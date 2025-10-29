@@ -17,6 +17,7 @@ import type * as discord from "../discord.js";
 import type * as importer from "../importer.js";
 import type * as init from "../init.js";
 import type * as mapper from "../mapper.js";
+import type * as perfectCats from "../perfectCats.js";
 import type * as previews from "../previews.js";
 import type * as rarities from "../rarities.js";
 import type * as seasons from "../seasons.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   importer: typeof importer;
   init: typeof init;
   mapper: typeof mapper;
+  perfectCats: typeof perfectCats;
   previews: typeof previews;
   rarities: typeof rarities;
   seasons: typeof seasons;
