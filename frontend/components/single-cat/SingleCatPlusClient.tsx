@@ -28,7 +28,6 @@ import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import type { BatchRenderResponse } from "@/lib/cat-v3/types";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore -- legacy JS module without types.
 import { encodeCatShare } from "@/legacy/core/catShare";
 

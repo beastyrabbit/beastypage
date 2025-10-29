@@ -157,7 +157,7 @@ export function OptionPreview({
       return JSON.stringify(baseParams);
     } catch (error) {
       console.warn("Unable to serialize base params for preview cache", error);
-      return `${Date.now()}`;
+      return "invalid-base-params";
     }
   }, [baseParams]);
 
@@ -208,17 +208,22 @@ export function OptionPreview({
 
   useEffect(() => {
     if (!step || !generator || !ready || !optionCacheKey || !chunkCacheKey) {
-      setLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setSrc(null);
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
     if (OPTION_PREVIEW_CACHE.has(optionCacheKey)) {
-      setSrc(OPTION_PREVIEW_CACHE.get(optionCacheKey) ?? null);
-      setLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setSrc(OPTION_PREVIEW_CACHE.get(optionCacheKey) ?? null);
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
-    setLoading(true);
+    const startTimer = window.setTimeout(() => setLoading(true), 0);
     const requestId = ++requestRef.current;
 
     let chunkPromise = CHUNK_PROMISE_CACHE.get(chunkCacheKey);
@@ -256,6 +261,7 @@ export function OptionPreview({
       });
 
     return () => {
+      window.clearTimeout(startTimer);
       requestRef.current += 1;
     };
   }, [

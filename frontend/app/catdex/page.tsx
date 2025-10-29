@@ -58,7 +58,6 @@ type SubmitModalProps = {
 };
 
 type MassUploadModalProps = {
-  open: boolean;
   onClose: () => void;
   seasons: SeasonPayload[];
   rarities: RarityPayload[];
@@ -443,13 +442,14 @@ export default function CatdexPage() {
         onSubmit={createCatRecord}
       />
 
-      <MassUploadModal
-        open={massUploadOpen}
-        onClose={() => setMassUploadOpen(false)}
-        seasons={seasons}
-        rarities={rarities}
-        onSubmit={createCatRecord}
-      />
+      {massUploadOpen ? (
+        <MassUploadModal
+          onClose={() => setMassUploadOpen(false)}
+          seasons={seasons}
+          rarities={rarities}
+          onSubmit={createCatRecord}
+        />
+      ) : null}
 
       <CreditBanner />
 
@@ -924,7 +924,7 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
   );
 }
 
-function MassUploadModal({ open, onClose, seasons, rarities, onSubmit }: MassUploadModalProps) {
+function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadModalProps) {
   const [owner, setOwner] = useState("");
   const [entries, setEntries] = useState<MassUploadEntry[]>([]);
   const [status, setStatus] = useState<string | null>(null);
@@ -932,22 +932,6 @@ function MassUploadModal({ open, onClose, seasons, rarities, onSubmit }: MassUpl
   const defaultInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (open) {
-      setStatus(null);
-      setBusy(false);
-      return;
-    }
-    setOwner("");
-    setStatus(null);
-    setBusy(false);
-    setEntries((prev) => {
-      prev.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
-      return [];
-    });
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !busy) {
         event.preventDefault();
@@ -956,9 +940,13 @@ function MassUploadModal({ open, onClose, seasons, rarities, onSubmit }: MassUpl
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, busy, onClose]);
+  }, [busy, onClose]);
 
-  if (!open) return null;
+  useEffect(() => {
+    return () => {
+      entries.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
+    };
+  }, [entries]);
 
   const seasonOptions = seasons.map((season) => ({ id: season.id, label: season.season_name }));
   const rarityOptions = rarities.map((rarity) => ({ id: rarity.id, label: rarity.rarity_name }));
