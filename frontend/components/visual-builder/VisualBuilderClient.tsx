@@ -150,8 +150,11 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     return true;
   }, [lockedShareSlug]);
 
-  const markShareDirty = useCallback(() => {
-    unlockShare();
+  const markShareDirty = useCallback((shouldUnlock = true) => {
+    if (shouldUnlock) {
+      unlockShare();
+      setStatusMessage(null);
+    }
     setShareStale(true);
   }, [unlockShare]);
 
@@ -299,7 +302,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     });
 
     if (shareInfo) {
-      markShareDirty();
+      markShareDirty(false);
     }
   }, [markShareDirty, normalizedOptions, shareInfo]);
 
