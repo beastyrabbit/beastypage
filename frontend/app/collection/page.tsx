@@ -177,16 +177,9 @@ export default function CollectionPage() {
               <div className="flex flex-col gap-4">
                 <div>
                   <h2 className="text-2xl font-semibold capitalize">{activeEntry.artist_name}</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {activeEntry.animal ?? "Unknown subject"}
-                  </p>
                 </div>
                 <dl className="grid gap-2 text-xs">
-                  <InfoRow label="Updated" value={formatDate(activeEntry.updated ?? activeEntry.created)} />
-                  <InfoRow
-                    label="Has full quality"
-                    value={absoluteUrl(activeEntry.full_img) ? "Yes" : "Preview only"}
-                  />
+                  <InfoRow label="Animal" value={activeEntry.animal ?? "Unknown"} />
                   {activeEntry.link && (
                     <InfoRow label="Source" value={normalizeLink(activeEntry.link)} isLink />
                   )}
