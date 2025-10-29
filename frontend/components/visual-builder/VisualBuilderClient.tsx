@@ -354,13 +354,9 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     if (mode === "off") {
       return mapperInstance.getColours();
     }
-    const extras = mapperInstance.getExperimentalColoursByMode?.(mode);
-    if (extras && extras.length) {
+    const extras = mapperInstance.getExperimentalColoursByMode?.(mode) ?? [];
+    if (extras.length > 0) {
       return extras;
-    }
-    const fallback = mapperInstance.getColourOptions(mode);
-    if (fallback && fallback.length) {
-      return fallback;
     }
     return mapperInstance.getColours();
   }, []);
@@ -1803,14 +1799,14 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         combined.tortieColour = primary?.colour;
         combined.tortieMask = primary?.mask;
       }
-      const basePaletteRaw = typeof random?.basePalette === "string" ? random.basePalette.toLowerCase() : undefined;
-      const nextPaletteMode = basePaletteRaw && PALETTE_CONTROLS.some((entry) => entry.id === basePaletteRaw)
-        ? (basePaletteRaw as PaletteMode)
-        : "off";
-      const tortiePaletteRaw = typeof random?.tortiePalette === "string" ? random.tortiePalette.toLowerCase() : undefined;
-      const nextTortiePaletteMode = tortiePaletteRaw && PALETTE_CONTROLS.some((entry) => entry.id === tortiePaletteRaw)
-        ? (tortiePaletteRaw as PaletteMode)
-        : "off";
+      const determinePaletteMode = (candidate: unknown) => {
+        if (typeof candidate !== "string") return "off";
+        const lower = candidate.toLowerCase() as PaletteMode;
+        return PALETTE_CONTROLS.some((entry) => entry.id === lower) ? lower : "off";
+      };
+
+      const nextPaletteMode = determinePaletteMode(random?.basePalette ?? random?.experimentalColourMode);
+      const nextTortiePaletteMode = determinePaletteMode(random?.tortiePalette);
       setExperimentalColourMode(nextPaletteMode);
       setTortiePaletteMode(nextTortiePaletteMode);
       initialSpriteNumberRef.current = combined.spriteNumber ?? null;
