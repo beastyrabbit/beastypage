@@ -70,6 +70,7 @@ const PALETTE_CONTROLS: { id: PaletteMode; label: string }[] = [
 
 const MAX_TORTIE_LAYERS = 6;
 const DISPLAY_CANVAS_SIZE = 540;
+const LEGACY_SPRITE_RANGE = Array.from({ length: 21 }, (_, index) => index);
 
 type SectionId =
   | "pose"
@@ -136,7 +137,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   const deferredParams = useDeferredValue(params);
   const normalizedOptions = useMemo(() => {
     if (!options) return null;
-    const sprites = new Set(options.sprites);
+    const sprites = new Set<number>([...options.sprites, ...LEGACY_SPRITE_RANGE]);
     if (initialSpriteNumber !== null) {
       sprites.add(initialSpriteNumber);
     }
