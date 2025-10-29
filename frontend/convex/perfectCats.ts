@@ -80,7 +80,7 @@ export const registerCats = mutation({
         appearances: 0,
         createdAt: now,
         updatedAt: now,
-        lastShownAt: undefined,
+        lastShownAt: 0,
       });
       const inserted = await db.get(insertedId);
       if (inserted) {
@@ -244,7 +244,7 @@ export const submitVote = mutation({
       catAId: args.winnerId,
       catBId: args.loserId,
       winnerId: args.winnerId,
-      clientId: args.clientId ?? undefined,
+      clientId: args.clientId ?? "",
       createdAt: now,
     });
 
