@@ -1803,11 +1803,13 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         combined.tortieColour = primary?.colour;
         combined.tortieMask = primary?.mask;
       }
-      const nextPaletteMode = typeof random?.basePalette === "string" && PALETTE_CONTROLS.some((entry) => entry.id === random.basePalette)
-        ? (random.basePalette as PaletteMode)
+      const basePaletteRaw = typeof random?.basePalette === "string" ? random.basePalette.toLowerCase() : undefined;
+      const nextPaletteMode = basePaletteRaw && PALETTE_CONTROLS.some((entry) => entry.id === basePaletteRaw)
+        ? (basePaletteRaw as PaletteMode)
         : "off";
-      const nextTortiePaletteMode = typeof random?.tortiePalette === "string" && PALETTE_CONTROLS.some((entry) => entry.id === random.tortiePalette)
-        ? (random.tortiePalette as PaletteMode)
+      const tortiePaletteRaw = typeof random?.tortiePalette === "string" ? random.tortiePalette.toLowerCase() : undefined;
+      const nextTortiePaletteMode = tortiePaletteRaw && PALETTE_CONTROLS.some((entry) => entry.id === tortiePaletteRaw)
+        ? (tortiePaletteRaw as PaletteMode)
         : "off";
       setExperimentalColourMode(nextPaletteMode);
       setTortiePaletteMode(nextTortiePaletteMode);
