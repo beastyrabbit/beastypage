@@ -31,6 +31,11 @@ function coerceString(value: unknown, fallback: string | undefined = undefined):
   return trimmed;
 }
 
+function coerceColour(value: unknown, fallback: string | undefined = undefined): string | undefined {
+  const normalised = coerceString(value, fallback);
+  return normalised ? normalised.toUpperCase() : fallback;
+}
+
 function coerceNumber(value: unknown, fallback: number): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -100,10 +105,10 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
       DEFAULT_PARAMS.spriteNumber
     ),
     peltName: coerceString(rawParams["peltName"], DEFAULT_PARAMS.peltName) ?? DEFAULT_PARAMS.peltName,
-    colour: coerceString(rawParams["colour"] ?? rawParams["color"], DEFAULT_PARAMS.colour) ?? DEFAULT_PARAMS.colour,
-    eyeColour: coerceString(rawParams["eyeColour"] ?? rawParams["eye_color"], DEFAULT_PARAMS.eyeColour) ?? DEFAULT_PARAMS.eyeColour,
+    colour: coerceColour(rawParams["colour"] ?? rawParams["color"], DEFAULT_PARAMS.colour) ?? DEFAULT_PARAMS.colour,
+    eyeColour: coerceColour(rawParams["eyeColour"] ?? rawParams["eye_color"], DEFAULT_PARAMS.eyeColour) ?? DEFAULT_PARAMS.eyeColour,
     eyeColour2: sanitizeOption(rawParams["eyeColour2"] ?? rawParams["eye_color2"] ?? rawParams["eyeColourSecondary"]),
-    skinColour: coerceString(rawParams["skinColour"] ?? rawParams["skin_color"], DEFAULT_PARAMS.skinColour) ?? DEFAULT_PARAMS.skinColour,
+    skinColour: coerceColour(rawParams["skinColour"] ?? rawParams["skin_color"], DEFAULT_PARAMS.skinColour) ?? DEFAULT_PARAMS.skinColour,
     whitePatches: sanitizeOption(rawParams["whitePatches"] ?? rawParams["white_patches"]),
     whitePatchesTint:
       coerceString(rawParams["whitePatchesTint"] ?? rawParams["white_patches_tint"], DEFAULT_PARAMS.whitePatchesTint) ??
@@ -141,8 +146,8 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
     params.tint = "none";
   }
 
-  const palette = coerceString(catData["basePalette"]);
-  const tortiePalette = coerceString(catData["tortiePalette"]);
+  const palette = coerceString(catData["basePalette"])?.toLowerCase();
+  const tortiePalette = coerceString(catData["tortiePalette"])?.toLowerCase();
   const paletteModes: PaletteMode[] = ["off", "mood", "bold", "darker", "blackout"];
 
   const slugValue = record.slug ?? record.shareToken ?? null;
