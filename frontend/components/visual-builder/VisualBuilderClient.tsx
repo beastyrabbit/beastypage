@@ -118,6 +118,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [shareInfo, setShareInfo] = useState<{ slug: string; url: string } | null>(null);
   const [shareStale, setShareStale] = useState(false);
+  const [lockedShareSlug, setLockedShareSlug] = useState<string | null>(null);
   const [catName, setCatName] = useState("");
   const [creatorName, setCreatorName] = useState("");
   const [randomizing, setRandomizing] = useState(false);
@@ -133,6 +134,28 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
 
   const { mapper, options, loading: loadingOptions, error: optionsError } = useSpriteMapperOptions();
   const { generator, ready: rendererReady, error: rendererError } = useCatGenerator();
+
+  const unlockShare = useCallback(() => {
+    if (!lockedShareSlug) return false;
+    setLockedShareSlug(null);
+    setShareInfo(null);
+    setCatName("");
+    setCreatorName("");
+    if (typeof window !== "undefined") {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete("slug");
+      const nextRelative = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
+      window.history.replaceState(null, "", nextRelative);
+    }
+    return true;
+  }, [lockedShareSlug]);
+
+  const markShareDirty = useCallback(() => {
+    unlockShare();
+    setShareStale(true);
+  }, [unlockShare]);
+
+  const isShareLocked = lockedShareSlug !== null;
 
   const deferredParams = useDeferredValue(params);
   const normalizedOptions = useMemo(() => {
@@ -211,6 +234,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     setInitialSpriteNumber(synced.spriteNumber ?? null);
     setCatName(initialCat.catName ?? "");
     setCreatorName(initialCat.creatorName ?? "");
+    setLockedShareSlug(initialCat.slug ?? null);
     setShareInfo((prev) => {
       if (initialCat.shareUrl) {
         const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -275,9 +299,9 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     });
 
     if (shareInfo) {
-      setShareStale(true);
+      markShareDirty();
     }
-  }, [normalizedOptions, shareInfo]);
+  }, [markShareDirty, normalizedOptions, shareInfo]);
 
   useEffect(() => {
     const generatorInstance = generatorRef.current;
@@ -313,13 +337,13 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   }, [params, rendererReady]);
 
   const updateParams = useCallback((mutator: (draft: CatParams) => void) => {
-    setShareStale(true);
+    markShareDirty();
     setParams((prev) => {
       const draft = cloneParams(prev);
       mutator(draft);
       return draft;
     });
-  }, []);
+  }, [markShareDirty]);
 
   const getPaletteForMode = useCallback((mode: PaletteMode) => {
     const mapperInstance = spriteMapperRef.current;
@@ -382,7 +406,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
 
   const applyTortieLayers = useCallback(
     (layers: TortieLayer[], enabled: boolean) => {
-      setShareStale(true);
+      markShareDirty();
       setTortieLayers(layers);
       setExpandedTortieSub((previous) => {
         if (!enabled || layers.length === 0) return {};
@@ -402,7 +426,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         return ensureTortieSync(layers, draft);
       });
     },
-    [ensureTortieSync]
+    [ensureTortieSync, markShareDirty]
   );
 
   const requestPreview = useCallback(
@@ -568,13 +592,13 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
 
   const handleBasePaletteChange = useCallback((value: PaletteMode) => {
     setExperimentalColourMode(value);
-    setShareStale(true);
-  }, []);
+    markShareDirty();
+  }, [markShareDirty]);
 
   const handleTortiePaletteChange = useCallback((value: PaletteMode) => {
     setTortiePaletteMode(value);
-    setShareStale(true);
-  }, []);
+    markShareDirty();
+  }, [markShareDirty]);
 
   const renderColourSection = () => (
     <section id="colour" className="scroll-mt-40 space-y-4 rounded-3xl border border-slate-800 bg-slate-950/60 p-6">
@@ -663,15 +687,15 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       if (!enabled) {
         applyTortieLayers([], false);
         setExpandedLayer(null);
-        setShareStale(true);
+        markShareDirty();
         return;
       }
       const firstLayer = tortieLayers[0] ?? computeDefaultTortieLayer(0, params);
       applyTortieLayers([firstLayer], true);
       setExpandedLayer(0);
-      setShareStale(true);
+      markShareDirty();
     },
-    [applyTortieLayers, computeDefaultTortieLayer, params, tortieLayers]
+    [applyTortieLayers, computeDefaultTortieLayer, markShareDirty, params, tortieLayers]
   );
 
   const handleAddLayer = useCallback(() => {
@@ -679,8 +703,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     const next = [...tortieLayers, computeDefaultTortieLayer(tortieLayers.length, params)];
     applyTortieLayers(next, true);
     setExpandedLayer(next.length - 1);
-    setShareStale(true);
-  }, [applyTortieLayers, computeDefaultTortieLayer, params, tortieLayers]);
+    markShareDirty();
+  }, [applyTortieLayers, computeDefaultTortieLayer, markShareDirty, params, tortieLayers]);
 
   const handleRemoveLayer = useCallback(
     (index: number) => {
@@ -696,9 +720,9 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         if (prev > index) return prev - 1;
         return prev;
       });
-      setShareStale(true);
+      markShareDirty();
     },
-    [applyTortieLayers, tortieLayers]
+    [applyTortieLayers, markShareDirty, tortieLayers]
   );
 
   const handleUpdateLayer = useCallback(
@@ -1378,9 +1402,9 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         draft.accessories = Array.from(set);
         draft.accessory = draft.accessories[0] ?? undefined;
       });
-      setShareStale(true);
+      markShareDirty();
     },
-    [updateParams]
+    [markShareDirty, updateParams]
   );
 
   const toggleScar = useCallback(
@@ -1395,9 +1419,9 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         draft.scars = Array.from(set);
         draft.scar = draft.scars[0] ?? undefined;
       });
-      setShareStale(true);
+      markShareDirty();
     },
-    [updateParams]
+    [markShareDirty, updateParams]
   );
 
   const accessoriesSection = useMemo(() => {
@@ -1700,6 +1724,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       const url = origin ? `${origin}/visual-builder?slug=${encodeURIComponent(slug)}` : `/visual-builder?slug=${slug}`;
       setShareInfo({ slug, url });
       setShareStale(false);
+      setLockedShareSlug(slug);
       await ensureCopied(url);
       setStatusMessage("Saved to history!");
       if (typeof window !== "undefined") {
@@ -1724,6 +1749,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   }, [previewUrl]);
 
   const handleReset = useCallback(() => {
+    unlockShare();
     setShareInfo(null);
     setStatusMessage(null);
     setParams(DEFAULT_PARAMS);
@@ -1741,8 +1767,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     setExpandedScarGroup(null);
     setExpandedSkinGroup(null);
     previewCacheRef.current.clear();
-    setShareStale(true);
-  }, []);
+    markShareDirty();
+  }, [markShareDirty, unlockShare]);
 
   const handleRandomize = useCallback(async () => {
     const generatorInstance = generatorRef.current;
@@ -1772,16 +1798,17 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       }
       setParams(combined);
       setTortieLayers(tortie);
+      unlockShare();
       setShareInfo(null);
       setStatusMessage("Random cat generated!");
-      setShareStale(true);
+      markShareDirty();
     } catch (error) {
       console.error("Random generation failed", error);
       window.alert("Failed to roll a random cat.");
     } finally {
       setRandomizing(false);
     }
-  }, [experimentalColourMode]);
+  }, [experimentalColourMode, markShareDirty, unlockShare]);
 
   const builderBaseUrl = useMemo(() => {
     if (!generator?.buildCatURL) return null;
@@ -1851,11 +1878,12 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 <label className="block text-xs font-semibold uppercase tracking-wide text-neutral-400">Cat name</label>
                 <input
                   value={catName}
+                  disabled={isShareLocked}
                   onChange={(event) => {
                     const value = event.target.value;
                     startMetaTransition(() => {
                       setCatName(value);
-                      setShareStale(true);
+                      markShareDirty();
                       setStatusMessage(null);
                     });
                   }}
@@ -1867,11 +1895,12 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 <label className="block text-xs font-semibold uppercase tracking-wide text-neutral-400">Creator</label>
                 <input
                   value={creatorName}
+                  disabled={isShareLocked}
                   onChange={(event) => {
                     const value = event.target.value;
                     startMetaTransition(() => {
                       setCreatorName(value);
-                      setShareStale(true);
+                      markShareDirty();
                       setStatusMessage(null);
                     });
                   }}
@@ -1880,6 +1909,11 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 />
               </div>
             </form>
+            {isShareLocked ? (
+              <p className="mt-3 text-xs text-neutral-400">
+                Shared cats are read-only. Change any trait to unlock editing and create a new link.
+              </p>
+            ) : null}
             <div className="mt-6 grid gap-3">
               <button
                 type="button"
