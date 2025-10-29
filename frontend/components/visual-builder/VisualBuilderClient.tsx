@@ -359,14 +359,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   const getPaletteForMode = useCallback((mode: PaletteMode) => {
     const mapperInstance = spriteMapperRef.current;
     if (!mapperInstance) return [];
-    if (mode === "off") {
-      return mapperInstance.getColours();
-    }
-    const extras = mapperInstance.getExperimentalColoursByMode?.(mode) ?? [];
-    if (extras.length > 0) {
-      return extras;
-    }
-    return mapperInstance.getColours();
+    return mapperInstance.getColourOptions?.(mode) ?? mapperInstance.getColours();
   }, []);
 
   const paletteColours = useMemo(() => {
