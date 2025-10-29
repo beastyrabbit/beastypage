@@ -192,5 +192,30 @@ export default defineSchema({
     usedAt: v.optional(v.number())
   })
     .index("byToken", ["token"])
-    .index("byExpiresAt", ["expiresAt"])
+    .index("byExpiresAt", ["expiresAt"]),
+
+  perfect_cats: defineTable({
+    hash: v.string(),
+    params: v.any(),
+    rating: v.number(),
+    wins: v.number(),
+    losses: v.number(),
+    appearances: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    lastShownAt: v.optional(v.number())
+  })
+    .index("byHash", ["hash"])
+    .index("byRating", ["rating", "createdAt"])
+    .index("byUpdated", ["updatedAt"]),
+
+  perfect_votes: defineTable({
+    catAId: v.id("perfect_cats"),
+    catBId: v.id("perfect_cats"),
+    winnerId: v.id("perfect_cats"),
+    clientId: v.optional(v.string()),
+    createdAt: v.number()
+  })
+    .index("byClient", ["clientId", "createdAt"])
+    .index("byCats", ["catAId", "catBId", "createdAt"])
 });
