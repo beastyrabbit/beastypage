@@ -83,12 +83,26 @@ pm2 status
 
 ### Using the Ecosystem File
 
-If you prefer to describe everything in PM2’s ecosystem file, duplicate the existing `beastypage-frontend` entry inside `ecosystem.config.cjs` and adjust `name`, `env.PORT`, and `env.NEXT_ENTRY_REDIRECT` for each variation. After editing, launch with:
+The repository already includes `ecosystem.config.cjs` with five frontend entries (hub, gatcha, stream, collection, personal) plus the renderer service. To launch everything in one shot, run:
 
 ```bash
 pm2 start ecosystem.config.cjs
 pm2 save
 ```
+
+Each frontend entry sets its own `PORT` and `NEXT_ENTRY_REDIRECT`, so Pangolin can map subdomains directly to the exposed ports without extra flags. The renderer service (`beastypage-renderer`) is started alongside them; remove it from the ecosystem file if you host that component elsewhere.
+
+### PM2 Startup (Reboot Persistence)
+
+To have PM2 revive the processes after system restarts:
+
+```bash
+pm2 startup              # prints a command tailored to your distro
+# copy & run the printed command with sudo
+pm2 save                 # store the current process list
+```
+
+Whenever you change the PM2 lineup (add/remove apps), rerun `pm2 save` so the launch script stays current.
 
 ### Alternative: Single Process with Host Map
 
@@ -109,20 +123,19 @@ Requests to `/` will redirect according to the hostname value that Pangolin forw
 
 ## Updating Production After Pulls
 
-1. Pull the latest code and rebuild:
+1. Use the helper script (`scripts/update-prod.sh`) to automate pull/install/build/reload. Copy it once to the parent directory (next to the `beastypage/` folder) and run it from there:
    ```bash
-   git pull
-   cd frontend
-   bun install
-   bun run build
+   cp scripts/update-prod.sh ../update-beastypage.sh
+   chmod +x ../update-beastypage.sh
+   ../update-beastypage.sh
    ```
+   The script will:
+   - `git fetch && git pull --ff-only`
+   - `bun install` and `bun run build`
+   - Reload running PM2 apps (or start them from `ecosystem.config.cjs` if missing)
+   - Copy the latest version of itself back to `../update-beastypage.sh` after each run
 
-2. Reload the PM2 processes so they pick up the new build:
-   ```bash
-   pm2 reload beastypage-hub beastypage-gatcha beastypage-stream beastypage-collection beastypage-personal
-   # or pm2 reload all
-   pm2 save
-   ```
+2. If you prefer manual steps, run the commands above as separate operations and finish with `pm2 save`.
 
 ## Troubleshooting Tips
 
