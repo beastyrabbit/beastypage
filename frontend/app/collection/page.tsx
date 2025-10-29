@@ -114,7 +114,12 @@ export default function CollectionPage() {
                 onClick={() => setActiveEntry(entry)}
               >
                 <div className="relative aspect-video overflow-hidden bg-muted">
-                  <ProgressiveImage lowSrc={blur} highSrc={preview} alt={entry.animal ?? "Artwork"} />
+                  <ProgressiveImage
+                    lowSrc={blur}
+                    highSrc={preview}
+                    alt={entry.animal ?? "Artwork"}
+                    imgStyle={{ objectPosition: `${entry.focusX}% ${entry.focusY}%` }}
+                  />
                   <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-1 text-xs font-medium text-white">
                     {entry.animal ?? "Unknown"}
                   </span>
@@ -167,6 +172,7 @@ export default function CollectionPage() {
                 highSrc={absoluteUrl(activeEntry.full_img) ?? absoluteUrl(activeEntry.preview_img)}
                 alt={activeEntry.animal ?? "Artwork"}
                 className="w-full overflow-hidden rounded-2xl bg-muted"
+                imgStyle={{ objectPosition: `${activeEntry.focusX}% ${activeEntry.focusY}%` }}
               />
               <div className="flex flex-col gap-4">
                 <div>
