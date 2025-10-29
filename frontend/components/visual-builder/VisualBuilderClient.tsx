@@ -1799,8 +1799,13 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         combined.tortieColour = primary?.colour;
         combined.tortieMask = primary?.mask;
       }
+      initialSpriteNumberRef.current = combined.spriteNumber ?? null;
+      setInitialSpriteNumber(combined.spriteNumber ?? null);
       setParams(combined);
       setTortieLayers(tortie);
+      setExpandedLayer(null);
+      setExpandedTortieSub({});
+      previewCacheRef.current.clear();
       unlockShare();
       setShareInfo(null);
       setStatusMessage("Random cat generated!");
