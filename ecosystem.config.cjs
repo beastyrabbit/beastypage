@@ -64,7 +64,7 @@ module.exports = {
       name: "beastypage-renderer",
       cwd: "./backend/renderer_service",
       script: "uv",
-      args: "run uvicorn renderer_service.app.main:app --host 0.0.0.0 --port ${UVICORN_PORT:-8001}",
+      args: "run uvicorn renderer_service.app.main:app --host 0.0.0.0 --port 8001",
       interpreter: "none"
     }
   ]
