@@ -1783,7 +1783,11 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       setRandomizing(true);
       const random = await generatorInstance.generateRandomParams({
         ignoreForbiddenSprites: true,
-        experimentalColourMode: experimentalColourMode === "off" ? undefined : experimentalColourMode,
+        accessoryRange: { min: 0, max: MAX_TORTIE_LAYERS },
+        scarRange: { min: 0, max: MAX_TORTIE_LAYERS },
+        tortieRange: { min: 0, max: MAX_TORTIE_LAYERS },
+        experimentalColourMode: "any",
+        tortiePaletteMode: "any",
       } as Record<string, unknown>);
       const combined = { ...DEFAULT_PARAMS, ...random } as CatParams;
       combined.accessories = Array.isArray(random?.accessories) ? (random?.accessories as string[]) : [];
@@ -1816,7 +1820,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     } finally {
       setRandomizing(false);
     }
-  }, [experimentalColourMode, markShareDirty, unlockShare]);
+  }, [markShareDirty, unlockShare]);
 
   const builderBaseUrl = useMemo(() => {
     if (!generator?.buildCatURL) return null;
