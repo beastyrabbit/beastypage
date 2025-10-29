@@ -7,9 +7,10 @@ import type { Id } from "@/convex/_generated/dataModel";
 import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { renderCatV3 } from "@/lib/cat-v3/api";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
-import { Loader2, Trophy, RefreshCcw } from "lucide-react";
+import { Loader2, Trophy } from "lucide-react";
 
 const PALETTE_MODES = ["off", "mood", "bold", "darker", "blackout"] as const;
+const NEW_CAT_PROBABILITY = 0.4;
 
 function randomInt(maxInclusive: number): number {
   return Math.floor(Math.random() * (maxInclusive + 1));
@@ -217,20 +218,23 @@ export default function PerfectCatFinderPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = (await requestMatchup({ clientId })) as unknown as MatchupResponse;
+      let response = (await requestMatchup({ clientId })) as unknown as MatchupResponse;
+      let seeded = false;
+
       if (response.needsSeed > 0 && ready && generator) {
-        await seedCats(response.needsSeed + 2);
-        const retry = (await requestMatchup({ clientId })) as unknown as MatchupResponse;
-        if (retry.cats.length >= 2) {
-          const normalized = retry.cats.slice(0, 2).map((cat) => ({
-            ...cat,
-            params: cat.params as CatRenderParams,
-          }));
-          setMatchup(normalized);
-          setPoolSize(retry.totalCats);
-          normalized.forEach((cat) => void ensurePreview(cat));
-        }
-      } else if (response.cats.length >= 2) {
+        const extra = Math.max(2, Math.ceil(response.needsSeed * 0.5));
+        await seedCats(response.needsSeed + extra);
+        seeded = true;
+      } else if (ready && generator && Math.random() < NEW_CAT_PROBABILITY) {
+        await seedCats(1 + Math.floor(Math.random() * 2));
+        seeded = true;
+      }
+
+      if (seeded) {
+        response = (await requestMatchup({ clientId })) as unknown as MatchupResponse;
+      }
+
+      if (response.cats.length >= 2) {
         const normalized = response.cats.slice(0, 2).map((cat) => ({
           ...cat,
           params: cat.params as CatRenderParams,
@@ -238,9 +242,6 @@ export default function PerfectCatFinderPage() {
         setMatchup(normalized);
         setPoolSize(response.totalCats);
         normalized.forEach((cat) => void ensurePreview(cat));
-        if (ready && generator && Math.random() < 0.15) {
-          void seedCats(1);
-        }
       } else {
         setMatchup([]);
         setPoolSize(response.totalCats);
@@ -285,28 +286,19 @@ export default function PerfectCatFinderPage() {
 
   const leaderboardEntries: LeaderboardEntry[] = (leaderboard as LeaderboardEntry[] | undefined) ?? [];
 
+  useEffect(() => {
+    leaderboardEntries.forEach((entry) => void ensurePreview(entry));
+  }, [leaderboardEntries, ensurePreview]);
+
   const isReady = useMemo(() => matchup.length === 2 && !loading, [matchup.length, loading]);
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-16">
-      <section className="theme-hero theme-gatcha px-8 py-12 text-balance">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-12">
+      <section className="theme-hero theme-gatcha px-8 py-10 text-balance">
         <div className="section-eyebrow">Perfect Cat Finder</div>
-        <h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl md:text-6xl">
-          Pick between two cats to find the community favourite.
+        <h1 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl md:text-5xl">
+          Vote between two cats. Help crown the favourite.
         </h1>
-        <p className="mt-6 max-w-3xl text-lg text-muted-foreground sm:text-xl">
-          Every vote improves the shared leaderboard. Cats are generated across all colour palettes, tortie layers, scars, and accessories. The more everyone plays, the smarter the rankings become.
-        </p>
-        <div className="mt-6 inline-flex items-center gap-3 text-sm text-muted-foreground">
-          <span>Pool size: {poolSize}</span>
-          <button
-            type="button"
-            onClick={() => loadMatchup()}
-            className="inline-flex items-center gap-2 rounded-full border border-border/50 px-3 py-1 text-xs font-semibold text-foreground transition hover:bg-foreground hover:text-background"
-          >
-            <RefreshCcw className="size-3" /> New matchup
-          </button>
-        </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
@@ -329,18 +321,21 @@ export default function PerfectCatFinderPage() {
       </section>
 
       <section className="glass-card space-y-6 rounded-3xl border border-border/60 bg-background/70 px-8 py-10">
-        <div className="flex items-center gap-2 text-primary">
-          <Trophy className="size-5" />
-          <h2 className="text-2xl font-semibold text-foreground">Community leaderboard</h2>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-primary">
+            <Trophy className="size-5" />
+            <h2 className="text-2xl font-semibold text-foreground">Community leaderboard</h2>
+          </div>
+          <span className="inline-flex items-center gap-2 rounded-full border border-border/40 px-3 py-1 text-xs font-semibold text-muted-foreground">
+            Pool size {poolSize}
+          </span>
         </div>
-        <p className="text-sm text-muted-foreground">
-          These cats currently hold the highest Elo ratings across all votes. Keep playing to reshape the rankings.
-        </p>
         <div className="overflow-hidden rounded-2xl border border-border/40">
           <table className="min-w-full table-auto text-sm">
             <thead className="bg-background/80 text-xs uppercase tracking-wide text-muted-foreground/70">
               <tr>
                 <th className="px-4 py-3 text-left">#</th>
+                <th className="px-4 py-3 text-left">Sprite</th>
                 <th className="px-4 py-3 text-left">Rating</th>
                 <th className="px-4 py-3 text-left">Record</th>
                 <th className="px-4 py-3 text-left">Votes</th>
@@ -349,19 +344,39 @@ export default function PerfectCatFinderPage() {
             <tbody>
               {leaderboardEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-sm text-muted-foreground/70">
+                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground/70">
                     No votes yet — be the first to crown a favourite.
                   </td>
                 </tr>
               ) : (
-                leaderboardEntries.map((entry, index) => (
-                  <tr key={entry.id as unknown as string} className="border-t border-border/30">
-                    <td className="px-4 py-3 text-muted-foreground/70">{index + 1}</td>
-                    <td className="px-4 py-3 font-semibold text-foreground">{formatRating(entry.rating)}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{entry.wins} – {entry.losses}</td>
-                    <td className="px-4 py-3 text-muted-foreground/70">{entry.appearances}</td>
-                  </tr>
-                ))
+                leaderboardEntries.map((entry, index) => {
+                  const preview = getPreview(entry);
+                  return (
+                    <tr key={String(entry.id)} className="border-t border-border/30">
+                      <td className="px-4 py-3 text-muted-foreground/70">{index + 1}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-border/50 bg-background/80 p-1">
+                          {preview.loading ? (
+                            <Loader2 className="size-4 animate-spin text-primary" />
+                          ) : preview.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={preview.url}
+                              alt="Cat preview"
+                              className="h-full w-full object-contain"
+                              style={{ imageRendering: "pixelated" }}
+                            />
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">No preview</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-foreground">{formatRating(entry.rating)}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{entry.wins} – {entry.losses}</td>
+                      <td className="px-4 py-3 text-muted-foreground/70">{entry.appearances}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
