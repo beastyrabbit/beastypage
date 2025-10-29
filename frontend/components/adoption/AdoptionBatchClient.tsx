@@ -126,7 +126,7 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
     if (!record?.slug) return null;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     return origin ? `${origin}/adoption/${record.slug}` : `/adoption/${record.slug}`;
-  }, [record?.slug]);
+  }, [record]);
 
   const formattedDate = formatTimestamp(record?.created);
   const batchTitle = record?.title?.trim() || "Adoption Batch";

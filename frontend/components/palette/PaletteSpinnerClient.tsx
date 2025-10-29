@@ -157,6 +157,7 @@ export function PaletteSpinnerClient() {
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<number | null>(null);
   const lastResultRef = useRef<{ hexes: string[]; formattedHexes: string[] } | null>(null);
+  const [hasCopyableResult, setHasCopyableResult] = useState(false);
 
   const paletteSize = useMemo(() => {
     const min = parseInt(sizeMin, 10);
@@ -210,6 +211,7 @@ export function PaletteSpinnerClient() {
         hexes: result.colors,
         formattedHexes: result.colors.map((hex) => formatColor(hex, transform)),
       };
+      setHasCopyableResult(true);
       setSpinCount((count) => count + 1);
       setError(null);
     } catch (err) {
@@ -232,10 +234,13 @@ export function PaletteSpinnerClient() {
       return;
     }
     if (spinCount >= targetSpins && targetSpins > 0) {
-      setIsSpinning(false);
-      return;
+      const timer = window.setTimeout(() => setIsSpinning(false), 0);
+      return () => window.clearTimeout(timer);
     }
     scheduleNext();
+    return () => {
+      stopTimer();
+    };
   }, [isSpinning, scheduleNext, spinCount, targetSpins, stopTimer]);
 
   const handleToggleMode = useCallback(
@@ -287,7 +292,7 @@ export function PaletteSpinnerClient() {
     }
   }, [transform]);
 
-  const isCopyEnabled = !isSpinning && !!lastResultRef.current;
+  const isCopyEnabled = !isSpinning && hasCopyableResult;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">

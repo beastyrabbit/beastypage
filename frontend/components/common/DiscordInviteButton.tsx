@@ -63,12 +63,11 @@ export function DiscordInviteButton({ className }: { className?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [attemptCount, setAttemptCount] = useState(0);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
-  const [nowMs, setNowMs] = useState(Date.now());
+  const [nowMs, setNowMs] = useState(0);
 
   const resetState = useCallback(() => {
     setStatus("idle");
@@ -161,7 +160,9 @@ export function DiscordInviteButton({ className }: { className?: string }) {
             const nextAttempt = attemptCount + 1;
             setAttemptCount(nextAttempt);
             const waitSeconds = getCooldownDuration(nextAttempt);
-            setCooldownUntil(Date.now() + waitSeconds * 1000);
+            const now = Date.now();
+            setCooldownUntil(now + waitSeconds * 1000);
+            setNowMs(now);
             setStatus("error");
             setInviteUrl(null);
             setChallenge(null);
@@ -198,7 +199,9 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         const nextAttempt = attemptCount + 1;
         setAttemptCount(nextAttempt);
         const waitSeconds = getCooldownDuration(nextAttempt);
-        setCooldownUntil(Date.now() + waitSeconds * 1000);
+        const now = Date.now();
+        setCooldownUntil(now + waitSeconds * 1000);
+        setNowMs(now);
         setStatus("error");
         setInviteUrl(null);
         setChallenge(null);
@@ -218,7 +221,10 @@ export function DiscordInviteButton({ className }: { className?: string }) {
     if (!open) {
       return;
     }
-    void requestChallenge();
+    const timer = window.setTimeout(() => {
+      void requestChallenge();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open, requestChallenge]);
 
   useEffect(() => {
@@ -262,24 +268,25 @@ export function DiscordInviteButton({ className }: { className?: string }) {
   }, [copied]);
 
   useEffect(() => {
-    setMounted(true);
+    const timer = window.setTimeout(() => setNowMs(Date.now()), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (!cooldownUntil) {
+    if (!cooldownUntil && !challenge) {
       return;
     }
     const tick = () => setNowMs(Date.now());
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
-  }, [cooldownUntil]);
+  }, [cooldownUntil, challenge]);
 
   const expiresLabel = useMemo(() => {
     if (!challenge) {
       return null;
     }
-    const remainingMs = challenge.expiresAt - Date.now();
+    const remainingMs = challenge.expiresAt - nowMs;
     if (remainingMs <= 0) {
       return "Challenge expired";
     }
@@ -287,7 +294,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
     return remainingMinutes > 1
       ? `Expires in about ${remainingMinutes} minutes`
       : "Expires in under a minute";
-  }, [challenge]);
+  }, [challenge, nowMs]);
 
   const cooldownActive = useMemo(() => {
     if (!cooldownUntil) return false;
@@ -474,7 +481,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         Join the Discord
       </button>
 
-      {mounted && open ? createPortal(overlay, document.body) : null}
+      {typeof document !== "undefined" && open ? createPortal(overlay, document.body) : null}
     </>
   );
 }

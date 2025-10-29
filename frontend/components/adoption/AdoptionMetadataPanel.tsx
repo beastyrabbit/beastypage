@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 export type AdoptionMetadata = {
@@ -17,17 +17,15 @@ export type AdoptionMetadataPanelProps = {
   canSave?: boolean;
 };
 
-export function AdoptionMetadataPanel({ savedValue, onSave, busy, error, message, canSave }: AdoptionMetadataPanelProps) {
-  const [title, setTitle] = useState(savedValue.title);
-  const [creator, setCreator] = useState(savedValue.creator);
+export function AdoptionMetadataPanel(props: AdoptionMetadataPanelProps) {
+  const { savedValue } = props;
+  const resetKey = `${savedValue.title}::${savedValue.creator}`;
+  return <AdoptionMetadataPanelInner key={resetKey} {...props} />;
+}
 
-  useEffect(() => {
-    setTitle(savedValue.title);
-  }, [savedValue.title]);
-
-  useEffect(() => {
-    setCreator(savedValue.creator);
-  }, [savedValue.creator]);
+function AdoptionMetadataPanelInner({ savedValue, onSave, busy, error, message, canSave }: AdoptionMetadataPanelProps) {
+  const [title, setTitle] = useState(() => savedValue.title);
+  const [creator, setCreator] = useState(() => savedValue.creator);
 
   const dirty = title !== savedValue.title || creator !== savedValue.creator;
   const showMessage = !dirty ? message : null;

@@ -93,7 +93,8 @@ export function ViewerClient() {
       existingFingerprint = generateViewerSessionId();
       storage.setItem(baseKey, existingFingerprint);
     }
-    setFingerprint(existingFingerprint);
+    const timer = window.setTimeout(() => setFingerprint(existingFingerprint), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -102,7 +103,8 @@ export function ViewerClient() {
     const key = viewerKey ? `${VIEWER_SESSION_PREFIX}:${viewerKey}` : VIEWER_SESSION_PREFIX;
     const existing = storage.getItem(key);
     if (existing) {
-      setViewerSession(existing);
+      const timer = window.setTimeout(() => setViewerSession(existing), 0);
+      return () => window.clearTimeout(timer);
     }
   }, [viewerKey]);
 
@@ -164,9 +166,9 @@ export function ViewerClient() {
   const participant = participantList[0] as ParticipantRecord | undefined;
 
   useEffect(() => {
-    if (participant?.display_name) {
-      setDisplayName(participant.display_name);
-    }
+    if (!participant?.display_name) return;
+    const timer = window.setTimeout(() => setDisplayName(participant.display_name), 0);
+    return () => window.clearTimeout(timer);
   }, [participant?.display_name]);
 
   const registerParticipant = useMutation(api.streamParticipants.create);
@@ -192,7 +194,7 @@ export function ViewerClient() {
 
   const stepState = useMemo(
     () => ({ params, history: Array.isArray(session?.step_history) ? session.step_history : [] }),
-    [params, session?.step_history]
+    [params, session]
   );
 
   const options: StepOption[] = useMemo(() => {
@@ -209,17 +211,16 @@ export function ViewerClient() {
   }, [votes]);
 
   const disabledOptions = useMemo(() => {
-    if (!session?.params || !currentStep) return new Set<string>();
-    const map = (session.params as StreamParams)._disabledOptions;
+    if (!params || !currentStep) return new Set<string>();
+    const map = params._disabledOptions;
     const list = map?.[currentStep.id] ?? [];
     return new Set(list);
-  }, [session?.params, currentStep]);
+  }, [params, currentStep]);
 
   const tieFilter = useMemo(() => {
-    const params = session?.params as StreamParams | undefined;
     const filter = params?._tieFilter;
     return Array.isArray(filter) && filter.length ? new Set(filter) : null;
-  }, [session?.params]);
+  }, [params]);
 
   const { displayOptions, activeTieFilter } = useMemo(() => {
     if (tieFilter && tieFilter.size) {
@@ -325,7 +326,8 @@ export function ViewerClient() {
   }, [displayOptions, optionSearch]);
 
   useEffect(() => {
-    setOptionSearch("");
+    const id = window.setTimeout(() => setOptionSearch(""), 0);
+    return () => window.clearTimeout(id);
   }, [currentStep?.id, session?.params?._votesOpen, session?.status]);
 
   const sessionParams = session?.params as StreamParams | undefined;
