@@ -59,15 +59,12 @@ function SingleCatPlusContent() {
 
 export default function SingleCatPlusPage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-14 px-6 py-16">
-      <section className="glass-card overflow-hidden px-8 py-10">
-        <div className="section-eyebrow">Single Cat Plus</div>
-        <h1 className="text-4xl font-semibold sm:text-5xl">
+    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
+      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">Single Cat Plus</p>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">
           Generate, preview, and export pixel cats in the React pipeline.
         </h1>
-        <p className="mt-4 max-w-3xl text-muted-foreground">
-          This is the first live port of the renderer. We&apos;re still adding layer controls, animations, and Convex-powered uploads, but you can already roll cats and export high-res PNGs.
-        </p>
       </section>
 
       <Suspense fallback={<div className="text-sm text-muted-foreground">Loading renderer…</div>}>

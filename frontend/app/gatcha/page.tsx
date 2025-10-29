@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Copy, ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
 import { useCallback } from "react";
 
 type LegacyCard = {
@@ -146,21 +146,11 @@ const CTA_LINKS = [
 ];
 
 export default function GatchaLanding() {
-  const handleCopy = useCallback(async (value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      window.alert("Link copied to clipboard.");
-    } catch (error) {
-      console.warn("Clipboard unavailable", error);
-      window.prompt("Copy this link", value);
-    }
-  }, []);
-
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-16">
-      <section className="theme-hero theme-gatcha px-8 py-12 text-balance">
-        <div className="section-eyebrow">Cat Gacha Platform</div>
-        <h1 className="mt-4 text-4xl font-semibold sm:text-5xl md:text-6xl">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
+      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">Cat Gacha Platform</p>
+        <h1 className="mt-4 text-4xl font-semibold text-white sm:text-5xl md:text-6xl">
           Gold-standard gatcha experience
         </h1>
         <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -248,23 +238,15 @@ export default function GatchaLanding() {
         <h2 className="text-base font-semibold text-foreground">Quick links</h2>
         <div className="flex flex-col gap-3 md:flex-row md:flex-wrap">
           {CTA_LINKS.map((cta) => (
-            <div key={cta.href} className="flex items-center gap-2">
-              <Link
-                href={cta.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-foreground hover:text-background"
-              >
-                {cta.label} <ExternalLink className="size-4" />
-              </Link>
-              <button
-                type="button"
-                onClick={() => handleCopy(cta.href)}
-                className="inline-flex items-center gap-1 rounded-full border border-border/60 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-              >
-                <Copy className="size-3" /> Copy
-              </button>
-            </div>
+            <Link
+              key={cta.href}
+              href={cta.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-foreground hover:text-background"
+            >
+              {cta.label} <ExternalLink className="size-4" />
+            </Link>
           ))}
         </div>
       </section>

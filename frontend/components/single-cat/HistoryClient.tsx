@@ -175,7 +175,14 @@ export function HistoryClient() {
         case "oldest":
           return (a.created ?? 0) - (b.created ?? 0);
         case "name":
-          return a.title.localeCompare(b.title);
+          {
+            const aEmpty = !a.title;
+            const bEmpty = !b.title;
+            if (aEmpty && bEmpty) return 0;
+            if (aEmpty) return 1;
+            if (bEmpty) return -1;
+            return a.title.localeCompare(b.title);
+          }
         case "newest":
         default:
           return (b.created ?? 0) - (a.created ?? 0);
@@ -193,13 +200,21 @@ export function HistoryClient() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-10 px-6 py-16">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold">Cat History</h1>
-        <p className="text-sm text-muted-foreground">Every saved cat and adoption preview rendered via the backend pipeline.</p>
-      </header>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
+      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">History</p>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Relive every cat you saved</h1>
+        <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-200/80">
+          <span className="rounded-full border border-amber-400/40 bg-amber-500/15 px-3 py-1 font-semibold text-amber-200">
+            {sortedItems.length.toLocaleString()} saved cats
+          </span>
+          <span className="rounded-full border border-amber-400/30 bg-slate-950/60 px-3 py-1">
+            {adoptionItems.length.toLocaleString()} adoption batches
+          </span>
+        </div>
+      </section>
 
-      <div className="flex flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+      <section className="flex flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <label className="flex w-full flex-col gap-1 text-xs uppercase tracking-wide text-muted-foreground/70 md:max-w-md">
             <span className="flex items-center gap-2 text-[11px]">
@@ -251,9 +266,9 @@ export function HistoryClient() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         {sortedItems.map((item) => (
           <HistoryCard
             key={item.id}
@@ -261,7 +276,7 @@ export function HistoryClient() {
             onPreview={(title, url) => setFocusedPreview({ title, url })}
           />
         ))}
-      </div>
+      </section>
 
       {focusedPreview && (
         <div

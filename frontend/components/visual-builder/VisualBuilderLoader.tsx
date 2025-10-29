@@ -154,7 +154,7 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
     paletteMode: paletteModes.includes(palette as PaletteMode) ? (palette as PaletteMode) : undefined,
     tortiePaletteMode: paletteModes.includes(tortiePalette as PaletteMode) ? (tortiePalette as PaletteMode) : undefined,
     slug: slugValue,
-    shareUrl: slugValue ? `/visual-builder/view/${slugValue}` : null,
+    shareUrl: slugValue ? `/visual-builder?slug=${encodeURIComponent(slugValue)}` : null,
     catName: record.catName ?? null,
     creatorName: record.creatorName ?? null,
   };

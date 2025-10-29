@@ -26,6 +26,32 @@ function sumFromPrompt(prompt: string) {
   return left + right;
 }
 
+function getCooldownDuration(attempt: number): number {
+  const schedule = [60, 180, 600];
+  if (attempt <= schedule.length) {
+    return schedule[attempt - 1];
+  }
+  const extra = attempt - schedule.length;
+  const base = schedule[schedule.length - 1];
+  return base * Math.pow(2, extra);
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.max(1, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    const minutePart = minutes > 0 ? ` ${minutes}m` : "";
+    return `${hours}h${minutePart}`;
+  }
+  if (minutes > 0) {
+    const secondPart = seconds > 0 ? ` ${seconds}s` : "";
+    return `${minutes}m${secondPart}`;
+  }
+  return `${seconds}s`;
+}
+
 export function DiscordInviteButton({ className }: { className?: string }) {
   const issueChallenge = useMutation(api.discord.issueChallenge);
   const redeemChallenge = useMutation(api.discord.redeemChallenge);
@@ -40,6 +66,9 @@ export function DiscordInviteButton({ className }: { className?: string }) {
   const [mounted, setMounted] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(Date.now());
 
   const resetState = useCallback(() => {
     setStatus("idle");
@@ -57,6 +86,17 @@ export function DiscordInviteButton({ className }: { className?: string }) {
 
   const requestChallenge = useCallback(
     async (options?: { message?: string; avoidAnswer?: number }) => {
+      const now = Date.now();
+      if (cooldownUntil && now < cooldownUntil) {
+        setStatus("error");
+        setInviteUrl(null);
+        setChallenge(null);
+        setAnswer("");
+        setCopied(false);
+        setError(`Please wait ${formatDuration(cooldownUntil - now)} before trying again.`);
+        return;
+      }
+
       setStatus("loadingChallenge");
       setError(null);
       setInviteUrl(null);
@@ -87,7 +127,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         setError(err instanceof Error ? err.message : "Unable to start challenge.");
       }
     },
-    [issueChallenge]
+    [cooldownUntil, issueChallenge]
   );
 
   const submitAnswer = useCallback(async () => {
@@ -112,14 +152,21 @@ export function DiscordInviteButton({ className }: { className?: string }) {
             setStatus("success");
             setChallenge(null);
             setAnswer("");
+            setAttemptCount(0);
+            setCooldownUntil(null);
             return;
           }
 
           if (result.status === "retry") {
-            await requestChallenge({
-              message: result.message,
-              avoidAnswer: Number.isNaN(previousAnswer) ? undefined : previousAnswer
-            });
+            const nextAttempt = attemptCount + 1;
+            setAttemptCount(nextAttempt);
+            const waitSeconds = getCooldownDuration(nextAttempt);
+            setCooldownUntil(Date.now() + waitSeconds * 1000);
+            setStatus("error");
+            setInviteUrl(null);
+            setChallenge(null);
+            setAnswer("");
+            setError(`${result.message ?? "Incorrect answer."} Try again in ${formatDuration(waitSeconds * 1000)}.`);
             return;
           }
 
@@ -135,6 +182,8 @@ export function DiscordInviteButton({ className }: { className?: string }) {
           setStatus("success");
           setChallenge(null);
           setAnswer("");
+          setAttemptCount(0);
+          setCooldownUntil(null);
           return;
         }
       }
@@ -146,10 +195,15 @@ export function DiscordInviteButton({ className }: { className?: string }) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong.";
       if (/incorrect answer/i.test(message) || /answer must be a number/i.test(message) || /challenge (expired|timed out)/i.test(message)) {
-        await requestChallenge({
-          message: "Not quite! Here's a fresh puzzle.",
-          avoidAnswer: Number.isNaN(previousAnswer) ? undefined : previousAnswer
-        });
+        const nextAttempt = attemptCount + 1;
+        setAttemptCount(nextAttempt);
+        const waitSeconds = getCooldownDuration(nextAttempt);
+        setCooldownUntil(Date.now() + waitSeconds * 1000);
+        setStatus("error");
+        setInviteUrl(null);
+        setChallenge(null);
+        setAnswer("");
+        setError(`Not quite! Try again in ${formatDuration(waitSeconds * 1000)}.`);
         return;
       }
 
@@ -158,7 +212,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
       setChallenge(null);
       setError(message);
     }
-  }, [redeemChallenge, challenge, answer, requestChallenge]);
+  }, [redeemChallenge, challenge, answer, attemptCount]);
 
   useEffect(() => {
     if (!open) {
@@ -211,6 +265,16 @@ export function DiscordInviteButton({ className }: { className?: string }) {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!cooldownUntil) {
+      return;
+    }
+    const tick = () => setNowMs(Date.now());
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [cooldownUntil]);
+
   const expiresLabel = useMemo(() => {
     if (!challenge) {
       return null;
@@ -224,6 +288,16 @@ export function DiscordInviteButton({ className }: { className?: string }) {
       ? `Expires in about ${remainingMinutes} minutes`
       : "Expires in under a minute";
   }, [challenge]);
+
+  const cooldownActive = useMemo(() => {
+    if (!cooldownUntil) return false;
+    return nowMs < cooldownUntil;
+  }, [cooldownUntil, nowMs]);
+
+  const cooldownLabel = useMemo(() => {
+    if (!cooldownActive || !cooldownUntil) return null;
+    return formatDuration(cooldownUntil - nowMs);
+  }, [cooldownActive, cooldownUntil, nowMs]);
 
   async function handleCopy() {
     if (!inviteUrl) {
@@ -296,10 +370,11 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                     <button
                       type="button"
                       onClick={() => void requestChallenge()}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted"
+                      disabled={cooldownActive}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <RefreshCcw className="h-3.5 w-3.5" />
-                      Try another challenge
+                      {cooldownActive && cooldownLabel ? `Try again in ${cooldownLabel}` : "Try another challenge"}
                     </button>
                   </div>
                 ) : null}
@@ -341,10 +416,11 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                       <button
                         type="button"
                         onClick={() => void requestChallenge()}
-                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted"
+                        disabled={cooldownActive}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <RefreshCcw className="h-3.5 w-3.5" />
-                        New challenge
+                        {cooldownActive && cooldownLabel ? `Wait ${cooldownLabel}` : "New challenge"}
                       </button>
                     </div>
                   </form>

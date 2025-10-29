@@ -260,31 +260,24 @@ export default function CatdexPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 py-12">
-      <header className="glass-card relative overflow-hidden px-8 py-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-amber-400/15" aria-hidden />
-        <div className="relative flex flex-col gap-4">
-          <div className="section-eyebrow">Catdex</div>
-          <h1 className="text-4xl font-semibold sm:text-5xl">
-            Explore Gatcha Cat Cards
-          </h1>
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">
-              {stats.total} cards
-            </span>
-            <span
-              className={cn(
-                "rounded-full px-3 py-1",
-                (pendingCount ?? 0) > 0
-                  ? "bg-amber-500/15 text-amber-600"
-                  : "bg-muted text-muted-foreground"
-              )}
-            >
-              {(pendingCount ?? 0).toLocaleString()} pending
-            </span>
-          </div>
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
+      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">Catdex</p>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Explore Gatcha Cat Cards</h1>
+        <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-200/80">
+          <span className="rounded-full border border-amber-400/40 bg-amber-500/20 px-3 py-1 font-semibold text-amber-100">
+            {stats.total.toLocaleString()} cards indexed
+          </span>
+          <span
+            className={cn(
+              "rounded-full border border-amber-400/30 bg-slate-950/60 px-3 py-1",
+              (pendingCount ?? 0) > 0 ? "text-amber-200" : "text-neutral-300"
+            )}
+          >
+            {(pendingCount ?? 0).toLocaleString()} pending approvals
+          </span>
         </div>
-      </header>
+      </section>
 
       <section className="glass-card grid gap-4 p-6">
         <div className="grid gap-4 lg:grid-cols-[1.2fr,repeat(3,minmax(0,1fr))]">

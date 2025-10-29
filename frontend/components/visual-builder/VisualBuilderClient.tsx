@@ -208,8 +208,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       if (initialCat.slug) {
         const origin = typeof window !== "undefined" ? window.location.origin : "";
         const url = origin
-          ? `${origin}/visual-builder/view/${initialCat.slug}`
-          : `/visual-builder/view/${initialCat.slug}`;
+          ? `${origin}/visual-builder?slug=${encodeURIComponent(initialCat.slug)}`
+          : `/visual-builder?slug=${initialCat.slug}`;
         return { slug: initialCat.slug, url };
       }
       return prev;
@@ -1656,7 +1656,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       const slug = (record as { slug?: string; shareToken?: string; id?: string }).slug ?? (record as { shareToken?: string; id?: string }).shareToken ?? (record as { id?: string }).id;
       if (!slug) throw new Error("Share API did not return a slug.");
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const url = origin ? `${origin}/visual-builder/view/${slug}` : `/visual-builder/view/${slug}`;
+      const url = origin ? `${origin}/visual-builder?slug=${encodeURIComponent(slug)}` : `/visual-builder?slug=${slug}`;
       setShareInfo({ slug, url });
       setShareStale(false);
       await ensureCopied(url);
@@ -1772,15 +1772,10 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-12 px-6 py-16 lg:px-10">
-      <header className="max-w-3xl space-y-3">
-        <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-200">
-          Visual Builder
-        </span>
-        <h1 className="text-3xl font-semibold text-white sm:text-4xl">Design a cat with live sprite previews</h1>
-        <p className="text-sm text-neutral-300 sm:text-base">
-          Trait-by-trait controls with instant updates powered by the v3 renderer. Layer torties, accessories, scars, and export the result in one click.
-        </p>
-      </header>
+      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">Visual Builder</p>
+        <h1 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">Design a cat with live sprite previews</h1>
+      </section>
 
       <div className="grid gap-10 lg:grid-cols-[minmax(420px,480px)_minmax(0,1fr)] xl:grid-cols-[minmax(460px,520px)_minmax(0,1fr)]">
         <aside className="flex flex-col gap-6 self-start lg:sticky lg:top-24">

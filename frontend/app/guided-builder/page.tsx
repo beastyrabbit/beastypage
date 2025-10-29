@@ -15,10 +15,6 @@ export default function GuidedBuilderPage() {
         <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">
           Build your cat one thoughtful step at a time
         </h1>
-        <p className="mt-4 max-w-2xl text-sm text-neutral-200/85 sm:text-base">
-          Follow the classic guided builder flow with modern Convex storage and the FastAPI renderer.
-          Every choice updates the preview instantly, and you can share the entire timeline once you are done.
-        </p>
       </section>
       <GuidedBuilderClient />
     </main>

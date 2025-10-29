@@ -1,5 +1,54 @@
 # Cat Gacha Frontend
 
+## PM2 / LXC Quick Start
+
+These are the PM2 commands we run on the LXC host (adjust `/opt/beastypage` to your path).
+
+```bash
+cd /opt/beastypage
+
+# install dependencies (first run / after changes)
+mkdir -p frontend/.bun-tmp
+BUN_TMPDIR=$(pwd)/frontend/.bun-tmp bun install
+
+# build production bundle
+bun run build
+
+# PM2 script for combined frontend + renderer
+cat <<'EOF' > pm2-start.sh
+#!/usr/bin/env bash
+cd /opt/beastypage
+exec bun run start
+EOF
+chmod +x pm2-start.sh
+pm2 start ./pm2-start.sh --name beastypage
+
+# optional: standalone renderer worker
+cat <<'EOF' > pm2-renderer.sh
+#!/usr/bin/env bash
+cd /opt/beastypage
+exec bun run dev:renderer
+EOF
+chmod +x pm2-renderer.sh
+pm2 start ./pm2-renderer.sh --name beastypage-renderer
+
+pm2 save
+```
+
+**Deploy workflow**
+
+```bash
+cd /opt/beastypage
+git pull
+BUN_TMPDIR=$(pwd)/frontend/.bun-tmp bun install
+bun run build
+pm2 reload beastypage
+pm2 reload beastypage-renderer   # if running separately
+```
+
+Logs: `pm2 logs beastypage` (and `pm2 logs beastypage-renderer`).
+
+
 Next.js app that powers the Catdex, history tools, and collection gallery. The project ships with a self-hosted Convex backend and an importer so fresh deployments can boot with production-quality data.
 
 ## Prerequisites

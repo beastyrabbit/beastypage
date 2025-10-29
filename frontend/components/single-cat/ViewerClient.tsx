@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { encodeCatShare, decodeCatShare } from "@/legacy/core/catShare";
@@ -11,7 +12,6 @@ import {
   AlertTriangle,
   ArrowUpRight,
   ChevronDown,
-  Clock,
   Copy,
   Loader2,
   Sparkles,
@@ -76,21 +76,6 @@ interface SpriteVariantPreview {
   dataUrl: string;
 }
 
-interface BuilderSpec {
-  id: string;
-  accessory: string | null;
-  scar: string | null;
-  tortie: TortieSlot | null;
-}
-
-interface BuilderVariantPreview {
-  id: string;
-  label: string;
-  spriteNumber: number;
-  dataUrl: string;
-  builderUrl?: string | null;
-}
-
 interface TraitRow {
   label: string;
   value: string;
@@ -98,13 +83,36 @@ interface TraitRow {
 }
 
 const VALID_SPRITES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
-const BUILDER_VARIANT_LIMIT = 12;
 const DISPLAY_CANVAS_SIZE = 900;
 const PREVIEW_CANVAS_SIZE = 360;
+
+type BuilderMeta = { slug?: string | null; catName?: string | null; creatorName?: string | null };
+
+function buildVisualBuilderUrl(payload: CatSharePayload | null, meta?: BuilderMeta): string | null {
+  if (meta?.slug) {
+    return `/visual-builder?slug=${encodeURIComponent(meta.slug)}`;
+  }
+  if (!payload?.params) return null;
+  try {
+    const encoded = encodeCatShare(payload);
+    const params = new URLSearchParams({ cat: encoded });
+    if (meta?.catName) {
+      params.set("name", meta.catName);
+    }
+    if (meta?.creatorName) {
+      params.set("creator", meta.creatorName);
+    }
+    return `/visual-builder?${params.toString()}`;
+  } catch (error) {
+    console.warn("Failed to encode Visual Builder payload", error);
+    return null;
+  }
+}
 
 export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
+  const router = useRouter();
 
   const mapperRecord = useQuery(
     api.mapper.getBySlug,
@@ -130,12 +138,28 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   const [spriteVariantsLoading, setSpriteVariantsLoading] = useState(false);
   const [spriteVariantsOpen, setSpriteVariantsOpen] = useState(false);
 
-  const [builderSpecs, setBuilderSpecs] = useState<BuilderSpec[]>([]);
-  const [builderVariantPreviews, setBuilderVariantPreviews] = useState<BuilderVariantPreview[]>([]);
-  const [builderVariantsLoading, setBuilderVariantsLoading] = useState(false);
-  const [builderVariantsOpen, setBuilderVariantsOpen] = useState(false);
   const [builderBaseUrl, setBuilderBaseUrl] = useState<string | null>(null);
   const [showDarkForestTint, setShowDarkForestTint] = useState(true);
+
+  const builderMeta = useMemo<BuilderMeta | null>(() => {
+    if (!meta && !catPayload?.params) {
+      return null;
+    }
+    const slugRef = meta?.slug ?? meta?.shareToken ?? null;
+    const rawName = catPayload?.params ? (catPayload.params as Record<string, unknown>)?.["catName"] : null;
+    const catName = meta?.catName ?? (typeof rawName === "string" ? rawName : null);
+    const creatorName = meta?.creatorName ?? null;
+
+    if (!slugRef && !catPayload?.params) {
+      return null;
+    }
+
+    return {
+      slug: slugRef ?? undefined,
+      catName: catName ?? undefined,
+      creatorName: creatorName ?? undefined,
+    };
+  }, [meta, catPayload]);
 
   useEffect(() => {
     let cancelled = false;
@@ -281,71 +305,25 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   }, [rendererReady, catPayload, showDarkForestTint, previewImageUrl]);
 
   useEffect(() => {
-    if (!rendererReady || !catPayload?.params) {
+    if (!builderMeta && !catPayload?.params) {
       setBuilderBaseUrl(null);
       return;
     }
-    const generator = generatorRef.current;
-    if (!generator?.buildCatURL) {
-      setBuilderBaseUrl(null);
-      return;
-    }
-    try {
-      const url = generator.buildCatURL(catPayload.params);
-      setBuilderBaseUrl(url);
-    } catch (err) {
-      console.warn("Failed to build base builder URL", err);
-      setBuilderBaseUrl(null);
-    }
-  }, [rendererReady, catPayload]);
+    const url = buildVisualBuilderUrl(catPayload, builderMeta ?? undefined);
+    setBuilderBaseUrl(url ?? null);
+  }, [catPayload, builderMeta]);
 
   useEffect(() => {
     if (!catPayload) {
       setSpriteVariants([]);
       setSpriteVariantsLoading(false);
       setSpriteVariantsOpen(false);
-      setBuilderSpecs([]);
-      setBuilderVariantPreviews([]);
-      setBuilderVariantsLoading(false);
-      setBuilderVariantsOpen(false);
       return;
     }
 
-    const accessories = (catPayload.accessorySlots ?? []).filter(
-      (entry): entry is string => !!entry && entry !== "none"
-    );
-    const scars = (catPayload.scarSlots ?? []).filter(
-      (entry): entry is string => !!entry && entry !== "none"
-    );
-    const torties = (catPayload.tortieSlots ?? []).filter(
-      (entry): entry is TortieSlot => !!entry
-    );
-
-    const accessoryOptions = accessories.length ? accessories : [null];
-    const scarOptions = scars.length ? scars : [null];
-    const tortieOptions = torties.length ? torties : [null];
-
-    const specs: BuilderSpec[] = [];
-    accessoryOptions.forEach((accessory) => {
-      scarOptions.forEach((scar) => {
-        tortieOptions.forEach((tortie, index) => {
-          specs.push({
-            id: `${accessory ?? "none"}|${scar ?? "none"}|${index}`,
-            accessory,
-            scar,
-            tortie,
-          });
-        });
-      });
-    });
-
-    setBuilderSpecs(specs.slice(0, BUILDER_VARIANT_LIMIT));
     setSpriteVariants([]);
     setSpriteVariantsLoading(false);
     setSpriteVariantsOpen(false);
-    setBuilderVariantPreviews([]);
-    setBuilderVariantsLoading(false);
-    setBuilderVariantsOpen(false);
   }, [catPayload]);
 
   useEffect(() => {
@@ -392,55 +370,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     };
   }, [rendererReady, catPayload]);
 
-  useEffect(() => {
-    if (!rendererReady || builderSpecs.length === 0 || !catPayload?.params) {
-      setBuilderVariantPreviews([]);
-      setBuilderVariantsLoading(false);
-      return;
-    }
-    const generator = generatorRef.current;
-    if (!generator) return;
-
-    let cancelled = false;
-    setBuilderVariantsLoading(true);
-    setBuilderVariantPreviews([]);
-
-    (async () => {
-      const previews: BuilderVariantPreview[] = [];
-      for (const spec of builderSpecs) {
-        if (cancelled) return;
-        try {
-          const params = buildVariantParams(catPayload.params, spec);
-          const result = await generator.generateCat(params);
-          const previewCanvas = document.createElement("canvas");
-          previewCanvas.width = PREVIEW_CANVAS_SIZE;
-          previewCanvas.height = PREVIEW_CANVAS_SIZE;
-          const ctx = previewCanvas.getContext("2d");
-          if (!ctx) continue;
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(result.canvas as HTMLCanvasElement, 0, 0, PREVIEW_CANVAS_SIZE, PREVIEW_CANVAS_SIZE);
-          const builderUrl = generator.buildCatURL ? generator.buildCatURL(params) : null;
-          previews.push({
-            id: spec.id,
-            label: buildVariantLabel(spec),
-            spriteNumber: params.spriteNumber as number,
-            dataUrl: previewCanvas.toDataURL("image/png"),
-            builderUrl,
-          });
-        } catch (err) {
-          console.warn("Failed to render builder variant", err);
-        }
-      }
-      if (!cancelled) {
-        setBuilderVariantPreviews(previews);
-        setBuilderVariantsLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [rendererReady, builderSpecs, catPayload]);
+  
 
   const traitRows = useMemo(() => {
     if (!catPayload?.params) return [] as TraitRow[];
@@ -493,12 +423,6 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     ? `${spriteVariants.length} sprite${spriteVariants.length === 1 ? "" : "s"} available`
     : "Sprite previews unavailable";
 
-  const builderVariantsSubtitle = builderVariantsLoading
-    ? "Preparing builder variants…"
-    : builderSpecs.length > 0
-    ? `${builderSpecs.length} variant${builderSpecs.length === 1 ? "" : "s"} available`
-    : "No additional variants for this cat";
-
   const showLoader = !!loadingMessage || (slug && mapperRecord === undefined);
   const showCanvas = !showLoader && !error && !!catPayload;
 
@@ -516,20 +440,144 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   const handleOpenBuilder = (url?: string | null) => {
     const target = url ?? builderBaseUrl;
     if (!target) return;
-    const opened = window.open(target, "_blank", "noopener=yes");
-    if (!opened) {
-      window.location.href = target;
-    }
+    router.push(target);
   };
 
+  const downloadDataUrl = useCallback((dataUrl: string, filename: string) => {
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, []);
+
+  const handleCopyMainSprite = useCallback(async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    try {
+      const blob: Blob | null = await new Promise((resolve) => {
+        if ("toBlob" in canvas && typeof canvas.toBlob === "function") {
+          canvas.toBlob((result) => resolve(result), "image/png");
+        } else {
+          resolve(null);
+        }
+      });
+      if (blob && typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ "image/png": blob }),
+          ]);
+          window.alert("Sprite copied to clipboard.");
+          return;
+        } catch (error) {
+          console.warn("Clipboard write failed, downloading instead", error);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            if (typeof reader.result === "string") {
+              downloadDataUrl(reader.result, "shared-cat.png");
+            }
+            window.alert("Clipboard unavailable; downloaded instead.");
+          };
+          reader.readAsDataURL(blob);
+          return;
+        }
+      }
+      const fallback = canvas.toDataURL("image/png");
+      downloadDataUrl(fallback, "shared-cat.png");
+      window.alert("Clipboard unavailable; downloaded instead.");
+    } catch (error) {
+      console.error("Failed to copy main sprite", error);
+      const fallback = canvas.toDataURL("image/png");
+      downloadDataUrl(fallback, "shared-cat.png");
+      window.alert("Clipboard unavailable; downloaded instead.");
+    }
+  }, [downloadDataUrl]);
+
+  const handleCopyVariantSprite = useCallback(
+    async (dataUrl: string, filename: string) => {
+      try {
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({ "image/png": blob }),
+            ]);
+            window.alert("Sprite copied to clipboard.");
+            return;
+          } catch (error) {
+            console.warn("Clipboard write failed, downloading instead", error);
+          }
+        }
+        downloadDataUrl(dataUrl, filename);
+        window.alert("Clipboard unavailable; downloaded instead.");
+      } catch (error) {
+        console.warn("Clipboard write failed, downloading instead", error);
+        downloadDataUrl(dataUrl, filename);
+        window.alert("Clipboard unavailable; downloaded instead.");
+      }
+    },
+    [downloadDataUrl]
+  );
+
+  const catDisplayName = useMemo(() => {
+    const metaName = meta?.catName?.trim();
+    if (metaName) return metaName;
+    const payloadName = typeof (catPayload?.params as Record<string, unknown> | undefined)?.catName === "string"
+      ? ((catPayload?.params as Record<string, unknown>).catName as string).trim()
+      : "";
+    return payloadName || "Shared Cat";
+  }, [catPayload, meta]);
+
+  const creatorDisplayName = useMemo(() => {
+    const metaCreator = meta?.creatorName?.trim();
+    if (metaCreator) return metaCreator;
+    const payloadCreator = typeof (catPayload?.params as Record<string, unknown> | undefined)?.creatorName === "string"
+      ? ((catPayload?.params as Record<string, unknown>).creatorName as string).trim()
+      : "";
+    return payloadCreator || null;
+  }, [catPayload, meta]);
+
+  const createdDisplay = useMemo(() => {
+    if (!meta?.created) return null;
+    try {
+      return new Date(meta.created).toLocaleString();
+    } catch {
+      return null;
+    }
+  }, [meta]);
+
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-12 px-6 py-16">
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold text-foreground">Shared Cat Viewer</h1>
-        <p className="text-sm text-muted-foreground">
-          Short links powered by Convex with a fully local renderer. Inspect the cat, compare sprite variants, and jump back into the original builder.
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
+      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">Shared Cat Viewer</p>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">{catDisplayName}</h1>
+        <p className="mt-3 max-w-2xl text-sm text-neutral-200/85 sm:text-base">
+          {creatorDisplayName ? `Created by ${creatorDisplayName}` : "Shared from the cat builder pipeline"}
+          {createdDisplay ? ` • ${createdDisplay}` : null}
         </p>
-      </header>
+        <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-200/80">
+          {shareUrl ? (
+            <button
+              type="button"
+              onClick={handleCopyShare}
+              className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/20 px-4 py-2 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/25"
+            >
+              Copy share link <Copy className="size-3" />
+            </button>
+          ) : null}
+          {builderBaseUrl ? (
+            <button
+              type="button"
+              onClick={() => handleOpenBuilder(builderBaseUrl)}
+              className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-slate-950/60 px-4 py-2 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:text-white"
+            >
+              Open in Visual Builder <ArrowUpRight className="size-3" />
+            </button>
+          ) : null}
+        </div>
+      </section>
 
       {showLoader && (
         <div className="flex flex-col items-center gap-2 rounded-3xl border border-border/40 bg-background/70 py-12 text-sm text-muted-foreground">
@@ -555,41 +603,18 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                 height={DISPLAY_CANVAS_SIZE}
                 className="aspect-square w-full rounded-2xl border border-border/30 bg-background"
               />
+              <div className="mt-4 flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleCopyMainSprite}
+                  className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary"
+                >
+                  <Copy className="size-3" /> Copy sprite
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-6">
-              <div className="rounded-3xl border border-border/40 bg-background/70 p-5">
-                <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                  <span className="text-base font-semibold text-foreground">{meta?.catName || "Unnamed cat"}</span>
-                  <span>{meta?.creatorName ? `Created by ${meta.creatorName}` : "Creator unknown"}</span>
-                  {meta?.created && (
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground/70">
-                      <Clock className="size-3" /> {new Date(meta.created).toLocaleString()}
-                    </span>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {shareUrl && (
-                      <button
-                        type="button"
-                        onClick={handleCopyShare}
-                        className="inline-flex items-center gap-1 rounded-full border border-border/50 px-3 py-1 text-[11px] font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-                      >
-                        <Copy className="size-3" /> Copy Share Link
-                      </button>
-                    )}
-                    {builderBaseUrl && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenBuilder(builderBaseUrl)}
-                        className="inline-flex items-center gap-1 rounded-full border border-border/50 px-3 py-1 text-[11px] font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-                      >
-                        <ArrowUpRight className="size-3" /> Original Visual Builder
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               <div className="rounded-3xl border border-border/40 bg-background/70 p-5">
                 <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Sparkles className="size-4 text-primary" /> Trait Breakdown
@@ -707,90 +732,18 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                           className="mx-auto block h-72 w-72 image-render-pixel"
                         />
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyVariantSprite(variant.dataUrl, `${variant.name || "sprite"}.png`)}
+                        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary"
+                      >
+                        <Copy className="size-3" /> Copy sprite
+                      </button>
                     </div>
                   ))}
               </div>
             </div>
 
-            <div className="glass-card px-6 py-6">
-              <button
-                type="button"
-                onClick={() => setBuilderVariantsOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/70 px-4 py-3 text-left transition hover:bg-background"
-              >
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Original Visual Builder Variants</h3>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-                    {builderVariantsSubtitle}
-                  </p>
-                </div>
-                <ChevronDown
-                  className={cn(
-                    "size-4 text-muted-foreground transition-transform",
-                    builderVariantsOpen ? "rotate-180" : "rotate-0"
-                  )}
-                />
-              </button>
-              <div
-                className={cn(
-                  "overflow-hidden transition-all duration-300",
-                  builderVariantsOpen ? "mt-4 max-h-[9999px]" : "max-h-0"
-                )}
-              >
-                {builderVariantsOpen && (
-                  <div className="space-y-4">
-                    {builderVariantsLoading && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="size-4 animate-spin" /> Generating preview variants…
-                      </div>
-                    )}
-                    {!builderVariantsLoading && builderSpecs.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        No additional variants were rolled for this cat.
-                      </p>
-                    )}
-                    {!builderVariantsLoading && builderSpecs.length > 0 && builderVariantPreviews.length === 0 && (
-                      <p className="text-sm text-muted-foreground">Preparing preview sprites…</p>
-                    )}
-                    {!builderVariantsLoading && builderVariantPreviews.length > 0 && (
-                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {builderVariantPreviews.map((variant, index) => (
-                          <div
-                            key={variant.id}
-                            className="rounded-2xl border border-border/40 bg-background/70 p-4"
-                          >
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-semibold text-foreground">Variant {index + 1}</p>
-                              <span className="text-xs text-muted-foreground">#{variant.spriteNumber}</span>
-                            </div>
-                            <p className="mt-1 text-xs text-muted-foreground">{variant.label}</p>
-                            <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
-                              <Image
-                                src={variant.dataUrl}
-                                alt={variant.label}
-                                width={PREVIEW_CANVAS_SIZE}
-                                height={PREVIEW_CANVAS_SIZE}
-                                unoptimized
-                                className="mx-auto block h-72 w-72 image-render-pixel"
-                              />
-                            </div>
-                            {variant.builderUrl && (
-                              <button
-                                type="button"
-                                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                                onClick={() => handleOpenBuilder(variant.builderUrl)}
-                              >
-                                <ArrowUpRight className="size-4" /> Open in Original Visual Builder
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -817,52 +770,6 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       </div>
     </div>
   );
-}
-
-function buildVariantParams(base: Record<string, unknown>, spec: BuilderSpec) {
-  const params: Record<string, unknown> = { ...base };
-  params.accessories = [];
-  params.scars = [];
-  params.tortie = [];
-  params.spriteNumber = 8;
-
-  if (spec.accessory) {
-    params.accessories = [spec.accessory];
-    params.accessory = spec.accessory;
-  } else {
-    delete params.accessory;
-  }
-
-  if (spec.scar) {
-    params.scars = [spec.scar];
-    params.scar = spec.scar;
-  } else {
-    delete params.scar;
-  }
-
-  if (spec.tortie) {
-    params.tortie = [spec.tortie];
-    params.isTortie = true;
-    params.tortieMask = spec.tortie.mask ?? undefined;
-    params.tortiePattern = spec.tortie.pattern ?? undefined;
-    params.tortieColour = spec.tortie.colour ?? undefined;
-  } else {
-    params.tortie = [];
-    params.isTortie = false;
-    delete params.tortieMask;
-    delete params.tortiePattern;
-    delete params.tortieColour;
-  }
-
-  return params;
-}
-
-function buildVariantLabel(spec: BuilderSpec) {
-  const parts: string[] = [];
-  parts.push(spec.accessory ? `Accessory: ${formatValue(spec.accessory)}` : "Accessory: None");
-  parts.push(spec.scar ? `Scar: ${formatValue(spec.scar)}` : "Scar: None");
-  parts.push(spec.tortie ? `Tortie: ${formatTortieLayer(spec.tortie)}` : "Tortie: None");
-  return parts.join(" • ");
 }
 
 function formatValue(value: unknown): string {

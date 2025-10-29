@@ -158,14 +158,11 @@ export default function CoinflipPage() {
   }, [gameState, lastChoice, lastResult]);
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-6 py-12">
-      <header className="flex flex-col gap-4 text-center">
-        <span className="section-eyebrow">Coinflip Challenge</span>
-        <h1 className="text-4xl font-semibold sm:text-5xl">Predict the flip, stack the streak</h1>
-        <p className="text-muted-foreground">
-          Pick heads or tails. Each correct call adds to your streak. Miss once and the run ends—submit your initials to climb the leaderboard.
-        </p>
-      </header>
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
+      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">Coinflip Challenge</p>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Predict the flip, stack the streak</h1>
+      </section>
 
       <section className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
         <div className="glass-card flex flex-col gap-6 p-6">
