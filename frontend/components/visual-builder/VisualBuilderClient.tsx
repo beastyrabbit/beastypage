@@ -281,7 +281,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
 
   useEffect(() => {
     const generatorInstance = generatorRef.current;
-    if (!generatorInstance) return;
+    if (!rendererReady || !generatorInstance) return;
     const requestId = ++previewRequestRef.current;
     setPreviewLoading(true);
     (async () => {
@@ -310,7 +310,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         }
       }
     })();
-  }, [params]);
+  }, [params, rendererReady]);
 
   const updateParams = useCallback((mutator: (draft: CatParams) => void) => {
     setShareStale(true);
