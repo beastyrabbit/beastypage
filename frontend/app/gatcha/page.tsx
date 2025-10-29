@@ -91,7 +91,7 @@ const LEGACY_MODE_CARDS: LegacyCard[] = [
     icon: "📺",
     description:
       "Live session controls for audience voting and shareable builds.",
-    comingSoon: true,
+    href: "/streamer-voting",
   },
   {
     title: "Perfect Cat Finder",
