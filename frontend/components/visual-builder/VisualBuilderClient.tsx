@@ -357,10 +357,12 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   }, [markShareDirty]);
 
   const getPaletteForMode = useCallback((mode: PaletteMode) => {
-    const mapperInstance = spriteMapperRef.current;
+    const mapperInstance = mapper ?? spriteMapperRef.current;
     if (!mapperInstance) return [];
-    return mapperInstance.getColourOptions?.(mode) ?? mapperInstance.getColours();
-  }, []);
+    const options = mapperInstance.getColourOptions?.(mode) ?? mapperInstance.getColours();
+    console.log("[visual-builder] getPaletteForMode", { mode, optionsLength: options?.length, options });
+    return options;
+  }, [mapper]);
 
   const paletteColours = useMemo(() => {
     const mapperInstance = mapper ?? spriteMapperRef.current;
@@ -1815,7 +1817,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         combined.tortieMask = primary?.mask;
       }
       const determinePaletteMode = (candidate: unknown, fallback: PaletteMode) => {
-        if (typeof candidate !== "string") return "off";
+        if (typeof candidate !== "string") return fallback;
         const lower = candidate.toLowerCase() as PaletteMode;
         return PALETTE_CONTROLS.some((entry) => entry.id === lower) ? lower : fallback;
       };
