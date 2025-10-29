@@ -1921,11 +1921,11 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               <button
                 type="button"
                 onClick={handleSaveShare}
-                disabled={shareBusy}
+                disabled={shareBusy || isShareLocked}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Copy className="size-4" />
-                {shareBusy ? "Preparing link…" : "Save & Copy Link"}
+                {shareBusy ? "Preparing link…" : isShareLocked ? "Loaded share (read-only)" : "Save & Copy Link"}
               </button>
               <button
                 type="button"
