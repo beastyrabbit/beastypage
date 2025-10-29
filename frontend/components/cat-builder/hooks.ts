@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "./types";
+import { FORBIDDEN_SPRITES } from "./types";
 
 export function useSpriteMapperOptions() {
   const [mapper, setMapper] = useState<SpriteMapperApi | null>(null);
@@ -25,7 +26,7 @@ export function useSpriteMapperOptions() {
 
         setMapper(spriteMapper);
 
-        const spriteNumbers = spriteMapper.getSprites();
+        const spriteNumbers = spriteMapper.getSprites().filter((value) => !FORBIDDEN_SPRITES.has(value));
         const builderOptions: BuilderOptions = {
           sprites: spriteNumbers,
           pelts: spriteMapper.getPeltNames(),
