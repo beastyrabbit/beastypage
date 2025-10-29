@@ -54,7 +54,26 @@ uv run uvicorn renderer_service.app.main:app --reload --host 127.0.0.1 --port 80
 ```
 
 * The service defaults to the bundled `sprites/` directory. Override with `CG3_SPRITE_ROOT=/path/to/sprites`.
-* `/health` returns a liveness probe. `/render` accepts JSON payloads mirroring the V2 generator parameters.
+* `/health` returns a liveness probe plus queue metrics (`queue_size`, `circuit_open`, etc.). `/render` accepts JSON payloads mirroring the V2 generator parameters.
+
+### Runtime observability
+
+The renderer throttles work using a bounded queue and a small worker pool. Key environment variables (`CG3_*`) you can tune:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CG3_MAX_QUEUE_SIZE` | `120` | Maximum number of enqueued render jobs before new requests receive HTTP 503. |
+| `CG3_WORKER_COUNT` | `4` | Number of background workers servicing the queue. |
+| `CG3_CIRCUIT_FAILURE_THRESHOLD` | `8` | Consecutive failures before the circuit breaker trips. |
+| `CG3_CIRCUIT_RESET_SECONDS` | `12` | Cooldown window before the circuit closes automatically. |
+
+Probe `/health` (or expose it through your reverse proxy) to let pm2 or your load balancer watch the queue:
+
+```sh
+curl -s http://localhost:8001/health | jq
+```
+
+When the queue approaches capacity or the circuit opens, FastAPI logs (`renderer.queue` logger) emit warnings that surface in `pm2 logs beastypage-renderer`.
 
 ### During frontend development
 
@@ -89,6 +108,41 @@ uv run uvicorn renderer_service.app.main:app --host 0.0.0.0 --port 8001
 ```
 
 Adjust the host/port or process supervisor configuration to match your production environment.
+
+### Quick load test recipe
+
+Use [k6](https://k6.io/) (or a similar tool such as `hey`) to validate queue behaviour before pushing to production:
+
+```sh
+# k6 example (10 s ramp up to 40 virtual users)
+k6 run scripts/render-load-test.js
+```
+
+Create `scripts/render-load-test.js` with a minimal payload:
+
+```js
+import http from 'k6/http';
+import { sleep } from 'k6';
+
+export const options = {
+  stages: [
+    { duration: '10s', target: 40 },
+    { duration: '20s', target: 40 },
+    { duration: '10s', target: 0 },
+  ],
+};
+
+export default function () {
+  const payload = JSON.stringify({
+    payload: { spriteNumber: 8, params: { colour: 'WHITE', peltName: 'SingleColour' } },
+    options: { collectLayers: false },
+  });
+  http.post('http://localhost:8001/render', payload, { headers: { 'Content-Type': 'application/json' } });
+  sleep(0.2);
+}
+```
+
+Monitor `/health` while the test runs to tune queue/worker settings and confirm the circuit breaker only trips once saturation is sustained.
 
 ## TODO / Next steps
 

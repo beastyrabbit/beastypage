@@ -13,6 +13,25 @@ export default function TestsLanding() {
 
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <div className="glass-card relative flex h-full flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+          <div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-amber-400/15 via-transparent to-rose-500/15" aria-hidden />
+          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground/60">
+            <span className="font-semibold text-foreground">Renderer Stress Harness</span>
+            <span className="rounded-full bg-amber-500/15 px-3 py-1 text-[11px] font-semibold text-amber-400">Reliability</span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Fire controlled bursts against <code>/api/renderer</code>, monitor retries, and verify the queue / circuit breaker behaviour from the browser.
+          </p>
+          <div className="mt-auto flex gap-2 text-xs">
+            <Link
+              href="/tests/renderer-stress"
+              className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 font-semibold text-foreground transition hover:bg-foreground hover:text-background"
+            >
+              Open stress test
+            </Link>
+          </div>
+        </div>
+
+        <div className="glass-card relative flex h-full flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
           <div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-primary/10 via-transparent to-rose-400/10" aria-hidden />
           <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground/60">
             <span className="font-semibold text-foreground">Snapshot Runner</span>
