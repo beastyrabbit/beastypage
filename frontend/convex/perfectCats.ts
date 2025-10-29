@@ -1,6 +1,6 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
-import type { Doc, Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel.js";
 
 const INITIAL_RATING = 1500;
 const K_FACTOR = 24;
@@ -58,12 +58,12 @@ export const registerCats = mutation({
   args: {
     cats: v.array(v.object({ params: v.any() })),
   },
-  handler: async (ctx, args) => {
+  handler: async ({ db }, args) => {
     const now = Date.now();
-    const results = [] as Array<ReturnType<typeof sanitizeCat>>;
+    const results: Array<ReturnType<typeof sanitizeCat>> = [];
     for (const entry of args.cats) {
       const hash = hashCatParams(entry.params);
-      const existing = await ctx.db
+      const existing = await db
         .query("perfect_cats")
         .withIndex("byHash", (q) => q.eq("hash", hash))
         .unique();
@@ -71,7 +71,7 @@ export const registerCats = mutation({
         results.push(sanitizeCat(existing));
         continue;
       }
-      const insertedId = await ctx.db.insert("perfect_cats", {
+      const insertedId = await db.insert("perfect_cats", {
         hash,
         params: entry.params,
         rating: INITIAL_RATING,
@@ -82,7 +82,7 @@ export const registerCats = mutation({
         updatedAt: now,
         lastShownAt: undefined,
       });
-      const inserted = await ctx.db.get(insertedId);
+      const inserted = await db.get(insertedId);
       if (inserted) {
         results.push(sanitizeCat(inserted));
       }
@@ -103,8 +103,8 @@ export const requestMatchup = mutation({
   args: {
     clientId: v.optional(v.string()),
   },
-  handler: async (ctx, args): Promise<MatchupResponse> => {
-    const allCats = await ctx.db.query("perfect_cats").collect();
+  handler: async ({ db }, args): Promise<MatchupResponse> => {
+    const allCats = await db.query("perfect_cats").collect();
     const totalCats = allCats.length;
     const needsSeed = Math.max(0, MINIMUM_POOL_SIZE - totalCats);
 
@@ -113,7 +113,7 @@ export const requestMatchup = mutation({
     }
 
     const candidateMap = new Map<string, Doc<"perfect_cats">>();
-    const topRated = await ctx.db
+    const topRated = await db
       .query("perfect_cats")
       .withIndex("byRating", (q) => q)
       .order("desc")
@@ -122,7 +122,7 @@ export const requestMatchup = mutation({
       candidateMap.set(doc._id as unknown as string, doc);
     }
 
-    const recentlyUpdated = await ctx.db
+    const recentlyUpdated = await db
       .query("perfect_cats")
       .withIndex("byUpdated", (q) => q)
       .order("desc")
@@ -142,7 +142,7 @@ export const requestMatchup = mutation({
 
     const seenPairs = new Set<string>();
     if (args.clientId) {
-      const recentVotes = await ctx.db
+      const recentVotes = await db
         .query("perfect_votes")
         .withIndex("byClient", (q) => q.eq("clientId", args.clientId))
         .order("desc")
@@ -185,8 +185,8 @@ export const requestMatchup = mutation({
 
     const now = Date.now();
     await Promise.all([
-      ctx.db.patch(first._id, { lastShownAt: now, updatedAt: now }),
-      ctx.db.patch(second._id, { lastShownAt: now, updatedAt: now }),
+      db.patch(first._id, { lastShownAt: now, updatedAt: now }),
+      db.patch(second._id, { lastShownAt: now, updatedAt: now }),
     ]);
 
     return {
@@ -203,14 +203,14 @@ export const submitVote = mutation({
     winnerId: v.id("perfect_cats"),
     loserId: v.id("perfect_cats"),
   },
-  handler: async (ctx, args) => {
+  handler: async ({ db }, args) => {
     if (args.winnerId === args.loserId) {
       throw new Error("Winner and loser must be different cats");
     }
 
     const [winner, loser] = await Promise.all([
-      ctx.db.get(args.winnerId),
-      ctx.db.get(args.loserId),
+      db.get(args.winnerId),
+      db.get(args.loserId),
     ]);
     if (!winner || !loser) {
       throw new Error("One of the cats no longer exists");
@@ -224,14 +224,14 @@ export const submitVote = mutation({
 
     const now = Date.now();
     await Promise.all([
-      ctx.db.patch(winner._id, {
+      db.patch(winner._id, {
         rating: winnerRating,
         wins: winner.wins + 1,
         appearances: winner.appearances + 1,
         updatedAt: now,
         lastShownAt: now,
       }),
-      ctx.db.patch(loser._id, {
+      db.patch(loser._id, {
         rating: loserRating,
         losses: loser.losses + 1,
         appearances: loser.appearances + 1,
@@ -240,7 +240,7 @@ export const submitVote = mutation({
       }),
     ]);
 
-    await ctx.db.insert("perfect_votes", {
+    await db.insert("perfect_votes", {
       catAId: args.winnerId,
       catBId: args.loserId,
       winnerId: args.winnerId,
@@ -259,9 +259,9 @@ export const leaderboard = query({
   args: {
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: async ({ db }, args) => {
     const limit = Math.max(1, Math.min(args.limit ?? 20, 100));
-    const cats = await ctx.db
+    const cats = await db
       .query("perfect_cats")
       .withIndex("byRating", (q) => q)
       .order("desc")
