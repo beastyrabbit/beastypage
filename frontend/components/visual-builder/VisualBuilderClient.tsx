@@ -1777,13 +1777,17 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     }
     try {
       setRandomizing(true);
+      const paletteModes: PaletteMode[] = ["off", "mood", "bold", "darker", "blackout"];
+      const pickMode = () => paletteModes[Math.floor(Math.random() * paletteModes.length)];
+      const requestedPalette = pickMode();
+      const requestedTortiePalette = pickMode();
       const random = await generatorInstance.generateRandomParams({
         ignoreForbiddenSprites: true,
         accessoryRange: { min: 0, max: MAX_TORTIE_LAYERS },
         scarRange: { min: 0, max: MAX_TORTIE_LAYERS },
         tortieRange: { min: 0, max: MAX_TORTIE_LAYERS },
-        experimentalColourMode: "any",
-        tortiePaletteMode: "any",
+        experimentalColourMode: requestedPalette,
+        tortiePaletteMode: requestedTortiePalette,
       } as Record<string, unknown>);
       const combined = { ...DEFAULT_PARAMS, ...random } as CatParams;
       combined.accessories = Array.isArray(random?.accessories) ? (random?.accessories as string[]) : [];
@@ -1799,14 +1803,17 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         combined.tortieColour = primary?.colour;
         combined.tortieMask = primary?.mask;
       }
-      const determinePaletteMode = (candidate: unknown) => {
+      const determinePaletteMode = (candidate: unknown, fallback: PaletteMode) => {
         if (typeof candidate !== "string") return "off";
         const lower = candidate.toLowerCase() as PaletteMode;
-        return PALETTE_CONTROLS.some((entry) => entry.id === lower) ? lower : "off";
+        return PALETTE_CONTROLS.some((entry) => entry.id === lower) ? lower : fallback;
       };
 
-      const nextPaletteMode = determinePaletteMode(random?.basePalette ?? random?.experimentalColourMode);
-      const nextTortiePaletteMode = determinePaletteMode(random?.tortiePalette);
+      const nextPaletteMode = determinePaletteMode(
+        random?.basePalette ?? random?.experimentalColourMode,
+        requestedPalette
+      );
+      const nextTortiePaletteMode = determinePaletteMode(random?.tortiePalette, requestedTortiePalette);
       setExperimentalColourMode(nextPaletteMode);
       setTortiePaletteMode(nextTortiePaletteMode);
       initialSpriteNumberRef.current = combined.spriteNumber ?? null;
