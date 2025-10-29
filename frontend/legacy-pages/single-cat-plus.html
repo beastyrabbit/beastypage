@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://eu.i.posthog.com https://cdn.jsdelivr.net https://eu-assets.i.posthog.com; img-src 'self' https://media.githubusercontent.com data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;">
+    <title>Single Cat Abridged (Multi‑Layer)</title>
+    <link rel="icon" type="image/png" href="../assets/images/beasty-favicon-rounded.png">
+    <link rel="stylesheet" href="../assets/styles/pages/single-cat.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.11.2/cdn/themes/dark.css">
+    <script type="module" src="../js/posthog-init.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.11.2/cdn/shoelace.js"></script>
+</head>
+<body class="sl-theme-dark">
+    <!-- Floating back button -->
+    <a class="back-btn" href="../index.html">← Back</a>
+
+    <!-- Background elements -->
+    <div class="bg"></div>
+    <div class="blob blob-a"></div>
+    <div class="blob blob-b"></div>
+    <div class="blob blob-c"></div>
+
+    <!-- Main content -->
+    <div class="container">
+        <!-- Cat building area -->
+        <div class="building-section">
+            <div class="building-container">
+                <div class="building-header">
+                    <h2>Generating Your Unique Cat</h2>
+                </div>
+                
+                <div class="building-area">
+                    <div class="cat-display-wrapper">
+                        <div class="cat-display" id="catDisplay">
+                            <div class="flip-container" id="flipContainer">
+                                <canvas id="buildingCanvas" width="700" height="700"></canvas>
+                            </div>
+                        </div>
+                        <div class="building-glow"></div>
+                    </div>
+                    
+                    <div class="parameter-area">
+                        <div class="value-slot" id="valueSlot">
+                            <div class="value-roller" id="valueRoller"></div>
+                        </div>
+                        <div class="parameter-table" id="parameterTable">
+                            <!-- Parameter list will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="generate-controls">
+                    <div class="generate-row">
+                        <button id="generateButton" class="generate-button">
+                            Generate New Cat
+                        </button>
+                        <div class="sl-toggle-group">
+                            <span class="setting-label">Speed:</span>
+                            <sl-radio-group id="speedGroup" class="sl-segment" value="fast">
+                                <sl-radio-button value="fast">Fast</sl-radio-button>
+                                <sl-radio-button value="normal">Normal</sl-radio-button>
+                                <sl-radio-button value="slow">Chill</sl-radio-button>
+                            </sl-radio-group>
+                        </div>
+                    </div>
+                    <!-- Layer options (counts) -->
+                    <div class="generate-row controls-left" style="gap: 16px; align-items: center; flex-wrap: wrap;">
+                        <div class="toggle-label" style="min-width: 120px;">Layer Options:</div>
+                        <label for="accCount" style="display: inline-flex; align-items: center; gap: 8px;">
+                            Accessories
+                            <div class="select-wrap"><div class="select-inner"><select id="accCount">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="random12">Random (1–2)</option>
+                                <option value="random13">Random (1–3)</option>
+                                <option value="random24">Random (2–4)</option>
+                                <option value="random14" selected>Random (1–4)</option>
+                            </select><span class="select-caret">▾</span></div></div>
+                        </label>
+                        <label for="scarCount" style="display: inline-flex; align-items: center; gap: 8px;">
+                            Scars
+                            <div class="select-wrap"><div class="select-inner"><select id="scarCount">
+                                <option value="1" selected>1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="random12">Random (1–2)</option>
+                                <option value="random13">Random (1–3)</option>
+                                <option value="random24">Random (2–4)</option>
+                                <option value="random14">Random (1–4)</option>
+                            </select><span class="select-caret">▾</span></div></div>
+                        </label>
+                        <label for="tortieCount" style="display: inline-flex; align-items: center; gap: 8px;">
+                            Tortie Layers
+                            <div class="select-wrap"><div class="select-inner"><select id="tortieCount">
+                                <option value="1" selected>1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                                <option value="random12">Random (1–2)</option>
+                                <option value="random13">Random (1–3)</option>
+                                <option value="random24">Random (2–4)</option>
+                                <option value="random14">Random (1–4)</option>
+                            </select><span class="select-caret">▾</span></div></div>
+                        </label>
+                        
+                    </div>
+                    <div class="generate-row controls-left" style="gap: 16px; align-items: center; flex-wrap: wrap;">
+                        <div class="toggle-label" style="min-width: 120px;">Dark/Star Clan:</div>
+                        <label for="darkForestMode" style="display: inline-flex; align-items: center; gap: 8px;">
+                            Dark Forest
+                            <div class="select-wrap"><div class="select-inner"><select id="darkForestMode">
+                                <option value="off">Off</option>
+                                <option value="random10" selected>Random (10%)</option>
+                                <option value="on">On</option>
+                            </select><span class="select-caret">▾</span></div></div>
+                        </label>
+                        <label for="deadMode" style="display: inline-flex; align-items: center; gap: 8px;">
+                            Star Clan
+                            <div class="select-wrap"><div class="select-inner"><select id="deadMode">
+                                <option value="off">Off</option>
+                                <option value="random10" selected>Random (10%)</option>
+                                <option value="on">On</option>
+                            </select><span class="select-caret">▾</span></div></div>
+                        </label>
+                    </div>
+                    <div class="generate-row palette-toggle-row" id="extendedPaletteControls">
+                        <span class="setting-label">Additional Colors:</span>
+                        <div class="palette-toggle-buttons">
+                            <button type="button" class="palette-toggle active" data-extended-mode="base" aria-pressed="true">Base Colors</button>
+                            <button type="button" class="palette-toggle" data-extended-mode="mood" aria-pressed="false">Mood</button>
+                            <button type="button" class="palette-toggle" data-extended-mode="bold" aria-pressed="false">Bold</button>
+                            <button type="button" class="palette-toggle" data-extended-mode="darker" aria-pressed="false">Darker</button>
+                            <button type="button" class="palette-toggle" data-extended-mode="blackout" aria-pressed="false">Blackout</button>
+                            <button type="button" class="palette-reset" data-extended-reset>Clear</button>
+                        </div>
+                    </div>
+                    <div class="cat-links" id="catLinks" style="display: none;">
+                        <button id="openShareViewer" class="cat-link-btn">
+                            🔗 Open Shared Viewer
+                        </button>
+                        <button id="copyCatBig" class="cat-link-btn">
+                            <span class="icon-group">
+                                <img src="../assets/images/copy-solid.svg" class="copy-icon" alt="Copy">
+                                <img src="../assets/images/copy-solid.svg" class="copy-icon" alt="Copy">
+                            </span>
+                            <span>Copy Cat (700×700)</span>
+                        </button>
+                        <button id="copyCatNoTint" class="cat-link-btn" title="Shift+Click canvas also works" style="display:none;">
+                            <img src="../assets/images/copy-solid.svg" class="copy-icon" alt="Copy">
+                            <span>Copy (No Tint)</span>
+                        </button>
+                        <a id="openInBuilder" href="#" class="cat-link-btn">
+                            🎨 Open in Visual Builder
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sprite variations section -->
+        <div class="sprites-section" id="spritesSection" style="display: none;">
+            <div class="sprites-header">
+                <h3>All Sprite Variations</h3>
+                <p class="sprites-subtitle">Click any sprite to copy</p>
+            </div>
+            
+            <div class="sprites-grid" id="spritesGrid">
+                <!-- Sprite items will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast">Copied!</div>
+
+    <!-- Scripts -->
+    <script>
+        window.singleCatConfig = {
+            accessories: { min: 1, max: 4 },
+            tortie: { min: 1, max: 4 }
+        };
+    </script>
+    <script type="module" src="../js/pages/single-cat.js"></script>
+</body>
+</html>

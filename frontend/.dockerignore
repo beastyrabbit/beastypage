@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+Dockerfile
+.vitest
+coverage
+dist
+.env.local
+.env.development
+.env.test
+.env.production
+.env*

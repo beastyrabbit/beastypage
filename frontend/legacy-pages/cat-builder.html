@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://eu.i.posthog.com https://cdn.jsdelivr.net https://eu-assets.i.posthog.com; img-src 'self' https://media.githubusercontent.com data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';">
+    <title>Visual Cat Builder - Create Your Perfect Cat</title>
+    <link rel="icon" type="image/png" href="../assets/images/beasty-favicon-rounded.png">
+    <link rel="stylesheet" href="../assets/styles/pages/cat-builder.css">
+</head>
+<body>
+    <!-- Floating back button -->
+    <a class="back-btn" href="../index.html">← Back</a>
+
+    <!-- Tab navigation -->
+    <nav class="tab-navigation" id="tabNavigation">
+        <button class="tab-btn active" data-tab="pose">
+            <span class="tab-icon">🐱</span>
+            <span class="tab-title">Age/Pose</span>
+        </button>
+        <button class="tab-btn" data-tab="pattern">
+            <span class="tab-icon">🎨</span>
+            <span class="tab-title">Pattern</span>
+        </button>
+        <button class="tab-btn" data-tab="color">
+            <span class="tab-icon">🎨</span>
+            <span class="tab-title">Base Color</span>
+        </button>
+        <button class="tab-btn" data-tab="tortiePattern">
+            <span class="tab-icon">🌈</span>
+            <span class="tab-title">Two-Color Pattern</span>
+        </button>
+        <button class="tab-btn" data-tab="tortieColor">
+            <span class="tab-icon">🌈</span>
+            <span class="tab-title">Two-Color Secondary</span>
+        </button>
+        <button class="tab-btn" data-tab="tortieMask">
+            <span class="tab-icon">🌈</span>
+            <span class="tab-title">Two-Color Mask</span>
+        </button>
+        <button class="tab-btn" data-tab="eyeColor">
+            <span class="tab-icon">👁️</span>
+            <span class="tab-title">Primary Eye Color</span>
+        </button>
+        <button class="tab-btn" data-tab="eyeColor2">
+            <span class="tab-icon">👁️</span>
+            <span class="tab-title">Secondary Eye Color</span>
+        </button>
+        <button class="tab-btn" data-tab="whitePatches">
+            <span class="tab-icon">✨</span>
+            <span class="tab-title">White Patches</span>
+        </button>
+        <button class="tab-btn" data-tab="points">
+            <span class="tab-icon">✨</span>
+            <span class="tab-title">Color Points</span>
+        </button>
+        <button class="tab-btn" data-tab="whiteTint">
+            <span class="tab-icon">✨</span>
+            <span class="tab-title">White Tint</span>
+        </button>
+        <button class="tab-btn" data-tab="vitiligo">
+            <span class="tab-icon">✨</span>
+            <span class="tab-title">Vitiligo</span>
+        </button>
+        <button class="tab-btn" data-tab="skinColor">
+            <span class="tab-icon">🎭</span>
+            <span class="tab-title">Skin Color</span>
+        </button>
+        <button class="tab-btn" data-tab="tint">
+            <span class="tab-icon">🎭</span>
+            <span class="tab-title">Tints</span>
+        </button>
+        <button class="tab-btn" data-tab="lineart">
+            <span class="tab-icon">✏️</span>
+            <span class="tab-title">Lineart Style</span>
+        </button>
+        <button class="tab-btn" data-tab="plantAccessory">
+            <span class="tab-icon">🌿</span>
+            <span class="tab-title">Plant Accessories</span>
+        </button>
+        <button class="tab-btn" data-tab="wildAccessory">
+            <span class="tab-icon">🦋</span>
+            <span class="tab-title">Wild Accessories</span>
+        </button>
+        <button class="tab-btn" data-tab="collar">
+            <span class="tab-icon">🎀</span>
+            <span class="tab-title">Collars</span>
+        </button>
+        <button class="tab-btn" data-tab="battleScars">
+            <span class="tab-icon">⚔️</span>
+            <span class="tab-title">Battle Scars</span>
+        </button>
+        <button class="tab-btn" data-tab="missingParts">
+            <span class="tab-icon">🩹</span>
+            <span class="tab-title">Missing Parts</span>
+        </button>
+        <button class="tab-btn" data-tab="environmentalScars">
+            <span class="tab-icon">🔥</span>
+            <span class="tab-title">Environmental Scars</span>
+        </button>
+    </nav>
+
+
+
+    <!-- Main container -->
+    <div class="builder-container" id="builderContainer">
+        <!-- Parameters list -->
+        <div class="parameters-container">
+            <div class="parameters-scroll">
+                <!-- Age/Pose -->
+                <div class="parameter-section" data-section="pose">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🐱</span>
+                            <span>Age/Pose</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="spriteGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Pattern -->
+                <div class="parameter-section" data-section="pattern">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🎨</span>
+                            <span>Pattern</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="patternGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Base Color -->
+                <div class="parameter-section" data-section="color">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🎨</span>
+                            <span>Base Color</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="colorGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Two-Color Pattern -->
+                <div class="parameter-section" data-section="tortiePattern">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🌈</span>
+                            <span>Two-Color Pattern</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="tortiePatternGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Two-Color Secondary -->
+                <div class="parameter-section" data-section="tortieColor">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🌈</span>
+                            <span>Two-Color Secondary</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="tortieColorGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Two-Color Mask -->
+                <div class="parameter-section" data-section="tortieMask">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🌈</span>
+                            <span>Two-Color Mask</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="tortieMaskGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Primary Eye Color -->
+                <div class="parameter-section" data-section="eyeColor">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">👁️</span>
+                            <span>Primary Eye Color</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="eyeColorGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Secondary Eye Color -->
+                <div class="parameter-section" data-section="eyeColor2">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">👁️</span>
+                            <span>Secondary Eye Color</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="eyeColor2Grid"></div>
+                    </div>
+                </div>
+
+                <!-- White Patches -->
+                <div class="parameter-section" data-section="whitePatches">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">✨</span>
+                            <span>White Patches</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="whitePatchesGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Color Points -->
+                <div class="parameter-section" data-section="points">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">✨</span>
+                            <span>Color Points</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="pointsGrid"></div>
+                    </div>
+                </div>
+
+                <!-- White Tint -->
+                <div class="parameter-section" data-section="whiteTint">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">✨</span>
+                            <span>White Tint</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="whiteTintGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Vitiligo -->
+                <div class="parameter-section" data-section="vitiligo">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">✨</span>
+                            <span>Vitiligo</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="vitiligoGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Skin Color -->
+                <div class="parameter-section" data-section="skinColor">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🎭</span>
+                            <span>Skin Color</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="skinColorGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Tints -->
+                <div class="parameter-section" data-section="tint">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🎭</span>
+                            <span>Tints</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="tintGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Lineart Style -->
+                <div class="parameter-section" data-section="lineart">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">✏️</span>
+                            <span>Lineart Style</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="lineartGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Plant Accessories -->
+                <div class="parameter-section" data-section="plantAccessory">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🌿</span>
+                            <span>Plant Accessories</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="plantAccessoryGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Wild Accessories -->
+                <div class="parameter-section" data-section="wildAccessory">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🦋</span>
+                            <span>Wild Accessories</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="wildAccessoryGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Collars -->
+                <div class="parameter-section" data-section="collar">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🎀</span>
+                            <span>Collars</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="collarGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Battle Scars -->
+                <div class="parameter-section" data-section="battleScars">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">⚔️</span>
+                            <span>Battle Scars</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="battleScarsGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Missing Parts -->
+                <div class="parameter-section" data-section="missingParts">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🩹</span>
+                            <span>Missing Parts</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="missingPartsGrid"></div>
+                    </div>
+                </div>
+
+                <!-- Environmental Scars -->
+                <div class="parameter-section" data-section="environmentalScars">
+                    <div class="section-divider">
+                        <span class="section-divider-text">
+                            <span class="section-icon">🔥</span>
+                            <span>Environmental Scars</span>
+                        </span>
+                    </div>
+                    <div class="parameter-group">
+                        <div class="sprite-grid" id="environmentalScarsGrid"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fixed preview area -->
+        <main class="preview-area">
+            <!-- Control buttons above preview -->
+            <div class="preview-controls-top">
+                <div class="controls-left">
+                    <button id="shadingToggleBtn" class="control-btn toggle-btn" title="Toggle Shading">
+                        <span>💡</span>
+                    </button>
+                    <button id="reverseToggleBtn" class="control-btn toggle-btn" title="Flip Horizontally">
+                        <span>↔️</span>
+                    </button>
+                    <button id="tortieToggleBtn" class="control-btn toggle-btn" title="Toggle Tortie/Calico">
+                        <span>🌈</span>
+                    </button>
+                </div>
+                
+                <div class="controls-center">
+                    <button id="randomizeBtn" class="control-btn" title="Randomize All">
+                        <span>🎲</span>
+                    </button>
+                    <button id="resetBtn" class="control-btn" title="Reset All">
+                        <span>🔄</span>
+                    </button>
+                    <button id="refreshThumbnailsBtn" class="control-btn" title="Refresh All Thumbnails">
+                        <span>🔃</span>
+                    </button>
+                </div>
+                
+                <div class="controls-right">
+                    <button id="loadUrlBtn" class="control-btn" title="Load from URL">
+                        <span>📥</span>
+                    </button>
+                    <button id="importClanCatsBtn" class="control-btn" title="Import Clan Cats">
+                        <span>🐾</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Zoom control separate row -->
+            <div class="zoom-control" style="width: 100%; padding-bottom: 15px; margin-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span class="slider-label">🔍</span>
+                <input type="range" id="imageSizeSlider" class="image-size-slider" min="1" max="8.5" value="3" step="0.5">
+                <span id="sizeDisplay" class="size-display">3x</span>
+            </div>
+            
+            <div class="preview-container">
+                <div class="cat-preview-wrapper">
+                    <canvas id="catPreview" width="800" height="800"></canvas>
+                    <div class="preview-loading" id="previewLoading">
+                        <div class="cat-paw-loader">
+                            <img src="../assets/images/paw.png" alt="Loading..." width="50" height="50">
+                        </div>
+                        <span>Generating...</span>
+                    </div>
+                </div>
+                
+                <div class="preview-controls">
+                    <button id="downloadBtn" class="action-btn primary">
+                        <span>💾</span>
+                        <span>Download Cat</span>
+                    </button>
+                    <button id="shareBtn" class="action-btn">
+                        <span>🔗</span>
+                        <span>Share URL</span>
+                    </button>
+                    <button id="copyUrlBtn" class="action-btn">
+                        <span>📋</span>
+                        <span>Copy Cat URL</span>
+                    </button>
+                    <button id="viewInMakerBtn" class="action-btn">
+                        <span>🔗</span>
+                        <span>View in Cat Maker</span>
+                    </button>
+                </div>
+
+                <div class="cat-info">
+                    <h3>Current Parameters</h3>
+                    <div id="currentParams" class="params-display"></div>
+                </div>
+                
+                <button id="helpBtn" class="action-btn" style="width: 100%; margin-top: 20px;">
+                    <span>❓</span>
+                    <span>Help / Getting Started</span>
+                </button>
+            </div>
+        </main>
+
+        <!-- Mobile parameter drawer toggle -->
+        <button class="mobile-drawer-toggle" id="mobileDrawerToggle">
+            <span>☰</span>
+        </button>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast">Copied!</div>
+
+    <!-- Sprite popup -->
+    <div id="spritePopup" class="sprite-popup-overlay">
+        <div class="sprite-popup-content">
+            <button class="sprite-popup-close" id="spritePopupClose">✕</button>
+            <h3 class="sprite-popup-title" id="spritePopupTitle">Sprite Preview</h3>
+            <canvas id="spritePopupCanvas" class="sprite-popup-canvas"></canvas>
+        </div>
+    </div>
+
+    <!-- URL Load Modal -->
+    <div id="urlLoadModal" class="sprite-popup-overlay">
+        <div class="sprite-popup-content" style="width: 600px;">
+            <button class="sprite-popup-close" id="urlLoadClose">✕</button>
+            <h3 class="sprite-popup-title">Load Cat from URL</h3>
+            <div style="padding: 20px;">
+                <p style="color: var(--muted); margin-bottom: 15px; font-size: 14px;">
+                    Paste a URL from the Pixel Cat Maker to load all parameters
+                </p>
+                <input type="text" id="urlInput" placeholder="https://cgen-tools.github.io/pixel-cat-maker/?..." 
+                    style="width: 100%; padding: 10px; background: var(--glass); border: 1px solid var(--glass-border); 
+                           border-radius: var(--radius-sm); color: var(--text); font-size: 14px; margin-bottom: 15px;">
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button id="urlLoadCancel" style="padding: 8px 20px; background: var(--glass); 
+                        border: 1px solid var(--glass-border); border-radius: var(--radius-sm); 
+                        color: var(--muted); cursor: pointer; font-size: 14px;">
+                        Cancel
+                    </button>
+                    <button id="urlLoadConfirm" style="padding: 8px 20px; background: var(--brand-1); 
+                        border: none; border-radius: var(--radius-sm); color: white; 
+                        cursor: pointer; font-size: 14px; font-weight: 600;">
+                        Load Cat
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay for initial sprite generation -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="cat-paw-loader cat-paw-loader-large spinner-large">
+                <img src="../assets/images/paw.png" alt="Loading..." width="60" height="60">
+            </div>
+            <h2>Preparing Visual Cat Builder</h2>
+            <p>Generating sprite previews...</p>
+            <div class="loading-progress">
+                <div class="progress-bar" id="loadingProgress"></div>
+            </div>
+            <p id="loadingStatus">Loading base sprites...</p>
+        </div>
+    </div>
+
+    <!-- Help/Landing overlay -->
+    <div id="helpOverlay" class="help-overlay">
+        <div class="help-content">
+            <button class="help-close" id="helpClose">✕</button>
+            <h2>🎨 Welcome to Visual Cat Builder!</h2>
+            
+            <div class="help-section">
+                <h3>🔧 How It Works</h3>
+                <p style="margin-bottom: 20px; color: var(--muted); line-height: 1.6;">
+                    Build your perfect cat by selecting sprites from each parameter section. 
+                    Use the tabs at the top to quickly navigate between different categories, 
+                    or scroll through all options. Your cat preview updates instantly on the right!
+                </p>
+            </div>
+            
+            <div class="help-section">
+                <h3>🎮 Header Controls</h3>
+                <div class="help-grid">
+                    <div class="help-item">
+                        <span class="help-icon">🔍</span>
+                        <div>
+                            <strong>Image Size Slider</strong>
+                            <p>Scale preview images from 1x to 8.5x for better visibility</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <span class="help-icon">💡</span>
+                        <div>
+                            <strong>Shading Toggle</strong>
+                            <p>Add depth and shadows to your cat</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <span class="help-icon">↔️</span>
+                        <div>
+                            <strong>Flip Horizontal</strong>
+                            <p>Mirror your cat left/right</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <span class="help-icon">🌈</span>
+                        <div>
+                            <strong>Tortie/Calico Toggle</strong>
+                            <p>Enable/disable two-color patterns. Auto-enables when selecting tortie options</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <span class="help-icon">🔃</span>
+                        <div>
+                            <strong>Refresh Thumbnails</strong>
+                            <p>Regenerate all preview images</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <span class="help-icon">🎲</span>
+                        <div>
+                            <strong>Randomize</strong>
+                            <p>Generate a random cat combination</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <span class="help-icon">🔄</span>
+                        <div>
+                            <strong>Reset All</strong>
+                            <p>Reset all parameters to default values</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <span class="help-icon">📥</span>
+                        <div>
+                            <strong>Load from URL</strong>
+                            <p>Import a cat from Pixel Cat Maker URL</p>
+                        </div>
+                    </div>
+                    <div class="help-item">
+                        <span class="help-icon">🐾</span>
+                        <div>
+                            <strong>Import Clan Cats</strong>
+                            <p>Load cats from ClanGen JSON export</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="help-start-btn" id="helpStart">Start Building! 🚀</button>
+        </div>
+    </div>
+
+    <!-- Clan Cats Import Modal -->
+    <div id="clanCatsModal" class="sprite-popup-overlay">
+        <div class="sprite-popup-content" style="width: 90%; max-width: 1200px; height: 80vh; display: flex; flex-direction: column;">
+            <button class="sprite-popup-close" id="clanCatsClose">✕</button>
+            <h3 class="sprite-popup-title">Import Clan Cats</h3>
+            
+            <div style="padding: 20px; flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                <!-- Simplified upload/paste buttons -->
+                <div id="clanCatsUploadSection" style="margin-bottom: 20px;">
+                    <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
+                        <button id="clanCatsBrowseBtn" style="padding: 12px 30px; background: var(--brand-1); 
+                            border: none; border-radius: var(--radius-sm); color: white; 
+                            cursor: pointer; font-size: 14px; font-weight: 600;">
+                            📁 Browse File
+                        </button>
+                        <button id="clanCatsPasteBtn" style="padding: 12px 30px; background: var(--brand-1); 
+                            border: none; border-radius: var(--radius-sm); color: white; 
+                            cursor: pointer; font-size: 14px; font-weight: 600;">
+                            📋 Paste JSON
+                        </button>
+                        <input type="file" id="clanCatsFile" accept=".json" style="display: none;">
+                    </div>
+                    <textarea id="clanCatsPasteArea" placeholder="Paste your clan cats JSON here and press Enter or click Load..." 
+                        style="width: 100%; height: 150px; padding: 10px; background: var(--glass); 
+                               border: 1px solid var(--glass-border); border-radius: var(--radius-sm); 
+                               color: var(--text); font-size: 14px; font-family: monospace; display: none; resize: vertical;">
+                    </textarea>
+                    <button id="clanCatsLoadBtn" style="padding: 10px 30px; background: var(--succ); 
+                        border: none; border-radius: var(--radius-sm); color: white; 
+                        cursor: pointer; font-size: 14px; font-weight: 600; display: none;">
+                        Load Pasted JSON
+                    </button>
+                </div>
+                
+                <!-- Cat selection grid (always visible if cats loaded) -->
+                <div id="clanCatsGridSection" style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+                    <p id="clanCatsGridLabel" style="color: var(--muted); margin-bottom: 15px; font-size: 14px; display: none;">
+                        Select a cat to load into the builder
+                    </p>
+                    <div id="clanCatsGrid" style="flex: 1; overflow-y: auto; display: grid; 
+                        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); 
+                        gap: 15px; padding: 10px; background: var(--glass); 
+                        border: 1px solid var(--glass-border); border-radius: var(--radius-sm); min-height: 200px;">
+                        <!-- Cat items will be dynamically added here -->
+                        <div id="clanCatsEmptyState" style="grid-column: 1 / -1; text-align: center; 
+                            padding: 40px 20px; color: var(--muted); font-size: 14px;">
+                            <div style="font-size: 48px; margin-bottom: 15px; opacity: 0.3;">🐱</div>
+                            <p>No cats loaded yet</p>
+                            <p style="font-size: 12px; margin-top: 8px;">Use the Browse or Paste buttons above to load your clan cats</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px;">
+                        <button id="clanCatsCancelBtn" style="padding: 8px 20px; background: var(--glass); 
+                            border: 1px solid var(--glass-border); border-radius: var(--radius-sm); 
+                            color: var(--muted); cursor: pointer; font-size: 14px;">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="../js/posthog-init.js"></script>
+    <script type="module" src="../js/pages/cat-builder.js"></script>
+</body>
+</html>

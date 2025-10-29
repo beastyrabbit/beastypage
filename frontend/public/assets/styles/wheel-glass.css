@@ -1,0 +1,675 @@
+/* Wheel Glass - Premium Glassmorphism CSS */
+
+:root {
+    --bg: #0b0f1a;
+    --panel: rgba(255, 255, 255, 0.06);
+    --panel-strong: rgba(255, 255, 255, 0.1);
+    --border: rgba(255, 255, 255, 0.16);
+    --text: rgba(255, 255, 255, 0.95);
+    --muted: rgba(255, 255, 255, 0.7);
+    --accent: #ffd86e; /* golden accent */
+    --shadow-lg: 0 30px 120px rgba(0, 0, 0, 0.55);
+    --shadow-md: 0 18px 60px rgba(0, 0, 0, 0.45);
+    --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.35);
+    
+    /* Rarity colors */
+    --moondust: #808080;
+    --starborn: #22c55e;
+    --lunara: #d4af37;
+    --celestara: #3b82f6;
+    --divinara: #f97316;
+    --holo-nova: #e0e7ff;
+    --singularity: #fbbf24;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    background: var(--bg);
+    overflow-x: hidden;
+}
+
+/* Catdex-style animated background */
+.bg {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(1200px 700px at 20% -10%, #2a2520, #1a1714);
+    z-index: -3;
+}
+
+.blob {
+    position: fixed;
+    filter: blur(70px);
+    mix-blend-mode: screen;
+    opacity: 0.35;
+    border-radius: 50%;
+    z-index: -2;
+}
+
+.blob.a {
+    width: 520px;
+    height: 520px;
+    left: -120px;
+    top: 140px;
+    background: conic-gradient(
+        from 0deg,
+        #d4af37,
+        #f4e4c1,
+        #b8860b,
+        #d4af37
+    );
+    animation: blobA 26s linear infinite;
+    opacity: 0.3;
+}
+
+.blob.b {
+    width: 440px;
+    height: 440px;
+    right: -100px;
+    top: 48%;
+    background: conic-gradient(
+        from 60deg,
+        #ffd700,
+        #daa520,
+        #f0e68c,
+        #ffd700
+    );
+    animation: blobB 32s linear infinite;
+    opacity: 0.28;
+}
+
+.blob.c {
+    width: 360px;
+    height: 360px;
+    left: 45%;
+    bottom: -120px;
+    background: conic-gradient(
+        from 120deg,
+        #ffd86e,
+        #d4af37,
+        #c59cff,
+        #ffd86e
+    );
+    animation: blobC 36s linear infinite;
+    opacity: 0.28;
+}
+
+@keyframes blobA {
+    0% {
+        transform: translate(0, 0) rotate(0);
+    }
+    50% {
+        transform: translate(26px, -14px) rotate(180deg);
+    }
+    100% {
+        transform: translate(0, 0) rotate(360deg);
+    }
+}
+
+@keyframes blobB {
+    0% {
+        transform: translate(0, 0) rotate(0);
+    }
+    50% {
+        transform: translate(-16px, 16px) rotate(180deg);
+    }
+    100% {
+        transform: translate(0, 0) rotate(360deg);
+    }
+}
+
+@keyframes blobC {
+    0% {
+        transform: translate(0, 0) rotate(0);
+    }
+    50% {
+        transform: translate(14px, 0) rotate(180deg);
+    }
+    100% {
+        transform: translate(0, 0) rotate(360deg);
+    }
+}
+
+.noise {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.18;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' opacity='0.12' width='40' height='40'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Layout wrapper */
+.wrap {
+    min-height: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+}
+
+/* Floating back button */
+.back-btn {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid #2f3036;
+    background: rgba(23, 24, 27, 0.85);
+    color: #cfcfcf;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+}
+
+.back-btn:hover {
+    color: #fff;
+    border-color: #ffd700;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.3);
+}
+
+
+/* Main content area */
+main {
+    display: grid;
+    place-items: center;
+    padding: 48px 16px 48px;
+}
+
+/* Responsive wheel sizing */
+.wheel-size {
+    --wheel-diameter: clamp(340px, min(66vh, 66vw), 920px);
+}
+
+/* Spinner container wrapper */
+.spinner-container {
+    position: relative;
+    display: inline-block;
+    margin: 20px auto;
+}
+
+/* Wheel frame with glass effect */
+#wheel-container {
+    position: relative;
+    width: var(--wheel-diameter);
+    height: var(--wheel-diameter);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--border);
+    background: linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.08),
+            rgba(255, 255, 255, 0.04)
+        ),
+        var(--panel);
+    box-shadow: var(--shadow-lg),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    overflow: visible;
+}
+
+/* Subtle golden rim glow */
+#wheel-container::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 0 28px rgba(255, 216, 110, 0.15);
+    pointer-events: none;
+}
+
+/* Wheel canvas - stays perfectly round */
+#wheel-container canvas,
+#wheel-container .wheel {
+    width: calc(var(--wheel-diameter) - 56px);
+    height: calc(var(--wheel-diameter) - 56px);
+    border-radius: 50%;
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+}
+
+/* Golden pointer */
+.pointer {
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 30px solid transparent;
+    border-right: 30px solid transparent;
+    border-top: 60px solid var(--accent);
+    filter: drop-shadow(0 0 10px rgba(255, 216, 110, 0.6));
+    z-index: 6;
+    pointer-events: none;
+}
+
+/* Premium dark glass center button */
+.spin-button {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: calc(var(--wheel-diameter) * 0.16);
+    height: calc(var(--wheel-diameter) * 0.16);
+    min-width: 70px;
+    min-height: 70px;
+    max-width: 150px;
+    max-height: 150px;
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background:
+        radial-gradient(120% 120% at 30% 30%, rgba(255,255,255,0.14), rgba(255,255,255,0.06) 40%, rgba(0,0,0,0.3) 70%),
+        linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+    background-color: rgba(10, 14, 24, 0.85);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0;
+    box-shadow: 0 24px 62px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+        inset 0 -14px 28px rgba(0, 0, 0, 0.45);
+    transform: translateZ(0);
+    transition: transform 150ms ease, filter 150ms ease, box-shadow 150ms ease;
+    z-index: 10;
+}
+
+/* Subtle metallic halo ring */
+.spin-button::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: conic-gradient(
+        from 0deg,
+        #f1f5f9,
+        #a7b4d1,
+        #f1f5f9,
+        #99a6c7,
+        #f1f5f9
+    );
+    opacity: 0.2;
+    filter: blur(4px);
+    transition: opacity 150ms ease, filter 150ms ease;
+    z-index: -1;
+}
+
+/* Inner gloss */
+.spin-button::after {
+    content: "";
+    position: absolute;
+    width: 64%;
+    height: 64%;
+    top: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: radial-gradient(
+        120% 120% at 50% 0%,
+        rgba(255, 255, 255, 0.35),
+        rgba(255, 255, 255, 0.06) 45%,
+        transparent 70%
+    );
+    pointer-events: none;
+}
+
+.spin-button:hover:not(:disabled) {
+    transform: translateY(-2px) scale(1.02);
+    filter: brightness(1.04);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+        inset 0 -14px 28px rgba(0, 0, 0, 0.45);
+}
+
+.spin-button:hover::before {
+    opacity: 0.32;
+    filter: blur(3px);
+}
+
+.spin-button:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+    filter: brightness(0.98);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+        inset 0 -18px 32px rgba(0, 0, 0, 0.55);
+}
+
+.spin-button:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+}
+
+.spin-button svg {
+    width: 55%;
+    height: 55%;
+    max-width: 64px;
+    max-height: 64px;
+    fill: currentColor;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+    transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.spin-button:disabled svg {
+    animation: none !important;
+}
+
+.spin-button:active svg {
+    transform: scale(0.96);
+    opacity: 0.92;
+}
+
+/* Rotating animation for spin button icon */
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin-button svg {
+    animation: rotate 2s linear infinite;
+}
+
+/* Result display */
+.result {
+    font-size: 2.5em;
+    margin: 30px auto;
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    text-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+    position: relative;
+    z-index: 50;
+    flex-direction: column;
+}
+
+.result.win {
+    animation: winAnimation 0.5s ease;
+}
+
+@keyframes winAnimation {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Rarity table with glass treatment */
+.rarity-table {
+    margin-top: 30px;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.08),
+        rgba(255, 255, 255, 0.04)
+    );
+    padding: 30px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    width: 100%;
+    max-width: 600px;
+    box-shadow: var(--shadow-md),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(10px);
+}
+
+.rarity-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.rarity-table th,
+.rarity-table td {
+    padding: 12px 16px;
+    text-align: left;
+}
+
+.rarity-table th {
+    font-weight: 600;
+    color: #d4af37;
+    border-bottom: 2px solid rgba(212, 175, 55, 0.3);
+}
+
+.rarity-table td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.rarity-table th:last-child,
+.rarity-table td:last-child {
+    text-align: right;
+}
+
+.rarity-table tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.prize-name {
+    font-weight: 600;
+}
+
+/* Prize colors in table */
+.rarity-table tr:nth-child(1) .prize-name { color: var(--moondust); }
+.rarity-table tr:nth-child(2) .prize-name { color: var(--starborn); }
+.rarity-table tr:nth-child(3) .prize-name { color: var(--lunara); }
+.rarity-table tr:nth-child(4) .prize-name { color: var(--celestara); }
+.rarity-table tr:nth-child(5) .prize-name { color: var(--divinara); }
+.rarity-table tr:nth-child(6) .prize-name { color: var(--holo-nova); }
+.rarity-table tr:nth-child(7) .prize-name { color: var(--singularity); }
+
+.prize-chance {
+    color: var(--muted);
+}
+
+/* Popup Modal with glass styling */
+.popup-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.popup-overlay.show {
+    display: flex;
+}
+
+.popup-content {
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.12),
+        rgba(255, 255, 255, 0.06)
+    );
+    backdrop-filter: blur(20px) saturate(120%);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    animation: popupAppear 0.3s ease;
+    box-shadow: var(--shadow-lg),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+@keyframes popupAppear {
+    0% { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.popup-content h2 {
+    margin: 0 0 20px 0;
+    font-size: 2em;
+    background: linear-gradient(45deg, #d4af37, #ffd700);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.popup-prize {
+    font-size: 3em;
+    font-weight: 700;
+    margin: 20px 0 30px 0;
+    text-shadow: 0 0 20px currentColor;
+}
+
+.close-button {
+    background: linear-gradient(
+        180deg,
+        rgba(212, 175, 55, 0.8),
+        rgba(184, 134, 11, 0.8)
+    );
+    color: white;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    padding: 15px 30px;
+    border-radius: 10px;
+    font-size: 1.2em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 24px rgba(212, 175, 55, 0.3),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.close-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(212, 175, 55, 0.4),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Special holographic effect for Holo Nova */
+.holo-nova {
+    background: linear-gradient(45deg, #ff0080, #00ff88, #00aaff, #ff00ff, #ffaa00);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: holographic 3s ease-in-out infinite;
+}
+
+@keyframes holographic {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Debug Controls with glass styling */
+.debug-controls {
+    margin-top: 30px;
+    padding: 20px;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.08),
+        rgba(255, 255, 255, 0.04)
+    );
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.debug-controls h3 {
+    margin-bottom: 15px;
+    color: #d4af37;
+}
+
+.debug-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.debug-buttons button {
+    padding: 10px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.debug-buttons button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--muted);
+}
+
+/* Container wrapper for content */
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    header h1 { font-size: 18px; }
+    
+    .wheel-size {
+        --wheel-diameter: clamp(300px, min(80vh, 80vw), 400px);
+    }
+    
+    .pointer {
+        border-left-width: 20px;
+        border-right-width: 20px;
+        border-top-width: 40px;
+        top: -30px;
+    }
+    
+    .spin-button {
+        min-width: 60px;
+        min-height: 60px;
+    }
+    
+    .debug-buttons {
+        flex-direction: column;
+    }
+    
+    .debug-buttons button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .pointer {
+        border-left-width: 14px;
+        border-right-width: 14px;
+        border-top-width: 28px;
+        top: -20px;
+    }
+}

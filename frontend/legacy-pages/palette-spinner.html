@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://www.thecolorapi.com https://eu.i.posthog.com https://cdn.jsdelivr.net https://eu-assets.i.posthog.com; img-src 'self' https://media.githubusercontent.com data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;">
+  <title>Palette Spinner</title>
+  <link rel="icon" type="image/png" href="../assets/images/beasty-favicon-rounded.png">
+  <link rel="stylesheet" href="../assets/styles/pages/single-cat.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.11.2/cdn/themes/dark.css">
+      <script type="module" src="../js/posthog-init.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.11.2/cdn/shoelace.js"></script>
+  <style>
+    /* Overrides for palette display */
+    .palette-card { background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+    .row { display: grid; gap: 0; height: 140px; }
+    .sw { height: 100%; transition: background-color 600ms ease-in-out; }
+
+    .controls-bar { display: flex; gap: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .ctrl-inline { display: inline-flex; align-items: center; gap: 10px; }
+
+    .hex-row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); padding: 10px; }
+    .hex-chip { background: #0d121c; border: 1px solid #1a2030; border-radius: 8px; padding: 6px 8px; font-variant-numeric: tabular-nums; text-align: center; opacity: .9; }
+
+    /* Nicer numeric inputs for palette size */
+    .ctrl-inline input.inline-num {
+      width: 100px;
+      height: 36px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 0 12px;
+      font-size: 14px;
+      outline: none;
+    }
+    .ctrl-inline input.inline-num:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(212,175,55,0.25); }
+    .ctrl-inline input.inline-num::-webkit-outer-spin-button,
+    .ctrl-inline input.inline-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .ctrl-inline input[type=number].inline-num { -moz-appearance: textfield; }
+    .range-sep { margin: 0 6px; color: var(--muted); }
+
+    .go-btn { height: 40px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+    .go-btn:hover { border-color: var(--accent); }
+
+    .copy-btn { height: 40px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+    /* Subtle text link for footer meta */
+    .api-link { color: var(--muted); text-decoration: none; font-size: 13px; opacity: .85; border: 0; background: transparent; padding: 0; }
+    .api-link:hover, .api-link:focus { color: var(--text); text-decoration: underline; outline: none; }
+  </style>
+</head>
+<body class="sl-theme-dark">
+  <a class="back-btn" href="../index.html">← Back</a>
+
+  <!-- Background elements -->
+  <div class="bg"></div>
+  <div class="blob blob-a"></div>
+  <div class="blob blob-b"></div>
+  <div class="blob blob-c"></div>
+
+  <div class="container">
+    <div class="building-section">
+      <div class="building-container">
+        <div class="building-header">
+          <h2>Palette Spinner</h2>
+        </div>
+
+        <div class="controls-bar" style="margin-bottom: 16px;">
+          <div class="sl-toggle-group">
+            <span class="setting-label">Length:</span>
+            <sl-radio-group id="lengthGroup" class="sl-segment" value="normal">
+              <sl-radio-button value="quick">Quick</sl-radio-button>
+              <sl-radio-button value="normal">Normal</sl-radio-button>
+              <sl-radio-button value="long">Long</sl-radio-button>
+            </sl-radio-group>
+          </div>
+
+          <div class="sl-toggle-group">
+            <span class="setting-label">Transform:</span>
+            <sl-radio-group id="transformGroup" class="sl-segment" value="css">
+              <sl-radio-button value="css">CSS</sl-radio-button>
+              <sl-radio-button value="rgb">RGB</sl-radio-button>
+              <sl-radio-button value="hsl">HSL</sl-radio-button>
+              <sl-radio-button value="oklch">OKLCH</sl-radio-button>
+            </sl-radio-group>
+          </div>
+
+          <div class="sl-toggle-group">
+            <span class="setting-label">Speed:</span>
+            <sl-radio-group id="speedGroup" class="sl-segment" value="normal">
+              <sl-radio-button value="fast">Fast</sl-radio-button>
+              <sl-radio-button value="normal">Normal</sl-radio-button>
+              <sl-radio-button value="slow">Chill</sl-radio-button>
+            </sl-radio-group>
+          </div>
+
+          <div class="sl-toggle-group">
+            <span class="setting-label">Modes:</span>
+            <div id="modeButtons" class="palette-toggle-buttons">
+              <button type="button" class="palette-toggle" data-mode="monochrome" aria-pressed="false">Monochrome</button>
+              <button type="button" class="palette-toggle" data-mode="monochrome-dark" aria-pressed="false">Mono Dark</button>
+              <button type="button" class="palette-toggle" data-mode="monochrome-light" aria-pressed="false">Mono Light</button>
+              <button type="button" class="palette-toggle active" data-mode="analogic" aria-pressed="true">Analogic</button>
+              <button type="button" class="palette-toggle active" data-mode="complement" aria-pressed="true">Complement</button>
+              <button type="button" class="palette-toggle active" data-mode="analogic-complement" aria-pressed="true">Analogic+Comp</button>
+              <button type="button" class="palette-toggle active" data-mode="triad" aria-pressed="true">Triad</button>
+              <button type="button" class="palette-toggle active" data-mode="quad" aria-pressed="true">Quad</button>
+            </div>
+          </div>
+
+          <div class="ctrl-inline">
+            <span class="setting-label">Palette size:</span>
+            <div class="ctrl-inline" style="gap: 6px;">
+              <input id="sizeA" class="inline-num" type="number" min="1" max="12" value="5" aria-label="Min or fixed count">
+              <span class="range-sep">–</span>
+              <input id="sizeB" class="inline-num" type="number" min="1" max="12" placeholder="max (optional)" aria-label="Max count (optional)">
+            </div>
+            <span class="setting-label" style="opacity:.7; font-size: 12px;">Tip: Fill only the first for fixed size; add second to randomize between them.</span>
+          </div>
+
+          <div class="ctrl-inline">
+            <button id="goButton" class="go-btn">Go</button>
+            <button id="copyButton" class="copy-btn" style="display:none;">Copy PNG</button>
+          </div>
+        </div>
+
+        <div class="palette-card">
+          <div id="row" class="row" style="grid-template-columns: repeat(5, 1fr);"></div>
+          <div id="meta" class="parameter-table" style="display: flex; justify-content: space-between; align-items: center; padding: 10px;">
+            <span id="counter"></span>
+            <a href="https://www.thecolorapi.com/" target="_blank" rel="noopener noreferrer" class="api-link">The Color API</a>
+          </div>
+          <div id="hexRow" class="hex-row" style="display:none;"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Copied!</div>
+
+  <script type="module" src="../js/pages/palette-spinner.js"></script>
+</body>
+</html>

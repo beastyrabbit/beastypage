@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://eu.i.posthog.com https://cdn.jsdelivr.net https://eu-assets.i.posthog.com; img-src 'self' https://media.githubusercontent.com data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;">
+    <title>Guided Cat Builder Timeline</title>
+    <link rel="icon" type="image/png" href="../assets/images/beasty-favicon-rounded.png">
+    <link rel="stylesheet" href="../assets/styles/pages/cat-builder-wizard.css">
+    <link rel="stylesheet" href="../assets/styles/pages/cat-builder-viewer.css">
+</head>
+<body class="wizard-page viewer-page">
+    <a class="back-btn" href="../pages/cat-builder-wizard.html">← Back to Builder</a>
+
+    <div class="bg"></div>
+    <div class="blob blob-a"></div>
+    <div class="blob blob-b"></div>
+    <div class="blob blob-c"></div>
+
+    <main class="viewer-layout">
+        <section class="viewer-summary">
+            <header class="viewer-header">
+                <h1>Creation Timeline</h1>
+                <p>Review every step taken to build this cat.</p>
+            </header>
+            <div class="viewer-canvas-wrap">
+                <canvas id="finalCanvas" width="700" height="700"></canvas>
+            </div>
+            <div class="viewer-actions">
+                <button id="copyFinalSprite" class="primary-btn">Copy Final Sprite</button>
+            </div>
+            <div class="viewer-info" id="catInfoPanel">
+                <h2>Final Parameters</h2>
+                <table id="catInfoTable"></table>
+            </div>
+        </section>
+
+        <section class="viewer-timeline" id="timelineEntries">
+            <div class="timeline-empty" id="timelineStatus">Loading timeline…</div>
+        </section>
+    </main>
+
+    <div id="viewerToast" class="toast" role="status">Ready</div>
+
+    <script type="module" src="../js/posthog-init.js"></script>
+    <script type="module" src="../js/pages/cat-builder-wizard-viewer.js"></script>
+</body>
+</html>

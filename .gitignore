@@ -1,0 +1,45 @@
+# Global ignores
+.DS_Store
+*.log
+*.tmp
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.pyc
+**/__pycache__/
+
+# Environment files
+.env*
+frontend/.env.local
+
+# Frontend build artifacts
+frontend/node_modules/
+frontend/.pnp
+frontend/.pnp.*
+frontend/.yarn/*
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.vercel
+frontend/next-env.d.ts
+frontend/*.tsbuildinfo
+
+# Backend virtual envs / caches
+backend/renderer_service/.venv/
+backend/renderer_service/.pytest_cache/
+backend/renderer_service/renderer_service.egg-info/
+backend/renderer_service/tests/__pycache__/
+backend/renderer_service/*.png
+backend/renderer_service/uv.lock
+
+# Data exports / runtime assets
+backend/catdex-export-20251022-142634/
+backend/catdex-runtime/
+
+# Legacy folders no longer tracked
+frontend-lagacy/
+lifegen-fullgen/
+
+# Systemd / secrets
+systemd/
