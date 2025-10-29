@@ -509,7 +509,7 @@ export default function PerfectCatFinderPage() {
                     <img
                       src={preview.url}
                       alt="Selected cat"
-                      className="h-[320px] w-[320px] object-contain"
+                      className="h-[640px] w-[640px] max-w-full object-contain"
                       style={{ imageRendering: "pixelated" }}
                     />
                   );
