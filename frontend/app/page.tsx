@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Calendar, Github, MonitorPlay, Twitch, Twitter } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 const HUB_PILLARS = [
   {
@@ -28,25 +28,17 @@ const HUB_PILLARS = [
   },
 ];
 
-const NEWS_ITEMS = [
+const NEW_STUFF_ITEMS = [
   {
-    title: "Catdex migration live",
-    description: "React + Convex submission flow has landed. Upload default and custom art today.",
+    href: "/history",
+    title: "CatGen history",
+    description: "Browse every rollout, watch the timeline evolve, and jump straight into any build.",
   },
   {
-    title: "Single Cat Plus port",
-    description: "Renderer TypeScript moving into React components. Expect early access soon.",
+    href: "/personal",
+    title: "Personal hub",
+    description: "Find stay-connected links, stream goals, and the latest BeastyRabbit updates in one place.",
   },
-  {
-    title: "Stream overlays 2.0",
-    description: "Wheel, queue, and donation triggers are being consolidated under Convex state.",
-  },
-];
-
-const COMMUNITY_LINKS = [
-  { href: "https://github.com/BeastyTwitch", label: "GitHub", icon: Github },
-  { href: "https://twitch.tv/BeastyRabbit", label: "Twitch", icon: Twitch },
-  { href: "https://twitter.com/BeastyRabbit", label: "Twitter", icon: Twitter },
 ];
 
 export default function HubLanding() {
@@ -55,10 +47,10 @@ export default function HubLanding() {
       <section className="theme-hero theme-gatcha px-8 py-12 text-balance">
         <div className="section-eyebrow">Beasty Hub</div>
         <h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl md:text-6xl">
-          All gatcha systems, stream tech, and creative labs live under one roof.
+          Welcome to the BeastyVerse.
         </h1>
         <p className="mt-6 max-w-3xl text-lg text-muted-foreground sm:text-xl">
-          Follow ongoing migrations from the legacy Bun stack to Next.js 15, React 19, Tailwind v4, and Convex. Explore the Cat Gacha ecosystem, stream automations, art collections, and personal experiments.
+          Everything you want lives here: cat gatchas, stream tools, collections, personal links, and plenty more on the way.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <Link
@@ -99,68 +91,25 @@ export default function HubLanding() {
         ))}
       </section>
 
-      <section className="glass-card grid gap-8 px-8 py-10 lg:grid-cols-[2fr,1fr]">
-        <div className="space-y-6">
-          <div className="section-eyebrow">New & noteworthy</div>
-          <h2 className="text-3xl font-semibold">Shipping updates</h2>
-          <div className="space-y-5">
-            {NEWS_ITEMS.map((item) => (
-              <div key={item.title} className="rounded-2xl border border-border/60 bg-background/40 p-4">
-                <h3 className="text-lg font-semibold text-foreground">{item.title}</h3>
-                <p className="text-sm text-muted-foreground">{item.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-        <aside className="glass-card space-y-4 p-5">
-          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Calendar className="size-4 text-primary" />
-            Stream Schedule
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Live most weekends — follow Twitch for notifications. Wheel testing and Catdex moderation runs happen mid-week on Discord.
-          </p>
-          <div className="rounded-2xl border border-border/60 bg-background/60 p-4 text-xs text-muted-foreground">
-            <p>• Friday: Overlay QA & wheel triggers</p>
-            <p>• Saturday: Cat Gacha stream + new cats</p>
-            <p>• Sunday: Art catch-up / community showcase</p>
-          </div>
-        </aside>
-      </section>
-
-      <section className="glass-card grid gap-6 px-8 py-10 lg:grid-cols-[1fr,1fr]">
-        <div className="space-y-4">
-          <div className="section-eyebrow">Featured clip</div>
-          <h2 className="text-2xl font-semibold">Legendary pull on stream</h2>
-          <p className="text-sm text-muted-foreground">
-            Rewatch the moment the wheel dropped a Singularity cat mid charity stream. The new overlay pipeline will let us replay moments like this instantly.
-          </p>
-          <Link
-            href="https://www.youtube.com/@beastyrabbit"
-            target="_blank"
-            className="inline-flex w-fit items-center gap-2 rounded-full border border-foreground/30 px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-foreground hover:text-background"
-          >
-            Watch on YouTube <MonitorPlay className="size-3" />
-          </Link>
-        </div>
-        <div className="glass-card bg-background/70 p-6 text-sm text-muted-foreground">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            Community
-          </div>
-          <p>Contribute ideas, sprites, or code. The migration is public and we welcome PRs and art submissions.</p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            {COMMUNITY_LINKS.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={label}
-                href={href}
-                target="_blank"
-                className="inline-flex items-center gap-2 rounded-full border border-border/50 px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-              >
-                <Icon className="size-3" />
-                {label}
-              </Link>
-            ))}
-          </div>
+      <section className="glass-card space-y-6 px-8 py-10">
+        <div className="section-eyebrow">New stuff</div>
+        <h2 className="text-3xl font-semibold">Catch up with the latest drops</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          {NEW_STUFF_ITEMS.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="glass-card relative flex h-full flex-col gap-3 p-5 transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
+            >
+              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                {item.title}
+              </span>
+              <p className="text-sm text-muted-foreground">{item.description}</p>
+              <span className="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-primary">
+                Open <ArrowRight className="size-3" />
+              </span>
+            </Link>
+          ))}
         </div>
       </section>
     </main>
