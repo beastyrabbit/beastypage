@@ -98,7 +98,7 @@ const LEGACY_MODE_CARDS: LegacyCard[] = [
     icon: "⚖️",
     description:
       "Head-to-head comparisons that evolve toward your favourite cat.",
-    comingSoon: true,
+    href: "/perfect-cat-finder",
   },
   {
     title: "ClanGen History Explorer",
