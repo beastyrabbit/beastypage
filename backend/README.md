@@ -6,7 +6,6 @@ This directory now hosts all backend-facing infrastructure for the BeastyRabbit 
 
 - `renderer_service/` – FastAPI + uv powered CatGenerator V3 renderer. The service is self-contained
   (sprite atlases live under `renderer_service/sprites`) and is packaged for deployment via Docker/uvicorn.
-- `legacy/` – Archived Caddy, PocketBase, and deployment scripts retained for reference until the old stack is fully retired.
 
 ## Renderer service
 
@@ -29,8 +28,3 @@ uv run --directory backend/renderer_service pytest
 
 A `Dockerfile` lives beside the project root. GitHub Actions builds and publishes `ghcr.io/<org>/<repo>/renderer-service` on
 pushes that touch the backend renderer.
-
-## Legacy assets
-
-Legacy deployment files remain under `legacy/` for now. They are not part of the new Docker pipeline and will be removed
-once PocketBase/Caddy are decommissioned.
