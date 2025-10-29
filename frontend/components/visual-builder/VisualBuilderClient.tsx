@@ -1591,20 +1591,30 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
             key={sprite}
             type="button"
             className={cn(
-              "rounded-xl border border-slate-700/60 bg-slate-900/60 p-4 text-left transition hover:border-amber-400/60",
+              "rounded-xl border border-slate-700/60 bg-slate-900/60 p-3 text-left transition hover:border-amber-400/60",
               params.spriteNumber === sprite && "border-amber-400 bg-amber-500/10 text-amber-100"
             )}
             onClick={() => updateParams((draft) => {
               draft.spriteNumber = sprite;
             })}
           >
-            <div className="text-sm font-semibold">Pose {sprite}</div>
-            <p className="mt-1 text-xs text-neutral-300/80">Adjusts age and posture.</p>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold">Pose {sprite}</span>
+              <PreviewSprite
+                cacheKey={`pose-option-${sprite}`}
+                mutate={(draft) => {
+                  draft.spriteNumber = sprite;
+                }}
+                selected={params.spriteNumber === sprite}
+                label={`Pose ${sprite}`}
+                size={160}
+              />
+            </div>
           </button>
         ))}
       </div>
     </section>
-  ), [viewOptions?.sprites, params.spriteNumber, updateParams]);
+  ), [PreviewSprite, params.spriteNumber, updateParams, viewOptions?.sprites]);
 
   const renderPoseSection = useCallback(() => poseSection, [poseSection]);
 
