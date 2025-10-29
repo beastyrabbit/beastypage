@@ -1,1 +1,0 @@
-Implementation note: Extras spinning added via spinExtrasSequence in mood-board.js; Semi-Low disables spinning and appends sequentially.

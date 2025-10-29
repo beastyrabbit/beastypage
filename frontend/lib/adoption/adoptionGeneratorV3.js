@@ -1,6 +1,6 @@
 import catGenerator from '../single-cat/catGeneratorV3';
 import spriteMapper from '../single-cat/spriteMapper.js';
-import { encodeCatShare } from '../../legacy/core/catShare.js';
+import { encodeCatShare } from '../catShare';
 
 const CONFIG = {
     CANVAS: {

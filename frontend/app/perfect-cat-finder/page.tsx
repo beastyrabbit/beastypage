@@ -8,7 +8,7 @@ import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { renderCatV3 } from "@/lib/cat-v3/api";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { Loader2, Trophy, ClipboardCopy, ExternalLink, X } from "lucide-react";
-import { encodeCatShare } from "@/legacy/core/catShare";
+import { encodeCatShare } from "@/lib/catShare";
 
 const PALETTE_MODES = ["off", "mood", "bold", "darker", "blackout"] as const;
 const NEW_CAT_PROBABILITY = 0.4;
@@ -39,22 +39,16 @@ type MatchupResponse = {
 type LeaderboardEntry = MatchupCat;
 
 function useClientToken(key: string): string | null {
-  const [token, setToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const [token] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
     const storageKey = `pcf:${key}`;
     let existing = window.localStorage.getItem(storageKey);
     if (!existing) {
-      if (window.crypto?.randomUUID) {
-        existing = window.crypto.randomUUID();
-      } else {
-        existing = `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
-      }
+      existing = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
       window.localStorage.setItem(storageKey, existing);
     }
-    setToken(existing);
-  }, [key]);
+    return existing;
+  });
 
   return token;
 }
@@ -360,7 +354,10 @@ export default function PerfectCatFinderPage() {
     }
   }, [setError]);
 
-  const leaderboardEntries: LeaderboardEntry[] = (leaderboard as LeaderboardEntry[] | undefined) ?? [];
+  const leaderboardEntries: LeaderboardEntry[] = useMemo(
+    () => (leaderboard as LeaderboardEntry[] | undefined) ?? [],
+    [leaderboard]
+  );
 
   useEffect(() => {
     leaderboardEntries.forEach((entry) => void ensurePreview(entry));

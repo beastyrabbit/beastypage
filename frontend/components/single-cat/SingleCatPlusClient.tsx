@@ -29,7 +29,7 @@ import type { BatchRenderResponse } from "@/lib/cat-v3/types";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
 // @ts-ignore -- legacy JS module without types.
-import { encodeCatShare } from "@/legacy/core/catShare";
+import { encodeCatShare } from "@/lib/catShare";
 
 type ExtendedMode = "base" | "mood" | "bold" | "darker" | "blackout";
 export type AfterlifeOption = "off" | "dark10" | "star10" | "both10" | "darkForce" | "starForce";
