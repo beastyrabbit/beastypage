@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { renderCatV3 } from "@/lib/cat-v3/api";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
-import { Loader2, Trophy } from "lucide-react";
+import { Loader2, Trophy, ClipboardCopy, ExternalLink, X } from "lucide-react";
+import { encodeCatShare } from "@/legacy/core/catShare";
 
 const PALETTE_MODES = ["off", "mood", "bold", "darker", "blackout"] as const;
 const NEW_CAT_PROBABILITY = 0.4;
@@ -188,11 +189,25 @@ export default function PerfectCatFinderPage() {
   const { generator, ready } = useCatGenerator();
   const { ensurePreview, getPreview } = usePreviewCache();
 
+  const [message, setMessage] = useState<string | null>(null);
+  const messageTimeoutRef = useRef<number | null>(null);
   const [matchup, setMatchup] = useState<MatchupCat[]>([]);
   const [poolSize, setPoolSize] = useState(0);
   const [loading, setLoading] = useState(true);
   const [voteBusy, setVoteBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCat, setSelectedCat] = useState<MatchupCat | null>(null);
+
+  const showMessage = useCallback((text: string) => {
+    if (messageTimeoutRef.current) {
+      window.clearTimeout(messageTimeoutRef.current);
+    }
+    setMessage(text);
+    messageTimeoutRef.current = window.setTimeout(() => {
+      setMessage(null);
+      messageTimeoutRef.current = null;
+    }, 3000);
+  }, []);
 
   const seedCats = useCallback(
     async (count: number) => {
@@ -284,11 +299,84 @@ export default function PerfectCatFinderPage() {
     [clientId, loadMatchup, matchup, submitVote]
   );
 
+  const handleCopySprite = useCallback(
+    async (cat: MatchupCat) => {
+      try {
+        await ensurePreview(cat);
+        const preview = getPreview(cat);
+        if (!preview.url) {
+          throw new Error("Preview unavailable");
+        }
+        const response = await fetch(preview.url);
+        const blob = await response.blob();
+        if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+          await navigator.clipboard.write([new ClipboardItem({ [blob.type || "image/png"]: blob })]);
+          showMessage("Sprite copied to clipboard");
+        } else {
+          const link = document.createElement("a");
+          link.href = preview.url;
+          link.download = "perfect-cat.png";
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          showMessage("Sprite downloaded");
+        }
+      } catch (copyError) {
+        console.error("Failed to copy sprite", copyError);
+        setError("Failed to copy sprite. Please try again.");
+      }
+    },
+    [ensurePreview, getPreview, showMessage]
+  );
+
+  const handleOpenInBuilder = useCallback((cat: MatchupCat) => {
+    try {
+      const coreParams = {
+        ...(cat.params.params as Record<string, unknown>),
+        spriteNumber: cat.params.spriteNumber,
+      } as Record<string, unknown>;
+
+      const accessories = Array.isArray(coreParams.accessories) ? (coreParams.accessories as string[]) : [];
+      const scars = Array.isArray(coreParams.scars) ? (coreParams.scars as string[]) : [];
+      const tortie = Array.isArray(coreParams.tortie) ? (coreParams.tortie as Record<string, unknown>[]) : [];
+
+      const encoded = encodeCatShare({
+        params: coreParams,
+        accessorySlots: accessories,
+        scarSlots: scars,
+        tortieSlots: tortie,
+        counts: {
+          accessories: accessories.length,
+          scars: scars.length,
+          tortie: tortie.length,
+        },
+      });
+
+      const url = `/visual-builder?cat=${encodeURIComponent(encoded)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (shareError) {
+      console.error("Failed to open cat in builder", shareError);
+      setError("Could not open the cat in the visual builder.");
+    }
+  }, [setError]);
+
   const leaderboardEntries: LeaderboardEntry[] = (leaderboard as LeaderboardEntry[] | undefined) ?? [];
 
   useEffect(() => {
     leaderboardEntries.forEach((entry) => void ensurePreview(entry));
   }, [leaderboardEntries, ensurePreview]);
+
+  useEffect(() => () => {
+    if (messageTimeoutRef.current) {
+      window.clearTimeout(messageTimeoutRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedCat) {
+      void ensurePreview(selectedCat);
+    }
+  }, [selectedCat, ensurePreview]);
 
   const isReady = useMemo(() => matchup.length === 2 && !loading, [matchup.length, loading]);
 
@@ -299,6 +387,11 @@ export default function PerfectCatFinderPage() {
         <h1 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl md:text-5xl">
           Vote between two cats. Help crown the favourite.
         </h1>
+        {message && (
+          <div className="mt-4 inline-flex items-center rounded-full border border-border/50 bg-background/90 px-4 py-2 text-xs font-semibold text-muted-foreground">
+            {message}
+          </div>
+        )}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">
@@ -355,7 +448,14 @@ export default function PerfectCatFinderPage() {
                     <tr key={String(entry.id)} className="border-t border-border/30">
                       <td className="px-4 py-3 text-muted-foreground/70">{index + 1}</td>
                       <td className="px-4 py-3">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-border/50 bg-background/80 p-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCat(entry);
+                            void ensurePreview(entry);
+                          }}
+                          className="group flex items-center justify-center rounded-xl border border-border/50 bg-background/80 p-1 transition hover:border-primary/50"
+                        >
                           {preview.loading ? (
                             <Loader2 className="size-4 animate-spin text-primary" />
                           ) : preview.url ? (
@@ -363,13 +463,13 @@ export default function PerfectCatFinderPage() {
                             <img
                               src={preview.url}
                               alt="Cat preview"
-                              className="h-full w-full object-contain"
+                              className="h-16 w-16 object-contain transition group-hover:scale-105"
                               style={{ imageRendering: "pixelated" }}
                             />
                           ) : (
                             <span className="text-[10px] text-muted-foreground">No preview</span>
                           )}
-                        </div>
+                        </button>
                       </td>
                       <td className="px-4 py-3 font-semibold text-foreground">{formatRating(entry.rating)}</td>
                       <td className="px-4 py-3 text-muted-foreground">{entry.wins} – {entry.losses}</td>
@@ -382,6 +482,64 @@ export default function PerfectCatFinderPage() {
           </table>
         </div>
       </section>
+      {selectedCat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8">
+          <div className="absolute inset-0" onClick={() => setSelectedCat(null)} />
+          <div className="relative z-10 w-full max-w-xl rounded-3xl border border-border/60 bg-background/95 p-6 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setSelectedCat(null)}
+              className="absolute right-3 top-3 rounded-full border border-border/40 bg-background/80 p-1 text-muted-foreground transition hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+            <div className="flex flex-col gap-4">
+              <div className="text-sm uppercase tracking-[0.3em] text-muted-foreground">Top contender</div>
+              <div className="flex items-center justify-center rounded-3xl border border-border/60 bg-background/80 p-4">
+                {(() => {
+                  const preview = getPreview(selectedCat);
+                  if (preview.loading) {
+                    return <Loader2 className="size-8 animate-spin text-primary" />;
+                  }
+                  if (!preview.url) {
+                    return <span className="text-sm text-muted-foreground">Preview unavailable</span>;
+                  }
+                  return (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={preview.url}
+                      alt="Selected cat"
+                      className="h-[320px] w-[320px] object-contain"
+                      style={{ imageRendering: "pixelated" }}
+                    />
+                  );
+                })()}
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">Rating {formatRating(selectedCat.rating)}</span>
+                <span>{selectedCat.wins} – {selectedCat.losses}</span>
+                <span>{selectedCat.appearances} votes</span>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleCopySprite(selectedCat)}
+                  className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
+                >
+                  <ClipboardCopy className="size-4" /> Copy sprite
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenInBuilder(selectedCat)}
+                  className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
+                >
+                  <ExternalLink className="size-4" /> Open in visual builder
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
