@@ -237,6 +237,14 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     setInitialSpriteNumber(synced.spriteNumber ?? null);
     setCatName(initialCat.catName ?? "");
     setCreatorName(initialCat.creatorName ?? "");
+    console.log("[visual-builder] load slug", {
+      slug: initialCat.slug,
+      shareUrl: initialCat.shareUrl,
+      paletteMode: initialCat.paletteMode,
+      tortiePaletteMode: initialCat.tortiePaletteMode,
+      colour: synced.colour,
+      tortieColour: synced.tortieColour,
+    });
     setLockedShareSlug(initialCat.slug ?? null);
     setShareInfo((prev) => {
       if (initialCat.shareUrl) {
@@ -368,9 +376,19 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     }
     const palette = getPaletteForMode(experimentalColourMode);
     if (palette.length > 0) {
+      console.log("[visual-builder] palette colours", {
+        mode: experimentalColourMode,
+        colours: palette,
+        currentColour: params.colour,
+      });
       return palette;
     }
     const base = mapperInstance.getColours?.() ?? [];
+    console.log("[visual-builder] fallback palette", {
+      mode: experimentalColourMode,
+      colours: base,
+      currentColour: params.colour,
+    });
     return base.length > 0 ? base : [params.colour ?? DEFAULT_PARAMS.colour];
   }, [experimentalColourMode, getPaletteForMode, mapper, params.colour]);
 
