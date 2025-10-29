@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Loader2, ArrowUpRight, Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { encodeCatShare } from "@/legacy/core/catShare";
+import { encodeCatShare } from "@/lib/catShare";
 
 type SortMode = "newest" | "oldest" | "name";
 

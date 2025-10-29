@@ -1,6 +1,6 @@
 import { VisualBuilderClient, type VisualBuilderInitialPayload } from "@/components/visual-builder/VisualBuilderClient";
 import { VisualBuilderLoader } from "@/components/visual-builder/VisualBuilderLoader";
-import { decodeCatShare } from "@/legacy/core/catShare";
+import { decodeCatShare } from "@/lib/catShare";
 
 type PageProps = {
   searchParams?: Promise<{

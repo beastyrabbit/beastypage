@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { encodeCatShare, decodeCatShare } from "@/legacy/core/catShare";
+import { encodeCatShare, decodeCatShare } from "@/lib/catShare";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,

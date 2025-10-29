@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AlertTriangle, ArrowLeft, ArrowUpRight, Loader2, X } from "lucide-react";
-import { encodeCatShare } from "@/legacy/core/catShare";
+import { encodeCatShare } from "@/lib/catShare";
 
 interface TortieSlot {
   mask?: string | null;
