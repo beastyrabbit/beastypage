@@ -1,0 +1,8 @@
+{
+  "name": "renderer-service",
+  "private": true,
+  "scripts": {
+    "renderer:dev": "uv run uvicorn renderer_service.app.main:app --reload --host 0.0.0.0 --port 8001",
+    "renderer:start": "uv run uvicorn renderer_service.app.main:app --host 0.0.0.0 --port 8001"
+  }
+}

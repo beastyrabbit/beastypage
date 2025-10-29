@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://eu.i.posthog.com https://cdn.jsdelivr.net https://eu-assets.i.posthog.com; img-src 'self' https://media.githubusercontent.com data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';">
+    <title>Catdex - Cat Collection Viewer</title>
+    <link rel="icon" type="image/png" href="../assets/images/beasty-favicon-rounded.png">
+    <link rel="stylesheet" href="../assets/styles/pages/catdex.css">
+</head>
+<body>
+    <!-- Floating back button -->
+    <a class="back-btn" href="../index.html">← Back</a>
+    
+    <!-- Background elements -->
+    <div class="bg"></div>
+    <div class="blob blob-a"></div>
+    <div class="blob blob-b"></div>
+    <div class="blob blob-c"></div>
+
+    <!-- Controls section -->
+    <div class="controls-section">
+        <div class="controls-inner">
+            <div class="search-group">
+                <div class="search-input-wrapper">
+                    <div class="search-icon">🔎</div>
+                    <input 
+                        type="text" 
+                        class="search-input" 
+                        id="searchInput"
+                        placeholder="Search by name, number, or range (e.g., 1-50)..."
+                    />
+                </div>
+            </div>
+
+            <div class="filter-row">
+                <div class="select-wrap">
+                    <div class="select-inner">
+                        <select id="seasonFilter">
+                            <option value="all">All Seasons</option>
+                        </select>
+                        <span class="select-caret">▾</span>
+                    </div>
+                </div>
+
+                <div class="select-wrap">
+                    <div class="select-inner">
+                        <select id="rarityFilter">
+                            <option value="all">All Rarities</option>
+                        </select>
+                        <span class="select-caret">▾</span>
+                    </div>
+                </div>
+
+                <div class="select-wrap">
+                    <div class="select-inner">
+                        <select id="sortBy">
+                            <option value="number:asc">Number ↑</option>
+                            <option value="number:desc">Number ↓</option>
+                            <option value="name:asc">Name A-Z</option>
+                            <option value="name:desc">Name Z-A</option>
+                            <option value="rarity:asc">Rarity ↑</option>
+                            <option value="rarity:desc">Rarity ↓</option>
+                        </select>
+                        <span class="select-caret">▾</span>
+                    </div>
+                </div>
+                <button class="image-toggle-global" id="toggleImageVariant" type="button" hidden>Show custom art</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="stats-bar" id="statsBar">
+        <div class="stat-item">
+            <span class="stat-label">Total Cats:</span>
+            <span class="stat-value" id="totalCount">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Showing:</span>
+            <span class="stat-value" id="showingCount">0</span>
+        </div>
+        <div class="submit-card-cta">
+            <span id="submitPendingBadge" class="submit-pending-badge" hidden data-label="cards awaiting approval">0</span>
+            <button class="submit-card-btn submit-card-btn--stats" id="openSubmitModal" type="button">Submit Card</button>
+        </div>
+    </div>
+
+    <section class="grid" id="catGrid">
+        <div class="loading">
+            <div class="cat-paw-loader">
+                <img src="../assets/images/paw.png" alt="Loading..." width="60" height="60">
+            </div>
+            <p>Loading cats...</p>
+        </div>
+    </section>
+
+    <div class="scrim" id="scrim"></div>
+    <aside class="drawer" id="drawer">
+        <div class="drawer-inner">
+            <div class="drawer-bar"></div>
+            <div class="drawer-header">
+                <div>
+                    <h2 class="drawer-title" id="drawerTitle">Cat Name</h2>
+                    <div class="drawer-subtitle" id="drawerSubtitle">No. 001</div>
+                </div>
+                <button class="close-btn" id="closeBtn">✕</button>
+            </div>
+            <div class="drawer-content">
+                <div class="drawer-media">
+                    <div class="drawer-glow"></div>
+                    <img id="drawerImg" class="drawer-img" src="" alt="">
+                </div>
+                <div class="drawer-image-actions" id="imageVariantToggleWrap" hidden>
+                    <button type="button" class="image-toggle-btn" id="imageVariantToggle">Show custom art</button>
+                </div>
+                <div class="drawer-info">
+                    <div class="info-row">
+                        <div class="info-item">
+                            <span class="info-label">Season</span>
+                            <span class="info-value" id="drawerSeason">Season One</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Rarity</span>
+                            <span class="info-value" id="drawerRarity">Starborn</span>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-item">
+                            <span class="info-label">Number</span>
+                            <span class="info-value" id="drawerNumber">#001</span>
+                        </div>
+                        <div class="info-item" id="ownerContainer">
+                            <span class="info-label">Submitted by</span>
+                            <span class="info-value" id="drawerOwner">Unknown</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="submit-modal" id="submitModal" aria-hidden="true">
+        <div class="submit-modal__scrim" id="submitModalScrim"></div>
+        <div class="submit-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="submitModalTitle">
+            <div class="submit-modal__header">
+                <h2 id="submitModalTitle">Submit a Cat Card</h2>
+                <button class="submit-modal__close" id="closeSubmitModal" type="button" aria-label="Close">✕</button>
+            </div>
+            <p class="submit-modal__intro">Share your cat card with the community. Submissions stay pending until a moderator approves them.</p>
+            <form id="submitCardForm" class="submit-form" enctype="multipart/form-data">
+                <label class="submit-form__field">
+                    <span>Season</span>
+                    <select id="submitSeason" name="season" required>
+                        <option value="" disabled selected>Select a season...</option>
+                    </select>
+                </label>
+                <label class="submit-form__field">
+                    <span>Cat name</span>
+                    <input id="submitCatName" name="cat_name" type="text" placeholder="e.g., Moonshadow" required>
+                </label>
+                <label class="submit-form__field">
+                    <span>Twitch username (or display name)</span>
+                    <input id="submitOwner" name="twitch_user_name" type="text" placeholder="e.g., Beastyrabbit" required>
+                </label>
+                <label class="submit-form__field">
+                    <span>Rarity</span>
+                    <select id="submitRarity" name="rarity" required>
+                        <option value="" disabled selected>Select a rarity...</option>
+                    </select>
+                </label>
+                <label class="submit-form__field">
+                    <span>Card number (optional)</span>
+                    <input id="submitCardNumber" name="card_number" type="number" min="0" step="1" placeholder="Enter the official card number if you know it">
+                </label>
+                <label class="submit-form__field">
+                    <span>Official card image (required)</span>
+                    <input id="submitDefaultFile" name="default_card" type="file" accept="image/png,image/jpeg" required>
+                    <small>Upload the standard card art so we can display it immediately.</small>
+                </label>
+                <label class="submit-form__field">
+                    <span>Custom art (optional)</span>
+                    <input id="submitCustomFile" name="custom_card" type="file" accept="image/png,image/jpeg">
+                    <small>Provide alternate artwork if you want to showcase a custom version.</small>
+                </label>
+                <button class="submit-form__submit" type="submit" id="submitCardButton">Submit card</button>
+                <p class="submit-form__status" id="submitFormStatus" role="status" aria-live="polite"></p>
+            </form>
+        </div>
+    </div>
+
+    <div class="mass-upload-modal" id="massUploadModal" aria-hidden="true">
+        <div class="mass-upload__scrim" id="massUploadScrim"></div>
+        <div class="mass-upload__dialog" role="dialog" aria-modal="true" aria-labelledby="massUploadTitle">
+            <div class="mass-upload__header">
+                <h2 id="massUploadTitle">Mass Upload Cards</h2>
+                <button class="mass-upload__close" id="closeMassUpload" type="button" aria-label="Close">✕</button>
+            </div>
+            <p class="mass-upload__intro">Upload multiple cards at once. Hold the submit button for five seconds to open this tool.</p>
+            <form class="mass-upload-form" id="massUploadForm" enctype="multipart/form-data">
+                <label class="mass-upload-form__field">
+                    <span>Twitch username for all cards</span>
+                    <input id="massUploadOwner" name="mass_upload_owner" type="text" placeholder="e.g., Beastyrabbit" required>
+                </label>
+                <label class="mass-upload-form__field">
+                    <span>Official card images</span>
+                    <input id="massUploadDefaultFiles" name="mass_upload_default" type="file" accept="image/png,image/jpeg" multiple required>
+                    <small>Select the default card art images you want to submit.</small>
+                </label>
+                <div class="mass-upload-list" id="massUploadList" hidden></div>
+                <div class="mass-upload-form__footer">
+                    <button class="mass-upload-btn mass-upload-btn--secondary" type="button" id="massUploadCancel">Cancel</button>
+                    <button class="mass-upload-btn" type="submit" id="massUploadSubmit">Upload all</button>
+                </div>
+                <p class="mass-upload-status" id="massUploadStatus" role="status" aria-live="polite"></p>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createCatdexAPI, createFilesAPI } from "../js/convex/catdex-api.js";
+        window.ConvexAPI = window.ConvexAPI || {};
+        window.ConvexAPI.catdex = createCatdexAPI();
+        window.ConvexAPI.files = createFilesAPI();
+    </script>
+    <script type="module" src="../js/posthog-init.js"></script>
+    <script src="../js/pages/catdex.js" defer></script>
+    <!-- Floating credits bar -->
+    <div class="floating-credits" id="floatingCredits">
+        <div class="credits-content">
+            <span>Cat cards created by</span>
+            <a href="https://www.twitch.tv/itthatmeowed" target="_blank" rel="noreferrer">itthatmeowed</a>
+        </div>
+    </div>
+
+</body>
+</html>

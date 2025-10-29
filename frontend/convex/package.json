@@ -1,0 +1,13 @@
+{
+  "name": "catgacha-convex",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "npx convex deploy",
+    "dev": "npx convex dev",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "convex": "^1.11.0"
+  }
+}

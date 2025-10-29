@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://eu.i.posthog.com https://cdn.jsdelivr.net https://eu-assets.i.posthog.com; img-src 'self' https://media.githubusercontent.com data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;">
+    <title>Stream Cat Builder</title>
+    <link rel="icon" type="image/png" href="../assets/images/beasty-favicon-rounded.png">
+    <link rel="stylesheet" href="../assets/styles/pages/cat-builder-stream.css">
+</head>
+<body class="stream-page stream-page--host">
+    <a class="back-btn" href="../index.html">← Back</a>
+    <div class="stream-layout">
+        <section class="stream-card stream-card--host">
+            <h1>Streamer Control</h1>
+            <p>Run a live cat build, share the viewer link, and advance once the votes are in.</p>
+
+            <div class="streamer-stage">
+                <div class="stage-preview">
+                    <canvas id="streamerCanvas" width="640" height="640"></canvas>
+                </div>
+
+                <div class="stage-info-grid">
+                    <div class="stream-info-card">
+                        <div class="stream-status-row">
+                            <span id="sessionStatus" class="stream-badge draft">No Session</span>
+                            <span id="signupStatus" class="stream-badge testing" hidden>Sign ups open</span>
+                        </div>
+                        <p id="stepStatus" class="viewer-status">Waiting to start…</p>
+                    </div>
+                    <div class="stream-link-card">
+                        <h3>Viewer Link</h3>
+                        <div class="stream-link-box" id="viewerLinkRow" hidden>
+                            <code id="viewerLink"></code>
+                            <div class="stream-link-actions">
+                                <button id="copyViewerLink" class="stream-btn" title="Copy viewer link">Copy</button>
+                                <button id="openViewerLink" class="stream-btn icon-btn" title="Open viewer link in a new tab" aria-label="Open viewer link in a new tab">↗</button>
+                            </div>
+                        </div>
+                        <p class="viewer-status">Share this link with your viewers so they can join.</p>
+                    </div>
+                </div>
+
+                <div class="stream-controls stage-controls">
+                    <button id="createSession" class="stream-btn primary">Start New Session</button>
+                    <button id="toggleSignupGate" class="stream-btn" disabled>Close Sign Ups</button>
+                <button id="completeSession" class="stream-btn danger" disabled>Finish Session</button>
+                </div>
+            </div>
+
+            <div class="vote-toolbar">
+                <button id="toggleVotes" class="stream-btn" disabled>Open Votes</button>
+                <button id="goNextStep" class="stream-btn" disabled>Next Step</button>
+            </div>
+
+            <div class="stream-card" style="margin-top: 24px;">
+                <h2 id="voteStepTitle">Current Step</h2>
+                <p id="voteStepDescription" class="viewer-status">Create a session to begin voting.</p>
+                <p id="voteProgress" class="viewer-status" aria-live="polite">Waiting for viewers…</p>
+                <div class="vote-grid-controls">
+                    <label for="sortVoteOptions" class="viewer-status">Sort options by:</label>
+                    <select id="sortVoteOptions" class="stream-select">
+                        <option value="order" selected>Original order</option>
+                        <option value="desc">Votes (high to low)</option>
+                        <option value="asc">Votes (low to high)</option>
+                    </select>
+                </div>
+                <div id="voteOptionGrid" class="option-grid vote-grid" aria-live="polite">
+                    <div class="viewer-status">No data yet.</div>
+                </div>
+                <div id="tieActions" class="tie-actions" hidden>
+                    <p id="tieMessage" class="viewer-status"></p>
+                    <div class="stream-controls">
+                        <button id="coinFlipTie" class="stream-btn">Coin Flip</button>
+                        <button id="revoteTie" class="stream-btn">Tie Revote</button>
+                        <button id="cancelTie" class="stream-btn">Clear Tie Filter</button>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+        <section class="stream-card stream-card--timeline">
+            <h2>Session Timeline</h2>
+            <p class="viewer-status">Each locked step is listed here so viewers can follow the build.</p>
+            <div id="timelineContainer" class="stream-timeline"></div>
+        </section>
+
+                <section class="stream-card stream-card--participants">
+            <h2>Checked-in Viewers</h2>
+            <p id="participantStatus" class="viewer-status">No viewers have checked in yet.</p>
+            <div class="stream-controls">
+                <button id="refreshParticipants" class="stream-btn">Refresh Viewers</button>
+            </div>
+            <ul id="participantList" class="stream-participant-list">
+                <li class="stream-participant-empty">No viewers yet.</li>
+            </ul>
+        </section>
+
+<section class="stream-card stream-card--sessions">
+            <h2>Active Sessions</h2>
+            <p class="viewer-status">Resume a draft or live session if you refresh or switch devices.</p>
+            <div class="stream-controls">
+                <button id="refreshSessions" class="stream-btn">Refresh Sessions</button>
+            </div>
+            <ul id="sessionList" class="stream-session-list">
+                <li class="stream-session-empty">No draft or live sessions.</li>
+            </ul>
+        </section>
+    </div>
+
+    <div id="streamToast" class="toast" role="status">Copied!</div>
+
+    <div id="experimentModal" class="stream-modal" role="dialog" aria-modal="true" aria-labelledby="experimentTitle" hidden>
+        <div class="stream-modal__panel">
+            <h2 id="experimentTitle">Experimental Feature</h2>
+            <p>This live streamer build flow is still experimental. Only proceed if you understand how to manage live sessions and viewer votes.</p>
+            <button id="experimentAcknowledge" class="stream-btn primary">I understand</button>
+        </div>
+    </div>
+
+    <div id="streamIntroModal" class="stream-modal" role="dialog" aria-modal="true" aria-labelledby="streamIntroTitle" hidden>
+        <div class="stream-modal__panel">
+            <h2 id="streamIntroTitle">How Stream Voting Works</h2>
+            <ol class="stream-intro-steps">
+                <li>Click <strong>Start New Session</strong> to generate a unique viewer link.</li>
+                <li>Share that link with your viewers so they can vote on each step.</li>
+                <li>Open and close votes manually, then use <strong>Next Step</strong> to lock in the winner.</li>
+                <li>Need a tie-breaker? Choose coin flip or revote from the tie controls.</li>
+                <li>Walk through each step until the cat is complete, then finish the stream.</li>
+            </ol>
+            <button id="streamIntroDismiss" class="stream-btn primary">Let’s Go</button>
+        </div>
+    </div>
+
+    <script type="module" src="../js/posthog-init.js"></script>
+    <script type="module" src="../js/pages/cat-builder-streamer.js"></script>
+</body>
+</html>

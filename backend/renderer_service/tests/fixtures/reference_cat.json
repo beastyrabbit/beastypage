@@ -1,0 +1,39 @@
+{
+  "params": {
+    "accessories": ["MAPLE LEAF"],
+    "accessory": "MAPLE LEAF",
+    "colour": "GREY",
+    "darkForest": false,
+    "darkMode": false,
+    "dead": false,
+    "eyeColour": "PALEGREEN",
+    "isTortie": true,
+    "peltName": "Tabby",
+    "reverse": false,
+    "scar": "FROSTSOCK",
+    "scars": ["FROSTSOCK"],
+    "shading": false,
+    "skinColour": "PEACH",
+    "spriteNumber": 10,
+    "tint": "red",
+    "tortie": [
+      {
+        "colour": "CREAM",
+        "mask": "REDTAIL",
+        "pattern": "Ticked"
+      },
+      null,
+      {
+        "colour": "DARKGINGER",
+        "mask": "SMUDGED",
+        "pattern": "Mackerel"
+      },
+      null
+    ],
+    "tortieColour": "CREAM",
+    "tortieMask": "REDTAIL",
+    "tortiePattern": "Ticked",
+    "vitiligo": "SMOKEY",
+    "whitePatchesTint": "cream"
+  }
+}

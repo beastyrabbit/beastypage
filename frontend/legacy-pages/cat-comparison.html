@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://eu.i.posthog.com https://cdn.jsdelivr.net https://eu-assets.i.posthog.com; img-src 'self' https://media.githubusercontent.com data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline';">
+    <title>Perfect Cat Finder - Find Your Ideal Cat</title>
+    <link rel="icon" type="image/png" href="../assets/images/beasty-favicon-rounded.png">
+    <link rel="stylesheet" href="../assets/styles/pages/cat-comparison.css">
+</head>
+<body>
+    <!-- Floating back button -->
+    <a class="back-btn" href="../index.html">← Back</a>
+
+    <!-- Background elements -->
+    <div class="bg"></div>
+    <div class="blob blob-a"></div>
+    <div class="blob blob-b"></div>
+    <div class="blob blob-c"></div>
+
+    <!-- Main content -->
+    <div class="container">
+        <!-- Instructions -->
+        <div class="instructions">
+            <p>Choose your favorite cat in each comparison. Your perfect cat will evolve with each choice!</p>
+            <div class="stats">
+                <span>Comparisons: <strong id="comparisonCount">0</strong></span>
+                <span>Confidence: <strong id="confidence">0%</strong></span>
+            </div>
+        </div>
+
+        <!-- Comparison area -->
+        <div class="comparison-section">
+            <!-- Cat A -->
+            <div class="cat-card cat-a">
+                <div class="cat-display">
+                    <canvas id="catA" width="700" height="700"></canvas>
+                    <div class="loading-indicator" id="loadingA">
+                        <img src="../assets/images/paw.png" alt="Loading" class="paw-spinner">
+                    </div>
+                </div>
+                <button class="choose-button" id="chooseA">
+                    Choose This Cat
+                </button>
+            </div>
+
+            <!-- Perfect Cat (Center) -->
+            <div class="perfect-cat-section">
+                <h2>Your Perfect Cat</h2>
+                <div class="perfect-cat-display">
+                    <canvas id="perfectCat" width="700" height="700"></canvas>
+                    <div class="loading-indicator" id="loadingPerfect">
+                        <img src="../assets/images/paw.png" alt="Loading" class="paw-spinner">
+                    </div>
+                </div>
+                <div class="perfect-stats">
+                    <p>Evolving from your choices...</p>
+                </div>
+                <div class="action-buttons">
+                    <button id="skipButton" class="skip-button">
+                        Skip
+                    </button>
+                    <button id="shareButton" class="share-button">
+                        Share
+                    </button>
+                    <button id="resetButton" class="reset-button">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cat B -->
+            <div class="cat-card cat-b">
+                <div class="cat-display">
+                    <canvas id="catB" width="700" height="700"></canvas>
+                    <div class="loading-indicator" id="loadingB">
+                        <img src="../assets/images/paw.png" alt="Loading" class="paw-spinner">
+                    </div>
+                </div>
+                <button class="choose-button" id="chooseB">
+                    Choose This Cat
+                </button>
+            </div>
+        </div>
+
+        <!-- Parameter differences -->
+        <div class="differences-section" id="differencesSection">
+            <h3>Key Differences</h3>
+            <div class="differences-grid" id="differencesGrid">
+                <!-- Differences will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Progress section -->
+        <div class="progress-section">
+            <h3>Parameter Confidence</h3>
+            <div class="progress-grid" id="progressGrid">
+                <!-- Progress bars will be inserted here -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast">Copied!</div>
+
+    <!-- Scripts -->
+    <script type="module" src="../js/posthog-init.js"></script>
+    <script type="module" src="../js/pages/cat-comparison.js"></script>
+</body>
+</html>

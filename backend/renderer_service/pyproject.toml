@@ -1,0 +1,27 @@
+[project]
+name = "renderer-service"
+version = "0.1.0"
+description = "FastAPI service that wraps the Lifegen sprite renderer for CatGenerator V3"
+authors = [{name = "BeastyRabbit Tools", email = "devnull@example.com"}]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.2",
+  "uvicorn[standard]>=0.30.6",
+  "pillow>=10.4.0",
+  "numpy>=2.1.2",
+  "pydantic>=2.9.2",
+  "pydantic-settings>=2.6.0",
+  "pygame>=2.5.2",
+  "pytest>=8.4.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["renderer_service*"]

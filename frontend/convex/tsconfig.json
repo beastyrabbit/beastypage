@@ -1,0 +1,12 @@
+{
+  "extends": "../node_modules/convex/tsconfig.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "types": ["node"],
+    "rootDir": ".",
+    "resolveJsonModule": true
+  },
+  "include": ["./**/*.ts"]
+}
