@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
 const FALLBACK_IMG =
@@ -14,6 +14,7 @@ type ProgressiveImageProps = {
   alt: string;
   className?: string;
   imgClassName?: string;
+  imgStyle?: CSSProperties;
   loading?: "eager" | "lazy";
 };
 
@@ -23,6 +24,7 @@ export function ProgressiveImage({
   alt,
   className,
   imgClassName,
+  imgStyle,
   loading = "lazy"
 }: ProgressiveImageProps) {
   const [state, setState] = useState(() => ({
@@ -59,6 +61,7 @@ export function ProgressiveImage({
         src={state.src}
         alt={alt}
         loading={loading}
+        style={imgStyle}
         className={cn(
           "h-full w-full object-cover transition duration-500",
           state.sharp ? "blur-0 scale-100" : "blur-md scale-[1.02]",

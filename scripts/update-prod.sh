@@ -47,6 +47,9 @@ bun install
 
 log "Building production bundle"
 bun run build
+
+log "Deploying Convex functions"
+bunx convex deploy
 popd >/dev/null
 
 if ! command -v pm2 >/dev/null 2>&1; then

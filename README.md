@@ -207,6 +207,7 @@ Requests to `/` will redirect according to the hostname value that Pangolin forw
    The script will:
    - `git fetch && git pull --ff-only`
    - `bun install` and `bun run build`
+   - `bunx convex deploy`
    - Reload running PM2 apps (or start them from `ecosystem.config.cjs` if missing)
    - Copy the latest version of itself back to `../update-beastypage.sh` after each run
 
