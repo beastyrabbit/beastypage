@@ -15,7 +15,7 @@ This CLI expects an extracted export directory created by
 Usage:
     python scripts/import_catdex.py \
         --export-dir backend/catdex-export-20251022-142634 \
-        --host http://192.168.50.233:3210
+        --env-file frontend/.env.local
 
 The script prompts for the Convex admin key if it is not passed via
 `--admin-key`. The target Convex instance must have empty `catdex` and
@@ -83,6 +83,11 @@ def parse_args() -> argparse.Namespace:
     help="Convex admin key. If omitted you will be prompted securely."
   )
   parser.add_argument(
+    "--env-file",
+    default="frontend/.env.local",
+    help="Path to a .env-style file providing Convex credentials (default: frontend/.env.local)."
+  )
+  parser.add_argument(
     "--batch-size",
     type=int,
     default=40,
@@ -96,7 +101,29 @@ def parse_args() -> argparse.Namespace:
   return parser.parse_args()
 
 
+def load_env_file(path: Optional[Path]) -> Dict[str, str]:
+  if not path:
+    return {}
+  path = path.resolve()
+  if not path.exists() or not path.is_file():
+    return {}
+  env: Dict[str, str] = {}
+  with path.open("r", encoding="utf-8") as fh:
+    for raw_line in fh:
+      line = raw_line.strip()
+      if not line or line.startswith("#") or "=" not in line:
+        continue
+      key, value = line.split("=", 1)
+      key = key.strip()
+      val = value.strip().strip('"').strip("'")
+      if key:
+        env[key] = val
+  return env
+
+
 def ensure_host(url: Optional[str]) -> str:
+  if not url:
+    url = os.environ.get("CONVEX_SELF_HOSTED_URL") or os.environ.get("NEXT_PUBLIC_CONVEX_URL")
   if not url:
     url = input("Convex host (e.g. http://192.168.50.233:3210): ").strip()
   if not url:
@@ -108,6 +135,8 @@ def ensure_host(url: Optional[str]) -> str:
 
 
 def ensure_admin_key(key: Optional[str]) -> str:
+  if not key:
+    key = os.environ.get("CONVEX_SELF_HOSTED_ADMIN_KEY")
   if key:
     return key.strip()
   return getpass.getpass("Convex admin key: ").strip()
@@ -442,6 +471,10 @@ def main() -> None:
   export_dir = Path(args.export_dir).resolve()
   if not export_dir.exists():
     raise SystemExit(f"Export directory not found: {export_dir}")
+
+  env_values = load_env_file(Path(args.env_file) if args.env_file else None)
+  for key, value in env_values.items():
+    os.environ.setdefault(key, value)
 
   base_url = ensure_host(args.host)
   admin_key = ensure_admin_key(args.admin_key)

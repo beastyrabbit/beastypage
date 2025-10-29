@@ -61,10 +61,7 @@ function bestPreview(previews?: {
 }
 
 
-const STORAGE_ORIGIN =
-  process.env.NEXT_PUBLIC_CONVEX_URL ??
-  process.env.CONVEX_SELF_HOSTED_URL ??
-  null;
+const STORAGE_ORIGIN = (process.env.NEXT_PUBLIC_CONVEX_URL ?? "").replace(/\/$/, "") || null;
 
 const fixPreviewUrl = (url: string | null): string | null => {
   if (!url || !STORAGE_ORIGIN) return url;
@@ -76,7 +73,7 @@ const fixPreviewUrl = (url: string | null): string | null => {
     return resolved.toString();
   } catch {
     if (url.startsWith("/")) {
-      return `${STORAGE_ORIGIN.replace(/\/$/, "")}${url}`;
+      return `${STORAGE_ORIGIN}${url}`;
     }
     return url;
   }

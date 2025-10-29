@@ -65,7 +65,7 @@ The frontend now deploys without Docker. Typical flow (bare metal, VM, or LXC):
    ```bash
    CONVEX_SELF_HOSTED_URL=http://convex:3210
    CONVEX_SELF_HOSTED_ADMIN_KEY=...
-   NEXT_PUBLIC_CONVEX_URL=https://your-domain.example/api/convex
+   NEXT_PUBLIC_CONVEX_URL=https://convex.your-domain.example
    ```
 
    Adjust values to match your Convex deployment and public hostname.

@@ -5,11 +5,14 @@ import type { MutationCtx } from "./_generated/server.js";
 
 const CHALLENGE_EXPIRY_MS = 5 * 60 * 1000;
 
+const rawInviteSecret = (process.env.DISCORD_INVITE_SECRET ?? "").trim();
+
 const INVITE_URL =
-  process.env.DISCORD_INVITE_URL ??
-  process.env.DISCORD_INVITE ??
-  process.env.GATCHA_DISCORD_INVITE ??
-  null;
+  rawInviteSecret.length === 0
+    ? null
+    : rawInviteSecret.includes("://")
+      ? rawInviteSecret
+      : `https://discord.gg/${rawInviteSecret}`;
 
 function randomIntInclusive(min: number, max: number) {
   if (max <= min) {
