@@ -1,32 +1,14 @@
 import { ConvexReactClient } from "convex/react";
 
-const PROXIED_CONVEX_PATH = "/api/convex";
+const rawConvexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 
-function getServerConvexUrl(): string {
-  const url = process.env.CONVEX_SELF_HOSTED_URL;
-  if (!url) {
-    throw new Error("CONVEX_SELF_HOSTED_URL must be defined in the container environment.");
-  }
-  return url.replace(/\/$/, "");
+if (!rawConvexUrl) {
+  throw new Error("NEXT_PUBLIC_CONVEX_URL must be defined to initialize Convex.");
 }
 
-function resolveConvexUrl(): string {
-  if (typeof window === "undefined") {
-    return getServerConvexUrl();
-  }
-  return `${window.location.origin}${PROXIED_CONVEX_PATH}`;
-}
+const convexUrl = rawConvexUrl.replace(/\/$/, "");
 
-function resolveHttpUrl(): string {
-  if (typeof window === "undefined") {
-    return getServerConvexUrl();
-  }
-  return `${window.location.origin}${PROXIED_CONVEX_PATH}`.replace(/\/$/, "");
-}
-
-const convexUrl = resolveConvexUrl();
-
-export const CONVEX_HTTP_URL = resolveHttpUrl();
+export const CONVEX_HTTP_URL = convexUrl;
 
 export const convex = new ConvexReactClient(convexUrl, {
   verbose: process.env.NODE_ENV === "development",
