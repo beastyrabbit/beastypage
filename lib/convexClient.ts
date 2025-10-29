@@ -1,6 +1,5 @@
 import { ConvexReactClient } from "convex/react";
 
-const PROXIED_CONVEX_PATH = "/api/convex";
 const DEFAULT_INTERNAL_URL = "http://127.0.0.1:3210";
 
 const SERVER_CONVEX_URL =
@@ -10,17 +9,7 @@ const SERVER_CONVEX_URL =
 
 const PUBLIC_CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL || undefined;
 
-function resolveConvexUrl(): string {
-  if (typeof window === "undefined") {
-    return SERVER_CONVEX_URL.replace(/\/$/, "");
-  }
-  if (PUBLIC_CONVEX_URL) {
-    return PUBLIC_CONVEX_URL.replace(/\/$/, "");
-  }
-  return `${window.location.origin}${PROXIED_CONVEX_PATH}`.replace(/\/$/, "");
-}
-
-const convexUrl = resolveConvexUrl();
+const convexUrl = (PUBLIC_CONVEX_URL || SERVER_CONVEX_URL).replace(/\/$/, "");
 
 export const CONVEX_HTTP_URL = convexUrl;
 
