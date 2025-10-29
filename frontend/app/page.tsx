@@ -59,13 +59,6 @@ export default function HubLanding() {
           >
             Dive into Gatcha <ArrowRight className="size-4" />
           </Link>
-          <Link
-            href="https://discord.gg/convex"
-            target="_blank"
-            className="inline-flex items-center gap-2 rounded-full border border-foreground/30 px-5 py-2 text-sm font-semibold text-foreground transition hover:bg-foreground hover:text-background"
-          >
-            Join the build channel
-          </Link>
         </div>
       </section>
 
