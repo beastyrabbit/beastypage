@@ -83,7 +83,12 @@ export async function renderCatV3(
     requestInit.priority = options.priority;
   }
 
-  const response = await fetch(buildRendererUrl(baseUrl, '/render'), requestInit);
+  const response = await fetchWithRetry(buildRendererUrl(baseUrl, '/render'), requestInit, {
+    attempts: 3,
+    baseDelayMs: 100,
+    maxDelayMs: 1200,
+    context: 'render-single',
+  });
 
   if (!response.ok) {
     const message = await safeReadError(response);
@@ -152,7 +157,12 @@ export async function renderCatBatchV3(
     requestInit.priority = options.priority;
   }
 
-  const response = await fetch(buildRendererUrl(baseUrl, '/render/batch'), requestInit);
+  const response = await fetchWithRetry(buildRendererUrl(baseUrl, '/render/batch'), requestInit, {
+    attempts: 3,
+    baseDelayMs: 100,
+    maxDelayMs: 1500,
+    context: 'render-batch',
+  });
 
   if (!response.ok) {
     const message = await safeReadError(response);
@@ -203,4 +213,80 @@ export async function renderCatBatchV3(
       imageDataUrl: source.image,
     })),
   };
+}
+
+interface RetryConfig {
+  attempts?: number;
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+  context?: string;
+}
+
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit & { priority?: RequestPriority },
+  { attempts = 3, baseDelayMs = 100, maxDelayMs = 1000, context }: RetryConfig = {}
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      if (!shouldRetryResponse(response) || attempt === attempts - 1) {
+        return response;
+      }
+      const delay = computeBackoffDelay(baseDelayMs, attempt, maxDelayMs);
+      logRetry(context, attempt + 1, response.status, delay);
+      await wait(delay);
+      continue;
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts - 1) {
+        throw error;
+      }
+      const delay = computeBackoffDelay(baseDelayMs, attempt, maxDelayMs);
+      logRetry(context, attempt + 1, null, delay, error);
+      await wait(delay);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Renderer request failed after retries');
+}
+
+function shouldRetryResponse(response: Response): boolean {
+  if (response.status >= 500) return true;
+  if (response.status === 429) return true;
+  return false;
+}
+
+function computeBackoffDelay(base: number, attempt: number, maxDelay: number): number {
+  const jitter = Math.random() * 0.3 + 0.85;
+  const delay = Math.min(maxDelay, base * 2 ** attempt);
+  return Math.round(delay * jitter);
+}
+
+function wait(duration: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, duration);
+  });
+}
+
+function logRetry(
+  context: string | undefined,
+  attemptNumber: number,
+  status: number | null,
+  delayMs: number,
+  error?: unknown
+) {
+  if (process.env.NODE_ENV === 'development') {
+    const prefix = context ? `[renderer:${context}]` : '[renderer]';
+    if (status !== null) {
+      // eslint-disable-next-line no-console
+      console.warn(`${prefix} retrying after status ${status} (attempt ${attemptNumber}) in ${delayMs}ms`);
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn(`${prefix} retrying after error (attempt ${attemptNumber}) in ${delayMs}ms`, error);
+    }
+  }
 }

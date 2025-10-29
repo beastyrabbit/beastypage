@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const RAW_RENDERER_BASE =
+export const RAW_RENDERER_BASE =
   process.env.RENDERER_INTERNAL_URL ||
   process.env.CONVEX_RENDERER_URL ||
   process.env.NEXT_PUBLIC_RENDERER_URL ||
   'http://127.0.0.1:8001';
 
-const RENDERER_BASE = RAW_RENDERER_BASE.replace(/\/$/, '');
+export const RENDERER_BASE = RAW_RENDERER_BASE.replace(/\/$/, '');
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 

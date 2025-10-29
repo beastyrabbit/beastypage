@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     )
     default_canvas_size: int = Field(50, ge=32, le=200)
     enable_cache: bool = Field(True)
+    max_queue_size: int = Field(120, ge=10, le=1000)
+    worker_count: int = Field(4, ge=1, le=32)
+    circuit_failure_threshold: int = Field(8, ge=3, le=50)
+    circuit_reset_seconds: int = Field(12, ge=3, le=120)
     allowed_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:3000",
