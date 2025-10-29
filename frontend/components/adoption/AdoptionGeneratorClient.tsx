@@ -117,14 +117,14 @@ export function AdoptionGeneratorClient() {
     };
 
     (async () => {
-      const [{ createAdoptionGeneratorV3 }] = await Promise.all([
-        import("@/lib/adoption/adoptionGeneratorV3"),
+      const [{ createAdoptionGenerator }] = await Promise.all([
+        import("@/lib/adoption/adoptionGenerator"),
       ]);
       if (cancelled) return;
 
       detachSpeedGroup = attachSpeedGroup() ?? detachSpeedGroup;
 
-      createAdoptionGeneratorV3({
+      createAdoptionGenerator({
         viewerBasePath: "/view",
         onGenerationStart: () => {
           setGenerationComplete(false);

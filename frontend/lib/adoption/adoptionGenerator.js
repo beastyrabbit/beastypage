@@ -20,7 +20,7 @@ const CONFIG = {
 
 const AFTERLIFE_DEFAULT = 'both10';
 
-export class AdoptionGeneratorV3 {
+export class AdoptionGenerator {
     constructor(options = {}) {
         this.options = options || {};
         this.onBatchFinalized = typeof this.options.onBatchFinalized === 'function'
@@ -1674,8 +1674,7 @@ export class AdoptionGeneratorV3 {
     }
 }
 
-export function createAdoptionGeneratorV3(options = {}) {
-    return new AdoptionGeneratorV3(options);
+export function createAdoptionGenerator(options = {}) {
+    return new AdoptionGenerator(options);
 }
-
-export default AdoptionGeneratorV3;
+export default AdoptionGenerator;
