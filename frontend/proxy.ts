@@ -24,7 +24,7 @@ function normalizeRoute(route: string | undefined) {
   return route.startsWith("/") ? route : `/${route}`;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (pathname !== "" && pathname !== "/") {
     return NextResponse.next();
