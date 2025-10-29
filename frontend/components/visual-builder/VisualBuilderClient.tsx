@@ -1586,7 +1586,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         <p className="text-sm text-neutral-300">Choose the sprite pose and orientation.</p>
       </header>
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {(options?.sprites ?? []).map((sprite) => (
+        {(viewOptions?.sprites ?? []).map((sprite) => (
           <button
             key={sprite}
             type="button"
@@ -1604,7 +1604,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         ))}
       </div>
     </section>
-  ), [options?.sprites, params.spriteNumber, updateParams]);
+  ), [viewOptions?.sprites, params.spriteNumber, updateParams]);
 
   const renderPoseSection = useCallback(() => poseSection, [poseSection]);
 
