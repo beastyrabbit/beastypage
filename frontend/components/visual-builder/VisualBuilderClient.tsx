@@ -1591,25 +1591,22 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
             key={sprite}
             type="button"
             className={cn(
-              "rounded-xl border border-slate-700/60 bg-slate-900/60 p-3 text-left transition hover:border-amber-400/60",
+              "rounded-xl border border-slate-700/60 bg-slate-900/60 p-0 transition hover:border-amber-400/60",
               params.spriteNumber === sprite && "border-amber-400 bg-amber-500/10 text-amber-100"
             )}
             onClick={() => updateParams((draft) => {
               draft.spriteNumber = sprite;
             })}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold">Pose {sprite}</span>
-              <PreviewSprite
-                cacheKey={`pose-option-${sprite}`}
-                mutate={(draft) => {
-                  draft.spriteNumber = sprite;
-                }}
-                selected={params.spriteNumber === sprite}
-                label={`Pose ${sprite}`}
-                size={160}
-              />
-            </div>
+            <PreviewSprite
+              cacheKey={`pose-option-${sprite}`}
+              mutate={(draft) => {
+                draft.spriteNumber = sprite;
+              }}
+              selected={params.spriteNumber === sprite}
+              label={`Pose ${sprite}`}
+              size={180}
+            />
           </button>
         ))}
       </div>
