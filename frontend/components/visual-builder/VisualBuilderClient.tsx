@@ -8,7 +8,7 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
-import type { CatGeneratorApi, SpriteMapperApi } from "@/components/cat-builder/types";
+import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "@/components/cat-builder/types";
 import { canvasToDataUrl, cloneParams, formatName, getColourSwatch } from "@/components/cat-builder/utils";
 
 type PaletteMode = "off" | "mood" | "bold" | "darker" | "blackout";
@@ -111,6 +111,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   const [tortieLayers, setTortieLayers] = useState<TortieLayer[]>([]);
   const [experimentalColourMode, setExperimentalColourMode] = useState<PaletteMode>("off");
   const [tortiePaletteMode, setTortiePaletteMode] = useState<PaletteMode>("off");
+  const [initialSpriteNumber, setInitialSpriteNumber] = useState<number | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -133,9 +134,20 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   const { generator, ready: rendererReady, error: rendererError } = useCatGenerator();
 
   const deferredParams = useDeferredValue(params);
-  const deferredOptions = useDeferredValue(options);
+  const normalizedOptions = useMemo(() => {
+    if (!options) return null;
+    const sprites = new Set(options.sprites);
+    if (initialSpriteNumber !== null) {
+      sprites.add(initialSpriteNumber);
+    }
+    return {
+      ...options,
+      sprites: Array.from(sprites).sort((a, b) => a - b),
+    } satisfies BuilderOptions;
+  }, [options, initialSpriteNumber]);
+  const deferredOptions = useDeferredValue(normalizedOptions);
   const viewParams = deferredParams ?? params;
-  const viewOptions = deferredOptions ?? options;
+  const viewOptions = deferredOptions ?? normalizedOptions;
 
 
   const spriteMapperRef = useRef<SpriteMapperApi | null>(null);
@@ -195,6 +207,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     });
     setExperimentalColourMode(initialCat.paletteMode ?? "off");
     setTortiePaletteMode(initialCat.tortiePaletteMode ?? "off");
+    setInitialSpriteNumber(synced.spriteNumber ?? null);
     setCatName(initialCat.catName ?? "");
     setCreatorName(initialCat.creatorName ?? "");
     setShareInfo((prev) => {
@@ -224,15 +237,15 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   }, [ensureTortieSync, initialCat]);
 
   useEffect(() => {
-    if (!options) return;
+    if (!normalizedOptions) return;
     setParams((prev) => {
       let needsUpdate = false;
       const initialSpriteNumber = initialSpriteNumberRef.current;
-      const spriteAllowed = options.sprites.includes(prev.spriteNumber);
+      const spriteAllowed = normalizedOptions.sprites.includes(prev.spriteNumber);
 
-      if (!options.pelts.includes(prev.peltName)) needsUpdate = true;
-      if (!options.eyeColours.includes(prev.eyeColour)) needsUpdate = true;
-      if (!options.skinColours.includes(prev.skinColour)) needsUpdate = true;
+      if (!normalizedOptions.pelts.includes(prev.peltName)) needsUpdate = true;
+      if (!normalizedOptions.eyeColours.includes(prev.eyeColour)) needsUpdate = true;
+      if (!normalizedOptions.skinColours.includes(prev.skinColour)) needsUpdate = true;
       if (!spriteAllowed && !(initialSpriteNumber !== null && prev.spriteNumber === initialSpriteNumber)) {
         needsUpdate = true;
       }
@@ -240,21 +253,21 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       if (!needsUpdate) return prev;
 
       const next = cloneParams(prev);
-      if (!options.pelts.includes(next.peltName)) {
-        next.peltName = options.pelts[0] ?? next.peltName;
+      if (!normalizedOptions.pelts.includes(next.peltName)) {
+        next.peltName = normalizedOptions.pelts[0] ?? next.peltName;
       }
-      if (!options.eyeColours.includes(next.eyeColour)) {
-        next.eyeColour = options.eyeColours[0] ?? next.eyeColour;
+      if (!normalizedOptions.eyeColours.includes(next.eyeColour)) {
+        next.eyeColour = normalizedOptions.eyeColours[0] ?? next.eyeColour;
       }
-      if (!options.skinColours.includes(next.skinColour)) {
-        next.skinColour = options.skinColours[0] ?? next.skinColour;
+      if (!normalizedOptions.skinColours.includes(next.skinColour)) {
+        next.skinColour = normalizedOptions.skinColours[0] ?? next.skinColour;
       }
-      if (!options.sprites.includes(next.spriteNumber)) {
+      if (!normalizedOptions.sprites.includes(next.spriteNumber)) {
         const preferred = initialSpriteNumber !== null ? initialSpriteNumber : undefined;
-        if (preferred !== undefined && options.sprites.includes(preferred)) {
+        if (preferred !== undefined && normalizedOptions.sprites.includes(preferred)) {
           next.spriteNumber = preferred;
         } else {
-          next.spriteNumber = options.sprites[0] ?? next.spriteNumber;
+          next.spriteNumber = normalizedOptions.sprites[0] ?? next.spriteNumber;
         }
       }
       return next;
@@ -263,7 +276,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     if (shareInfo) {
       setShareStale(true);
     }
-  }, [options, shareInfo]);
+  }, [normalizedOptions, shareInfo]);
 
   useEffect(() => {
     const generatorInstance = generatorRef.current;
@@ -1708,6 +1721,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     setParams(DEFAULT_PARAMS);
     setTortieLayers([]);
     initialSpriteNumberRef.current = null;
+    setInitialSpriteNumber(null);
     setExperimentalColourMode("off");
     setTortiePaletteMode("off");
     setCatName("");
