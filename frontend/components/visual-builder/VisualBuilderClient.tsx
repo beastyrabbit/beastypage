@@ -1803,6 +1803,14 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         combined.tortieColour = primary?.colour;
         combined.tortieMask = primary?.mask;
       }
+      const nextPaletteMode = typeof random?.basePalette === "string" && PALETTE_CONTROLS.some((entry) => entry.id === random.basePalette)
+        ? (random.basePalette as PaletteMode)
+        : "off";
+      const nextTortiePaletteMode = typeof random?.tortiePalette === "string" && PALETTE_CONTROLS.some((entry) => entry.id === random.tortiePalette)
+        ? (random.tortiePalette as PaletteMode)
+        : "off";
+      setExperimentalColourMode(nextPaletteMode);
+      setTortiePaletteMode(nextTortiePaletteMode);
       initialSpriteNumberRef.current = combined.spriteNumber ?? null;
       setInitialSpriteNumber(combined.spriteNumber ?? null);
       setParams(combined);
