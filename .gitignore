@@ -13,6 +13,7 @@ yarn-error.log*
 .env*
 frontend/.env.local
 
+
 # Frontend build artifacts
 frontend/node_modules/
 frontend/.pnp
@@ -40,6 +41,7 @@ backend/catdex-runtime/
 # Legacy folders no longer tracked
 frontend-lagacy/
 lifegen-fullgen/
+node_modules/
 
 # Systemd / secrets
 systemd/

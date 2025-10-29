@@ -290,7 +290,12 @@ export function PaletteSpinnerClient() {
   const isCopyEnabled = !isSpinning && !!lastResultRef.current;
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-6 py-12">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
+      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">Palette Spinner</p>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Find your next base palette in seconds</h1>
+      </section>
+
       <section className="rounded-3xl border border-border/40 bg-background/70 p-6 shadow-lg shadow-black/20">
         <div className="grid gap-6 md:grid-cols-3">
           <div className="flex flex-col gap-2">
@@ -440,9 +445,11 @@ export function PaletteSpinnerClient() {
             >
               Copy colours
             </button>
-            <span className="text-xs uppercase tracking-wide text-muted-foreground/70">
-              {spinCount} / {targetSpins || "∞"} palettes
-            </span>
+            {!isSpinning && (
+              <span className="text-xs uppercase tracking-wide text-muted-foreground/70">
+                {spinCount} / {targetSpins || "∞"} palettes
+              </span>
+            )}
           </div>
 
           {error && (

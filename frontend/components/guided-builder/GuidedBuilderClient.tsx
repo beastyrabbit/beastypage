@@ -146,17 +146,6 @@ const PALETTE_CONTROLS: { id: PaletteMode; label: string }[] = [
 
 const DISPLAY_CANVAS_SIZE = 540;
 
-function formatName(value: unknown): string {
-  if (value === null || value === undefined) return "None";
-  if (typeof value === "number") return `#${value}`;
-  return String(value)
-    .replace(/[_-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase()) || "None";
-}
-
 export function GuidedBuilderClient() {
   const router = useRouter();
   const [params, setParams] = useState<CatParams>(DEFAULT_PARAMS);
@@ -248,7 +237,7 @@ export function GuidedBuilderClient() {
   );
 
   const getPaletteForMode = useCallback((mode: PaletteMode) => {
-    const activeMapper = spriteMapperRef.current;
+    const activeMapper = mapper ?? spriteMapperRef.current;
     if (!activeMapper) return [];
     if (mode === "off") {
       return activeMapper.getColours();
@@ -262,7 +251,7 @@ export function GuidedBuilderClient() {
       return fallback;
     }
     return activeMapper.getColours();
-  }, []);
+  }, [mapper]);
 
   const paletteColours = useMemo(() => getPaletteForMode(experimentalColourMode), [experimentalColourMode, getPaletteForMode]);
 
@@ -1674,8 +1663,8 @@ export function GuidedBuilderClient() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[20rem,1fr]">
-      <aside className="flex flex-col gap-6 rounded-3xl border border-slate-800 bg-slate-950/70 p-6">
+    <div className="grid gap-6 md:grid-cols-[15rem,1fr] lg:grid-cols-[18rem,1fr] xl:grid-cols-[20rem,1fr]">
+      <aside className="flex flex-col gap-5 rounded-3xl border border-slate-800 bg-slate-950/70 p-5 md:p-6">
         <header>
           <h1 className="text-xl font-semibold text-white">Guided Cat Builder</h1>
           <p className="mt-2 text-sm text-neutral-300">
@@ -1691,7 +1680,7 @@ export function GuidedBuilderClient() {
                 key={step.id}
                 type="button"
                 className={cn(
-                  "w-full rounded-xl border border-transparent px-4 py-3 text-left transition",
+                  "w-full rounded-xl border border-transparent px-3 py-2.5 text-left text-sm transition",
                   unlocked
                     ? activeStep === step.id
                       ? "border-amber-400 bg-amber-500/20 text-amber-100"

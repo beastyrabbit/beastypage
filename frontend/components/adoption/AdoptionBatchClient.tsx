@@ -154,25 +154,30 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 py-16">
-      <header className="flex flex-col gap-2">
-        <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
-          <ArrowLeft className="size-4" /> Back
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
+      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
+        <Link href="/" className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-amber-200/80 transition hover:text-amber-100">
+          <ArrowLeft className="size-3" /> Back to hub
         </Link>
-        <h1 className="text-3xl font-semibold">{batchTitle}</h1>
-        <p className="text-sm text-muted-foreground">
-          {batchCreator ? `Created by ${batchCreator}` : "Created by the adoption generator"}
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">{batchTitle}</h1>
+        <p className="mt-3 max-w-2xl text-sm text-neutral-200/85 sm:text-base">
+          {batchCreator ? `Created by ${batchCreator}` : "Generated in the adoption wizard"}
           {formattedDate ? ` • ${formattedDate}` : null}
         </p>
-        {shareUrl ? (
-          <Link
-            href={shareUrl}
-            className="inline-flex w-fit items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-          >
-            Share batch <ArrowUpRight className="size-4" />
-          </Link>
-        ) : null}
-      </header>
+        <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-200/80">
+          <span className="rounded-full border border-amber-400/30 bg-slate-950/60 px-3 py-1">
+            {enrichedCats.length.toLocaleString()} cats in this batch
+          </span>
+          {shareUrl ? (
+            <Link
+              href={shareUrl}
+              className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/20 px-4 py-2 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/25"
+            >
+              Share batch <ArrowUpRight className="size-4" />
+            </Link>
+          ) : null}
+        </div>
+      </section>
 
       <section className="flex flex-col gap-6">
         {enrichedCats.length === 0 ? (

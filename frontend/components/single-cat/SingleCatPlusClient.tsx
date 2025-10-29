@@ -12,7 +12,6 @@ import {
 import { cn } from "@/lib/utils";
 import {
   ArrowUpRight,
-  ChevronDown,
   Copy,
   Download,
   Loader2,
@@ -59,19 +58,6 @@ interface SpriteVariation {
   spriteNumber: number;
   name: string;
   dataUrl: string;
-}
-
-interface BuilderVariantSpec {
-  id: string;
-  accessory: string | null;
-  scar: string | null;
-  tortie: TortieSlot | null;
-}
-
-interface BuilderVariantPreview extends BuilderVariantSpec {
-  dataUrl: string;
-  builderUrl: string;
-  label: string;
 }
 
 interface VariationOption {
@@ -1302,10 +1288,6 @@ export function SingleCatPlusClient({
   const [toast, setToast] = useState<string | null>(null);
   const [rollerExpanded, setRollerExpanded] = useState(false);
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
-  const [builderVariantsOpen, setBuilderVariantsOpen] = useState(false);
-  const [builderVariantSpecs, setBuilderVariantSpecs] = useState<BuilderVariantSpec[]>([]);
-  const [builderVariantPreviews, setBuilderVariantPreviews] = useState<BuilderVariantPreview[]>([]);
-  const [builderVariantsLoading, setBuilderVariantsLoading] = useState(false);
   const [catNameDraft, setCatNameDraft] = useState("");
   const [creatorNameDraft, setCreatorNameDraft] = useState("");
   const [metaSaving, setMetaSaving] = useState(false);
@@ -1326,7 +1308,6 @@ export function SingleCatPlusClient({
   const updateMapperMeta = useMutation(api.mapper.updateMeta);
 
   const extendedModesArray = useMemo(() => Array.from(extendedModes), [extendedModes]);
-  const builderVariantsSupported = useMemo(() => includeBaseColours && extendedModes.size === 0, [includeBaseColours, extendedModes]);
 
   const resetMetaDrafts = useCallback((catName?: string | null, creatorName?: string | null) => {
     setCatNameDraft(catName ?? "");
@@ -2141,10 +2122,6 @@ export function SingleCatPlusClient({
     setRollSummary(null);
     setActiveParamId(null);
     setHasTint(false);
-    setBuilderVariantsOpen(false);
-    setBuilderVariantSpecs([]);
-    setBuilderVariantPreviews([]);
-    setBuilderVariantsLoading(false);
     clearMirror();
     drawPlaceholder();
     setRollerExpanded(true);
@@ -2254,7 +2231,6 @@ export function SingleCatPlusClient({
       );
       setHasTint(Boolean(enableDarkForest || enableDead));
       setSpriteGalleryOpen(false);
-      setBuilderVariantsOpen(false);
 
       const uniqueAccessories = Array.from(
         new Set(accessorySlots.filter((entry): entry is string => typeof entry === "string" && entry !== "none"))
@@ -2263,29 +2239,6 @@ export function SingleCatPlusClient({
         new Set(scarSlots.filter((entry): entry is string => typeof entry === "string" && entry !== "none"))
       );
       const tortieChoices = tortieLayers.length ? tortieLayers : [];
-
-      const accessoryOptions = uniqueAccessories.length > 0 ? uniqueAccessories : [null];
-      const scarOptions = uniqueScars.length > 0 ? uniqueScars : [null];
-      const tortieOptions = tortieChoices.length > 0 ? tortieChoices : [null];
-
-      const comboSpecs: BuilderVariantSpec[] = [];
-      accessoryOptions.forEach((accessory) => {
-        scarOptions.forEach((scar) => {
-          tortieOptions.forEach((tortie) => {
-            if (!accessory && !scar && !tortie) {
-              return;
-            }
-            const tortieKey = tortie ? `${tortie.mask}-${tortie.pattern}-${tortie.colour}` : "none";
-            comboSpecs.push({
-              id: `${accessory ?? "none"}|${scar ?? "none"}|${tortieKey}`,
-              accessory: accessory ?? null,
-              scar: scar ?? null,
-              tortie: tortie ?? null,
-            });
-          });
-        });
-      });
-
 
       const progressiveParams: Record<string, unknown> = {
         spriteNumber: DEFAULT_SPRITE_NUMBER,
@@ -2491,16 +2444,6 @@ export function SingleCatPlusClient({
       await renderCat(params);
       if (generationIdRef.current !== token) return;
 
-      if (builderVariantsSupported) {
-        setBuilderVariantSpecs(comboSpecs);
-        setBuilderVariantPreviews([]);
-        setBuilderVariantsLoading(false);
-      } else {
-        setBuilderVariantSpecs([]);
-        setBuilderVariantPreviews([]);
-        setBuilderVariantsLoading(false);
-      }
-
       const builderPrimaryAccessory = uniqueAccessories[0] ?? null;
       const builderPrimaryScar = uniqueScars[0] ?? null;
       const builderPrimaryTortie = tortieLayers.length > 0 ? tortieLayers[0] : null;
@@ -2643,74 +2586,11 @@ export function SingleCatPlusClient({
     drawPlaceholder,
     settleRoller,
     readSpinState,
-    builderVariantsSupported,
     createMapper,
     resetMetaDrafts,
   ]);
 
-  useEffect(() => {
-    if (!builderVariantsSupported) {
-      if (builderVariantPreviews.length > 0) setBuilderVariantPreviews([]);
-      if (builderVariantSpecs.length > 0) setBuilderVariantSpecs([]);
-      setBuilderVariantsLoading(false);
-      return;
-    }
-    if (!builderVariantsOpen) return;
-    if (builderVariantSpecs.length === 0) {
-      setBuilderVariantPreviews([]);
-      setBuilderVariantsLoading(false);
-      return;
-    }
-    if (builderVariantPreviews.length > 0) return;
-    const generator = generatorRef.current;
-    const state = catStateRef.current;
-    if (!generator || !state) return;
-
-    let cancelled = false;
-    (async () => {
-      setBuilderVariantsLoading(true);
-      const previews: BuilderVariantPreview[] = [];
-      for (const spec of builderVariantSpecs) {
-        if (cancelled) return;
-        const variantParams = sanitizeForBuilder(state.params, {
-          accessory: spec.accessory,
-          scar: spec.scar,
-          tortie: spec.tortie,
-        });
-        variantParams.spriteNumber = DEFAULT_SPRITE_NUMBER;
-        variantParams.sprite = DEFAULT_SPRITE_NUMBER;
-        const result = await generator.generateCat(variantParams);
-        if (cancelled) return;
-        const previewCanvas = document.createElement("canvas");
-        previewCanvas.width = 120;
-        previewCanvas.height = 120;
-        const ctx = previewCanvas.getContext("2d");
-        if (ctx) {
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(result.canvas as HTMLCanvasElement, 0, 0, 120, 120);
-        }
-        const builderUrl = generator.buildCatURL(variantParams);
-        const labelParts: string[] = [];
-        labelParts.push(spec.accessory ? `Accessory: ${formatValue(spec.accessory)}` : "No Accessory");
-        labelParts.push(spec.scar ? `Scar: ${formatValue(spec.scar)}` : "No Scar");
-        labelParts.push(spec.tortie ? `Tortie: ${formatTortieLayer(spec.tortie)}` : "No Tortie");
-        previews.push({
-          ...spec,
-          dataUrl: previewCanvas.toDataURL("image/png"),
-          builderUrl,
-          label: labelParts.join(" • "),
-        });
-      }
-      if (!cancelled) {
-        setBuilderVariantPreviews(previews);
-        setBuilderVariantsLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [builderVariantSpecs, builderVariantPreviews.length, builderVariantsOpen, builderVariantsSupported]);
+  
 
   const handleDownload = useCallback(() => {
     const canvas = canvasRef.current;
@@ -2964,8 +2844,8 @@ export function SingleCatPlusClient({
               )}
             </div>
 
-            <div className="w-full max-w-[700px] rounded-2xl border border-border/40 bg-background/70 p-4 shadow-inner">
-              <div className="text-xs uppercase tracking-[0.32em] text-muted-foreground/80">
+            <div className="mx-auto w-full max-w-[700px] rounded-2xl border border-border/40 bg-background/70 p-4 shadow-inner">
+              <div className="text-center text-xs uppercase tracking-[0.32em] text-muted-foreground/80">
                 {rollerLabel ?? "Ready"}
               </div>
               <div
@@ -3364,95 +3244,6 @@ export function SingleCatPlusClient({
               View Sprite Gallery
             </button>
           </div>
-        </div>
-      </div>
-
-      <div className="glass-card px-6 py-6">
-        <button
-          type="button"
-          onClick={() => builderVariantsSupported && setBuilderVariantsOpen((prev) => !prev)}
-          disabled={!builderVariantsSupported}
-          className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/70 px-4 py-3 text-left transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Original Visual Builder Variants</h3>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-              {!builderVariantsSupported
-                ? "Variants unavailable: original builder only supports base colour palette"
-                : builderVariantSpecs.length > 0
-                ? `${builderVariantSpecs.length} variant${builderVariantSpecs.length === 1 ? "" : "s"} available`
-                : "No additional variants for this roll"}
-            </p>
-          </div>
-          <ChevronDown
-            className={cn(
-              "size-4 text-muted-foreground transition-transform",
-              builderVariantsOpen ? "rotate-180" : "rotate-0"
-            )}
-          />
-        </button>
-        <div
-          className={cn(
-            "overflow-hidden transition-all duration-300",
-            builderVariantsOpen ? "mt-4 max-h-[1200px]" : "max-h-0"
-          )}
-        >
-          {builderVariantsOpen && (
-            <div className="space-y-4">
-              {builderVariantsLoading && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" /> Generating preview variants…
-                </div>
-              )}
-              {!builderVariantsLoading && builderVariantSpecs.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Roll accessories, scars, or tortie layers to unlock individual builder variants.
-                </p>
-              )}
-              {!builderVariantsLoading && builderVariantSpecs.length > 0 && builderVariantPreviews.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Preparing preview sprites…
-                </p>
-              )}
-              {!builderVariantsLoading && builderVariantPreviews.length > 0 && (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {builderVariantPreviews.map((variant, index) => (
-                    <div
-                      key={variant.id}
-                      className="rounded-2xl border border-border/40 bg-background/70 p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-foreground">Variant {index + 1}</p>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">{variant.label}</p>
-                      <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
-                        <Image
-                          src={variant.dataUrl}
-                          alt={variant.label}
-                          width={120}
-                          height={120}
-                          unoptimized
-                          className="mx-auto block h-28 w-28 image-render-pixel"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                        onClick={() => {
-                          const opened = window.open(variant.builderUrl, "_blank", "noopener=yes");
-                          if (!opened) {
-                            showToast("Enable popups to open the original builder.");
-                          }
-                        }}
-                      >
-                        <ArrowUpRight className="size-4" /> Open in Original Visual Builder
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

@@ -7,12 +7,11 @@ import { api } from "@/convex/_generated/api";
 import type { CollectionEntry } from "@/convex/collection";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
-import { ExternalLink, Filter, Search, Sparkles, X } from "lucide-react";
+import { ExternalLink, Search, Sparkles, X } from "lucide-react";
 
 export default function CollectionPage() {
   const entries = useQuery(api.collection.list, {});
   const [search, setSearch] = useState("");
-  const [animalFilter, setAnimalFilter] = useState<string>("all");
   const [activeEntry, setActiveEntry] = useState<CollectionEntry | null>(null);
 
   useEffect(() => {
@@ -31,21 +30,11 @@ export default function CollectionPage() {
 
   const isLoading = !entries;
 
-  const animals = useMemo(() => {
-    if (!entries) return [] as string[];
-    const names = new Set<string>();
-    for (const entry of entries) {
-      if (entry.animal) names.add(entry.animal);
-    }
-    return Array.from(names).sort();
-  }, [entries]);
-
   const filteredEntries = useMemo(() => {
     if (!entries) return [] as CollectionEntry[];
     const query = search.trim().toLowerCase();
     return entries
       .filter((entry) => {
-        if (animalFilter !== "all" && entry.animal !== animalFilter) return false;
         if (!query) return true;
         const haystack = [
           entry.artist_name,
@@ -58,7 +47,7 @@ export default function CollectionPage() {
         return haystack.includes(query);
       })
       .sort((a, b) => (b.created ?? 0) - (a.created ?? 0));
-  }, [entries, search, animalFilter]);
+  }, [entries, search]);
 
   if (isLoading) {
     return (
@@ -97,33 +86,15 @@ export default function CollectionPage() {
       </header>
 
       <section className="glass-card grid gap-4 p-6">
-        <div className="grid gap-4 md:grid-cols-[1.2fr,1fr]">
-          <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-3 py-2">
-            <Search className="size-4 text-muted-foreground" />
-            <input
-              className="flex-1 bg-transparent text-sm outline-none"
-              placeholder="Search by artist, animal, or link"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
-          <select
-            className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            value={animalFilter}
-            onChange={(event) => setAnimalFilter(event.target.value)}
-          >
-            <option value="all">All animals</option>
-            {animals.map((animal) => (
-              <option key={animal} value={animal}>
-                {animal}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1 text-xs text-muted-foreground">
-          <Filter className="size-3" />
-          <span>{filteredEntries.length} items match the filters</span>
-        </div>
+        <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-3 py-2">
+          <Search className="size-4 text-muted-foreground" />
+          <input
+            className="flex-1 bg-transparent text-sm outline-none"
+            placeholder="Search by artist, animal, or link"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
       </section>
 
       {filteredEntries.length === 0 ? (
@@ -150,20 +121,7 @@ export default function CollectionPage() {
                 </div>
                 <div className="flex flex-1 flex-col gap-2 p-4">
                   <h3 className="text-lg font-semibold capitalize">{entry.artist_name}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Updated {formatDate(entry.updated ?? entry.created)}
-                  </p>
                   <div className="mt-auto flex flex-wrap gap-2">
-                    {full && (
-                      <a
-                        href={full}
-                        target="_blank"
-                        className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition hover:opacity-90"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        Open full image <ExternalLink className="size-3" />
-                      </a>
-                    )}
                     {entry.link && (
                       <Link
                         href={normalizeLink(entry.link)}
@@ -187,7 +145,10 @@ export default function CollectionPage() {
       </footer>
 
       {activeEntry && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-10 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-10 backdrop-blur-sm"
+          onClick={() => setActiveEntry(null)}
+        >
           <div className="glass-card relative w-full max-w-5xl overflow-hidden">
             <button
               type="button"
@@ -197,7 +158,10 @@ export default function CollectionPage() {
             >
               <X className="size-4" />
             </button>
-            <div className="grid gap-6 p-6 md:grid-cols-[1.4fr,1fr]">
+            <div
+              className="grid gap-6 p-6 md:grid-cols-[1.4fr,1fr]"
+              onClick={(event) => event.stopPropagation()}
+            >
               <ProgressiveImage
                 lowSrc={absoluteUrl(activeEntry.blur_img) ?? absoluteUrl(activeEntry.preview_img) ?? absoluteUrl(activeEntry.full_img)}
                 highSrc={absoluteUrl(activeEntry.full_img) ?? absoluteUrl(activeEntry.preview_img)}
