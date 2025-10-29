@@ -1,7 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { createHash } from "crypto";
 
 const INITIAL_RATING = 1500;
 const K_FACTOR = 24;
@@ -24,7 +23,13 @@ function stableStringify(value: unknown): string {
 }
 
 function hashCatParams(params: unknown): string {
-  return createHash("sha1").update(stableStringify(params)).digest("hex");
+  const input = stableStringify(params);
+  let hash = 5381;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash * 33) ^ input.charCodeAt(i);
+    hash >>>= 0;
+  }
+  return hash.toString(16);
 }
 
 function sanitizeCat(doc: Doc<"perfect_cats">) {
