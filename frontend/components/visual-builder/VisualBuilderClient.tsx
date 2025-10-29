@@ -165,6 +165,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   const previewCacheRef = useRef<Map<string, string>>(new Map());
   const previewPendingRef = useRef<Map<string, Promise<string | null>>>(new Map());
   const previewRequestRef = useRef(0);
+  const initialSpriteNumberRef = useRef<number | null>(null);
 
   const createMapperRecord = useMutation(api.mapper.create);
 
@@ -184,6 +185,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     const synced = ensureTortieSync(incomingTortie, mergedParams);
     setParams(synced);
     setTortieLayers(synced.tortie ?? []);
+    initialSpriteNumberRef.current = synced.spriteNumber ?? null;
     setExpandedTortieSub(() => {
       const mapping: Record<number, "pattern" | "colour" | "mask" | null> = {};
       (synced.tortie ?? []).forEach((_, idx) => {
@@ -224,6 +226,19 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   useEffect(() => {
     if (!options) return;
     setParams((prev) => {
+      let needsUpdate = false;
+      const initialSpriteNumber = initialSpriteNumberRef.current;
+      const spriteAllowed = options.sprites.includes(prev.spriteNumber);
+
+      if (!options.pelts.includes(prev.peltName)) needsUpdate = true;
+      if (!options.eyeColours.includes(prev.eyeColour)) needsUpdate = true;
+      if (!options.skinColours.includes(prev.skinColour)) needsUpdate = true;
+      if (!spriteAllowed && !(initialSpriteNumber !== null && prev.spriteNumber === initialSpriteNumber)) {
+        needsUpdate = true;
+      }
+
+      if (!needsUpdate) return prev;
+
       const next = cloneParams(prev);
       if (!options.pelts.includes(next.peltName)) {
         next.peltName = options.pelts[0] ?? next.peltName;
@@ -235,7 +250,12 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         next.skinColour = options.skinColours[0] ?? next.skinColour;
       }
       if (!options.sprites.includes(next.spriteNumber)) {
-        next.spriteNumber = options.sprites[0] ?? next.spriteNumber;
+        const preferred = initialSpriteNumber !== null ? initialSpriteNumber : undefined;
+        if (preferred !== undefined && options.sprites.includes(preferred)) {
+          next.spriteNumber = preferred;
+        } else {
+          next.spriteNumber = options.sprites[0] ?? next.spriteNumber;
+        }
       }
       return next;
     });
@@ -1687,6 +1707,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     setStatusMessage(null);
     setParams(DEFAULT_PARAMS);
     setTortieLayers([]);
+    initialSpriteNumberRef.current = null;
     setExperimentalColourMode("off");
     setTortiePaletteMode("off");
     setCatName("");
