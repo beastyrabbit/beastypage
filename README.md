@@ -24,6 +24,12 @@ This project serves multiple front-end entry points (hub, gatcha, stream, collec
 
 3. (Optional) If you also serve the renderer service, install its dependencies (see `backend/renderer_service`).
 
+4. After deploying Convex functions for the first time (and whenever they change), run:
+   ```bash
+   cd frontend
+   npx convex deploy
+   ```
+
 ## Running the Front-End with PM2
 
 The Next.js app includes `middleware.ts` which reads two environment variables:
@@ -72,6 +78,50 @@ PORT=3004 NEXT_ENTRY_REDIRECT=/personal \
   --interpreter none --cwd ./frontend -- run start
 ```
 
+If you’re using subdomains under `beastyrabbit.com`, you can copy these ready-to-run commands (replace the domain if needed):
+
+```bash
+PORT=3000 NEXT_ENTRY_REDIRECT=/ \
+  NEXT_PUBLIC_HUB_URL=https://hub.beastyrabbit.com \
+  NEXT_PUBLIC_GATCHA_URL=https://gatcha.beastyrabbit.com \
+  NEXT_PUBLIC_STREAM_URL=https://stream.beastyrabbit.com \
+  NEXT_PUBLIC_COLLECTION_URL=https://collection.beastyrabbit.com \
+  NEXT_PUBLIC_PERSONAL_URL=https://personal.beastyrabbit.com \
+  pm2 start bun --name beastypage-hub --interpreter none --cwd ./frontend -- run start
+
+PORT=3001 NEXT_ENTRY_REDIRECT=/gatcha \
+  NEXT_PUBLIC_HUB_URL=https://hub.beastyrabbit.com \
+  NEXT_PUBLIC_GATCHA_URL=https://gatcha.beastyrabbit.com \
+  NEXT_PUBLIC_STREAM_URL=https://stream.beastyrabbit.com \
+  NEXT_PUBLIC_COLLECTION_URL=https://collection.beastyrabbit.com \
+  NEXT_PUBLIC_PERSONAL_URL=https://personal.beastyrabbit.com \
+  pm2 start bun --name beastypage-gatcha --interpreter none --cwd ./frontend -- run start
+
+PORT=3002 NEXT_ENTRY_REDIRECT=/stream \
+  NEXT_PUBLIC_HUB_URL=https://hub.beastyrabbit.com \
+  NEXT_PUBLIC_GATCHA_URL=https://gatcha.beastyrabbit.com \
+  NEXT_PUBLIC_STREAM_URL=https://stream.beastyrabbit.com \
+  NEXT_PUBLIC_COLLECTION_URL=https://collection.beastyrabbit.com \
+  NEXT_PUBLIC_PERSONAL_URL=https://personal.beastyrabbit.com \
+  pm2 start bun --name beastypage-stream --interpreter none --cwd ./frontend -- run start
+
+PORT=3003 NEXT_ENTRY_REDIRECT=/collection \
+  NEXT_PUBLIC_HUB_URL=https://hub.beastyrabbit.com \
+  NEXT_PUBLIC_GATCHA_URL=https://gatcha.beastyrabbit.com \
+  NEXT_PUBLIC_STREAM_URL=https://stream.beastyrabbit.com \
+  NEXT_PUBLIC_COLLECTION_URL=https://collection.beastyrabbit.com \
+  NEXT_PUBLIC_PERSONAL_URL=https://personal.beastyrabbit.com \
+  pm2 start bun --name beastypage-collection --interpreter none --cwd ./frontend -- run start
+
+PORT=3004 NEXT_ENTRY_REDIRECT=/personal \
+  NEXT_PUBLIC_HUB_URL=https://hub.beastyrabbit.com \
+  NEXT_PUBLIC_GATCHA_URL=https://gatcha.beastyrabbit.com \
+  NEXT_PUBLIC_STREAM_URL=https://stream.beastyrabbit.com \
+  NEXT_PUBLIC_COLLECTION_URL=https://collection.beastyrabbit.com \
+  NEXT_PUBLIC_PERSONAL_URL=https://personal.beastyrabbit.com \
+  pm2 start bun --name beastypage-personal --interpreter none --cwd ./frontend -- run start
+```
+
 Pair each port with the matching Caddy/Pangolin subdomain (e.g. `hub.example.com -> :3000`, `gatcha.example.com -> :3001`, and so on). The middleware ensures that requests for `/` on that port are redirected to the correct route.
 
 After you start all processes, save and check their status:
@@ -103,6 +153,31 @@ pm2 save                 # store the current process list
 ```
 
 Whenever you change the PM2 lineup (add/remove apps), rerun `pm2 save` so the launch script stays current.
+
+### Environment Variables for Cross-Linking
+
+Navigation links can point directly at their live subdomains/ports when the following optional environment variables are defined at build/start time:
+
+| Variable                     | Purpose                           | Default (if unset) |
+|------------------------------|-----------------------------------|---------------------|
+| `NEXT_PUBLIC_HUB_URL`        | Hub link + logo target            | `/`                 |
+| `NEXT_PUBLIC_GATCHA_URL`     | Gatcha nav link                   | `/gatcha`           |
+| `NEXT_PUBLIC_STREAM_URL`     | Stream tools nav link             | `/stream`           |
+| `NEXT_PUBLIC_COLLECTION_URL` | Collection nav link               | `/collection`       |
+| `NEXT_PUBLIC_PERSONAL_URL`   | Personal nav link                 | `/personal`         |
+
+Set these on each PM2 process (or in your hosting provider) so cross-links jump straight to the correct subdomain. Example for the gatcha process:
+
+```bash
+PORT=3001 NEXT_ENTRY_REDIRECT=/gatcha NEXT_PUBLIC_HUB_URL=https://hub.example.com \
+  NEXT_PUBLIC_GATCHA_URL=https://gatcha.example.com \
+  NEXT_PUBLIC_STREAM_URL=https://stream.example.com \
+  NEXT_PUBLIC_COLLECTION_URL=https://collection.example.com \
+  NEXT_PUBLIC_PERSONAL_URL=https://personal.example.com \
+  pm2 start bun --name beastypage-gatcha --interpreter none --cwd ./frontend -- run start
+```
+
+Only define the variables that differ from the defaults; any omitted value keeps the relative in-app link.
 
 ### Alternative: Single Process with Host Map
 

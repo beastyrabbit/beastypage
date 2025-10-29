@@ -1,4 +1,4 @@
-import { internalQuery, query } from "./_generated/server.js";
+import { internalQuery, mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
 
 export const totalCount = query({
@@ -25,6 +25,31 @@ export const list = query({
     const entries = await ctx.db.query("collection").collect();
     entries.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     return Promise.all(entries.map((doc) => collectionDocToClient(ctx, doc)));
+  }
+});
+
+export const setFocus = mutation({
+  args: {
+    id: v.id("collection"),
+    focusX: v.number(),
+    focusY: v.number()
+  },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.id);
+    if (!doc) {
+      throw new Error("Collection entry not found.");
+    }
+
+    const focusX = clampFocus(args.focusX);
+    const focusY = clampFocus(args.focusY);
+
+    await ctx.db.patch(args.id, {
+      focusX,
+      focusY,
+      updatedAt: Date.now()
+    });
+
+    return { focusX, focusY } as const;
   }
 });
 
@@ -60,7 +85,16 @@ async function collectionDocToClient(ctx: QueryCtx, doc: CollectionDoc) {
     preview_img_height: doc.previewImgHeight ?? null,
     full_img_width: doc.fullImgWidth ?? null,
     full_img_height: doc.fullImgHeight ?? null,
+    focusX: clampFocus(doc.focusX ?? 50),
+    focusY: clampFocus(doc.focusY ?? 50),
     created: doc.createdAt,
     updated: doc.updatedAt
   } as const;
+}
+
+function clampFocus(value: number) {
+  if (!Number.isFinite(value)) return 50;
+  if (value < 0) return 0;
+  if (value > 100) return 100;
+  return Math.round(value);
 }
