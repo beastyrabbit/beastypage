@@ -115,6 +115,13 @@ The frontend now deploys without Docker. Typical flow (bare metal, VM, or LXC):
    CONVEX_SELF_HOSTED_URL=http://convex:3210
    CONVEX_SELF_HOSTED_ADMIN_KEY=...
    NEXT_PUBLIC_CONVEX_URL=https://convex.your-domain.example
+   # Optional: override navigation targets if the app is split across hosts.
+   # For local dev, the defaults already point to the single Next dev server (http://localhost:3000/…).
+   NEXT_PUBLIC_HUB_URL=https://hub.your-domain.example
+   NEXT_PUBLIC_GATCHA_URL=https://gatcha.your-domain.example
+   NEXT_PUBLIC_STREAM_URL=https://stream.your-domain.example
+   NEXT_PUBLIC_COLLECTION_URL=https://collection.your-domain.example
+   NEXT_PUBLIC_PERSONAL_URL=https://personal.your-domain.example
    ```
 
    Adjust values to match your Convex deployment and public hostname.

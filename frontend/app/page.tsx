@@ -35,6 +35,11 @@ const NEW_STUFF_ITEMS = [
     description: "Browse every rollout, watch the timeline evolve, and jump straight into any build.",
   },
   {
+    href: "/streamer-voting",
+    title: "Stream voting",
+    description: "Host live builds with audience votes and real-time overlays.",
+  },
+  {
     href: "/personal",
     title: "Personal hub",
     description: "Find stay-connected links, stream goals, and the latest BeastyRabbit updates in one place.",
@@ -58,6 +63,12 @@ export default function HubLanding() {
             className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:translate-y-0.5 hover:opacity-90"
           >
             Dive into Gatcha <ArrowRight className="size-4" />
+          </Link>
+          <Link
+            href="/streamer-voting"
+            className="inline-flex items-center gap-2 rounded-full border border-primary/40 px-5 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10 hover:text-primary"
+          >
+            Open Stream Voting <ArrowRight className="size-4" />
           </Link>
         </div>
       </section>
