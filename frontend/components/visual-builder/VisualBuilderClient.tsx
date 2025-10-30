@@ -1812,7 +1812,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
 
   const handleRandomize = useCallback(async () => {
     const generatorInstance = generatorRef.current;
-    if (!generatorInstance?.generateRandomParams) {
+    const randomizer = generatorInstance?.generateRandomParams?.bind(generatorInstance ?? null);
+    if (!generatorInstance || !randomizer) {
       window.alert("Random generator is not available in this build.");
       return;
     }
@@ -1822,7 +1823,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       const pickMode = () => paletteModes[Math.floor(Math.random() * paletteModes.length)];
       const requestedPalette = pickMode();
       const requestedTortiePalette = pickMode();
-      const random = await generatorInstance.generateRandomParams({
+      const random = await randomizer({
         ignoreForbiddenSprites: true,
         accessoryRange: { min: 0, max: MAX_TORTIE_LAYERS },
         scarRange: { min: 0, max: MAX_TORTIE_LAYERS },

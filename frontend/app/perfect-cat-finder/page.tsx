@@ -103,11 +103,15 @@ async function buildRandomCat(generator: Awaited<ReturnType<typeof useCatGenerat
   if (!generator) {
     throw new Error("Generator unavailable");
   }
+  const randomizer = generator.generateRandomParams?.bind(generator);
+  if (!randomizer) {
+    throw new Error("Random generator unavailable");
+  }
   const experimentalMode = pickPalette();
   const accessorySlots = randomInt(6);
   const scarSlots = randomInt(4);
   const tortieSlots = randomInt(4);
-  const randomParams = (await generator.generateRandomParams({
+  const randomParams = (await randomizer({
     ignoreForbiddenSprites: true,
     experimentalColourMode: experimentalMode,
     includeBaseColours: true,
