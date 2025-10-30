@@ -7,6 +7,7 @@ function getConvexUrl(): string {
     process.env.NEXT_PUBLIC_CONVEX_URL ||
     process.env.CONVEX_SITE_ORIGIN ||
     process.env.CONVEX_SELF_HOSTED_URL ||
+    process.env.CONVEX_URL ||
     ""
   );
 }

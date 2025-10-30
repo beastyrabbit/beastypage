@@ -97,6 +97,7 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
   const catData = toRecord(record.cat_data);
   const rawParamsSource = catData.params ?? catData.finalParams ?? record.cat_data;
   const rawParams = toRecord(rawParamsSource);
+  const shareSlug = coerceString(catData["shareSlug"]);
 
   const params = {
     ...DEFAULT_PARAMS,
@@ -150,7 +151,7 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
   const tortiePalette = coerceString(catData["tortiePalette"])?.toLowerCase();
   const paletteModes: PaletteMode[] = ["off", "mood", "bold", "darker", "blackout"];
 
-  const slugValue = record.slug ?? record.shareToken ?? null;
+  const slugValue = shareSlug ?? record.slug ?? record.shareToken ?? null;
   return {
     params,
     tortie: tortieLayers,
@@ -159,7 +160,11 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
     paletteMode: paletteModes.includes(palette as PaletteMode) ? (palette as PaletteMode) : undefined,
     tortiePaletteMode: paletteModes.includes(tortiePalette as PaletteMode) ? (tortiePalette as PaletteMode) : undefined,
     slug: slugValue,
-    shareUrl: slugValue ? `/visual-builder?slug=${encodeURIComponent(slugValue)}` : null,
+    shareUrl: slugValue
+      ? shareSlug
+        ? `/visual-builder?share=${encodeURIComponent(slugValue)}`
+        : `/visual-builder?slug=${encodeURIComponent(slugValue)}`
+      : null,
     catName: record.catName ?? null,
     creatorName: record.creatorName ?? null,
   };
