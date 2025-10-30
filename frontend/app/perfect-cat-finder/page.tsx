@@ -141,16 +141,25 @@ function CatCard({
   preview,
   disabled,
   onVote,
+  onInspect,
 }: {
   cat: MatchupCat;
   preview: PreviewState;
   disabled: boolean;
   onVote: (cat: MatchupCat) => Promise<void>;
+  onInspect: (cat: MatchupCat) => void;
 }) {
   return (
     <div className="glass-card flex h-full flex-col gap-4 rounded-3xl border border-border/60 bg-background/70 p-6 shadow-inner">
       <div className="text-xs uppercase tracking-[0.35em] text-muted-foreground">Pick your favourite</div>
       <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-background/80">
+        <button
+          type="button"
+          onClick={() => onInspect(cat)}
+          className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-border/40 bg-background/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary/50 hover:text-primary"
+        >
+          <ExternalLink className="size-3" /> Inspect
+        </button>
         {preview.loading ? (
           <Loader2 className="size-6 animate-spin text-primary" />
         ) : preview.url ? (
@@ -420,6 +429,10 @@ export default function PerfectCatFinderPage() {
               preview={getPreview(cat)}
               disabled={voteBusy}
               onVote={handleVote}
+              onInspect={(entry) => {
+                setSelectedCat(entry);
+                void ensurePreview(entry);
+              }}
             />
           ))
         ) : (

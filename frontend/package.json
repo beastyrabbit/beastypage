@@ -10,7 +10,7 @@
     "lint": "bunx eslint .",
     "convex:dev": "convex dev",
     "deploy": "bunx convex deploy",
-    "prepare": "convex codegen"
+    "prepare": "npx convex codegen"
   },
   "dependencies": {
     "@napi-rs/canvas": "^0.1.81",

@@ -881,9 +881,14 @@ function clampLayerValue(value: number): number {
   return Math.max(0, Math.min(MAX_LAYER_VALUE, Math.round(value)));
 }
 
-function computeLayerCount(range: LayerRange) {
+function normalizeLayerRange(range: LayerRange) {
   const min = clampLayerValue(Math.min(range.min, range.max));
   const max = clampLayerValue(Math.max(range.min, range.max));
+  return { min, max };
+}
+
+function computeLayerCount(range: LayerRange) {
+  const { min, max } = normalizeLayerRange(range);
   if (min === max) {
     return min;
   }
@@ -2153,6 +2158,13 @@ export function SingleCatPlusClient({
         params.colour = PLACEHOLDER_COLOUR;
       }
 
+      const initialSprite = Number(params.spriteNumber ?? params.sprite ?? DEFAULT_SPRITE_NUMBER);
+      const normalizedSprite = Number.isFinite(initialSprite) && VALID_SPRITES.includes(initialSprite)
+        ? initialSprite
+        : DEFAULT_SPRITE_NUMBER;
+      params.spriteNumber = normalizedSprite;
+      params.sprite = normalizedSprite;
+
       // Re-run per-slot logic to mirror legacy behaviour.
       const accessoriesAll = invokeMapperArray(mapper, mapper.getAccessories).filter(
         (entry: string) => entry && entry !== "none"
@@ -2164,40 +2176,38 @@ export function SingleCatPlusClient({
       const tortiePeltsAll = invokeMapperArray(mapper, mapper.getPeltNames);
       const coloursAll = parameterOptionsRef.current?.colour ?? invokeMapperArray(mapper, mapper.getColours);
 
-      const accessorySlots: string[] = [];
-      for (let i = 0; i < accessoryCount; i += 1) {
-        const include = Math.random() <= 0.5;
-        if (include && accessoriesAll.length > 0) {
-          accessorySlots.push(randomFrom(accessoriesAll));
-        } else {
-          accessorySlots.push("none");
+      const accessorySlots: string[] = Array.from({ length: accessoryCount }, () => "none");
+      if (accessoriesAll.length > 0) {
+        for (let i = 0; i < accessoryCount; i += 1) {
+          if (Math.random() <= 0.5) {
+            accessorySlots[i] = randomFrom(accessoriesAll);
+          }
         }
       }
       params.accessories = accessorySlots.filter((entry) => entry && entry !== "none");
       params.accessory = (params.accessories as string[])[0];
 
-      const scarSlots: string[] = [];
-      for (let i = 0; i < scarCount; i += 1) {
-        const include = Math.random() <= 0.5;
-        if (include && scarsAll.length > 0) {
-          scarSlots.push(randomFrom(scarsAll));
-        } else {
-          scarSlots.push("none");
+      const scarSlots: string[] = Array.from({ length: scarCount }, () => "none");
+      if (scarsAll.length > 0) {
+        for (let i = 0; i < scarCount; i += 1) {
+          if (Math.random() <= 0.5) {
+            scarSlots[i] = randomFrom(scarsAll);
+          }
         }
       }
       params.scars = scarSlots.filter((entry) => entry && entry !== "none");
       params.scar = (params.scars as string[])[0];
 
-      const tortieSlots: (TortieSlot | null)[] = [];
-      for (let i = 0; i < tortieCount; i += 1) {
-        const include = Math.random() <= 0.5;
-        if (include && tortieMasksAll.length > 0) {
-          const mask = randomFrom(tortieMasksAll);
-          const pattern = randomFrom(tortiePeltsAll);
-          const colour = coloursAll.length > 0 ? randomFrom(coloursAll) : "GINGER";
-          tortieSlots.push({ mask, pattern, colour });
-        } else {
-          tortieSlots.push(null);
+      const tortieSlots: (TortieSlot | null)[] = Array.from({ length: tortieCount }, () => null);
+      const tortieSourcesAvailable = tortieMasksAll.length > 0 && tortiePeltsAll.length > 0;
+      if (tortieSourcesAvailable) {
+        for (let i = 0; i < tortieCount; i += 1) {
+          if (Math.random() <= 0.5) {
+            const mask = randomFrom(tortieMasksAll);
+            const pattern = randomFrom(tortiePeltsAll);
+            const colour = coloursAll.length > 0 ? randomFrom(coloursAll) : "GINGER";
+            tortieSlots[i] = { mask, pattern, colour };
+          }
         }
       }
       const tortieLayers = tortieSlots.filter(Boolean) as TortieSlot[];
@@ -2220,14 +2230,18 @@ export function SingleCatPlusClient({
       params.darkMode = enableDarkForest;
       params.dead = enableDead;
 
+      const actualAccessoryCount = accessorySlots.filter((entry) => entry && entry !== "none").length;
+      const actualScarCount = scarSlots.filter((entry) => entry && entry !== "none").length;
+      const actualTortieCount = tortieLayers.length;
+
       const countsResult: GenerationCounts = {
-        accessories: accessoryCount,
-        scars: scarCount,
-        tortie: tortieCount,
+        accessories: actualAccessoryCount,
+        scars: actualScarCount,
+        tortie: actualTortieCount,
       };
 
       setRollSummary(
-        `Rolled → Accessories: ${accessoryCount} • Scars: ${scarCount} • Tortie layers: ${tortieCount}`
+        `Rolled → Accessories: ${actualAccessoryCount} • Scars: ${actualScarCount} • Tortie layers: ${actualTortieCount}`
       );
       setHasTint(Boolean(enableDarkForest || enableDead));
       setSpriteGalleryOpen(false);
@@ -2452,8 +2466,8 @@ export function SingleCatPlusClient({
         scar: builderPrimaryScar,
         tortie: builderPrimaryTortie,
       });
-      builderParams.spriteNumber = DEFAULT_SPRITE_NUMBER;
-      builderParams.sprite = DEFAULT_SPRITE_NUMBER;
+      builderParams.spriteNumber = normalizedSprite;
+      builderParams.sprite = normalizedSprite;
 
       const catUrl = generator.buildCatURL(builderParams);
 

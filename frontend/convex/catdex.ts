@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
 import type { QueryCtx } from "./_generated/server.js";
 import { docIdToString, normalizeStorageUrl } from "./utils.js";
+import { api } from "./_generated/api.js";
 
 type CatdexDoc = Doc<"catdex">;
 type SeasonDoc = Doc<"card_season">;
@@ -107,6 +108,7 @@ export const create = mutation({
     if (!doc) {
       throw new Error("Failed to create catdex record");
     }
+    await ctx.scheduler.runAfter(0, api.imageService.generateForCat, { id: docId });
     return catdexRecordToClient(ctx, doc);
   }
 });
@@ -194,3 +196,93 @@ function rarityRecordToClient(doc: RarityDoc) {
     updated: doc.updatedAt
   };
 }
+
+export const applyThumbnailUpdates = mutation({
+  args: {
+    id: v.id("catdex"),
+    defaultCard: v.optional(
+      v.object({
+        thumbStorageId: v.id("_storage"),
+        thumbName: v.string(),
+        thumbWidth: v.optional(v.number()),
+        thumbHeight: v.optional(v.number()),
+        width: v.optional(v.number()),
+        height: v.optional(v.number())
+      })
+    ),
+    customCard: v.optional(
+      v.object({
+        thumbStorageId: v.id("_storage"),
+        thumbName: v.string(),
+        thumbWidth: v.optional(v.number()),
+        thumbHeight: v.optional(v.number()),
+        width: v.optional(v.number()),
+        height: v.optional(v.number())
+      })
+    )
+  },
+  handler: async (ctx, args) => {
+    const updates: Partial<CatdexDoc> = {
+      updatedAt: Date.now()
+    };
+
+    if (args.defaultCard) {
+      updates.defaultCardThumbStorageId = args.defaultCard.thumbStorageId;
+      updates.defaultCardThumbName = args.defaultCard.thumbName;
+      if (args.defaultCard.thumbWidth !== undefined) {
+        updates.defaultCardThumbWidth = args.defaultCard.thumbWidth;
+      }
+      if (args.defaultCard.thumbHeight !== undefined) {
+        updates.defaultCardThumbHeight = args.defaultCard.thumbHeight;
+      }
+      if (args.defaultCard.width !== undefined) {
+        updates.defaultCardWidth = args.defaultCard.width;
+      }
+      if (args.defaultCard.height !== undefined) {
+        updates.defaultCardHeight = args.defaultCard.height;
+      }
+    }
+
+    if (args.customCard) {
+      updates.customCardThumbStorageId = args.customCard.thumbStorageId;
+      updates.customCardThumbName = args.customCard.thumbName;
+      if (args.customCard.thumbWidth !== undefined) {
+        updates.customCardThumbWidth = args.customCard.thumbWidth;
+      }
+      if (args.customCard.thumbHeight !== undefined) {
+        updates.customCardThumbHeight = args.customCard.thumbHeight;
+      }
+      if (args.customCard.width !== undefined) {
+        updates.customCardWidth = args.customCard.width;
+      }
+      if (args.customCard.height !== undefined) {
+        updates.customCardHeight = args.customCard.height;
+      }
+    }
+
+    await ctx.db.patch(args.id, updates);
+    return { success: true };
+  }
+});
+
+export const enqueueMissingThumbnails = mutation({
+  args: {
+    limit: v.optional(v.number())
+  },
+  handler: async (ctx, args) => {
+    const max = Math.max(1, Math.min(args.limit ?? 25, 200));
+    let enqueued = 0;
+
+    for await (const cat of ctx.db.query("catdex")) {
+      const needsDefault = Boolean(cat.defaultCardStorageId && !cat.defaultCardThumbStorageId);
+      const needsCustom = Boolean(cat.customCardStorageId && !cat.customCardThumbStorageId);
+      if (!needsDefault && !needsCustom) continue;
+
+      await ctx.scheduler.runAfter(0, api.imageService.generateForCat, { id: cat._id });
+      enqueued += 1;
+      if (enqueued >= max) break;
+    }
+
+    return { enqueued };
+  }
+});
