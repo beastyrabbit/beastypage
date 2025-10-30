@@ -282,10 +282,8 @@ function logRetry(
   if (process.env.NODE_ENV === 'development') {
     const prefix = context ? `[renderer:${context}]` : '[renderer]';
     if (status !== null) {
-      // eslint-disable-next-line no-console
       console.warn(`${prefix} retrying after status ${status} (attempt ${attemptNumber}) in ${delayMs}ms`);
     } else {
-      // eslint-disable-next-line no-console
       console.warn(`${prefix} retrying after error (attempt ${attemptNumber}) in ${delayMs}ms`, error);
     }
   }
