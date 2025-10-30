@@ -114,6 +114,14 @@ export default defineSchema({
     .index("byProfile", ["catProfileId"])
     .index("byProfileKind", ["catProfileId", "kind"]),
 
+  cat_shares: defineTable({
+    slug: v.string(),
+    data: v.any(),
+    createdAt: v.number(),
+  })
+    .index("bySlug", ["slug"])
+    .index("byCreated", ["createdAt"]),
+
   adoption_batch: defineTable({
     slug: v.optional(v.string()),
     title: v.optional(v.string()),

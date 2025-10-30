@@ -76,7 +76,7 @@ function sanitizeStringArray(values: unknown, fallbackLength = 0): string[] {
   return result;
 }
 
-type TortieLayer = {
+export type TortieLayer = {
   mask: string;
   pattern: string;
   colour: string;
@@ -107,7 +107,7 @@ function sanitizeTortieArray(values: unknown, fallbackLength = 0): (TortieLayer 
   return result;
 }
 
-type Counts = {
+export type CatShareCounts = {
   accessories: number;
   scars: number;
   tortie: number;
@@ -115,15 +115,15 @@ type Counts = {
 
 type CatShareParams = Record<string, unknown>;
 
-function sanitizeCounts(counts?: Partial<Counts>): Counts {
+type SanitizedParams = Record<string, unknown>;
+
+function sanitizeCounts(counts?: Partial<CatShareCounts>): CatShareCounts {
   return {
     accessories: Number.isFinite(counts?.accessories) ? Math.max(0, Math.trunc(counts!.accessories!)) : 0,
     scars: Number.isFinite(counts?.scars) ? Math.max(0, Math.trunc(counts!.scars!)) : 0,
     tortie: Number.isFinite(counts?.tortie) ? Math.max(0, Math.trunc(counts!.tortie!)) : 0,
   };
 }
-
-type SanitizedParams = Record<string, unknown>;
 
 function sanitizeParams(params: CatShareParams = {}): SanitizedParams {
   const clean: SanitizedParams = {};
@@ -189,15 +189,34 @@ function sanitizeParams(params: CatShareParams = {}): SanitizedParams {
   return clean;
 }
 
+export type CatShareStoredPayload = {
+  v: number;
+  params: SanitizedParams;
+  slots: {
+    accessories: string[];
+    scars: string[];
+    tortie: (TortieLayer | null)[];
+  };
+  counts: CatShareCounts;
+};
+
+export type CatSharePayload = {
+  params: SanitizedParams;
+  accessorySlots: string[];
+  scarSlots: string[];
+  tortieSlots: (TortieLayer | null)[];
+  counts: CatShareCounts;
+};
+
 type EncodePayload = {
   params: CatShareParams;
   accessorySlots?: string[];
   scarSlots?: string[];
   tortieSlots?: (Record<string, unknown> | null)[];
-  counts?: Partial<Counts>;
+  counts?: Partial<CatShareCounts>;
 };
 
-export function encodeCatShare(data: EncodePayload): string {
+export function prepareCatShare(data: EncodePayload): CatShareStoredPayload {
   if (!data || !data.params) {
     throw new Error("encodeCatShare: params are required");
   }
@@ -209,7 +228,7 @@ export function encodeCatShare(data: EncodePayload): string {
     tortie: sanitizeTortieArray(data.tortieSlots, counts.tortie),
   };
 
-  const payload = {
+  return {
     v: SHARE_VERSION,
     params: sanitizeParams(data.params),
     slots,
@@ -219,39 +238,62 @@ export function encodeCatShare(data: EncodePayload): string {
       tortie: slots.tortie.length,
     },
   };
-
-  const json = JSON.stringify(payload);
-  return toBase64(json);
 }
 
-type DecodedPayload = {
-  params: SanitizedParams;
-  accessorySlots: string[];
-  scarSlots: string[];
-  tortieSlots: (TortieLayer | null)[];
-  counts: Counts;
+export type CreateCatShareResult = {
+  slug: string;
+  id?: string | null;
+  payload: CatShareStoredPayload;
 };
 
-export function decodeCatShare(encoded: string | null | undefined): DecodedPayload | null {
-  if (!encoded) return null;
+type CreateCatShareOptions = {
+  slug?: string;
+};
 
-  let payload: any;
+export async function createCatShare(data: EncodePayload, options?: CreateCatShareOptions): Promise<CreateCatShareResult | null> {
+  if (typeof fetch !== "function") {
+    console.warn("createCatShare: fetch is unavailable in this environment");
+    return null;
+  }
+
   try {
-    payload = JSON.parse(fromBase64(encoded));
+    const payload = prepareCatShare(data);
+    const response = await fetch("/api/cat-share", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+      body: JSON.stringify({
+        slug: options?.slug,
+        data: payload,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`createCatShare: unexpected status ${response.status}`);
+    }
+
+    const json = (await response.json()) as { slug?: string; id?: string | null };
+    const slug = json?.slug;
+    if (!slug) {
+      throw new Error("createCatShare: response missing slug");
+    }
+
+    return {
+      slug,
+      id: json?.id ?? null,
+      payload,
+    };
   } catch (error) {
-    console.error("decodeCatShare: failed to parse payload", error);
+    console.error("Failed to create cat share", error);
     return null;
   }
+}
 
-  if (!payload || typeof payload !== "object") {
-    return null;
-  }
-
-  if (payload.v !== SHARE_VERSION) {
-    console.warn(`decodeCatShare: unsupported version ${payload.v}`);
-    return null;
-  }
-
+function normalizeStoredPayload(payload: any): CatSharePayload | null {
+  if (!payload || typeof payload !== "object") return null;
+  if (payload.v !== SHARE_VERSION) return null;
   return {
     params: sanitizeParams(payload.params || {}),
     accessorySlots: sanitizeStringArray(payload.slots?.accessories, payload.counts?.accessories),
@@ -260,4 +302,53 @@ export function decodeCatShare(encoded: string | null | undefined): DecodedPaylo
     counts: sanitizeCounts(payload.counts),
   };
 }
-import type { Buffer } from "buffer";
+
+export function encodeCatShare(data: EncodePayload): string {
+  const payload = prepareCatShare(data);
+  return toBase64(JSON.stringify(payload));
+}
+
+function decodeLegacyCatShare(encoded: string): CatSharePayload | null {
+  try {
+    const payload = JSON.parse(fromBase64(encoded));
+    return normalizeStoredPayload(payload);
+  } catch (error) {
+    console.error("decodeCatShare: failed to parse payload", error);
+    return null;
+  }
+}
+
+function isLikelySlug(value: string): boolean {
+  if (!value) return false;
+  if (value.length < 4 || value.length > 12) return false;
+  if (/[^0-9A-Za-z]/.test(value)) return false;
+  return !value.includes("=");
+}
+
+async function fetchShareBySlug(slug: string): Promise<CatSharePayload | null> {
+  try {
+    const response = await fetch(`/api/cat-share?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
+    if (!response.ok) {
+      return null;
+    }
+    const json = await response.json();
+    return normalizeStoredPayload(json?.data ?? json);
+  } catch (error) {
+    console.error("Failed to fetch cat share", error);
+    return null;
+  }
+}
+
+export async function decodeCatShare(value: string | null | undefined): Promise<CatSharePayload | null> {
+  if (!value) return null;
+  if (isLikelySlug(value)) {
+    return fetchShareBySlug(value);
+  }
+  return decodeLegacyCatShare(value);
+}
+
+export async function resolveCatShareValue(value: string | null | undefined): Promise<CatSharePayload | null> {
+  return decodeCatShare(value);
+}
+
+export { sanitizeCounts }; // exported for tests if needed

@@ -7,6 +7,7 @@ import { useMutation } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { createCatShare } from "@/lib/catShare";
 import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
 import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "@/components/cat-builder/types";
 import { canvasToDataUrl, cloneParams, formatName, getColourSwatch } from "@/components/cat-builder/utils";
@@ -144,6 +145,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     if (typeof window !== "undefined") {
       const currentUrl = new URL(window.location.href);
       currentUrl.searchParams.delete("slug");
+      currentUrl.searchParams.delete("share");
       const nextRelative = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
       window.history.replaceState(null, "", nextRelative);
     }
@@ -1724,19 +1726,45 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     try {
       setShareBusy(true);
       const payload = buildSharePayload();
+      const shareSeed = {
+        params: payload.params,
+        accessorySlots: payload.accessorySlots,
+        scarSlots: payload.scarSlots,
+        tortieSlots: payload.tortieSlots,
+        counts: payload.counts,
+      } as const;
+
+      const shareRecord = await createCatShare(shareSeed).catch((error) => {
+        console.error("Failed to create cat share record", error);
+        return null;
+      });
+      const shareSlug = shareRecord?.slug ?? null;
+      const mapperPayload = shareSlug ? { ...payload, shareSlug } : payload;
+
       const record = await createMapperRecord({
-        catData: payload,
+        catData: mapperPayload,
         catName: catName.trim() || undefined,
         creatorName: creatorName.trim() || undefined,
       });
       if (!record) throw new Error("Share API did not return a record.");
-      const slug = (record as { slug?: string; shareToken?: string; id?: string }).slug ?? (record as { shareToken?: string; id?: string }).shareToken ?? (record as { id?: string }).id;
-      if (!slug) throw new Error("Share API did not return a slug.");
+
+      const mapperSlug =
+        (record as { slug?: string; shareToken?: string; id?: string }).slug ??
+        (record as { shareToken?: string; id?: string }).shareToken ??
+        (record as { id?: string }).id;
+      if (!mapperSlug) throw new Error("Share API did not return a slug.");
+
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const url = origin ? `${origin}/visual-builder?slug=${encodeURIComponent(slug)}` : `/visual-builder?slug=${slug}`;
-      setShareInfo({ slug, url });
+      const preferredSlug = shareSlug ?? mapperSlug;
+      const url = origin
+        ? `${origin}/visual-builder?${shareSlug ? "share" : "slug"}=${encodeURIComponent(preferredSlug)}`
+        : shareSlug
+          ? `/visual-builder?share=${encodeURIComponent(preferredSlug)}`
+          : `/visual-builder?slug=${encodeURIComponent(preferredSlug)}`;
+
+      setShareInfo({ slug: preferredSlug, url });
       setShareStale(false);
-      setLockedShareSlug(slug);
+      setLockedShareSlug(preferredSlug);
       await ensureCopied(url);
       setStatusMessage("Saved to history!");
       if (typeof window !== "undefined") {

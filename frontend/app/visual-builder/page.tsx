@@ -15,21 +15,22 @@ export default async function VisualBuilderPage({ searchParams }: PageProps) {
   const resolvedSearch = searchParams ? await searchParams : undefined;
 
   const rawSlug = typeof resolvedSearch?.slug === "string" ? resolvedSearch.slug : Array.isArray(resolvedSearch?.slug) ? resolvedSearch?.slug[0] : undefined;
+  const rawShare = typeof resolvedSearch?.share === "string" ? resolvedSearch.share : Array.isArray(resolvedSearch?.share) ? resolvedSearch?.share[0] : undefined;
   const rawCat = typeof resolvedSearch?.cat === "string" ? resolvedSearch.cat : Array.isArray(resolvedSearch?.cat) ? resolvedSearch?.cat[0] : undefined;
   const rawName = typeof resolvedSearch?.name === "string" ? resolvedSearch.name : Array.isArray(resolvedSearch?.name) ? resolvedSearch?.name[0] : undefined;
   const rawCreator = typeof resolvedSearch?.creator === "string" ? resolvedSearch.creator : Array.isArray(resolvedSearch?.creator) ? resolvedSearch?.creator[0] : undefined;
 
   const slugParam = rawSlug?.trim();
-  const encoded = rawCat?.trim();
+  const shareValue = (rawShare ?? rawCat)?.trim();
 
-  if (slugParam && !encoded) {
+  if (slugParam && !shareValue) {
     return <VisualBuilderLoader slug={slugParam} />;
   }
 
   let initialCat: VisualBuilderInitialPayload | null = null;
 
-  if (encoded) {
-    const decoded = decodeCatShare(encoded);
+  if (shareValue) {
+    const decoded = await decodeCatShare(shareValue);
     if (decoded?.params) {
       const accessories = (decoded.accessorySlots ?? []).filter((value): value is string => !!value && value !== "none");
       const scars = (decoded.scarSlots ?? []).filter((value): value is string => !!value && value !== "none");
@@ -42,9 +43,10 @@ export default async function VisualBuilderPage({ searchParams }: PageProps) {
         catName: rawName?.trim() || undefined,
         creatorName: rawCreator?.trim() || undefined,
       };
-      if (slugParam) {
-        initialCat.slug = slugParam;
-        initialCat.shareUrl = `/visual-builder?slug=${encodeURIComponent(slugParam)}`;
+      const slug = shareValue;
+      if (slug && initialCat) {
+        initialCat.slug = slug;
+        initialCat.shareUrl = `/visual-builder?share=${encodeURIComponent(slug)}`;
       }
     }
   }

@@ -8,7 +8,7 @@ import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { renderCatV3 } from "@/lib/cat-v3/api";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { Loader2, Trophy, ClipboardCopy, ExternalLink, X } from "lucide-react";
-import { encodeCatShare } from "@/lib/catShare";
+import { createCatShare, encodeCatShare } from "@/lib/catShare";
 
 const PALETTE_MODES = ["off", "mood", "bold", "darker", "blackout"] as const;
 const NEW_CAT_PROBABILITY = 0.4;
@@ -323,7 +323,7 @@ export default function PerfectCatFinderPage() {
     [ensurePreview, getPreview, showMessage]
   );
 
-  const handleOpenInBuilder = useCallback((cat: MatchupCat) => {
+  const handleOpenInBuilder = useCallback(async (cat: MatchupCat) => {
     try {
       const coreParams = {
         ...(cat.params.params as Record<string, unknown>),
@@ -334,7 +334,7 @@ export default function PerfectCatFinderPage() {
       const scars = Array.isArray(coreParams.scars) ? (coreParams.scars as string[]) : [];
       const tortie = Array.isArray(coreParams.tortie) ? (coreParams.tortie as Record<string, unknown>[]) : [];
 
-      const encoded = encodeCatShare({
+      const shareSeed = {
         params: coreParams,
         accessorySlots: accessories,
         scarSlots: scars,
@@ -344,9 +344,25 @@ export default function PerfectCatFinderPage() {
           scars: scars.length,
           tortie: tortie.length,
         },
-      });
+      } as const;
 
-      const url = `/visual-builder?cat=${encodeURIComponent(encoded)}`;
+      const shareRecord = await createCatShare(shareSeed);
+      let url: string | null = null;
+      if (shareRecord?.slug) {
+        url = `/visual-builder?share=${encodeURIComponent(shareRecord.slug)}`;
+      } else {
+        try {
+          const encoded = encodeCatShare(shareSeed);
+          url = `/visual-builder?cat=${encodeURIComponent(encoded)}`;
+        } catch (encodeError) {
+          console.warn("Failed to encode backup share payload", encodeError);
+        }
+      }
+
+      if (!url) {
+        throw new Error("Unable to determine builder URL");
+      }
+
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (shareError) {
       console.error("Failed to open cat in builder", shareError);
@@ -380,9 +396,9 @@ export default function PerfectCatFinderPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
-        <p className="text-xs uppercase tracking-widest text-amber-200/90">SpriteMash</p>
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">Pick the better sprite. Crowdsource the perfect cat</p>
         <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">
-          Pick the stronger sprite. Crowdsource the perfect cat.
+          SpriteMash
         </h1>
         {message && (
           <span className="mt-4 inline-flex items-center rounded-full border border-amber-400/40 bg-black/30 px-4 py-2 text-xs font-semibold text-amber-100">
@@ -527,7 +543,7 @@ export default function PerfectCatFinderPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleOpenInBuilder(selectedCat)}
+                  onClick={() => { void handleOpenInBuilder(selectedCat); }}
                   className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
                 >
                   <ExternalLink className="size-4" /> Open in visual builder
