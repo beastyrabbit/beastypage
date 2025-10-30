@@ -320,14 +320,40 @@ function decodeLegacyCatShare(encoded: string): CatSharePayload | null {
 
 function isLikelySlug(value: string): boolean {
   if (!value) return false;
-  if (value.length < 4 || value.length > 12) return false;
+  if (value.length < 4 || value.length > 16) return false;
   if (/[^0-9A-Za-z]/.test(value)) return false;
   return !value.includes("=");
 }
 
+function resolveApiBase(): string {
+  if (typeof window !== "undefined") {
+    return "";
+  }
+
+  const candidates = [
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.NEXT_PUBLIC_HUB_URL,
+    process.env.NEXT_PUBLIC_BASE_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
+    process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : undefined,
+    "http://localhost:3000",
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (candidate.startsWith("http://") || candidate.startsWith("https://")) {
+      return candidate.replace(/\/$/, "");
+    }
+  }
+  return "";
+}
+
 async function fetchShareBySlug(slug: string): Promise<CatSharePayload | null> {
   try {
-    const response = await fetch(`/api/cat-share?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
+    const base = resolveApiBase();
+    const url = base ? `${base}/api/cat-share?slug=${encodeURIComponent(slug)}` : `/api/cat-share?slug=${encodeURIComponent(slug)}`;
+    const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
       return null;
     }
