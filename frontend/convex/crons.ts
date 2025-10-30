@@ -7,4 +7,11 @@ crons.interval("refresh-mapper-previews", { hours: 24 }, api.previews.refreshMap
   limit: 10,
 });
 
+crons.interval(
+  "catdex-thumbnail-backfill",
+  { hours: 6 },
+  api.catdex.enqueueMissingThumbnails,
+  { limit: 25 },
+);
+
 export default crons;

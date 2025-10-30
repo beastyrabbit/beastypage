@@ -15,6 +15,7 @@ import type * as coinflipper from "../coinflipper.js";
 import type * as collection from "../collection.js";
 import type * as crons from "../crons.js";
 import type * as discord from "../discord.js";
+import type * as imageService from "../imageService.js";
 import type * as importer from "../importer.js";
 import type * as init from "../init.js";
 import type * as mapper from "../mapper.js";
@@ -50,6 +51,7 @@ declare const fullApi: ApiFromModules<{
   collection: typeof collection;
   crons: typeof crons;
   discord: typeof discord;
+  imageService: typeof imageService;
   importer: typeof importer;
   init: typeof init;
   mapper: typeof mapper;
