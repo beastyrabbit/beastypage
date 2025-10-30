@@ -1,6 +1,6 @@
 import catGenerator from '../single-cat/catGeneratorV3';
 import spriteMapper from '../single-cat/spriteMapper.js';
-import { encodeCatShare } from '../catShare';
+import { encodeCatShare, createCatShare } from '../catShare';
 
 const CONFIG = {
     CANVAS: {
@@ -1499,6 +1499,17 @@ export class AdoptionGenerator {
             const sharedPayload = this.buildSharePayload(plan, params);
             const viewerUrl = this.buildViewerUrl();
 
+            let shareSlug = null;
+            try {
+                const shareRecord = await createCatShare(sharedPayload);
+                if (shareRecord?.slug) {
+                    shareSlug = shareRecord.slug;
+                    sharedPayload.shareSlug = shareSlug;
+                }
+            } catch (shareError) {
+                console.warn('Failed to create adoption cat share slug', shareError);
+            }
+
             if (this.persistCat) {
                 try {
                     const persistResult = await this.persistCat(sharedPayload, { plan, params });
@@ -1507,8 +1518,13 @@ export class AdoptionGenerator {
                         return resolved;
                     }
                 } catch (error) {
-                    console.warn('Failed to persist share payload, falling back to encoded URL.', error);
+                    console.warn('Failed to persist share payload, falling back to local share options.', error);
                 }
+            }
+
+            if (shareSlug) {
+                const builderUrl = new URL(`/visual-builder?share=${encodeURIComponent(shareSlug)}`, viewerUrl);
+                return builderUrl.toString();
             }
 
             const encoded = encodeCatShare(sharedPayload);

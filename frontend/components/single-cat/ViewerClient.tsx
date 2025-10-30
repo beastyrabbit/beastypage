@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { encodeCatShare, decodeCatShare } from "@/lib/catShare";
+import { encodeCatShare, decodeCatShare, createCatShare } from "@/lib/catShare";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -211,19 +211,27 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   useEffect(() => {
     if (slug) return;
     if (!encoded) return;
-    try {
-      const decoded = decodeCatShare(encoded);
-      if (!decoded || !decoded.params) {
-        throw new Error("Invalid payload");
+    let cancelled = false;
+    (async () => {
+      try {
+        const decoded = await decodeCatShare(encoded);
+        if (cancelled) return;
+        if (!decoded || !decoded.params) {
+          throw new Error("Invalid payload");
+        }
+        setCatPayload(decoded as CatSharePayload);
+        setMeta(null);
+        setLoadingMessage(null);
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Failed to decode encoded cat", err);
+        setError("The provided share code is invalid or corrupted.");
+        setLoadingMessage(null);
       }
-      setCatPayload(decoded as CatSharePayload);
-      setMeta(null);
-      setLoadingMessage(null);
-    } catch (err) {
-      console.error("Failed to decode encoded cat", err);
-      setError("The provided share code is invalid or corrupted.");
-      setLoadingMessage(null);
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [encoded, slug]);
 
   useEffect(() => {
@@ -311,7 +319,37 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     }
     const url = buildVisualBuilderUrl(catPayload, builderMeta ?? undefined);
     setBuilderBaseUrl(url ?? null);
-  }, [catPayload, builderMeta]);
+
+    if (!catPayload?.params || builderMeta?.slug) {
+      return;
+    }
+
+    let cancelled = false;
+    const counts = catPayload.counts ?? {
+      accessories: catPayload.accessorySlots?.length ?? 0,
+      scars: catPayload.scarSlots?.length ?? 0,
+      tortie: catPayload.tortieSlots?.length ?? 0,
+    };
+
+    const shareSeed = {
+      params: catPayload.params,
+      accessorySlots: catPayload.accessorySlots ?? [],
+      scarSlots: catPayload.scarSlots ?? [],
+      tortieSlots: catPayload.tortieSlots ?? [],
+      counts,
+    } as const;
+
+    (async () => {
+      const shareRecord = await createCatShare(shareSeed);
+      if (!cancelled && shareRecord?.slug) {
+        setBuilderBaseUrl(`/visual-builder?share=${encodeURIComponent(shareRecord.slug)}`);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [builderMeta, catPayload]);
 
   useEffect(() => {
     if (!catPayload) {

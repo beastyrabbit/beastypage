@@ -29,7 +29,7 @@ import type { BatchRenderResponse } from "@/lib/cat-v3/types";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
 // @ts-ignore -- legacy JS module without types.
-import { encodeCatShare } from "@/lib/catShare";
+import { encodeCatShare, createCatShare } from "@/lib/catShare";
 
 type ExtendedMode = "base" | "mood" | "bold" | "darker" | "blackout";
 export type AfterlifeOption = "off" | "dark10" | "star10" | "both10" | "darkForce" | "starForce";
@@ -116,6 +116,7 @@ interface CatState {
   legacyEncoded?: string | null;
   catName?: string | null;
   creatorName?: string | null;
+  catShareSlug?: string | null;
 }
 
 interface ParameterOptions {
@@ -2490,6 +2491,7 @@ export function SingleCatPlusClient({
         profileId: null,
         mapperSlug: null,
         legacyEncoded: catStateRef.current?.legacyEncoded ?? null,
+        catShareSlug: catStateRef.current?.catShareSlug ?? null,
         catName: null,
         creatorName: null,
       };
@@ -2512,6 +2514,24 @@ export function SingleCatPlusClient({
         const state = catStateRef.current;
         if (!state) return;
         const payload = buildSharePayload(state);
+        const shareSeed = {
+          params: payload.params,
+          accessorySlots: payload.accessorySlots,
+          scarSlots: payload.scarSlots,
+          tortieSlots: payload.tortieSlots,
+          counts: payload.counts,
+        } as const;
+
+        let shareSlug: string | null = state.catShareSlug ?? null;
+        const shareRecord = await createCatShare(shareSeed);
+        if (generationIdRef.current !== persistToken) return;
+        if (shareRecord?.slug) {
+          shareSlug = shareRecord.slug;
+        }
+        if (shareSlug && catStateRef.current) {
+          catStateRef.current = { ...catStateRef.current, catShareSlug: shareSlug };
+        }
+
         let legacyEncoded: string | null = state.legacyEncoded ?? null;
         if (!legacyEncoded) {
           try {
@@ -2524,9 +2544,12 @@ export function SingleCatPlusClient({
         if (legacyEncoded && catStateRef.current) {
           catStateRef.current = { ...catStateRef.current, legacyEncoded };
         }
+
+        const mapperPayload = shareSlug ? { ...payload, shareSlug } : payload;
+
         try {
           const result = await createMapper({
-            catData: payload,
+            catData: mapperPayload,
             catName: state.catName ?? undefined,
             creatorName: state.creatorName ?? undefined,
           });
@@ -2541,16 +2564,23 @@ export function SingleCatPlusClient({
               mapperSlug: shareToken,
               legacyEncoded,
               shareUrl: url,
+              catShareSlug: shareSlug ?? catStateRef.current.catShareSlug ?? null,
             };
             setShareLink(url);
           }
         } catch (err) {
           console.warn("Failed to persist mapper record", err);
-          if (legacyEncoded && catStateRef.current) {
-            const origin = typeof window !== "undefined" ? window.location.origin : "";
-            const fallbackUrl = origin ? `${origin}/view?cat=${legacyEncoded}` : `/view?cat=${legacyEncoded}`;
-            catStateRef.current = { ...catStateRef.current, legacyEncoded, shareUrl: fallbackUrl };
-            setShareLink(fallbackUrl);
+          const origin = typeof window !== "undefined" ? window.location.origin : "";
+          if (catStateRef.current) {
+            if (shareSlug) {
+              const fallbackUrl = origin ? `${origin}/visual-builder?share=${shareSlug}` : `/visual-builder?share=${shareSlug}`;
+              catStateRef.current = { ...catStateRef.current, catShareSlug: shareSlug, shareUrl: fallbackUrl };
+              setShareLink(fallbackUrl);
+            } else if (legacyEncoded) {
+              const fallbackUrl = origin ? `${origin}/view?cat=${legacyEncoded}` : `/view?cat=${legacyEncoded}`;
+              catStateRef.current = { ...catStateRef.current, legacyEncoded, shareUrl: fallbackUrl };
+              setShareLink(fallbackUrl);
+            }
           }
         }
       })();
@@ -2676,6 +2706,8 @@ export function SingleCatPlusClient({
     if (state.shareUrl) return state.shareUrl;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
 
+    let shareSlug: string | null = state.catShareSlug ?? null;
+
     const slugCandidate = state.mapperSlug ?? state.profileId ?? null;
     if (slugCandidate) {
       const url = origin ? `${origin}/view/${slugCandidate}` : `/view/${slugCandidate}`;
@@ -2696,7 +2728,7 @@ export function SingleCatPlusClient({
 
     try {
       const result = await createMapper({
-        catData: payload,
+        catData: shareSlug ? { ...payload, shareSlug } : payload,
         catName: state.catName ?? undefined,
         creatorName: state.creatorName ?? undefined,
       });
@@ -2709,12 +2741,43 @@ export function SingleCatPlusClient({
           mapperSlug: shareToken,
           legacyEncoded,
           shareUrl: url,
+          catShareSlug: shareSlug ?? state.catShareSlug ?? null,
         };
         setShareLink(url);
         return url;
       }
     } catch (err) {
       console.warn("Failed to persist share payload to Convex", err);
+    }
+
+    if (!shareSlug) {
+      const shareRecord = await createCatShare({
+        params: payload.params,
+        accessorySlots: payload.accessorySlots,
+        scarSlots: payload.scarSlots,
+        tortieSlots: payload.tortieSlots,
+        counts: payload.counts,
+      });
+      if (shareRecord?.slug) {
+        shareSlug = shareRecord.slug;
+        if (catStateRef.current) {
+          catStateRef.current = { ...catStateRef.current, catShareSlug: shareSlug };
+        }
+      }
+    }
+
+    if (shareSlug) {
+      const url = origin ? `${origin}/visual-builder?share=${shareSlug}` : `/visual-builder?share=${shareSlug}`;
+      if (catStateRef.current) {
+        catStateRef.current = {
+          ...catStateRef.current,
+          catShareSlug: shareSlug,
+          shareUrl: url,
+          legacyEncoded: catStateRef.current.legacyEncoded ?? legacyEncoded ?? null,
+        };
+      }
+      setShareLink(url);
+      return url;
     }
 
     if (legacyEncoded) {
