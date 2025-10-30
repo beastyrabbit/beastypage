@@ -1,8 +1,8 @@
-"use client";
-
 import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
-import { useCallback } from "react";
+import type { Metadata } from "next";
+
+import { PageHero } from "@/components/common/PageHero";
 
 type LegacyCard = {
   title: string;
@@ -12,6 +12,17 @@ type LegacyCard = {
   badge?: string;
   comingSoon?: boolean;
   statusLabel?: string;
+};
+
+export const metadata: Metadata = {
+  title: "Cat Gacha Hub | BeastyRabbit",
+  description:
+    "Explore every cat gacha tool: wheels, adopters, history, builders, and experimental generators in one hub.",
+  openGraph: {
+    title: "Cat Gacha Hub",
+    description:
+      "Explore every cat gacha tool: wheels, adopters, history, builders, and experimental generators in one hub.",
+  },
 };
 
 const LEGACY_MODE_CARDS: LegacyCard[] = [
@@ -145,42 +156,42 @@ const CTA_LINKS = [
   },
 ];
 
-export default function GatchaLanding() {
+export default function GachaLanding() {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
-      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
-        <p className="text-xs uppercase tracking-widest text-amber-200/90">Cat Gacha Platform</p>
-        <h1 className="mt-4 text-4xl font-semibold text-white sm:text-5xl md:text-6xl">
-          Gold-standard gatcha experience
-        </h1>
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Link
-            href="/catdex"
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:translate-y-0.5 hover:opacity-90"
-          >
-            Browse Catdex <ArrowRight className="size-4" />
-          </Link>
-          <Link
-            href="/single-cat-plus"
-            className="inline-flex items-center gap-2 rounded-full border border-foreground/30 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-foreground hover:text-background"
-          >
-            Cat generator
-          </Link>
-        </div>
-      </section>
+      <PageHero
+        eyebrow="Cat Gacha Platform"
+        title="Gold-standard gacha experience"
+        description="Pick any generator — from classic wheels to modern builders — and keep every rollout in one place."
+      >
+        <Link
+          href="/catdex"
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:opacity-90"
+        >
+          Browse Catdex <ArrowRight className="size-4" />
+        </Link>
+        <Link
+          href="/single-cat-plus"
+          className="inline-flex items-center gap-2 rounded-full border border-foreground/30 px-4 py-2 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:bg-foreground hover:text-background"
+        >
+          Cat generator
+        </Link>
+      </PageHero>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {LEGACY_MODE_CARDS.map((card) => {
-          const isActive = !card.comingSoon && !!card.href;
+          const isActive = Boolean(!card.comingSoon && card.href);
           const baseClasses = "relative flex h-full flex-col gap-3 rounded-3xl border bg-background/80 p-6 transition shadow-inner";
-          const activeClasses = "border-border/50 hover:-translate-y-1 hover:border-primary/40 hover:shadow-2xl";
-          const inactiveClasses = "border-border/50 cursor-not-allowed opacity-70";
           const overlayActive = "absolute inset-0 -z-10 rounded-3xl bg-[radial-gradient(circle_at_top_left,_rgba(253,230,138,0.22),_transparent_55%),radial-gradient(circle_at_bottom_right,_rgba(250,204,21,0.18),_transparent_60%),linear-gradient(135deg,_rgba(253,230,138,0.12),_rgba(217,119,6,0.05))]";
           const overlayInactive = "absolute inset-0 -z-10 rounded-3xl bg-[radial-gradient(circle_at_top_left,_rgba(148,163,184,0.16),_transparent_55%),radial-gradient(circle_at_bottom_right,_rgba(71,85,105,0.14),_transparent_60%),linear-gradient(135deg,_rgba(148,163,184,0.08),_rgba(30,41,59,0.05))]";
+          const wrapperClassName = `${baseClasses} ${
+            isActive ? "border-border/50 hover:-translate-y-1 hover:border-primary/40 hover:shadow-2xl" : "border-border/50 pointer-events-none opacity-70"
+          }`;
+          const overlayClassName = isActive ? overlayActive : overlayInactive;
 
           const content = (
             <>
-              <span className={isActive ? overlayActive : overlayInactive} aria-hidden />
+              <span className={overlayClassName} role="presentation" aria-hidden="true" />
               {card.badge && (
                 <span className="absolute right-4 top-4 rounded-full bg-amber-500/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
                   {card.badge}
@@ -201,14 +212,14 @@ export default function GatchaLanding() {
 
           if (isActive && card.href) {
             return (
-              <Link key={card.title} href={card.href} className={`${baseClasses} ${activeClasses}`}>
+              <Link key={card.title} href={card.href} className={wrapperClassName}>
                 {content}
               </Link>
             );
           }
 
           return (
-            <div key={card.title} role="article" className={`${baseClasses} ${inactiveClasses}`}>
+            <div key={card.title} className={wrapperClassName}>
               {content}
             </div>
           );
@@ -220,7 +231,7 @@ export default function GatchaLanding() {
         <h2 className="text-3xl font-semibold text-foreground">The Story Behind This Project</h2>
         <div className="space-y-3 text-sm text-muted-foreground">
           <p>
-            This page started as a “what if” conversation about letting the generator decide a commission topic. It snowballed into a full gatcha
+            This page started as a “what if” conversation about letting the generator decide a commission topic. It snowballed into a full gacha
             commission service, and I had way too much fun building out this hub to support it.
           </p>
           <p>

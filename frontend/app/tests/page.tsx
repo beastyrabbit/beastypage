@@ -7,7 +7,7 @@ export default function TestsLanding() {
         <div className="section-eyebrow">Sandbox & QA</div>
         <h1 className="mt-4 text-4xl font-semibold sm:text-5xl md:text-6xl">Test Pages & Feature Experiments</h1>
         <p className="mt-6 max-w-3xl text-lg text-muted-foreground">
-          Lightweight environments for trying out new pipeline steps, UI treatments, and renderer tweaks before they roll into the main gatcha flow.
+          Lightweight environments for trying out new pipeline steps, UI treatments, and renderer tweaks before they roll into the main gacha flow.
         </p>
       </section>
 
@@ -45,7 +45,7 @@ export default function TestsLanding() {
               href="/gatcha"
               className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 font-semibold text-foreground transition hover:bg-foreground hover:text-background"
             >
-              Back to Gatcha
+              Back to Gacha
             </Link>
           </div>
         </div>

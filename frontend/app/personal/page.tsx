@@ -1,23 +1,16 @@
 import Link from "next/link";
-import {
-  Twitch,
-  Twitter,
-  ShieldQuestion,
-  Youtube,
-  Cloud,
-  PawPrint,
-  Home,
-  Coffee,
-} from "lucide-react";
-import type { SVGProps } from "react";
+import { Twitch, Twitter, Youtube, Cloud, PawPrint, Home, Coffee } from "lucide-react";
+import type { ComponentType } from "react";
+import type { Metadata } from "next";
 
 import { DiscordInviteButton } from "@/components/common/DiscordInviteButton";
+import { PageHero } from "@/components/common/PageHero";
 
 type LinkCard = {
   href: string;
   label: string;
   sublabel: string;
-  icon: (props: SVGProps<SVGSVGElement>) => JSX.Element;
+  icon: ComponentType<{ className?: string }>;
 };
 
 const ADDITIONAL_LINKS: LinkCard[] = [
@@ -65,35 +58,41 @@ const ADDITIONAL_LINKS: LinkCard[] = [
   },
 ];
 
+export const metadata: Metadata = {
+  title: "BeastyRabbit Personal Hub",
+  description: "Stay connected with BeastyRabbit across socials, goals, and support links.",
+  openGraph: {
+    title: "BeastyRabbit Personal Hub",
+    description: "Stay connected with BeastyRabbit across socials, goals, and support links.",
+  },
+};
+
 export default function PersonalLanding() {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-16">
-      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 px-8 py-12 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
-        <p className="text-xs uppercase tracking-widest text-amber-200/90">About BeastyRabbit</p>
-        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Hey there, I&apos;m Beasty.</h1>
-        <p className="mt-4 max-w-3xl text-sm text-neutral-200/85 sm:text-base">
-          Germany-based streamer building a cozy English-first space for tech deep dives, offbeat gadgets, and nostalgic games. You&apos;ll usually catch me tinkering with my dual-PC setup while two very opinionated cats try to co-host.
-        </p>
-        <div className="mt-6 flex flex-wrap items-center gap-2">
-          <Link
-            href="https://twitch.tv/BeastyRabbit"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:text-white"
-          >
-            <Twitch className="size-3" /> Twitch
-          </Link>
-          <Link
-            href="https://twitter.com/BeastyRabbit"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:text-white"
-          >
-            <Twitter className="size-3" /> X (Twitter)
-          </Link>
-          <DiscordInviteButton className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:text-white" />
-        </div>
-      </section>
+      <PageHero
+        eyebrow="About BeastyRabbit"
+        title="Hey there, I'm Beasty."
+        description="Germany-based streamer building a cozy English-first space for tech deep dives, offbeat gadgets, and nostalgic games."
+      >
+        <Link
+          href="https://twitch.tv/BeastyRabbit"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:text-white"
+        >
+          <Twitch className="size-3" /> Twitch
+        </Link>
+        <Link
+          href="https://twitter.com/BeastyRabbit"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:text-white"
+        >
+          <Twitter className="size-3" /> X (Twitter)
+        </Link>
+        <DiscordInviteButton className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:text-white" />
+      </PageHero>
 
       <section className="glass-card space-y-6 px-8 py-10">
         <div>
