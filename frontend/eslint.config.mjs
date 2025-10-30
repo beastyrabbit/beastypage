@@ -12,7 +12,6 @@ const eslintConfig = defineConfig([
     'next-env.d.ts',
     // Project-specific ignores:
     'convex/_generated/**',
-    'legacy-pages/**',
     'lib/single-cat/**',
     'lib/streamer/steps.js',
   ]),
