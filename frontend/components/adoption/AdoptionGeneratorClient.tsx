@@ -9,10 +9,14 @@ import { AdoptionMetadataPanel, AdoptionMetadata } from "@/components/adoption/A
 import type { Id } from "@/convex/_generated/dataModel";
 
 interface LegacyBatchCat {
-  label?: string;
-  index?: number;
+  label?: string | null;
+  index?: number | null;
   encoded?: string | null;
   catData: unknown;
+  shareToken?: string | null;
+  profileId?: string | null;
+  catName?: string | null;
+  creatorName?: string | null;
 }
 
 interface LegacyBatchPayload {
@@ -23,6 +27,16 @@ interface LegacyBatchPayload {
   createdAt?: number;
 }
 
+type AdoptionCatPayload = {
+  label: string;
+  catData: unknown;
+  profileId?: string;
+  encoded?: string;
+  shareToken?: string;
+  catName?: string;
+  creatorName?: string;
+};
+
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 const AFTERLIFE_OPTIONS = [
@@ -32,6 +46,12 @@ const AFTERLIFE_OPTIONS = [
   { value: "both10", label: "Both 10%" },
   { value: "darkForce", label: "Always Dark Forest" },
   { value: "starForce", label: "Always StarClan" },
+];
+
+const SPEED_OPTIONS = [
+  { value: "fast", label: "Fast" },
+  { value: "normal", label: "Normal" },
+  { value: "slow", label: "Chill" },
 ];
 
 const LegacyCatGrid = memo(
@@ -45,7 +65,8 @@ export function AdoptionGeneratorClient() {
   const createBatch = useMutation(api.adoption.createBatch);
   const createMapper = useMutation(api.mapper.create);
   const updateBatchMeta = useMutation(api.adoption.updateBatchMeta);
-  const lastTokenRef = useRef<unknown>(null);
+  const stylesheetRef = useRef<HTMLLinkElement | null>(null);
+  const lastTokenRef = useRef<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSavedToken, setLastSavedToken] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
@@ -56,21 +77,27 @@ export function AdoptionGeneratorClient() {
   const [metadataMessage, setMetadataMessage] = useState<string | null>(null);
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [metadataSaving, setMetadataSaving] = useState(false);
+  const [speed, setSpeed] = useState<string>("normal");
 
   useEffect(() => {
     if (typeof document === "undefined") return;
     const attr = "data-adoption-css";
     const existing = document.querySelector<HTMLLinkElement>(`link[${attr}]`);
-    if (existing) return;
+    if (existing) {
+      stylesheetRef.current = existing;
+      return () => {
+        stylesheetRef.current = null;
+      };
+    }
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = "/assets/styles/pages/adoption-generator.css";
     link.setAttribute(attr, "true");
     document.head.appendChild(link);
+    stylesheetRef.current = link;
     return () => {
-      if (link.parentNode) {
-        link.parentNode.removeChild(link);
-      }
+      stylesheetRef.current?.remove();
+      stylesheetRef.current = null;
     };
   }, []);
 
@@ -80,49 +107,12 @@ export function AdoptionGeneratorClient() {
 
   useEffect(() => {
     let cancelled = false;
-    let detachSpeedGroup: (() => void) | undefined;
-
-    const attachSpeedGroup = () => {
-      const group = document.getElementById("speedGroup");
-      if (!group) return;
-      const buttons = Array.from(group.querySelectorAll<HTMLButtonElement>("[data-speed-option]"));
-      if (!buttons.length) return;
-
-      const setActive = (value: string) => {
-        buttons.forEach((button) => {
-          const isActive = button.dataset.value === value;
-          button.classList.toggle("active", isActive);
-          button.setAttribute("aria-pressed", isActive ? "true" : "false");
-        });
-        (group as unknown as Record<string, unknown>).value = value;
-        group.setAttribute("data-value", value);
-      };
-
-      const handleClick = (event: Event) => {
-        const target = event.currentTarget as HTMLButtonElement | null;
-        if (!target) return;
-        const value = target.dataset.value || "normal";
-        setActive(value);
-        const detail = { value };
-        group.dispatchEvent(new CustomEvent("sl-change", { detail, bubbles: true }));
-      };
-
-      buttons.forEach((button) => button.addEventListener("click", handleClick));
-      const initial = group.getAttribute("data-value") || "normal";
-      setActive(initial);
-
-      return () => {
-        buttons.forEach((button) => button.removeEventListener("click", handleClick));
-      };
-    };
 
     (async () => {
       const [{ createAdoptionGenerator }] = await Promise.all([
         import("@/lib/adoption/adoptionGenerator"),
       ]);
       if (cancelled) return;
-
-      detachSpeedGroup = attachSpeedGroup() ?? detachSpeedGroup;
 
       createAdoptionGenerator({
         viewerBasePath: "/view",
@@ -144,56 +134,52 @@ export function AdoptionGeneratorClient() {
         },
         onBatchFinalized: async (payload: LegacyBatchPayload) => {
           if (!payload?.cats?.length) return;
-          if (payload.token && payload.token === lastTokenRef.current) {
+          const payloadToken = typeof payload.token === "string" ? payload.token : null;
+          if (payloadToken && payloadToken === lastTokenRef.current) {
             return;
           }
-          lastTokenRef.current = payload.token;
+          lastTokenRef.current = payloadToken;
           setSaveState("saving");
           try {
-            const catsPayload: {
-              label: string;
-              catData: unknown;
-              profileId?: string;
-              encoded?: string;
-              shareToken?: string;
-              catName?: string;
-              creatorName?: string;
-            }[] = [];
+            const catsPayload: AdoptionCatPayload[] = await Promise.all(
+              payload.cats.map(async (cat, index) => {
+                const label = cat.label?.trim() ? cat.label : `Cat ${index + 1}`;
+                const encoded = typeof cat.encoded === "string" ? cat.encoded : undefined;
+                let shareToken = typeof cat.shareToken === "string" ? cat.shareToken : undefined;
+                let profileId = typeof cat.profileId === "string" ? cat.profileId : undefined;
 
-            for (let index = 0; index < payload.cats.length; index += 1) {
-              const cat = payload.cats[index];
-              const label = cat.label ?? `Cat ${index + 1}`;
-              const encoded = typeof cat.encoded === "string" ? cat.encoded : undefined;
-              let shareToken = typeof cat.shareToken === "string" ? cat.shareToken : undefined;
-              let profileId: string | undefined =
-                typeof (cat as { profileId?: string }).profileId === "string"
-                  ? (cat as { profileId?: string }).profileId
-                  : undefined;
-
-              if (!shareToken || !profileId) {
-                try {
-                  const mapperResult = await createMapper({
-                    catData: cat.catData,
-                    catName: cat.catName ?? undefined,
-                    creatorName: cat.creatorName ?? undefined,
-                  });
-                  shareToken = shareToken ?? ((mapperResult as { shareToken?: string }).shareToken ?? mapperResult.slug ?? mapperResult.id);
-                  profileId = mapperResult.id;
-                } catch (error) {
-                  console.warn("Failed to persist adoption cat", error);
+                if (!shareToken || !profileId) {
+                  try {
+                    const mapperResult = await createMapper({
+                      catData: cat.catData,
+                      catName: cat.catName ?? undefined,
+                      creatorName: cat.creatorName ?? undefined,
+                    });
+                    if (mapperResult && typeof mapperResult === "object") {
+                      const mapperPayload = mapperResult as {
+                        id: string;
+                        shareToken?: string | null;
+                        slug?: string | null;
+                      };
+                      shareToken = shareToken ?? mapperPayload.shareToken ?? mapperPayload.slug ?? mapperPayload.id;
+                      profileId = profileId ?? mapperPayload.id;
+                    }
+                  } catch (error) {
+                    console.warn("Failed to persist adoption cat", error);
+                  }
                 }
-              }
 
-              catsPayload.push({
-                label,
-                catData: cat.catData,
-                profileId,
-                encoded,
-                shareToken,
-                catName: cat.catName ?? undefined,
-                creatorName: cat.creatorName ?? undefined,
-              });
-            }
+                return {
+                  label,
+                  catData: cat.catData,
+                  profileId,
+                  encoded,
+                  shareToken,
+                  catName: cat.catName ?? undefined,
+                  creatorName: cat.creatorName ?? undefined,
+                } satisfies AdoptionCatPayload;
+              })
+            );
 
             const currentMeta = savedMetadataRef.current;
             const settingsPayload = {
@@ -232,9 +218,17 @@ export function AdoptionGeneratorClient() {
 
     return () => {
       cancelled = true;
-      detachSpeedGroup?.();
     };
   }, [createBatch, createMapper]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const group = document.getElementById("speedGroup");
+    if (!group) return;
+    group.setAttribute("data-value", speed);
+    const detail = { value: speed };
+    group.dispatchEvent(new CustomEvent("sl-change", { detail, bubbles: true }));
+  }, [speed]);
 
   useEffect(() => {
     if (saveState !== "saved") return;
@@ -343,21 +337,25 @@ export function AdoptionGeneratorClient() {
             <button id="generateButton" className="generate-button" type="button">
               Generate Adoption
             </button>
-            <div className="sl-toggle-group">
-              <span className="setting-label">Speed:</span>
-              <div id="speedGroup" className="sl-segment" data-value="normal">
-                <button type="button" className="palette-toggle" data-speed-option data-value="fast" aria-pressed="false">
-                  Fast
-                </button>
-                <button type="button" className="palette-toggle" data-speed-option data-value="normal" aria-pressed="true">
-                  Normal
-                </button>
-                <button type="button" className="palette-toggle" data-speed-option data-value="slow" aria-pressed="false">
-                  Chill
-                </button>
+              <div className="sl-toggle-group">
+                <span className="setting-label">Speed:</span>
+                <div id="speedGroup" className="sl-segment" data-value={speed}>
+                  {SPEED_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-speed-option
+                      data-value={option.value}
+                      aria-pressed={speed === option.value}
+                      className={`palette-toggle${speed === option.value ? " active" : ""}`}
+                      onClick={() => setSpeed(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
           <div className="controls-right">
             <div className="control-row">
               <span className="toggle-label">Layer Counts:</span>

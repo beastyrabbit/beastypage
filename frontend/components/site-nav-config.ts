@@ -16,7 +16,7 @@ export type ResolvedNavItem = {
 
 export const NAV_DEFINITIONS: NavDefinition[] = [
   { key: "hub", label: "Hub", defaultHref: "/", envKey: "NEXT_PUBLIC_HUB_URL" },
-  { key: "gatcha", label: "Gatcha", defaultHref: "/gatcha", envKey: "NEXT_PUBLIC_GATCHA_URL" },
+  { key: "gatcha", label: "Gacha", defaultHref: "/gatcha", envKey: "NEXT_PUBLIC_GATCHA_URL" },
   { key: "stream", label: "Stream Tools", defaultHref: "/stream", envKey: "NEXT_PUBLIC_STREAM_URL" },
   { key: "collection", label: "Collection", defaultHref: "/collection", envKey: "NEXT_PUBLIC_COLLECTION_URL" },
   { key: "personal", label: "Personal", defaultHref: "/personal", envKey: "NEXT_PUBLIC_PERSONAL_URL" },

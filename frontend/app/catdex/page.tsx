@@ -134,6 +134,18 @@ export default function CatdexPage() {
     clearSubmitHold();
   }, [clearSubmitHold]);
 
+  const handleCloseSubmitModal = useCallback(() => {
+    clearSubmitHold();
+    submitHoldTriggeredRef.current = false;
+    setSubmitOpen(false);
+  }, [clearSubmitHold]);
+
+  const handleCloseMassUpload = useCallback(() => {
+    clearSubmitHold();
+    submitHoldTriggeredRef.current = false;
+    setMassUploadOpen(false);
+  }, [clearSubmitHold]);
+
   useEffect(() => {
     return () => {
       clearSubmitHold();
@@ -262,7 +274,7 @@ export default function CatdexPage() {
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
         <p className="text-xs uppercase tracking-widest text-amber-200/90">Catdex</p>
-        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Explore Gatcha Cat Cards</h1>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Explore Gacha Cat Cards</h1>
         <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-200/80">
           <span className="rounded-full border border-amber-400/40 bg-amber-500/20 px-3 py-1 font-semibold text-amber-100">
             {stats.total.toLocaleString()} cards indexed
@@ -436,7 +448,7 @@ export default function CatdexPage() {
 
       <SubmitModal
         open={submitOpen}
-        onClose={() => setSubmitOpen(false)}
+        onClose={handleCloseSubmitModal}
         seasons={seasons}
         rarities={rarities}
         onSubmit={createCatRecord}
@@ -444,7 +456,7 @@ export default function CatdexPage() {
 
       {massUploadOpen ? (
         <MassUploadModal
-          onClose={() => setMassUploadOpen(false)}
+          onClose={handleCloseMassUpload}
           seasons={seasons}
           rarities={rarities}
           onSubmit={createCatRecord}
@@ -930,6 +942,7 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const defaultInputRef = useRef<HTMLInputElement | null>(null);
+  const entriesRef = useRef<MassUploadEntry[]>([]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -943,10 +956,14 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
   }, [busy, onClose]);
 
   useEffect(() => {
-    return () => {
-      entries.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
-    };
+    entriesRef.current = entries;
   }, [entries]);
+
+  useEffect(() => {
+    return () => {
+      entriesRef.current.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
+    };
+  }, []);
 
   const seasonOptions = seasons.map((season) => ({ id: season.id, label: season.season_name }));
   const rarityOptions = rarities.map((rarity) => ({ id: rarity.id, label: rarity.rarity_name }));
@@ -1011,8 +1028,12 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
     let failed = 0;
 
     for (const entry of entries) {
+      const trimmedName = entry.catName.trim();
       const validationErrors: string[] = [];
-      if (!entry.catName.trim()) validationErrors.push("Add the cat name.");
+      if (!trimmedName) validationErrors.push("Add the cat name.");
+      if (trimmedName && !/^[A-Za-z0-9\s\-_'`]+$/.test(trimmedName)) {
+        validationErrors.push("Cat name contains invalid characters.");
+      }
       if (!entry.seasonId) validationErrors.push("Choose a season.");
       if (!entry.rarityId) validationErrors.push("Choose a rarity.");
       if (!entry.defaultFile) validationErrors.push("Missing default art.");
@@ -1033,7 +1054,7 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
         await onSubmit({
           seasonId: entry.seasonId,
           rarityId: entry.rarityId,
-          catName: entry.catName,
+          catName: trimmedName,
           owner,
           cardNumber: entry.cardNumber,
           defaultFile: entry.defaultFile,

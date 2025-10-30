@@ -1,10 +1,33 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import type { Metadata } from "next";
 
-const HUB_PILLARS = [
+type HubAccent = "gatcha" | "stream" | "collection" | "personal";
+
+type HubPillar = {
+  href: string;
+  title: string;
+  description: string;
+  accent: HubAccent;
+};
+
+type NewStuffItem = {
+  href: string;
+  title: string;
+  description: string;
+};
+
+const HUB_THEME_CLASSES: Record<HubAccent, string> = {
+  gatcha: "theme-hero theme-gatcha",
+  stream: "theme-hero theme-stream",
+  collection: "theme-hero theme-collection",
+  personal: "theme-hero theme-personal",
+};
+
+const HUB_PILLARS: HubPillar[] = [
   {
     href: "/gatcha",
-    title: "Gatcha",
+    title: "Gacha",
     description: "Catdex, premium wheel, and sprite pipeline — rebuilt with Convex.",
     accent: "gatcha",
   },
@@ -28,7 +51,7 @@ const HUB_PILLARS = [
   },
 ];
 
-const NEW_STUFF_ITEMS = [
+const NEW_STUFF_ITEMS: NewStuffItem[] = [
   {
     href: "/history",
     title: "CatGen history",
@@ -36,15 +59,21 @@ const NEW_STUFF_ITEMS = [
   },
   {
     href: "/streamer-voting",
-    title: "Stream voting",
+    title: "Streamer voting",
     description: "Host live builds with audience votes and real-time overlays.",
   },
   {
     href: "/personal",
     title: "Personal hub",
-    description: "Find stay-connected links, stream goals, and the latest BeastyRabbit updates in one place.",
+    description: "Stay-connected links, stream goals, and the latest BeastyRabbit updates in one place.",
   },
 ];
+
+export const metadata: Metadata = {
+  title: "Beasty Hub | BeastyRabbit Universe",
+  description:
+    "Explore gacha generators, stream tools, the cat collection, and personal updates from BeastyRabbit in one place.",
+};
 
 export default function HubLanding() {
   return (
@@ -55,14 +84,14 @@ export default function HubLanding() {
           Welcome to the BeastyVerse.
         </h1>
         <p className="mt-6 max-w-3xl text-lg text-muted-foreground sm:text-xl">
-          Everything you want lives here: cat gatchas, stream tools, collections, personal links, and plenty more on the way.
+          Everything you want lives here: cat gacha tools, stream utilities, collections, personal links, and plenty more on the way.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <Link
             href="/gatcha"
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:translate-y-0.5 hover:opacity-90"
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:opacity-90"
           >
-            Dive into Gatcha <ArrowRight className="size-4" />
+            Dive into Gacha <ArrowRight className="size-4" />
           </Link>
           <Link
             href="/streamer-voting"
@@ -80,11 +109,8 @@ export default function HubLanding() {
             href={pillar.href}
             className={`glass-card relative overflow-hidden p-5 transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-2xl`}
           >
-            <div className={`theme-hero theme-${pillar.accent} absolute inset-0 opacity-60`} aria-hidden />
+            <div className={`${HUB_THEME_CLASSES[pillar.accent]} absolute inset-0 opacity-60`} role="presentation" aria-hidden="true" />
             <div className="relative flex h-full flex-col gap-3">
-              <span className="text-xs font-semibold uppercase tracking-[0.4em] text-muted-foreground">
-                {pillar.title}
-              </span>
               <h3 className="text-lg font-semibold text-foreground">{pillar.title}</h3>
               <p className="text-sm text-muted-foreground">{pillar.description}</p>
               <span className="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-primary">
@@ -105,9 +131,7 @@ export default function HubLanding() {
               href={item.href}
               className="glass-card relative flex h-full flex-col gap-3 p-5 transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
             >
-              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                {item.title}
-              </span>
+              <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
               <p className="text-sm text-muted-foreground">{item.description}</p>
               <span className="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-primary">
                 Open <ArrowRight className="size-3" />

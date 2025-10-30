@@ -200,21 +200,16 @@ export function HistoryClient() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
-      <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
-        <p className="text-xs uppercase tracking-widest text-amber-200/90">History</p>
-        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Relive every cat you saved</h1>
-        <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-200/80">
-          <span className="rounded-full border border-amber-400/40 bg-amber-500/15 px-3 py-1 font-semibold text-amber-200">
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground/80">
+          <span className="rounded-full border border-amber-400/40 bg-amber-500/15 px-3 py-1 font-semibold text-amber-200/90">
             {sortedItems.length.toLocaleString()} saved cats
           </span>
-          <span className="rounded-full border border-amber-400/30 bg-slate-950/60 px-3 py-1">
+          <span className="rounded-full border border-amber-400/30 bg-slate-950/60 px-3 py-1 text-foreground/80">
             {adoptionItems.length.toLocaleString()} adoption batches
           </span>
         </div>
-      </section>
-
-      <section className="flex flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <label className="flex w-full flex-col gap-1 text-xs uppercase tracking-wide text-muted-foreground/70 md:max-w-md">
             <span className="flex items-center gap-2 text-[11px]">
