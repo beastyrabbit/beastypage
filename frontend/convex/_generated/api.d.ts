@@ -23,6 +23,7 @@ import type * as perfectCats from "../perfectCats.js";
 import type * as previews from "../previews.js";
 import type * as rarities from "../rarities.js";
 import type * as seasons from "../seasons.js";
+import type * as singleCatSettings from "../singleCatSettings.js";
 import type * as streamParticipants from "../streamParticipants.js";
 import type * as streamSessions from "../streamSessions.js";
 import type * as streamVotes from "../streamVotes.js";
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   previews: typeof previews;
   rarities: typeof rarities;
   seasons: typeof seasons;
+  singleCatSettings: typeof singleCatSettings;
   streamParticipants: typeof streamParticipants;
   streamSessions: typeof streamSessions;
   streamVotes: typeof streamVotes;

@@ -122,6 +122,15 @@ export default defineSchema({
     .index("bySlug", ["slug"])
     .index("byCreated", ["createdAt"]),
 
+  single_cat_settings: defineTable({
+    slug: v.string(),
+    config: v.any(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("bySlug", ["slug"])
+    .index("byCreated", ["createdAt"]),
+
   adoption_batch: defineTable({
     slug: v.optional(v.string()),
     title: v.optional(v.string()),
