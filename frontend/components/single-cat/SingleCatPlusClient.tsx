@@ -26,6 +26,26 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import type { BatchRenderResponse } from "@/lib/cat-v3/types";
+import {
+  ABSOLUTE_MIN_STEP_MS,
+  MIN_SAFE_STEP_MS,
+  PARAM_TIMING_ORDER,
+  PARAM_TIMING_LABELS,
+  PARAM_TIMING_PRESETS,
+  PARAM_DEFAULT_STEP_COUNTS,
+  DEFAULT_TIMING_CONFIG,
+  type ParamTimingKey,
+  type SpinTimingConfig,
+  type TimingPresetSet,
+  clampDelay,
+  computeTimingTotals,
+  computeDefaultTotal,
+  getDelayForKey,
+  getPresetValues,
+  isParamTimingKey,
+  stepCountsToMetrics,
+  usePersistentTimingConfig,
+} from "../../utils/spinTiming";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
 // @ts-ignore -- legacy JS module without types.
@@ -80,7 +100,16 @@ interface VariantDescriptor extends VariantSheetRequest {
   option: VariationOption;
 }
 
-type FetchPriority = 'high' | 'low' | 'auto';
+interface TimingSnapshot {
+  counts: Record<ParamTimingKey, number>;
+  estimated: Partial<Record<ParamTimingKey, number>>;
+  estimatedTotal: number;
+  actual: Record<ParamTimingKey, number>;
+  actualTotal: number;
+  timestamp: number;
+}
+
+type FetchPriority = "high" | "low" | "auto";
 
 const MAX_LAYER_VARIATIONS = 12;
 const MAX_SPINNY_VARIATIONS = Number.MAX_SAFE_INTEGER;
@@ -88,6 +117,8 @@ const MAX_SPINNY_LAYER_VARIATIONS = Number.MAX_SAFE_INTEGER;
 const MAX_LAYER_VALUE = 4;
 const DEFAULT_SPRITE_NUMBER = 8;
 const PLACEHOLDER_COLOUR = "GINGER";
+const GLOBAL_PRESETS: Array<keyof TimingPresetSet> = ["slow", "normal", "fast"];
+const SUBSET_LIMIT = 20;
 
 interface LayerRange {
   min: number;
@@ -139,6 +170,91 @@ interface ParameterOptions {
   scar: (string | "none")[];
   shading: boolean[];
   reverse: boolean[];
+}
+
+function countOptions(list: unknown[] | undefined, { includeNone = false }: { includeNone?: boolean } = {}) {
+  if (!Array.isArray(list)) return 0;
+  const normalized = list
+    .filter((value) => value !== undefined && value !== null && (includeNone || value !== "none"))
+    .map((value) => (typeof value === "string" || typeof value === "number" ? String(value) : JSON.stringify(value)));
+  return new Set(normalized).size;
+}
+
+function deriveOptionCounts(options: ParameterOptions | null): Record<ParamTimingKey, number> {
+  const counts: Record<ParamTimingKey, number> = Object.fromEntries(
+    PARAM_TIMING_ORDER.map((key) => [key, PARAM_DEFAULT_STEP_COUNTS[key] ?? 0])
+  ) as Record<ParamTimingKey, number>;
+  if (!options) return counts;
+
+  const assign = (key: ParamTimingKey, list: unknown[] | undefined, opts?: { includeNone?: boolean }) => {
+    const total = countOptions(list, opts ?? {});
+    if (total > 0) counts[key] = total;
+  };
+
+  assign("sprite", options.sprite as unknown[]);
+  assign("pelt", options.pelt);
+  assign("colour", options.colour);
+  assign("eyeColour", options.eyeColour);
+  assign("eyeColour2", options.eyeColour2, { includeNone: false });
+  assign("tint", options.tint, { includeNone: false });
+  assign("skinColour", options.skinColour);
+  assign("whitePatches", options.whitePatches, { includeNone: false });
+  assign("points", options.points, { includeNone: false });
+  assign("whitePatchesTint", options.whitePatchesTint, { includeNone: false });
+  assign("vitiligo", options.vitiligo, { includeNone: false });
+  assign("accessory", options.accessory);
+  assign("scar", options.scar);
+  assign("tortie", options.tortie as unknown[]);
+  assign("tortieMask", options.tortieMask);
+  assign("tortiePattern", options.tortiePattern);
+  assign("tortieColour", options.tortieColour);
+  assign("shading", options.shading as unknown[], { includeNone: true });
+  assign("reverse", options.reverse as unknown[], { includeNone: true });
+
+  return counts;
+}
+
+function logTimingReport(
+  context: string,
+  profile: SpinTimingConfig,
+  optionCounts: Record<ParamTimingKey, number>,
+  estimatedTotals: { perKey: Partial<Record<ParamTimingKey, number>>; total: number },
+  actualDurations: Record<ParamTimingKey, number>,
+  actualTotalMs: number
+) {
+  const estimatedSeconds = (estimatedTotals.total / 1000).toFixed(2);
+  const actualSeconds = (actualTotalMs / 1000).toFixed(2);
+  const groupLabel = `[timing] ${context} → est ${estimatedSeconds}s vs actual ${actualSeconds}s`;
+  const openedGroup = typeof console.group === "function" ? true : false;
+  if (openedGroup) {
+    console.group(groupLabel);
+  } else if (typeof console.groupCollapsed === "function") {
+    console.groupCollapsed(groupLabel);
+  } else {
+    console.log(groupLabel);
+  }
+  try {
+    PARAM_TIMING_ORDER.forEach((key) => {
+      const delay = getDelayForKey(profile, key);
+      const options = optionCounts[key] ?? 0;
+      const estimated = estimatedTotals.perKey[key] ?? delay * options;
+      const actual = actualDurations[key] ?? 0;
+      const label = PARAM_TIMING_LABELS[key] ?? key;
+      console.log(
+        `${label}: options=${options}, delay=${delay}ms, est=${(estimated / 1000).toFixed(2)}s, actual=${(actual / 1000).toFixed(2)}s`
+      );
+    });
+  } finally {
+    if ((openedGroup || typeof console.groupCollapsed === "function") && typeof console.groupEnd === "function") {
+      console.groupEnd();
+    }
+  }
+}
+
+function formatMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "0.00 s";
+  if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
+  return `${ms.toFixed(0)} ms`;
 }
 
 interface SpriteMapperApi {
@@ -208,19 +324,21 @@ const DISPLAY_SIZE = 720;
 const FULL_EXPORT_SIZE = 700;
 const INSTANT_PARAMS: ParamId[] = ["whitePatchesTint"];
 const MIN_FRAME_DURATION = 45;
-const PRESET_DURATIONS = [5, 10, 20];
 
 function computeStepDurations(
   sequence: { delay: number }[],
-  targetDuration: number,
+  baseDelay: number,
+  allowFast: boolean,
   minimum: number = MIN_FRAME_DURATION
 ): number[] {
   if (sequence.length === 0) {
     return [];
   }
-  const totalWeight = sequence.reduce((sum, step) => sum + step.delay, 0) || sequence.length;
-  const base = Math.max(targetDuration / totalWeight, minimum);
-  return sequence.map((step) => Math.max(base * step.delay, minimum));
+  const safeBase = clampDelay(baseDelay, allowFast);
+  return sequence.map((step) => {
+    const scaled = safeBase * Math.max(step.delay, 1);
+    return Math.max(scaled, allowFast ? ABSOLUTE_MIN_STEP_MS : Math.max(MIN_SAFE_STEP_MS, minimum));
+  });
 }
 
 function getBaseFrameDuration(speed: { baseFrameDuration: number }): number {
@@ -614,12 +732,13 @@ function buildLayerOptionStrings(
   allValuesInput: string[] | null | undefined,
   target: string | null | undefined,
   includeNone = true,
-  options?: { spinny?: boolean }
+  options?: { spinny?: boolean; limit?: number }
 ): VariationOption[] {
   const spinnyMode = options?.spinny ?? false;
   const allValues = Array.isArray(allValuesInput) ? allValuesInput : [];
   const normalizedTarget = target && target !== "" ? target : "none";
-  const variationLimit = spinnyMode ? MAX_SPINNY_LAYER_VARIATIONS : MAX_LAYER_VARIATIONS;
+  const baseLimit = spinnyMode ? MAX_SPINNY_LAYER_VARIATIONS : MAX_LAYER_VARIATIONS;
+  const variationLimit = Math.max(1, Math.min(baseLimit, options?.limit ?? baseLimit));
   const results: string[] = [];
 
   if (includeNone) {
@@ -881,14 +1000,9 @@ function clampLayerValue(value: number): number {
   return Math.max(0, Math.min(MAX_LAYER_VALUE, Math.round(value)));
 }
 
-function normalizeLayerRange(range: LayerRange) {
+function computeLayerCount(range: LayerRange) {
   const min = clampLayerValue(Math.min(range.min, range.max));
   const max = clampLayerValue(Math.max(range.min, range.max));
-  return { min, max };
-}
-
-function computeLayerCount(range: LayerRange) {
-  const { min, max } = normalizeLayerRange(range);
   if (min === max) {
     return min;
   }
@@ -1266,12 +1380,48 @@ export function SingleCatPlusClient({
   const [error, setError] = useState<string | null>(null);
 
   const [mode, setMode] = useState<"flashy" | "calm">(defaultMode);
-  const [spinDurationSeconds, setSpinDurationSeconds] = useState(10);
   const [accessoryRange, setAccessoryRange] = useState<LayerRange>(defaultAccessoryRange);
   const [scarRange, setScarRange] = useState<LayerRange>(defaultScarRange);
   const [tortieRange, setTortieRange] = useState<LayerRange>(defaultTortieRange);
-  const spinDurationRef = useRef(spinDurationSeconds);
+  const [timingConfig, setTimingConfig] = usePersistentTimingConfig();
+  const [timingModalOpen, setTimingModalOpen] = useState(false);
+  const [lastTimingSnapshot, setLastTimingSnapshot] = useState<TimingSnapshot | null>(null);
+  const subsetLimits = useMemo(
+    () => timingConfig.subsetLimits ?? (DEFAULT_TIMING_CONFIG.subsetLimits ?? {}),
+    [timingConfig.subsetLimits]
+  );
+  const defaultFlashyPauseMs = DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ?? 520;
+  const defaultCalmPauseMs = DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ?? 420;
+  const flashyPauseMs = timingConfig.pauseDelays?.flashyMs ?? defaultFlashyPauseMs;
+  const calmPauseMs = timingConfig.pauseDelays?.calmMs ?? defaultCalmPauseMs;
+  const flashyPauseSeconds = flashyPauseMs / 1000;
+  const calmPauseSeconds = calmPauseMs / 1000;
+  const activeTimingRef = useRef<SpinTimingConfig>(DEFAULT_TIMING_CONFIG);
+  const optionCountsRef = useRef<Record<ParamTimingKey, number>>(Object.fromEntries(
+    PARAM_TIMING_ORDER.map((key) => [key, PARAM_DEFAULT_STEP_COUNTS[key] ?? 0])
+  ) as Record<ParamTimingKey, number>);
+  const actualDurationsRef = useRef<Record<ParamTimingKey, number>>({});
+  const totalActualRef = useRef(0);
   const modeRef = useRef(mode);
+  const [optionCounts, setOptionCounts] = useState<Record<ParamTimingKey, number>>(optionCountsRef.current);
+  useEffect(() => {
+    optionCountsRef.current = optionCounts;
+  }, [optionCounts]);
+
+  const resetActualDurations = useCallback(() => {
+    actualDurationsRef.current = {};
+    totalActualRef.current = 0;
+  }, []);
+
+  const addActualDuration = useCallback((key: ParamTimingKey | null, deltaMs: number) => {
+    if (!Number.isFinite(deltaMs) || deltaMs <= 0) return;
+    totalActualRef.current += deltaMs;
+    if (!key) return;
+    actualDurationsRef.current = {
+      ...actualDurationsRef.current,
+      [key]: (actualDurationsRef.current[key] ?? 0) + deltaMs,
+    };
+  }, []);
   const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(defaultAfterlife);
   const [includeBaseColours, setIncludeBaseColours] = useState(true);
   const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(() => new Set());
@@ -1332,30 +1482,146 @@ export function SingleCatPlusClient({
   }, []);
 
   useEffect(() => {
-    spinDurationRef.current = spinDurationSeconds;
-  }, [spinDurationSeconds]);
-
-  useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
 
+  const adjustedOptionCounts = useMemo(() => {
+    const adjusted: Record<ParamTimingKey, number> = {} as Record<ParamTimingKey, number>;
+    PARAM_TIMING_ORDER.forEach((key) => {
+      const baseCount = optionCounts[key] ?? PARAM_DEFAULT_STEP_COUNTS[key] ?? 0;
+      const limited = subsetLimits[key] && baseCount > SUBSET_LIMIT ? SUBSET_LIMIT : baseCount;
+      adjusted[key] = limited;
+    });
+    return adjusted;
+  }, [optionCounts, subsetLimits]);
+
+  const estimatedTotals = useMemo(() => {
+    const metrics = stepCountsToMetrics(adjustedOptionCounts);
+    return computeTimingTotals(timingConfig, metrics);
+  }, [timingConfig, adjustedOptionCounts]);
+
+  const effectiveTotalMs = useMemo(
+    () => estimatedTotals.total || computeDefaultTotal(timingConfig),
+    [estimatedTotals.total, timingConfig]
+  );
+
   const readSpinState = useCallback(() => {
-    const durationMs = Math.max(1000, spinDurationRef.current * 1000);
+    const durationMs = Math.max(1000, effectiveTotalMs);
+    const baseSpeed = getSpeedSettings(durationMs);
     return {
       mode: modeRef.current,
       spinny: modeRef.current === "flashy",
-      speed: getSpeedSettings(durationMs),
+      speed: {
+        ...baseSpeed,
+        paramPause: flashyPauseMs,
+        calmParamPause: calmPauseMs,
+      },
     };
-  }, []);
+  }, [calmPauseMs, effectiveTotalMs, flashyPauseMs]);
+
 
   const clearMirror = useCallback(() => {}, []);
 
-  const handleDurationChange = useCallback((seconds: number) => {
-    if (Number.isNaN(seconds)) {
-      return;
+  const detectGlobalPreset = useCallback(() => {
+    for (const presetKey of GLOBAL_PRESETS) {
+      const matches = PARAM_TIMING_ORDER.every((param) => {
+        const target = PARAM_TIMING_PRESETS[param]?.[presetKey];
+        if (typeof target !== "number") return false;
+        const current = timingConfig.delays[param] ?? getPresetValues(param).normal;
+        return current === target;
+      });
+      if (matches) return presetKey;
     }
-    setSpinDurationSeconds(Math.max(1, seconds));
-  }, []);
+    return "custom" as const;
+  }, [timingConfig.delays]);
+
+  const [activeGlobalPreset, setActiveGlobalPreset] = useState<ReturnType<typeof detectGlobalPreset>>(detectGlobalPreset);
+
+  useEffect(() => {
+    setActiveGlobalPreset(detectGlobalPreset());
+  }, [detectGlobalPreset]);
+
+  const handleGlobalPreset = useCallback(
+    (preset: keyof TimingPresetSet) => {
+      const nextDelays: SpinTimingConfig["delays"] = { ...timingConfig.delays };
+      PARAM_TIMING_ORDER.forEach((key) => {
+        const value = PARAM_TIMING_PRESETS[key]?.[preset];
+        if (typeof value === "number") {
+          nextDelays[key] = clampDelay(value, timingConfig.allowFastFlips);
+        }
+      });
+      setTimingConfig({
+        ...timingConfig,
+        delays: nextDelays,
+      });
+      setActiveGlobalPreset(preset);
+    },
+    [setTimingConfig, timingConfig]
+  );
+
+  const handleTimingStepChange = useCallback(
+    (key: ParamTimingKey, value: number) => {
+      if (!Number.isFinite(value)) {
+        return;
+      }
+      const nextValue = Math.max(value, 0);
+      setTimingConfig({
+        ...timingConfig,
+        delays: {
+          ...timingConfig.delays,
+          [key]: nextValue,
+        },
+      });
+      setActiveGlobalPreset("custom");
+    },
+    [setTimingConfig, setActiveGlobalPreset, timingConfig]
+  );
+
+  const handlePauseChange = useCallback(
+    (kind: "flashyMs" | "calmMs", seconds: number) => {
+      if (!Number.isFinite(seconds)) return;
+      const clampedSeconds = Math.min(10, Math.max(1, seconds));
+      const nextMs = Math.round(clampedSeconds * 1000);
+      setTimingConfig({
+        ...timingConfig,
+        pauseDelays: {
+          ...(timingConfig.pauseDelays ?? {}),
+          [kind]: nextMs,
+        },
+      });
+      setActiveGlobalPreset("custom");
+    },
+    [setActiveGlobalPreset, setTimingConfig, timingConfig]
+  );
+
+  const toggleSubsetLimit = useCallback(
+    (key: ParamTimingKey) => {
+      const current = Boolean(subsetLimits[key]);
+      const nextLimits: Partial<Record<ParamTimingKey, boolean>> = { ...subsetLimits };
+      if (current) {
+        delete nextLimits[key];
+      } else {
+        nextLimits[key] = true;
+      }
+      setTimingConfig({
+        ...timingConfig,
+        subsetLimits: nextLimits,
+      });
+      setActiveGlobalPreset("custom");
+    },
+    [setActiveGlobalPreset, setTimingConfig, subsetLimits, timingConfig]
+  );
+
+  const handleResetTimings = useCallback(() => {
+    setTimingConfig({
+      ...timingConfig,
+      allowFastFlips: DEFAULT_TIMING_CONFIG.allowFastFlips,
+      delays: { ...DEFAULT_TIMING_CONFIG.delays },
+      subsetLimits: { ...DEFAULT_TIMING_CONFIG.subsetLimits },
+      pauseDelays: { ...DEFAULT_TIMING_CONFIG.pauseDelays },
+    });
+    setActiveGlobalPreset("normal");
+  }, [setActiveGlobalPreset, setTimingConfig, timingConfig]);
 
   const settleRoller = useCallback(
     async (
@@ -1541,7 +1807,10 @@ export function SingleCatPlusClient({
         if (spinState.spinny) {
           updateLayerRow("accessories", i, { status: "active", value: "—" });
 
-          const variationOptions = buildLayerOptionStrings(allAccessories, target, true, { spinny: true });
+          const variationOptions = buildLayerOptionStrings(allAccessories, target, true, {
+            spinny: true,
+            limit: subsetLimits.accessory ? SUBSET_LIMIT : undefined,
+          });
           if (!baseCanvas) {
             const basePreview = cloneParams(progressiveParams);
             basePreview.accessories = [];
@@ -1577,8 +1846,8 @@ export function SingleCatPlusClient({
           }
 
           const sequence = buildFlipSequence(frames);
-          const baseSpinState = readSpinState();
-          const stepDurations = computeStepDurations(sequence, baseSpinState.speed.targetSpinDuration);
+          const accessoryDelay = getDelayForKey(timingConfig, "accessory");
+          const stepDurations = computeStepDurations(sequence, accessoryDelay, timingConfig.allowFastFlips);
 
           for (let idx = 0; idx < sequence.length; idx += 1) {
             const step = sequence[idx];
@@ -1644,7 +1913,18 @@ export function SingleCatPlusClient({
       await wait(pauseDuration);
       clearMirror();
     },
-    [clearMirror, drawCanvas, playFlip, renderCat, settleRoller, updateLayerRow, updateParamRow, readSpinState]
+    [
+      clearMirror,
+      drawCanvas,
+      playFlip,
+      renderCat,
+      settleRoller,
+      subsetLimits,
+      timingConfig,
+      updateLayerRow,
+      updateParamRow,
+      readSpinState,
+    ]
   );
 
   const spinScarSlots = useCallback(
@@ -1703,7 +1983,10 @@ export function SingleCatPlusClient({
         if (spinState.spinny) {
           updateLayerRow("scars", i, { status: "active", value: "—" });
 
-          const variationOptions = buildLayerOptionStrings(allScars, target, true, { spinny: true });
+          const variationOptions = buildLayerOptionStrings(allScars, target, true, {
+            spinny: true,
+            limit: subsetLimits.scar ? SUBSET_LIMIT : undefined,
+          });
           if (!baseCanvas) {
             const basePreview = cloneParams(progressiveParams);
             basePreview.scars = [];
@@ -1739,8 +2022,8 @@ export function SingleCatPlusClient({
           }
 
           const sequence = buildFlipSequence(frames);
-          const baseSpinState = readSpinState();
-          const stepDurations = computeStepDurations(sequence, baseSpinState.speed.targetSpinDuration);
+          const scarDelay = getDelayForKey(timingConfig, "scar");
+          const stepDurations = computeStepDurations(sequence, scarDelay, timingConfig.allowFastFlips);
 
           for (let idx = 0; idx < sequence.length; idx += 1) {
             const step = sequence[idx];
@@ -1806,7 +2089,18 @@ export function SingleCatPlusClient({
       await wait(pauseDuration);
       clearMirror();
     },
-    [clearMirror, drawCanvas, playFlip, renderCat, settleRoller, updateLayerRow, updateParamRow, readSpinState]
+    [
+      clearMirror,
+      drawCanvas,
+      playFlip,
+      renderCat,
+      settleRoller,
+      subsetLimits,
+      timingConfig,
+      updateLayerRow,
+      updateParamRow,
+      readSpinState,
+    ]
   );
 
   const spinTortieSlots = useCallback(
@@ -1888,10 +2182,16 @@ export function SingleCatPlusClient({
             baseSpinState.speed.targetSpinDuration / Math.max(stageConfigs.length, 1);
 
           for (const stage of stageConfigs) {
+            const stageKey: ParamTimingKey =
+              stage.kind === "mask" ? "tortieMask" : stage.kind === "pattern" ? "tortiePattern" : "tortieColour";
+            const stageStart = typeof performance !== "undefined" ? performance.now() : Date.now();
             setRollerLabel(`Tortie Layer ${i + 1} – ${stage.label}`);
             const stageTargetValue =
               stage.kind === "mask" ? working.mask : stage.kind === "pattern" ? working.pattern : working.colour;
-            const options = buildLayerOptionStrings(stage.source, stageTargetValue, false, { spinny: true });
+            const options = buildLayerOptionStrings(stage.source, stageTargetValue, false, {
+              spinny: true,
+              limit: subsetLimits[stageKey] ? SUBSET_LIMIT : undefined,
+            });
             const descriptors: VariantDescriptor[] = options.map((option, variantIndex) => {
               const preview = cloneParams(progressiveParams);
               const candidateLayer: TortieSlot = {
@@ -1921,7 +2221,8 @@ export function SingleCatPlusClient({
             }
 
             const sequence = buildFlipSequence(frames);
-            const stageDurations = computeStepDurations(sequence, phaseTargetDuration);
+            const stageDelay = getDelayForKey(timingConfig, stageKey);
+            const stageDurations = computeStepDurations(sequence, stageDelay, timingConfig.allowFastFlips);
 
             for (let idx = 0; idx < sequence.length; idx += 1) {
               const step = sequence[idx];
@@ -1949,6 +2250,8 @@ export function SingleCatPlusClient({
             }
 
             await wait(pauseDuration);
+            const stageEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+            addActualDuration(stageKey, stageEnd - stageStart);
           }
 
           committed.push({ ...working });
@@ -1991,11 +2294,14 @@ export function SingleCatPlusClient({
       clearMirror();
     },
     [
+      addActualDuration,
       clearMirror,
       drawCanvas,
       playFlip,
       renderCat,
       settleRoller,
+      subsetLimits,
+      timingConfig,
       updateLayerRow,
       updateParamRow,
       readSpinState,
@@ -2028,6 +2334,9 @@ export function SingleCatPlusClient({
             includeBaseColours,
             extendedModesArray
           );
+          const counts = deriveOptionCounts(parameterOptionsRef.current);
+          optionCountsRef.current = counts;
+          setOptionCounts(counts);
         }
 
         if (!catStateRef.current) {
@@ -2060,6 +2369,9 @@ export function SingleCatPlusClient({
       );
       if (!cancelled) {
         parameterOptionsRef.current = options;
+        const counts = deriveOptionCounts(options);
+        optionCountsRef.current = counts;
+        setOptionCounts(counts);
       }
     })();
     return () => {
@@ -2104,6 +2416,9 @@ export function SingleCatPlusClient({
         includeBaseColours,
         extendedModesArray
       );
+      const counts = deriveOptionCounts(parameterOptionsRef.current);
+      optionCountsRef.current = counts;
+      setOptionCounts(counts);
     }
     return mapperRef.current;
   }, [includeBaseColours, extendedModesArray]);
@@ -2116,6 +2431,13 @@ export function SingleCatPlusClient({
       setRollerExpanded(false);
       return;
     }
+
+    resetActualDurations();
+    const timingProfile: SpinTimingConfig = {
+      allowFastFlips: timingConfig.allowFastFlips,
+      delays: { ...DEFAULT_TIMING_CONFIG.delays, ...timingConfig.delays },
+    };
+    activeTimingRef.current = timingProfile;
 
     setError(null);
     setShareLink(null);
@@ -2158,13 +2480,6 @@ export function SingleCatPlusClient({
         params.colour = PLACEHOLDER_COLOUR;
       }
 
-      const initialSprite = Number(params.spriteNumber ?? params.sprite ?? DEFAULT_SPRITE_NUMBER);
-      const normalizedSprite = Number.isFinite(initialSprite) && VALID_SPRITES.includes(initialSprite)
-        ? initialSprite
-        : DEFAULT_SPRITE_NUMBER;
-      params.spriteNumber = normalizedSprite;
-      params.sprite = normalizedSprite;
-
       // Re-run per-slot logic to mirror legacy behaviour.
       const accessoriesAll = invokeMapperArray(mapper, mapper.getAccessories).filter(
         (entry: string) => entry && entry !== "none"
@@ -2176,38 +2491,40 @@ export function SingleCatPlusClient({
       const tortiePeltsAll = invokeMapperArray(mapper, mapper.getPeltNames);
       const coloursAll = parameterOptionsRef.current?.colour ?? invokeMapperArray(mapper, mapper.getColours);
 
-      const accessorySlots: string[] = Array.from({ length: accessoryCount }, () => "none");
-      if (accessoriesAll.length > 0) {
-        for (let i = 0; i < accessoryCount; i += 1) {
-          if (Math.random() <= 0.5) {
-            accessorySlots[i] = randomFrom(accessoriesAll);
-          }
+      const accessorySlots: string[] = [];
+      for (let i = 0; i < accessoryCount; i += 1) {
+        const include = Math.random() <= 0.5;
+        if (include && accessoriesAll.length > 0) {
+          accessorySlots.push(randomFrom(accessoriesAll));
+        } else {
+          accessorySlots.push("none");
         }
       }
       params.accessories = accessorySlots.filter((entry) => entry && entry !== "none");
       params.accessory = (params.accessories as string[])[0];
 
-      const scarSlots: string[] = Array.from({ length: scarCount }, () => "none");
-      if (scarsAll.length > 0) {
-        for (let i = 0; i < scarCount; i += 1) {
-          if (Math.random() <= 0.5) {
-            scarSlots[i] = randomFrom(scarsAll);
-          }
+      const scarSlots: string[] = [];
+      for (let i = 0; i < scarCount; i += 1) {
+        const include = Math.random() <= 0.5;
+        if (include && scarsAll.length > 0) {
+          scarSlots.push(randomFrom(scarsAll));
+        } else {
+          scarSlots.push("none");
         }
       }
       params.scars = scarSlots.filter((entry) => entry && entry !== "none");
       params.scar = (params.scars as string[])[0];
 
-      const tortieSlots: (TortieSlot | null)[] = Array.from({ length: tortieCount }, () => null);
-      const tortieSourcesAvailable = tortieMasksAll.length > 0 && tortiePeltsAll.length > 0;
-      if (tortieSourcesAvailable) {
-        for (let i = 0; i < tortieCount; i += 1) {
-          if (Math.random() <= 0.5) {
-            const mask = randomFrom(tortieMasksAll);
-            const pattern = randomFrom(tortiePeltsAll);
-            const colour = coloursAll.length > 0 ? randomFrom(coloursAll) : "GINGER";
-            tortieSlots[i] = { mask, pattern, colour };
-          }
+      const tortieSlots: (TortieSlot | null)[] = [];
+      for (let i = 0; i < tortieCount; i += 1) {
+        const include = Math.random() <= 0.5;
+        if (include && tortieMasksAll.length > 0) {
+          const mask = randomFrom(tortieMasksAll);
+          const pattern = randomFrom(tortiePeltsAll);
+          const colour = coloursAll.length > 0 ? randomFrom(coloursAll) : "GINGER";
+          tortieSlots.push({ mask, pattern, colour });
+        } else {
+          tortieSlots.push(null);
         }
       }
       const tortieLayers = tortieSlots.filter(Boolean) as TortieSlot[];
@@ -2230,18 +2547,14 @@ export function SingleCatPlusClient({
       params.darkMode = enableDarkForest;
       params.dead = enableDead;
 
-      const actualAccessoryCount = accessorySlots.filter((entry) => entry && entry !== "none").length;
-      const actualScarCount = scarSlots.filter((entry) => entry && entry !== "none").length;
-      const actualTortieCount = tortieLayers.length;
-
       const countsResult: GenerationCounts = {
-        accessories: actualAccessoryCount,
-        scars: actualScarCount,
-        tortie: actualTortieCount,
+        accessories: accessoryCount,
+        scars: scarCount,
+        tortie: tortieCount,
       };
 
       setRollSummary(
-        `Rolled → Accessories: ${actualAccessoryCount} • Scars: ${actualScarCount} • Tortie layers: ${actualTortieCount}`
+        `Rolled → Accessories: ${accessoryCount} • Scars: ${scarCount} • Tortie layers: ${tortieCount}`
       );
       setHasTint(Boolean(enableDarkForest || enableDead));
       setSpriteGalleryOpen(false);
@@ -2282,11 +2595,15 @@ export function SingleCatPlusClient({
       setParamRows([]);
 
       for (const definition of PARAM_SEQUENCE) {
-        if (definition.id === "tortieMask" || definition.id === "tortiePattern" || definition.id === "tortieColour") {
-          continue;
-        }
-        if (generationIdRef.current !== token) return;
-        if (definition.requiresTortie && !params.isTortie) continue;
+      if (definition.id === "tortieMask" || definition.id === "tortiePattern" || definition.id === "tortieColour") {
+        continue;
+      }
+      if (generationIdRef.current !== token) return;
+      if (definition.requiresTortie && !params.isTortie) continue;
+
+      const paramKeyCandidate = definition.id;
+      const paramKey = isParamTimingKey(paramKeyCandidate) ? paramKeyCandidate : null;
+      const paramStart = typeof performance !== "undefined" ? performance.now() : Date.now();
 
         const rawTargetValue = getParameterRawValue(definition.id, params);
         const displayValue = getParameterValueForDisplay(definition.id, params);
@@ -2318,38 +2635,44 @@ export function SingleCatPlusClient({
         const isTortieToggle = definition.id === "tortie";
         const shouldAnimate = spinState.spinny && !!rollerOptions && !isInstantParam && !isTortieToggle;
 
-        if (definition.id === "accessory") {
-          await spinAccessorySlots(
-            rowIndex,
-            accessorySlots,
-            contextForApply,
-            progressiveParams,
-            mapper,
-            pauseDuration,
-            token
-          );
-          if (rowIndex >= 0) {
-            setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
-          }
-          clearMirror();
-          continue;
+      if (definition.id === "accessory") {
+        const accessoryStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+        await spinAccessorySlots(
+          rowIndex,
+          accessorySlots,
+          contextForApply,
+          progressiveParams,
+          mapper,
+          pauseDuration,
+          token
+        );
+        const accessoryEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+        addActualDuration("accessory", accessoryEnd - accessoryStart);
+        if (rowIndex >= 0) {
+          setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
         }
+        clearMirror();
+        continue;
+      }
 
-        if (definition.id === "scar") {
-          await spinScarSlots(
-            rowIndex,
-            scarSlots,
-            contextForApply,
-            progressiveParams,
-            mapper,
-            pauseDuration,
-            token
-          );
-          if (rowIndex >= 0) {
-            setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
-          }
-          clearMirror();
-          continue;
+      if (definition.id === "scar") {
+        const scarStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+        await spinScarSlots(
+          rowIndex,
+          scarSlots,
+          contextForApply,
+          progressiveParams,
+          mapper,
+          pauseDuration,
+          token
+        );
+        const scarEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+        addActualDuration("scar", scarEnd - scarStart);
+        if (rowIndex >= 0) {
+          setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+        }
+        clearMirror();
+        continue;
         }
 
         if (shouldAnimate) {
@@ -2358,12 +2681,13 @@ export function SingleCatPlusClient({
           setRollerActiveValue("—");
           await wait(Math.max(getBaseFrameDuration(currentSpeedSetting) * 0.25, PRE_SPIN_DELAY));
 
+          const subsetEnabled = paramKey ? Boolean(subsetLimits[paramKey]) : false;
           const variationOptions = sampleValues(
             rollerOptions,
             definition.id,
             rawTargetValue,
             displayValue,
-            MAX_SPINNY_VARIATIONS
+            subsetEnabled ? SUBSET_LIMIT : MAX_SPINNY_VARIATIONS
           );
 
           const frames = await preRenderVariationFrames(
@@ -2374,8 +2698,8 @@ export function SingleCatPlusClient({
             contextForApply
           );
           const sequence = buildFlipSequence(frames);
-          const baseSpinState = readSpinState();
-          const stepDurations = computeStepDurations(sequence, baseSpinState.speed.targetSpinDuration);
+          const configuredDelay = paramKey ? getDelayForKey(timingConfig, paramKey) : MIN_SAFE_STEP_MS;
+          const stepDurations = computeStepDurations(sequence, configuredDelay, timingConfig.allowFastFlips);
 
           for (let idx = 0; idx < sequence.length; idx += 1) {
             const step = sequence[idx];
@@ -2449,6 +2773,8 @@ export function SingleCatPlusClient({
         }
 
         await wait(pauseDuration);
+        const paramEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+        addActualDuration(paramKey, paramEnd - paramStart);
       }
 
       setActiveParamId(null);
@@ -2466,8 +2792,8 @@ export function SingleCatPlusClient({
         scar: builderPrimaryScar,
         tortie: builderPrimaryTortie,
       });
-      builderParams.spriteNumber = normalizedSprite;
-      builderParams.sprite = normalizedSprite;
+      builderParams.spriteNumber = DEFAULT_SPRITE_NUMBER;
+      builderParams.sprite = DEFAULT_SPRITE_NUMBER;
 
       const catUrl = generator.buildCatURL(builderParams);
 
@@ -2515,6 +2841,22 @@ export function SingleCatPlusClient({
       setShareLink(null);
       setMetaSaving(false);
 
+      logTimingReport(
+        "post-roll",
+        activeTimingRef.current,
+        adjustedOptionCounts,
+        estimatedTotals,
+        actualDurationsRef.current,
+        totalActualRef.current
+      );
+      setLastTimingSnapshot({
+        counts: { ...adjustedOptionCounts },
+        estimated: { ...estimatedTotals.perKey },
+        estimatedTotal: estimatedTotals.total,
+        actual: { ...actualDurationsRef.current },
+        actualTotal: totalActualRef.current,
+        timestamp: typeof performance !== "undefined" ? performance.now() : Date.now(),
+      });
       setIsGenerating(false);
       window.setTimeout(() => {
         if (generationIdRef.current === token) {
@@ -2631,6 +2973,13 @@ export function SingleCatPlusClient({
     readSpinState,
     createMapper,
     resetMetaDrafts,
+    timingConfig,
+    subsetLimits,
+    resetActualDurations,
+    addActualDuration,
+    estimatedTotals,
+    adjustedOptionCounts,
+    setLastTimingSnapshot,
   ]);
 
   
@@ -3191,31 +3540,18 @@ export function SingleCatPlusClient({
                   </button>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Spin Duration</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={spinDurationSeconds}
-                      onChange={(event) => handleDurationChange(Number(event.currentTarget.value))}
-                      className="w-24 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-                    />
-                    <span className="text-xs uppercase tracking-wide text-muted-foreground/70">seconds</span>
-                    {PRESET_DURATIONS.map((seconds) => (
-                      <button
-                        key={`duration-preset-${seconds}`}
-                        type="button"
-                        onClick={() => handleDurationChange(seconds)}
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                          spinDurationSeconds === seconds
-                            ? "border-primary/60 bg-primary/15 text-foreground"
-                            : "border-border/60 bg-background/70"
-                        }`}
-                      >
-                        {seconds}s
-                      </button>
-                    ))}
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Timing</p>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTimingModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-full border border-border/60 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
+                    >
+                      Adjust Timing Settings
+                    </button>
+                    <span className="text-xs text-muted-foreground/70">
+                      Estimated total: {formatMs(effectiveTotalMs)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -3393,6 +3729,197 @@ export function SingleCatPlusClient({
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {timingModalOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 py-10"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setTimingModalOpen(false);
+            }
+          }}
+        >
+          <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setTimingModalOpen(false)}
+              className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
+              aria-label="Close timing settings"
+            >
+              <X className="size-4" />
+            </button>
+            <div className="max-h-[80vh] overflow-y-auto px-6 pb-8 pt-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">Spin Timing</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Tune per-parameter delays for flashy rolls. Estimated totals update instantly; actuals are logged after each roll.
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-2 text-xs text-muted-foreground/80">
+                  <span className="rounded-full border border-border/50 bg-background/80 px-3 py-1 font-mono text-foreground">
+                    Estimated total: {formatMs(estimatedTotals.total)}
+                  </span>
+                  {lastTimingSnapshot && (
+                    <span className="rounded-full border border-border/50 bg-background/80 px-3 py-1 font-mono text-muted-foreground">
+                      Last roll: {formatMs(lastTimingSnapshot.actualTotal)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                {GLOBAL_PRESETS.map((preset) => {
+                  const label = preset === "slow" ? "Slow" : preset === "fast" ? "Fast" : "Normal";
+                  const active = activeGlobalPreset === preset;
+                  return (
+                    <button
+                      key={`preset-${preset}`}
+                      type="button"
+                      onClick={() => handleGlobalPreset(preset)}
+                      className={cn(
+                        "rounded-full border px-4 py-1.5 text-xs font-semibold transition",
+                        active
+                          ? "border-primary/60 bg-primary/20 text-foreground"
+                          : "border-border/60 bg-background/70 text-muted-foreground"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={handleResetTimings}
+                  className="ml-auto rounded-full border border-border/60 bg-background/70 px-4 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
+                >
+                  Reset to Default
+                </button>
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground/80">
+                  <span>Flashy pause</span>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={1}
+                      max={10}
+                      step={0.1}
+                      value={flashyPauseSeconds}
+                      onChange={(event) => handlePauseChange("flashyMs", Number.parseFloat(event.target.value))}
+                      className="h-2 flex-1 rounded-full bg-border/60 accent-primary"
+                    />
+                    <span className="w-12 text-right font-mono text-sm text-foreground">
+                      {flashyPauseSeconds.toFixed(1)} s
+                    </span>
+                  </div>
+                </label>
+                <label className="flex flex-col gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground/80">
+                  <span>Calm pause</span>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min={1}
+                      max={10}
+                      step={0.1}
+                      value={calmPauseSeconds}
+                      onChange={(event) => handlePauseChange("calmMs", Number.parseFloat(event.target.value))}
+                      className="h-2 flex-1 rounded-full bg-border/60 accent-primary"
+                    />
+                    <span className="w-12 text-right font-mono text-sm text-foreground">
+                      {calmPauseSeconds.toFixed(1)} s
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="mt-4 grid gap-2 text-xs text-muted-foreground/80 sm:grid-cols-2">
+                <span className="rounded-xl border border-border/40 bg-background/70 px-3 py-2">
+                  Flashy pause: <strong className="ml-1 font-mono text-foreground">{formatMs(flashyPauseMs)}</strong>
+                </span>
+                <span className="rounded-xl border border-border/40 bg-background/70 px-3 py-2">
+                  Calm pause: <strong className="ml-1 font-mono text-foreground">{formatMs(calmPauseMs)}</strong>
+                </span>
+              </div>
+
+              <div className="mt-6 overflow-hidden rounded-2xl border border-border/40">
+                <div className="grid grid-cols-[minmax(0,1.6fr)_100px_80px_110px_110px] gap-3 border-b border-border/40 bg-background/70 px-4 py-3 text-[0.65rem] uppercase tracking-wide text-muted-foreground/70">
+                  <span>Parameter</span>
+                  <span className="text-right">Delay (ms)</span>
+                  <span className="text-right">Options</span>
+                  <span className="text-right">Estimated</span>
+                  <span className="text-right">Last Actual</span>
+                </div>
+                {PARAM_TIMING_ORDER.map((key) => {
+                  const label = PARAM_TIMING_LABELS[key] ?? key;
+                  const storedDelay = timingConfig.delays[key];
+                  const delayInputValue = Number.isFinite(storedDelay)
+                    ? (storedDelay as number)
+                    : getPresetValues(key).normal;
+                  const rawOptions = optionCounts[key] ?? PARAM_DEFAULT_STEP_COUNTS[key] ?? 0;
+                  const subsetEligible = rawOptions > SUBSET_LIMIT;
+                  const subsetEnabled = Boolean(subsetLimits[key]);
+                  const effectiveOptions = adjustedOptionCounts[key] ?? rawOptions;
+                  const delayForEstimate = delayInputValue;
+                  const estimatedDuration = estimatedTotals.perKey[key] ?? delayForEstimate * effectiveOptions;
+                  const actualDuration = lastTimingSnapshot?.actual?.[key] ?? 0;
+                  const hasActual = actualDuration > 0;
+                  return (
+                    <div
+                      key={`timing-row-${key}`}
+                      className="grid grid-cols-[minmax(0,1.6fr)_100px_80px_110px_110px] items-center gap-3 border-b border-border/30 px-4 py-3 last:border-b-0"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground">{label}</p>
+                        {subsetEligible ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleSubsetLimit(key)}
+                            className={cn(
+                              "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition",
+                              subsetEnabled
+                                ? "border-primary/60 bg-primary/20 text-foreground"
+                                : "border-border/60 bg-background/70 text-muted-foreground"
+                            )}
+                          >
+                            {subsetEnabled ? "Subset 20" : "All"}
+                          </button>
+                        ) : null}
+                      </div>
+                      <div className="text-right">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          value={delayInputValue}
+                          onChange={(event) => {
+                            const next = Number.parseFloat(event.target.value);
+                            if (Number.isFinite(next)) {
+                              handleTimingStepChange(key, next);
+                            }
+                          }}
+                          className="w-full rounded-lg border border-border/50 bg-background/80 px-2 py-1 text-right font-mono text-xs text-foreground focus:border-primary focus:outline-none"
+                        />
+                      </div>
+                      <div className="text-right font-mono text-sm text-foreground">
+                        {subsetEnabled && subsetEligible ? `${effectiveOptions}/${rawOptions}` : effectiveOptions}
+                      </div>
+                      <div className="text-right font-mono text-sm text-muted-foreground">{formatMs(estimatedDuration)}</div>
+                      <div className="text-right font-mono text-sm text-muted-foreground">
+                        {hasActual ? formatMs(actualDuration) : "—"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="mt-4 text-xs text-muted-foreground/70">
+                Minimum delay is {MIN_SAFE_STEP_MS}ms. Console logs include a full breakdown after each roll.
+              </p>
             </div>
           </div>
         </div>
