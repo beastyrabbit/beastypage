@@ -2377,7 +2377,14 @@ export function SingleCatPlusClient({
         }
 
         if (spinState.spinny) {
-          let working: TortieSlot = { ...target };
+          // Pick a random starting colour that isn't the target, so we get a spin.
+          const availableColours = colours.filter((c) => c !== target.colour);
+          const startColour =
+            availableColours.length > 0
+              ? availableColours[Math.floor(Math.random() * availableColours.length)]
+              : target.colour;
+
+          let working: TortieSlot = { ...target, colour: startColour };
           updateLayerRow("torties", i, { value: "—", status: "active" });
 
           const stageConfigs: Array<{ kind: "mask" | "pattern" | "colour"; label: string; source: string[] }> = [
@@ -2396,7 +2403,11 @@ export function SingleCatPlusClient({
             const stageStart = typeof performance !== "undefined" ? performance.now() : Date.now();
             setRollerLabel(`Tortie Layer ${i + 1} – ${stage.label}`);
             const stageTargetValue =
-              stage.kind === "mask" ? working.mask : stage.kind === "pattern" ? working.pattern : working.colour;
+              stage.kind === "mask"
+                ? working.mask
+                : stage.kind === "pattern"
+                  ? working.pattern
+                  : target.colour;
             const options = buildLayerOptionStrings(stage.source, stageTargetValue, false, {
               spinny: true,
               limit: subsetLimits[stageKey] ? SUBSET_LIMIT : undefined,
