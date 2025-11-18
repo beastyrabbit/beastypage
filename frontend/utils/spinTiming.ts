@@ -122,22 +122,22 @@ export interface TimingPresetSet {
 }
 
 export const PARAM_TIMING_PRESETS: Record<ParamTimingKey, TimingPresetSet> = {
-  colour: { slow: 220, normal: 180, fast: 150 },
-  pelt: { slow: 220, normal: 180, fast: 150 },
-  eyeColour: { slow: 200, normal: 160, fast: 130 },
-  eyeColour2: { slow: 200, normal: 160, fast: 130 },
-  tint: { slow: 210, normal: 170, fast: 140 },
-  skinColour: { slow: 210, normal: 170, fast: 140 },
-  whitePatches: { slow: 230, normal: 190, fast: 150 },
-  points: { slow: 210, normal: 170, fast: 140 },
-  whitePatchesTint: { slow: 200, normal: 160, fast: 130 },
-  vitiligo: { slow: 210, normal: 170, fast: 140 },
-  accessory: { slow: 240, normal: 190, fast: 150 },
-  scar: { slow: 240, normal: 190, fast: 150 },
-  tortieMask: { slow: 260, normal: 210, fast: 170 },
-  tortiePattern: { slow: 260, normal: 210, fast: 170 },
-  tortieColour: { slow: 260, normal: 210, fast: 170 },
-  sprite: { slow: 230, normal: 190, fast: 150 },
+  colour: { slow: 360, normal: 180, fast: 150 },
+  pelt: { slow: 360, normal: 180, fast: 150 },
+  eyeColour: { slow: 320, normal: 160, fast: 130 },
+  eyeColour2: { slow: 320, normal: 160, fast: 130 },
+  tint: { slow: 340, normal: 170, fast: 140 },
+  skinColour: { slow: 340, normal: 170, fast: 140 },
+  whitePatches: { slow: 380, normal: 190, fast: 150 },
+  points: { slow: 340, normal: 170, fast: 140 },
+  whitePatchesTint: { slow: 320, normal: 160, fast: 130 },
+  vitiligo: { slow: 340, normal: 170, fast: 140 },
+  accessory: { slow: 380, normal: 190, fast: 150 },
+  scar: { slow: 380, normal: 190, fast: 150 },
+  tortieMask: { slow: 420, normal: 210, fast: 170 },
+  tortiePattern: { slow: 420, normal: 210, fast: 170 },
+  tortieColour: { slow: 420, normal: 210, fast: 170 },
+  sprite: { slow: 380, normal: 190, fast: 150 },
 };
 
 const STORAGE_KEY = "singleCatPlus.paramTiming";

@@ -1060,7 +1060,7 @@ function LayerRangeSelector({ label, value, onChange }: LayerRangeSliderProps) {
     selectedValue: number,
     clickHandler: (next: number) => void
   ) => (
-      <div className="flex items-center gap-2" role="radiogroup" aria-label={`${label} ${type}`}>
+    <div className="flex items-center gap-2" role="radiogroup" aria-label={`${label} ${type}`}>
       <span className="w-10 text-[10px] uppercase tracking-wide text-muted-foreground/70">
         {type === "min" ? "Min" : "Max"}
       </span>
@@ -1148,8 +1148,8 @@ function sanitizeForBuilder(
   const accessoryValue = overrides?.accessory ?? (Array.isArray(next.accessories) && next.accessories.length > 0
     ? (next.accessories[0] as string)
     : typeof next.accessory === "string"
-    ? (next.accessory as string)
-    : null);
+      ? (next.accessory as string)
+      : null);
 
   if (accessoryValue) {
     next.accessory = accessoryValue;
@@ -1162,8 +1162,8 @@ function sanitizeForBuilder(
   const scarValue = overrides?.scar ?? (Array.isArray(next.scars) && next.scars.length > 0
     ? (next.scars[0] as string)
     : typeof next.scar === "string"
-    ? (next.scar as string)
-    : null);
+      ? (next.scar as string)
+      : null);
 
   if (scarValue) {
     next.scar = scarValue;
@@ -1408,6 +1408,8 @@ export function SingleCatPlusClient({
   const [timingConfig, setTimingConfig] = usePersistentTimingConfig();
   const [timingModalOpen, setTimingModalOpen] = useState(false);
   const [lastTimingSnapshot, setLastTimingSnapshot] = useState<TimingSnapshot | null>(null);
+  const [speedMultiplier, setSpeedMultiplier] = useState(1.0);
+  const speedMultiplierRef = useRef(1.0);
   const subsetLimits = useMemo(
     () => timingConfig.subsetLimits ?? (DEFAULT_TIMING_CONFIG.subsetLimits ?? {}),
     [timingConfig.subsetLimits]
@@ -1419,6 +1421,24 @@ export function SingleCatPlusClient({
   const flashyPauseSeconds = flashyPauseMs / 1000;
   const calmPauseSeconds = calmPauseMs / 1000;
   const activeTimingRef = useRef<SpinTimingConfig>(DEFAULT_TIMING_CONFIG);
+  const timingConfigRef = useRef<SpinTimingConfig>(timingConfig);
+  
+  // Sync activeTimingRef and timingConfigRef when timingConfig changes for live updates
+  useEffect(() => {
+    const timingProfile: SpinTimingConfig = {
+      allowFastFlips: timingConfig.allowFastFlips,
+      delays: { ...DEFAULT_TIMING_CONFIG.delays, ...timingConfig.delays },
+      subsetLimits: timingConfig.subsetLimits,
+      pauseDelays: timingConfig.pauseDelays,
+    };
+    activeTimingRef.current = timingProfile;
+    timingConfigRef.current = timingConfig;
+  }, [timingConfig]);
+  
+  // Sync speedMultiplierRef when speedMultiplier changes
+  useEffect(() => {
+    speedMultiplierRef.current = speedMultiplier;
+  }, [speedMultiplier]);
   const optionCountsRef = useRef<Record<ParamTimingKey, number>>(Object.fromEntries(
     PARAM_TIMING_ORDER.map((key) => [key, PARAM_DEFAULT_STEP_COUNTS[key] ?? 0])
   ) as Record<ParamTimingKey, number>);
@@ -1429,6 +1449,14 @@ export function SingleCatPlusClient({
   useEffect(() => {
     optionCountsRef.current = optionCounts;
   }, [optionCounts]);
+  
+  // Helper function to get delay with speed multiplier applied
+  // Uses refs to always get the latest timing config and speed multiplier
+  const getDelayWithMultiplier = useCallback((key: ParamTimingKey): number => {
+    const config = timingConfigRef.current;
+    const baseDelay = getDelayForKey(config, key);
+    return Math.max(MIN_SAFE_STEP_MS, baseDelay / speedMultiplierRef.current);
+  }, []);
 
   const resetActualDurations = useCallback(() => {
     actualDurationsRef.current = {};
@@ -1535,19 +1563,22 @@ export function SingleCatPlusClient({
   const readSpinState = useCallback(() => {
     const durationMs = Math.max(1000, effectiveTotalMs);
     const baseSpeed = getSpeedSettings(durationMs);
+    const currentConfig = timingConfigRef.current;
+    const currentFlashyPause = currentConfig.pauseDelays?.flashyMs ?? defaultFlashyPauseMs;
+    const currentCalmPause = currentConfig.pauseDelays?.calmMs ?? defaultCalmPauseMs;
     return {
       mode: modeRef.current,
       spinny: modeRef.current === "flashy",
       speed: {
         ...baseSpeed,
-        paramPause: flashyPauseMs,
-        calmParamPause: calmPauseMs,
+        paramPause: currentFlashyPause,
+        calmParamPause: currentCalmPause,
       },
     };
-  }, [calmPauseMs, effectiveTotalMs, flashyPauseMs]);
+  }, [defaultCalmPauseMs, defaultFlashyPauseMs, effectiveTotalMs]);
 
 
-  const clearMirror = useCallback(() => {}, []);
+  const clearMirror = useCallback(() => { }, []);
 
   const detectGlobalPreset = useCallback(() => {
     for (const presetKey of GLOBAL_PRESETS) {
@@ -2055,12 +2086,17 @@ export function SingleCatPlusClient({
           }
 
           const sequence = buildFlipSequence(frames);
-          const accessoryDelay = getDelayForKey(timingConfig, "accessory");
-          const stepDurations = computeStepDurations(sequence, accessoryDelay, timingConfig.allowFastFlips);
 
           for (let idx = 0; idx < sequence.length; idx += 1) {
             const step = sequence[idx];
             if (generationIdRef.current !== currentToken) return;
+            
+            // Recalculate delay on each step to get live updates
+            const accessoryDelay = getDelayWithMultiplier("accessory");
+            const currentConfig = timingConfigRef.current;
+            const stepDurations = computeStepDurations(sequence.slice(idx), accessoryDelay, currentConfig.allowFastFlips);
+            const stepDuration = stepDurations[0] ?? accessoryDelay;
+            
             const frameDisplay = step.frame.option.display;
             setRollerActiveValue(frameDisplay);
             updateLayerRow("accessories", i, {
@@ -2070,7 +2106,7 @@ export function SingleCatPlusClient({
 
             const drawStep = () => drawCanvas(step.frame.canvas);
             const stepState = readSpinState();
-            await playFlip(drawStep, stepDurations[idx]);
+            await playFlip(drawStep, stepDuration);
             if (!stepState.spinny) {
               break;
             }
@@ -2125,6 +2161,7 @@ export function SingleCatPlusClient({
     [
       clearMirror,
       drawCanvas,
+      getDelayWithMultiplier,
       playFlip,
       renderCat,
       settleRoller,
@@ -2231,12 +2268,17 @@ export function SingleCatPlusClient({
           }
 
           const sequence = buildFlipSequence(frames);
-          const scarDelay = getDelayForKey(timingConfig, "scar");
-          const stepDurations = computeStepDurations(sequence, scarDelay, timingConfig.allowFastFlips);
 
           for (let idx = 0; idx < sequence.length; idx += 1) {
             const step = sequence[idx];
             if (generationIdRef.current !== currentToken) return;
+            
+            // Recalculate delay on each step to get live updates
+            const scarDelay = getDelayWithMultiplier("scar");
+            const currentConfig = timingConfigRef.current;
+            const stepDurations = computeStepDurations(sequence.slice(idx), scarDelay, currentConfig.allowFastFlips);
+            const stepDuration = stepDurations[0] ?? scarDelay;
+            
             const frameDisplay = step.frame.option.display;
             setRollerActiveValue(frameDisplay);
             updateLayerRow("scars", i, {
@@ -2246,7 +2288,7 @@ export function SingleCatPlusClient({
 
             const drawStep = () => drawCanvas(step.frame.canvas);
             const stepState = readSpinState();
-            await playFlip(drawStep, stepDurations[idx]);
+            await playFlip(drawStep, stepDuration);
             if (!stepState.spinny) {
               break;
             }
@@ -2301,6 +2343,7 @@ export function SingleCatPlusClient({
     [
       clearMirror,
       drawCanvas,
+      getDelayWithMultiplier,
       playFlip,
       renderCat,
       settleRoller,
@@ -2384,6 +2427,13 @@ export function SingleCatPlusClient({
               ? availableColours[Math.floor(Math.random() * availableColours.length)]
               : target.colour;
 
+          // Pick a different random colour for mask/pattern stages (not the final colour)
+          const maskPatternColours = colours.filter((c) => c !== target.colour);
+          const maskPatternColour =
+            maskPatternColours.length > 0
+              ? maskPatternColours[Math.floor(Math.random() * maskPatternColours.length)]
+              : target.colour;
+
           let working: TortieSlot = { ...target, colour: startColour };
           updateLayerRow("torties", i, { value: "—", status: "active" });
 
@@ -2417,7 +2467,7 @@ export function SingleCatPlusClient({
               const candidateLayer: TortieSlot = {
                 mask: stage.kind === "mask" ? (option.raw as string) : working.mask,
                 pattern: stage.kind === "pattern" ? (option.raw as string) : working.pattern,
-                colour: stage.kind === "colour" ? (option.raw as string) : working.colour,
+                colour: stage.kind === "colour" ? (option.raw as string) : (stage.kind === "mask" || stage.kind === "pattern" ? maskPatternColour : working.colour),
               };
               const tortieList = committed.map((layer) => ({ ...layer }));
               tortieList.push(candidateLayer);
@@ -2441,20 +2491,25 @@ export function SingleCatPlusClient({
             }
 
             const sequence = buildFlipSequence(frames);
-            const stageDelay = getDelayForKey(timingConfig, stageKey);
-            const stageDurations = computeStepDurations(sequence, stageDelay, timingConfig.allowFastFlips);
 
             for (let idx = 0; idx < sequence.length; idx += 1) {
               const step = sequence[idx];
               if (generationIdRef.current !== currentToken) return;
+              
+              // Recalculate delay on each step to get live updates
+              const stageDelay = getDelayWithMultiplier(stageKey);
+              const currentConfig = timingConfigRef.current;
+              const stageDurations = computeStepDurations(sequence.slice(idx), stageDelay, currentConfig.allowFastFlips);
+              const stepDuration = stageDurations[0] ?? stageDelay;
+              
               const candidateLayer: TortieSlot = {
                 mask: stage.kind === "mask" ? (step.frame.option.raw as string) : working.mask,
                 pattern: stage.kind === "pattern" ? (step.frame.option.raw as string) : working.pattern,
-                colour: stage.kind === "colour" ? (step.frame.option.raw as string) : working.colour,
+                colour: stage.kind === "colour" ? (step.frame.option.raw as string) : (stage.kind === "mask" || stage.kind === "pattern" ? maskPatternColour : working.colour),
               };
 
               const drawStep = () => drawCanvas(step.frame.canvas);
-              await playFlip(drawStep, stageDurations[idx]);
+              await playFlip(drawStep, stepDuration);
               setRollerActiveValue(formatTortieLayer(candidateLayer));
               updateLayerRow("torties", i, {
                 value: formatTortieLayer(candidateLayer),
@@ -2815,15 +2870,15 @@ export function SingleCatPlusClient({
       setParamRows([]);
 
       for (const definition of PARAM_SEQUENCE) {
-      if (definition.id === "tortieMask" || definition.id === "tortiePattern" || definition.id === "tortieColour") {
-        continue;
-      }
-      if (generationIdRef.current !== token) return;
-      if (definition.requiresTortie && !params.isTortie) continue;
+        if (definition.id === "tortieMask" || definition.id === "tortiePattern" || definition.id === "tortieColour") {
+          continue;
+        }
+        if (generationIdRef.current !== token) return;
+        if (definition.requiresTortie && !params.isTortie) continue;
 
-      const paramKeyCandidate = definition.id;
-      const paramKey = isParamTimingKey(paramKeyCandidate) ? paramKeyCandidate : null;
-      const paramStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const paramKeyCandidate = definition.id;
+        const paramKey = isParamTimingKey(paramKeyCandidate) ? paramKeyCandidate : null;
+        const paramStart = typeof performance !== "undefined" ? performance.now() : Date.now();
 
         const rawTargetValue = getParameterRawValue(definition.id, params);
         const displayValue = getParameterValueForDisplay(definition.id, params);
@@ -2845,54 +2900,55 @@ export function SingleCatPlusClient({
 
         const spinState = readSpinState();
         const currentSpeedSetting = spinState.speed;
+        const basePause = modeRef.current === "calm"
+          ? currentSpeedSetting.calmParamPause
+          : currentSpeedSetting.paramPause;
         const pauseDuration = Math.max(
           PARAM_REVEAL_PAUSE,
-          modeRef.current === "calm"
-            ? currentSpeedSetting.calmParamPause
-            : currentSpeedSetting.paramPause
+          basePause / speedMultiplierRef.current
         );
         const isInstantParam = INSTANT_PARAMS.includes(definition.id);
         const isTortieToggle = definition.id === "tortie";
         const shouldAnimate = spinState.spinny && !!rollerOptions && !isInstantParam && !isTortieToggle;
 
-      if (definition.id === "accessory") {
-        const accessoryStart = typeof performance !== "undefined" ? performance.now() : Date.now();
-        await spinAccessorySlots(
-          rowIndex,
-          accessorySlots,
-          contextForApply,
-          progressiveParams,
-          mapper,
-          pauseDuration,
-          token
-        );
-        const accessoryEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
-        addActualDuration("accessory", accessoryEnd - accessoryStart);
-        if (rowIndex >= 0) {
-          setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+        if (definition.id === "accessory") {
+          const accessoryStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+          await spinAccessorySlots(
+            rowIndex,
+            accessorySlots,
+            contextForApply,
+            progressiveParams,
+            mapper,
+            pauseDuration,
+            token
+          );
+          const accessoryEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+          addActualDuration("accessory", accessoryEnd - accessoryStart);
+          if (rowIndex >= 0) {
+            setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+          }
+          clearMirror();
+          continue;
         }
-        clearMirror();
-        continue;
-      }
 
-      if (definition.id === "scar") {
-        const scarStart = typeof performance !== "undefined" ? performance.now() : Date.now();
-        await spinScarSlots(
-          rowIndex,
-          scarSlots,
-          contextForApply,
-          progressiveParams,
-          mapper,
-          pauseDuration,
-          token
-        );
-        const scarEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
-        addActualDuration("scar", scarEnd - scarStart);
-        if (rowIndex >= 0) {
-          setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
-        }
-        clearMirror();
-        continue;
+        if (definition.id === "scar") {
+          const scarStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+          await spinScarSlots(
+            rowIndex,
+            scarSlots,
+            contextForApply,
+            progressiveParams,
+            mapper,
+            pauseDuration,
+            token
+          );
+          const scarEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+          addActualDuration("scar", scarEnd - scarStart);
+          if (rowIndex >= 0) {
+            setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+          }
+          clearMirror();
+          continue;
         }
 
         if (shouldAnimate) {
@@ -2918,22 +2974,27 @@ export function SingleCatPlusClient({
             contextForApply
           );
           const sequence = buildFlipSequence(frames);
-          const configuredDelay = paramKey ? getDelayForKey(timingConfig, paramKey) : MIN_SAFE_STEP_MS;
-          const stepDurations = computeStepDurations(sequence, configuredDelay, timingConfig.allowFastFlips);
 
           for (let idx = 0; idx < sequence.length; idx += 1) {
             const step = sequence[idx];
             if (generationIdRef.current !== token) return;
+            
+            // Recalculate delay on each step to get live updates
+            const currentConfig = timingConfigRef.current;
+            const configuredDelay = paramKey ? getDelayWithMultiplier(paramKey) : MIN_SAFE_STEP_MS;
+            const stepDurations = computeStepDurations(sequence.slice(idx), configuredDelay, currentConfig.allowFastFlips);
+            const stepDuration = stepDurations[0] ?? configuredDelay;
+            
             const frameDisplay = step.frame.option.display;
             setRollerActiveValue(frameDisplay);
             setParamRows((prev) =>
               prev.map((row) =>
                 row.id === definition.id
                   ? {
-                      ...row,
-                      value: step.isFinal ? frameDisplay : row.value,
-                      status: step.isFinal ? "revealed" : "active",
-                    }
+                    ...row,
+                    value: step.isFinal ? frameDisplay : row.value,
+                    status: step.isFinal ? "revealed" : "active",
+                  }
                   : row
               )
             );
@@ -2941,7 +3002,7 @@ export function SingleCatPlusClient({
               drawCanvas(step.frame.canvas);
             };
             const stepState = readSpinState();
-            await playFlip(drawStep, stepDurations[idx]);
+            await playFlip(drawStep, stepDuration);
             if (!stepState.spinny) {
               break;
             }
@@ -3202,7 +3263,7 @@ export function SingleCatPlusClient({
     setLastTimingSnapshot,
   ]);
 
-  
+
 
   const handleDownload = useCallback(() => {
     const canvas = canvasRef.current;
@@ -3418,7 +3479,7 @@ export function SingleCatPlusClient({
           profileId: result.id ?? catStateRef.current.profileId,
           mapperSlug: ((result as { shareToken?: string }).shareToken ?? result.slug ?? result.id) ?? catStateRef.current.mapperSlug,
         };
-          resetMetaDrafts(result.catName, result.creatorName);
+        resetMetaDrafts(result.catName, result.creatorName);
       } else {
         resetMetaDrafts(trimmedCat || null, trimmedCreator || null);
       }
@@ -3592,11 +3653,10 @@ export function SingleCatPlusClient({
                 {paramRows.map((row) => (
                   <div
                     key={row.id}
-                    className={`flex items-center justify-between rounded-xl border border-border/30 px-3 py-2 text-sm transition ${
-                      row.status === "active" || activeParamId === row.id
+                    className={`flex items-center justify-between rounded-xl border border-border/30 px-3 py-2 text-sm transition ${row.status === "active" || activeParamId === row.id
                         ? "bg-primary/10 text-foreground"
                         : "bg-background/70 text-muted-foreground"
-                    }`}
+                      }`}
                   >
                     <span className="font-medium text-foreground/90">{row.label}</span>
                     <span className="font-mono text-xs uppercase tracking-wide text-foreground">
@@ -3627,8 +3687,8 @@ export function SingleCatPlusClient({
                                 row.status === "active"
                                   ? "border-primary/60 bg-primary/10 text-primary"
                                   : row.status === "revealed"
-                                  ? "border-border/40 text-foreground"
-                                  : "border-border/20 text-muted-foreground"
+                                    ? "border-border/40 text-foreground"
+                                    : "border-border/20 text-muted-foreground"
                               )}
                             >
                               <span className="block text-[0.65rem] uppercase tracking-wide text-muted-foreground/70">
@@ -3739,22 +3799,20 @@ export function SingleCatPlusClient({
                   <button
                     type="button"
                     onClick={() => setMode("flashy")}
-                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                      mode === "flashy"
+                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${mode === "flashy"
                         ? "border-primary/60 bg-primary/15 text-foreground"
                         : "border-border/60 bg-background/70"
-                    }`}
+                      }`}
                   >
                     Flashy
                   </button>
                   <button
                     type="button"
                     onClick={() => setMode("calm")}
-                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                      mode === "calm"
+                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${mode === "calm"
                         ? "border-primary/60 bg-primary/15 text-foreground"
                         : "border-border/60 bg-background/70"
-                    }`}
+                      }`}
                   >
                     Calm
                   </button>
@@ -3762,16 +3820,43 @@ export function SingleCatPlusClient({
                 <div className="space-y-2">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Timing</p>
                   <div className="flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTimingModalOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-full border border-border/60 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
-                    >
-                      Adjust Timing Settings
-                    </button>
-                    <span className="text-xs text-muted-foreground/70">
-                      Estimated total: {formatMs(effectiveTotalMs)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTimingModalOpen(true)}
+                        className="flex-1 inline-flex items-center gap-2 rounded-full border border-border/60 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
+                      >
+                        Adjust Timing Settings
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSpeedMultiplier((prev) => Math.max(0.25, Math.min(4.0, prev - 0.25)))}
+                        className="inline-flex items-center justify-center rounded-full border border-border/60 px-2.5 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Slow down (decrease speed multiplier)"
+                        disabled={speedMultiplier <= 0.25}
+                      >
+                        −
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSpeedMultiplier((prev) => Math.max(0.25, Math.min(4.0, prev + 0.25)))}
+                        className="inline-flex items-center justify-center rounded-full border border-border/60 px-2.5 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Speed up (increase speed multiplier)"
+                        disabled={speedMultiplier >= 4.0}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground/70">
+                        Estimated total: {formatMs(effectiveTotalMs / speedMultiplier)}
+                      </span>
+                      {speedMultiplier !== 1.0 && (
+                        <span className="text-muted-foreground/70">
+                          {speedMultiplier > 1 ? "×" : "÷"} {Math.abs(speedMultiplier).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3814,11 +3899,10 @@ export function SingleCatPlusClient({
                         key={modeKey}
                         type="button"
                         onClick={() => handleToggleExtended(modeKey)}
-                        className={`rounded-full border px-4 py-1 text-xs font-semibold transition ${
-                          active
+                        className={`rounded-full border px-4 py-1 text-xs font-semibold transition ${active
                             ? "border-primary/60 bg-primary/20 text-foreground"
                             : "border-border/60 bg-background/70"
-                        }`}
+                          }`}
                       >
                         {modeKey === "base" ? "Base" : modeKey.charAt(0).toUpperCase() + modeKey.slice(1)}
                       </button>
