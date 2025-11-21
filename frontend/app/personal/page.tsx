@@ -9,7 +9,6 @@ import { PageHero } from "@/components/common/PageHero";
 type LinkCard = {
   href: string;
   label: string;
-  sublabel: string;
   icon: ComponentType<{ className?: string }>;
 };
 
@@ -17,43 +16,36 @@ const ADDITIONAL_LINKS: LinkCard[] = [
   {
     href: "https://twitch.tv/BeastyRabbit",
     label: "Twitch Channel",
-    sublabel: "Live streams and tech chaos.",
     icon: Twitch,
   },
   {
     href: "https://twitter.com/BeastyRabbit",
     label: "X (Twitter)",
-    sublabel: "Real-time updates & gadget musings.",
     icon: Twitter,
   },
   {
     href: "https://www.youtube.com/@beastyrabbit",
     label: "YouTube Channel",
-    sublabel: "VODs, edited recaps, and devlogs.",
     icon: Youtube,
   },
   {
     href: "https://bsky.app/profile/beastyrabbit.com",
     label: "Bluesky",
-    sublabel: "Long-form updates and community posts.",
     icon: Cloud,
   },
   {
     href: "https://www.furaffinity.net/user/beastyrabbit",
     label: "FurAffinity",
-    sublabel: "Illustrations and commission backlog.",
     icon: PawPrint,
   },
   {
     href: "https://toyhou.se/Beastyrabbit",
     label: "Toyhouse",
-    sublabel: "Character sheets and lore notes.",
     icon: Home,
   },
   {
     href: "https://ko-fi.com/beastyrabbit",
     label: "Ko-fi",
-    sublabel: "Support the stream and projects.",
     icon: Coffee,
   },
 ];
@@ -72,14 +64,14 @@ export default function PersonalLanding() {
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-16">
       <PageHero
         eyebrow="About BeastyRabbit"
-        title="Hey there, I'm Beasty."
+        title={<>Hey there, I'm <span className="text-gradient-personal animate-shimmer bg-[length:200%_auto]">Beasty.</span></>}
         description="Germany-based streamer building a cozy English-first space for tech deep dives, offbeat gadgets, and nostalgic games."
       >
         <Link
           href="https://twitch.tv/BeastyRabbit"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:text-white"
+          className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]"
         >
           <Twitch className="size-3" /> Twitch
         </Link>
@@ -87,32 +79,35 @@ export default function PersonalLanding() {
           href="https://twitter.com/BeastyRabbit"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:text-white"
+          className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]"
         >
           <Twitter className="size-3" /> X (Twitter)
         </Link>
-        <DiscordInviteButton className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:border-amber-300/60 hover:text-white" />
+        <DiscordInviteButton className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]" />
       </PageHero>
 
-      <section className="glass-card space-y-6 px-8 py-10">
-        <div>
+      <section className="glass-card space-y-8 px-8 py-12 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-b from-slate-800/20 to-transparent rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10">
           <p className="section-eyebrow">Stay connected</p>
-          <h2 className="text-2xl font-semibold text-foreground">Find me across the web</h2>
+          <h2 className="text-3xl font-bold text-foreground mt-2">Find me across the web</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {ADDITIONAL_LINKS.map(({ href, label, sublabel, icon: Icon }) => (
+          {ADDITIONAL_LINKS.map(({ href, label, icon: Icon }, index) => (
             <Link
               key={label}
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="group flex flex-col gap-2 rounded-2xl border border-border/40 bg-background/70 p-4 transition hover:-translate-y-1 hover:border-amber-400/40 hover:bg-background/90"
+              className="glass-card group flex items-center gap-4 p-5 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-white/20 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
+              style={{ animationDelay: `${index * 50}ms` }}
             >
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Icon className="size-4 text-amber-200" />
-                {label}
+              <div className="p-3 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors">
+                <Icon className="size-6 text-amber-200 group-hover:text-amber-100 transition-colors" />
               </div>
-              <p className="text-xs text-muted-foreground/80">{sublabel}</p>
+              <span className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
+                {label}
+              </span>
             </Link>
           ))}
         </div>

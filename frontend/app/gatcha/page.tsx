@@ -161,65 +161,86 @@ export default function GachaLanding() {
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <PageHero
         eyebrow="Cat Gacha Platform"
-        title="Gold-standard gacha experience"
+        title={<>Gold-standard <span className="text-gradient-gatcha animate-shimmer bg-[length:200%_auto]">gacha experience</span></>}
         description="Pick any generator — from classic wheels to modern builders — and keep every rollout in one place."
       >
         <Link
           href="/catdex"
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:opacity-90"
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:-translate-y-1 hover:shadow-primary/40 hover:scale-105 animate-pulse-glow"
         >
           Browse Catdex <ArrowRight className="size-4" />
         </Link>
         <Link
           href="/single-cat-plus"
-          className="inline-flex items-center gap-2 rounded-full border border-foreground/30 px-4 py-2 text-sm font-semibold text-foreground transition hover:-translate-y-0.5 hover:bg-foreground hover:text-background"
+          className="inline-flex items-center gap-2 rounded-full border border-foreground/30 px-6 py-3 text-sm font-semibold text-foreground transition-all hover:-translate-y-1 hover:bg-foreground hover:text-background"
         >
           Cat generator
         </Link>
       </PageHero>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {LEGACY_MODE_CARDS.map((card) => {
+        {LEGACY_MODE_CARDS.map((card, index) => {
           const isActive = Boolean(!card.comingSoon && card.href);
-          const baseClasses = "relative flex h-full flex-col gap-3 rounded-3xl border bg-background/80 p-6 transition shadow-inner";
-          const overlayActive = "absolute inset-0 -z-10 rounded-3xl bg-[radial-gradient(circle_at_top_left,_rgba(253,230,138,0.22),_transparent_55%),radial-gradient(circle_at_bottom_right,_rgba(250,204,21,0.18),_transparent_60%),linear-gradient(135deg,_rgba(253,230,138,0.12),_rgba(217,119,6,0.05))]";
-          const overlayInactive = "absolute inset-0 -z-10 rounded-3xl bg-[radial-gradient(circle_at_top_left,_rgba(148,163,184,0.16),_transparent_55%),radial-gradient(circle_at_bottom_right,_rgba(71,85,105,0.14),_transparent_60%),linear-gradient(135deg,_rgba(148,163,184,0.08),_rgba(30,41,59,0.05))]";
-          const wrapperClassName = `${baseClasses} ${
-            isActive ? "border-border/50 hover:-translate-y-1 hover:border-primary/40 hover:shadow-2xl" : "border-border/50 pointer-events-none opacity-70"
-          }`;
-          const overlayClassName = isActive ? overlayActive : overlayInactive;
+          const baseClasses = "glass-card relative flex h-full flex-col gap-4 p-6 transition-all duration-500 overflow-hidden group";
+          const wrapperClassName = isActive
+            ? `${baseClasses} hover:-translate-y-2 hover:shadow-2xl hover:border-amber-400/30`
+            : `${baseClasses} opacity-70 grayscale-[0.5] hover:opacity-100 hover:grayscale-0 animate-pulse-soft`;
 
           const content = (
             <>
-              <span className={overlayClassName} role="presentation" aria-hidden="true" />
-              {card.badge && (
-                <span className="absolute right-4 top-4 rounded-full bg-amber-500/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
-                  {card.badge}
-                </span>
-              )}
-              {card.comingSoon && (
-                <span className="absolute right-4 top-4 rounded-full bg-primary/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                  {card.statusLabel ?? "Coming soon"}
-                </span>
-              )}
-              <div className="text-3xl" aria-hidden>
-                {card.icon}
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100" role="presentation" aria-hidden="true" />
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:animate-shine" />
+
+              <div className="flex items-start justify-between">
+                <div className="text-4xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" aria-hidden>
+                  {card.icon}
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  {card.badge && (
+                    <span className="rounded-full bg-amber-500/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]">
+                      {card.badge}
+                    </span>
+                  )}
+                  {card.comingSoon && (
+                    <span className="rounded-full bg-primary/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-primary shadow-[0_0_10px_rgba(236,72,153,0.2)]">
+                      {card.statusLabel ?? "Coming soon"}
+                    </span>
+                  )}
+                </div>
               </div>
-              <h3 className="text-lg font-semibold text-foreground">{card.title}</h3>
-              <p className="text-sm text-muted-foreground">{card.description}</p>
+
+              <div className="relative z-10">
+                <h3 className="text-xl font-bold text-foreground group-hover:text-gradient-gatcha transition-colors">{card.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors">{card.description}</p>
+              </div>
+
+              {isActive && (
+                <span className="mt-auto inline-flex items-center gap-1 text-xs font-bold text-primary transition-transform group-hover:translate-x-2 pt-2">
+                  Launch Tool <ArrowRight className="size-3" />
+                </span>
+              )}
             </>
           );
 
           if (isActive && card.href) {
             return (
-              <Link key={card.title} href={card.href} className={wrapperClassName}>
+              <Link
+                key={card.title}
+                href={card.href}
+                className={`${wrapperClassName} animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards`}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
                 {content}
               </Link>
             );
           }
 
           return (
-            <div key={card.title} className={wrapperClassName}>
+            <div
+              key={card.title}
+              className={`${wrapperClassName} animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards`}
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
               {content}
             </div>
           );
