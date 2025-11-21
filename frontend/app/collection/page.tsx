@@ -64,33 +64,34 @@ export default function CollectionPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 py-12">
-      <header className="glass-card relative overflow-hidden px-8 py-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-500/15 via-transparent to-purple-500/20" aria-hidden />
+      <header className="glass-card relative overflow-hidden px-8 py-12">
+        <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10" aria-hidden />
+        <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer" />
         <div className="relative flex flex-col gap-4">
           <div className="section-eyebrow">Collection</div>
-          <h1 className="text-4xl font-semibold sm:text-5xl">
-            Community art, mood boards, and archival batik textures.
+          <h1 className="text-4xl font-bold sm:text-5xl md:text-6xl">
+            Community <span className="text-gradient-collection animate-shimmer bg-[length:200%_auto]">Art Collection</span>
           </h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            This gallery ships with the PocketBase export bundle. Each card preloads a blurred thumbnail so the grid appears instantly, then upgrades in-place as higher quality assets stream in.
+          <p className="max-w-3xl text-sm text-muted-foreground/90 leading-relaxed">
+            Explore the creative works and fan art from the BeastyRabbit community.
           </p>
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">
+          <div className="flex flex-wrap items-center gap-3 text-xs mt-2">
+            <span className="rounded-full bg-sky-500/10 px-3 py-1 font-bold text-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.2)]">
               {safeEntries.length} items
             </span>
-            <span className="rounded-full bg-muted px-3 py-1 text-muted-foreground">
+            <span className="rounded-full bg-white/5 px-3 py-1 text-muted-foreground border border-white/5">
               {filteredEntries.length} showing
             </span>
           </div>
         </div>
       </header>
 
-      <section className="glass-card grid gap-4 p-6">
-        <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-3 py-2">
-          <Search className="size-4 text-muted-foreground" />
+      <section className="glass-card grid gap-4 p-6 sticky top-4 z-30 backdrop-blur-xl border-white/20 shadow-2xl">
+        <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/40 px-4 py-3 transition-all focus-within:border-sky-500/50 focus-within:bg-black/60 focus-within:shadow-[0_0_20px_rgba(14,165,233,0.1)]">
+          <Search className="size-5 text-muted-foreground" />
           <input
-            className="flex-1 bg-transparent text-sm outline-none"
-            placeholder="Search by artist, animal, or link"
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+            placeholder="Search by artist, animal, or link..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -98,19 +99,20 @@ export default function CollectionPage() {
       </section>
 
       {filteredEntries.length === 0 ? (
-        <div className="glass-card border border-dashed border-border/60 p-12 text-center text-muted-foreground">
+        <div className="glass-card border border-dashed border-white/10 p-12 text-center text-muted-foreground">
           No artwork found for this combination. Try another search or animal.
         </div>
       ) : (
         <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredEntries.map((entry) => {
+          {filteredEntries.map((entry, index) => {
             const preview = absoluteUrl(entry.preview_img) ?? absoluteUrl(entry.full_img);
             const blur = absoluteUrl(entry.blur_img) ?? preview;
             const full = absoluteUrl(entry.full_img);
             return (
               <article
                 key={entry.id}
-                className="glass-card group flex cursor-pointer flex-col overflow-hidden transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-2xl"
+                className="glass-card group flex cursor-pointer flex-col overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:border-sky-500/30 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
+                style={{ animationDelay: `${index * 50}ms` }}
                 onClick={() => setActiveEntry(entry)}
               >
                 <div className="relative aspect-video overflow-hidden bg-muted">
@@ -119,19 +121,21 @@ export default function CollectionPage() {
                     highSrc={preview}
                     alt={entry.animal ?? "Artwork"}
                     imgStyle={{ objectPosition: `${entry.focusX}% ${entry.focusY}%` }}
+                    className="transition-transform duration-700 group-hover:scale-110"
                   />
-                  <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-1 text-xs font-medium text-white">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                  <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur-md border border-white/10">
                     {entry.animal ?? "Unknown"}
                   </span>
                 </div>
-                <div className="flex flex-1 flex-col gap-2 p-4">
-                  <h3 className="text-lg font-semibold capitalize">{entry.artist_name}</h3>
+                <div className="flex flex-1 flex-col gap-2 p-5">
+                  <h3 className="text-lg font-bold capitalize text-foreground group-hover:text-sky-400 transition-colors">{entry.artist_name}</h3>
                   <div className="mt-auto flex flex-wrap gap-2">
                     {entry.link && (
                       <Link
                         href={normalizeLink(entry.link)}
                         target="_blank"
-                        className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs font-medium text-foreground transition hover:bg-foreground hover:text-background"
+                        className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground transition-all hover:bg-white/10 hover:text-white hover:border-white/20"
                         onClick={(event) => event.stopPropagation()}
                       >
                         Visit artist <ExternalLink className="size-3" />
@@ -145,23 +149,23 @@ export default function CollectionPage() {
         </section>
       )}
 
-      <footer className="rounded-2xl border border-border bg-card p-6 text-xs text-muted-foreground">
+      <footer className="rounded-2xl border border-white/5 bg-white/5 p-6 text-xs text-muted-foreground text-center">
         Committing the export archive keeps deployments deterministic: bring up a fresh Convex instance, run the seed mutation, and these assets are instantly ready for LAN or production environments.
       </footer>
 
       {activeEntry && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-10 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-10 backdrop-blur-md animate-in fade-in duration-300"
           onClick={() => setActiveEntry(null)}
         >
-          <div className="glass-card relative w-full max-w-5xl overflow-hidden">
+          <div className="glass-card relative w-full max-w-5xl overflow-hidden shadow-2xl border-white/20 animate-in zoom-in-95 duration-300">
             <button
               type="button"
-              className="absolute right-4 top-4 z-20 rounded-full bg-black/70 p-2 text-white shadow-lg transition hover:bg-black/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              className="absolute right-4 top-4 z-20 rounded-full bg-black/50 p-2 text-white shadow-lg transition hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white backdrop-blur-md border border-white/10"
               onClick={() => setActiveEntry(null)}
               aria-label="Close"
             >
-              <X className="size-4" />
+              <X className="size-5" />
             </button>
             <div
               className="grid gap-6 p-6 md:grid-cols-[1.4fr,1fr]"
@@ -171,14 +175,14 @@ export default function CollectionPage() {
                 lowSrc={absoluteUrl(activeEntry.blur_img) ?? absoluteUrl(activeEntry.preview_img) ?? absoluteUrl(activeEntry.full_img)}
                 highSrc={absoluteUrl(activeEntry.full_img) ?? absoluteUrl(activeEntry.preview_img)}
                 alt={activeEntry.animal ?? "Artwork"}
-                className="w-full overflow-hidden rounded-2xl bg-muted"
+                className="w-full overflow-hidden rounded-2xl bg-muted shadow-lg"
                 imgStyle={{ objectPosition: `${activeEntry.focusX}% ${activeEntry.focusY}%` }}
               />
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-6 py-4">
                 <div>
-                  <h2 className="text-2xl font-semibold capitalize">{activeEntry.artist_name}</h2>
+                  <h2 className="text-3xl font-bold capitalize text-gradient-collection inline-block">{activeEntry.artist_name}</h2>
                 </div>
-                <dl className="grid gap-2 text-xs">
+                <dl className="grid gap-3 text-sm">
                   <InfoRow label="Animal" value={activeEntry.animal ?? "Unknown"} />
                   {activeEntry.link && (
                     <InfoRow label="Source" value={normalizeLink(activeEntry.link)} isLink />
@@ -189,7 +193,7 @@ export default function CollectionPage() {
                     <a
                       href={absoluteUrl(activeEntry.full_img)!}
                       target="_blank"
-                      className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 font-medium text-primary-foreground transition hover:opacity-90"
+                      className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-bold text-primary-foreground transition-all hover:opacity-90 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5"
                     >
                       Open full image <ExternalLink className="size-3" />
                     </a>
@@ -198,7 +202,7 @@ export default function CollectionPage() {
                     <Link
                       href={normalizeLink(activeEntry.link)}
                       target="_blank"
-                      className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 font-medium text-foreground transition hover:bg-foreground hover:text-background"
+                      className="inline-flex items-center gap-2 rounded-full border border-white/10 px-5 py-2.5 font-bold text-foreground transition-all hover:bg-white/10 hover:text-white hover:-translate-y-0.5"
                     >
                       Visit artist <ExternalLink className="size-3" />
                     </Link>

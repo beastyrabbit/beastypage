@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 type PageHeroProps = {
   eyebrow: string;
-  title: string;
+  title: ReactNode;
   description?: string;
   children?: ReactNode;
 };

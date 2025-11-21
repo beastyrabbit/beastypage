@@ -78,24 +78,25 @@ export const metadata: Metadata = {
 export default function HubLanding() {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-16">
-      <section className="theme-hero theme-gatcha px-8 py-12 text-balance">
+      <section className="theme-hero theme-gatcha relative px-8 py-12 text-balance overflow-visible">
+        <div className="absolute left-1/2 top-1/2 -z-10 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/20 blur-[120px] animate-pulse-glow animate-float" />
         <div className="section-eyebrow">Beasty Hub</div>
-        <h1 className="mt-4 text-4xl font-semibold leading-tight sm:text-5xl md:text-6xl">
-          Welcome to the BeastyVerse.
+        <h1 className="mt-4 text-5xl font-bold leading-tight sm:text-6xl md:text-7xl">
+          Welcome to the <span className="text-gradient-hub animate-shimmer bg-[length:200%_auto]">BeastyVerse.</span>
         </h1>
-        <p className="mt-6 max-w-3xl text-lg text-muted-foreground sm:text-xl">
+        <p className="mt-6 max-w-3xl text-lg text-muted-foreground/90 sm:text-xl leading-relaxed">
           Everything you want lives here: cat gacha tools, stream utilities, collections, personal links, and plenty more on the way.
         </p>
-        <div className="mt-8 flex flex-wrap items-center gap-3">
+        <div className="mt-8 flex flex-wrap items-center gap-4">
           <Link
             href="/gatcha"
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:-translate-y-0.5 hover:opacity-90"
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:-translate-y-1 hover:shadow-primary/40 hover:scale-105"
           >
             Dive into Gacha <ArrowRight className="size-4" />
           </Link>
           <Link
             href="/streamer-voting"
-            className="inline-flex items-center gap-2 rounded-full border border-primary/40 px-5 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10 hover:text-primary"
+            className="inline-flex items-center gap-2 rounded-full border border-primary/40 px-6 py-3 text-sm font-semibold text-primary transition-all hover:bg-primary/10 hover:text-primary hover:-translate-y-1"
           >
             Open Stream Voting <ArrowRight className="size-4" />
           </Link>
@@ -103,17 +104,19 @@ export default function HubLanding() {
       </section>
 
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {HUB_PILLARS.map((pillar) => (
+        {HUB_PILLARS.map((pillar, index) => (
           <Link
             key={pillar.href}
             href={pillar.href}
-            className={`glass-card relative overflow-hidden p-5 transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-2xl`}
+            className={`glass-card group relative overflow-hidden p-6 transition-all hover:-translate-y-2 hover:shadow-2xl animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards`}
+            style={{ animationDelay: `${index * 100}ms` }}
           >
-            <div className={`${HUB_THEME_CLASSES[pillar.accent]} absolute inset-0 opacity-60`} role="presentation" aria-hidden="true" />
-            <div className="relative flex h-full flex-col gap-3">
-              <h3 className="text-lg font-semibold text-foreground">{pillar.title}</h3>
-              <p className="text-sm text-muted-foreground">{pillar.description}</p>
-              <span className="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-primary">
+            <div className={`${HUB_THEME_CLASSES[pillar.accent]} absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100`} role="presentation" aria-hidden="true" />
+            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:animate-shine" />
+            <div className="relative flex h-full flex-col gap-4">
+              <h3 className={`text-xl font-bold text-foreground group-hover:text-gradient-${pillar.accent} transition-colors`}>{pillar.title}</h3>
+              <p className="text-sm text-muted-foreground group-hover:text-foreground/80 transition-colors">{pillar.description}</p>
+              <span className="mt-auto inline-flex items-center gap-1 text-xs font-bold text-primary transition-transform group-hover:translate-x-2">
                 Explore <ArrowRight className="size-3" />
               </span>
             </div>
@@ -121,19 +124,22 @@ export default function HubLanding() {
         ))}
       </section>
 
-      <section className="glass-card space-y-6 px-8 py-10">
-        <div className="section-eyebrow">New stuff</div>
-        <h2 className="text-3xl font-semibold">Catch up with the latest drops</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {NEW_STUFF_ITEMS.map((item) => (
+      <section className="glass-card space-y-8 px-8 py-12 relative overflow-hidden">
+        <div className="absolute top-0 right-0 -mt-20 -mr-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none animate-pulse-soft" />
+        <div className="relative">
+          <div className="section-eyebrow">New stuff</div>
+          <h2 className="text-3xl font-bold mt-2">Catch up with the latest drops</h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {NEW_STUFF_ITEMS.map((item, index) => (
             <Link
               key={item.href}
               href={item.href}
-              className="glass-card relative flex h-full flex-col gap-3 p-5 transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
+              className="group relative flex h-full flex-col gap-3 rounded-2xl border border-white/5 bg-white/5 p-5 transition-all hover:-translate-y-1 hover:bg-white/10 hover:border-white/10 hover:shadow-lg"
             >
-              <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
+              <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">{item.title}</h3>
               <p className="text-sm text-muted-foreground">{item.description}</p>
-              <span className="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-primary">
+              <span className="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-primary/80 transition-transform group-hover:translate-x-1 group-hover:text-primary">
                 Open <ArrowRight className="size-3" />
               </span>
             </Link>
