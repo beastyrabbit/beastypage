@@ -56,22 +56,18 @@ function fullPreview(previews?: {
   return previews?.full?.url ?? previews?.preview?.url ?? null;
 }
 
-const STORAGE_ORIGIN = (process.env.NEXT_PUBLIC_CONVEX_URL ?? "").replace(/\/$/, "") || null;
-
+/**
+ * Fix preview URLs: /api/... routes stay relative (Next.js routes),
+ * while storage URLs get the Convex origin applied.
+ */
 function fixPreviewUrl(url: string | null): string | null {
-  if (!url || !STORAGE_ORIGIN) return url;
-  try {
-    const base = new URL(STORAGE_ORIGIN);
-    const resolved = url.startsWith("/") ? new URL(url, base) : new URL(url);
-    resolved.protocol = base.protocol;
-    resolved.host = base.host;
-    return resolved.toString();
-  } catch {
-    if (url.startsWith("/")) {
-      return `${STORAGE_ORIGIN}${url}`;
-    }
-    return url;
-  }
+  if (!url) return url;
+  // /api/... paths are Next.js routes - keep them relative
+  if (url.startsWith("/api/")) return url;
+  // Absolute URLs are fine as-is
+  if (/^https?:\/\//i.test(url)) return url;
+  // For other relative paths (storage), we can leave them relative too
+  return url;
 }
 
 export function HistoryClient() {
