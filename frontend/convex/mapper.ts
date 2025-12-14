@@ -316,24 +316,16 @@ async function profileToClient(ctx: QueryCtx | MutationCtx, doc: ProfileDoc) {
   };
 }
 
-const SITE_ORIGIN = (process.env.CONVEX_SITE_ORIGIN ?? "").trim().replace(/\/$/, "");
-
-function getPreviewUrl(profileId: string, cachedUrl: string | null): string {
-  // If we have a cached URL, use it
-  if (cachedUrl) return cachedUrl;
-  // Otherwise, return the on-demand endpoint
-  if (SITE_ORIGIN) return `${SITE_ORIGIN}/api/preview/${profileId}`;
-  // Local dev fallback (relative URL)
-  return `/api/preview/${profileId}`;
-}
-
+/**
+ * Build preview payload - returns cached storage URLs when available, null otherwise.
+ * The frontend uses /api/preview/{id} for on-demand rendering when no cached URL exists.
+ */
 async function buildPreviewPayload(
   ctx: QueryCtx | MutationCtx,
   profileId: Id<"cat_profile">,
   updatedAt: number | null
 ) {
   const refs = await loadImageRefs(ctx, profileId);
-  const profileIdString = docIdToString(profileId);
 
   const tinyUrl = refs.tiny ? await safeGetUrl(ctx, refs.tiny.storageId) : null;
   const previewUrl = refs.preview ? await safeGetUrl(ctx, refs.preview.storageId) : null;
@@ -343,30 +335,9 @@ async function buildPreviewPayload(
     updatedAt ?? (tinyUrl || previewUrl || fullUrl || spriteSheetUrl ? Date.now() : null);
 
   return {
-    tiny: tinyUrl
-      ? {
-          url: tinyUrl,
-          name: refs.tiny?.filename ?? null,
-        }
-      : null,
-    preview: previewUrl
-      ? {
-          url: previewUrl,
-          name: refs.preview?.filename ?? null,
-        }
-      : {
-          url: getPreviewUrl(profileIdString, null),
-          name: null,
-        },
-    full: fullUrl
-      ? {
-          url: fullUrl,
-          name: refs.full?.filename ?? null,
-        }
-      : {
-          url: getPreviewUrl(profileIdString, null),
-          name: null,
-        },
+    tiny: tinyUrl ? { url: tinyUrl, name: refs.tiny?.filename ?? null } : null,
+    preview: previewUrl ? { url: previewUrl, name: refs.preview?.filename ?? null } : null,
+    full: fullUrl ? { url: fullUrl, name: refs.full?.filename ?? null } : null,
     spriteSheet: spriteSheetUrl
       ? {
           url: spriteSheetUrl,

@@ -119,7 +119,9 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     slug ? { slugOrId: slug } : "skip"
   ) as MapperRecord | null | undefined;
 
-  const previewImageUrl = (mapperRecord?.previews?.full?.url ?? mapperRecord?.previews?.preview?.url) ?? null;
+  // Use cached preview if available, otherwise use on-demand endpoint
+  const cachedPreviewUrl = mapperRecord?.previews?.full?.url ?? mapperRecord?.previews?.preview?.url ?? null;
+  const previewImageUrl = cachedPreviewUrl ?? (mapperRecord?.id ? `/api/preview/${mapperRecord.id}` : null);
 
   const [catPayload, setCatPayload] = useState<CatSharePayload | null>(null);
   const [meta, setMeta] = useState<{
