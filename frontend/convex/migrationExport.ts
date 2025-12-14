@@ -2,212 +2,128 @@
  * Migration export functions - deploy these to self-hosted Convex
  * to export data for migration to Convex Cloud.
  * 
- * These are queries that return all documents from each table.
+ * Simple .collect() for all tables since data is small.
  */
-import { query } from "./_generated/server";
+import { query } from "./_generated/server.js";
 import { v } from "convex/values";
-
-// Generic paginated export for any table
-// Returns up to 1000 documents per call, use cursor for pagination
+import type { QueryCtx } from "./_generated/server.js";
+import type { Id } from "./_generated/dataModel.js";
 
 export const exportCardSeasons = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx: QueryCtx) => {
     return await ctx.db.query("card_season").collect();
   },
 });
 
 export const exportRarities = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx: QueryCtx) => {
     return await ctx.db.query("rarity").collect();
   },
 });
 
 export const exportCatdex = query({
-  args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
-    let query = ctx.db.query("catdex").order("asc");
-    
-    const results = await query.take(limit + 1);
-    const hasMore = results.length > limit;
-    const documents = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore ? documents[documents.length - 1]._id : null;
-    
-    return { documents, nextCursor, hasMore };
+  args: {},
+  handler: async (ctx: QueryCtx) => {
+    return await ctx.db.query("catdex").collect();
   },
 });
 
 export const exportCollection = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx: QueryCtx) => {
     return await ctx.db.query("collection").collect();
   },
 });
 
 export const exportCatProfiles = query({
-  args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
-    const results = await ctx.db.query("cat_profile").order("asc").take(limit + 1);
-    const hasMore = results.length > limit;
-    const documents = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore ? documents[documents.length - 1]._id : null;
-    
-    return { documents, nextCursor, hasMore };
+  args: {},
+  handler: async (ctx: QueryCtx) => {
+    return await ctx.db.query("cat_profile").collect();
   },
 });
 
 export const exportCatImages = query({
-  args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
-    const results = await ctx.db.query("cat_images").order("asc").take(limit + 1);
-    const hasMore = results.length > limit;
-    const documents = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore ? documents[documents.length - 1]._id : null;
-    
-    return { documents, nextCursor, hasMore };
+  args: {},
+  handler: async (ctx: QueryCtx) => {
+    return await ctx.db.query("cat_images").collect();
   },
 });
 
 export const exportAdoptionBatches = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx: QueryCtx) => {
     return await ctx.db.query("adoption_batch").collect();
   },
 });
 
 export const exportCatShares = query({
-  args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
-    const results = await ctx.db.query("cat_shares").order("asc").take(limit + 1);
-    const hasMore = results.length > limit;
-    const documents = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore ? documents[documents.length - 1]._id : null;
-    
-    return { documents, nextCursor, hasMore };
+  args: {},
+  handler: async (ctx: QueryCtx) => {
+    return await ctx.db.query("cat_shares").collect();
   },
 });
 
 export const exportSingleCatSettings = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx: QueryCtx) => {
     return await ctx.db.query("single_cat_settings").collect();
   },
 });
 
 export const exportPerfectCats = query({
-  args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
-    const results = await ctx.db.query("perfect_cats").order("asc").take(limit + 1);
-    const hasMore = results.length > limit;
-    const documents = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore ? documents[documents.length - 1]._id : null;
-    
-    return { documents, nextCursor, hasMore };
+  args: {},
+  handler: async (ctx: QueryCtx) => {
+    return await ctx.db.query("perfect_cats").collect();
   },
 });
 
 export const exportPerfectVotes = query({
-  args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
-    const results = await ctx.db.query("perfect_votes").order("asc").take(limit + 1);
-    const hasMore = results.length > limit;
-    const documents = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore ? documents[documents.length - 1]._id : null;
-    
-    return { documents, nextCursor, hasMore };
+  args: {},
+  handler: async (ctx: QueryCtx) => {
+    return await ctx.db.query("perfect_votes").collect();
   },
 });
 
 export const exportStreamSessions = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx: QueryCtx) => {
     return await ctx.db.query("stream_sessions").collect();
   },
 });
 
 export const exportStreamParticipants = query({
-  args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
-    const results = await ctx.db.query("stream_participants").order("asc").take(limit + 1);
-    const hasMore = results.length > limit;
-    const documents = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore ? documents[documents.length - 1]._id : null;
-    
-    return { documents, nextCursor, hasMore };
+  args: {},
+  handler: async (ctx: QueryCtx) => {
+    return await ctx.db.query("stream_participants").collect();
   },
 });
 
 export const exportStreamVotes = query({
-  args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
-    const results = await ctx.db.query("stream_votes").order("asc").take(limit + 1);
-    const hasMore = results.length > limit;
-    const documents = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore ? documents[documents.length - 1]._id : null;
-    
-    return { documents, nextCursor, hasMore };
+  args: {},
+  handler: async (ctx: QueryCtx) => {
+    return await ctx.db.query("stream_votes").collect();
   },
 });
 
 export const exportWheelSpins = query({
-  args: {
-    cursor: v.optional(v.string()),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
-    const results = await ctx.db.query("wheel_spins").order("asc").take(limit + 1);
-    const hasMore = results.length > limit;
-    const documents = hasMore ? results.slice(0, limit) : results;
-    const nextCursor = hasMore ? documents[documents.length - 1]._id : null;
-    
-    return { documents, nextCursor, hasMore };
+  args: {},
+  handler: async (ctx: QueryCtx) => {
+    return await ctx.db.query("wheel_spins").collect();
   },
 });
 
 export const exportCoinflipperScores = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx: QueryCtx) => {
     return await ctx.db.query("coinflipper_scores").collect();
   },
 });
 
 export const exportDiscordChallenges = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx: QueryCtx) => {
     return await ctx.db.query("discord_challenge").collect();
   },
 });
@@ -215,7 +131,7 @@ export const exportDiscordChallenges = query({
 // Helper to get a file URL for downloading
 export const getStorageUrl = query({
   args: { storageId: v.id("_storage") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: QueryCtx, args: { storageId: Id<"_storage"> }) => {
     return await ctx.storage.getUrl(args.storageId);
   },
 });

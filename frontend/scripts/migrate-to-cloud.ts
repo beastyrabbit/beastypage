@@ -48,11 +48,6 @@ interface Doc {
   [key: string]: unknown;
 }
 
-interface PaginatedResult {
-  documents: Doc[];
-  nextCursor: string | null;
-  hasMore: boolean;
-}
 
 // ============================================================================
 // Validation
@@ -98,7 +93,7 @@ function createTargetClient(): ConvexHttpClient {
 // Export Functions (using Convex queries)
 // ============================================================================
 
-async function exportSimpleTable(
+async function exportTable(
   client: ConvexHttpClient,
   functionName: string,
   tableName: string
@@ -109,38 +104,6 @@ async function exportSimpleTable(
     const docs = result as Doc[];
     console.log(`    → ${docs.length} documents`);
     return docs;
-  } catch (error) {
-    console.log(`    → Error: ${error}`);
-    return [];
-  }
-}
-
-async function exportPaginatedTable(
-  client: ConvexHttpClient,
-  functionName: string,
-  tableName: string
-): Promise<Doc[]> {
-  console.log(`  Exporting ${tableName}...`);
-  const allDocs: Doc[] = [];
-  let cursor: string | null = null;
-
-  try {
-    while (true) {
-      const result = await client.query(functionName as any, {
-        cursor: cursor ?? undefined,
-        limit: 100,
-      }) as PaginatedResult;
-
-      allDocs.push(...result.documents);
-
-      if (!result.hasMore || !result.nextCursor) {
-        break;
-      }
-      cursor = result.nextCursor;
-      process.stdout.write(`\r    → ${allDocs.length} documents...`);
-    }
-    console.log(`\r    → ${allDocs.length} documents    `);
-    return allDocs;
   } catch (error) {
     console.log(`    → Error: ${error}`);
     return [];
@@ -716,30 +679,30 @@ async function main() {
 
   const allData = new Map<string, Doc[]>();
 
-  // Tier 1: Reference tables (simple, non-paginated)
-  allData.set("card_season", await exportSimpleTable(sourceClient, "migrationExport:exportCardSeasons", "card_season"));
-  allData.set("rarity", await exportSimpleTable(sourceClient, "migrationExport:exportRarities", "rarity"));
+  // Tier 1: Reference tables
+  allData.set("card_season", await exportTable(sourceClient, "migrationExport:exportCardSeasons", "card_season"));
+  allData.set("rarity", await exportTable(sourceClient, "migrationExport:exportRarities", "rarity"));
 
   // Tier 2: Core data
-  allData.set("catdex", (await exportPaginatedTable(sourceClient, "migrationExport:exportCatdex", "catdex")));
-  allData.set("collection", await exportSimpleTable(sourceClient, "migrationExport:exportCollection", "collection"));
-  allData.set("cat_profile", (await exportPaginatedTable(sourceClient, "migrationExport:exportCatProfiles", "cat_profile")));
-  allData.set("cat_images", (await exportPaginatedTable(sourceClient, "migrationExport:exportCatImages", "cat_images")));
-  allData.set("adoption_batch", await exportSimpleTable(sourceClient, "migrationExport:exportAdoptionBatches", "adoption_batch"));
+  allData.set("catdex", await exportTable(sourceClient, "migrationExport:exportCatdex", "catdex"));
+  allData.set("collection", await exportTable(sourceClient, "migrationExport:exportCollection", "collection"));
+  allData.set("cat_profile", await exportTable(sourceClient, "migrationExport:exportCatProfiles", "cat_profile"));
+  allData.set("cat_images", await exportTable(sourceClient, "migrationExport:exportCatImages", "cat_images"));
+  allData.set("adoption_batch", await exportTable(sourceClient, "migrationExport:exportAdoptionBatches", "adoption_batch"));
 
   // Tier 3: Simple data
-  allData.set("cat_shares", (await exportPaginatedTable(sourceClient, "migrationExport:exportCatShares", "cat_shares")));
-  allData.set("single_cat_settings", await exportSimpleTable(sourceClient, "migrationExport:exportSingleCatSettings", "single_cat_settings"));
-  allData.set("perfect_cats", (await exportPaginatedTable(sourceClient, "migrationExport:exportPerfectCats", "perfect_cats")));
-  allData.set("perfect_votes", (await exportPaginatedTable(sourceClient, "migrationExport:exportPerfectVotes", "perfect_votes")));
+  allData.set("cat_shares", await exportTable(sourceClient, "migrationExport:exportCatShares", "cat_shares"));
+  allData.set("single_cat_settings", await exportTable(sourceClient, "migrationExport:exportSingleCatSettings", "single_cat_settings"));
+  allData.set("perfect_cats", await exportTable(sourceClient, "migrationExport:exportPerfectCats", "perfect_cats"));
+  allData.set("perfect_votes", await exportTable(sourceClient, "migrationExport:exportPerfectVotes", "perfect_votes"));
 
   // Tier 4: Session data
-  allData.set("stream_sessions", await exportSimpleTable(sourceClient, "migrationExport:exportStreamSessions", "stream_sessions"));
-  allData.set("stream_participants", (await exportPaginatedTable(sourceClient, "migrationExport:exportStreamParticipants", "stream_participants")));
-  allData.set("stream_votes", (await exportPaginatedTable(sourceClient, "migrationExport:exportStreamVotes", "stream_votes")));
-  allData.set("wheel_spins", (await exportPaginatedTable(sourceClient, "migrationExport:exportWheelSpins", "wheel_spins")));
-  allData.set("coinflipper_scores", await exportSimpleTable(sourceClient, "migrationExport:exportCoinflipperScores", "coinflipper_scores"));
-  allData.set("discord_challenge", await exportSimpleTable(sourceClient, "migrationExport:exportDiscordChallenges", "discord_challenge"));
+  allData.set("stream_sessions", await exportTable(sourceClient, "migrationExport:exportStreamSessions", "stream_sessions"));
+  allData.set("stream_participants", await exportTable(sourceClient, "migrationExport:exportStreamParticipants", "stream_participants"));
+  allData.set("stream_votes", await exportTable(sourceClient, "migrationExport:exportStreamVotes", "stream_votes"));
+  allData.set("wheel_spins", await exportTable(sourceClient, "migrationExport:exportWheelSpins", "wheel_spins"));
+  allData.set("coinflipper_scores", await exportTable(sourceClient, "migrationExport:exportCoinflipperScores", "coinflipper_scores"));
+  allData.set("discord_challenge", await exportTable(sourceClient, "migrationExport:exportDiscordChallenges", "discord_challenge"));
 
   // ========== PHASE 2: Migrate storage files ==========
   console.log("\nPhase 2: Migrating storage files...");
