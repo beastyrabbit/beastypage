@@ -46,9 +46,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // If preview exists, redirect to it
+    // If a real cached preview exists (not the fallback on-demand URL), redirect to it
     const existingPreviewUrl = profile.previews?.preview?.url ?? profile.previews?.full?.url ?? null;
-    if (existingPreviewUrl) {
+    // Skip redirect if the URL is the on-demand endpoint itself (would cause infinite redirect)
+    const isOnDemandUrl = existingPreviewUrl?.includes("/api/preview/");
+    if (existingPreviewUrl && !isOnDemandUrl) {
       return NextResponse.redirect(existingPreviewUrl, 302);
     }
 
