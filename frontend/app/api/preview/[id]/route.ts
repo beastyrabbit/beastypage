@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 
 const RENDERER_BASE = (process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001").replace(/\/$/, "");
 const PREVIEW_SIZE = 360;
@@ -48,8 +47,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const convex = new ConvexHttpClient(convexUrl);
 
-    // Fetch cat profile from Convex
-    const profile = await convex.query(api.mapper.get, { id: profileId as Id<"cat_profile"> });
+    // Fetch cat profile from Convex (accepts slug or ID string)
+    const profile = await convex.query(api.mapper.getBySlug, { slugOrId: profileId });
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
