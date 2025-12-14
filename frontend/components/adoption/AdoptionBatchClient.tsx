@@ -54,32 +54,24 @@ type AdoptionBatchClientProps = {
 
 /**
  * Get the best available preview URL from cached previews,
- * or construct on-demand URL if no cached preview exists.
+ * or construct on-demand URL with encoded cat data if no cached preview exists.
  */
 function getPreviewUrl(
-  profileId: string,
+  profileId: string | null,
+  encodedCatData: string | null,
   previews?: {
     tiny?: { url: string | null } | null;
     preview?: { url: string | null } | null;
     full?: { url: string | null } | null;
   }
-): string {
+): string | null {
   const cached = previews?.preview?.url ?? previews?.full?.url ?? previews?.tiny?.url ?? null;
-  return cached ?? `/api/preview/${profileId}`;
-}
-
-/**
- * Get full-res URL or fall back to on-demand preview.
- */
-function getFullUrl(
-  profileId: string,
-  previews?: {
-    full?: { url: string | null } | null;
-    preview?: { url: string | null } | null;
-  }
-): string {
-  const cached = previews?.full?.url ?? previews?.preview?.url ?? null;
-  return cached ?? `/api/preview/${profileId}`;
+  if (cached) return cached;
+  // Use encoded cat data for on-demand rendering
+  if (encodedCatData) return `/api/preview/_?cat=${encodeURIComponent(encodedCatData)}`;
+  // Fallback to profile ID lookup
+  if (profileId) return `/api/preview/${profileId}`;
+  return null;
 }
 
 function formatTimestamp(created?: number): string |
@@ -112,9 +104,8 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
           ? origin ? `${origin}/view?cat=${encoded}` : `/view?cat=${encoded}`
           : null;
 
-      const catProfileId = cat.profileId ?? cat.shareToken ?? `batch-cat-${cat.index}`;
-      const previewUrl = getPreviewUrl(catProfileId, cat.previews ?? undefined);
-      const fullUrl = getFullUrl(catProfileId, cat.previews ?? undefined);
+      const previewUrl = getPreviewUrl(cat.profileId ?? null, encoded, cat.previews ?? undefined);
+      const fullUrl = previewUrl; // Use same URL for full (on-demand renders at fixed size anyway)
 
       return {
         ...cat,
