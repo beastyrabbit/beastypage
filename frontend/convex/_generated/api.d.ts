@@ -19,6 +19,8 @@ import type * as imageService from "../imageService.js";
 import type * as importer from "../importer.js";
 import type * as init from "../init.js";
 import type * as mapper from "../mapper.js";
+import type * as migrationExport from "../migrationExport.js";
+import type * as migrationImport from "../migrationImport.js";
 import type * as perfectCats from "../perfectCats.js";
 import type * as previews from "../previews.js";
 import type * as rarities from "../rarities.js";
@@ -36,14 +38,6 @@ import type {
   FunctionReference,
 } from "convex/server";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 declare const fullApi: ApiFromModules<{
   adoption: typeof adoption;
   catShares: typeof catShares;
@@ -56,6 +50,8 @@ declare const fullApi: ApiFromModules<{
   importer: typeof importer;
   init: typeof init;
   mapper: typeof mapper;
+  migrationExport: typeof migrationExport;
+  migrationImport: typeof migrationImport;
   perfectCats: typeof perfectCats;
   previews: typeof previews;
   rarities: typeof rarities;
@@ -67,14 +63,30 @@ declare const fullApi: ApiFromModules<{
   utils: typeof utils;
   wheel: typeof wheel;
 }>;
-declare const fullApiWithMounts: typeof fullApi;
 
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export declare const api: FilterApi<
-  typeof fullApiWithMounts,
+  typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
-  typeof fullApiWithMounts,
+  typeof fullApi,
   FunctionReference<any, "internal">
 >;
 
