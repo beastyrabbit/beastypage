@@ -26,21 +26,62 @@ const STORAGE_BASE =
 
 export function normalizeStorageUrl(url: string | null): string | null {
   if (!url) return null;
+  
   try {
-    if (STORAGE_BASE) {
-      const base = new URL(STORAGE_BASE);
-      const resolved = new URL(url, base);
-      resolved.protocol = base.protocol;
-      resolved.host = base.host;
-      return resolved.toString();
+    // Use JSON serialization to force conversion to primitive string
+    // This completely avoids any URL object property access that Convex restricts
+    // JSON.stringify will serialize the URL to a string, then we parse it back
+    const urlStr = JSON.parse(JSON.stringify(url)) as string;
+    
+    // If we have a storage base, ensure the URL uses it
+    const storageBase = STORAGE_BASE ? String(STORAGE_BASE) : null;
+    if (storageBase && storageBase !== "null" && storageBase !== "undefined") {
+      // Normalize storage base - remove trailing slash using regex
+      const baseMatch = storageBase.match(/^(.+?)\/?$/);
+      const base = baseMatch ? baseMatch[1] : storageBase;
+      
+      // Escape special regex characters in base for safe regex construction
+      const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      
+      // Check if URL starts with base using regex (avoiding indexOf/charAt which might trigger URL methods)
+      const startsWithBase = urlStr.match(new RegExp("^" + escapedBase));
+      if (startsWithBase) {
+        return urlStr;
+      }
+      
+      // Check if URL is relative (starts with /) using regex
+      const isRelative = urlStr.match(/^\//);
+      if (isRelative) {
+        return base + urlStr;
+      }
+      
+      // If URL is absolute but different origin, extract path manually using regex
+      const absoluteMatch = urlStr.match(/^https?:\/\/[^\/]+(\/.*)$/);
+      if (absoluteMatch && absoluteMatch[1]) {
+        return base + absoluteMatch[1];
+      }
+      
+      // Fallback: treat as relative
+      return base + "/" + urlStr;
     }
-    const parsed = new URL(url, "http://placeholder");
-    const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
-    return path.startsWith("/") ? path : `/${path}`;
+    
+    // No storage base - extract path from absolute URLs, keep relative as-is
+    const absoluteMatch = urlStr.match(/^https?:\/\/[^\/]+(\/.*)$/);
+    if (absoluteMatch && absoluteMatch[1]) {
+      return absoluteMatch[1];
+    }
+    
+    // Check if already relative using regex
+    const isRelative = urlStr.match(/^\//);
+    return isRelative ? urlStr : "/" + urlStr;
   } catch (error) {
-    if (STORAGE_BASE && url.startsWith("/")) {
-      return `${STORAGE_BASE.replace(/\/$/, "")}${url}`;
+    // If normalization fails (e.g., due to Convex restrictions), try direct conversion
+    // This ensures the function never throws and always returns a string or null
+    try {
+      // Last resort: try JSON serialization which should work even for URL objects
+      return JSON.parse(JSON.stringify(url)) as string;
+    } catch {
+      return null;
     }
-    return url;
   }
 }

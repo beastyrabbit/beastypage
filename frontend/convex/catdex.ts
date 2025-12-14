@@ -2,7 +2,7 @@ import { mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
 import type { QueryCtx } from "./_generated/server.js";
-import { docIdToString, normalizeStorageUrl } from "./utils.js";
+import { docIdToString } from "./utils.js";
 import { api } from "./_generated/api.js";
 
 type CatdexDoc = Doc<"catdex">;
@@ -123,18 +123,11 @@ async function catdexRecordToClient(ctx: QueryCtx, doc: CatdexDoc) {
   const seasonName = seasonInfo?.season_name ?? null;
   const rarityName = rarityInfo?.rarity_name ?? null;
 
-  const defaultCardUrl = doc.defaultCardStorageId
-    ? normalizeStorageUrl(await ctx.storage.getUrl(doc.defaultCardStorageId))
-    : null;
-  const defaultCardThumbUrl = doc.defaultCardThumbStorageId
-    ? normalizeStorageUrl(await ctx.storage.getUrl(doc.defaultCardThumbStorageId))
-    : null;
-  const customCardUrl = doc.customCardStorageId
-    ? normalizeStorageUrl(await ctx.storage.getUrl(doc.customCardStorageId))
-    : null;
-  const customCardThumbUrl = doc.customCardThumbStorageId
-    ? normalizeStorageUrl(await ctx.storage.getUrl(doc.customCardThumbStorageId))
-    : null;
+  // Convex Cloud returns proper absolute URLs - no normalization needed
+  const defaultCardUrl = doc.defaultCardStorageId ? await ctx.storage.getUrl(doc.defaultCardStorageId) : null;
+  const defaultCardThumbUrl = doc.defaultCardThumbStorageId ? await ctx.storage.getUrl(doc.defaultCardThumbStorageId) : null;
+  const customCardUrl = doc.customCardStorageId ? await ctx.storage.getUrl(doc.customCardStorageId) : null;
+  const customCardThumbUrl = doc.customCardThumbStorageId ? await ctx.storage.getUrl(doc.customCardThumbStorageId) : null;
 
   return {
     id,

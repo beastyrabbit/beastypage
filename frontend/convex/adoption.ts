@@ -2,7 +2,7 @@ import { mutation, query } from "./_generated/server.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
-import { docIdToString, toId, normalizeStorageUrl } from "./utils.js";
+import { docIdToString, toId } from "./utils.js";
 import type { Id } from "./_generated/dataModel.js";
 
 const SLUG_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -218,6 +218,17 @@ async function batchRecordToClient(ctx: QueryCtx | MutationCtx, doc: AdoptionBat
   };
 }
 
+const SITE_ORIGIN = (process.env.CONVEX_SITE_ORIGIN ?? "").trim().replace(/\/$/, "");
+
+function getPreviewUrl(profileId: string, cachedUrl: string | null): string {
+  // If we have a cached URL, use it
+  if (cachedUrl) return cachedUrl;
+  // Otherwise, return the on-demand endpoint
+  if (SITE_ORIGIN) return `${SITE_ORIGIN}/api/preview/${profileId}`;
+  // Local dev fallback (relative URL)
+  return `/api/preview/${profileId}`;
+}
+
 async function resolveProfilePreview(ctx: QueryCtx | MutationCtx, profileId: Id<"cat_profile">) {
   const profile = await ctx.db.get(profileId);
   if (!profile) return null;
@@ -239,16 +250,21 @@ async function resolveProfilePreview(ctx: QueryCtx | MutationCtx, profileId: Id<
   const previewUrl = previewImage ? await safeGetUrl(ctx, previewImage.storageId) : null;
   const fullUrl = fullImage ? await safeGetUrl(ctx, fullImage.storageId) : null;
   const sheetUrl = sheetImage ? await safeGetUrl(ctx, sheetImage.storageId) : null;
+  const profileIdString = docIdToString(profile._id);
 
   return {
-    id: docIdToString(profile._id),
+    id: profileIdString,
     slug: profile.slug,
     catName: profile.catName ?? null,
     creatorName: profile.creatorName ?? null,
     previews: {
       tiny: tinyUrl ? { url: tinyUrl, name: tinyImage?.filename ?? null } : null,
-      preview: previewUrl ? { url: previewUrl, name: previewImage?.filename ?? null } : null,
-      full: fullUrl ? { url: fullUrl, name: fullImage?.filename ?? null } : null,
+      preview: previewUrl
+        ? { url: previewUrl, name: previewImage?.filename ?? null }
+        : { url: getPreviewUrl(profileIdString, null), name: null },
+      full: fullUrl
+        ? { url: fullUrl, name: fullImage?.filename ?? null }
+        : { url: getPreviewUrl(profileIdString, null), name: null },
       spriteSheet: sheetUrl
         ? {
             url: sheetUrl,
@@ -263,8 +279,10 @@ async function resolveProfilePreview(ctx: QueryCtx | MutationCtx, profileId: Id<
 
 async function safeGetUrl(ctx: QueryCtx | MutationCtx, id: Id<"_storage">): Promise<string | null> {
   try {
+    // Convex Cloud returns proper absolute URLs from storage.getUrl()
+    // Return directly without normalization to avoid URL object property access restrictions
     const url = await ctx.storage.getUrl(id);
-    return normalizeStorageUrl(url);
+    return url ?? null;
   } catch (error) {
     console.warn("Failed to obtain storage URL", error);
     return null;
