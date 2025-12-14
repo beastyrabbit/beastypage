@@ -2,7 +2,7 @@ import { mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
-import { docIdToString, normalizeStorageUrl } from "./utils.js";
+import { docIdToString } from "./utils.js";
 
 type SeasonDoc = Doc<"card_season">;
 
@@ -78,9 +78,8 @@ export const ensureDefaults = mutation({
 
 async function seasonRecordToClient(ctx: QueryCtx, doc: SeasonDoc) {
   const id = docIdToString(doc._id);
-  const cardBackUrl = doc.cardBackStorageId
-    ? normalizeStorageUrl(await ctx.storage.getUrl(doc.cardBackStorageId))
-    : null;
+  // Convex Cloud returns proper absolute URLs - no normalization needed
+  const cardBackUrl = doc.cardBackStorageId ? await ctx.storage.getUrl(doc.cardBackStorageId) : null;
 
   return {
     id,

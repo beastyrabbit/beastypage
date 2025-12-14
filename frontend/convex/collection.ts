@@ -13,7 +13,7 @@ export const totalCount = query({
 });
 import type { Doc } from "./_generated/dataModel.js";
 import type { QueryCtx } from "./_generated/server.js";
-import { docIdToString, normalizeStorageUrl } from "./utils.js";
+import { docIdToString } from "./utils.js";
 
 type CollectionDoc = Doc<"collection">;
 
@@ -61,14 +61,10 @@ export const getDoc = internalQuery({
 });
 
 async function collectionDocToClient(ctx: QueryCtx, doc: CollectionDoc) {
-  const blurRaw = doc.blurImgStorageId ? await ctx.storage.getUrl(doc.blurImgStorageId) : null;
-  const blurUrl = doc.blurImgStorageId ? normalizeStorageUrl(blurRaw) : null;
-  const previewUrl = doc.previewImgStorageId
-    ? normalizeStorageUrl(await ctx.storage.getUrl(doc.previewImgStorageId))
-    : null;
-  const fullUrl = doc.fullImgStorageId
-    ? normalizeStorageUrl(await ctx.storage.getUrl(doc.fullImgStorageId))
-    : null;
+  // Convex Cloud returns proper absolute URLs - no normalization needed
+  const blurUrl = doc.blurImgStorageId ? await ctx.storage.getUrl(doc.blurImgStorageId) : null;
+  const previewUrl = doc.previewImgStorageId ? await ctx.storage.getUrl(doc.previewImgStorageId) : null;
+  const fullUrl = doc.fullImgStorageId ? await ctx.storage.getUrl(doc.fullImgStorageId) : null;
 
   return {
     id: docIdToString(doc._id),
