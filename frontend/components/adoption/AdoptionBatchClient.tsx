@@ -52,28 +52,35 @@ type AdoptionBatchClientProps = {
   slug: string;
 };
 
-function bestPreview(previews?: {
-  tiny?: { url: string | null } | null;
-  preview?: { url: string | null } | null;
-  full?: { url: string | null } | null;
-}) {
-  return previews?.preview?.url ?? previews?.full?.url ?? previews?.tiny?.url ?? null;
+/**
+ * Get the best available preview URL from cached previews,
+ * or construct on-demand URL if no cached preview exists.
+ */
+function getPreviewUrl(
+  profileId: string,
+  previews?: {
+    tiny?: { url: string | null } | null;
+    preview?: { url: string | null } | null;
+    full?: { url: string | null } | null;
+  }
+): string {
+  const cached = previews?.preview?.url ?? previews?.full?.url ?? previews?.tiny?.url ?? null;
+  return cached ?? `/api/preview/${profileId}`;
 }
 
-
 /**
- * Fix preview URLs: /api/... routes stay relative (Next.js routes),
- * while absolute URLs are kept as-is.
+ * Get full-res URL or fall back to on-demand preview.
  */
-const fixPreviewUrl = (url: string | null): string | null => {
-  if (!url) return url;
-  // /api/... paths are Next.js routes - keep them relative
-  if (url.startsWith("/api/")) return url;
-  // Absolute URLs are fine as-is
-  if (/^https?:\/\//i.test(url)) return url;
-  // For other relative paths, keep them relative
-  return url;
-};
+function getFullUrl(
+  profileId: string,
+  previews?: {
+    full?: { url: string | null } | null;
+    preview?: { url: string | null } | null;
+  }
+): string {
+  const cached = previews?.full?.url ?? previews?.preview?.url ?? null;
+  return cached ?? `/api/preview/${profileId}`;
+}
 
 function formatTimestamp(created?: number): string |
  null {
@@ -105,8 +112,9 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
           ? origin ? `${origin}/view?cat=${encoded}` : `/view?cat=${encoded}`
           : null;
 
-      const previewUrl = fixPreviewUrl(bestPreview(cat.previews ?? undefined));
-      const fullUrl = fixPreviewUrl(cat.previews?.full?.url ?? previewUrl);
+      const catProfileId = cat.profileId ?? cat.shareToken ?? `batch-cat-${cat.index}`;
+      const previewUrl = getPreviewUrl(catProfileId, cat.previews ?? undefined);
+      const fullUrl = getFullUrl(catProfileId, cat.previews ?? undefined);
 
       return {
         ...cat,

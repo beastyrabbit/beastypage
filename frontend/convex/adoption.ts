@@ -218,17 +218,10 @@ async function batchRecordToClient(ctx: QueryCtx | MutationCtx, doc: AdoptionBat
   };
 }
 
-const SITE_ORIGIN = (process.env.CONVEX_SITE_ORIGIN ?? "").trim().replace(/\/$/, "");
-
-function getPreviewUrl(profileId: string, cachedUrl: string | null): string {
-  // If we have a cached URL, use it
-  if (cachedUrl) return cachedUrl;
-  // Otherwise, return the on-demand endpoint
-  if (SITE_ORIGIN) return `${SITE_ORIGIN}/api/preview/${profileId}`;
-  // Local dev fallback (relative URL)
-  return `/api/preview/${profileId}`;
-}
-
+/**
+ * Resolve profile preview - returns cached storage URLs when available, null otherwise.
+ * The frontend uses /api/preview/{id} for on-demand rendering when no cached URL exists.
+ */
 async function resolveProfilePreview(ctx: QueryCtx | MutationCtx, profileId: Id<"cat_profile">) {
   const profile = await ctx.db.get(profileId);
   if (!profile) return null;
@@ -259,12 +252,8 @@ async function resolveProfilePreview(ctx: QueryCtx | MutationCtx, profileId: Id<
     creatorName: profile.creatorName ?? null,
     previews: {
       tiny: tinyUrl ? { url: tinyUrl, name: tinyImage?.filename ?? null } : null,
-      preview: previewUrl
-        ? { url: previewUrl, name: previewImage?.filename ?? null }
-        : { url: getPreviewUrl(profileIdString, null), name: null },
-      full: fullUrl
-        ? { url: fullUrl, name: fullImage?.filename ?? null }
-        : { url: getPreviewUrl(profileIdString, null), name: null },
+      preview: previewUrl ? { url: previewUrl, name: previewImage?.filename ?? null } : null,
+      full: fullUrl ? { url: fullUrl, name: fullImage?.filename ?? null } : null,
       spriteSheet: sheetUrl
         ? {
             url: sheetUrl,

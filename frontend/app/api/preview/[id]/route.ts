@@ -25,6 +25,14 @@ function dataUrlToBuffer(dataUrl: string): Buffer {
   return Buffer.from(base64, "base64");
 }
 
+/**
+ * Simple on-demand preview generation.
+ * 1. Fetch cat data from Convex
+ * 2. Render locally via renderer service
+ * 3. Return image directly (HTTP caching handles the rest)
+ * 
+ * No database caching, no redirects, no complexity.
+ */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: profileId } = await params;
 
@@ -40,27 +48,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const convex = new ConvexHttpClient(convexUrl);
 
-    // Get profile and check for existing preview
+    // Fetch cat profile from Convex
     const profile = await convex.query(api.mapper.get, { id: profileId as Id<"cat_profile"> });
     if (!profile) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // If a real cached preview exists (not the fallback on-demand URL), redirect to it
-    const existingPreviewUrl = profile.previews?.preview?.url ?? profile.previews?.full?.url ?? null;
-    // Skip redirect if the URL is the on-demand endpoint itself (would cause infinite redirect)
-    const isOnDemandUrl = existingPreviewUrl?.includes("/api/preview/");
-    if (existingPreviewUrl && !isOnDemandUrl) {
-      return NextResponse.redirect(existingPreviewUrl, 302);
-    }
-
-    // No preview exists - generate it
     const catData = profile.cat_data;
     if (!catData) {
       return NextResponse.json({ error: "Cat data not found" }, { status: 400 });
     }
 
-    // Render preview via local renderer
+    // Render preview via local renderer service
     const baseParams = catData?.params ?? catData?.finalParams ?? catData ?? {};
     const spriteNumber = baseParams?.spriteNumber ?? catData?.spriteNumber ?? 0;
     const renderPayload = {
@@ -98,30 +97,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Renderer returned no image" }, { status: 502 });
     }
 
-    // Upload to Convex storage via action
+    // Convert data URL to buffer and return directly
     const buffer = dataUrlToBuffer(imageDataUrl);
-    
-    // Convert buffer to base64 data URL for the action
-    const base64 = buffer.toString("base64");
-    const dataUrl = `data:image/png;base64,${base64}`;
-
-    // Upload preview via action
-    await convex.action(api.previews.upsertMapperPreviews, {
-      id: profileId as Id<"cat_profile">,
-      preview: {
-        dataUrl,
-        filename: `preview-${profileId}.png`,
-      },
-    });
-
-    // Return the image directly
-    // Convert Buffer to Uint8Array for NextResponse
     const uint8Array = new Uint8Array(buffer);
+
     return new NextResponse(uint8Array, {
       status: 200,
       headers: {
         "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=31536000, immutable",
+        // Cache for 1 day, allow CDN/browser caching
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
       },
     });
   } catch (error) {

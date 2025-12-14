@@ -41,33 +41,35 @@ function cleanDisplay(value: string | null | undefined): string {
   return trimmed;
 }
 
-function bestPreview(previews?: {
-  tiny?: { url: string | null } | null;
-  preview?: { url: string | null } | null;
-  full?: { url: string | null } | null;
-}) {
-  return previews?.preview?.url ?? previews?.full?.url ?? previews?.tiny?.url ?? null;
-}
-
-function fullPreview(previews?: {
-  full?: { url: string | null } | null;
-  preview?: { url: string | null } | null;
-}) {
-  return previews?.full?.url ?? previews?.preview?.url ?? null;
+/**
+ * Get the best available preview URL from cached previews,
+ * or construct on-demand URL if no cached preview exists.
+ */
+function getPreviewUrl(
+  profileId: string,
+  previews?: {
+    tiny?: { url: string | null } | null;
+    preview?: { url: string | null } | null;
+    full?: { url: string | null } | null;
+  }
+): string {
+  const cached = previews?.preview?.url ?? previews?.full?.url ?? previews?.tiny?.url ?? null;
+  // Use cached URL if available, otherwise use on-demand endpoint
+  return cached ?? `/api/preview/${profileId}`;
 }
 
 /**
- * Fix preview URLs: /api/... routes stay relative (Next.js routes),
- * while storage URLs get the Convex origin applied.
+ * Get full-res URL or fall back to on-demand preview.
  */
-function fixPreviewUrl(url: string | null): string | null {
-  if (!url) return url;
-  // /api/... paths are Next.js routes - keep them relative
-  if (url.startsWith("/api/")) return url;
-  // Absolute URLs are fine as-is
-  if (/^https?:\/\//i.test(url)) return url;
-  // For other relative paths (storage), we can leave them relative too
-  return url;
+function getFullUrl(
+  profileId: string,
+  previews?: {
+    full?: { url: string | null } | null;
+    preview?: { url: string | null } | null;
+  }
+): string {
+  const cached = previews?.full?.url ?? previews?.preview?.url ?? null;
+  return cached ?? `/api/preview/${profileId}`;
 }
 
 export function HistoryClient() {
@@ -94,8 +96,8 @@ export function HistoryClient() {
         title: cleanDisplay(profile.catName),
         creator: cleanDisplay(profile.creatorName) || null,
         created: profile.created ?? null,
-        previewUrl: fixPreviewUrl(bestPreview(profile.previews ?? undefined)),
-        fullUrl: fixPreviewUrl(fullPreview(profile.previews ?? undefined)),
+        previewUrl: getPreviewUrl(profile.id, profile.previews ?? undefined),
+        fullUrl: getFullUrl(profile.id, profile.previews ?? undefined),
         slug,
         variant,
         href,
@@ -125,8 +127,9 @@ export function HistoryClient() {
             ? `${origin}/view?cat=${encoded}`
             : `/view?cat=${encoded}`
           : null;
-      const previewUrl = fixPreviewUrl(bestPreview(cat.previews ?? undefined));
-      const fullUrl = fixPreviewUrl(fullPreview(cat.previews ?? undefined)) ?? previewUrl;
+      const catProfileId = cat.profileId ?? cat.shareToken ?? `adoption-${batch.id}-${index}`;
+      const previewUrl = getPreviewUrl(catProfileId, cat.previews ?? undefined);
+      const fullUrl = getFullUrl(catProfileId, cat.previews ?? undefined);
       return {
         index,
         label: cat.label ?? "",
