@@ -61,22 +61,18 @@ function bestPreview(previews?: {
 }
 
 
-const STORAGE_ORIGIN = (process.env.NEXT_PUBLIC_CONVEX_URL ?? "").replace(/\/$/, "") || null;
-
+/**
+ * Fix preview URLs: /api/... routes stay relative (Next.js routes),
+ * while absolute URLs are kept as-is.
+ */
 const fixPreviewUrl = (url: string | null): string | null => {
-  if (!url || !STORAGE_ORIGIN) return url;
-  try {
-    const base = new URL(STORAGE_ORIGIN);
-    const resolved = url.startsWith("/") ? new URL(url, base) : new URL(url);
-    resolved.protocol = base.protocol;
-    resolved.host = base.host;
-    return resolved.toString();
-  } catch {
-    if (url.startsWith("/")) {
-      return `${STORAGE_ORIGIN}${url}`;
-    }
-    return url;
-  }
+  if (!url) return url;
+  // /api/... paths are Next.js routes - keep them relative
+  if (url.startsWith("/api/")) return url;
+  // Absolute URLs are fine as-is
+  if (/^https?:\/\//i.test(url)) return url;
+  // For other relative paths, keep them relative
+  return url;
 };
 
 function formatTimestamp(created?: number): string |
