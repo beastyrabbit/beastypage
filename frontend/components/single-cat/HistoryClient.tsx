@@ -43,33 +43,24 @@ function cleanDisplay(value: string | null | undefined): string {
 
 /**
  * Get the best available preview URL from cached previews,
- * or construct on-demand URL if no cached preview exists.
+ * or construct on-demand URL with encoded cat data if no cached preview exists.
  */
 function getPreviewUrl(
-  profileId: string,
+  profileId: string | null,
+  encodedCatData: string | null,
   previews?: {
     tiny?: { url: string | null } | null;
     preview?: { url: string | null } | null;
     full?: { url: string | null } | null;
   }
-): string {
+): string | null {
   const cached = previews?.preview?.url ?? previews?.full?.url ?? previews?.tiny?.url ?? null;
-  // Use cached URL if available, otherwise use on-demand endpoint
-  return cached ?? `/api/preview/${profileId}`;
-}
-
-/**
- * Get full-res URL or fall back to on-demand preview.
- */
-function getFullUrl(
-  profileId: string,
-  previews?: {
-    full?: { url: string | null } | null;
-    preview?: { url: string | null } | null;
-  }
-): string {
-  const cached = previews?.full?.url ?? previews?.preview?.url ?? null;
-  return cached ?? `/api/preview/${profileId}`;
+  if (cached) return cached;
+  // Use encoded cat data for on-demand rendering
+  if (encodedCatData) return `/api/preview/_?cat=${encodeURIComponent(encodedCatData)}`;
+  // Fallback to profile ID lookup
+  if (profileId) return `/api/preview/${profileId}`;
+  return null;
 }
 
 export function HistoryClient() {
@@ -90,14 +81,15 @@ export function HistoryClient() {
       const variant: "single" | "guided" = mode === "wizard-timeline" ? "guided" : "single";
       const slug = profile.slug ?? profile.shareToken ?? profile.id;
       const href = variant === "guided" ? `/guided-builder/view/${slug}` : `/view/${slug}`;
+      const previewUrl = getPreviewUrl(profile.id, null, profile.previews ?? undefined);
       return {
         kind: "single" as const,
         id: profile.id,
         title: cleanDisplay(profile.catName),
         creator: cleanDisplay(profile.creatorName) || null,
         created: profile.created ?? null,
-        previewUrl: getPreviewUrl(profile.id, profile.previews ?? undefined),
-        fullUrl: getFullUrl(profile.id, profile.previews ?? undefined),
+        previewUrl,
+        fullUrl: previewUrl,
         slug,
         variant,
         href,
@@ -127,9 +119,8 @@ export function HistoryClient() {
             ? `${origin}/view?cat=${encoded}`
             : `/view?cat=${encoded}`
           : null;
-      const catProfileId = cat.profileId ?? cat.shareToken ?? `adoption-${batch.id}-${index}`;
-      const previewUrl = getPreviewUrl(catProfileId, cat.previews ?? undefined);
-      const fullUrl = getFullUrl(catProfileId, cat.previews ?? undefined);
+      const previewUrl = getPreviewUrl(cat.profileId ?? null, encoded, cat.previews ?? undefined);
+      const fullUrl = previewUrl;
       return {
         index,
         label: cat.label ?? "",
