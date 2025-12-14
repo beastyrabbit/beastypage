@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { AppProviders } from "@/components/providers";
 import { RuntimeEnvScript } from "@/components/runtime-env-script";
 import { SiteHeader } from "@/components/site-header";
-import { resolveNavItems } from "@/components/site-nav-config";
 import { SiteFooter } from "@/components/site-footer";
 import { Toaster } from "sonner";
 import "./globals.css";
@@ -33,7 +32,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const navItems = resolveNavItems(process.env as Record<string, string | undefined>);
   return (
     <html lang="en" suppressHydrationWarning className="dark">
       <body
@@ -42,7 +40,7 @@ export default function RootLayout({
         <RuntimeEnvScript />
         <AppProviders>
           <div className="relative flex min-h-screen flex-col">
-            <SiteHeader navItems={navItems} />
+            <SiteHeader />
             <div className="flex-1">{children}</div>
             <SiteFooter />
           </div>
