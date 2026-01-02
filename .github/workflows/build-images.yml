@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
     paths:
       - 'frontend/**'
       - 'backend/renderer_service/**'
@@ -45,7 +47,7 @@ jobs:
 
   build-frontend:
     needs: changes
-    if: needs.changes.outputs.frontend == 'true' || github.event.inputs.build_frontend == 'true'
+    if: startsWith(github.ref, 'refs/tags/') || needs.changes.outputs.frontend == 'true' || github.event.inputs.build_frontend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,8 +66,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-frontend
           tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
 
       # Note: NEXT_PUBLIC_CONVEX_URL uses a placeholder at build time
       # and is injected at runtime via docker-entrypoint.sh
@@ -84,7 +88,7 @@ jobs:
 
   build-renderer:
     needs: changes
-    if: needs.changes.outputs.renderer == 'true' || github.event.inputs.build_renderer == 'true'
+    if: startsWith(github.ref, 'refs/tags/') || needs.changes.outputs.renderer == 'true' || github.event.inputs.build_renderer == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -103,8 +107,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-renderer
           tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=
-            type=raw,value=latest
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - uses: docker/build-push-action@v6
         with:
