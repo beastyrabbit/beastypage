@@ -6,7 +6,8 @@ This directory now hosts all backend-facing infrastructure for the BeastyRabbit 
 
 - `renderer_service/` – FastAPI + uv powered CatGenerator V3 renderer. The service is self-contained
   (sprite atlases live under `renderer_service/sprites`) and is packaged for deployment via Docker/uvicorn.
-- `img_service/` – FastAPI utility service for lightweight image transformations (Catdex thumbnails, etc.).
+
+> **Note:** Image transformations (Catdex thumbnails) are now handled by `sharp` directly in Convex.
 
 ## Renderer service
 
