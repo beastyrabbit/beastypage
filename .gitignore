@@ -45,3 +45,11 @@ node_modules/
 
 # Systemd / secrets
 systemd/
+
+# Test scripts (may contain credentials)
+test-*.sh
+
+# Temporary/cache directories
+.tmp/
+.serena/
+bun.lock
