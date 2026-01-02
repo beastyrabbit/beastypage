@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import type { CatParams } from '@/lib/cat-v3/types';
 import { generateRandomParamsV3 } from '@/lib/cat-v3/randomGenerator';
 
 const SAMPLE_COUNT = Number(process.env.CG3_DIST_SAMPLES ?? '2000');
@@ -22,7 +23,7 @@ async function loadJsonAsset(relPath: string): Promise<Response> {
 }
 
 beforeAll(() => {
-  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     if (typeof input === 'string' && input.startsWith('/sprite-data/')) {
       const rel = input.replace('/sprite-data/', '');
       return loadJsonAsset(rel);
@@ -32,7 +33,7 @@ beforeAll(() => {
       return loadJsonAsset(rel);
     }
     return originalFetch(input, init);
-  };
+  }) as typeof fetch;
 });
 
 afterAll(() => {
@@ -65,7 +66,7 @@ function record(summary: Summary, key: SummaryKey, value: string | number | null
   bucket[label] = (bucket[label] ?? 0) + 1;
 }
 
-function summarise(params: Record<string, unknown>): Summary {
+function summarise(params: CatParams | Record<string, unknown>): Summary {
   const summary = emptySummary();
   const tortieList = Array.isArray(params.tortie) ? params.tortie : [];
   record(summary, 'tortieCount', tortieList.length);
@@ -73,9 +74,9 @@ function summarise(params: Record<string, unknown>): Summary {
   record(summary, 'accessoryCount', accessories.length);
   const scars = Array.isArray(params.scars) ? params.scars : [];
   record(summary, 'scarCount', scars.length);
-  record(summary, 'whitePatches', params.whitePatches);
-  record(summary, 'vitiligo', params.vitiligo);
-  record(summary, 'points', params.points);
+  record(summary, 'whitePatches', params.whitePatches as string | number | null | undefined);
+  record(summary, 'vitiligo', params.vitiligo as string | number | null | undefined);
+  record(summary, 'points', params.points as string | number | null | undefined);
   return summary;
 }
 
@@ -120,7 +121,8 @@ describe('random generator parity', () => {
     const summaryV3 = emptySummary();
 
     for (let i = 0; i < SAMPLE_COUNT; i += 1) {
-      const v2Params = await catGenerator.generateRandomParams({ ignoreForbiddenSprites: true });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const v2Params = await (catGenerator.generateRandomParams as (options?: any) => Promise<Record<string, unknown>>)({ ignoreForbiddenSprites: true });
       mergeSummaries(summaryV2, summarise(v2Params));
 
       const v3Params = await generateRandomParamsV3({ ignoreForbiddenSprites: true });

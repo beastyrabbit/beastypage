@@ -69,17 +69,17 @@ function toStringArray(value: unknown): string[] {
 
 function normalizeTortieLayers(value: unknown): TortieLayer[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .map((entry) => {
-      if (typeof entry !== "object" || entry === null) return null;
-      const record = entry as Record<string, unknown>;
-      const pattern = coerceString(record.pattern ?? record.peltName);
-      const colour = coerceString(record.colour ?? record.color);
-      const mask = coerceString(record.mask);
-      if (!pattern || !colour || !mask) return null;
-      return { pattern, colour, mask } satisfies TortieLayer;
-    })
-    .filter((entry): entry is TortieLayer => entry !== null);
+  const result: TortieLayer[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    const pattern = coerceString(record.pattern ?? record.peltName);
+    const colour = coerceString(record.colour ?? record.color);
+    const mask = coerceString(record.mask);
+    if (!pattern || !colour || !mask) continue;
+    result.push({ pattern, colour, mask });
+  }
+  return result;
 }
 
 function sanitizeOption(value: unknown): string | undefined {

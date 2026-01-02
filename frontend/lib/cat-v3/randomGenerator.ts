@@ -1,17 +1,10 @@
-import type { CatRenderParams } from './types';
+import type { CatParams, TortieLayer, RandomGenerationOptions } from './types';
 import config from './random-config.json';
 
 type CountCategory = 'tortie' | 'accessories' | 'scars';
 type CountStrategy = 'weighted' | 'uniform';
 
-export interface RandomGenerationOptions {
-  ignoreForbiddenSprites?: boolean;
-  experimentalColourMode?: string | string[];
-  includeBaseColours?: boolean;
-  countsMode?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>;
-  slotOverrides?: Partial<Record<CountCategory, number>>;
-  whitePatchColourMode?: string;
-}
+export type { RandomGenerationOptions } from './types';
 
 interface CountConfig {
   weights?: Record<string, number>;
@@ -187,7 +180,7 @@ function drawUnique<T>(available: T[]): T | null {
   return item ?? null;
 }
 
-export async function generateRandomParamsV3(options: RandomGenerationOptions = {}): Promise<CatRenderParams['params']> {
+export async function generateRandomParamsV3(options: RandomGenerationOptions = {}): Promise<CatParams> {
   const spriteMapper = await ensureSpriteMapper();
 
   const spriteInclude = ensureArray(RANDOM_CONFIG.spritePool.include);
@@ -220,7 +213,7 @@ export async function generateRandomParamsV3(options: RandomGenerationOptions = 
   const points = spriteMapper.getPoints();
   const vitiligo = spriteMapper.getVitiligo();
 
-  const params: Record<string, unknown> = {
+  const params: CatParams = {
     spriteNumber,
     peltName: pickOne(pelts),
     colour: pickOne(colours),
@@ -229,6 +222,7 @@ export async function generateRandomParamsV3(options: RandomGenerationOptions = 
     eyeColour: pickOne(eyeColours),
     shading: roll(RANDOM_CONFIG.probabilities.shading),
     reverse: roll(RANDOM_CONFIG.probabilities.reverse),
+    isTortie: false,
   };
 
   if (roll(RANDOM_CONFIG.probabilities.isTortie)) {
@@ -255,7 +249,7 @@ export async function generateRandomParamsV3(options: RandomGenerationOptions = 
     const uniqueMasks = tortieConfig.unique !== false;
     const availableMasks = uniqueMasks ? [...masks] : masks;
     const layerProbability = RANDOM_CONFIG.probabilities.tortieLayer ?? RANDOM_CONFIG.probabilities.isTortie ?? 0.5;
-    const tortiePatterns: Array<{ mask: string; pattern: string; colour: string }> = [];
+    const tortiePatterns: TortieLayer[] = [];
 
     for (let slot = 0; slot < slotCount; slot += 1) {
       const shouldAdd = slot === 0 || roll(layerProbability);

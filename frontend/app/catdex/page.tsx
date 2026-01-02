@@ -82,7 +82,7 @@ export default function CatdexPage() {
   const [submitOpen, setSubmitOpen] = useState(false);
   const [massUploadOpen, setMassUploadOpen] = useState(false);
 
-  const submitHoldTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const submitHoldTimerRef = useRef<number | null>(null);
   const submitHoldTriggeredRef = useRef(false);
 
   const clearSubmitHold = useCallback(() => {

@@ -208,7 +208,6 @@ export function HostClient() {
   const updateSession = useMutation(api.streamSessions.update);
   const completeSession = useMutation(api.streamSessions.update);
   const createVote = useMutation(api.streamVotes.create);
-  const resetVotes = useMutation(api.streamVotes.resetStep);
   const updateParticipant = useMutation(api.streamParticipants.update);
   const createMapperRecord = useMutation(api.mapper.create);
 
@@ -772,18 +771,13 @@ export function HostClient() {
     const keys = effectiveTieKeys;
     if (!keys.length) return;
 
-    await resetVotes({
-      sessionId: toId("stream_sessions", activeSessionId),
-      stepId: currentStep.id,
-    });
-
     await updateSessionParams((draft) => {
       draft._tieFilter = keys;
       draft._votesOpen = true;
       draft._tieIteration = ((draft._tieIteration as number | undefined) ?? 0) + 1;
     });
     setStatusMessage("Tie-break vote reopened for the tied options.");
-  }, [effectiveTieKeys, updateSessionParams, resetVotes, currentStep, activeSessionId]);
+  }, [effectiveTieKeys, updateSessionParams, currentStep, activeSessionId]);
 
   const handleTieClear = useCallback(async () => {
     await updateSessionParams((draft) => {

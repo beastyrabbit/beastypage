@@ -138,6 +138,9 @@ export const PARAM_TIMING_PRESETS: Record<ParamTimingKey, TimingPresetSet> = {
   tortiePattern: { slow: 420, normal: 210, fast: 170 },
   tortieColour: { slow: 420, normal: 210, fast: 170 },
   sprite: { slow: 380, normal: 190, fast: 150 },
+  reverse: { slow: 300, normal: 150, fast: 120 },
+  tortie: { slow: 400, normal: 200, fast: 160 },
+  shading: { slow: 300, normal: 150, fast: 120 },
 };
 
 const STORAGE_KEY = "singleCatPlus.paramTiming";
@@ -231,8 +234,8 @@ export function loadTimingConfig(): SpinTimingConfig {
       delays: { ...DEFAULT_TIMING_CONFIG.delays, ...(parsed.delays ?? {}) },
       subsetLimits: { ...(DEFAULT_TIMING_CONFIG.subsetLimits ?? {}), ...(parsed.subsetLimits ?? {}) },
       pauseDelays: {
-        ...(DEFAULT_TIMING_CONFIG.pauseDelays ?? {}),
-        ...(parsed.pauseDelays ?? {}),
+        flashyMs: parsed.pauseDelays?.flashyMs ?? DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ?? 1000,
+        calmMs: parsed.pauseDelays?.calmMs ?? DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ?? 1000,
       },
     };
     return hydrated;

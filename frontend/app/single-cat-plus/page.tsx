@@ -38,7 +38,7 @@ function parseAfterlife(value: string | null, fallback: AfterlifeOption): Afterl
 function SingleCatPlusContent() {
   const searchParams = useSearchParams();
   const params = useMemo(() => {
-    const mode = searchParams.get("mode") === "calm" ? "calm" : "flashy";
+    const mode: "flashy" | "calm" = searchParams.get("mode") === "calm" ? "calm" : "flashy";
     const accessories = parseRange(searchParams.get("accessories"), RANGE_FALLBACKS.accessories);
     const scars = parseRange(searchParams.get("scars"), RANGE_FALLBACKS.scars);
     const torties = parseRange(searchParams.get("torties"), RANGE_FALLBACKS.torties);

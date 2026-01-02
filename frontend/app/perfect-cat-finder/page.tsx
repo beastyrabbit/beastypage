@@ -111,7 +111,7 @@ async function buildRandomCat(generator: Awaited<ReturnType<typeof useCatGenerat
   const accessorySlots = randomInt(6);
   const scarSlots = randomInt(4);
   const tortieSlots = randomInt(4);
-  const randomParams = (await randomizer({
+  const randomParams = await randomizer({
     ignoreForbiddenSprites: true,
     experimentalColourMode: experimentalMode,
     includeBaseColours: true,
@@ -120,11 +120,10 @@ async function buildRandomCat(generator: Awaited<ReturnType<typeof useCatGenerat
       scars: scarSlots,
       tortie: tortieSlots,
     },
-  } as Record<string, unknown>)) as Record<string, unknown>;
+  });
 
-  const spriteNumberRaw = (randomParams.spriteNumber ?? randomParams.sprite) as number | undefined;
-  const spriteNumber = Number.isFinite(spriteNumberRaw) ? Number(spriteNumberRaw) : 0;
-  const { spriteNumber: _ignored, sprite: _legacy, ...rest } = randomParams;
+  const spriteNumber = Number.isFinite(randomParams.spriteNumber) ? randomParams.spriteNumber : 0;
+  const { spriteNumber: _ignored, ...rest } = randomParams;
 
   return {
     spriteNumber,

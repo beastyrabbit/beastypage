@@ -178,21 +178,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
           return;
         }
 
-        if ("inviteUrl" in result && typeof result.inviteUrl === "string") {
-          setInviteUrl(result.inviteUrl);
-          setStatus("success");
-          setChallenge(null);
-          setAnswer("");
-          setAttemptCount(0);
-          setCooldownUntil(null);
-          return;
-        }
       }
-
-      setStatus("error");
-      setInviteUrl(null);
-      setChallenge(null);
-      setError("Unexpected response from the server. Please try again.");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong.";
       if (/incorrect answer/i.test(message) || /answer must be a number/i.test(message) || /challenge (expired|timed out)/i.test(message)) {

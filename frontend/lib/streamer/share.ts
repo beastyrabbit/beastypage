@@ -9,46 +9,46 @@ export type StreamerHistoryEntry = {
   votes?: number;
 };
 
-function sanitizeParams(params: StreamerParams) {
-  const packaged = cloneParams(params);
+function sanitizeParams(params: StreamerParams): StreamerParams {
+  const cloned = cloneParams(params);
 
-  const internalKeys = Object.keys(packaged).filter((key) => key.startsWith("_"));
-  for (const key of internalKeys) {
-    delete (packaged as Record<string, unknown>)[key];
-  }
+  // Filter out internal keys using Object.fromEntries
+  const filtered = Object.fromEntries(
+    Object.entries(cloned).filter(([key]) => !key.startsWith("_"))
+  ) as StreamerParams;
 
-  const accessories = Array.isArray(packaged.accessories)
-    ? packaged.accessories.filter((item) => item !== undefined)
+  const accessories = Array.isArray(filtered.accessories)
+    ? filtered.accessories.filter((item) => item !== undefined)
     : [];
-  const scars = Array.isArray(packaged.scars)
-    ? packaged.scars.filter((item) => item !== undefined)
+  const scars = Array.isArray(filtered.scars)
+    ? filtered.scars.filter((item) => item !== undefined)
     : [];
 
-  packaged.accessories = accessories.map((item) => (item === null ? null : String(item)));
-  packaged.scars = scars.map((item) => (item === null ? null : String(item)));
-  packaged.accessory =
-    packaged.accessories.find((item) => typeof item === "string" && item) ?? undefined;
-  packaged.scar = packaged.scars.find((item) => typeof item === "string" && item) ?? undefined;
+  filtered.accessories = accessories.map((item) => (item === null ? null : String(item)));
+  filtered.scars = scars.map((item) => (item === null ? null : String(item)));
+  filtered.accessory =
+    filtered.accessories.find((item) => typeof item === "string" && item) ?? undefined;
+  filtered.scar = filtered.scars.find((item) => typeof item === "string" && item) ?? undefined;
 
-  const tortieLayers = Array.isArray(packaged.tortie)
-    ? packaged.tortie.filter((layer) => layer && typeof layer === "object").map((layer) => ({
+  const tortieLayers = Array.isArray(filtered.tortie)
+    ? filtered.tortie.filter((layer) => layer && typeof layer === "object").map((layer) => ({
         mask: layer?.mask ?? "ONE",
-        pattern: layer?.pattern ?? packaged.peltName ?? "SingleColour",
-        colour: layer?.colour ?? packaged.colour ?? "GINGER",
+        pattern: layer?.pattern ?? filtered.peltName ?? "SingleColour",
+        colour: layer?.colour ?? filtered.colour ?? "GINGER",
       }))
     : [];
 
-  packaged.tortie = tortieLayers;
-  packaged.isTortie = tortieLayers.length > 0;
-  packaged.tortiePattern = tortieLayers[0]?.pattern;
-  packaged.tortieColour = tortieLayers[0]?.colour;
-  packaged.tortieMask = tortieLayers[0]?.mask;
+  filtered.tortie = tortieLayers;
+  filtered.isTortie = tortieLayers.length > 0;
+  filtered.tortiePattern = tortieLayers[0]?.pattern;
+  filtered.tortieColour = tortieLayers[0]?.colour;
+  filtered.tortieMask = tortieLayers[0]?.mask;
 
-  if (!Number.isFinite(packaged.spriteNumber)) {
-    (packaged as Record<string, unknown>).spriteNumber = 0;
+  if (!Number.isFinite(filtered.spriteNumber)) {
+    filtered.spriteNumber = 0;
   }
 
-  return packaged;
+  return filtered;
 }
 
 export function buildStreamerSharePayload(

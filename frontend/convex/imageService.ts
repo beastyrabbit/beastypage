@@ -104,7 +104,7 @@ async function generateThumbnail(
 
     // Store the thumbnail
     const thumbStorageId = await ctx.storage.store(
-      new Blob([processed], { type: "image/jpeg" })
+      new Blob([new Uint8Array(processed)], { type: "image/jpeg" })
     );
 
     const thumbName = `${name ?? variant}-card-thumb.jpg`;

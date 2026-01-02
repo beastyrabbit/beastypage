@@ -10,6 +10,7 @@ import { useMutation } from "convex/react";
 import { cn } from "@/lib/utils";
 import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
 import type { CatGeneratorApi, SpriteMapperApi } from "@/components/cat-builder/types";
+import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import { canvasToDataUrl, cloneParams, formatName, getColourSwatch } from "@/components/cat-builder/utils";
 
 type PaletteMode = "off" | "mood" | "bold" | "darker" | "blackout";
@@ -21,6 +22,9 @@ type StepId =
   | "tortie-layer-1"
   | "tortie-layer-2"
   | "tortie-layer-3"
+  | "tortie-layer-4"
+  | "tortie-layer-5"
+  | "tortie-layer-6"
   | "eyes"
   | "accents"
   | "skin-tint"
@@ -46,37 +50,6 @@ interface StepDefinition {
     | "pose";
   parent?: StepId;
   layerIndex?: number;
-}
-
-interface TortieLayer {
-  pattern?: string;
-  colour?: string;
-  mask?: string;
-}
-
-interface CatParams {
-  spriteNumber: number;
-  peltName: string;
-  colour: string;
-  isTortie: boolean;
-  tortiePattern?: string;
-  tortieColour?: string;
-  tortieMask?: string;
-  tortie?: TortieLayer[];
-  eyeColour: string;
-  eyeColour2?: string;
-  skinColour: string;
-  whitePatches?: string;
-  whitePatchesTint?: string;
-  points?: string;
-  vitiligo?: string;
-  tint?: string;
-  shading: boolean;
-  reverse: boolean;
-  accessory?: string;
-  accessories?: string[];
-  scar?: string;
-  scars?: string[];
 }
 
 interface StepState {
@@ -153,7 +126,7 @@ export function GuidedBuilderClient() {
   const [desiredTortieLayers, setDesiredTortieLayers] = useState(0);
   const [experimentalColourMode, setExperimentalColourMode] = useState<PaletteMode>("off");
   const [tortiePaletteMode, setTortiePaletteMode] = useState<PaletteMode>("off");
-  const [stepStates, setStepStates] = useState<Record<StepId, StepState>>({});
+  const [stepStates, setStepStates] = useState<Record<StepId, StepState>>({} as Record<StepId, StepState>);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [unlockedSteps, setUnlockedSteps] = useState<StepId[]>(["colour"]);
   const [activeStep, setActiveStep] = useState<StepId>("colour");
@@ -774,17 +747,14 @@ export function GuidedBuilderClient() {
   const handleAccessoryToggle = useCallback(
     (accessory: string, enabled: boolean) => {
       updateParams((draft) => {
-        const set = new Set(draft.accessories ?? []);
+        const set = new Set((draft.accessories ?? []).filter((x): x is string => x !== null));
         if (enabled) {
           set.add(accessory);
         } else {
           set.delete(accessory);
         }
         draft.accessories = Array.from(set);
-        draft.accessory = draft.accessories[0];
-        if (!draft.accessories.length) {
-          draft.accessory = undefined;
-        }
+        draft.accessory = draft.accessories[0] ?? undefined;
       }, "accessories");
     },
     [updateParams]
@@ -793,17 +763,14 @@ export function GuidedBuilderClient() {
   const handleScarToggle = useCallback(
     (scar: string, enabled: boolean) => {
       updateParams((draft) => {
-        const set = new Set(draft.scars ?? []);
+        const set = new Set((draft.scars ?? []).filter((x): x is string => x !== null));
         if (enabled) {
           set.add(scar);
         } else {
           set.delete(scar);
         }
         draft.scars = Array.from(set);
-        draft.scar = draft.scars[0];
-        if (!draft.scars.length) {
-          draft.scar = undefined;
-        }
+        draft.scar = draft.scars[0] ?? undefined;
       }, "scars");
     },
     [updateParams]
@@ -881,7 +848,7 @@ export function GuidedBuilderClient() {
     setDesiredTortieLayers(0);
     setExperimentalColourMode("off");
     setTortiePaletteMode("off");
-    setStepStates({});
+    setStepStates({} as Record<StepId, StepState>);
     setTimeline([]);
     setUnlockedSteps(["colour"]);
     setActiveStep("colour");
@@ -1493,10 +1460,10 @@ export function GuidedBuilderClient() {
                     <PreviewSprite
                       cacheKey={previewKey}
                       mutate={(draft) => {
-                        const set = new Set(draft.accessories ?? []);
+                        const set = new Set((draft.accessories ?? []).filter((x): x is string => x !== null));
                         set.add(option);
                         draft.accessories = Array.from(set);
-                        draft.accessory = draft.accessories[0];
+                        draft.accessory = draft.accessories[0] ?? undefined;
                       }}
                       label={label}
                       selected={selected}

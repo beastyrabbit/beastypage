@@ -1,3 +1,5 @@
+import type { CatParams, RandomGenerationOptions, BatchRenderResponse } from '@/lib/cat-v3/types';
+
 export interface SpriteMapperApi {
   loaded: boolean;
   init(): Promise<boolean>;
@@ -26,22 +28,22 @@ export interface SpriteMapperApi {
 }
 
 export interface CatGeneratorApi {
-  generateCat(params: Record<string, unknown>): Promise<{
+  generateCat(params: Partial<CatParams> | CatParams): Promise<{
     canvas: HTMLCanvasElement | OffscreenCanvas;
     imageDataUrl?: string | null;
     meta?: unknown;
   }>;
-  generateRandomParams?(options?: Record<string, unknown>): Promise<Record<string, unknown>>;
-  generateRandomCat?(options?: Record<string, unknown>): Promise<{
-    params: Record<string, unknown>;
+  generateRandomParams?(options?: RandomGenerationOptions): Promise<CatParams>;
+  generateRandomCat?(options?: RandomGenerationOptions): Promise<{
+    params: CatParams;
     canvas: HTMLCanvasElement | OffscreenCanvas;
   }>;
-  buildCatURL?(params: Record<string, unknown>): string;
+  buildCatURL?(params: Partial<CatParams> | CatParams): string;
   generateVariantSheet?(
-    baseParams: Record<string, unknown>,
-    variants: { id: string; params: Record<string, unknown>; label?: string }[],
+    baseParams: Partial<CatParams> | CatParams,
+    variants: { id: string; params: Partial<CatParams>; label?: string; group?: string }[],
     options?: unknown
-  ): Promise<unknown>;
+  ): Promise<BatchRenderResponse>;
 }
 
 export interface BuilderOptions {

@@ -11,12 +11,13 @@ import type {
   BatchRenderOptions,
   BatchRenderResponse,
   BatchVariantPayload,
+  CatParams,
   CatRenderParams,
 } from '@/lib/cat-v3/types';
 
 type VariantInput = {
   id: string;
-  params: Record<string, unknown>;
+  params: Partial<CatParams>;
   label?: string;
   group?: string;
 };
@@ -50,8 +51,8 @@ function coerceSpriteNumber(value: unknown, fallback = 0): number {
   return fallback;
 }
 
-function splitPayload(params: Record<string, unknown>): CatRenderParams {
-  const working = clonePlain(params);
+function splitPayload(params: CatParams | Partial<CatParams>): CatRenderParams {
+  const working = clonePlain(params as Record<string, unknown>);
   const spriteNumber = coerceSpriteNumber(
     working.spriteNumber ?? working.sprite_number ?? working.sprite,
     0
@@ -61,11 +62,11 @@ function splitPayload(params: Record<string, unknown>): CatRenderParams {
   delete working.sprite;
   return {
     spriteNumber,
-    params: working,
+    params: working as Omit<CatParams, 'spriteNumber'>,
   };
 }
 
-function buildLegacyUrl(params: Record<string, unknown> | null | undefined): string {
+function buildLegacyUrl(params: CatParams | null | undefined): string {
   if (!params) return '';
 
   const urlParams = new URLSearchParams();
@@ -123,7 +124,7 @@ export class CatGeneratorV3 {
     this.baseUrl = baseUrl;
   }
 
-  async generateCat(params: Record<string, unknown>) {
+  async generateCat(params: CatParams) {
     const payload = splitPayload(params);
     const response = await renderCatV3(payload, { baseUrl: this.baseUrl });
     const canvas = await decodeImageFromDataUrl(response.imageDataUrl);
@@ -171,12 +172,12 @@ export class CatGeneratorV3 {
     return { params, canvas: result.canvas };
   }
 
-  buildCatURL(params: Record<string, unknown>) {
+  buildCatURL(params: CatParams) {
     return buildLegacyUrl(params);
   }
 
   async generateVariantSheet(
-    baseParams: Record<string, unknown>,
+    baseParams: CatParams,
     variants: VariantInput[],
     options?: (BatchRenderOptions & { priority?: RequestPriority })
   ): Promise<BatchRenderResponse> {

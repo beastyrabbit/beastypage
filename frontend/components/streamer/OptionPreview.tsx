@@ -6,9 +6,23 @@ import Image from "next/image";
 import { cloneParams, ensureSpriteDataLoaded } from "@/lib/streamer/steps";
 import type { StreamerParams, StreamStep } from "@/lib/streamer/steps";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
+import type { CatParams } from "@/lib/cat-v3/types";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 
 type StepOption = ReturnType<StreamStep["getOptions"]>[number];
+
+interface VariantSheetFrame {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface VariantSheetResult {
+  sheetDataUrl: string;
+  frames: VariantSheetFrame[];
+}
 
 type OptionPreviewProps = {
   generator: CatGeneratorApi | null;
@@ -37,14 +51,15 @@ function buildChunkCacheKey(
   return `${stepId ?? "unknown"}|chunk|${size}|${chunkSize}|${baseSignature}|${chunkOptionKeys.join(",")}`;
 }
 
-function stripInternalFields(params: StreamerParams): Record<string, unknown> {
-  const clone = cloneParams(params) as Record<string, unknown>;
-  for (const key of Object.keys(clone)) {
-    if (key.startsWith("_")) {
-      delete clone[key];
+function stripInternalFields(params: StreamerParams): Partial<CatParams> {
+  const clone = cloneParams(params);
+  const result: Partial<CatParams> = {};
+  for (const [key, value] of Object.entries(clone)) {
+    if (!key.startsWith("_")) {
+      (result as Record<string, unknown>)[key] = value;
     }
   }
-  return clone;
+  return result;
 }
 
 async function renderChunkPreviews(
@@ -76,7 +91,7 @@ async function renderChunkPreviews(
 
   try {
     if (typeof generator.generateVariantSheet === "function") {
-      const sheet = await generator.generateVariantSheet(
+      const sheet = (await generator.generateVariantSheet(
         sanitizedBase,
         descriptors.map((descriptor) => ({
           id: descriptor.key,
@@ -88,11 +103,11 @@ async function renderChunkPreviews(
           frameMode: "composed",
           priority: "auto",
         }
-      );
+      )) as VariantSheetResult;
 
       if (sheet.frames.length > 0) {
         const sheetCanvas = await decodeImageFromDataUrl(sheet.sheetDataUrl);
-        const frameMap = new Map(sheet.frames.map((frame) => [frame.id, frame]));
+        const frameMap = new Map<string, VariantSheetFrame>(sheet.frames.map((frame) => [frame.id, frame]));
 
         for (const descriptor of descriptors) {
           const frame = frameMap.get(descriptor.key);

@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { CatParams } from '@/lib/cat-v3/types';
 import type { RandomGenerationOptions } from '@/lib/cat-v3/randomGenerator';
 import { ensureSpriteMapper, generateRandomParamsV3 } from '@/lib/cat-v3/randomGenerator';
 
 type CountStrategy = 'weighted' | 'uniform';
 
-type JsonParams = Record<string, unknown>;
+type JsonParams = CatParams;
 
 interface MetricDefinition {
   key: string;
@@ -51,13 +52,13 @@ const DEFAULT_ITERATIONS = 10000;
 const MAX_DISPLAY_ROWS = 15;
 
 const METRICS: MetricDefinition[] = [
-  { key: 'spriteNumber', label: 'Sprite Number', extractor: (p) => p.spriteNumber ?? 'unknown', importance: 'high' },
-  { key: 'peltName', label: 'Pelt', extractor: (p) => p.peltName, importance: 'high' },
-  { key: 'colour', label: 'Base Colour', extractor: (p) => p.colour, importance: 'high' },
-  { key: 'tint', label: 'Tint', extractor: (p) => p.tint, importance: 'high' },
-  { key: 'skinColour', label: 'Skin Colour', extractor: (p) => p.skinColour },
-  { key: 'eyeColour', label: 'Eye Colour', extractor: (p) => p.eyeColour },
-  { key: 'eyeColour2', label: 'Second Eye Colour', extractor: (p) => p.eyeColour2 },
+  { key: 'spriteNumber', label: 'Sprite Number', extractor: (p) => (p.spriteNumber as string | number | null | undefined) ?? 'unknown', importance: 'high' },
+  { key: 'peltName', label: 'Pelt', extractor: (p) => p.peltName as string | null | undefined, importance: 'high' },
+  { key: 'colour', label: 'Base Colour', extractor: (p) => p.colour as string | null | undefined, importance: 'high' },
+  { key: 'tint', label: 'Tint', extractor: (p) => p.tint as string | null | undefined, importance: 'high' },
+  { key: 'skinColour', label: 'Skin Colour', extractor: (p) => p.skinColour as string | null | undefined },
+  { key: 'eyeColour', label: 'Eye Colour', extractor: (p) => p.eyeColour as string | null | undefined },
+  { key: 'eyeColour2', label: 'Second Eye Colour', extractor: (p) => p.eyeColour2 as string | null | undefined },
   { key: 'reverse', label: 'Reverse Pose', extractor: (p) => Boolean(p.reverse) },
   { key: 'shading', label: 'Shading Enabled', extractor: (p) => Boolean(p.shading) },
   { key: 'isTortie', label: 'Is Tortie', extractor: (p) => Boolean(p.isTortie), importance: 'high' },
@@ -76,14 +77,14 @@ const METRICS: MetricDefinition[] = [
       return layers.map((layer) => layer.mask ?? 'unknown');
     },
   },
-  { key: 'whitePatches', label: 'White Patches', extractor: (p) => p.whitePatches ?? 'none', importance: 'high' },
+  { key: 'whitePatches', label: 'White Patches', extractor: (p) => (p.whitePatches as string | null | undefined) ?? 'none', importance: 'high' },
   {
     key: 'whitePatchesTint',
     label: 'White Patch Tint',
-    extractor: (p) => p.whitePatchesTint ?? 'none',
+    extractor: (p) => (p.whitePatchesTint as string | null | undefined) ?? 'none',
   },
-  { key: 'points', label: 'Points', extractor: (p) => p.points ?? 'none', importance: 'high' },
-  { key: 'vitiligo', label: 'Vitiligo', extractor: (p) => p.vitiligo ?? 'none', importance: 'high' },
+  { key: 'points', label: 'Points', extractor: (p) => (p.points as string | null | undefined) ?? 'none', importance: 'high' },
+  { key: 'vitiligo', label: 'Vitiligo', extractor: (p) => (p.vitiligo as string | null | undefined) ?? 'none', importance: 'high' },
   {
     key: 'accessoryCount',
     label: 'Accessories (count)',
@@ -477,7 +478,7 @@ function buildDistributionRows(
   values.forEach((value) => {
     const baselinePct = percentOf(baselineCounts[value], baseline.iterations);
     const variantPct = percentOf(variantCounts[value], variant.iterations);
-    const alternatePct = alternateCounts ? percentOf(alternateCounts[value], alternate.iterations) : undefined;
+    const alternatePct = alternateCounts && alternate ? percentOf(alternateCounts[value], alternate.iterations) : undefined;
     rows.push({
       value,
       baseline: baselinePct,

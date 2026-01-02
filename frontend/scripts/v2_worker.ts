@@ -49,7 +49,7 @@ globalThis.localStorage = {
   getItem: () => null,
   setItem: () => undefined,
   removeItem: () => undefined,
-} as Storage;
+} as unknown as Storage;
 
 globalThis.navigator = {
   userAgent: 'bun',
@@ -80,15 +80,15 @@ class NodeOffscreenCanvas {
   }
 
   getContext(type: string): CanvasRenderingContext2D | null {
-    return this.canvas.getContext(type) as CanvasRenderingContext2D | null;
+    return this.canvas.getContext(type as '2d') as unknown as CanvasRenderingContext2D | null;
   }
 
   toBuffer(mimeType?: string) {
-    return this.canvas.toBuffer(mimeType);
+    return this.canvas.toBuffer(mimeType as 'image/png');
   }
 
   toDataURL(mimeType?: string) {
-    return this.canvas.toDataURL(mimeType);
+    return this.canvas.toDataURL(mimeType as 'image/png');
   }
 }
 
@@ -97,23 +97,58 @@ const createNodeCanvas = (width = 50, height = 50) => {
   return canvas;
 };
 
-class SpriteImage extends Image {
-  override set src(value: string | Buffer) {
-    if (typeof value === 'string') {
-      const resolved = resolvePublicPath(value);
-      const finalSrc = resolved.startsWith('http')
-        ? resolved
-        : resolved;
-      process.stderr.write(`[sprite] load ${finalSrc}\n`);
-      super.src = finalSrc;
-    } else {
-      super.src = value;
-    }
-  }
+// SpriteImage wraps the napi-rs Image class to intercept src assignments
+// We use a factory function pattern to avoid TypeScript's accessor/property conflict
+function createSpriteImage(): Image {
+  const img = new Image();
+
+  // Store original src property descriptor
+  const originalDescriptor = Object.getOwnPropertyDescriptor(img, 'src') ||
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(img), 'src');
+
+  let customSrc: string | Buffer = '';
+
+  Object.defineProperty(img, 'src', {
+    get() {
+      return customSrc;
+    },
+    set(value: string | Buffer) {
+      if (typeof value === 'string') {
+        const resolved = resolvePublicPath(value);
+        const finalSrc = resolved.startsWith('http')
+          ? resolved
+          : resolved;
+        process.stderr.write(`[sprite] load ${finalSrc}\n`);
+        customSrc = finalSrc;
+        // Set on the underlying Image using the original setter or direct assignment
+        if (originalDescriptor?.set) {
+          originalDescriptor.set.call(img, finalSrc);
+        } else {
+          // napi-rs Image should always have a setter - warn if missing
+          console.warn('Image descriptor setter not found, image may not load correctly');
+        }
+      } else {
+        customSrc = value;
+        if (originalDescriptor?.set) {
+          originalDescriptor.set.call(img, value);
+        }
+      }
+    },
+    enumerable: true,
+    configurable: true,
+  });
+
+  return img;
 }
 
+// Create a class that TypeScript will accept as an Image constructor
+const SpriteImage = function(this: Image) {
+  return createSpriteImage();
+} as unknown as typeof Image;
+SpriteImage.prototype = Image.prototype;
+
 globalThis.OffscreenCanvas = NodeOffscreenCanvas as unknown as typeof OffscreenCanvas;
-globalThis.Image = SpriteImage as unknown as typeof Image;
+(globalThis as unknown as { Image: typeof Image }).Image = SpriteImage;
 globalThis.document = {
   createElement(tag: string) {
     if (tag === 'canvas') {
@@ -128,7 +163,7 @@ globalThis.document = {
 
 // Bun already provides fetch/Response/Blob/atob/btoa. Override fetch for local assets.
 const originalFetch = globalThis.fetch;
-globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   if (url.startsWith('/sprite-data/')) {
     const filePath = resolvePublicPath(url);
@@ -146,6 +181,7 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise
   }
   return originalFetch(input, init);
 };
+globalThis.fetch = customFetch as typeof fetch;
 
 // ---------------------------------------------------------------------------
 // Rendering helpers
@@ -156,7 +192,7 @@ async function initOnce() {
 }
 
 async function renderRandomCat() {
-  const params = await catGenerator.generateRandomParams({
+  const params = await (catGenerator.generateRandomParams as (opts: { ignoreForbiddenSprites?: boolean }) => Promise<unknown>)({
     ignoreForbiddenSprites: true,
   });
   const result = await catGenerator.render(params, { outputFormat: 'canvas' });

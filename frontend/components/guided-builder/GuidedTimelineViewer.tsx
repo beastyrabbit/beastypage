@@ -9,6 +9,8 @@ import { Download, Loader2, RefreshCw, Share2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
+import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
+import type { CatGeneratorApi } from "@/components/cat-builder/types";
 
 type StepId =
   | "colour"
@@ -23,37 +25,6 @@ type StepId =
   | "accessories"
   | "scars"
   | "pose";
-
-interface TortieLayer {
-  pattern?: string;
-  colour?: string;
-  mask?: string;
-}
-
-interface CatParams {
-  spriteNumber: number;
-  peltName: string;
-  colour: string;
-  isTortie: boolean;
-  tortie?: TortieLayer[];
-  tortiePattern?: string;
-  tortieColour?: string;
-  tortieMask?: string;
-  eyeColour: string;
-  eyeColour2?: string;
-  skinColour: string;
-  whitePatches?: string;
-  whitePatchesTint?: string;
-  points?: string;
-  vitiligo?: string;
-  tint?: string;
-  shading?: boolean;
-  reverse?: boolean;
-  accessories?: string[];
-  accessory?: string;
-  scars?: string[];
-  scar?: string;
-}
 
 interface TimelineStep {
   id: StepId;
@@ -86,9 +57,6 @@ interface MapperRecord {
   created?: number;
 }
 
-interface CatGeneratorApi {
-  generateCat(params: Record<string, unknown>): Promise<{ canvas: HTMLCanvasElement; imageDataUrl?: string }>;
-}
 
 type GuidedTimelineViewerProps = {
   slug?: string | null;
@@ -300,6 +268,7 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
     entries.push(["Scars", scars.length ? scars.join(", ") : "none"]);
     if (params.isTortie && Array.isArray(params.tortie)) {
       params.tortie.forEach((layer, index) => {
+        if (!layer) return; // Skip null layers
         entries.push([
           `Tortie Layer ${index + 1}`,
           `${layer.pattern ?? "?"} · ${layer.colour ?? "?"} · ${layer.mask ?? "?"}`,
@@ -572,7 +541,19 @@ async function renderParams(generator: CatGeneratorApi, params: CatParams): Prom
     spriteNumber: params.spriteNumber,
   });
   if (result.imageDataUrl) return result.imageDataUrl;
-  return result.canvas.toDataURL("image/png");
+
+  // Handle both HTMLCanvasElement and OffscreenCanvas
+  const canvas = result.canvas;
+  if (canvas instanceof HTMLCanvasElement) {
+    return canvas.toDataURL("image/png");
+  }
+  // OffscreenCanvas - use convertToBlob
+  const blob = await canvas.convertToBlob({ type: "image/png" });
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
 }
 
 function formatName(value: unknown): string {
