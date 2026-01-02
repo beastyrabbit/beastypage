@@ -47,8 +47,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Ensure .next directory is writable for runtime placeholder replacement
-RUN chmod -R u+w /app/.next
+# Ensure directories are writable for runtime placeholder replacement
+# /app needs to be writable for sed -i to create temp files
+RUN chown nextjs:nodejs /app && chmod -R u+w /app/.next
 
 # Copy entrypoint script for runtime env var injection
 COPY --chmod=755 docker-entrypoint.sh /docker-entrypoint.sh
