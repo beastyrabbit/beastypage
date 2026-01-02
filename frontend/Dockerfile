@@ -14,12 +14,8 @@ COPY . .
 
 # Build-time env vars for Next.js
 ENV NEXT_PUBLIC_CONVEX_URL=https://standing-crane-709.convex.cloud
-
-# Optional: PostHog analytics (leave empty to disable)
-ARG NEXT_PUBLIC_POSTHOG_KEY=""
-ARG NEXT_PUBLIC_POSTHOG_HOST=""
-ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
-ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
+ENV NEXT_PUBLIC_POSTHOG_KEY=phc_tFlnQBrAuQMdW8JwJt0lzihPGBRjfDkBUstD5K4OYhk
+ENV NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
 
 # Build Next.js with standalone output
 RUN bun run build
