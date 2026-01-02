@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import type { CollectionEntry } from "@/convex/collection";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
@@ -48,7 +49,7 @@ export default function CollectionFocusTestingPage() {
     async (entry: CollectionEntry, override?: { focusX: number; focusY: number }) => {
       const draft = override ?? getDraft(entry);
       try {
-        await setFocus({ id: entry.id, focusX: draft.focusX, focusY: draft.focusY });
+        await setFocus({ id: entry.id as Id<"collection">, focusX: draft.focusX, focusY: draft.focusY });
         setStatus(`Saved focus for ${entry.artist_name}.`);
         setTimeout(() => setStatus(null), 2500);
       } catch (error) {

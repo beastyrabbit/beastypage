@@ -41,23 +41,44 @@ globalThis.localStorage = {
   getItem: () => null,
   setItem: () => undefined,
   removeItem: () => undefined,
-} as Storage;
+} as unknown as Storage;
 
 globalThis.navigator = {
   userAgent: 'bun'
 } as Navigator;
 
 class SpriteImage extends Image {
-  override set src(value: string | Buffer) {
+  setSrc(value: string | Buffer | Uint8Array): void {
     if (typeof value === 'string') {
-      super.src = resolvePublicPath(value);
+      this.src = resolvePublicPath(value);
     } else {
-      super.src = value;
+      this.src = value instanceof Buffer ? new Uint8Array(value) : value;
     }
   }
 }
 
-globalThis.Image = SpriteImage as unknown as typeof Image;
+// Override the Image constructor to intercept src assignments
+const OriginalImage = Image;
+const SpriteImageProxy = new Proxy(SpriteImage, {
+  construct(target, args) {
+    const instance = Reflect.construct(target, args) as SpriteImage;
+    return new Proxy(instance, {
+      set(obj, prop, value) {
+        if (prop === 'src') {
+          if (typeof value === 'string') {
+            obj.src = resolvePublicPath(value);
+          } else {
+            obj.src = value instanceof Buffer ? new Uint8Array(value) : value;
+          }
+          return true;
+        }
+        return Reflect.set(obj, prop, value);
+      }
+    });
+  }
+});
+
+(globalThis as { Image: unknown }).Image = SpriteImageProxy;
 
 class NodeOffscreenCanvas {
   private canvas = createCanvas(1, 1);
@@ -84,19 +105,40 @@ class NodeOffscreenCanvas {
   }
 
   getContext(type: string): CanvasRenderingContext2D | null {
-    return this.canvas.getContext(type) as CanvasRenderingContext2D | null;
+    if (type === '2d') {
+      return this.canvas.getContext('2d') as unknown as CanvasRenderingContext2D;
+    }
+    return null;
   }
 
   transferToImageBitmap() {
     return this.canvas as unknown as ImageBitmap;
   }
 
-  toBuffer(mimeType?: string) {
-    return this.canvas.toBuffer(mimeType);
+  toBuffer(mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/avif' | 'image/gif' = 'image/png') {
+    if (mimeType === 'image/png') {
+      return this.canvas.toBuffer('image/png');
+    }
+    if (mimeType === 'image/avif') {
+      return this.canvas.toBuffer('image/avif');
+    }
+    if (mimeType === 'image/gif') {
+      return this.canvas.toBuffer('image/gif');
+    }
+    return this.canvas.toBuffer(mimeType as 'image/jpeg' | 'image/webp');
   }
 
-  toDataURL(mimeType?: string) {
-    return this.canvas.toDataURL(mimeType);
+  toDataURL(mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | 'image/avif' = 'image/png') {
+    if (mimeType === 'image/png') {
+      return this.canvas.toDataURL('image/png');
+    }
+    if (mimeType === 'image/avif') {
+      return this.canvas.toDataURL('image/avif');
+    }
+    if (mimeType === 'image/gif') {
+      return this.canvas.toDataURL('image/gif');
+    }
+    return this.canvas.toDataURL(mimeType as 'image/jpeg' | 'image/webp');
   }
 }
 
@@ -118,7 +160,7 @@ globalThis.document = {
 
 const originalFetch = globalThis.fetch;
 
-globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   if (url.startsWith('/sprite-data/')) {
     const filePath = resolvePublicPath(url);
@@ -135,6 +177,8 @@ globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise
   }
   return originalFetch(input, init);
 };
+
+(globalThis as { fetch: unknown }).fetch = customFetch;
 
 await catGenerator.initialize();
 

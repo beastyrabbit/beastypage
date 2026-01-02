@@ -10,6 +10,19 @@ import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 
 type StepOption = ReturnType<StreamStep["getOptions"]>[number];
 
+interface VariantSheetFrame {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface VariantSheetResult {
+  sheetDataUrl: string;
+  frames: VariantSheetFrame[];
+}
+
 type OptionPreviewProps = {
   generator: CatGeneratorApi | null;
   ready: boolean;
@@ -76,7 +89,7 @@ async function renderChunkPreviews(
 
   try {
     if (typeof generator.generateVariantSheet === "function") {
-      const sheet = await generator.generateVariantSheet(
+      const sheet = (await generator.generateVariantSheet(
         sanitizedBase,
         descriptors.map((descriptor) => ({
           id: descriptor.key,
@@ -88,11 +101,11 @@ async function renderChunkPreviews(
           frameMode: "composed",
           priority: "auto",
         }
-      );
+      )) as VariantSheetResult;
 
       if (sheet.frames.length > 0) {
         const sheetCanvas = await decodeImageFromDataUrl(sheet.sheetDataUrl);
-        const frameMap = new Map(sheet.frames.map((frame) => [frame.id, frame]));
+        const frameMap = new Map<string, VariantSheetFrame>(sheet.frames.map((frame) => [frame.id, frame]));
 
         for (const descriptor of descriptors) {
           const frame = frameMap.get(descriptor.key);

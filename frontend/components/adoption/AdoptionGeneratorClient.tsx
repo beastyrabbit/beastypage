@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { AdoptionMetadataPanel, AdoptionMetadata } from "@/components/adoption/AdoptionMetadataPanel";
 import type { Id } from "@/convex/_generated/dataModel";
+import { toId } from "@/convex/utils";
 
 interface LegacyBatchCat {
   label?: string | null;
@@ -30,7 +31,7 @@ interface LegacyBatchPayload {
 type AdoptionCatPayload = {
   label: string;
   catData: unknown;
-  profileId?: string;
+  profileId?: Id<"cat_profile">;
   encoded?: string;
   shareToken?: string;
   catName?: string;
@@ -146,9 +147,9 @@ export function AdoptionGeneratorClient() {
                 const label = cat.label?.trim() ? cat.label : `Cat ${index + 1}`;
                 const encoded = typeof cat.encoded === "string" ? cat.encoded : undefined;
                 let shareToken = typeof cat.shareToken === "string" ? cat.shareToken : undefined;
-                let profileId = typeof cat.profileId === "string" ? cat.profileId : undefined;
+                let profileIdStr = typeof cat.profileId === "string" ? cat.profileId : undefined;
 
-                if (!shareToken || !profileId) {
+                if (!shareToken || !profileIdStr) {
                   try {
                     const mapperResult = await createMapper({
                       catData: cat.catData,
@@ -162,7 +163,7 @@ export function AdoptionGeneratorClient() {
                         slug?: string | null;
                       };
                       shareToken = shareToken ?? mapperPayload.shareToken ?? mapperPayload.slug ?? mapperPayload.id;
-                      profileId = profileId ?? mapperPayload.id;
+                      profileIdStr = profileIdStr ?? mapperPayload.id;
                     }
                   } catch (error) {
                     console.warn("Failed to persist adoption cat", error);
@@ -172,7 +173,7 @@ export function AdoptionGeneratorClient() {
                 return {
                   label,
                   catData: cat.catData,
-                  profileId,
+                  profileId: profileIdStr ? toId("cat_profile", profileIdStr) : undefined,
                   encoded,
                   shareToken,
                   catName: cat.catName ?? undefined,

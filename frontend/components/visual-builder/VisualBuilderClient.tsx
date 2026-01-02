@@ -18,6 +18,7 @@ interface TortieLayer {
   pattern?: string;
   colour?: string;
   mask?: string;
+  [key: string]: unknown;
 }
 
 interface CatParams {
@@ -43,6 +44,7 @@ interface CatParams {
   accessory?: string;
   scars?: string[];
   scar?: string;
+  [key: string]: unknown;
 }
 
 export const DEFAULT_PARAMS: CatParams = {

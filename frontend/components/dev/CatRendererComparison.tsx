@@ -32,7 +32,7 @@ export function CatRendererComparison() {
 
   const [params, setParams] = useState<Record<string, unknown>>(DEFAULT_PARAMS);
   const [meta, setMeta] = useState<RendererResponse['meta'] | null>(null);
-  const [layers, setLayers] = useState<RendererResponse['layers']>(null);
+  const [layers, setLayers] = useState<RendererResponse['layers']>(undefined);
   const [diff, setDiff] = useState<DiffStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +97,7 @@ export function CatRendererComparison() {
 
       setDiff({ mismatch, total: CANVAS_SIZE * CANVAS_SIZE, ratio: mismatch / (CANVAS_SIZE * CANVAS_SIZE) });
       setMeta(rendererResult.meta);
-      setLayers(rendererResult.layers ?? null);
+      setLayers(rendererResult.layers ?? undefined);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : String(err));
@@ -113,7 +113,7 @@ export function CatRendererComparison() {
   const handleRandomise = useCallback(async () => {
     try {
       const { default: catGenerator } = await import('@/lib/single-cat/catGeneratorV2.js');
-      const randomParams = await catGenerator.generateRandomParams({ ignoreForbiddenSprites: true });
+      const randomParams = await catGenerator.generateRandomParams({ ignoreForbiddenSprites: true, accessoryCount: 0 });
       setParams({ ...randomParams });
     } catch (err) {
       console.error(err);
@@ -210,7 +210,7 @@ export function CatRendererComparison() {
 interface CanvasPanelProps {
   title: string;
   subtitle: string;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
   loading: boolean;
 }
 

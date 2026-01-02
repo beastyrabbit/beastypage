@@ -10,9 +10,9 @@ import type { Id } from "@/convex/_generated/dataModel";
 type PaletteMode = "off" | "mood" | "bold" | "darker" | "blackout";
 
 type TortieLayer = {
-  pattern?: string;
-  colour?: string;
-  mask?: string;
+  pattern: string;
+  colour: string;
+  mask: string;
 };
 
 type MapperRecord = {
