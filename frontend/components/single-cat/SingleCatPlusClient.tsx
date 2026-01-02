@@ -104,7 +104,7 @@ interface TimingSnapshot {
   counts: Record<ParamTimingKey, number>;
   estimated: Partial<Record<ParamTimingKey, number>>;
   estimatedTotal: number;
-  actual: Record<ParamTimingKey, number>;
+  actual: Partial<Record<ParamTimingKey, number>>;
   actualTotal: number;
   timestamp: number;
 }
@@ -238,7 +238,7 @@ function logTimingReport(
   profile: SpinTimingConfig,
   optionCounts: Record<ParamTimingKey, number>,
   estimatedTotals: { perKey: Partial<Record<ParamTimingKey, number>>; total: number },
-  actualDurations: Record<ParamTimingKey, number>,
+  actualDurations: Partial<Record<ParamTimingKey, number>>,
   actualTotalMs: number
 ) {
   const estimatedSeconds = (estimatedTotals.total / 1000).toFixed(2);
@@ -648,9 +648,6 @@ async function renderVariantFrames(
         {
           includeSources: false,
           includeBase: false,
-          frameMode: options?.layerId ? "layer" : "composed",
-          layerId: options?.layerId,
-          priority: options?.priority ?? "high",
         }
       );
       if (sheet.frames.length >= descriptors.length) {
@@ -1442,7 +1439,7 @@ export function SingleCatPlusClient({
   const optionCountsRef = useRef<Record<ParamTimingKey, number>>(Object.fromEntries(
     PARAM_TIMING_ORDER.map((key) => [key, PARAM_DEFAULT_STEP_COUNTS[key] ?? 0])
   ) as Record<ParamTimingKey, number>);
-  const actualDurationsRef = useRef<Record<ParamTimingKey, number>>({});
+  const actualDurationsRef = useRef<Partial<Record<ParamTimingKey, number>>>({});
   const totalActualRef = useRef(0);
   const modeRef = useRef(mode);
   const [optionCounts, setOptionCounts] = useState<Record<ParamTimingKey, number>>(optionCountsRef.current);
@@ -1643,7 +1640,8 @@ export function SingleCatPlusClient({
       setTimingConfig({
         ...timingConfig,
         pauseDelays: {
-          ...(timingConfig.pauseDelays ?? {}),
+          flashyMs: timingConfig.pauseDelays?.flashyMs ?? DEFAULT_TIMING_CONFIG.pauseDelays!.flashyMs,
+          calmMs: timingConfig.pauseDelays?.calmMs ?? DEFAULT_TIMING_CONFIG.pauseDelays!.calmMs,
           [kind]: nextMs,
         },
       });
@@ -1676,7 +1674,10 @@ export function SingleCatPlusClient({
       allowFastFlips: DEFAULT_TIMING_CONFIG.allowFastFlips,
       delays: { ...DEFAULT_TIMING_CONFIG.delays },
       subsetLimits: { ...DEFAULT_TIMING_CONFIG.subsetLimits },
-      pauseDelays: { ...DEFAULT_TIMING_CONFIG.pauseDelays },
+      pauseDelays: {
+        flashyMs: DEFAULT_TIMING_CONFIG.pauseDelays!.flashyMs,
+        calmMs: DEFAULT_TIMING_CONFIG.pauseDelays!.calmMs,
+      },
     });
     setActiveGlobalPreset("normal");
   }, [setActiveGlobalPreset, setTimingConfig, timingConfig]);
@@ -1710,7 +1711,7 @@ export function SingleCatPlusClient({
         }
       });
 
-      const incomingPause = incomingTiming.pauseDelays ?? {};
+      const incomingPause = incomingTiming.pauseDelays ?? {} as Partial<{ flashyMs: number; calmMs: number }>;
       const nextPause = {
         flashyMs: clampPauseMs(incomingPause.flashyMs, defaultFlashyPauseMs),
         calmMs: clampPauseMs(incomingPause.calmMs, defaultCalmPauseMs),
@@ -2970,8 +2971,7 @@ export function SingleCatPlusClient({
             generator,
             progressiveParams,
             definition.id,
-            variationOptions,
-            contextForApply
+            variationOptions
           );
           const sequence = buildFlipSequence(frames);
 
@@ -3012,7 +3012,7 @@ export function SingleCatPlusClient({
           if (finalFrame) {
             drawCanvas(finalFrame.canvas);
           }
-          applyParamValue(progressiveParams, definition.id, finalFrame.option.raw, contextForApply);
+          applyParamValue(progressiveParams, definition.id, finalFrame.option.raw);
           setParamRows((prev) =>
             prev.map((row) =>
               row.id === definition.id
@@ -3033,7 +3033,7 @@ export function SingleCatPlusClient({
                 : row
             )
           );
-          applyParamValue(progressiveParams, definition.id, rawTargetValue, contextForApply);
+          applyParamValue(progressiveParams, definition.id, rawTargetValue);
           await renderCat(progressiveParams);
           if (generationIdRef.current !== token) return;
           setRollerLabel(null);

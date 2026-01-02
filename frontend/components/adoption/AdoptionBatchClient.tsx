@@ -12,6 +12,7 @@ interface TortieSlot {
   mask?: string | null;
   pattern?: string | null;
   colour?: string | null;
+  [key: string]: unknown;
 }
 
 interface CatSharePayload {

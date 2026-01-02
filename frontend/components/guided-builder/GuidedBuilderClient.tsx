@@ -21,6 +21,9 @@ type StepId =
   | "tortie-layer-1"
   | "tortie-layer-2"
   | "tortie-layer-3"
+  | "tortie-layer-4"
+  | "tortie-layer-5"
+  | "tortie-layer-6"
   | "eyes"
   | "accents"
   | "skin-tint"
@@ -77,6 +80,7 @@ interface CatParams {
   accessories?: string[];
   scar?: string;
   scars?: string[];
+  [key: string]: unknown;
 }
 
 interface StepState {
@@ -153,7 +157,7 @@ export function GuidedBuilderClient() {
   const [desiredTortieLayers, setDesiredTortieLayers] = useState(0);
   const [experimentalColourMode, setExperimentalColourMode] = useState<PaletteMode>("off");
   const [tortiePaletteMode, setTortiePaletteMode] = useState<PaletteMode>("off");
-  const [stepStates, setStepStates] = useState<Record<StepId, StepState>>({});
+  const [stepStates, setStepStates] = useState<Record<StepId, StepState>>({} as Record<StepId, StepState>);
   const [timeline, setTimeline] = useState<TimelineEntry[]>([]);
   const [unlockedSteps, setUnlockedSteps] = useState<StepId[]>(["colour"]);
   const [activeStep, setActiveStep] = useState<StepId>("colour");
@@ -881,7 +885,7 @@ export function GuidedBuilderClient() {
     setDesiredTortieLayers(0);
     setExperimentalColourMode("off");
     setTortiePaletteMode("off");
-    setStepStates({});
+    setStepStates({} as Record<StepId, StepState>);
     setTimeline([]);
     setUnlockedSteps(["colour"]);
     setActiveStep("colour");

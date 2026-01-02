@@ -36,6 +36,7 @@ interface TortieSlot {
   mask?: string | null;
   pattern?: string | null;
   colour?: string | null;
+  [key: string]: unknown;
 }
 
 interface CatSharePayload {
@@ -204,7 +205,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
         slug: mapperRecord.slug ?? mapperRecord.shareToken ?? mapperRecord.id,
         catName: mapperRecord.catName ?? null,
         creatorName: mapperRecord.creatorName ?? null,
-        created: mapperRecord.created ?? null,
+        created: mapperRecord.created ?? undefined,
       });
       setLoadingMessage(null);
     }

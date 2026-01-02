@@ -218,7 +218,12 @@ useEffect(() => {
   }, [normaliseCanvas]);
 
   const buildRandomOptions = useCallback(() => {
-    const options: Record<string, unknown> = { ignoreForbiddenSprites: true };
+    const options: {
+      ignoreForbiddenSprites: boolean;
+      accessoryCount: number;
+      scarCount?: number;
+      tortieCount?: number;
+    } = { ignoreForbiddenSprites: true, accessoryCount: 1 };
     if (multiCounts.accessories.enabled) {
       options.accessoryCount = Math.min(Math.max(multiCounts.accessories.count, 1), 4);
     }
