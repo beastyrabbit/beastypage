@@ -1,22 +1,30 @@
 # BeastyPage
 
-A Next.js application serving multiple entry points (hub, gatcha, stream, collection, personal) with a Python-based renderer service.
+A pixel cat gacha platform featuring generators, wheels, and collection tools built with ClanGen sprites.
 
-## Architecture
+## Features
 
-- **Frontend**: Next.js 16 with React 19, deployed as a standalone Docker container
-- **Renderer Service**: FastAPI/Python service for cat card generation
-- **Database**: Convex (serverless)
-- **Deployment**: Kubernetes via FluxCD
+- **Cat Generator** - Generate random pixel cats with customizable traits, accessories, and tortie coats
+- **Gacha Wheel** - Weighted wheel spins with animated reveals
+- **Catdex** - Browse and search all generated cats in a Pokedex-style archive
+- **Adoption Generator** - Roll whole litters, trim each round, finish with your favorites
+- **Visual Builder** - Trait-by-trait sprite previews with instant updates
+- **Stream Tools** - Live session controls for audience voting and shareable builds
 
-## Container Images
+## Tech Stack
 
-Images are automatically built and pushed to GHCR on pushes to `main`:
+- **Frontend**: Next.js 16, React 19, TailwindCSS
+- **Backend**: Convex (serverless database), FastAPI renderer service
+- **Package Manager**: Bun
+- **Deployment**: Kubernetes via FluxCD, Docker containers
 
-- `ghcr.io/beastyrabbit/beastypage-frontend:latest`
-- `ghcr.io/beastyrabbit/beastypage-renderer:latest`
+## Quick Start
 
-## Local Development
+### Prerequisites
+
+- [Bun](https://bun.sh) (v1.0+)
+- [Convex](https://convex.dev) account (for database)
+- Python 3.11+ with [uv](https://github.com/astral-sh/uv) (for renderer service)
 
 ### Frontend
 
@@ -26,7 +34,11 @@ bun install
 bun run dev
 ```
 
-### Renderer Service
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Renderer Service (Optional)
+
+The renderer service generates cat card images. If not running, the frontend will work but card generation will be unavailable.
 
 ```bash
 cd backend/renderer_service
@@ -37,8 +49,6 @@ uv run uvicorn renderer_service.app.main:app --reload --port 8001
 ## Environment Variables
 
 ### Build-time (Frontend)
-
-Set as GitHub repository secrets for CI/CD:
 
 | Variable | Description |
 |----------|-------------|
@@ -54,10 +64,6 @@ Set as GitHub repository secrets for CI/CD:
 | `PORT` | Server port | `3000` |
 | `RENDERER_INTERNAL_URL` | Renderer service URL | - |
 
-## Kubernetes Deployment
-
-Deployment manifests are managed in the [kub-homelab](https://github.com/beastyrabbit/kub-homelab) repository under `cluster/homelab/apps/webpage/beastypage/`.
-
 ## Project Structure
 
 ```
@@ -70,5 +76,41 @@ beastypage/
 │   ├── renderer_service/   # FastAPI cat renderer
 │   │   └── Dockerfile      # Python/uv build
 │   └── README.md
+├── lifegen-fullgen/        # LifeGen sprite generation library
 └── .github/workflows/      # CI/CD pipelines
 ```
+
+## Container Images
+
+Images are automatically built and pushed to GHCR on pushes to `main`:
+
+- `ghcr.io/beastyrabbit/beastypage-frontend:latest`
+- `ghcr.io/beastyrabbit/beastypage-renderer:latest`
+
+## Credits
+
+### ClanGen Sprites
+
+Cat sprites originate from [ClanGen](https://github.com/ClanGenOfficial/clangen), licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
+
+- Original creator: just-some-cat.tumblr.com
+- Fan-edit creator: SableSteel and others
+
+### LifeGen
+
+Built with components from [LifeGen](https://mods.clangen.io/LifeGen/download), a ClanGen mod.
+
+### Pixel Cat Maker
+
+Additional tooling from [Pixel Cat Maker](https://github.com/cgen-tools/pixel-cat-maker).
+
+## License
+
+- **Code**: [MPL-2.0](LICENSE.md) (Mozilla Public License 2.0)
+- **Sprites/Art**: [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) (NonCommercial)
+
+See [LICENSE.md](LICENSE.md) for full details.
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
