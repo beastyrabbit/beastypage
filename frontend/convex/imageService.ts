@@ -1,21 +1,10 @@
+"use node";
 import { action } from "./_generated/server.js";
 import type { ActionCtx } from "./_generated/server.js";
 import type { Id } from "./_generated/dataModel.js";
 import { v } from "convex/values";
 import { api } from "./_generated/api.js";
-
-const IMAGE_SERVICE_URL = (() => {
-  const raw = (process.env.CONVEX_IMAGE_SERVICE_URL ?? "").trim();
-  if (!raw) return null;
-  try {
-    const url = new URL(raw.includes("://") ? raw : `http://${raw}`);
-    url.pathname = url.pathname.replace(/\/$/, "");
-    return url.toString();
-  } catch (error) {
-    console.warn("Invalid CONVEX_IMAGE_SERVICE_URL", { raw, error });
-    return null;
-  }
-})();
+import sharp from "sharp";
 
 type Variant = "default" | "custom";
 
@@ -38,11 +27,6 @@ export const generateForCat = action({
     id: v.id("catdex"),
   },
   handler: async (ctx, args) => {
-    if (!IMAGE_SERVICE_URL) {
-      console.warn("Image service URL not configured; skipping thumbnail generation.");
-      return { success: false, reason: "missing_service_url" } as const;
-    }
-
     const cat = await ctx.runQuery(api.catdex.getDoc, { id: args.id });
     if (!cat) {
       return { success: false, reason: "cat_not_found" } as const;
@@ -53,12 +37,12 @@ export const generateForCat = action({
     const tasks: Array<Promise<VariantResult | null>> = [];
     if (cat.defaultCardStorageId && !cat.defaultCardThumbStorageId) {
       tasks.push(
-        generateVariant(ctx, IMAGE_SERVICE_URL, args.id, "default", cat.defaultCardStorageId, cat.defaultCardName),
+        generateThumbnail(ctx, args.id, "default", cat.defaultCardStorageId, cat.defaultCardName),
       );
     }
     if (cat.customCardStorageId && !cat.customCardThumbStorageId) {
       tasks.push(
-        generateVariant(ctx, IMAGE_SERVICE_URL, args.id, "custom", cat.customCardStorageId, cat.customCardName),
+        generateThumbnail(ctx, args.id, "custom", cat.customCardStorageId, cat.customCardName),
       );
     }
 
@@ -84,9 +68,8 @@ export const generateForCat = action({
   },
 });
 
-async function generateVariant(
+async function generateThumbnail(
   ctx: ActionCtx,
-  serviceUrl: string,
   catId: Id<"catdex">,
   variant: Variant,
   storageId: string,
@@ -98,59 +81,47 @@ async function generateVariant(
     return null;
   }
 
-  const endpoint = `${serviceUrl}/thumbnail/url`;
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      source_url: downloadUrl,
-      filename: name ?? `${variant}-card`,
-    }),
-  });
+  try {
+    // Fetch the original image
+    const response = await fetch(downloadUrl);
+    if (!response.ok) {
+      console.warn("Failed to fetch image for thumbnail", { catId, variant, status: response.status });
+      return null;
+    }
 
-  if (!response.ok) {
-    console.warn("Image service responded with an error", { catId, variant, status: response.status });
+    const buffer = await response.arrayBuffer();
+
+    // Get original image metadata
+    const originalMetadata = await sharp(Buffer.from(buffer)).metadata();
+
+    // Resize with sharp (256px max dimension, 85% quality)
+    const processed = await sharp(Buffer.from(buffer))
+      .resize(256, 256, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    const processedMetadata = await sharp(processed).metadata();
+
+    // Store the thumbnail
+    const thumbStorageId = await ctx.storage.store(
+      new Blob([processed], { type: "image/jpeg" })
+    );
+
+    const thumbName = `${name ?? variant}-card-thumb.jpg`;
+
+    return {
+      variant,
+      payload: {
+        thumbStorageId,
+        thumbName,
+        thumbWidth: processedMetadata.width,
+        thumbHeight: processedMetadata.height,
+        width: originalMetadata.width,
+        height: originalMetadata.height,
+      },
+    };
+  } catch (error) {
+    console.warn("Error generating thumbnail with sharp", { catId, variant, error });
     return null;
   }
-
-  const data = (await response.json()) as {
-    image_data_url: string;
-    width: number;
-    height: number;
-    original_width: number;
-    original_height: number;
-    filename: string;
-    content_type: string;
-  };
-
-  const blob = dataUrlToBlob(data.image_data_url, data.content_type);
-  const thumbStorageId = await ctx.storage.store(blob);
-
-  return {
-    variant,
-    payload: {
-      thumbStorageId,
-      thumbName: data.filename,
-      thumbWidth: data.width,
-      thumbHeight: data.height,
-      width: data.original_width,
-      height: data.original_height,
-    },
-  };
-}
-
-function dataUrlToBlob(dataUrl: string, fallbackType: string) {
-  const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  const contentType = matches?.[1] ?? fallbackType;
-  const base64 = matches?.[2] ?? dataUrl;
-
-  const binary = atob(base64);
-  const view = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    view[index] = binary.charCodeAt(index);
-  }
-
-  return new Blob([view], { type: contentType || "application/octet-stream" });
 }
