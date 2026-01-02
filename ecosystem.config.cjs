@@ -21,16 +21,6 @@ module.exports = {
       env: {
         UVICORN_PORT: process.env.UVICORN_PORT || "8001"
       }
-    },
-    {
-      name: "beastypage-img",
-      cwd: "./backend/img_service",
-      script: "uv",
-      args: `run uvicorn img_service.app.main:app --host 0.0.0.0 --port ${process.env.IMG_SERVICE_PORT || "8011"}`,
-      interpreter: "none",
-      env: {
-        IMG_SERVICE_PORT: process.env.IMG_SERVICE_PORT || "8011"
-      }
     }
   ]
 };
