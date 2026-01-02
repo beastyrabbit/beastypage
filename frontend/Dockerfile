@@ -14,7 +14,8 @@ COPY . .
 
 # Build-time env vars for Next.js (passed via --build-arg)
 ARG CONVEX_DEPLOYMENT
-ARG NEXT_PUBLIC_CONVEX_URL
+# Use placeholder for Convex URL - replaced at runtime by entrypoint script
+ARG NEXT_PUBLIC_CONVEX_URL=__CONVEX_URL_PLACEHOLDER__
 ARG NEXT_PUBLIC_POSTHOG_KEY
 ARG NEXT_PUBLIC_POSTHOG_HOST
 
@@ -44,8 +45,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy entrypoint script for runtime env var injection
+COPY --chmod=755 docker-entrypoint.sh /docker-entrypoint.sh
+
 USER nextjs
 
 EXPOSE 3000
 
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "server.js"]

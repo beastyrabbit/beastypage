@@ -67,6 +67,8 @@ jobs:
             type=sha,prefix=
             type=raw,value=latest
 
+      # Note: NEXT_PUBLIC_CONVEX_URL uses a placeholder at build time
+      # and is injected at runtime via docker-entrypoint.sh
       - uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -75,7 +77,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             CONVEX_DEPLOYMENT=${{ secrets.CONVEX_DEPLOYMENT }}
-            NEXT_PUBLIC_CONVEX_URL=${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
             NEXT_PUBLIC_POSTHOG_KEY=${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
             NEXT_PUBLIC_POSTHOG_HOST=${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
           cache-from: type=gha
