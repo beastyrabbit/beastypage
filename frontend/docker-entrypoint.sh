@@ -11,19 +11,23 @@ PLACEHOLDER="https://placeholder.convex.cloud"
 if [ -n "$NEXT_PUBLIC_CONVEX_URL" ]; then
   echo "Injecting NEXT_PUBLIC_CONVEX_URL..."
 
+  # Escape special sed characters in the replacement string
+  # & = matched pattern, \ = escape char, | = our delimiter
+  ESCAPED_URL=$(printf '%s' "$NEXT_PUBLIC_CONVEX_URL" | sed 's/[&/\|]/\\&/g')
+
   # Replace placeholder in all relevant files
   # With output: 'standalone', files are in .next/standalone and .next/static
   # Strings can be in .js, .json, and other artifacts
   find /app/.next -type f \( -name "*.js" -o -name "*.json" \) 2>/dev/null | while read -r file; do
     if grep -q "$PLACEHOLDER" "$file" 2>/dev/null; then
-      sed -i "s|$PLACEHOLDER|$NEXT_PUBLIC_CONVEX_URL|g" "$file"
+      sed -i "s|$PLACEHOLDER|$ESCAPED_URL|g" "$file"
     fi
   done
 
   # Also check root server.js and other files
   for file in /app/server.js /app/*.json; do
     if [ -f "$file" ] && grep -q "$PLACEHOLDER" "$file" 2>/dev/null; then
-      sed -i "s|$PLACEHOLDER|$NEXT_PUBLIC_CONVEX_URL|g" "$file"
+      sed -i "s|$PLACEHOLDER|$ESCAPED_URL|g" "$file"
     fi
   done
 
