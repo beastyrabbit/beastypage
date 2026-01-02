@@ -7,7 +7,6 @@ on:
     paths:
       - 'frontend/**'
       - 'backend/renderer_service/**'
-      - '.github/workflows/build-images.yml'
   workflow_dispatch:
     inputs:
       build_frontend:
@@ -74,6 +73,11 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            CONVEX_DEPLOYMENT=${{ secrets.CONVEX_DEPLOYMENT }}
+            NEXT_PUBLIC_CONVEX_URL=${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+            NEXT_PUBLIC_POSTHOG_KEY=${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
+            NEXT_PUBLIC_POSTHOG_HOST=${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
