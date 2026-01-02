@@ -26,19 +26,19 @@ export interface SpriteMapperApi {
 }
 
 export interface CatGeneratorApi {
-  generateCat(params: Record<string, unknown>): Promise<{
+  generateCat<T extends Record<string, unknown>>(params: T): Promise<{
     canvas: HTMLCanvasElement | OffscreenCanvas;
     imageDataUrl?: string | null;
     meta?: unknown;
   }>;
-  generateRandomParams?(options?: Record<string, unknown>): Promise<Record<string, unknown>>;
-  generateRandomCat?(options?: Record<string, unknown>): Promise<{
+  generateRandomParams?<T extends Record<string, unknown>>(options?: T): Promise<Record<string, unknown>>;
+  generateRandomCat?<T extends Record<string, unknown>>(options?: T): Promise<{
     params: Record<string, unknown>;
     canvas: HTMLCanvasElement | OffscreenCanvas;
   }>;
-  buildCatURL?(params: Record<string, unknown>): string;
-  generateVariantSheet?(
-    baseParams: Record<string, unknown>,
+  buildCatURL?<T extends Record<string, unknown>>(params: T): string;
+  generateVariantSheet?<T extends Record<string, unknown>>(
+    baseParams: T,
     variants: { id: string; params: Record<string, unknown>; label?: string }[],
     options?: unknown
   ): Promise<unknown>;

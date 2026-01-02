@@ -124,10 +124,8 @@ function createSpriteImage(): Image {
         if (originalDescriptor?.set) {
           originalDescriptor.set.call(img, finalSrc);
         } else {
-          // Direct property assignment for class fields
-          Object.defineProperty(img, '_src', { value: finalSrc, writable: true, configurable: true });
-          // Force the image to load by invoking internal mechanism
-          (img as any).__src__ = finalSrc;
+          // napi-rs Image should always have a setter - warn if missing
+          console.warn('Image descriptor setter not found, image may not load correctly');
         }
       } else {
         customSrc = value;
