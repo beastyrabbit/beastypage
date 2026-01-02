@@ -12,10 +12,16 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build-time env vars for Next.js
-ENV NEXT_PUBLIC_CONVEX_URL=https://standing-crane-709.convex.cloud
-ENV NEXT_PUBLIC_POSTHOG_KEY=REDACTED_POSTHOG_KEY
-ENV NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
+# Build-time env vars for Next.js (passed via --build-arg)
+ARG CONVEX_DEPLOYMENT
+ARG NEXT_PUBLIC_CONVEX_URL
+ARG NEXT_PUBLIC_POSTHOG_KEY
+ARG NEXT_PUBLIC_POSTHOG_HOST
+
+ENV CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
+ENV NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}
+ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
+ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
 
 # Build Next.js with standalone output
 RUN bun run build
