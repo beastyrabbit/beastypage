@@ -10,6 +10,7 @@ import { useMutation } from "convex/react";
 import { cn } from "@/lib/utils";
 import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
 import type { CatGeneratorApi, SpriteMapperApi } from "@/components/cat-builder/types";
+import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import { canvasToDataUrl, cloneParams, formatName, getColourSwatch } from "@/components/cat-builder/utils";
 
 type PaletteMode = "off" | "mood" | "bold" | "darker" | "blackout";
@@ -49,38 +50,6 @@ interface StepDefinition {
     | "pose";
   parent?: StepId;
   layerIndex?: number;
-}
-
-interface TortieLayer {
-  pattern?: string;
-  colour?: string;
-  mask?: string;
-}
-
-interface CatParams {
-  spriteNumber: number;
-  peltName: string;
-  colour: string;
-  isTortie: boolean;
-  tortiePattern?: string;
-  tortieColour?: string;
-  tortieMask?: string;
-  tortie?: TortieLayer[];
-  eyeColour: string;
-  eyeColour2?: string;
-  skinColour: string;
-  whitePatches?: string;
-  whitePatchesTint?: string;
-  points?: string;
-  vitiligo?: string;
-  tint?: string;
-  shading: boolean;
-  reverse: boolean;
-  accessory?: string;
-  accessories?: string[];
-  scar?: string;
-  scars?: string[];
-  [key: string]: unknown;
 }
 
 interface StepState {

@@ -1,3 +1,5 @@
+import type { TortieLayer as SharedTortieLayer, CatParams } from '@/lib/cat-v3/types';
+
 const SHARE_VERSION = 1;
 
 function toBase64(str: string): string {
@@ -125,7 +127,7 @@ function sanitizeCounts(counts?: Partial<CatShareCounts>): CatShareCounts {
   };
 }
 
-function sanitizeParams(params: CatShareParams = {}): SanitizedParams {
+function sanitizeParams(params: CatShareParams | CatParams | Record<string, unknown> = {}): SanitizedParams {
   const clean: SanitizedParams = {};
   for (const key of PARAM_KEYS) {
     if (!(key in params)) continue;
@@ -209,10 +211,10 @@ export type CatSharePayload = {
 };
 
 type EncodePayload = {
-  params: CatShareParams;
-  accessorySlots?: string[];
-  scarSlots?: string[];
-  tortieSlots?: (Record<string, unknown> | null)[];
+  params: CatShareParams | CatParams | Record<string, unknown>;
+  accessorySlots?: (string | null)[];
+  scarSlots?: (string | null)[];
+  tortieSlots?: (SharedTortieLayer | TortieLayer | Record<string, unknown> | null)[];
   counts?: Partial<CatShareCounts>;
 };
 

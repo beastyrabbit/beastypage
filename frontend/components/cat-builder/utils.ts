@@ -11,7 +11,7 @@ export function formatName(value: unknown): string {
     .replace(/\b\w/g, (char) => char.toUpperCase()) || "None";
 }
 
-export function cloneParams<T extends Record<string, unknown>>(params: T): T {
+export function cloneParams<T extends object>(params: T): T {
   return structuredClone(params) as T;
 }
 

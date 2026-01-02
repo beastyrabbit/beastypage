@@ -9,6 +9,8 @@ import { Download, Loader2, RefreshCw, Share2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
+import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
+import type { CatGeneratorApi } from "@/components/cat-builder/types";
 
 type StepId =
   | "colour"
@@ -23,37 +25,6 @@ type StepId =
   | "accessories"
   | "scars"
   | "pose";
-
-interface TortieLayer {
-  pattern?: string;
-  colour?: string;
-  mask?: string;
-}
-
-interface CatParams {
-  spriteNumber: number;
-  peltName: string;
-  colour: string;
-  isTortie: boolean;
-  tortie?: TortieLayer[];
-  tortiePattern?: string;
-  tortieColour?: string;
-  tortieMask?: string;
-  eyeColour: string;
-  eyeColour2?: string;
-  skinColour: string;
-  whitePatches?: string;
-  whitePatchesTint?: string;
-  points?: string;
-  vitiligo?: string;
-  tint?: string;
-  shading?: boolean;
-  reverse?: boolean;
-  accessories?: string[];
-  accessory?: string;
-  scars?: string[];
-  scar?: string;
-}
 
 interface TimelineStep {
   id: StepId;
@@ -86,9 +57,6 @@ interface MapperRecord {
   created?: number;
 }
 
-interface CatGeneratorApi {
-  generateCat(params: Record<string, unknown>): Promise<{ canvas: HTMLCanvasElement; imageDataUrl?: string }>;
-}
 
 type GuidedTimelineViewerProps = {
   slug?: string | null;

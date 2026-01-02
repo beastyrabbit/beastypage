@@ -1,26 +1,6 @@
-export type StreamerParams = {
-  spriteNumber: number;
-  peltName: string;
-  colour: string;
-  isTortie: boolean;
-  tortie?: Array<{ pattern?: string; colour?: string; mask?: string } | null>;
-  tortiePattern?: string;
-  tortieColour?: string;
-  tortieMask?: string;
-  eyeColour: string;
-  eyeColour2?: string;
-  skinColour: string;
-  whitePatches?: string;
-  whitePatchesTint?: string;
-  points?: string;
-  vitiligo?: string;
-  tint?: string;
-  shading: boolean;
-  reverse: boolean;
-  accessories?: Array<string | null>;
-  accessory?: string;
-  scars?: Array<string | null>;
-  scar?: string;
+import type { CatParams } from '@/lib/cat-v3/types';
+
+export type StreamerParams = CatParams & {
   _tortieLayers?: number;
   _accessorySlots?: number;
   _scarSlots?: number;
@@ -34,7 +14,7 @@ export type StreamerParams = {
   _finalShareUrl?: string;
   _finalName?: string;
   _finalCreator?: string;
-  [key: string]: unknown;
+  _paletteMode?: string;
 };
 
 export type StreamStep = {

@@ -7,19 +7,13 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AlertTriangle, ArrowLeft, ArrowUpRight, Loader2, X } from "lucide-react";
 import { encodeCatShare } from "@/lib/catShare";
-
-interface TortieSlot {
-  mask?: string | null;
-  pattern?: string | null;
-  colour?: string | null;
-  [key: string]: unknown;
-}
+import type { TortieLayer } from "@/lib/cat-v3/types";
 
 interface CatSharePayload {
   params: Record<string, unknown>;
   accessorySlots?: string[];
   scarSlots?: string[];
-  tortieSlots?: (TortieSlot | null)[];
+  tortieSlots?: (TortieLayer | null)[];
 }
 
 interface AdoptionCatRecord {

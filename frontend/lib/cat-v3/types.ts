@@ -1,6 +1,53 @@
+export interface TortieLayer {
+  pattern?: string;
+  colour?: string;
+  mask?: string;
+}
+
+export interface CatParams {
+  spriteNumber: number;
+  peltName: string;
+  colour: string;
+  isTortie: boolean;
+  tortiePattern?: string;
+  tortieColour?: string;
+  tortieMask?: string;
+  tortie?: (TortieLayer | null)[];
+  eyeColour: string;
+  eyeColour2?: string;
+  skinColour: string;
+  whitePatches?: string;
+  whitePatchesTint?: string;
+  points?: string;
+  vitiligo?: string;
+  tint?: string;
+  shading: boolean;
+  reverse: boolean;
+  accessory?: string;
+  accessories?: (string | null)[];
+  scar?: string;
+  scars?: (string | null)[];
+  basePalette?: string;
+  experimentalColourMode?: string;
+  tortiePalette?: string;
+  darkForest?: boolean;
+}
+
+export interface RandomGenerationOptions {
+  ignoreForbiddenSprites?: boolean;
+  experimentalColourMode?: string | string[];
+  includeBaseColours?: boolean;
+  countsMode?:
+    | 'weighted'
+    | 'uniform'
+    | Partial<Record<'tortie' | 'accessories' | 'scars', 'weighted' | 'uniform'>>;
+  slotOverrides?: Partial<Record<'tortie' | 'accessories' | 'scars', number>>;
+  whitePatchColourMode?: string;
+}
+
 export interface CatRenderParams {
   spriteNumber: number;
-  params: Record<string, unknown>;
+  params: Omit<CatParams, 'spriteNumber'>;
   collectLayers?: boolean;
   includeLayerImages?: boolean;
 }
@@ -59,8 +106,8 @@ export interface BatchVariantPayload {
   label?: string;
   group?: string;
   spriteNumber?: number;
-  overrides?: Record<string, unknown>;
-  params?: Record<string, unknown>;
+  overrides?: Partial<CatParams>;
+  params?: Partial<CatParams>;
 }
 
 export interface BatchRenderOptions {

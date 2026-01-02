@@ -10,42 +10,10 @@ import { cn } from "@/lib/utils";
 import { createCatShare } from "@/lib/catShare";
 import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
 import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "@/components/cat-builder/types";
+import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import { canvasToDataUrl, cloneParams, formatName, getColourSwatch } from "@/components/cat-builder/utils";
 
 type PaletteMode = "off" | "mood" | "bold" | "darker" | "blackout";
-
-interface TortieLayer {
-  pattern?: string;
-  colour?: string;
-  mask?: string;
-  [key: string]: unknown;
-}
-
-interface CatParams {
-  spriteNumber: number;
-  peltName: string;
-  colour: string;
-  isTortie: boolean;
-  tortiePattern?: string;
-  tortieColour?: string;
-  tortieMask?: string;
-  tortie?: TortieLayer[];
-  eyeColour: string;
-  eyeColour2?: string;
-  skinColour: string;
-  whitePatches?: string;
-  whitePatchesTint?: string;
-  points?: string;
-  vitiligo?: string;
-  tint?: string;
-  shading: boolean;
-  reverse: boolean;
-  accessories?: string[];
-  accessory?: string;
-  scars?: string[];
-  scar?: string;
-  [key: string]: unknown;
-}
 
 export const DEFAULT_PARAMS: CatParams = {
   spriteNumber: 8,

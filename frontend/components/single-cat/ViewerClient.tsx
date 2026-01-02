@@ -8,6 +8,8 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { encodeCatShare, decodeCatShare, createCatShare } from "@/lib/catShare";
 import { cn } from "@/lib/utils";
+import type { TortieLayer } from "@/lib/cat-v3/types";
+import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -22,28 +24,11 @@ type ViewerClientProps = {
   encoded?: string | null;
 };
 
-interface CatGeneratorApi {
-  generateCat: (params: Record<string, unknown>) => Promise<{ canvas: HTMLCanvasElement | OffscreenCanvas; imageDataUrl?: string }>;
-  generateVariantSheet?: (
-    baseParams: Record<string, unknown>,
-    variants: { id: string; params: Record<string, unknown>; label?: string }[],
-    options?: unknown
-  ) => Promise<unknown>;
-  buildCatURL?: (params: Record<string, unknown>) => string;
-}
-
-interface TortieSlot {
-  mask?: string | null;
-  pattern?: string | null;
-  colour?: string | null;
-  [key: string]: unknown;
-}
-
 interface CatSharePayload {
   params: Record<string, unknown>;
   accessorySlots?: string[];
   scarSlots?: string[];
-  tortieSlots?: (TortieSlot | null)[];
+  tortieSlots?: (TortieLayer | null)[];
   counts?: {
     accessories?: number;
     scars?: number;
@@ -434,7 +419,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     const scars = (catPayload.scarSlots ?? []).filter((item) => item && item !== "none");
     scars.forEach((item, index) => push(`Scar ${index + 1}`, item));
 
-    const torties = (catPayload.tortieSlots ?? []).filter((slot): slot is TortieSlot => !!slot);
+    const torties = (catPayload.tortieSlots ?? []).filter((slot): slot is TortieLayer => !!slot);
     torties.forEach((slot, index) => push(`Tortie ${index + 1}`, formatTortieLayer(slot)));
 
     push("Tint", params.tint);
@@ -823,7 +808,7 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-function formatTortieLayer(slot: TortieSlot | null | undefined): string {
+function formatTortieLayer(slot: TortieLayer | null | undefined): string {
   if (!slot) return "None";
   return [slot.mask, slot.pattern, slot.colour]
     .map((part) => formatValue(part))
