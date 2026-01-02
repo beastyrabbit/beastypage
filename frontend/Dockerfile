@@ -4,7 +4,7 @@
 FROM oven/bun:1.3-alpine AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Build application
 FROM oven/bun:1.3-alpine AS builder
@@ -22,6 +22,9 @@ ENV CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
 ENV NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}
 ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
 ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
+
+# Run convex codegen (skipped during install)
+RUN bun x convex codegen
 
 # Build Next.js with standalone output
 RUN bun run build
