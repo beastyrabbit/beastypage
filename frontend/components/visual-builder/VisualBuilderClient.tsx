@@ -195,7 +195,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     const incomingTortie = (initialCat.tortie ?? mergedParams.tortie ?? []).filter(Boolean) as TortieLayer[];
     const synced = ensureTortieSync(incomingTortie, mergedParams);
     setParams(synced);
-    setTortieLayers(synced.tortie ?? []);
+    setTortieLayers((synced.tortie ?? []).filter((layer): layer is TortieLayer => layer !== null));
     initialSpriteNumberRef.current = synced.spriteNumber ?? null;
     setExpandedTortieSub(() => {
       const mapping: Record<number, "pattern" | "colour" | "mask" | null> = {};
@@ -1443,7 +1443,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
           <p className="text-sm text-neutral-300">Stack multiple accessories from any category.</p>
         </header>
         {normalizedGroups.map((group) => {
-          const selectedLabels = (currentParams.accessories ?? []).filter((entry) => group.options.includes(entry)).map(formatName);
+          const selectedLabels = (currentParams.accessories ?? []).filter((entry): entry is string => entry !== null && group.options.includes(entry)).map(formatName);
           const summary = selectedLabels.length ? selectedLabels.join(", ") : "None selected";
           const expanded = expandedAccessoryGroup === group.label;
           return (
@@ -1526,7 +1526,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
           <p className="text-sm text-neutral-300">Highlight the cat&apos;s story with layered scars.</p>
         </header>
         {groups.map((group) => {
-          const selectedLabels = (currentParams.scars ?? []).filter((entry) => group.options.includes(entry)).map(formatName);
+          const selectedLabels = (currentParams.scars ?? []).filter((entry): entry is string => entry !== null && group.options.includes(entry)).map(formatName);
           const summary = selectedLabels.length ? selectedLabels.join(", ") : "None selected";
           const expanded = expandedScarGroup === group.label;
           return (
@@ -1697,12 +1697,12 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       setShareBusy(true);
       const payload = buildSharePayload();
       const shareSeed = {
-        params: payload.params,
+        params: { ...payload.params },
         accessorySlots: payload.accessorySlots,
         scarSlots: payload.scarSlots,
         tortieSlots: payload.tortieSlots,
         counts: payload.counts,
-      } as const;
+      };
 
       const shareRecord = await createCatShare(shareSeed).catch((error) => {
         console.error("Failed to create cat share record", error);

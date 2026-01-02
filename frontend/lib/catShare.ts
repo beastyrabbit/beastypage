@@ -127,7 +127,7 @@ function sanitizeCounts(counts?: Partial<CatShareCounts>): CatShareCounts {
   };
 }
 
-function sanitizeParams(params: CatShareParams | CatParams | Record<string, unknown> = {}): SanitizedParams {
+function sanitizeParams(params: Record<string, unknown> = {}): SanitizedParams {
   const clean: SanitizedParams = {};
   for (const key of PARAM_KEYS) {
     if (!(key in params)) continue;
@@ -211,7 +211,7 @@ export type CatSharePayload = {
 };
 
 type EncodePayload = {
-  params: CatShareParams | CatParams | Record<string, unknown>;
+  params: Record<string, unknown>;
   accessorySlots?: (string | null)[];
   scarSlots?: (string | null)[];
   tortieSlots?: (SharedTortieLayer | TortieLayer | Record<string, unknown> | null)[];

@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { CatParams } from '@/lib/cat-v3/types';
 import type { RandomGenerationOptions } from '@/lib/cat-v3/randomGenerator';
 import { ensureSpriteMapper, generateRandomParamsV3 } from '@/lib/cat-v3/randomGenerator';
 
 type CountStrategy = 'weighted' | 'uniform';
 
-type JsonParams = Record<string, unknown>;
+type JsonParams = CatParams;
 
 interface MetricDefinition {
   key: string;

@@ -184,7 +184,6 @@ export default function RendererStressHarness() {
       return {
         spriteNumber: pick(SPRITES),
         params: {
-          spriteNumber: pick(SPRITES),
           peltName: pick(PELTS),
           colour,
           isTortie: false,

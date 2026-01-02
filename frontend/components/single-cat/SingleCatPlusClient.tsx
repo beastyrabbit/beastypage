@@ -25,7 +25,8 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
-import type { BatchRenderResponse } from "@/lib/cat-v3/types";
+import type { BatchRenderResponse, CatParams } from "@/lib/cat-v3/types";
+import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import {
   ABSOLUTE_MIN_STEP_MS,
   MIN_SAFE_STEP_MS,
@@ -91,7 +92,7 @@ interface VariationFrame {
 
 interface VariantSheetRequest {
   id: string;
-  params: Record<string, unknown>;
+  params: Partial<CatParams>;
   label?: string;
   group?: string;
 }
@@ -153,14 +154,14 @@ interface LayerRowState {
 }
 
 interface CatState {
-  params: Record<string, unknown>;
+  params: Partial<CatParams>;
   accessorySlots: string[];
   scarSlots: string[];
   tortieSlots: (TortieSlot | null)[];
   counts: GenerationCounts;
   shareUrl?: string | null;
   catUrl?: string | null;
-  builderParams?: Record<string, unknown>;
+  builderParams?: Partial<CatParams>;
   profileId?: string | null;
   mapperSlug?: string | null;
   legacyEncoded?: string | null;
@@ -293,22 +294,6 @@ interface SpriteMapperApi {
   getVitiligo?: () => string[];
   getAccessories?: () => string[];
   getScars?: () => string[];
-}
-
-interface CatGeneratorApi {
-  generateRandomCat: (options?: Record<string, unknown>) => Promise<{
-    params: Record<string, unknown>;
-    canvas: HTMLCanvasElement | OffscreenCanvas;
-  }>;
-  generateCat: (params: Record<string, unknown>) => Promise<{
-    canvas: HTMLCanvasElement | OffscreenCanvas;
-  }>;
-  buildCatURL: (params: Record<string, unknown>) => string;
-  generateVariantSheet?: (
-    baseParams: Record<string, unknown>,
-    variants: VariantSheetRequest[],
-    options?: { includeSources?: boolean; includeBase?: boolean; tileSize?: number; columns?: number }
-  ) => Promise<BatchRenderResponse>;
 }
 
 type ParamId =
@@ -574,7 +559,7 @@ function coerceSpriteNumber(value: unknown): number | undefined {
   return undefined;
 }
 
-function cloneParams(params: Record<string, unknown>) {
+function cloneParams<T>(params: T): T {
   if (typeof structuredClone === "function") {
     try {
       return structuredClone(params);
@@ -613,7 +598,7 @@ function waitForIdle(): Promise<void> {
 
 async function preRenderVariationFrames(
   generator: CatGeneratorApi,
-  baseParams: Record<string, unknown>,
+  baseParams: Partial<CatParams>,
   paramId: ParamId,
   variationOptions: VariationOption[]
 ): Promise<VariationFrame[]> {
@@ -632,7 +617,7 @@ async function preRenderVariationFrames(
 
 async function renderVariantFrames(
   generator: CatGeneratorApi,
-  baseParams: Record<string, unknown>,
+  baseParams: Partial<CatParams>,
   descriptors: VariantDescriptor[],
   options?: { layerId?: string; baseCanvas?: HTMLCanvasElement; priority?: FetchPriority }
 ): Promise<VariationFrame[]> {
@@ -816,7 +801,7 @@ function formatTortieLayer(layer: TortieSlot | null): string {
     .join(" • ");
 }
 
-function getParameterRawValue(paramId: ParamId, params: Record<string, unknown>): unknown {
+function getParameterRawValue(paramId: ParamId, params: Partial<CatParams>): unknown {
   switch (paramId) {
     case "sprite":
       return params.spriteNumber;
@@ -880,19 +865,19 @@ function formatOptionDisplay(paramId: ParamId, raw: unknown): string {
   return formatValue(raw);
 }
 
-function applyParamValue(params: Record<string, unknown>, paramId: ParamId, value: unknown) {
+function applyParamValue(params: Partial<CatParams>, paramId: ParamId, value: unknown) {
   switch (paramId) {
     case "colour":
-      params.colour = value;
+      params.colour = value as string;
       break;
     case "pelt":
-      params.peltName = value;
+      params.peltName = value as string;
       break;
     case "eyeColour":
-      params.eyeColour = value;
+      params.eyeColour = value as string;
       break;
     case "eyeColour2":
-      params.eyeColour2 = value === "None" ? undefined : value;
+      params.eyeColour2 = value === "None" ? undefined : (value as string);
       break;
     case "tortie":
       params.isTortie = Boolean(value);
@@ -904,31 +889,31 @@ function applyParamValue(params: Record<string, unknown>, paramId: ParamId, valu
       }
       break;
     case "tortieMask":
-      params.tortieMask = value;
+      params.tortieMask = value as string;
       break;
     case "tortiePattern":
-      params.tortiePattern = value;
+      params.tortiePattern = value as string;
       break;
     case "tortieColour":
-      params.tortieColour = value;
+      params.tortieColour = value as string;
       break;
     case "tint":
-      params.tint = value;
+      params.tint = value as string;
       break;
     case "skinColour":
-      params.skinColour = value;
+      params.skinColour = value as string;
       break;
     case "whitePatches":
-      params.whitePatches = value === "None" ? undefined : value;
+      params.whitePatches = value === "None" ? undefined : (value as string);
       break;
     case "points":
-      params.points = value === "None" ? undefined : value;
+      params.points = value === "None" ? undefined : (value as string);
       break;
     case "whitePatchesTint":
-      params.whitePatchesTint = value === "None" ? undefined : value;
+      params.whitePatchesTint = value === "None" ? undefined : (value as string);
       break;
     case "vitiligo":
-      params.vitiligo = value === "None" ? undefined : value;
+      params.vitiligo = value === "None" ? undefined : (value as string);
       break;
     case "accessory": {
       const accessoryValue = typeof value === "string" && value !== "none" ? value : undefined;
@@ -951,10 +936,10 @@ function applyParamValue(params: Record<string, unknown>, paramId: ParamId, valu
       break;
     }
     case "shading":
-      params.shading = value;
+      params.shading = value as boolean;
       break;
     case "reverse":
-      params.reverse = value;
+      params.reverse = value as boolean;
       break;
     case "sprite": {
       const parsed = coerceSpriteNumber(value);
@@ -964,10 +949,9 @@ function applyParamValue(params: Record<string, unknown>, paramId: ParamId, valu
       break;
     }
   }
-
 }
 
-function getParameterValueForDisplay(paramId: ParamId, params: Record<string, unknown>): string {
+function getParameterValueForDisplay(paramId: ParamId, params: Partial<CatParams>): string {
   switch (paramId) {
     case "colour":
       return formatValue(params.colour);
@@ -1137,9 +1121,9 @@ function buildSharePayload(state: CatState) {
 }
 
 function sanitizeForBuilder(
-  baseParams: Record<string, unknown>,
+  baseParams: Partial<CatParams>,
   overrides?: { accessory?: string | null; scar?: string | null; tortie?: TortieSlot | null }
-): Record<string, unknown> {
+): Partial<CatParams> {
   const next = cloneParams(baseParams ?? {});
 
   const accessoryValue = overrides?.accessory ?? (Array.isArray(next.accessories) && next.accessories.length > 0
@@ -1982,7 +1966,7 @@ export function SingleCatPlusClient({
   }, []);
 
   const renderCat = useCallback(
-    async (params: Record<string, unknown>) => {
+    async (params: Partial<CatParams>) => {
       const generator = generatorRef.current;
       if (!generator) return;
       const result = await generator.generateCat(params);
@@ -1997,7 +1981,7 @@ export function SingleCatPlusClient({
       rowIndex: number,
       targetSlotsInput: string[] | null | undefined,
       context: { accessories: string[]; scars: string[]; torties: (TortieSlot | null)[] },
-      progressiveParams: Record<string, unknown>,
+      progressiveParams: Partial<CatParams>,
       mapper: SpriteMapperApi,
       pauseDuration: number,
       currentToken: number
@@ -2179,7 +2163,7 @@ export function SingleCatPlusClient({
       rowIndex: number,
       targetSlotsInput: string[] | null | undefined,
       context: { accessories: string[]; scars: string[]; torties: (TortieSlot | null)[] },
-      progressiveParams: Record<string, unknown>,
+      progressiveParams: Partial<CatParams>,
       mapper: SpriteMapperApi,
       pauseDuration: number,
       currentToken: number
@@ -2361,7 +2345,7 @@ export function SingleCatPlusClient({
       rowIndex: number,
       targetSlotsInput: (TortieSlot | null)[] | null | undefined,
       context: { accessories: string[]; scars: string[]; torties: (TortieSlot | null)[] },
-      progressiveParams: Record<string, unknown>,
+      progressiveParams: Partial<CatParams>,
       mapper: SpriteMapperApi,
       pauseDuration: number,
       currentToken: number
@@ -2738,6 +2722,9 @@ export function SingleCatPlusClient({
       const tortieCount = computeLayerCount(tortieRange);
       const experimentalMode = extendedModesArray.length === 0 ? "off" : extendedModesArray;
 
+      if (!generator.generateRandomCat) {
+        throw new Error("Random cat generation not available");
+      }
       const randomResult = await generator.generateRandomCat({
         accessoryCount,
         scarCount,
@@ -2749,9 +2736,9 @@ export function SingleCatPlusClient({
 
       if (generationIdRef.current !== token) return;
 
-      const params = {
+      const params: Partial<CatParams> = {
         ...randomResult.params,
-      } as Record<string, unknown>;
+      };
       if (!params.colour) {
         params.colour = PLACEHOLDER_COLOUR;
       }
@@ -2777,7 +2764,7 @@ export function SingleCatPlusClient({
         }
       }
       params.accessories = accessorySlots.filter((entry) => entry && entry !== "none");
-      params.accessory = (params.accessories as string[])[0];
+      params.accessory = params.accessories[0] ?? undefined;
 
       const scarSlots: string[] = [];
       for (let i = 0; i < scarCount; i += 1) {
@@ -2789,7 +2776,7 @@ export function SingleCatPlusClient({
         }
       }
       params.scars = scarSlots.filter((entry) => entry && entry !== "none");
-      params.scar = (params.scars as string[])[0];
+      params.scar = params.scars[0] ?? undefined;
 
       const tortieSlots: (TortieSlot | null)[] = [];
       for (let i = 0; i < tortieCount; i += 1) {
@@ -2843,7 +2830,7 @@ export function SingleCatPlusClient({
       );
       const tortieChoices = tortieLayers.length ? tortieLayers : [];
 
-      const progressiveParams: Record<string, unknown> = {
+      const progressiveParams: Partial<CatParams> = {
         spriteNumber: DEFAULT_SPRITE_NUMBER,
         shading: false,
         reverse: false,
@@ -3074,9 +3061,8 @@ export function SingleCatPlusClient({
         tortie: builderPrimaryTortie,
       });
       builderParams.spriteNumber = DEFAULT_SPRITE_NUMBER;
-      builderParams.sprite = DEFAULT_SPRITE_NUMBER;
 
-      const catUrl = generator.buildCatURL(builderParams);
+      const catUrl = generator.buildCatURL?.(builderParams) ?? "";
 
       const spritePreview: SpriteVariation[] = [];
       for (const spriteNumber of VALID_SPRITES) {

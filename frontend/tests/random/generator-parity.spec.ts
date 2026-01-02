@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import type { CatParams } from '@/lib/cat-v3/types';
 import { generateRandomParamsV3 } from '@/lib/cat-v3/randomGenerator';
 
 const SAMPLE_COUNT = Number(process.env.CG3_DIST_SAMPLES ?? '2000');
@@ -65,7 +66,7 @@ function record(summary: Summary, key: SummaryKey, value: string | number | null
   bucket[label] = (bucket[label] ?? 0) + 1;
 }
 
-function summarise(params: Record<string, unknown>): Summary {
+function summarise(params: CatParams | Record<string, unknown>): Summary {
   const summary = emptySummary();
   const tortieList = Array.isArray(params.tortie) ? params.tortie : [];
   record(summary, 'tortieCount', tortieList.length);

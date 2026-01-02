@@ -754,7 +754,7 @@ export function GuidedBuilderClient() {
           set.delete(accessory);
         }
         draft.accessories = Array.from(set);
-        draft.accessory = draft.accessories[0];
+        draft.accessory = draft.accessories[0] ?? undefined;
         if (!draft.accessories.length) {
           draft.accessory = undefined;
         }
@@ -773,7 +773,7 @@ export function GuidedBuilderClient() {
           set.delete(scar);
         }
         draft.scars = Array.from(set);
-        draft.scar = draft.scars[0];
+        draft.scar = draft.scars[0] ?? undefined;
         if (!draft.scars.length) {
           draft.scar = undefined;
         }
@@ -1469,7 +1469,7 @@ export function GuidedBuilderClient() {
                         const set = new Set(draft.accessories ?? []);
                         set.add(option);
                         draft.accessories = Array.from(set);
-                        draft.accessory = draft.accessories[0];
+                        draft.accessory = draft.accessories[0] ?? undefined;
                       }}
                       label={label}
                       selected={selected}

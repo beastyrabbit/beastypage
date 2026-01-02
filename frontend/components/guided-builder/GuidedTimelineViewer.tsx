@@ -268,6 +268,7 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
     entries.push(["Scars", scars.length ? scars.join(", ") : "none"]);
     if (params.isTortie && Array.isArray(params.tortie)) {
       params.tortie.forEach((layer, index) => {
+        if (!layer) return; // Skip null layers
         entries.push([
           `Tortie Layer ${index + 1}`,
           `${layer.pattern ?? "?"} · ${layer.colour ?? "?"} · ${layer.mask ?? "?"}`,
@@ -540,7 +541,19 @@ async function renderParams(generator: CatGeneratorApi, params: CatParams): Prom
     spriteNumber: params.spriteNumber,
   });
   if (result.imageDataUrl) return result.imageDataUrl;
-  return result.canvas.toDataURL("image/png");
+
+  // Handle both HTMLCanvasElement and OffscreenCanvas
+  const canvas = result.canvas;
+  if (canvas instanceof HTMLCanvasElement) {
+    return canvas.toDataURL("image/png");
+  }
+  // OffscreenCanvas - use convertToBlob
+  const blob = await canvas.convertToBlob({ type: "image/png" });
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
 }
 
 function formatName(value: unknown): string {

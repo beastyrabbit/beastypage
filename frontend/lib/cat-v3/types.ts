@@ -31,6 +31,8 @@ export interface CatParams {
   experimentalColourMode?: string;
   tortiePalette?: string;
   darkForest?: boolean;
+  darkMode?: boolean;
+  dead?: boolean;
 }
 
 export interface RandomGenerationOptions {
@@ -43,11 +45,15 @@ export interface RandomGenerationOptions {
     | Partial<Record<'tortie' | 'accessories' | 'scars', 'weighted' | 'uniform'>>;
   slotOverrides?: Partial<Record<'tortie' | 'accessories' | 'scars', number>>;
   whitePatchColourMode?: string;
+  // Legacy count options (mapped to slotOverrides internally)
+  accessoryCount?: number;
+  scarCount?: number;
+  tortieCount?: number;
 }
 
 export interface CatRenderParams {
   spriteNumber: number;
-  params: Omit<CatParams, 'spriteNumber'>;
+  params: Partial<Omit<CatParams, 'spriteNumber'>>;
   collectLayers?: boolean;
   includeLayerImages?: boolean;
 }
