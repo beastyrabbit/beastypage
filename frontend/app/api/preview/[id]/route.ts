@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+import { getServerConvexUrl } from "@/lib/convexUrl";
 
 const RENDERER_BASE = (process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001").replace(/\/$/, "");
 const PREVIEW_SIZE = 360;
-
-function getConvexUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_CONVEX_URL ||
-    process.env.CONVEX_SITE_ORIGIN ||
-    process.env.CONVEX_SELF_HOSTED_URL ||
-    process.env.CONVEX_URL ||
-    ""
-  );
-}
 
 function dataUrlToBuffer(dataUrl: string): Buffer {
   const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -121,7 +112,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Missing profile ID" }, { status: 400 });
   }
 
-  const convexUrl = getConvexUrl();
+  const convexUrl = getServerConvexUrl();
   if (!convexUrl) {
     return NextResponse.json({ error: "Convex URL not configured" }, { status: 500 });
   }
