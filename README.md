@@ -87,6 +87,37 @@ Images are automatically built and pushed to GHCR on pushes to `main`:
 - `ghcr.io/beastyrabbit/beastypage-frontend:latest`
 - `ghcr.io/beastyrabbit/beastypage-renderer:latest`
 
+### Running with Your Own Database
+
+The frontend image uses a placeholder for the Convex URL at build time. Provide your own Convex instance at runtime:
+
+```bash
+docker run -p 3000:3000 \
+  -e NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud \
+  ghcr.io/beastyrabbit/beastypage-frontend:latest
+```
+
+### Kubernetes Deployment
+
+For Kubernetes/Talos deployments, configure the Convex URL via ConfigMap or Secret:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/beastyrabbit/beastypage-frontend:latest
+          env:
+            - name: NEXT_PUBLIC_CONVEX_URL
+              valueFrom:
+                secretKeyRef:
+                  name: beastypage-secrets
+                  key: convex-url
+```
+
 ## Credits
 
 ### ClanGen Sprites

@@ -79,7 +79,7 @@ const nextConfig = {
     remotePatterns,
   },
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   turbopack: {
     root: projectRoot,
