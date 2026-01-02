@@ -1,12 +1,8 @@
 import { ConvexReactClient } from "convex/react";
 
-const rawConvexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+import { requireClientConvexUrl } from "@/lib/convexUrl";
 
-if (!rawConvexUrl) {
-  throw new Error("NEXT_PUBLIC_CONVEX_URL must be defined to initialize Convex.");
-}
-
-const convexUrl = rawConvexUrl.replace(/\/$/, "");
+const convexUrl = requireClientConvexUrl();
 
 export const CONVEX_HTTP_URL = convexUrl;
 

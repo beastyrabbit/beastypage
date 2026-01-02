@@ -1,16 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-
-function getConvexUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_CONVEX_URL ||
-    process.env.CONVEX_SITE_ORIGIN ||
-    process.env.CONVEX_SELF_HOSTED_URL ||
-    process.env.CONVEX_URL ||
-    ""
-  );
-}
+import { getServerConvexUrl } from "@/lib/convexUrl";
 
 export async function GET(request: NextRequest) {
   const slug = request.nextUrl.searchParams.get("slug");
@@ -18,7 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing slug" }, { status: 400 });
   }
 
-  const convexUrl = getConvexUrl();
+  const convexUrl = getServerConvexUrl();
   if (!convexUrl) {
     return NextResponse.json({ error: "Convex URL not configured" }, { status: 500 });
   }
@@ -42,7 +33,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const convexUrl = getConvexUrl();
+  const convexUrl = getServerConvexUrl();
   if (!convexUrl) {
     return NextResponse.json({ error: "Convex URL not configured" }, { status: 500 });
   }
