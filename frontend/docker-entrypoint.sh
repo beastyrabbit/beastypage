@@ -5,7 +5,8 @@ set -e
 # This script replaces build-time placeholders with runtime values
 # Required because Next.js NEXT_PUBLIC_* vars are embedded at build time
 
-PLACEHOLDER="__CONVEX_URL_PLACEHOLDER__"
+# Placeholder must match the ARG default in Dockerfile (valid URL format)
+PLACEHOLDER="https://placeholder.convex.cloud"
 
 if [ -n "$NEXT_PUBLIC_CONVEX_URL" ]; then
   echo "Injecting NEXT_PUBLIC_CONVEX_URL..."
