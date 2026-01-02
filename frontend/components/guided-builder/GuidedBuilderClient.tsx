@@ -747,7 +747,7 @@ export function GuidedBuilderClient() {
   const handleAccessoryToggle = useCallback(
     (accessory: string, enabled: boolean) => {
       updateParams((draft) => {
-        const set = new Set(draft.accessories ?? []);
+        const set = new Set((draft.accessories ?? []).filter((x): x is string => x !== null));
         if (enabled) {
           set.add(accessory);
         } else {
@@ -755,9 +755,6 @@ export function GuidedBuilderClient() {
         }
         draft.accessories = Array.from(set);
         draft.accessory = draft.accessories[0] ?? undefined;
-        if (!draft.accessories.length) {
-          draft.accessory = undefined;
-        }
       }, "accessories");
     },
     [updateParams]
@@ -766,7 +763,7 @@ export function GuidedBuilderClient() {
   const handleScarToggle = useCallback(
     (scar: string, enabled: boolean) => {
       updateParams((draft) => {
-        const set = new Set(draft.scars ?? []);
+        const set = new Set((draft.scars ?? []).filter((x): x is string => x !== null));
         if (enabled) {
           set.add(scar);
         } else {
@@ -774,9 +771,6 @@ export function GuidedBuilderClient() {
         }
         draft.scars = Array.from(set);
         draft.scar = draft.scars[0] ?? undefined;
-        if (!draft.scars.length) {
-          draft.scar = undefined;
-        }
       }, "scars");
     },
     [updateParams]
@@ -1466,7 +1460,7 @@ export function GuidedBuilderClient() {
                     <PreviewSprite
                       cacheKey={previewKey}
                       mutate={(draft) => {
-                        const set = new Set(draft.accessories ?? []);
+                        const set = new Set((draft.accessories ?? []).filter((x): x is string => x !== null));
                         set.add(option);
                         draft.accessories = Array.from(set);
                         draft.accessory = draft.accessories[0] ?? undefined;
