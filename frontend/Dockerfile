@@ -23,10 +23,8 @@ ENV NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}
 ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
 ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
 
-# Run convex codegen (skipped during install)
-RUN bun x convex codegen
-
 # Build Next.js with standalone output
+# Note: convex codegen runs via pre-commit hook, types are in git
 RUN bun run build
 
 # Stage 3: Production image (Node-based for standalone compatibility)
