@@ -73,6 +73,7 @@ if (process.env.NEXT_SHOW_CONFIG_LOGS === "1") {
 }
 
 const nextConfig = {
+  output: "standalone",
   allowedDevOrigins,
   images: {
     remotePatterns,
