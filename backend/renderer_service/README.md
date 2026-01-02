@@ -67,13 +67,13 @@ The renderer throttles work using a bounded queue and a small worker pool. Key e
 | `CG3_CIRCUIT_FAILURE_THRESHOLD` | `8` | Consecutive failures before the circuit breaker trips. |
 | `CG3_CIRCUIT_RESET_SECONDS` | `12` | Cooldown window before the circuit closes automatically. |
 
-Probe `/health` (or expose it through your reverse proxy) to let pm2 or your load balancer watch the queue:
+Probe `/health` (or expose it through your reverse proxy) to let your process supervisor or load balancer watch the queue:
 
 ```sh
 curl -s http://localhost:8001/health | jq
 ```
 
-When the queue approaches capacity or the circuit opens, FastAPI logs (`renderer.queue` logger) emit warnings that surface in `pm2 logs beastypage-renderer`.
+When the queue approaches capacity or the circuit opens, FastAPI logs (`renderer.queue` logger) emit warnings that surface in your container/process logs.
 
 ### During frontend development
 

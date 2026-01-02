@@ -105,7 +105,7 @@ class SpriteMapper:
         self.accessories = self._collect_accessories()
         if not self.accessories:
             raise ValueError(
-                "No accessories found in peltInfo.json. Run scripts/sync_accessories.py to refresh sprite data."
+                "No accessories found in peltInfo.json. Check that peltInfo.json contains valid accessory data."
             )
 
         collected_scars = self._collect_list("scars", ("scars1", "scars2", "scars3"))
@@ -560,7 +560,7 @@ class SpriteMapper:
             sample = ", ".join(f"{name} -> {sprite or 'None'}" for name, sprite in missing[:10])
             raise MissingAccessorySprite(
                 f"{len(missing)} accessories do not have sprite mappings. Sample: {sample}. "
-                "Run scripts/sync_accessories.py to regenerate sprite metadata."
+                "Check that sprite metadata is up to date."
             )
 
 
