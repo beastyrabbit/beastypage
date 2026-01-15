@@ -119,6 +119,11 @@ export class AdoptionGenerator {
         }
         this.overlayCloseTargets = Array.from(document.querySelectorAll('[data-overlay-close]'));
         this.spriteGalleryCloseTargets = Array.from(document.querySelectorAll('[data-sprite-gallery-close]'));
+
+        this.quickPreviewPopup = null;
+        this.quickPreviewCanvas = null;
+        this.createQuickPreviewPopup();
+
         this.currentDetailPlan = null;
         this.currentDetailParams = null;
         this.currentBatchTitle = '';
@@ -348,6 +353,10 @@ export class AdoptionGenerator {
             await this.animateTortieLayer(plan, stage);
             return;
         }
+        if (stage.type === 'tortie-sub') {
+            await this.animateTortieSubElement(plan, stage);
+            return;
+        }
         if (stage.type === 'accessory') {
             await this.animateAccessorySlot(plan, stage);
             return;
@@ -504,7 +513,9 @@ export class AdoptionGenerator {
         stages.push({ id: 'eyeColour2', label: 'Eye Colour 2', type: 'simple', param: 'eyeColour2' });
 
         for (let i = 0; i < tortieCount; i++) {
-            stages.push({ id: `tortie-${i}`, label: `Tortie Layer ${i + 1}`, type: 'tortie', layerIndex: i });
+            stages.push({ id: `tortie-${i}-mask`, label: `Tortie ${i + 1} Mask`, type: 'tortie-sub', layerIndex: i, subElement: 'mask' });
+            stages.push({ id: `tortie-${i}-pattern`, label: `Tortie ${i + 1} Pelt`, type: 'tortie-sub', layerIndex: i, subElement: 'pattern' });
+            stages.push({ id: `tortie-${i}-colour`, label: `Tortie ${i + 1} Colour`, type: 'tortie-sub', layerIndex: i, subElement: 'colour' });
         }
 
         stages.push({ id: 'tint', label: 'Tint', type: 'simple', param: 'tint' });
@@ -640,7 +651,8 @@ export class AdoptionGenerator {
             isTortie: false,
             accessorySlots: Array(accessoryCount).fill('none'),
             scarSlots: Array(scarCount).fill('none'),
-            tortieLayers: Array(tortieCount).fill(null)
+            tortieLayers: Array(tortieCount).fill(null),
+            tortieRevealed: Array(tortieCount).fill(null).map(() => ({ mask: false, pattern: false, colour: false }))
         };
         return state;
     }
@@ -689,15 +701,31 @@ export class AdoptionGenerator {
         const meta = document.createElement('div');
         meta.className = 'cat-meta';
 
+        const labelRow = document.createElement('div');
+        labelRow.className = 'cat-label-row';
+
         const labelEl = document.createElement('span');
         labelEl.className = 'cat-label';
         labelEl.textContent = `Cat ${plan.index}`;
+
+        const previewButton = document.createElement('button');
+        previewButton.className = 'cat-preview';
+        previewButton.type = 'button';
+        previewButton.title = 'Preview larger';
+        previewButton.textContent = '🔍';
+        previewButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.openQuickPreview(plan);
+        });
+
+        labelRow.appendChild(labelEl);
+        labelRow.appendChild(previewButton);
 
         const valueEl = document.createElement('span');
         valueEl.className = 'cat-stage-value';
         valueEl.textContent = 'Rolling soon…';
 
-        meta.appendChild(labelEl);
+        meta.appendChild(labelRow);
         meta.appendChild(valueEl);
 
         card.appendChild(canvasWrapper);
@@ -705,6 +733,7 @@ export class AdoptionGenerator {
 
         card.addEventListener('click', (event) => {
             if (event.target.closest('.cat-remove')) return;
+            if (event.target.closest('.cat-preview')) return;
             if (this.isGenerating || this.awaitingRemoval || !this.isRevealComplete) return;
             this.openDetailOverlay(plan);
         });
@@ -818,6 +847,80 @@ export class AdoptionGenerator {
         plan.valueEl.textContent = this.describeTortieLayer(stage, layer);
     }
 
+    async animateTortieSubElement(plan, stage) {
+        const { layerIndex, subElement } = stage;
+        const layer = plan.tortieSlots[layerIndex];
+
+        if (!layer) {
+            plan.state.tortieLayers[layerIndex] = null;
+            plan.state.isTortie = plan.state.tortieLayers.some(l => l);
+            await this.drawCat(plan.state, plan.canvas);
+            plan.valueEl.textContent = `Tortie Layer ${layerIndex + 1}: None`;
+            return;
+        }
+
+        const revealed = plan.state.tortieRevealed[layerIndex];
+
+        // Get or initialize placeholder values for this layer
+        if (!plan.tortiePlaceholders) {
+            plan.tortiePlaceholders = {};
+        }
+        if (!plan.tortiePlaceholders[layerIndex]) {
+            const patternOptions = this.parameterOptions?.tortiePattern || [];
+            const maskOptions = this.parameterOptions?.tortieMask || [];
+            plan.tortiePlaceholders[layerIndex] = {
+                mask: maskOptions.length > 0 ? maskOptions[0] : layer.mask,
+                pattern: patternOptions.length > 0 ? patternOptions[0] : layer.pattern,
+                colour: 'WHITE'
+            };
+        }
+        const placeholders = plan.tortiePlaceholders[layerIndex];
+
+        // Build current layer state with revealed values + placeholders for unrevealed
+        const currentLayer = {
+            mask: revealed.mask ? (plan.state.tortieLayers[layerIndex]?.mask || layer.mask) : placeholders.mask,
+            pattern: revealed.pattern ? (plan.state.tortieLayers[layerIndex]?.pattern || layer.pattern) : placeholders.pattern,
+            colour: revealed.colour ? (plan.state.tortieLayers[layerIndex]?.colour || layer.colour) : placeholders.colour
+        };
+
+        const paramMap = {
+            mask: 'tortieMask',
+            pattern: 'tortiePattern',
+            colour: 'tortieColour'
+        };
+        const paramKey = paramMap[subElement];
+        const finalValue = layer[subElement];
+        const options = this.sampleVariations(paramKey, finalValue);
+
+        for (const value of options) {
+            const tempState = this.cloneState(plan.state);
+            const tempLayer = {
+                mask: subElement === 'mask' ? value : currentLayer.mask,
+                pattern: subElement === 'pattern' ? value : currentLayer.pattern,
+                colour: subElement === 'colour' ? value : currentLayer.colour
+            };
+            tempState.tortieLayers[layerIndex] = tempLayer;
+            tempState.isTortie = true;
+            await this.drawCat(tempState, plan.canvas);
+            await this.wait(this.speedDurations[this.currentSpeed]);
+        }
+
+        // Update revealed state
+        revealed[subElement] = true;
+
+        // Build final layer with revealed value + keep placeholders for unrevealed
+        const finalLayer = {
+            mask: subElement === 'mask' ? finalValue : currentLayer.mask,
+            pattern: subElement === 'pattern' ? finalValue : currentLayer.pattern,
+            colour: subElement === 'colour' ? finalValue : currentLayer.colour
+        };
+
+        plan.state.tortieLayers[layerIndex] = finalLayer;
+        plan.state.isTortie = true;
+        await this.drawCat(plan.state, plan.canvas);
+        plan.valueEl.textContent = this.describeTortieSubElement(layerIndex, finalLayer, revealed);
+    }
+
     getStageValue(plan, stage) {
         if (stage.param === 'spriteNumber') {
             return plan.params.spriteNumber;
@@ -863,6 +966,16 @@ export class AdoptionGenerator {
         if (!layer) return `${stage.label}: None`;
         const parts = [layer.mask, layer.pattern, layer.colour].map(v => this.formatValue(v));
         return `${stage.label}: ${parts.join(' • ')}`;
+    }
+
+    describeTortieSubElement(layerIndex, layer, revealed) {
+        if (!layer) return `Tortie Layer ${layerIndex + 1}: None`;
+        const parts = [
+            revealed?.mask ? this.formatValue(layer.mask) : '—',
+            revealed?.pattern ? this.formatValue(layer.pattern) : '—',
+            revealed?.colour ? this.formatValue(layer.colour) : '—'
+        ];
+        return `Tortie Layer ${layerIndex + 1}: ${parts.join(' • ')}`;
     }
 
     applyStageValue(state, stage, value) {
@@ -1616,6 +1729,68 @@ export class AdoptionGenerator {
                 this.overlayOpenViewerBtn.textContent = this.overlayOpenViewerBtn.dataset.originalText;
             }
         }
+    }
+
+    createQuickPreviewPopup() {
+        const popup = document.createElement('div');
+        popup.className = 'quick-preview-popup';
+        popup.setAttribute('aria-hidden', 'true');
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'quick-preview-backdrop';
+        backdrop.addEventListener('click', () => this.closeQuickPreview());
+
+        const content = document.createElement('div');
+        content.className = 'quick-preview-content';
+
+        const canvas = document.createElement('canvas');
+        canvas.className = 'quick-preview-canvas';
+        canvas.width = 700;
+        canvas.height = 700;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'quick-preview-close';
+        closeBtn.type = 'button';
+        closeBtn.title = 'Close';
+        closeBtn.textContent = '✕';
+        closeBtn.addEventListener('click', () => this.closeQuickPreview());
+
+        content.appendChild(canvas);
+        content.appendChild(closeBtn);
+        popup.appendChild(backdrop);
+        popup.appendChild(content);
+
+        document.body.appendChild(popup);
+        this.quickPreviewPopup = popup;
+        this.quickPreviewCanvas = canvas;
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && this.quickPreviewPopup?.classList.contains('open')) {
+                this.closeQuickPreview();
+            }
+        });
+    }
+
+    async openQuickPreview(plan) {
+        if (!this.quickPreviewPopup || !this.quickPreviewCanvas || !plan) return;
+
+        this.quickPreviewPopup.classList.add('open');
+        this.quickPreviewPopup.setAttribute('aria-hidden', 'false');
+
+        // Draw at full canvas size (700x700)
+        const params = this.buildRenderParams(plan.state);
+        const result = await catGenerator.generateCat(params);
+        const ctx = this.quickPreviewCanvas.getContext('2d');
+        const size = this.quickPreviewCanvas.width;
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(result.canvas, 0, 0, size, size);
+    }
+
+    closeQuickPreview() {
+        if (!this.quickPreviewPopup) return;
+        this.quickPreviewPopup.classList.remove('open');
+        this.quickPreviewPopup.setAttribute('aria-hidden', 'true');
     }
 
     async copyCanvasToClipboard(canvas, size = null) {
