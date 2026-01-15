@@ -677,3 +677,94 @@ body.overlay-open {
         flex: 1 1 150px;
     }
 }
+
+/* Cat Label Row */
+.adoption-generator .cat-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Quick Preview Button */
+.adoption-generator .cat-preview {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.7);
+    color: rgba(226, 232, 240, 0.8);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.adoption-generator .cat-preview:hover {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(59, 130, 246, 0.6);
+    transform: scale(1.1);
+}
+
+/* Quick Preview Popup */
+.quick-preview-popup {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1300;
+}
+
+.quick-preview-popup.open {
+    display: flex;
+}
+
+.quick-preview-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.75);
+    backdrop-filter: blur(6px);
+}
+
+.quick-preview-content {
+    position: relative;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5);
+    z-index: 1;
+}
+
+.quick-preview-canvas {
+    display: block;
+    image-rendering: pixelated;
+    border-radius: 12px;
+}
+
+.quick-preview-close {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: rgba(15, 23, 42, 0.95);
+    color: rgba(226, 232, 240, 0.9);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.quick-preview-close:hover {
+    background: rgba(248, 113, 113, 0.25);
+    color: #fca5a5;
+}
