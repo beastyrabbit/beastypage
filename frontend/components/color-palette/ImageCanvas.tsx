@@ -27,9 +27,15 @@ export function ImageCanvas({
 
   // Load image element for spotlight overlay
   useEffect(() => {
+    let cancelled = false;
     const img = new Image();
-    img.onload = () => setLoadedImage(img);
+    img.onload = () => {
+      if (!cancelled) setLoadedImage(img);
+    };
     img.src = imageDataUrl;
+    return () => {
+      cancelled = true;
+    };
   }, [imageDataUrl]);
 
   const handleCrosshairMove = useCallback(

@@ -10,6 +10,7 @@ import {
   adjustHue,
   rgbToHex,
   getContrastColor,
+  hexToRgb,
 } from "@/lib/color-extraction/color-utils";
 
 interface ColorVariationsProps {
@@ -88,7 +89,7 @@ export function ColorVariations({ color }: ColorVariationsProps) {
                   <div className="flex size-full items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
                     <Copy
                       className="size-4"
-                      style={{ color: getContrastColor({ r: 0, g: 0, b: 0 }) }}
+                      style={{ color: getContrastColor(hexToRgb(variation.hex)) }}
                     />
                   </div>
                 </div>
@@ -121,7 +122,7 @@ export function ColorVariations({ color }: ColorVariationsProps) {
                   <div className="flex size-full items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
                     <Copy
                       className="size-4"
-                      style={{ color: getContrastColor({ r: 0, g: 0, b: 0 }) }}
+                      style={{ color: getContrastColor(hexToRgb(variation.hex)) }}
                     />
                   </div>
                 </div>

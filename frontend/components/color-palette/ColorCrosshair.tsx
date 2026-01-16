@@ -26,21 +26,31 @@ export function ColorCrosshair({
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
       setIsDragging(true);
-      dragOffset.current = { x: e.clientX - x, y: e.clientY - y };
+      dragOffset.current = {
+        x: e.clientX - rect.left - x,
+        y: e.clientY - rect.top - y,
+      };
     },
-    [x, y]
+    [x, y, containerRef]
   );
 
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (!containerRef.current) return;
       const touch = e.touches[0];
+      const rect = containerRef.current.getBoundingClientRect();
       setIsDragging(true);
-      dragOffset.current = { x: touch.clientX - x, y: touch.clientY - y };
+      dragOffset.current = {
+        x: touch.clientX - rect.left - x,
+        y: touch.clientY - rect.top - y,
+      };
     },
-    [x, y]
+    [x, y, containerRef]
   );
 
   useEffect(() => {
@@ -49,8 +59,8 @@ export function ColorCrosshair({
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
-      const newX = e.clientX - rect.left;
-      const newY = e.clientY - rect.top;
+      const newX = e.clientX - rect.left - dragOffset.current.x;
+      const newY = e.clientY - rect.top - dragOffset.current.y;
       onMove(index, newX, newY);
     };
 
@@ -58,8 +68,8 @@ export function ColorCrosshair({
       if (!containerRef.current) return;
       const touch = e.touches[0];
       const rect = containerRef.current.getBoundingClientRect();
-      const newX = touch.clientX - rect.left;
-      const newY = touch.clientY - rect.top;
+      const newX = touch.clientX - rect.left - dragOffset.current.x;
+      const newY = touch.clientY - rect.top - dragOffset.current.y;
       onMove(index, newX, newY);
     };
 
