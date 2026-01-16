@@ -67,6 +67,14 @@ Both packages share the same version and are managed by Release Please:
 | `frontend` | `frontend/package.json` | node |
 | `backend/renderer_service` | `backend/renderer_service/pyproject.toml` | python |
 
+## Pre-commit Hooks
+
+```bash
+pip install pre-commit && pre-commit install
+```
+
+Runs: gitleaks (secrets), ruff (Python), tsc (TypeScript)
+
 ## Development Workflow
 
 1. Create a feature branch from `main`
