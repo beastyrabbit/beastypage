@@ -20,17 +20,23 @@ export interface ExtractedColor {
   hsl: HSL;
   position: { x: number; y: number };
   prevalence: number;
+  name?: string; // Human-readable color name from thecolorapi.com
 }
 
 export interface PaletteState {
   image: HTMLImageElement | null;
   imageDataUrl: string | null;
-  extractedColors: ExtractedColor[];
-  colorCount: number;
+  topColors: ExtractedColor[];      // Renamed from extractedColors - dominant colors
+  familyColors: ExtractedColor[];   // NEW - accent/minor colors
+  topColorCount: number;            // Slider value for top colors (1-20)
+  familyColorCount: number;         // Slider value for family colors (1-20)
+  brightnessFactors: number[];      // [0.5, 0.75, 1.0, 1.25, 1.5]
+  hueShifts: number[];              // [0, 10, 20, 30]
   filterBlackWhite: boolean;
   isProcessing: boolean;
   error: string | null;
   hoveredColorIndex: number | null;
+  hoveredColorType: 'top' | 'family' | null; // Track which color set is hovered
 }
 
 export interface KMeansOptions {

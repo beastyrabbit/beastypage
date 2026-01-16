@@ -11,24 +11,38 @@ interface ImageCanvasProps {
   imageDataUrl: string;
   imageDimensions: { width: number; height: number };
   colors: ExtractedColor[];
+  familyColors?: ExtractedColor[];
   hoveredColor: RGB | null;
-  onCrosshairMove: (index: number, x: number, y: number) => void;
+  selectedDotIndex: number | null;
+  selectedDotType: "dominant" | "accent" | null;
+  highlightedDotIndex: number | null;
+  highlightedDotType: "dominant" | "accent" | null;
+  onCrosshairMove: (index: number, x: number, y: number, type: "dominant" | "accent") => void;
+  onDotSelect: (index: number, type: "dominant" | "accent") => void;
 }
 
 export function ImageCanvas({
   imageDataUrl,
   imageDimensions,
   colors,
+  familyColors = [],
   hoveredColor,
+  selectedDotIndex,
+  selectedDotType,
+  highlightedDotIndex,
+  highlightedDotType,
   onCrosshairMove,
+  onDotSelect,
 }: ImageCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loadedImage, setLoadedImage] = useState<HTMLImageElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  // Load image element for spotlight overlay
+  // Load image element for spotlight overlay and loupe
   useEffect(() => {
     let cancelled = false;
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       if (!cancelled) setLoadedImage(img);
     };
@@ -38,12 +52,41 @@ export function ImageCanvas({
     };
   }, [imageDataUrl]);
 
-  const handleCrosshairMove = useCallback(
+  const handleTopCrosshairMove = useCallback(
     (index: number, x: number, y: number) => {
-      onCrosshairMove(index, x, y);
+      onCrosshairMove(index, x, y, "dominant");
     },
     [onCrosshairMove]
   );
+
+  const handleFamilyCrosshairMove = useCallback(
+    (index: number, x: number, y: number) => {
+      onCrosshairMove(index, x, y, "accent");
+    },
+    [onCrosshairMove]
+  );
+
+  const handleTopDotSelect = useCallback(
+    (index: number) => {
+      onDotSelect(index, "dominant");
+    },
+    [onDotSelect]
+  );
+
+  const handleFamilyDotSelect = useCallback(
+    (index: number) => {
+      onDotSelect(index, "accent");
+    },
+    [onDotSelect]
+  );
+
+  const handleDragStart = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
 
   return (
     <div className="glass-card overflow-hidden p-4">
@@ -64,8 +107,8 @@ export function ImageCanvas({
           draggable={false}
         />
 
-        {/* Spotlight overlay when hovering a color */}
-        {hoveredColor && loadedImage && (
+        {/* Spotlight overlay when hovering a color (but not when dragging) */}
+        {hoveredColor && loadedImage && !isDragging && (
           <SpotlightOverlay
             image={loadedImage}
             targetColor={hoveredColor}
@@ -74,16 +117,43 @@ export function ImageCanvas({
           />
         )}
 
-        {/* Crosshairs for each extracted color */}
+        {/* Crosshairs for dominant colors */}
         {colors.map((color, index) => (
           <ColorCrosshair
-            key={index}
+            key={`dominant-${index}`}
             x={color.position.x}
             y={color.position.y}
             color={color.hex}
             index={index}
+            type="dominant"
+            isSelected={selectedDotType === "dominant" && selectedDotIndex === index}
+            isHighlighted={highlightedDotType === "dominant" && highlightedDotIndex === index}
             containerRef={containerRef}
-            onMove={handleCrosshairMove}
+            imageElement={loadedImage}
+            onMove={handleTopCrosshairMove}
+            onSelect={handleTopDotSelect}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          />
+        ))}
+
+        {/* Crosshairs for accent/family colors */}
+        {familyColors.map((color, index) => (
+          <ColorCrosshair
+            key={`accent-${index}`}
+            x={color.position.x}
+            y={color.position.y}
+            color={color.hex}
+            index={index}
+            type="accent"
+            isSelected={selectedDotType === "accent" && selectedDotIndex === index}
+            isHighlighted={highlightedDotType === "accent" && highlightedDotIndex === index}
+            containerRef={containerRef}
+            imageElement={loadedImage}
+            onMove={(idx, x, y) => handleFamilyCrosshairMove(idx, x, y)}
+            onSelect={handleFamilyDotSelect}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
           />
         ))}
       </div>

@@ -314,3 +314,81 @@ export function createSpotlightMask(
 
   return new ImageData(maskData, width, height);
 }
+
+/**
+ * Extract family colors (accent/minor colors) that are different from top colors
+ * These are colors present in the image but distinct from the dominant colors
+ */
+export function extractFamilyColors(
+  img: HTMLImageElement,
+  topColors: ExtractedColor[],
+  options: KMeansOptions,
+  similarityThreshold = 50
+): ExtractedColor[] {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+  const { data, width, height } = getImagePixels(img);
+
+  // Sample pixels, excluding those too similar to top colors
+  const pixels: PixelData[] = [];
+
+  for (let y = 0; y < height; y += opts.sampleStep) {
+    for (let x = 0; x < width; x += opts.sampleStep) {
+      const i = (y * width + x) * 4;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+
+      // Skip transparent pixels
+      if (a < 128) continue;
+
+      // Skip black/white if filtering
+      if (
+        opts.filterBlackWhite &&
+        isBlackOrWhite({ r, g, b }, opts.blackWhiteThreshold)
+      ) {
+        continue;
+      }
+
+      // Skip pixels too similar to any top color
+      const pixelColor = { r, g, b };
+      const isTooSimilar = topColors.some(
+        (topColor) => colorDistance(pixelColor, topColor.rgb) < similarityThreshold
+      );
+
+      if (!isTooSimilar) {
+        pixels.push({ r, g, b, x, y });
+      }
+    }
+  }
+
+  // If not enough unique pixels remain, return empty
+  if (pixels.length < opts.k) {
+    return [];
+  }
+
+  // Run K-Means on remaining pixels
+  const centroids = kMeans(pixels, opts.k, opts.maxIterations);
+
+  // Convert centroids to ExtractedColor format
+  const totalPixels = pixels.length;
+  const colors = centroids
+    .map((c) => ({
+      hex: rgbToHex({ r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) }),
+      rgb: {
+        r: Math.round(c.r),
+        g: Math.round(c.g),
+        b: Math.round(c.b),
+      },
+      hsl: rgbToHsl({
+        r: Math.round(c.r),
+        g: Math.round(c.g),
+        b: Math.round(c.b),
+      }),
+      position: { x: c.x, y: c.y },
+      prevalence: Math.round((c.count / totalPixels) * 100),
+    }))
+    .sort((a, b) => b.prevalence - a.prevalence);
+
+  return colors;
+}
