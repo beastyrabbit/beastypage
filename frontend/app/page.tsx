@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Twitch, Twitter, Youtube, Cloud, PawPrint, Home, Coffee, ArrowRight } from "lucide-react";
+import Image from "next/image";
+import { Twitch, Twitter, Youtube, Cloud, PawPrint, Home, Coffee, Github } from "lucide-react";
 import type { ComponentType } from "react";
 import type { Metadata } from "next";
 
 import { DiscordInviteButton } from "@/components/common/DiscordInviteButton";
-import { PageHero } from "@/components/common/PageHero";
 
 type LinkCard = {
   href: string;
@@ -12,16 +12,10 @@ type LinkCard = {
   icon: ComponentType<{ className?: string }>;
 };
 
-type QuickLink = {
-  href: string;
-  label: string;
-  description: string;
-};
-
-const ADDITIONAL_LINKS: LinkCard[] = [
+const PRIMARY_LINKS: LinkCard[] = [
   {
     href: "https://twitch.tv/BeastyRabbit",
-    label: "Twitch Channel",
+    label: "Twitch",
     icon: Twitch,
   },
   {
@@ -30,8 +24,16 @@ const ADDITIONAL_LINKS: LinkCard[] = [
     icon: Twitter,
   },
   {
+    href: "https://github.com/beastyrabbit",
+    label: "GitHub",
+    icon: Github,
+  },
+];
+
+const SECONDARY_LINKS: LinkCard[] = [
+  {
     href: "https://www.youtube.com/@beastyrabbit",
-    label: "YouTube Channel",
+    label: "YouTube",
     icon: Youtube,
   },
   {
@@ -56,23 +58,16 @@ const ADDITIONAL_LINKS: LinkCard[] = [
   },
 ];
 
-const QUICK_LINKS: QuickLink[] = [
-  {
-    href: "/projects",
-    label: "Projects Hub",
-    description: "Explore all cat creation tools, gacha wheels, and more.",
-  },
-  {
-    href: "/projects/gacha",
-    label: "Gacha Tools",
-    description: "Spin wheels and generate random cats.",
-  },
-  {
-    href: "/stream",
-    label: "Stream Tools",
-    description: "Overlay automations and chat triggers for streams.",
-  },
-];
+function getAge(): number {
+  const birthDate = new Date(1990, 8, 1); // September 1, 1990 (month is 0-indexed)
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
 
 export const metadata: Metadata = {
   title: "BeastyRabbit | Home",
@@ -84,82 +79,125 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-16">
-      <PageHero
-        eyebrow="About BeastyRabbit"
-        title={<>Hey there, I&apos;m <span className="text-gradient-personal animate-shimmer bg-[length:200%_auto]">Beasty.</span></>}
-        description="Germany-based streamer building a cozy English-first space for tech deep dives, offbeat gadgets, and nostalgic games."
-      >
-        <Link
-          href="https://twitch.tv/BeastyRabbit"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]"
-        >
-          <Twitch className="size-3" /> Twitch
-        </Link>
-        <Link
-          href="https://twitter.com/BeastyRabbit"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]"
-        >
-          <Twitter className="size-3" /> X (Twitter)
-        </Link>
-        <DiscordInviteButton className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]" />
-      </PageHero>
+  const age = getAge();
 
-      {/* Quick Navigation */}
-      <section className="glass-card space-y-8 px-8 py-12 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-b from-primary/10 to-transparent rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10">
-          <p className="section-eyebrow">Explore</p>
-          <h2 className="text-3xl font-bold text-foreground mt-2">Jump into the action</h2>
+  return (
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 py-16">
+      {/* Hero with Banner Background */}
+      <section className="relative rounded-3xl overflow-hidden">
+        {/* Banner Background */}
+        <div className="absolute inset-0">
+          <Image
+            src="/beasty-banner.png"
+            alt=""
+            fill
+            className="object-cover opacity-40"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/40" />
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {QUICK_LINKS.map((item, index) => (
+
+        {/* Hero Content */}
+        <div className="relative z-10 px-8 py-12 text-balance">
+          <p className="section-eyebrow">Welcome</p>
+          <h1 className="mt-4 text-5xl font-bold leading-tight sm:text-6xl">
+            Hey there, I&apos;m <span className="text-gradient-personal animate-shimmer bg-[length:200%_auto]">Beasty.</span>
+          </h1>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link
-              key={item.href}
-              href={item.href}
-              className="group relative flex h-full flex-col gap-3 rounded-2xl border border-white/5 bg-white/5 p-5 transition-all hover:-translate-y-1 hover:bg-white/10 hover:border-white/10 hover:shadow-lg animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards"
-              style={{ animationDelay: `${index * 100}ms` }}
+              href="https://twitch.tv/BeastyRabbit"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]"
             >
-              <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</h3>
-              <p className="text-sm text-muted-foreground">{item.description}</p>
-              <span className="mt-auto inline-flex items-center gap-1 text-xs font-semibold text-primary/80 transition-transform group-hover:translate-x-1 group-hover:text-primary">
-                Open <ArrowRight className="size-3" />
-              </span>
+              <Twitch className="size-3" /> Twitch
             </Link>
-          ))}
+            <Link
+              href="https://twitter.com/BeastyRabbit"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]"
+            >
+              <Twitter className="size-3" /> X
+            </Link>
+            <DiscordInviteButton className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]" />
+          </div>
         </div>
       </section>
 
-      {/* Socials */}
-      <section className="glass-card space-y-8 px-8 py-12 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-b from-slate-800/20 to-transparent rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10">
-          <p className="section-eyebrow">Stay connected</p>
-          <h2 className="text-3xl font-bold text-foreground mt-2">Find me across the web</h2>
+      {/* About Me */}
+      <section className="glass-card px-8 py-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-b from-primary/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row gap-6 items-center md:items-start">
+          {/* Profile Image */}
+          <div className="shrink-0">
+            <Image
+              src="/beasty-profile.png"
+              alt="BeastyRabbit"
+              width={240}
+              height={240}
+              className="rounded-2xl border-2 border-white/10"
+            />
+          </div>
+          {/* Bio */}
+          <div className="space-y-4 text-center md:text-left">
+            <p className="section-eyebrow">About me</p>
+            <p className="text-lg text-foreground/90 leading-relaxed">
+              {age}-year-old self-employed developer from Germany. I&apos;m into next-level tech and gear,
+              old-school games, and weird quirky stuff that probably shouldn&apos;t exist... but does.
+              Casual gamer and full-time art commission junkie. I run Arch Linux as my daily driver
+              and have two cats who offer zero tech support but plenty of chaos.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">Arch Linux</span>
+              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">Tech & Gadgets</span>
+              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">Retro Games</span>
+              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">Art Collector</span>
+            </div>
+          </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {ADDITIONAL_LINKS.map(({ href, label, icon: Icon }, index) => (
-            <Link
-              key={label}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="glass-card group flex items-center gap-4 p-5 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-white/20 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <div className="p-3 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors">
-                <Icon className="size-6 text-amber-200 group-hover:text-amber-100 transition-colors" />
-              </div>
-              <span className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
-                {label}
-              </span>
-            </Link>
-          ))}
+      </section>
+
+      {/* Primary Links */}
+      <section className="grid gap-4 md:grid-cols-3">
+        {PRIMARY_LINKS.map(({ href, label, icon: Icon }, index) => (
+          <Link
+            key={label}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="glass-card group flex items-center gap-4 p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-white/20 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
+            style={{ animationDelay: `${index * 50}ms` }}
+          >
+            <div className="p-3 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors">
+              <Icon className="size-7 text-amber-200 group-hover:text-amber-100 transition-colors" />
+            </div>
+            <span className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
+              {label}
+            </span>
+          </Link>
+        ))}
+      </section>
+
+      {/* Secondary Links */}
+      <section className="glass-card px-6 py-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-b from-slate-800/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10">
+          <p className="section-eyebrow mb-4">More links</p>
+          <div className="flex flex-wrap gap-3">
+            {SECONDARY_LINKS.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:border-white/20 hover:bg-white/10 hover:text-foreground"
+              >
+                <Icon className="size-4" />
+                <span>{label}</span>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
     </main>
