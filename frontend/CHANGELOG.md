@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.5.0](https://github.com/beastyrabbit/beastypage/compare/frontend-v1.4.0...frontend-v1.5.0) (2026-01-16)
+
+
+### Features
+
+* add Color Palette Creator tool for extracting colors from images ([3b9fa52](https://github.com/beastyrabbit/beastypage/commit/3b9fa52432551425020a8d9242718f0441ac6a6b))
+* add color set export with CLS/ACO formats and color naming ([fa60a59](https://github.com/beastyrabbit/beastypage/commit/fa60a59165f00b5fbe2fd5fccf695a9e5c1d54d4))
+* add color spotlight export with layered color highlighting ([d231b25](https://github.com/beastyrabbit/beastypage/commit/d231b2517320b542067667fde905d2be0dde7c73))
+* add random image button and fix image scaling issues ([0b17e78](https://github.com/beastyrabbit/beastypage/commit/0b17e785c95cf9adb066d0a28196f0177add1f1e))
+* add spotlight download and improve image handling ([bb9fc5e](https://github.com/beastyrabbit/beastypage/commit/bb9fc5ef07c5f172a852a7a8a3d825ac10d62651))
+
+
+### Bug Fixes
+
+* add file type validation to handleFileSelect ([a19a2c8](https://github.com/beastyrabbit/beastypage/commit/a19a2c83af39f87d3aa43aefaff5fc21ed95d113))
+* address CodeRabbit nitpick feedback ([6474ebd](https://github.com/beastyrabbit/beastypage/commit/6474ebd008524c0047cbd245cee66738b4e93f31))
+* address CodeRabbit review feedback ([86280c7](https://github.com/beastyrabbit/beastypage/commit/86280c7df38c885660aae5ba553570734ff1e076))
+* address CodeRabbit review feedback ([396eeef](https://github.com/beastyrabbit/beastypage/commit/396eeef9afff2cfb5638fd9a68f163d165773453))
+* address CodeRabbit review feedback ([18b5b28](https://github.com/beastyrabbit/beastypage/commit/18b5b287c1e55e4ad15fb8e5e42e753cd79bacda))
+* correct spotlight overlay scaling for responsive images ([fd66a4b](https://github.com/beastyrabbit/beastypage/commit/fd66a4bf1fb895172eb67b48e154ed9dfa9ea3cd))
+* dynamic similarity threshold for family color extraction ([53fff69](https://github.com/beastyrabbit/beastypage/commit/53fff69b0cb50f072021ffb54529cf8deb102e7b))
+* improve CLS export format and filter black/white/duplicates ([f7b7312](https://github.com/beastyrabbit/beastypage/commit/f7b731275f65ae249d7ac99c68fad4803155b8b7))
+* remove leading dot from extension in toast message ([09922c5](https://github.com/beastyrabbit/beastypage/commit/09922c51128abde280cb373822aacdca91a8c00d))
+* rewrite family color extraction to match Python version ([2936959](https://github.com/beastyrabbit/beastypage/commit/29369591566334834f739a10c5ec6cfb79c8b229))
+* use portal for export dropdown to fix z-index issues ([503290a](https://github.com/beastyrabbit/beastypage/commit/503290ae639228d3e208dce71d5a5a3f5905986e))
+
 ## [1.4.0](https://github.com/beastyrabbit/beastypage/compare/frontend-v1.3.0...frontend-v1.4.0) (2026-01-16)
 
 
