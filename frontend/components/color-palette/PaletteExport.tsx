@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { useCallback, useRef, useState, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { Download, Loader2, ChevronDown, Check } from "lucide-react";
 import { toast } from "sonner";
 
 import type { ExtractedColor, RGB } from "@/lib/color-extraction/types";
@@ -252,9 +253,39 @@ export function PaletteExport({
   isProcessing,
 }: PaletteExportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>(
     EXPORT_FORMATS[0]
   );
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isDropdownOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  }, [isDropdownOpen]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+      if (
+        buttonRef.current && !buttonRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const generatePalettePNG = useCallback(() => {
     const canvas = canvasRef.current;
@@ -420,11 +451,13 @@ export function PaletteExport({
     }
   }, [selectedFormat, generatePalettePNG, downloadColorSet]);
 
-  const handleFormatChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const format = EXPORT_FORMATS.find(f => f.id === e.target.value);
-    if (format) {
-      setSelectedFormat(format);
-    }
+  const handleFormatSelect = useCallback((format: ExportFormat) => {
+    setSelectedFormat(format);
+    setIsDropdownOpen(false);
+  }, []);
+
+  const toggleDropdown = useCallback(() => {
+    setIsDropdownOpen((prev) => !prev);
   }, []);
 
   const hasColors = topColors.length > 0 || familyColors.length > 0;
@@ -434,41 +467,67 @@ export function PaletteExport({
       {/* Hidden canvas for rendering PNG */}
       <canvas ref={canvasRef} style={{ display: "none" }} />
 
-      {/* Export controls */}
-      <div className="flex items-center gap-2">
-        {/* Format selector */}
-        <select
-          value={selectedFormat.id}
-          onChange={handleFormatChange}
-          disabled={isProcessing || !hasColors}
-          className="h-10 rounded-lg border border-border/50 bg-card px-3 pr-8 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50"
+      {/* Export controls - split button */}
+      <div ref={buttonRef}>
+        <div className="flex">
+          {/* Main download button */}
+          <button
+            onClick={handleExport}
+            disabled={isProcessing || !hasColors}
+            className="flex h-10 items-center gap-2 rounded-l-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Download className="size-4" />
+                {selectedFormat.label}
+              </>
+            )}
+          </button>
+
+          {/* Dropdown toggle */}
+          <button
+            onClick={toggleDropdown}
+            disabled={isProcessing || !hasColors}
+            className="flex h-10 items-center justify-center rounded-r-lg border-l border-primary-foreground/20 bg-primary px-2 text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ChevronDown className={`size-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Dropdown menu - rendered via portal to avoid z-index issues */}
+      {isDropdownOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed min-w-[180px] overflow-hidden rounded-lg border border-border/50 bg-card shadow-xl"
+          style={{
+            top: dropdownPosition.top,
+            right: dropdownPosition.right,
+            zIndex: 9999,
+          }}
         >
           {EXPORT_FORMATS.map((format) => (
-            <option key={format.id} value={format.id}>
-              {format.label}
-            </option>
+            <button
+              key={format.id}
+              onClick={() => handleFormatSelect(format)}
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"
+            >
+              <Check
+                className={`size-4 ${selectedFormat.id === format.id ? "text-primary" : "text-transparent"}`}
+              />
+              <span className={selectedFormat.id === format.id ? "font-medium text-foreground" : "text-muted-foreground"}>
+                {format.label}
+              </span>
+            </button>
           ))}
-        </select>
-
-        {/* Download button */}
-        <button
-          onClick={handleExport}
-          disabled={isProcessing || !hasColors}
-          className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/40 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="size-4 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <Download className="size-4" />
-              Download
-            </>
-          )}
-        </button>
-      </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 }
