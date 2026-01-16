@@ -2,6 +2,26 @@
  * Fetch random images from Wikimedia Commons
  */
 
+const FETCH_TIMEOUT_MS = 15000; // 15 second timeout
+
+/**
+ * Fetch with timeout using AbortController
+ */
+async function fetchWithTimeout(
+  url: string,
+  timeoutMs = FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 interface WikiSearchResult {
   query?: {
     search?: Array<{
@@ -53,13 +73,19 @@ async function searchImages(category: string, limit = 50): Promise<string[]> {
   url.searchParams.set("format", "json");
   url.searchParams.set("origin", "*");
 
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`Failed to search Wikimedia Commons: ${response.status}`);
+  try {
+    const response = await fetchWithTimeout(url.toString());
+    if (!response.ok) {
+      throw new Error(`Failed to search Wikimedia Commons: ${response.status}`);
+    }
+    const data = (await response.json()) as WikiSearchResult;
+    return data.query?.search?.map((item) => item.title) ?? [];
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Request timed out - Wikimedia Commons may be slow");
+    }
+    throw error;
   }
-
-  const data = (await response.json()) as WikiSearchResult;
-  return data.query?.search?.map((item) => item.title) ?? [];
 }
 
 /**
@@ -74,25 +100,32 @@ async function getImageUrl(fileTitle: string): Promise<string> {
   url.searchParams.set("format", "json");
   url.searchParams.set("origin", "*");
 
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`Failed to get image info: ${response.status}`);
-  }
+  try {
+    const response = await fetchWithTimeout(url.toString());
+    if (!response.ok) {
+      throw new Error(`Failed to get image info: ${response.status}`);
+    }
 
-  const data = (await response.json()) as WikiImageInfoResult;
-  const pages = data.query?.pages;
-  if (!pages) {
-    throw new Error("No image info found");
-  }
+    const data = (await response.json()) as WikiImageInfoResult;
+    const pages = data.query?.pages;
+    if (!pages) {
+      throw new Error("No image info found");
+    }
 
-  // Get the first page result
-  const page = Object.values(pages)[0];
-  const imageUrl = page?.imageinfo?.[0]?.url;
-  if (!imageUrl) {
-    throw new Error("No image URL found");
-  }
+    // Get the first page result
+    const page = Object.values(pages)[0];
+    const imageUrl = page?.imageinfo?.[0]?.url;
+    if (!imageUrl) {
+      throw new Error("No image URL found");
+    }
 
-  return imageUrl;
+    return imageUrl;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Request timed out - Wikimedia Commons may be slow");
+    }
+    throw error;
+  }
 }
 
 /**

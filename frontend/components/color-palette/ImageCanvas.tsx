@@ -112,8 +112,6 @@ export function ImageCanvas({
           <SpotlightOverlay
             image={loadedImage}
             targetColor={hoveredColor}
-            width={imageDimensions.width}
-            height={imageDimensions.height}
           />
         )}
 

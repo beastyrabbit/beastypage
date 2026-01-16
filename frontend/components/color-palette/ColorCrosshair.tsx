@@ -45,6 +45,7 @@ export function ColorCrosshair({
   const [showLoupe, setShowLoupe] = useState(false); // For smooth transition
   const dragOffset = useRef({ x: 0, y: 0 });
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cachedImageRef = useRef<HTMLImageElement | null>(null); // Track cached image
   const hasDragged = useRef(false); // Track if mouse actually moved during drag
 
   // Ring colors based on type
@@ -74,10 +75,13 @@ export function ColorCrosshair({
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
       if (!ctx) return;
 
-      // Set canvas to image size
-      canvas.width = imageElement.naturalWidth;
-      canvas.height = imageElement.naturalHeight;
-      ctx.drawImage(imageElement, 0, 0);
+      // Only redraw image to canvas if the image has changed
+      if (cachedImageRef.current !== imageElement) {
+        canvas.width = imageElement.naturalWidth;
+        canvas.height = imageElement.naturalHeight;
+        ctx.drawImage(imageElement, 0, 0);
+        cachedImageRef.current = imageElement;
+      }
 
       // Calculate scale between display and natural size
       const scaleX = imageElement.naturalWidth / imageElement.width;

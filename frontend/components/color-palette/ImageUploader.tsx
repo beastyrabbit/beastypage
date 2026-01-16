@@ -25,12 +25,12 @@ export function ImageUploader({
 }: ImageUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [urlInput, setUrlInput] = useState("");
-  const [isLoadingRandom, setIsLoadingRandom] = useState(false);
+  const [loadingCategory, setLoadingCategory] = useState<ImageCategory | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleRandomImage = useCallback(
     async (category: ImageCategory) => {
-      setIsLoadingRandom(true);
+      setLoadingCategory(category);
       try {
         const url = await fetchRandomWikimediaImage(category);
         onImageLoad(url);
@@ -39,7 +39,7 @@ export function ImageUploader({
           err instanceof Error ? err.message : "Failed to fetch random image"
         );
       } finally {
-        setIsLoadingRandom(false);
+        setLoadingCategory(null);
       }
     },
     [onImageLoad]
@@ -173,12 +173,12 @@ export function ImageUploader({
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              disabled={isLoading || isLoadingRandom}
+              disabled={isLoading || loadingCategory !== null}
             />
           </div>
           <button
             type="submit"
-            disabled={!urlInput.trim() || isLoading || isLoadingRandom}
+            disabled={!urlInput.trim() || isLoading || loadingCategory !== null}
             className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Load URL
@@ -203,10 +203,10 @@ export function ImageUploader({
               <button
                 key={category.id}
                 onClick={() => handleRandomImage(category.id)}
-                disabled={isLoading || isLoadingRandom}
+                disabled={isLoading || loadingCategory !== null}
                 className="flex items-center gap-2 rounded-xl border border-border/50 bg-background/50 px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isLoadingRandom ? (
+                {loadingCategory === category.id ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : null}
                 {category.label}

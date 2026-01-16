@@ -9,16 +9,12 @@ interface SpotlightOverlayProps {
   image: HTMLImageElement;
   targetColor: RGB;
   threshold?: number;
-  width: number;
-  height: number;
 }
 
 export function SpotlightOverlay({
   image,
   targetColor,
   threshold = 30,
-  width,
-  height,
 }: SpotlightOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
