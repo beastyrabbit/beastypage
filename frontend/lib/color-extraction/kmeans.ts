@@ -471,13 +471,21 @@ export function createMultiColorSpotlightImage(
 /**
  * Extract family colors (accent/minor colors) that are different from top colors
  * These are colors present in the image but distinct from the dominant colors
+ *
+ * The similarity threshold is dynamically adjusted based on the number of top colors:
+ * - With few top colors (1-6), use higher threshold (50) for cleaner separation
+ * - With many top colors (15-20), use lower threshold (20-25) so more colors can qualify
  */
 export function extractFamilyColors(
   img: HTMLImageElement,
   topColors: ExtractedColor[],
   options: KMeansOptions,
-  similarityThreshold = 50
+  similarityThreshold?: number
 ): ExtractedColor[] {
+  // Dynamic threshold: decreases as more top colors are extracted
+  // Range: 50 (for 1 top color) down to 20 (for 20+ top colors)
+  const effectiveThreshold =
+    similarityThreshold ?? Math.max(20, 50 - topColors.length * 1.5);
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const { data, width, height } = getImagePixels(img);
 
@@ -512,7 +520,7 @@ export function extractFamilyColors(
       // Skip pixels too similar to any top color
       const pixelColor = { r, g, b };
       const isTooSimilar = topColors.some(
-        (topColor) => colorDistance(pixelColor, topColor.rgb) < similarityThreshold
+        (topColor) => colorDistance(pixelColor, topColor.rgb) < effectiveThreshold
       );
 
       if (!isTooSimilar) {
