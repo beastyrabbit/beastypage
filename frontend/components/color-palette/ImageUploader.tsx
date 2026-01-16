@@ -17,6 +17,7 @@ interface ImageUploaderProps {
 }
 
 const VALID_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export function ImageUploader({
   onImageLoad,
@@ -70,6 +71,10 @@ export function ImageUploader({
           toast.error("Invalid image format. Use PNG, JPEG, WebP, or GIF.");
           return;
         }
+        if (file.size > MAX_FILE_SIZE) {
+          toast.error("Image file is too large (max 10MB).");
+          return;
+        }
         onImageLoad(file);
       }
     },
@@ -83,6 +88,10 @@ export function ImageUploader({
         const file = files[0];
         if (!VALID_IMAGE_TYPES.includes(file.type)) {
           toast.error("Invalid image format. Use PNG, JPEG, WebP, or GIF.");
+          return;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+          toast.error("Image file is too large (max 10MB).");
           return;
         }
         onImageLoad(file);

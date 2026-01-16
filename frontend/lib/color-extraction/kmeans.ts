@@ -358,6 +358,57 @@ export function createSpotlightMask(
 }
 
 /**
+ * Create a spotlight image (original + overlay) as a data URL
+ * Shows the original image with non-matching areas dimmed
+ */
+export function createSpotlightImage(
+  img: HTMLImageElement,
+  targetColor: RGB,
+  threshold = 30
+): string {
+  const { data, width, height } = getImagePixels(img);
+
+  // Create canvas for the result
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not get canvas context");
+
+  // Draw original image first
+  ctx.drawImage(img, 0, 0, width, height);
+
+  // Get the image data to modify
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const pixels = imageData.data;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const sourceAlpha = data[i + 3];
+
+      // Skip fully transparent pixels
+      if (sourceAlpha === 0) continue;
+
+      const pixelColor = { r: data[i], g: data[i + 1], b: data[i + 2] };
+      const dist = colorDistance(pixelColor, targetColor);
+
+      // If pixel doesn't match target color, darken it
+      if (dist > threshold) {
+        // Blend with black at ~70% opacity
+        const dimFactor = 0.3; // Keep 30% of original brightness
+        pixels[i] = Math.round(pixels[i] * dimFactor);
+        pixels[i + 1] = Math.round(pixels[i + 1] * dimFactor);
+        pixels[i + 2] = Math.round(pixels[i + 2] * dimFactor);
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
+/**
  * Extract family colors (accent/minor colors) that are different from top colors
  * These are colors present in the image but distinct from the dominant colors
  */
