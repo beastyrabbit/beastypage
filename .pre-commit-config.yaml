@@ -24,3 +24,15 @@ repos:
         language: system
         files: ^frontend/.*\.(ts|tsx)$
         pass_filenames: false
+
+  # CodeRabbit AI code review
+  # NOTE: This hook runs AI-powered code review and may take 7-30+ minutes.
+  # Run your commit in the background and wait for it to complete.
+  - repo: local
+    hooks:
+      - id: coderabbit
+        name: CodeRabbit Review
+        entry: coderabbit review --plain --type uncommitted
+        language: system
+        pass_filenames: false
+        verbose: true
