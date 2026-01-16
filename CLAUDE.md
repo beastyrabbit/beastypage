@@ -55,8 +55,17 @@ git commit -m "docs: add API documentation"
 ## Project Structure
 
 - `frontend/` - Next.js application (see `frontend/CLAUDE.md` for details)
-- `backend/renderer_service/` - Cat card renderer service
+- `backend/renderer_service/` - Cat card renderer service (Python/FastAPI)
 - `.github/workflows/` - CI/CD pipelines
+
+### Versioned Packages
+
+Both packages share the same version and are managed by Release Please:
+
+| Package | Version File | Type |
+|---------|--------------|------|
+| `frontend` | `frontend/package.json` | node |
+| `backend/renderer_service` | `backend/renderer_service/pyproject.toml` | python |
 
 ## Development Workflow
 
