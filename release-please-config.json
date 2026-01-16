@@ -4,6 +4,10 @@
     "frontend": {
       "release-type": "node",
       "bump-minor-pre-major": true
+    },
+    "backend/renderer_service": {
+      "release-type": "python",
+      "bump-minor-pre-major": true
     }
   }
 }
