@@ -6,9 +6,6 @@ on:
       - main
     tags:
       - 'v*'
-    paths:
-      - 'frontend/**'
-      - 'backend/renderer_service/**'
   workflow_dispatch:
     inputs:
       build_frontend:
