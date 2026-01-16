@@ -113,14 +113,15 @@ export function ColorPaletteClient() {
       const allColors = [...topColors, ...familyColors];
       const nameMap = await fetchColorNames(allColors);
 
-      // Update colors with names
+      // Update colors with names - use passed-in arrays as source of truth
+      // to avoid stale state issues from async fetch
       setState((prev) => ({
         ...prev,
-        topColors: prev.topColors.map((color) => ({
+        topColors: topColors.map((color) => ({
           ...color,
           name: nameMap.get(color.hex.toUpperCase()) || "Unknown",
         })),
-        familyColors: prev.familyColors.map((color) => ({
+        familyColors: familyColors.map((color) => ({
           ...color,
           name: nameMap.get(color.hex.toUpperCase()) || "Unknown",
         })),
