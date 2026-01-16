@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/beastyrabbit/beastypage/compare/frontend-v1.5.0...frontend-v1.5.1) (2026-01-16)
+
+
+### Bug Fixes
+
+* regenerate bun.lock to fix CI build ([c81aa19](https://github.com/beastyrabbit/beastypage/commit/c81aa19092b0d89012f15d947f4007268cd13db3))
+
 ## [1.5.0](https://github.com/beastyrabbit/beastypage/compare/frontend-v1.4.0...frontend-v1.5.0) (2026-01-16)
 
 
