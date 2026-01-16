@@ -41,11 +41,7 @@ export function SpotlightOverlay({
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none absolute inset-0 transition-opacity duration-200"
-      style={{
-        width,
-        height,
-      }}
+      className="pointer-events-none absolute inset-0 h-full w-full transition-opacity duration-200"
     />
   );
 }
