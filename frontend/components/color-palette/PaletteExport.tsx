@@ -64,6 +64,23 @@ function colorKey(rgb: RGB): string {
 }
 
 /**
+ * Filter ExtractedColor array to remove black, white, and duplicates
+ */
+function filterExtractedColors(
+  colors: ExtractedColor[],
+  seenColors?: Set<string>
+): ExtractedColor[] {
+  const seen = seenColors ?? new Set<string>();
+  return colors.filter((color) => {
+    if (isNearBlack(color.rgb) || isNearWhite(color.rgb)) return false;
+    const key = colorKey(color.rgb);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
  * Collect all colors with names for export (base + brightness + hue variations)
  * Filters out black, white, and duplicate colors
  */
@@ -250,10 +267,15 @@ export function PaletteExport({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Filter out black, white, and duplicate colors
+    const seenColors = new Set<string>();
+    const filteredTopColors = filterExtractedColors(topColors, seenColors);
+    const filteredFamilyColors = filterExtractedColors(familyColors, seenColors);
+
     // Calculate number of sections
     // Each color set has: palette strip + brightness grid + hue grid
-    const topSections = topColors.length > 0 ? 3 : 0;
-    const familySections = familyColors.length > 0 ? 3 : 0;
+    const topSections = filteredTopColors.length > 0 ? 3 : 0;
+    const familySections = filteredFamilyColors.length > 0 ? 3 : 0;
     const totalSections = topSections + familySections;
 
     if (totalSections === 0) return;
@@ -333,17 +355,17 @@ export function PaletteExport({
     };
 
     // Draw top colors sections
-    if (topColors.length > 0) {
-      yOffset = drawColorStrip(topColors, yOffset);
-      yOffset = drawBrightnessGrid(topColors, yOffset);
-      yOffset = drawHueGrid(topColors, yOffset);
+    if (filteredTopColors.length > 0) {
+      yOffset = drawColorStrip(filteredTopColors, yOffset);
+      yOffset = drawBrightnessGrid(filteredTopColors, yOffset);
+      yOffset = drawHueGrid(filteredTopColors, yOffset);
     }
 
     // Draw family colors sections
-    if (familyColors.length > 0) {
-      yOffset = drawColorStrip(familyColors, yOffset);
-      yOffset = drawBrightnessGrid(familyColors, yOffset);
-      yOffset = drawHueGrid(familyColors, yOffset);
+    if (filteredFamilyColors.length > 0) {
+      yOffset = drawColorStrip(filteredFamilyColors, yOffset);
+      yOffset = drawBrightnessGrid(filteredFamilyColors, yOffset);
+      yOffset = drawHueGrid(filteredFamilyColors, yOffset);
     }
 
     // Trigger download

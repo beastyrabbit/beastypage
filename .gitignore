@@ -32,7 +32,7 @@ backend/renderer_service/.pytest_cache/
 backend/renderer_service/renderer_service.egg-info/
 backend/renderer_service/tests/__pycache__/
 backend/renderer_service/*.png
-# backend/renderer_service/uv.lock  # Track this for reproducible builds
+# Lockfiles (uv.lock, bun.lock) are intentionally committed for reproducible builds
 
 # Data exports / runtime assets
 backend/catdex-export-20251022-142634/
@@ -52,7 +52,6 @@ test-*.sh
 # Temporary/cache directories
 .tmp/
 .serena/
-**/bun.lock
 
 # Playwright MCP
 .playwright-mcp/

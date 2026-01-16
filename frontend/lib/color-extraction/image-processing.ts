@@ -33,12 +33,43 @@ export async function loadImageFromFile(file: File): Promise<HTMLImageElement> {
 
 /**
  * Load an image from a URL
+ * Detects CORS/tainted canvas issues immediately after load
  */
 export async function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
+
+    img.onload = () => {
+      // Test for CORS/tainted canvas by trying to read pixel data
+      try {
+        const testCanvas = document.createElement("canvas");
+        testCanvas.width = 1;
+        testCanvas.height = 1;
+        const testCtx = testCanvas.getContext("2d");
+        if (!testCtx) {
+          reject(new Error("Could not create canvas context"));
+          return;
+        }
+        testCtx.drawImage(img, 0, 0, 1, 1);
+        // This will throw SecurityError if canvas is tainted
+        testCtx.getImageData(0, 0, 1, 1);
+        resolve(img);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "SecurityError") {
+          reject(
+            new Error(
+              "Cannot access image data due to CORS restrictions. " +
+                "The image server must include Access-Control-Allow-Origin headers. " +
+                "Try downloading the image first and uploading it locally."
+            )
+          );
+        } else {
+          reject(error);
+        }
+      }
+    };
+
     img.onerror = () =>
       reject(new Error("Failed to load image from URL. Try downloading it first."));
     img.src = url;

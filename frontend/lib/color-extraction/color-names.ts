@@ -43,16 +43,23 @@ export async function fetchColorName(hex: string): Promise<string> {
 }
 
 /**
+ * Normalize hex to canonical form: uppercase without # prefix
+ */
+function normalizeHex(hex: string): string {
+  return hex.replace(/^#/, "").toUpperCase();
+}
+
+/**
  * Batch fetch color names for multiple colors with rate limiting
- * Returns a Map of hex -> name
+ * Returns a Map of normalized hex (uppercase, no #) -> name
  */
 export async function fetchColorNames(
   colors: ExtractedColor[]
 ): Promise<Map<string, string>> {
   const nameMap = new Map<string, string>();
 
-  // Dedupe hexes
-  const uniqueHexes = [...new Set(colors.map((c) => c.hex.toUpperCase()))];
+  // Dedupe hexes using normalized form
+  const uniqueHexes = [...new Set(colors.map((c) => normalizeHex(c.hex)))];
 
   // Fetch in parallel with a small batch size to avoid rate limiting
   const BATCH_SIZE = 5;
@@ -62,13 +69,15 @@ export async function fetchColorNames(
 
     const results = await Promise.all(
       batch.map(async (hex) => {
+        // hex is already normalized (no #, uppercase)
         const name = await fetchColorName(hex);
         return { hex, name };
       })
     );
 
     for (const { hex, name } of results) {
-      nameMap.set(hex.toUpperCase(), name);
+      // Store with normalized key
+      nameMap.set(hex, name);
     }
 
     // Small delay between batches to be nice to the API
@@ -82,6 +91,7 @@ export async function fetchColorNames(
 
 /**
  * Generate display name for a color with context
+ * Supports combined brightness and hue variations
  */
 export function generateColorDisplayName(
   index: number,
@@ -90,14 +100,23 @@ export function generateColorDisplayName(
   variation?: { brightnessMultiplier?: number; hueShift?: number }
 ): string {
   const prefix = type === "dominant" ? "dom" : "acc";
-  let name = `${prefix} #${index + 1} - ${colorName}`;
+
+  // Build variation parts
+  const parts: string[] = [];
 
   if (variation?.brightnessMultiplier !== undefined && variation.brightnessMultiplier !== 1.0) {
-    name = `${prefix} #${index + 1} (${variation.brightnessMultiplier}x) - ${colorName}`;
-  } else if (variation?.hueShift !== undefined && variation.hueShift !== 0) {
-    const sign = variation.hueShift >= 0 ? "+" : "";
-    name = `${prefix} #${index + 1} (${sign}${variation.hueShift}°) - ${colorName}`;
+    parts.push(`${variation.brightnessMultiplier}x`);
   }
 
-  return name;
+  if (variation?.hueShift !== undefined && variation.hueShift !== 0) {
+    const sign = variation.hueShift >= 0 ? "+" : "";
+    parts.push(`${sign}${variation.hueShift}°`);
+  }
+
+  // Combine into final name
+  if (parts.length > 0) {
+    return `${prefix} #${index + 1} (${parts.join(", ")}) - ${colorName}`;
+  }
+
+  return `${prefix} #${index + 1} - ${colorName}`;
 }

@@ -115,15 +115,17 @@ export function ColorPaletteClient() {
 
       // Update colors with names - use passed-in arrays as source of truth
       // to avoid stale state issues from async fetch
+      // nameMap keys are normalized: uppercase without # prefix
+      const normalizeHex = (hex: string) => hex.replace(/^#/, "").toUpperCase();
       setState((prev) => ({
         ...prev,
         topColors: topColors.map((color) => ({
           ...color,
-          name: nameMap.get(color.hex.toUpperCase()) || "Unknown",
+          name: nameMap.get(normalizeHex(color.hex)) || "Unknown",
         })),
         familyColors: familyColors.map((color) => ({
           ...color,
-          name: nameMap.get(color.hex.toUpperCase()) || "Unknown",
+          name: nameMap.get(normalizeHex(color.hex)) || "Unknown",
         })),
       }));
     } catch (error) {
@@ -207,16 +209,14 @@ export function ColorPaletteClient() {
     if (state.image && state.topColors.length === 0) {
       performExtraction();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.image]);
+  }, [state.image, state.topColors.length, performExtraction]);
 
   // Auto-extract when slider values or filter changes
   useEffect(() => {
     if (state.image && (state.topColors.length > 0 || state.familyColors.length > 0)) {
       debouncedExtraction();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.topColorCount, state.familyColorCount, state.filterBlackWhite]);
+  }, [state.image, state.topColors.length, state.familyColors.length, state.topColorCount, state.familyColorCount, state.filterBlackWhite, debouncedExtraction]);
 
   const handleBrightnessFactorsChange = useCallback((factors: number[]) => {
     setState((prev) => ({ ...prev, brightnessFactors: factors }));

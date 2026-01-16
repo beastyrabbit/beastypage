@@ -86,17 +86,44 @@ export function ColorCrosshair({
       const natY = Math.floor(imgY * scaleY);
 
       const halfSize = Math.floor(LOUPE_SIZE / 2);
+      const loupeWidth = LOUPE_SIZE;
+      const loupeHeight = LOUPE_SIZE;
+
+      // Calculate the region bounds (may extend outside canvas)
+      const x0 = natX - halfSize;
+      const y0 = natY - halfSize;
+
+      // Calculate the actual region we can grab from canvas (clipped to bounds)
+      const clipX0 = Math.max(0, x0);
+      const clipY0 = Math.max(0, y0);
+      const clipX1 = Math.min(canvas.width, x0 + loupeWidth);
+      const clipY1 = Math.min(canvas.height, y0 + loupeHeight);
+      const clipWidth = clipX1 - clipX0;
+      const clipHeight = clipY1 - clipY0;
+
+      // Grab the entire visible region in one call (if any visible area)
+      let imageData: ImageData | null = null;
+      if (clipWidth > 0 && clipHeight > 0) {
+        imageData = ctx.getImageData(clipX0, clipY0, clipWidth, clipHeight);
+      }
+
       const pixels: string[][] = [];
 
-      for (let dy = -halfSize; dy <= halfSize; dy++) {
+      for (let dy = 0; dy < loupeHeight; dy++) {
         const row: string[] = [];
-        for (let dx = -halfSize; dx <= halfSize; dx++) {
-          const px = natX + dx;
-          const py = natY + dy;
+        for (let dx = 0; dx < loupeWidth; dx++) {
+          const px = x0 + dx;
+          const py = y0 + dy;
 
-          if (px >= 0 && px < canvas.width && py >= 0 && py < canvas.height) {
-            const data = ctx.getImageData(px, py, 1, 1).data;
-            row.push(`rgb(${data[0]}, ${data[1]}, ${data[2]})`);
+          if (px >= 0 && px < canvas.width && py >= 0 && py < canvas.height && imageData) {
+            // Calculate index into the clipped imageData
+            const dataX = px - clipX0;
+            const dataY = py - clipY0;
+            const idx = (dataY * clipWidth + dataX) * 4;
+            const r = imageData.data[idx];
+            const g = imageData.data[idx + 1];
+            const b = imageData.data[idx + 2];
+            row.push(`rgb(${r}, ${g}, ${b})`);
           } else {
             row.push("transparent");
           }

@@ -173,7 +173,12 @@ export function PaletteSettings({
                     onChange={(e) => setCustomBrightnessInput(e.target.value)}
                     placeholder="e.g., 0.5, 0.75, 1.0, 1.25, 1.5"
                     className="flex-1 rounded-lg border border-border/50 bg-background/50 px-3 py-1.5 text-xs placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
-                    onKeyDown={(e) => e.key === "Enter" && handleCustomBrightnessSubmit()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleCustomBrightnessSubmit();
+                      }
+                    }}
                   />
                   <button
                     onClick={handleCustomBrightnessSubmit}
@@ -243,7 +248,12 @@ export function PaletteSettings({
                     onChange={(e) => setCustomHueInput(e.target.value)}
                     placeholder="e.g., 0, 10, 20, 30 (degrees)"
                     className="flex-1 rounded-lg border border-border/50 bg-background/50 px-3 py-1.5 text-xs placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
-                    onKeyDown={(e) => e.key === "Enter" && handleCustomHueSubmit()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleCustomHueSubmit();
+                      }
+                    }}
                   />
                   <button
                     onClick={handleCustomHueSubmit}
@@ -280,6 +290,7 @@ export function PaletteSettings({
                   checked={filterBlackWhite}
                   onChange={(e) => onFilterToggle(e.target.checked)}
                   className="peer sr-only"
+                  aria-label="Filter Black & White"
                 />
                 <div className="peer h-5 w-9 rounded-full bg-border/50 after:absolute after:start-[2px] after:top-[2px] after:size-4 after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-focus:outline-none" />
               </label>

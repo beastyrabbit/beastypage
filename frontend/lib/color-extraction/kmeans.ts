@@ -21,6 +21,14 @@ const DEFAULT_OPTIONS: Required<KMeansOptions> = {
 };
 
 /**
+ * Count unique colors in pixel array
+ */
+function countUniqueColors(pixels: PixelData[]): number {
+  const uniqueKeys = new Set(pixels.map((p) => `${p.r},${p.g},${p.b}`));
+  return uniqueKeys.size;
+}
+
+/**
  * Extract dominant colors from an image using K-Means clustering
  */
 export function extractColors(
@@ -33,12 +41,17 @@ export function extractColors(
   // Sample pixels
   const pixels = samplePixels(data, width, height, opts);
 
-  if (pixels.length < opts.k) {
+  // Check unique color count, not just pixel count
+  const uniqueCount = countUniqueColors(pixels);
+  if (uniqueCount < 2) {
     throw new Error("Not enough unique colors in image");
   }
 
+  // Reduce k if more than unique colors available
+  const effectiveK = Math.min(opts.k, uniqueCount);
+
   // Run K-Means
-  const centroids = kMeans(pixels, opts.k, opts.maxIterations);
+  const centroids = kMeans(pixels, effectiveK, opts.maxIterations);
 
   // Convert centroids to ExtractedColor format
   const totalPixels = pixels.length;
@@ -65,6 +78,7 @@ export function extractColors(
 
 /**
  * Sample pixels from image data
+ * @throws Error if sampleStep is not a positive integer
  */
 function samplePixels(
   data: Uint8ClampedArray,
@@ -72,10 +86,16 @@ function samplePixels(
   height: number,
   opts: Required<KMeansOptions>
 ): PixelData[] {
+  // Validate sampleStep to prevent infinite loops
+  const step = opts.sampleStep;
+  if (!Number.isInteger(step) || step < 1) {
+    throw new Error(`sampleStep must be a positive integer, got: ${step}`);
+  }
+
   const pixels: PixelData[] = [];
 
-  for (let y = 0; y < height; y += opts.sampleStep) {
-    for (let x = 0; x < width; x += opts.sampleStep) {
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
       const i = (y * width + x) * 4;
       const r = data[i];
       const g = data[i + 1];
@@ -179,14 +199,23 @@ function assignPixels(
 
 /**
  * Update centroids based on cluster assignments
+ * For empty clusters, reuse the previous centroid instead of injecting gray
  */
-function updateCentroids(clusters: Map<number, PixelData[]>): Centroid[] {
+function updateCentroids(
+  clusters: Map<number, PixelData[]>,
+  previousCentroids: Centroid[]
+): Centroid[] {
   const newCentroids: Centroid[] = [];
 
-  clusters.forEach((pixels, _idx) => {
+  clusters.forEach((pixels, idx) => {
     if (pixels.length === 0) {
-      // Keep a random position for empty clusters
-      newCentroids.push({ r: 128, g: 128, b: 128, x: 0, y: 0, count: 0 });
+      // Reuse previous centroid for empty clusters (preserves real image colors)
+      if (previousCentroids[idx]) {
+        newCentroids.push({ ...previousCentroids[idx], count: 0 });
+      } else {
+        // Fallback: shouldn't happen, but use first non-empty cluster's mean if it does
+        newCentroids.push({ r: 128, g: 128, b: 128, x: 0, y: 0, count: 0 });
+      }
       return;
     }
 
@@ -240,7 +269,7 @@ function kMeans(
 
   for (let i = 0; i < maxIterations; i++) {
     const clusters = assignPixels(pixels, centroids);
-    const newCentroids = updateCentroids(clusters);
+    const newCentroids = updateCentroids(clusters, centroids);
 
     if (hasConverged(centroids, newCentroids)) {
       return newCentroids;
@@ -251,7 +280,7 @@ function kMeans(
 
   // Final assignment to get correct counts
   const finalClusters = assignPixels(pixels, centroids);
-  return updateCentroids(finalClusters);
+  return updateCentroids(finalClusters, centroids);
 }
 
 /**
@@ -281,6 +310,7 @@ export function findMatchingPixels(
 
 /**
  * Create a spotlight mask for highlighting colors
+ * Preserves transparency from the original image
  */
 export function createSpotlightMask(
   img: HTMLImageElement,
@@ -293,11 +323,22 @@ export function createSpotlightMask(
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
+      const sourceAlpha = data[i + 3];
+
+      // Skip fully transparent pixels - preserve transparency
+      if (sourceAlpha === 0) {
+        maskData[i] = 0;
+        maskData[i + 1] = 0;
+        maskData[i + 2] = 0;
+        maskData[i + 3] = 0;
+        continue;
+      }
+
       const pixelColor = { r: data[i], g: data[i + 1], b: data[i + 2] };
       const dist = colorDistance(pixelColor, targetColor);
 
       // If pixel matches target color, make it transparent (visible)
-      // Otherwise, add dark overlay
+      // Otherwise, add dark overlay scaled by source alpha
       if (dist <= threshold) {
         maskData[i] = 0;
         maskData[i + 1] = 0;
@@ -307,7 +348,8 @@ export function createSpotlightMask(
         maskData[i] = 0;
         maskData[i + 1] = 0;
         maskData[i + 2] = 0;
-        maskData[i + 3] = 178; // ~70% opacity
+        // Scale overlay alpha by source alpha for partially transparent pixels
+        maskData[i + 3] = Math.round((178 * sourceAlpha) / 255); // ~70% opacity scaled
       }
     }
   }
@@ -328,11 +370,17 @@ export function extractFamilyColors(
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const { data, width, height } = getImagePixels(img);
 
+  // Validate sampleStep
+  const step = opts.sampleStep;
+  if (!Number.isInteger(step) || step < 1) {
+    throw new Error(`sampleStep must be a positive integer, got: ${step}`);
+  }
+
   // Sample pixels, excluding those too similar to top colors
   const pixels: PixelData[] = [];
 
-  for (let y = 0; y < height; y += opts.sampleStep) {
-    for (let x = 0; x < width; x += opts.sampleStep) {
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
       const i = (y * width + x) * 4;
       const r = data[i];
       const g = data[i + 1];
@@ -362,13 +410,17 @@ export function extractFamilyColors(
     }
   }
 
-  // If not enough unique pixels remain, return empty
-  if (pixels.length < opts.k) {
+  // Check unique color count, not just pixel count
+  const uniqueCount = countUniqueColors(pixels);
+  if (uniqueCount < 2) {
     return [];
   }
 
+  // Reduce k if more than unique colors available
+  const effectiveK = Math.min(opts.k, uniqueCount);
+
   // Run K-Means on remaining pixels
-  const centroids = kMeans(pixels, opts.k, opts.maxIterations);
+  const centroids = kMeans(pixels, effectiveK, opts.maxIterations);
 
   // Convert centroids to ExtractedColor format
   const totalPixels = pixels.length;
