@@ -52,7 +52,7 @@ test-*.sh
 # Temporary/cache directories
 .tmp/
 .serena/
-bun.lock
+**/bun.lock
 
 # Playwright MCP
 .playwright-mcp/
