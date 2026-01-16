@@ -12,6 +12,7 @@ interface ColorCrosshairProps {
   isHighlighted: boolean;
   containerRef: React.RefObject<HTMLDivElement | null>;
   imageElement: HTMLImageElement | null;
+  imageDimensions: { width: number; height: number };
   onMove: (index: number, x: number, y: number) => void;
   onSelect: (index: number) => void;
   onDragStart?: () => void;
@@ -33,6 +34,7 @@ export function ColorCrosshair({
   isHighlighted,
   containerRef,
   imageElement,
+  imageDimensions,
   onMove,
   onSelect,
   onDragStart,
@@ -143,15 +145,18 @@ export function ColorCrosshair({
       if (!containerRef.current) return;
 
       const rect = containerRef.current.getBoundingClientRect();
+      // Convert image coordinates to container coordinates for offset
+      const containerX = (x / imageDimensions.width) * rect.width;
+      const containerY = (y / imageDimensions.height) * rect.height;
       hasDragged.current = false; // Reset drag tracking
       setIsDragging(true);
       dragOffset.current = {
-        x: e.clientX - rect.left - x,
-        y: e.clientY - rect.top - y,
+        x: e.clientX - rect.left - containerX,
+        y: e.clientY - rect.top - containerY,
       };
       // Don't extract loupe yet - wait for actual movement
     },
-    [x, y, containerRef]
+    [x, y, containerRef, imageDimensions]
   );
 
   const handleTouchStart = useCallback(
@@ -162,15 +167,18 @@ export function ColorCrosshair({
 
       const touch = e.touches[0];
       const rect = containerRef.current.getBoundingClientRect();
+      // Convert image coordinates to container coordinates for offset
+      const containerX = (x / imageDimensions.width) * rect.width;
+      const containerY = (y / imageDimensions.height) * rect.height;
       hasDragged.current = false; // Reset drag tracking
       setIsDragging(true);
       dragOffset.current = {
-        x: touch.clientX - rect.left - x,
-        y: touch.clientY - rect.top - y,
+        x: touch.clientX - rect.left - containerX,
+        y: touch.clientY - rect.top - containerY,
       };
       // Don't extract loupe yet - wait for actual movement
     },
-    [x, y, containerRef]
+    [x, y, containerRef, imageDimensions]
   );
 
   const handleClick = useCallback(
@@ -198,8 +206,13 @@ export function ColorCrosshair({
       }
 
       const rect = containerRef.current.getBoundingClientRect();
-      const newX = e.clientX - rect.left - dragOffset.current.x;
-      const newY = e.clientY - rect.top - dragOffset.current.y;
+      // Convert screen coordinates to image coordinate system
+      const scaleX = imageDimensions.width / rect.width;
+      const scaleY = imageDimensions.height / rect.height;
+      const containerX = e.clientX - rect.left - dragOffset.current.x;
+      const containerY = e.clientY - rect.top - dragOffset.current.y;
+      const newX = containerX * scaleX;
+      const newY = containerY * scaleY;
       onMove(index, newX, newY);
       extractLoupePixels(newX, newY);
     };
@@ -216,8 +229,13 @@ export function ColorCrosshair({
 
       const touch = e.touches[0];
       const rect = containerRef.current.getBoundingClientRect();
-      const newX = touch.clientX - rect.left - dragOffset.current.x;
-      const newY = touch.clientY - rect.top - dragOffset.current.y;
+      // Convert screen coordinates to image coordinate system
+      const scaleX = imageDimensions.width / rect.width;
+      const scaleY = imageDimensions.height / rect.height;
+      const containerX = touch.clientX - rect.left - dragOffset.current.x;
+      const containerY = touch.clientY - rect.top - dragOffset.current.y;
+      const newX = containerX * scaleX;
+      const newY = containerY * scaleY;
       onMove(index, newX, newY);
       extractLoupePixels(newX, newY);
     };
@@ -242,7 +260,7 @@ export function ColorCrosshair({
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleEnd);
     };
-  }, [isDragging, containerRef, index, onMove, extractLoupePixels, onDragEnd, onDragStart]);
+  }, [isDragging, containerRef, index, onMove, extractLoupePixels, onDragEnd, onDragStart, imageDimensions]);
 
   const centerIndex = Math.floor(LOUPE_SIZE / 2);
 
@@ -252,8 +270,8 @@ export function ColorCrosshair({
         isDragging ? "cursor-grabbing z-30" : "cursor-grab z-10"
       } ${isHighlighted || isSelected ? "z-20" : ""}`}
       style={{
-        left: x,
-        top: y,
+        left: `${(x / imageDimensions.width) * 100}%`,
+        top: `${(y / imageDimensions.height) * 100}%`,
         transform: "translate(-50%, -50%)",
       }}
       onMouseDown={handleMouseDown}

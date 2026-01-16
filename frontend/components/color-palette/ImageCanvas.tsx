@@ -94,9 +94,9 @@ export function ImageCanvas({
         ref={containerRef}
         className="relative mx-auto overflow-hidden rounded-2xl"
         style={{
-          width: imageDimensions.width,
-          height: imageDimensions.height,
-          maxWidth: "100%",
+          width: "100%",
+          maxWidth: imageDimensions.width,
+          aspectRatio: `${imageDimensions.width} / ${imageDimensions.height}`,
         }}
       >
         {/* Base image */}
@@ -130,6 +130,7 @@ export function ImageCanvas({
             isHighlighted={highlightedDotType === "dominant" && highlightedDotIndex === index}
             containerRef={containerRef}
             imageElement={loadedImage}
+            imageDimensions={imageDimensions}
             onMove={handleTopCrosshairMove}
             onSelect={handleTopDotSelect}
             onDragStart={handleDragStart}
@@ -150,7 +151,8 @@ export function ImageCanvas({
             isHighlighted={highlightedDotType === "accent" && highlightedDotIndex === index}
             containerRef={containerRef}
             imageElement={loadedImage}
-            onMove={(idx, x, y) => handleFamilyCrosshairMove(idx, x, y)}
+            imageDimensions={imageDimensions}
+            onMove={handleFamilyCrosshairMove}
             onSelect={handleFamilyDotSelect}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}

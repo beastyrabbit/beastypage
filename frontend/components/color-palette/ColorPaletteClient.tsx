@@ -63,6 +63,7 @@ export function ColorPaletteClient() {
   const [state, setState] = useState<PaletteState>(INITIAL_STATE);
   const [selection, setSelection] = useState<SelectionState>(INITIAL_SELECTION);
   const extractionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasExtractedRef = useRef(false);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -92,6 +93,7 @@ export function ColorPaletteClient() {
         familyColors: [],
         isProcessing: false,
       }));
+      hasExtractedRef.current = false;
       setSelection(INITIAL_SELECTION);
     } catch (err) {
       setState((prev) => ({
@@ -163,6 +165,7 @@ export function ColorPaletteClient() {
           isProcessing: false,
         }));
 
+        hasExtractedRef.current = true;
         setSelection(INITIAL_SELECTION);
 
         const familyMsg = familyColors.length > 0 ? ` and ${familyColors.length} family colors` : "";
@@ -206,17 +209,17 @@ export function ColorPaletteClient() {
 
   // Auto-extract immediately when image is loaded
   useEffect(() => {
-    if (state.image && state.topColors.length === 0) {
+    if (state.image && !hasExtractedRef.current) {
       performExtraction();
     }
-  }, [state.image, state.topColors.length, performExtraction]);
+  }, [state.image, performExtraction]);
 
-  // Auto-extract when slider values or filter changes
+  // Auto-extract when slider values or filter changes (only after initial extraction)
   useEffect(() => {
-    if (state.image && (state.topColors.length > 0 || state.familyColors.length > 0)) {
+    if (state.image && hasExtractedRef.current) {
       debouncedExtraction();
     }
-  }, [state.image, state.topColors.length, state.familyColors.length, state.topColorCount, state.familyColorCount, state.filterBlackWhite, debouncedExtraction]);
+  }, [state.image, state.topColorCount, state.familyColorCount, state.filterBlackWhite, debouncedExtraction]);
 
   const handleBrightnessFactorsChange = useCallback((factors: number[]) => {
     setState((prev) => ({ ...prev, brightnessFactors: factors }));
@@ -234,6 +237,7 @@ export function ColorPaletteClient() {
     if (extractionTimeoutRef.current) {
       clearTimeout(extractionTimeoutRef.current);
     }
+    hasExtractedRef.current = false;
     setState(INITIAL_STATE);
     setSelection(INITIAL_SELECTION);
   }, []);

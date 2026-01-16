@@ -1,13 +1,22 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Upload, Link as LinkIcon, Loader2, ImageIcon } from "lucide-react";
+import { Upload, Link as LinkIcon, Loader2, ImageIcon, Shuffle } from "lucide-react";
+import { toast } from "sonner";
+
+import {
+  fetchRandomWikimediaImage,
+  IMAGE_CATEGORIES,
+  type ImageCategory,
+} from "@/lib/color-extraction/wikimedia-random";
 
 interface ImageUploaderProps {
   onImageLoad: (source: File | string) => void;
   isLoading: boolean;
   error: string | null;
 }
+
+const VALID_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 export function ImageUploader({
   onImageLoad,
@@ -16,7 +25,25 @@ export function ImageUploader({
 }: ImageUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+  const [isLoadingRandom, setIsLoadingRandom] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRandomImage = useCallback(
+    async (category: ImageCategory) => {
+      setIsLoadingRandom(true);
+      try {
+        const url = await fetchRandomWikimediaImage(category);
+        onImageLoad(url);
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to fetch random image"
+        );
+      } finally {
+        setIsLoadingRandom(false);
+      }
+    },
+    [onImageLoad]
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -38,7 +65,12 @@ export function ImageUploader({
 
       const files = e.dataTransfer.files;
       if (files.length > 0) {
-        onImageLoad(files[0]);
+        const file = files[0];
+        if (!VALID_IMAGE_TYPES.includes(file.type)) {
+          toast.error("Invalid image format. Use PNG, JPEG, WebP, or GIF.");
+          return;
+        }
+        onImageLoad(file);
       }
     },
     [onImageLoad]
@@ -136,12 +168,12 @@ export function ImageUploader({
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              disabled={isLoading}
+              disabled={isLoading || isLoadingRandom}
             />
           </div>
           <button
             type="submit"
-            disabled={!urlInput.trim() || isLoading}
+            disabled={!urlInput.trim() || isLoading || isLoadingRandom}
             className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Load URL
@@ -150,6 +182,33 @@ export function ImageUploader({
         <p className="mt-3 text-xs text-muted-foreground">
           Note: Some URLs may be blocked due to CORS. Try downloading the image first if loading fails.
         </p>
+      </div>
+
+      {/* Random image buttons */}
+      <div className="glass-card p-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <Shuffle className="size-5 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">
+              Or try a random image from Wikimedia Commons
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {IMAGE_CATEGORIES.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => handleRandomImage(category.id)}
+                disabled={isLoading || isLoadingRandom}
+                className="flex items-center gap-2 rounded-xl border border-border/50 bg-background/50 px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isLoadingRandom ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                {category.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Error display */}
