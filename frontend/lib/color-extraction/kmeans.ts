@@ -409,6 +409,66 @@ export function createSpotlightImage(
 }
 
 /**
+ * Create a spotlight image with multiple colors highlighted as layers
+ * Each color's matching areas are painted with that color, with later colors
+ * layered on top (dominant 1 at bottom, then dominant 2, ..., accent colors on top)
+ * Non-matching areas are dimmed
+ */
+export function createMultiColorSpotlightImage(
+  img: HTMLImageElement,
+  targetColors: RGB[],
+  threshold = 30
+): string {
+  const { data, width, height } = getImagePixels(img);
+
+  // Create canvas for the result
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not get canvas context");
+
+  // Start with dimmed version of the original image
+  ctx.drawImage(img, 0, 0, width, height);
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const pixels = imageData.data;
+
+  // First pass: dim all pixels
+  for (let i = 0; i < pixels.length; i += 4) {
+    const dimFactor = 0.3;
+    pixels[i] = Math.round(pixels[i] * dimFactor);
+    pixels[i + 1] = Math.round(pixels[i + 1] * dimFactor);
+    pixels[i + 2] = Math.round(pixels[i + 2] * dimFactor);
+  }
+
+  // Second pass: paint matching colors in order (later colors overlay earlier ones)
+  for (const targetColor of targetColors) {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        const sourceAlpha = data[i + 3];
+
+        // Skip fully transparent pixels
+        if (sourceAlpha === 0) continue;
+
+        const pixelColor = { r: data[i], g: data[i + 1], b: data[i + 2] };
+        const dist = colorDistance(pixelColor, targetColor);
+
+        // If pixel matches this target color, paint it with the target color
+        if (dist <= threshold) {
+          pixels[i] = targetColor.r;
+          pixels[i + 1] = targetColor.g;
+          pixels[i + 2] = targetColor.b;
+        }
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
+/**
  * Extract family colors (accent/minor colors) that are different from top colors
  * These are colors present in the image but distinct from the dominant colors
  */

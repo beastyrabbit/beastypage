@@ -12,6 +12,7 @@ import {
   rgbToHex,
 } from "@/lib/color-extraction/color-utils";
 import { generateColorDisplayName } from "@/lib/color-extraction/color-names";
+import { createMultiColorSpotlightImage } from "@/lib/color-extraction/kmeans";
 
 interface PaletteExportProps {
   topColors: ExtractedColor[];
@@ -19,16 +20,18 @@ interface PaletteExportProps {
   brightnessFactors: number[];
   hueShifts: number[];
   isProcessing: boolean;
+  image: HTMLImageElement | null;
 }
 
 interface ExportFormat {
-  id: "png" | "aco";
+  id: "png" | "aco" | "spotlight";
   label: string;
   extension: string;
 }
 
 const EXPORT_FORMATS: ExportFormat[] = [
-  { id: "png", label: "PNG (Image)", extension: ".png" },
+  { id: "png", label: "PNG (Palette Grid)", extension: ".png" },
+  { id: "spotlight", label: "PNG (Color Spotlight)", extension: ".png" },
   { id: "aco", label: "ACO (Adobe Photoshop)", extension: ".aco" },
 ];
 
@@ -224,6 +227,7 @@ export function PaletteExport({
   brightnessFactors,
   hueShifts,
   isProcessing,
+  image,
 }: PaletteExportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
@@ -417,13 +421,43 @@ export function PaletteExport({
     [topColors, familyColors, brightnessFactors, hueShifts]
   );
 
+  const generateSpotlightPNG = useCallback(() => {
+    if (!image) {
+      toast.error("No image loaded");
+      return;
+    }
+
+    // Collect all colors (dominant + accent)
+    const allColors = [...topColors, ...familyColors].map((c) => c.rgb);
+    if (allColors.length === 0) {
+      toast.error("No colors to highlight");
+      return;
+    }
+
+    try {
+      const dataUrl = createMultiColorSpotlightImage(image, allColors);
+
+      // Trigger download
+      const link = document.createElement("a");
+      link.download = `color-spotlight-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+
+      toast.success("Spotlight image downloaded!");
+    } catch (err) {
+      toast.error("Failed to create spotlight image");
+    }
+  }, [image, topColors, familyColors]);
+
   const handleExport = useCallback(() => {
     if (selectedFormat.id === "png") {
       generatePalettePNG();
+    } else if (selectedFormat.id === "spotlight") {
+      generateSpotlightPNG();
     } else {
       downloadColorSet(selectedFormat);
     }
-  }, [selectedFormat, generatePalettePNG, downloadColorSet]);
+  }, [selectedFormat, generatePalettePNG, generateSpotlightPNG, downloadColorSet]);
 
   const handleFormatSelect = useCallback((format: ExportFormat) => {
     setSelectedFormat(format);

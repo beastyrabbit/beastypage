@@ -403,6 +403,7 @@ export function ColorPaletteClient() {
                   brightnessFactors={state.brightnessFactors}
                   hueShifts={state.hueShifts}
                   isProcessing={state.isProcessing}
+                  image={state.image}
                 />
               )}
             </div>

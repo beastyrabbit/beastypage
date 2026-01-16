@@ -1,12 +1,8 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Download } from "lucide-react";
-import { toast } from "sonner";
 
 import type { ExtractedColor, RGB } from "@/lib/color-extraction/types";
-import { createSpotlightImage } from "@/lib/color-extraction/kmeans";
-import { rgbToHex } from "@/lib/color-extraction/color-utils";
 
 import { ColorCrosshair } from "./ColorCrosshair";
 import { SpotlightOverlay } from "./SpotlightOverlay";
@@ -92,22 +88,6 @@ export function ImageCanvas({
     setIsDragging(false);
   }, []);
 
-  // Download spotlight image
-  const handleDownloadSpotlight = useCallback(() => {
-    if (!loadedImage || !hoveredColor) return;
-
-    try {
-      const dataUrl = createSpotlightImage(loadedImage, hoveredColor);
-      const link = document.createElement("a");
-      link.download = `spotlight-${rgbToHex(hoveredColor).slice(1)}-${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
-      toast.success("Spotlight image downloaded!");
-    } catch (err) {
-      toast.error("Failed to create spotlight image");
-    }
-  }, [loadedImage, hoveredColor]);
-
   return (
     <div className="glass-card overflow-hidden p-4">
       <div
@@ -128,21 +108,10 @@ export function ImageCanvas({
 
         {/* Spotlight overlay when hovering a color (but not when dragging) */}
         {hoveredColor && loadedImage && !isDragging && (
-          <>
-            <SpotlightOverlay
-              image={loadedImage}
-              targetColor={hoveredColor}
-            />
-            {/* Download spotlight button */}
-            <button
-              onClick={handleDownloadSpotlight}
-              className="absolute bottom-4 right-4 z-40 flex items-center gap-2 rounded-lg bg-white/90 px-3 py-2 text-sm font-medium text-gray-800 shadow-lg backdrop-blur-sm transition-all hover:bg-white hover:scale-105"
-              title="Download this spotlight view as an image"
-            >
-              <Download className="size-4" />
-              Save Spotlight
-            </button>
-          </>
+          <SpotlightOverlay
+            image={loadedImage}
+            targetColor={hoveredColor}
+          />
         )}
 
         {/* Crosshairs for dominant colors */}
