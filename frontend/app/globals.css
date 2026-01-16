@@ -179,6 +179,57 @@
   box-shadow: 0 4px 20px -4px oklch(0.35 0.1 285 / 0.5);
 }
 
+.nav-pill[data-accent="projects"].nav-pill--active {
+  background: linear-gradient(135deg, oklch(0.7 0.18 85), oklch(0.55 0.15 40));
+  box-shadow: 0 4px 20px -4px oklch(0.6 0.15 60 / 0.5);
+}
+
+/* Projects Sub-Navigation */
+.projects-subnav-pill--active {
+  @apply border-transparent text-white shadow-lg;
+}
+
+.projects-subnav-pill--active[data-category="warrior-cats"] {
+  background: linear-gradient(135deg, oklch(0.55 0.12 70), oklch(0.45 0.08 35));
+  box-shadow: 0 4px 16px -4px oklch(0.5 0.1 50 / 0.5);
+}
+
+.projects-subnav-pill--active[data-category="gacha"] {
+  background: linear-gradient(135deg, oklch(0.7 0.18 85), oklch(0.55 0.15 40));
+  box-shadow: 0 4px 16px -4px oklch(0.6 0.15 60 / 0.5);
+}
+
+.projects-subnav-pill--active[data-category="artist"] {
+  background: linear-gradient(135deg, oklch(0.55 0.18 300), oklch(0.45 0.15 330));
+  box-shadow: 0 4px 16px -4px oklch(0.5 0.15 315 / 0.5);
+}
+
+.projects-subnav-pill--active[data-category="games"] {
+  background: linear-gradient(135deg, oklch(0.6 0.15 190), oklch(0.5 0.12 170));
+  box-shadow: 0 4px 16px -4px oklch(0.55 0.12 180 / 0.5);
+}
+
+/* Category Card Gradients */
+.category-card-gradient--warrior-cats {
+  background: radial-gradient(circle at 20% 20%, oklch(0.55 0.12 70 / 0.25), transparent 55%),
+    radial-gradient(circle at 80% 40%, oklch(0.45 0.08 35 / 0.2), transparent 60%);
+}
+
+.category-card-gradient--gacha {
+  background: radial-gradient(circle at 20% 20%, oklch(0.65 0.15 80 / 0.25), transparent 55%),
+    radial-gradient(circle at 80% 40%, oklch(0.55 0.09 35 / 0.2), transparent 60%);
+}
+
+.category-card-gradient--artist {
+  background: radial-gradient(circle at 20% 20%, oklch(0.55 0.18 300 / 0.25), transparent 55%),
+    radial-gradient(circle at 80% 40%, oklch(0.45 0.15 330 / 0.2), transparent 60%);
+}
+
+.category-card-gradient--games {
+  background: radial-gradient(circle at 20% 20%, oklch(0.6 0.15 190 / 0.25), transparent 55%),
+    radial-gradient(circle at 80% 40%, oklch(0.5 0.12 170 / 0.2), transparent 60%);
+}
+
 /* Text Gradients */
 .text-gradient-hub {
   @apply bg-gradient-to-br from-white via-purple-200 to-purple-400 bg-clip-text text-transparent;
@@ -198,6 +249,26 @@
 
 .text-gradient-personal {
   @apply bg-gradient-to-br from-slate-200 via-slate-400 to-slate-600 bg-clip-text text-transparent;
+}
+
+.text-gradient-projects {
+  @apply bg-gradient-to-br from-amber-100 via-amber-300 to-orange-500 bg-clip-text text-transparent;
+}
+
+.text-gradient-warrior-cats {
+  @apply bg-gradient-to-br from-amber-200 via-amber-400 to-amber-700 bg-clip-text text-transparent;
+}
+
+.text-gradient-gacha {
+  @apply bg-gradient-to-br from-amber-100 via-amber-300 to-orange-500 bg-clip-text text-transparent;
+}
+
+.text-gradient-artist {
+  @apply bg-gradient-to-br from-purple-200 via-pink-400 to-purple-600 bg-clip-text text-transparent;
+}
+
+.text-gradient-games {
+  @apply bg-gradient-to-br from-cyan-200 via-teal-400 to-cyan-600 bg-clip-text text-transparent;
 }
 
 .theme-hero {
@@ -395,6 +466,15 @@
 }
 
 @layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   .image-render-pixel {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
