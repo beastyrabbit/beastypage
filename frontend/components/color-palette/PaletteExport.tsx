@@ -412,7 +412,7 @@ export function PaletteExport({
       link.click();
       URL.revokeObjectURL(url);
 
-      toast.success(`Color set downloaded as ${format.extension.toUpperCase()}`);
+      toast.success(`Color set downloaded as ${format.extension.replace(/^\./, "").toUpperCase()}`);
     },
     [topColors, familyColors, brightnessFactors, hueShifts]
   );
