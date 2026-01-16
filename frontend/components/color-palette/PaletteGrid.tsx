@@ -26,6 +26,22 @@ interface PaletteGridProps {
   onColorSelect: (index: number) => void;
 }
 
+/**
+ * Renders a palette UI with a main color strip plus brightness and hue variation grids.
+ *
+ * Displays each provided color as a selectable swatch, generates brightness and hue variations for each color, and exposes copy and hover interactions.
+ *
+ * @param colors - Array of extracted colors to render as rows; each row is used to generate its variations.
+ * @param brightnessFactors - Multipliers used to generate brightness variations for each color (one column per factor).
+ * @param hueShifts - Degree shifts used to generate hue variations for each color (one column per shift).
+ * @param title - Section title shown in the header.
+ * @param type - Visual accent type; controls the accent ring color and styling ("dominant" | "accent").
+ * @param selectedIndex - Index of the currently selected color row, or `null` when none is selected.
+ * @param highlightedIndex - Index of the currently highlighted color row, or `null` when none is highlighted.
+ * @param onColorHover - Callback invoked when hovering a color or variation. Called with the row index or `null` and optional `{ r, g, b }` RGB when available.
+ * @param onColorSelect - Callback invoked when a main color swatch is clicked; receives the selected color index.
+ * @returns The rendered React element for the palette, or `null` when `colors` is empty.
+ */
 export function PaletteGrid({
   colors,
   brightnessFactors,

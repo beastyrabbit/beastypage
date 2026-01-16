@@ -29,6 +29,20 @@ const HUE_PRESETS = [
   { label: "Complementary", values: [0, 60, 120, 180] },
 ];
 
+/**
+ * Renders a collapsible settings panel for configuring brightness variation, hue shifts, and a black-and-white filter.
+ *
+ * The component shows preset buttons, an option to enter custom comma/space-separated values, a current-value summary,
+ * and a reset control. User changes are propagated via the provided callbacks.
+ *
+ * @param brightnessFactors - Current brightness multipliers shown and editable in the Brightness Variation section.
+ * @param hueShifts - Current hue shift degrees shown and editable in the Hue Shift Variation section.
+ * @param filterBlackWhite - Whether the Black & White filter is enabled.
+ * @param onBrightnessFactorsChange - Called with updated brightness factor arrays when the user selects or applies brightness values.
+ * @param onHueShiftsChange - Called with updated hue shift arrays when the user selects or applies hue values.
+ * @param onFilterToggle - Called with the new filter state when the user toggles the Black & White switch.
+ * @returns A JSX element containing the interactive Palette Settings UI.
+ */
 export function PaletteSettings({
   brightnessFactors,
   hueShifts,

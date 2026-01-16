@@ -20,6 +20,16 @@ interface ColorVariationsProps {
 const BRIGHTNESS_STEPS = [-30, -15, 0, 15, 30];
 const HUE_STEPS = [-30, -20, -10, 0, 10, 20, 30];
 
+/**
+ * Render a card showing brightness and hue variations for a given color with clickable swatches.
+ *
+ * The card displays two grids — brightness adjustments and hue shifts — each showing color swatches
+ * labeled with the applied adjustment. Clicking a swatch copies its hex value to the clipboard and
+ * shows a success or error toast.
+ *
+ * @param color - The source color (hex and rgb) used to generate variations.
+ * @returns A JSX element containing the variations card with labeled swatches that copy their hex value when clicked.
+ */
 export function ColorVariations({ color }: ColorVariationsProps) {
   const brightnessVariations = useMemo(
     () =>

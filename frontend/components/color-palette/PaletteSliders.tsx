@@ -10,6 +10,18 @@ interface PaletteSlidersProps {
   onFamilyColorCountChange: (count: number) => void;
 }
 
+/**
+ * Render two labeled range sliders for adjusting the palette's top and family color counts.
+ *
+ * Each slider displays its current count, allows selecting values from 1 to 20, and is disabled when processing.
+ *
+ * @param topColorCount - Current number of top colors shown by the Top Colors slider
+ * @param familyColorCount - Current number of family colors shown by the Family Colors slider
+ * @param isProcessing - When `true`, both sliders are disabled
+ * @param onTopColorCountChange - Called with the new top color count when the Top Colors slider changes
+ * @param onFamilyColorCountChange - Called with the new family color count when the Family Colors slider changes
+ * @returns A React element containing two labeled range inputs for adjusting the palette counts
+ */
 export function PaletteSliders({
   topColorCount,
   familyColorCount,

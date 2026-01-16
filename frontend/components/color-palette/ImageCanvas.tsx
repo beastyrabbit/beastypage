@@ -21,6 +21,24 @@ interface ImageCanvasProps {
   onDotSelect: (index: number, type: "dominant" | "accent") => void;
 }
 
+/**
+ * Render an image canvas with an optional spotlight overlay and draggable color crosshairs for dominant and accent colors.
+ *
+ * Renders the provided image, shows a spotlight aligned to the hovered color when available and not dragging, and places interactive crosshairs for `colors` (dominant) and `familyColors` (accent). Propagates crosshair movement and selection through callbacks and tracks local drag state to disable the spotlight while dragging.
+ *
+ * @param imageDataUrl - Data URL or source of the image to display
+ * @param imageDimensions - Width and height used to size the canvas container
+ * @param colors - Array of dominant extracted colors with positions and hex values
+ * @param familyColors - Optional array of accent/family extracted colors (defaults to [])
+ * @param hoveredColor - RGB color currently hovered, used to position the spotlight; if null no spotlight is shown
+ * @param selectedDotIndex - Index of the currently selected crosshair, or null if none
+ * @param selectedDotType - Type of the selected crosshair ("dominant" | "accent") or null
+ * @param highlightedDotIndex - Index of the currently highlighted crosshair, or null if none
+ * @param highlightedDotType - Type of the highlighted crosshair ("dominant" | "accent") or null
+ * @param onCrosshairMove - Callback invoked when a crosshair moves: (index, x, y, type)
+ * @param onDotSelect - Callback invoked when a crosshair is selected: (index, type)
+ * @returns A React element containing the image, optional spotlight overlay, and interactive crosshairs
+ */
 export function ImageCanvas({
   imageDataUrl,
   imageDimensions,

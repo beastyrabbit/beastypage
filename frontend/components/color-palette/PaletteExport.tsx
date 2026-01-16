@@ -39,7 +39,10 @@ const SECTION_SIZE = 1000;
 const BLACK_WHITE_THRESHOLD = 15;
 
 /**
- * Check if a color is nearly black
+ * Determines whether an RGB color is close to pure black.
+ *
+ * @param rgb - Object with `r`, `g`, and `b` channels in the range 0–255
+ * @returns `true` if all channels are less than or equal to the black threshold, `false` otherwise.
  */
 function isNearBlack(rgb: RGB): boolean {
   return rgb.r <= BLACK_WHITE_THRESHOLD &&
@@ -48,7 +51,9 @@ function isNearBlack(rgb: RGB): boolean {
 }
 
 /**
- * Check if a color is nearly white
+ * Determines whether a color is within BLACK_WHITE_THRESHOLD of pure white.
+ *
+ * @returns `true` if red, green, and blue channels are each greater than or equal to 255 - BLACK_WHITE_THRESHOLD, `false` otherwise.
  */
 function isNearWhite(rgb: RGB): boolean {
   return rgb.r >= 255 - BLACK_WHITE_THRESHOLD &&
@@ -57,15 +62,22 @@ function isNearWhite(rgb: RGB): boolean {
 }
 
 /**
- * Create a unique key for a color to detect duplicates
+ * Produce a string key for an RGB color suitable for deduplication.
+ *
+ * @returns The color encoded as `r,g,b`, where `r`, `g`, and `b` are the red, green, and blue channel values (0–255).
  */
 function colorKey(rgb: RGB): string {
   return `${rgb.r},${rgb.g},${rgb.b}`;
 }
 
 /**
- * Collect all colors with names for export (base + brightness + hue variations)
- * Filters out black, white, and duplicate colors
+ * Produce a deduplicated list of color entries (base colors plus brightness and hue variants) suitable for export.
+ *
+ * @param topColors - Dominant palette colors to include.
+ * @param familyColors - Accent/family palette colors to include.
+ * @param brightnessFactors - Multipliers used to generate brightness variants (factor 1.0 is ignored).
+ * @param hueShifts - Hue shift values in degrees used to generate hue variants (shift 0 is ignored).
+ * @returns An array of objects each containing `rgb` and a generated `name` for export; excludes colors that are near-black, near-white, or duplicates. 
  */
 function collectAllColorsForExport(
   topColors: ExtractedColor[],
@@ -135,8 +147,10 @@ function collectAllColorsForExport(
 }
 
 /**
- * Generate ACO binary data (Adobe Photoshop Color Swatch)
- * Version 2 format with color names
+ * Builds an ArrayBuffer containing an Adobe Color Swatch (ACO) file in version 2 format for the provided colors.
+ *
+ * @param colors - Array of entries where each item has `rgb` (with `r`, `g`, `b` values in 0–255) and `name`; each entry becomes a swatch in the ACO.
+ * @returns An ArrayBuffer representing a valid ACO v2 file with big-endian fields and color names encoded in UTF-16BE.
  */
 function generateACO(colors: Array<{ rgb: RGB; name: string }>): ArrayBuffer {
   // ACO v2 format:
@@ -201,6 +215,15 @@ function generateACO(colors: Array<{ rgb: RGB; name: string }>): ArrayBuffer {
   return buffer;
 }
 
+/**
+ * Render split export controls and a hidden canvas for exporting color palettes as PNG or ACO.
+ *
+ * The component provides a main download button (exports in the selected format) and a dropdown to switch formats,
+ * renders the composed PNG to a hidden canvas when exporting images, generates ACO binary data for color-set exports,
+ * and shows toast notifications for success and error states. The controls are disabled while `isProcessing` is true or when no colors are available.
+ *
+ * @returns A JSX element containing the export UI (split button + dropdown) and the hidden canvas used for PNG generation.
+ */
 export function PaletteExport({
   topColors,
   familyColors,

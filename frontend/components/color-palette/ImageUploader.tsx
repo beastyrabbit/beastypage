@@ -9,6 +9,14 @@ interface ImageUploaderProps {
   error: string | null;
 }
 
+/**
+ * Render a UI for uploading or loading an image via drag-and-drop, file picker, or URL.
+ *
+ * @param onImageLoad - Callback invoked with a File or a trimmed URL string when the user provides an image.
+ * @param isLoading - When true, shows a loading state and disables file/URL inputs.
+ * @param error - An error message to display below the controls, or `null` to show no error.
+ * @returns The rendered ImageUploader JSX element.
+ */
 export function ImageUploader({
   onImageLoad,
   isLoading,

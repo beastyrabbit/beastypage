@@ -13,6 +13,16 @@ interface SpotlightOverlayProps {
   height: number;
 }
 
+/**
+ * Renders a canvas overlay that displays a spotlight mask isolating pixels close to a target color.
+ *
+ * @param image - Source HTMLImageElement used to compute the spotlight mask.
+ * @param targetColor - RGB color to target for the spotlight.
+ * @param threshold - Sensitivity threshold for mask generation; larger values broaden the match (default 30).
+ * @param width - Rendered width of the canvas overlay.
+ * @param height - Rendered height of the canvas overlay.
+ * @returns The canvas element showing the computed spotlight mask.
+ */
 export function SpotlightOverlay({
   image,
   targetColor,

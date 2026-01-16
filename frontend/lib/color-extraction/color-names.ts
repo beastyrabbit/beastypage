@@ -14,7 +14,10 @@ interface ColorApiResponse {
 }
 
 /**
- * Fetch color name from thecolorapi.com
+ * Retrieve the human-readable name for a hex color from thecolorapi.com.
+ *
+ * @param hex - Hex color string; may include a leading '#' or not.
+ * @returns The color name from the API, or "Unknown" if the lookup fails.
  */
 export async function fetchColorName(hex: string): Promise<string> {
   // Remove # if present
@@ -43,8 +46,10 @@ export async function fetchColorName(hex: string): Promise<string> {
 }
 
 /**
- * Batch fetch color names for multiple colors with rate limiting
- * Returns a Map of hex -> name
+ * Fetches color names for a list of extracted colors, deduplicating hex values and resolving names in controlled batches to reduce API load.
+ *
+ * @param colors - Array of extracted colors whose `hex` values will be resolved to names
+ * @returns A Map where each key is an uppercase hex string and the value is the resolved color name
  */
 export async function fetchColorNames(
   colors: ExtractedColor[]
@@ -81,7 +86,15 @@ export async function fetchColorNames(
 }
 
 /**
- * Generate display name for a color with context
+ * Builds a contextual, human-readable display name for a color.
+ *
+ * @param index - Zero-based position of the color; used to compute the displayed ordinal (index + 1)
+ * @param colorName - The resolved or desired color name to include in the display string
+ * @param type - "dominant" or "accent"; selects the short prefix ("dom" or "acc")
+ * @param variation - Optional adjustments that affect the display:
+ *   - brightnessMultiplier: when provided and not equal to 1.0, rendered as `(Xx)` after the ordinal
+ *   - hueShift: when provided and not equal to 0, rendered as `(+/-Y°)` after the ordinal
+ * @returns The assembled display name, e.g. `dom #1 - Red`, `acc #2 (1.2x) - Blue`, or `dom #3 (+15°) - Green`
  */
 export function generateColorDisplayName(
   index: number,

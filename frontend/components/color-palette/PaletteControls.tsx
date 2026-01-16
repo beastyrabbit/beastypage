@@ -13,6 +13,19 @@ interface PaletteControlsProps {
   onReset: () => void;
 }
 
+/**
+ * Renders UI controls for configuring and triggering color palette extraction.
+ *
+ * @param colorCount - Current number of colors to extract (3–12)
+ * @param filterBlackWhite - Whether to exclude black and white from extraction
+ * @param isProcessing - When true, disables inputs and shows a processing state
+ * @param hasColors - Whether a palette already exists (affects extract button label)
+ * @param onColorCountChange - Called with the new color count when the slider changes
+ * @param onFilterToggle - Called with the new filter state when the toggle changes
+ * @param onExtract - Invoked when the extract button is pressed
+ * @param onReset - Invoked when the reset button is pressed
+ * @returns The PaletteControls UI element
+ */
 export function PaletteControls({
   colorCount,
   filterBlackWhite,

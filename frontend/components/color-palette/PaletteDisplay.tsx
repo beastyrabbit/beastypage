@@ -11,6 +11,19 @@ interface PaletteDisplayProps {
   onColorSelect: (index: number | null) => void;
 }
 
+/**
+ * Render a palette of extracted color swatches or an empty-state prompt.
+ *
+ * Displays a centered placeholder when `colors` is empty. Otherwise shows a header with the total
+ * count, an optional "Clear selection" action when a swatch is selected, a grid of interactive
+ * color swatches that propagate hover and select events, and a short helper note.
+ *
+ * @param colors - Array of extracted colors to display
+ * @param onColorHover - Called with the swatch index or `null` when a swatch is hovered or unhovered
+ * @param selectedIndex - The index of the currently selected swatch, or `null` if none is selected
+ * @param onColorSelect - Called with a swatch index to select it or `null` to clear the selection
+ * @returns The component's rendered element: an empty-state card when `colors` is empty, otherwise a header, swatch grid, and helper text
+ */
 export function PaletteDisplay({
   colors,
   onColorHover,

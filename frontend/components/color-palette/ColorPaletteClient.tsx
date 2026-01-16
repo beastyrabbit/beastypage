@@ -59,6 +59,17 @@ const INITIAL_SELECTION: SelectionState = {
   hoveredColorRgb: null,
 };
 
+/**
+ * Render a client-side color palette tool that handles image upload, automatic and debounced color extraction,
+ * color sampling and manipulation, name lookup, selection/highlight state, and UI for exporting palettes.
+ *
+ * The component manages image loading, extraction of dominant and accent (family) colors, brightness and hue
+ * adjustments, filter toggles, crosshair sampling to update individual colors, and selection/hover interactions
+ * for both canvas dots and palette swatches. It also debounces re-extraction when controls change and fetches
+ * color names in the background.
+ *
+ * @returns The React element for the ColorPaletteClient UI.
+ */
 export function ColorPaletteClient() {
   const [state, setState] = useState<PaletteState>(INITIAL_STATE);
   const [selection, setSelection] = useState<SelectionState>(INITIAL_SELECTION);

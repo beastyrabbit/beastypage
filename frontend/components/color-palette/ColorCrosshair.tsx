@@ -23,6 +23,29 @@ const LOUPE_SIZE = 7; // 7x7 pixel grid
 const LOUPE_PIXEL_SIZE = 12; // Each pixel in loupe is 12x12px
 const LOUPE_TOTAL_SIZE = LOUPE_SIZE * LOUPE_PIXEL_SIZE;
 
+/**
+ * Render an interactive draggable color crosshair with an integrated loupe magnifier.
+ *
+ * The component displays a small colored crosshair that supports selecting, highlighting,
+ * and dragging. While dragging a magnified 7x7 pixel loupe—sampled from the provided
+ * image element—appears around the crosshair; movement emits onMove callbacks and optional
+ * drag lifecycle callbacks.
+ *
+ * @param x - Horizontal position in pixels relative to the container element's top-left.
+ * @param y - Vertical position in pixels relative to the container element's top-left.
+ * @param color - Fill color for the crosshair.
+ * @param index - Identifier for this crosshair instance (passed to callbacks).
+ * @param type - Visual style of the ring; `"dominant"` uses a purple ring, `"accent"` uses blue.
+ * @param isSelected - Whether the crosshair is currently selected.
+ * @param isHighlighted - Whether the crosshair is visually highlighted.
+ * @param containerRef - Ref to the container element used to compute bounds and pointer-to-container coordinates.
+ * @param imageElement - Source HTMLImageElement used to sample pixel colors for the loupe; sampling maps display coordinates to the image's natural resolution.
+ * @param onMove - Called during dragging as onMove(index, x, y) with the new coordinates relative to the container.
+ * @param onSelect - Called when the crosshair is clicked (no drag) as onSelect(index).
+ * @param onDragStart - Optional callback invoked once when a drag motion begins.
+ * @param onDragEnd - Optional callback invoked once when the drag ends.
+ * @returns The React element rendering the interactive crosshair and its loupe.
+ */
 export function ColorCrosshair({
   x,
   y,

@@ -15,6 +15,18 @@ interface ColorSwatchProps {
   onSelect: (index: number) => void;
 }
 
+/**
+ * Render an interactive color swatch that displays a color preview, prevalence, and copyable HEX/RGB/HSL values while exposing hover and selection interactions.
+ *
+ * The swatch shows a visual selection indicator when selected. Copy buttons write the chosen color format to the clipboard and surface a success or error toast.
+ *
+ * @param color - The ExtractedColor object containing hex, rgb, hsl, and prevalence data to display
+ * @param index - Zero-based position of this swatch in the palette
+ * @param isSelected - Whether this swatch is currently selected (controls visual ring and indicator)
+ * @param onHover - Callback invoked with the swatch index when hovered, or `null` when hover ends
+ * @param onSelect - Callback invoked with the swatch index when the swatch is activated (click or Enter)
+ * @returns The rendered React element for the color swatch
+ */
 export function ColorSwatch({
   color,
   index,
