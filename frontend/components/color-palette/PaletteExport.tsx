@@ -22,14 +22,13 @@ interface PaletteExportProps {
 }
 
 interface ExportFormat {
-  id: "png" | "cls" | "aco";
+  id: "png" | "aco";
   label: string;
   extension: string;
 }
 
 const EXPORT_FORMATS: ExportFormat[] = [
   { id: "png", label: "PNG (Image)", extension: ".png" },
-  { id: "cls", label: "CLS (Clip Studio)", extension: ".cls" },
   { id: "aco", label: "ACO (Adobe Photoshop)", extension: ".aco" },
 ];
 
@@ -133,126 +132,6 @@ function collectAllColorsForExport(
   processColorSet(familyColors, "accent");
 
   return result;
-}
-
-/**
- * Generate CLS binary data (Clip Studio Paint Color Set)
- * Based on https://github.com/Equbuxu/CLSEncoderDecoder
- */
-function generateCLS(
-  colors: Array<{ rgb: RGB; name: string }>,
-  setName: string
-): ArrayBuffer {
-  // CLS format (from CLSEncoderDecoder):
-  // - Magic: "SLCC" (4 bytes)
-  // - Version: 256 as uint16 little-endian (2 bytes)
-  // - Header size: uint32 (asciiName.length + utf8Name.length + 8)
-  // - ASCII name length: uint16
-  // - ASCII name: bytes
-  // - Separator: uint32 (0)
-  // - UTF8 name length: uint16
-  // - UTF8 name: bytes
-  // - Constant: uint32 (4)
-  // - Color count: uint32
-  // - Color data size: uint32 (colorCount * 12)
-  // - Colors: each is uint32(8) + RGBA bytes + uint32(0)
-
-  const encoder = new TextEncoder();
-  const asciiName = encoder.encode(setName);
-  const utf8Name = encoder.encode(setName);
-
-  // Calculate sizes
-  const headerDataSize = asciiName.length + utf8Name.length + 8;
-  const colorDataSize = colors.length * 12;
-
-  // Total size: magic(4) + version(2) + headerSize(4) + asciiLen(2) + ascii + separator(4)
-  //           + utf8Len(2) + utf8 + constant(4) + colorCount(4) + colorDataSize(4) + colors
-  const headerSize =
-    4 + // magic
-    2 + // version
-    4 + // header size field
-    2 + // ascii name length
-    asciiName.length +
-    4 + // separator
-    2 + // utf8 name length
-    utf8Name.length +
-    4 + // constant (4)
-    4 + // color count
-    4; // color data size
-
-  const totalSize = headerSize + colorDataSize;
-  const buffer = new ArrayBuffer(totalSize);
-  const view = new DataView(buffer);
-  const uint8 = new Uint8Array(buffer);
-
-  let offset = 0;
-
-  // Magic "SLCC"
-  uint8[offset++] = 0x53; // S
-  uint8[offset++] = 0x4c; // L
-  uint8[offset++] = 0x43; // C
-  uint8[offset++] = 0x43; // C
-
-  // Version: 256 (uint16 little-endian = 0x0100)
-  view.setUint16(offset, 256, true);
-  offset += 2;
-
-  // Header data size
-  view.setUint32(offset, headerDataSize, true);
-  offset += 4;
-
-  // ASCII name length
-  view.setUint16(offset, asciiName.length, true);
-  offset += 2;
-
-  // ASCII name
-  for (let i = 0; i < asciiName.length; i++) {
-    uint8[offset++] = asciiName[i];
-  }
-
-  // Separator (4 bytes of zero)
-  view.setUint32(offset, 0, true);
-  offset += 4;
-
-  // UTF8 name length
-  view.setUint16(offset, utf8Name.length, true);
-  offset += 2;
-
-  // UTF8 name
-  for (let i = 0; i < utf8Name.length; i++) {
-    uint8[offset++] = utf8Name[i];
-  }
-
-  // Constant: 4
-  view.setUint32(offset, 4, true);
-  offset += 4;
-
-  // Color count
-  view.setUint32(offset, colors.length, true);
-  offset += 4;
-
-  // Color data size
-  view.setUint32(offset, colorDataSize, true);
-  offset += 4;
-
-  // Write colors
-  for (const color of colors) {
-    // Entry size: 8
-    view.setUint32(offset, 8, true);
-    offset += 4;
-
-    // RGBA
-    uint8[offset++] = color.rgb.r;
-    uint8[offset++] = color.rgb.g;
-    uint8[offset++] = color.rgb.b;
-    uint8[offset++] = 0xff; // Alpha = 255
-
-    // Padding
-    view.setUint32(offset, 0, true);
-    offset += 4;
-  }
-
-  return buffer;
 }
 
 /**
@@ -494,10 +373,6 @@ export function PaletteExport({
       let mimeType: string;
 
       switch (format.id) {
-        case "cls":
-          buffer = generateCLS(allColors, "Color Palette");
-          mimeType = "application/octet-stream";
-          break;
         case "aco":
           buffer = generateACO(allColors);
           mimeType = "application/octet-stream";
