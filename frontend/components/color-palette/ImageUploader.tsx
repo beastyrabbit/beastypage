@@ -80,7 +80,12 @@ export function ImageUploader({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (files && files.length > 0) {
-        onImageLoad(files[0]);
+        const file = files[0];
+        if (!VALID_IMAGE_TYPES.includes(file.type)) {
+          toast.error("Invalid image format. Use PNG, JPEG, WebP, or GIF.");
+          return;
+        }
+        onImageLoad(file);
       }
     },
     [onImageLoad]
