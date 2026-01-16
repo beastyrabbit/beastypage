@@ -36,8 +36,37 @@ const EXPORT_FORMATS: ExportFormat[] = [
 // Fixed canvas size matching Python output
 const SECTION_SIZE = 1000;
 
+// Threshold for considering a color as black or white
+const BLACK_WHITE_THRESHOLD = 15;
+
+/**
+ * Check if a color is nearly black
+ */
+function isNearBlack(rgb: RGB): boolean {
+  return rgb.r <= BLACK_WHITE_THRESHOLD &&
+         rgb.g <= BLACK_WHITE_THRESHOLD &&
+         rgb.b <= BLACK_WHITE_THRESHOLD;
+}
+
+/**
+ * Check if a color is nearly white
+ */
+function isNearWhite(rgb: RGB): boolean {
+  return rgb.r >= 255 - BLACK_WHITE_THRESHOLD &&
+         rgb.g >= 255 - BLACK_WHITE_THRESHOLD &&
+         rgb.b >= 255 - BLACK_WHITE_THRESHOLD;
+}
+
+/**
+ * Create a unique key for a color to detect duplicates
+ */
+function colorKey(rgb: RGB): string {
+  return `${rgb.r},${rgb.g},${rgb.b}`;
+}
+
 /**
  * Collect all colors with names for export (base + brightness + hue variations)
+ * Filters out black, white, and duplicate colors
  */
 function collectAllColorsForExport(
   topColors: ExtractedColor[],
@@ -46,6 +75,18 @@ function collectAllColorsForExport(
   hueShifts: number[]
 ): Array<{ rgb: RGB; name: string }> {
   const result: Array<{ rgb: RGB; name: string }> = [];
+  const seenColors = new Set<string>();
+
+  // Helper to add color if not black/white/duplicate
+  const addColor = (rgb: RGB, name: string) => {
+    if (isNearBlack(rgb) || isNearWhite(rgb)) return;
+
+    const key = colorKey(rgb);
+    if (seenColors.has(key)) return;
+
+    seenColors.add(key);
+    result.push({ rgb, name });
+  };
 
   // Process a color set (dominant or accent)
   const processColorSet = (
@@ -54,22 +95,22 @@ function collectAllColorsForExport(
   ) => {
     colors.forEach((color, index) => {
       // Base color
-      result.push({
-        rgb: color.rgb,
-        name: generateColorDisplayName(index, color.name || "Color", type),
-      });
+      addColor(
+        color.rgb,
+        generateColorDisplayName(index, color.name || "Color", type)
+      );
 
       // Brightness variations
       brightnessFactors.forEach((factor) => {
         if (factor !== 1.0) {
           const adjustment = (factor - 1) * 50;
           const adjusted = adjustBrightness(color.rgb, adjustment);
-          result.push({
-            rgb: adjusted,
-            name: generateColorDisplayName(index, color.name || "Color", type, {
+          addColor(
+            adjusted,
+            generateColorDisplayName(index, color.name || "Color", type, {
               brightnessMultiplier: factor,
-            }),
-          });
+            })
+          );
         }
       });
 
@@ -77,12 +118,12 @@ function collectAllColorsForExport(
       hueShifts.forEach((shift) => {
         if (shift !== 0) {
           const adjusted = adjustHue(color.rgb, shift);
-          result.push({
-            rgb: adjusted,
-            name: generateColorDisplayName(index, color.name || "Color", type, {
+          addColor(
+            adjusted,
+            generateColorDisplayName(index, color.name || "Color", type, {
               hueShift: shift,
-            }),
-          });
+            })
+          );
         }
       });
     });
@@ -96,33 +137,48 @@ function collectAllColorsForExport(
 
 /**
  * Generate CLS binary data (Clip Studio Paint Color Set)
- * Uses the unnamed color format (8 bytes per color) for simplicity
+ * Based on https://github.com/Equbuxu/CLSEncoderDecoder
  */
 function generateCLS(
   colors: Array<{ rgb: RGB; name: string }>,
   setName: string
 ): ArrayBuffer {
-  // CLS format structure (simplified - unnamed colors):
-  // Header:
-  //   - Magic: "SLCC" (4 bytes)
-  //   - Version: 1 (2 bytes, little-endian)
-  //   - Color count: (4 bytes, little-endian)
-  //   - Name length: (2 bytes, little-endian)
-  //   - Name: ASCII string + null terminator
-  //   - Padding to align
-  //   - Group data
-  // Colors:
-  //   - Entry size: 8 (4 bytes)
-  //   - RGBA: 4 bytes
-  //   - Padding: 4 bytes zeros
+  // CLS format (from CLSEncoderDecoder):
+  // - Magic: "SLCC" (4 bytes)
+  // - Version: 256 as uint16 little-endian (2 bytes)
+  // - Header size: uint32 (asciiName.length + utf8Name.length + 8)
+  // - ASCII name length: uint16
+  // - ASCII name: bytes
+  // - Separator: uint32 (0)
+  // - UTF8 name length: uint16
+  // - UTF8 name: bytes
+  // - Constant: uint32 (4)
+  // - Color count: uint32
+  // - Color data size: uint32 (colorCount * 12)
+  // - Colors: each is uint32(8) + RGBA bytes + uint32(0)
 
-  // For simplicity, we'll use a fixed structure similar to observed CLS files
-  const nameBytes = new TextEncoder().encode(setName);
+  const encoder = new TextEncoder();
+  const asciiName = encoder.encode(setName);
+  const utf8Name = encoder.encode(setName);
 
-  // Calculate approximate header size (including padding)
-  // This is simplified - actual CLS files have more complex headers
-  const headerSize = 64; // Conservative fixed header
-  const colorDataSize = colors.length * 12; // 4 (size) + 4 (rgba) + 4 (padding)
+  // Calculate sizes
+  const headerDataSize = asciiName.length + utf8Name.length + 8;
+  const colorDataSize = colors.length * 12;
+
+  // Total size: magic(4) + version(2) + headerSize(4) + asciiLen(2) + ascii + separator(4)
+  //           + utf8Len(2) + utf8 + constant(4) + colorCount(4) + colorDataSize(4) + colors
+  const headerSize =
+    4 + // magic
+    2 + // version
+    4 + // header size field
+    2 + // ascii name length
+    asciiName.length +
+    4 + // separator
+    2 + // utf8 name length
+    utf8Name.length +
+    4 + // constant (4)
+    4 + // color count
+    4; // color data size
 
   const totalSize = headerSize + colorDataSize;
   const buffer = new ArrayBuffer(totalSize);
@@ -137,30 +193,51 @@ function generateCLS(
   uint8[offset++] = 0x43; // C
   uint8[offset++] = 0x43; // C
 
-  // Version 1 (little-endian)
-  view.setUint16(offset, 1, true);
+  // Version: 256 (uint16 little-endian = 0x0100)
+  view.setUint16(offset, 256, true);
   offset += 2;
 
-  // Color count (little-endian)
+  // Header data size
+  view.setUint32(offset, headerDataSize, true);
+  offset += 4;
+
+  // ASCII name length
+  view.setUint16(offset, asciiName.length, true);
+  offset += 2;
+
+  // ASCII name
+  for (let i = 0; i < asciiName.length; i++) {
+    uint8[offset++] = asciiName[i];
+  }
+
+  // Separator (4 bytes of zero)
+  view.setUint32(offset, 0, true);
+  offset += 4;
+
+  // UTF8 name length
+  view.setUint16(offset, utf8Name.length, true);
+  offset += 2;
+
+  // UTF8 name
+  for (let i = 0; i < utf8Name.length; i++) {
+    uint8[offset++] = utf8Name[i];
+  }
+
+  // Constant: 4
+  view.setUint32(offset, 4, true);
+  offset += 4;
+
+  // Color count
   view.setUint32(offset, colors.length, true);
   offset += 4;
 
-  // Name length (little-endian)
-  view.setUint16(offset, nameBytes.length, true);
-  offset += 2;
-
-  // Name (ASCII)
-  for (let i = 0; i < nameBytes.length; i++) {
-    uint8[offset++] = nameBytes[i];
-  }
-  uint8[offset++] = 0; // null terminator
-
-  // Pad to header size
-  offset = headerSize;
+  // Color data size
+  view.setUint32(offset, colorDataSize, true);
+  offset += 4;
 
   // Write colors
   for (const color of colors) {
-    // Entry size: 8 bytes (4 for RGBA + 4 padding, but we write 12 total with size prefix)
+    // Entry size: 8
     view.setUint32(offset, 8, true);
     offset += 4;
 
@@ -168,7 +245,7 @@ function generateCLS(
     uint8[offset++] = color.rgb.r;
     uint8[offset++] = color.rgb.g;
     uint8[offset++] = color.rgb.b;
-    uint8[offset++] = 0xff; // Alpha
+    uint8[offset++] = 0xff; // Alpha = 255
 
     // Padding
     view.setUint32(offset, 0, true);
