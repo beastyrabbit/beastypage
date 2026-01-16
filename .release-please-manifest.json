@@ -1,0 +1,4 @@
+{
+  "frontend": "1.3.0",
+  "backend/renderer_service": "1.3.0"
+}
