@@ -53,3 +53,6 @@ test-*.sh
 .tmp/
 .serena/
 bun.lock
+
+# Playwright MCP
+.playwright-mcp/
