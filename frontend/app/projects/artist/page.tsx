@@ -33,6 +33,13 @@ const TOOLS: ToolCard[] = [
     href: "/palette-spinner",
   },
   {
+    title: "Color Palette Creator",
+    icon: "🎨",
+    description:
+      "Extract dominant colors from images. Drag crosshairs to pick colors, hover to highlight regions.",
+    href: "/color-palette-creator",
+  },
+  {
     title: "Mood Board",
     icon: "🎞️",
     description:

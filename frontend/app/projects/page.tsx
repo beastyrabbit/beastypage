@@ -35,6 +35,7 @@ const CATEGORY_TOOLS = {
   ],
   artist: [
     { title: "Palette Spinner", icon: "🌀" },
+    { title: "Color Palette Creator", icon: "🎨" },
     { title: "Mood Board", icon: "🎞️" },
   ],
   games: [
