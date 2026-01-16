@@ -469,82 +469,79 @@ export function createMultiColorSpotlightImage(
 }
 
 /**
+ * Calculate brightness of a color (perceived luminance)
+ */
+function colorBrightness(color: RGB): number {
+  return Math.sqrt(
+    0.299 * (color.r ** 2) + 0.587 * (color.g ** 2) + 0.114 * (color.b ** 2)
+  );
+}
+
+/**
  * Extract family colors (accent/minor colors) that are different from top colors
- * These are colors present in the image but distinct from the dominant colors
- *
- * The similarity threshold is dynamically adjusted based on the number of top colors:
- * - With few top colors (1-6), use higher threshold (50) for cleaner separation
- * - With many top colors (15-20), use lower threshold (20-25) so more colors can qualify
+ * Uses the same approach as the Python version:
+ * 1. Extract MORE clusters initially (k * 2)
+ * 2. Sort by brightness (highlight colors)
+ * 3. Filter out colors similar to top colors
+ * 4. Recursively retry with lower threshold if not enough colors found
  */
 export function extractFamilyColors(
   img: HTMLImageElement,
   topColors: ExtractedColor[],
   options: KMeansOptions,
-  similarityThreshold?: number
+  similarityThreshold = 50
 ): ExtractedColor[] {
-  // Dynamic threshold: decreases as more top colors are extracted
-  // Range: 50 (for 1 top color) down to 20 (for 20+ top colors)
-  const effectiveThreshold =
-    similarityThreshold ?? Math.max(20, 50 - topColors.length * 1.5);
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const { data, width, height } = getImagePixels(img);
 
-  // Validate sampleStep
-  const step = opts.sampleStep;
-  if (!Number.isInteger(step) || step < 1) {
-    throw new Error(`sampleStep must be a positive integer, got: ${step}`);
-  }
+  // Recursive inner function (matches Python's recursive_group_colors)
+  function recursiveExtract(threshold: number): ExtractedColor[] {
+    // Validate sampleStep
+    const step = opts.sampleStep;
+    if (!Number.isInteger(step) || step < 1) {
+      throw new Error(`sampleStep must be a positive integer, got: ${step}`);
+    }
 
-  // Sample pixels, excluding those too similar to top colors
-  const pixels: PixelData[] = [];
+    // Sample ALL pixels (don't filter by similarity yet - that comes after k-means)
+    const pixels: PixelData[] = [];
 
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) {
-      const i = (y * width + x) * 4;
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const a = data[i + 3];
+    for (let y = 0; y < height; y += step) {
+      for (let x = 0; x < width; x += step) {
+        const i = (y * width + x) * 4;
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
 
-      // Skip transparent pixels
-      if (a < 128) continue;
+        // Skip transparent pixels
+        if (a < 128) continue;
 
-      // Skip black/white if filtering
-      if (
-        opts.filterBlackWhite &&
-        isBlackOrWhite({ r, g, b }, opts.blackWhiteThreshold)
-      ) {
-        continue;
-      }
+        // Skip black/white if filtering
+        if (
+          opts.filterBlackWhite &&
+          isBlackOrWhite({ r, g, b }, opts.blackWhiteThreshold)
+        ) {
+          continue;
+        }
 
-      // Skip pixels too similar to any top color
-      const pixelColor = { r, g, b };
-      const isTooSimilar = topColors.some(
-        (topColor) => colorDistance(pixelColor, topColor.rgb) < effectiveThreshold
-      );
-
-      if (!isTooSimilar) {
         pixels.push({ r, g, b, x, y });
       }
     }
-  }
 
-  // Check unique color count, not just pixel count
-  const uniqueCount = countUniqueColors(pixels);
-  if (uniqueCount < 2) {
-    return [];
-  }
+    // Check unique color count
+    const uniqueCount = countUniqueColors(pixels);
+    if (uniqueCount < 2) {
+      return [];
+    }
 
-  // Reduce k if more than unique colors available
-  const effectiveK = Math.min(opts.k, uniqueCount);
+    // Extract MORE clusters initially (k * 2) to allow for filtering
+    const clusterCount = Math.min(opts.k * 2, uniqueCount);
 
-  // Run K-Means on remaining pixels
-  const centroids = kMeans(pixels, effectiveK, opts.maxIterations);
+    // Run K-Means
+    const centroids = kMeans(pixels, clusterCount, opts.maxIterations);
 
-  // Convert centroids to ExtractedColor format
-  const totalPixels = pixels.length;
-  const colors = centroids
-    .map((c) => ({
+    // Convert to colors and sort by brightness (brightest first, like Python version)
+    const allColors = centroids.map((c) => ({
       hex: rgbToHex({ r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) }),
       rgb: {
         r: Math.round(c.r),
@@ -556,10 +553,44 @@ export function extractFamilyColors(
         g: Math.round(c.g),
         b: Math.round(c.b),
       }),
-      position: { x: c.x, y: c.y },
-      prevalence: Math.round((c.count / totalPixels) * 100),
-    }))
-    .sort((a, b) => b.prevalence - a.prevalence);
+      position: { x: Math.round(c.x), y: Math.round(c.y) },
+      prevalence: Math.round((c.count / pixels.length) * 100),
+      brightness: colorBrightness({
+        r: Math.round(c.r),
+        g: Math.round(c.g),
+        b: Math.round(c.b),
+      }),
+    }));
 
-  return colors;
+    // Sort by brightness (brightest first)
+    allColors.sort((a, b) => b.brightness - a.brightness);
+
+    // Filter out colors that are too similar to top colors
+    const familyColors: ExtractedColor[] = [];
+    for (const color of allColors) {
+      const isTooSimilar = topColors.some(
+        (topColor) => colorDistance(color.rgb, topColor.rgb) < threshold
+      );
+
+      if (!isTooSimilar) {
+        // Remove brightness property before adding
+        const { brightness, ...colorWithoutBrightness } = color;
+        familyColors.push(colorWithoutBrightness);
+      }
+
+      // Stop once we have enough colors
+      if (familyColors.length >= opts.k) {
+        break;
+      }
+    }
+
+    // If not enough colors found and threshold > 0, retry with lower threshold
+    if (familyColors.length < opts.k && threshold > 5) {
+      return recursiveExtract(threshold - 5);
+    }
+
+    return familyColors;
+  }
+
+  return recursiveExtract(similarityThreshold);
 }
