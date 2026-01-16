@@ -11,6 +11,19 @@ import { NAV_ITEMS } from "@/components/site-nav-config";
 export function SiteHeader() {
   const pathname = usePathname();
 
+  const isActive = (item: typeof NAV_ITEMS[0]) => {
+    // For personal (home), only exact match
+    if (item.key === "personal") {
+      return pathname === "/";
+    }
+    // For projects, match /projects and /projects/*
+    if (item.key === "projects") {
+      return pathname === "/projects" || pathname.startsWith("/projects/");
+    }
+    // For other items, exact match or starts with
+    return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  };
+
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
@@ -26,7 +39,7 @@ export function SiteHeader() {
               key={item.key}
               href={item.href}
               data-accent={item.key}
-              className={cn("nav-pill", pathname === item.href && "nav-pill--active")}
+              className={cn("nav-pill", isActive(item) && "nav-pill--active")}
             >
               {item.label}
             </Link>

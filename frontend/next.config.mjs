@@ -87,6 +87,22 @@ const nextConfig = {
       "posthog-js": posthogStandinRelative,
     },
   },
+  async redirects() {
+    return [
+      // Redirect old /gatcha to new /projects
+      {
+        source: "/gatcha",
+        destination: "/projects",
+        permanent: true,
+      },
+      // Redirect /personal to / (home)
+      {
+        source: "/personal",
+        destination: "/",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

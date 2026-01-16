@@ -1,4 +1,4 @@
-export type NavAccent = "hub" | "gatcha" | "stream" | "collection" | "personal";
+export type NavAccent = "projects" | "stream" | "collection" | "personal";
 
 export type NavItem = {
   key: NavAccent;
@@ -7,9 +7,50 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { key: "hub", label: "Hub", href: "/" },
-  { key: "gatcha", label: "Gacha", href: "/gatcha" },
+  { key: "projects", label: "Projects", href: "/projects" },
   { key: "stream", label: "Stream Tools", href: "/stream" },
   { key: "collection", label: "Collection", href: "/collection" },
-  { key: "personal", label: "Personal", href: "/personal" },
+  { key: "personal", label: "Personal", href: "/" },
+];
+
+// Projects sub-navigation categories
+export type ProjectCategory = "warrior-cats" | "gacha" | "artist" | "games";
+
+export type ProjectCategoryConfig = {
+  key: ProjectCategory;
+  label: string;
+  href: string;
+  description: string;
+  icon: string;
+};
+
+export const PROJECT_CATEGORIES: ProjectCategoryConfig[] = [
+  {
+    key: "warrior-cats",
+    label: "Warrior Cats",
+    href: "/projects/warrior-cats",
+    description: "Visual builders, guided creation, and ClanGen-inspired tools",
+    icon: "paw",
+  },
+  {
+    key: "gacha",
+    label: "Gacha",
+    href: "/projects/gacha",
+    description: "Wheels, generators, and chance-based cat creation",
+    icon: "sparkles",
+  },
+  {
+    key: "artist",
+    label: "Artist",
+    href: "/projects/artist",
+    description: "Palettes, mood boards, and creative inspiration tools",
+    icon: "palette",
+  },
+  {
+    key: "games",
+    label: "Games",
+    href: "/projects/games",
+    description: "Interactive challenges and playful experiments",
+    icon: "gamepad",
+  },
 ];
