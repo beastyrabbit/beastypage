@@ -1,8 +1,10 @@
-import type { CatParams } from '@/lib/cat-v3/types';
-import type { CatGenetics, GeneticTrait, Gender } from './types';
+import type { CatParams, TortieLayer } from '@/lib/cat-v3/types';
+import type { CatGenetics, GeneticTrait, Gender, TortieGenetics } from './types';
 import { pickOne } from './nameGenerator';
 
 const MUTATION_RATE = 0.05;
+const MIN_TORTIE_LAYERS = 1;
+const MAX_TORTIE_LAYERS = 4;
 
 const DOMINANT_PELTS = new Set([
   'Tabby', 'Mackerel', 'Classic', 'Ticked', 'Spotted', 'Rosette', 'Sokoke',
@@ -90,7 +92,160 @@ function expressedSimple<T>(allele1: T, allele2: T): T {
   return roll(0.5) ? allele1 : allele2;
 }
 
+/**
+ * Extract tortie genetics from cat params
+ */
+function extractTortieGenetics(params: CatParams): TortieGenetics | null {
+  if (!params.isTortie || !params.tortie || params.tortie.length === 0) {
+    return null;
+  }
+
+  const patterns: string[] = [];
+  const masks: string[] = [];
+  const colours: string[] = [];
+
+  for (const layer of params.tortie) {
+    if (layer) {
+      if (layer.pattern) patterns.push(layer.pattern);
+      if (layer.mask) masks.push(layer.mask);
+      if (layer.colour) colours.push(layer.colour);
+    }
+  }
+
+  // Also include legacy single-layer fields
+  if (params.tortiePattern && !patterns.includes(params.tortiePattern)) {
+    patterns.push(params.tortiePattern);
+  }
+  if (params.tortieMask && !masks.includes(params.tortieMask)) {
+    masks.push(params.tortieMask);
+  }
+  if (params.tortieColour && !colours.includes(params.tortieColour)) {
+    colours.push(params.tortieColour);
+  }
+
+  return {
+    hasTortieGene: true,
+    patterns,
+    masks,
+    colours,
+  };
+}
+
+/**
+ * Inherit tortie data from parents, combining their tortie gene pools
+ */
+function inheritTortieData(
+  motherData: TortieGenetics | null,
+  fatherData: TortieGenetics | null,
+  mutationPool: { pelts: string[]; colours: string[]; tortieMasks: string[] }
+): TortieGenetics | null {
+  // If neither parent has tortie genetics, rarely create new tortie genetics through mutation
+  if (!motherData && !fatherData) {
+    if (roll(MUTATION_RATE * 0.3)) {
+      // Spontaneous tortie mutation - create fresh tortie genetics
+      return {
+        hasTortieGene: true,
+        patterns: mutationPool.pelts.length > 0 ? [pickOne(mutationPool.pelts)] : ['Tabby'],
+        masks: mutationPool.tortieMasks.length > 0 ? [pickOne(mutationPool.tortieMasks)] : ['ONE'],
+        colours: mutationPool.colours.length > 0 ? [pickOne(mutationPool.colours)] : ['BLACK'],
+      };
+    }
+    return null;
+  }
+
+  // Combine genetics from both parents
+  const combinedPatterns = new Set<string>();
+  const combinedMasks = new Set<string>();
+  const combinedColours = new Set<string>();
+
+  if (motherData) {
+    motherData.patterns.forEach(p => combinedPatterns.add(p));
+    motherData.masks.forEach(m => combinedMasks.add(m));
+    motherData.colours.forEach(c => combinedColours.add(c));
+  }
+
+  if (fatherData) {
+    fatherData.patterns.forEach(p => combinedPatterns.add(p));
+    fatherData.masks.forEach(m => combinedMasks.add(m));
+    fatherData.colours.forEach(c => combinedColours.add(c));
+  }
+
+  // Apply mutations - chance to add new patterns/masks/colours
+  if (roll(MUTATION_RATE) && mutationPool.pelts.length > 0) {
+    combinedPatterns.add(pickOne(mutationPool.pelts));
+  }
+  if (roll(MUTATION_RATE) && mutationPool.tortieMasks.length > 0) {
+    combinedMasks.add(pickOne(mutationPool.tortieMasks));
+  }
+  if (roll(MUTATION_RATE) && mutationPool.colours.length > 0) {
+    combinedColours.add(pickOne(mutationPool.colours));
+  }
+
+  return {
+    hasTortieGene: true,
+    patterns: Array.from(combinedPatterns),
+    masks: Array.from(combinedMasks),
+    colours: Array.from(combinedColours),
+  };
+}
+
+/**
+ * Generate tortie layers from inherited genetics
+ * Returns 1-4 layers randomly, using inherited patterns/masks/colours
+ */
+function generateTortieLayers(
+  tortieData: TortieGenetics,
+  mutationPool: { pelts: string[]; colours: string[]; tortieMasks: string[] }
+): TortieLayer[] {
+  const numLayers = MIN_TORTIE_LAYERS + Math.floor(Math.random() * (MAX_TORTIE_LAYERS - MIN_TORTIE_LAYERS + 1));
+  const layers: TortieLayer[] = [];
+  const usedMasks = new Set<string>();
+
+  for (let i = 0; i < numLayers; i++) {
+    // Pick from inherited or mutate
+    let pattern: string;
+    let mask: string;
+    let colour: string;
+
+    // Pattern - inherit or mutate
+    if (tortieData.patterns.length > 0 && !roll(MUTATION_RATE)) {
+      pattern = pickOne(tortieData.patterns);
+    } else if (mutationPool.pelts.length > 0) {
+      pattern = pickOne(mutationPool.pelts);
+    } else {
+      pattern = 'Tabby';
+    }
+
+    // Mask - inherit or mutate (try to use unique masks)
+    const availableMasks = tortieData.masks.filter(m => !usedMasks.has(m));
+    if (availableMasks.length > 0 && !roll(MUTATION_RATE)) {
+      mask = pickOne(availableMasks);
+    } else if (mutationPool.tortieMasks.length > 0) {
+      const poolMasks = mutationPool.tortieMasks.filter(m => !usedMasks.has(m));
+      mask = poolMasks.length > 0 ? pickOne(poolMasks) : pickOne(mutationPool.tortieMasks);
+    } else {
+      mask = 'ONE';
+    }
+    usedMasks.add(mask);
+
+    // Colour - inherit or mutate
+    if (tortieData.colours.length > 0 && !roll(MUTATION_RATE)) {
+      colour = pickOne(tortieData.colours);
+    } else if (mutationPool.colours.length > 0) {
+      colour = pickOne(mutationPool.colours);
+    } else {
+      colour = 'BLACK';
+    }
+
+    layers.push({ pattern, mask, colour });
+  }
+
+  return layers;
+}
+
 export function createGeneticsFromParams(params: CatParams, gender: Gender): CatGenetics {
+  const tortieData = extractTortieGenetics(params);
+
   return {
     pelt: createTrait(params.peltName, params.peltName, params.peltName),
     colour: createTrait(params.colour, params.colour, params.colour),
@@ -101,7 +256,8 @@ export function createGeneticsFromParams(params: CatParams, gender: Gender): Cat
       params.whitePatches ?? null,
       params.whitePatches ?? null
     ),
-    isTortie: createTrait(params.isTortie, params.isTortie, params.isTortie),
+    isTortie: createTrait(params.isTortie ?? false, params.isTortie ?? false, params.isTortie ?? false),
+    tortieData: createTrait(tortieData, tortieData, tortieData),
   };
 }
 
@@ -115,6 +271,7 @@ export function inheritGenetics(
     eyeColours: string[];
     skinColours: string[];
     whitePatches: string[];
+    tortieMasks?: string[];
   }
 ): CatGenetics {
   // Each parent passes one random allele to the child
@@ -135,6 +292,14 @@ export function inheritGenetics(
 
   const motherTortie = roll(0.5) ? motherGenetics.isTortie.allele1 : motherGenetics.isTortie.allele2;
   const fatherTortie = roll(0.5) ? fatherGenetics.isTortie.allele1 : fatherGenetics.isTortie.allele2;
+
+  // Tortie data inheritance
+  const motherTortieData = roll(0.5)
+    ? motherGenetics.tortieData?.allele1
+    : motherGenetics.tortieData?.allele2;
+  const fatherTortieData = roll(0.5)
+    ? fatherGenetics.tortieData?.allele1
+    : fatherGenetics.tortieData?.allele2;
 
   // Apply mutations
   const childPeltA1 = roll(MUTATION_RATE) && mutationPool.pelts.length > 0
@@ -172,9 +337,30 @@ export function inheritGenetics(
     ? (roll(0.5) ? pickOne(mutationPool.whitePatches) : null)
     : fatherWhite;
 
-  // Tortie mutation is rare
+  // Tortie gene mutation is rare
   const childTortieA1 = roll(MUTATION_RATE * 0.5) ? !motherTortie : motherTortie;
   const childTortieA2 = roll(MUTATION_RATE * 0.5) ? !fatherTortie : fatherTortie;
+
+  // Inherit tortie layer data (patterns, masks, colours)
+  const childTortieData = inheritTortieData(
+    motherTortieData ?? null,
+    fatherTortieData ?? null,
+    { pelts: mutationPool.pelts, colours: mutationPool.colours, tortieMasks: mutationPool.tortieMasks ?? [] }
+  );
+
+  // Determine if child expresses tortie
+  const childIsTortie = expressedTortie(childTortieA1, childTortieA2, childGender);
+
+  // If child is tortie but has no inherited tortie data, create some
+  let expressedTortieData = childTortieData;
+  if (childIsTortie && !expressedTortieData) {
+    expressedTortieData = {
+      hasTortieGene: true,
+      patterns: mutationPool.pelts.length > 0 ? [pickOne(mutationPool.pelts)] : ['Tabby'],
+      masks: mutationPool.tortieMasks?.length ? [pickOne(mutationPool.tortieMasks)] : ['ONE'],
+      colours: mutationPool.colours.length > 0 ? [pickOne(mutationPool.colours)] : ['BLACK'],
+    };
+  }
 
   return {
     pelt: createTrait(childPeltA1, childPeltA2, expressedPelt(childPeltA1, childPeltA2)),
@@ -182,15 +368,21 @@ export function inheritGenetics(
     eyeColour: createTrait(childEyeA1, childEyeA2, expressedSimple(childEyeA1, childEyeA2)),
     skinColour: createTrait(childSkinA1, childSkinA2, expressedSimple(childSkinA1, childSkinA2)),
     whitePatches: createTrait(childWhiteA1, childWhiteA2, expressedWhitePatches(childWhiteA1, childWhiteA2)),
-    isTortie: createTrait(childTortieA1, childTortieA2, expressedTortie(childTortieA1, childTortieA2, childGender)),
+    isTortie: createTrait(childTortieA1, childTortieA2, childIsTortie),
+    tortieData: createTrait(childTortieData, childTortieData, expressedTortieData),
   };
 }
 
-export function geneticsToParams(genetics: CatGenetics, baseParams: Partial<CatParams>): CatParams {
+export function geneticsToParams(
+  genetics: CatGenetics,
+  baseParams: Partial<CatParams>,
+  mutationPool?: { pelts: string[]; colours: string[]; tortieMasks: string[] }
+): CatParams {
   // Spread baseParams first, then override with genetics-derived values
   // This ensures genetics takes precedence over baseParams for trait fields
-  const { peltName: _, colour: _c, eyeColour: _e, skinColour: _s, whitePatches: _w, isTortie: _t, ...allowedOverrides } = baseParams;
-  return {
+  const { peltName: _, colour: _c, eyeColour: _e, skinColour: _s, whitePatches: _w, isTortie: _t, tortie: _tortie, tortieMask: _tm, tortieColour: _tc, tortiePattern: _tp, ...allowedOverrides } = baseParams;
+
+  const result: CatParams = {
     spriteNumber: baseParams.spriteNumber ?? 0,
     shading: baseParams.shading ?? true,
     reverse: baseParams.reverse ?? false,
@@ -203,4 +395,22 @@ export function geneticsToParams(genetics: CatGenetics, baseParams: Partial<CatP
     whitePatches: genetics.whitePatches.expressed ?? undefined,
     isTortie: genetics.isTortie.expressed,
   };
+
+  // Generate tortie layers if cat is tortie
+  if (genetics.isTortie.expressed && genetics.tortieData?.expressed) {
+    const pool = mutationPool ?? { pelts: [], colours: [], tortieMasks: [] };
+    const layers = generateTortieLayers(genetics.tortieData.expressed, pool);
+
+    if (layers.length > 0) {
+      result.tortie = layers;
+      result.tortieMask = layers[0].mask;
+      result.tortieColour = layers[0].colour;
+      result.tortiePattern = layers[0].pattern;
+    }
+  }
+
+  return result;
 }
+
+// Export for use in tree manager
+export { generateTortieLayers };

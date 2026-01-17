@@ -1,21 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { X } from "lucide-react";
+import { useState, useMemo } from "react";
+import { X, Search } from "lucide-react";
 import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { encodeCatShare } from "@/lib/catShare";
 
-type HistoryCat = {
+type CatSource = "profile" | "batch";
+
+interface HistoryCat {
   id: string;
-  slug: string;
+  source: CatSource;
+  batchId?: string;
+  batchIndex?: number;
   catName: string | null;
   creatorName: string | null;
-  previewUrl: string | null;
+  previewUrl: string;
   catData: Record<string, unknown>;
-};
+}
 
 interface FoundingCoupleSelectorProps {
   onSelect: (params: {
@@ -73,27 +77,92 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
   const [selectedFather, setSelectedFather] = useState<HistoryCat | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const profilesQuery = useQuery(api.mapper.listHistory, { limit: 100 });
-  const profiles = profilesQuery ?? [];
+  // Query both profiles and batches
+  const profilesQuery = useQuery(api.mapper.listHistory, { limit: 200 });
+  const batchesQuery = useQuery(api.adoption.listBatches, { limit: 100 });
 
-  const historyCats: HistoryCat[] = profiles
-    .filter((p) => p.cat_data)
-    .map((p) => ({
-      id: p.id,
-      slug: p.slug ?? p.shareToken ?? p.id,
-      catName: p.catName || null,
-      creatorName: p.creatorName || null,
-      previewUrl: getPreviewUrl(p.cat_data as Record<string, unknown>),
-      catData: p.cat_data as Record<string, unknown>,
-    }));
+  // Combine and flatten all cats
+  const allCats = useMemo(() => {
+    const cats: HistoryCat[] = [];
 
-  const filteredCats = searchTerm.trim()
-    ? historyCats.filter(
-        (c) =>
-          c.catName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          c.creatorName?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : historyCats;
+    // Add individual profiles (excluding those linked to ancestry trees)
+    if (profilesQuery) {
+      for (const profile of profilesQuery) {
+        // Skip profiles that are part of an adoption batch (they'll be included from batches)
+        // Skip profiles that appear to be ancestry tree entries (no catData or explicitly marked)
+        if (!profile.cat_data) continue;
+
+        cats.push({
+          id: profile.id,
+          source: "profile",
+          catName: profile.catName || null,
+          creatorName: profile.creatorName || null,
+          previewUrl: getPreviewUrl(profile.cat_data as Record<string, unknown>),
+          catData: profile.cat_data as Record<string, unknown>,
+        });
+      }
+    }
+
+    // Flatten batches to individual cats
+    if (batchesQuery) {
+      for (const batch of batchesQuery) {
+        // Skip ancestry tree batches (check settings or title)
+        const isAncestryBatch =
+          batch.title?.toLowerCase().includes("ancestry") ||
+          batch.title?.toLowerCase().includes("tree") ||
+          (batch.settings as Record<string, unknown>)?.source === "ancestry_tree";
+
+        if (isAncestryBatch) continue;
+
+        for (const cat of batch.cats) {
+          if (!cat.catData) continue;
+
+          cats.push({
+            id: `batch-${batch.id}-${cat.index}`,
+            source: "batch",
+            batchId: batch.id,
+            batchIndex: cat.index,
+            catName: cat.catName || cat.label || null,
+            creatorName: cat.creatorName || batch.creatorName || null,
+            previewUrl: getPreviewUrl(cat.catData as Record<string, unknown>),
+            catData: cat.catData as Record<string, unknown>,
+          });
+        }
+      }
+    }
+
+    // Deduplicate by preview URL (rough heuristic)
+    const seen = new Set<string>();
+    return cats.filter((cat) => {
+      // Use a combination of catData hash for deduplication
+      const key = JSON.stringify(cat.catData).slice(0, 200);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [profilesQuery, batchesQuery]);
+
+  const filteredCats = useMemo(() => {
+    if (!searchTerm.trim()) return allCats;
+    const term = searchTerm.toLowerCase();
+    return allCats.filter(
+      (c) =>
+        c.catName?.toLowerCase().includes(term) ||
+        c.creatorName?.toLowerCase().includes(term)
+    );
+  }, [allCats, searchTerm]);
+
+  const handleCatClick = (cat: HistoryCat) => {
+    if (!selectedMother) {
+      setSelectedMother(cat);
+    } else if (!selectedFather && cat.id !== selectedMother.id) {
+      setSelectedFather(cat);
+    } else if (cat.id === selectedMother.id) {
+      setSelectedMother(null);
+    } else if (cat.id === selectedFather?.id) {
+      setSelectedFather(null);
+    }
+  };
 
   const handleConfirm = () => {
     if (!selectedMother || !selectedFather) return;
@@ -107,16 +176,18 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
     onSelect({
       mother: {
         params: motherParams,
-        historyProfileId: selectedMother.id,
+        historyProfileId: selectedMother.source === "profile" ? selectedMother.id : undefined,
         name: parseCatName(selectedMother.catName),
       },
       father: {
         params: fatherParams,
-        historyProfileId: selectedFather.id,
+        historyProfileId: selectedFather.source === "profile" ? selectedFather.id : undefined,
         name: parseCatName(selectedFather.catName),
       },
     });
   };
+
+  const isLoading = profilesQuery === undefined || batchesQuery === undefined;
 
   return (
     <div
@@ -138,13 +209,14 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
           </button>
         </div>
 
+        {/* Selected cats display */}
         <div className="flex gap-4 border-b border-white/10 p-4">
           <div className="flex flex-1 flex-col items-center gap-2 rounded-lg bg-pink-500/10 p-3">
-            <span className="text-sm font-medium text-pink-400">Mother</span>
+            <span className="text-sm font-medium text-pink-400">Mother ♀</span>
             {selectedMother ? (
               <div className="flex items-center gap-2">
                 <Image
-                  src={selectedMother.previewUrl!}
+                  src={selectedMother.previewUrl}
                   alt={selectedMother.catName ?? "Mother"}
                   width={48}
                   height={48}
@@ -165,11 +237,11 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
             )}
           </div>
           <div className="flex flex-1 flex-col items-center gap-2 rounded-lg bg-blue-500/10 p-3">
-            <span className="text-sm font-medium text-blue-400">Father</span>
+            <span className="text-sm font-medium text-blue-400">Father ♂</span>
             {selectedFather ? (
               <div className="flex items-center gap-2">
                 <Image
-                  src={selectedFather.previewUrl!}
+                  src={selectedFather.previewUrl}
                   alt={selectedFather.catName ?? "Father"}
                   width={48}
                   height={48}
@@ -191,20 +263,30 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
           </div>
         </div>
 
-        <div className="p-4">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by name..."
-            className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm placeholder:text-muted-foreground focus:border-amber-500 focus:outline-none"
-          />
+        {/* Search bar */}
+        <div className="p-4 border-b border-white/10">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by name..."
+              className="w-full rounded-lg border border-white/20 bg-white/5 pl-10 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:border-amber-500 focus:outline-none"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Showing {filteredCats.length} cats from history and adoption batches
+          </p>
         </div>
 
+        {/* Cat grid */}
         <div className="flex-1 overflow-y-auto p-4">
-          {filteredCats.length === 0 ? (
+          {isLoading ? (
+            <p className="text-center text-muted-foreground py-8">Loading...</p>
+          ) : filteredCats.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              {profilesQuery === undefined ? "Loading..." : "No cats found in history"}
+              No cats found in history
             </p>
           ) : (
             <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 md:grid-cols-6">
@@ -212,17 +294,7 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => {
-                    if (!selectedMother) {
-                      setSelectedMother(cat);
-                    } else if (!selectedFather && cat.id !== selectedMother.id) {
-                      setSelectedFather(cat);
-                    } else if (cat.id === selectedMother.id) {
-                      setSelectedMother(null);
-                    } else if (cat.id === selectedFather?.id) {
-                      setSelectedFather(null);
-                    }
-                  }}
+                  onClick={() => handleCatClick(cat)}
                   className={`flex flex-col items-center gap-1 rounded-lg p-2 transition-all hover:bg-white/10 ${
                     selectedMother?.id === cat.id
                       ? "ring-2 ring-pink-500 bg-pink-500/10"
@@ -232,7 +304,7 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
                   }`}
                 >
                   <Image
-                    src={cat.previewUrl!}
+                    src={cat.previewUrl}
                     alt={cat.catName ?? "Cat"}
                     width={48}
                     height={48}
@@ -242,12 +314,16 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
                   <span className="text-xs truncate max-w-full">
                     {cat.catName ?? "Unnamed"}
                   </span>
+                  {cat.source === "batch" && (
+                    <span className="text-[10px] text-muted-foreground">from batch</span>
+                  )}
                 </button>
               ))}
             </div>
           )}
         </div>
 
+        {/* Actions */}
         <div className="flex justify-end gap-3 border-t border-white/10 p-4">
           <button
             type="button"

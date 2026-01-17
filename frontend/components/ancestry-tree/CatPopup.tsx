@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Image from "next/image";
-import { X, Heart, Users, Dna } from "lucide-react";
+import { X, Heart, Users, Dna, Dices, UserPlus } from "lucide-react";
 import type { AncestryTreeCat, SerializedAncestryTree } from "@/lib/ancestry-tree/types";
 import { encodeCatShare } from "@/lib/catShare";
 import { findCatById, getSiblings } from "@/lib/ancestry-tree/familyChartAdapter";
@@ -13,9 +13,10 @@ interface CatPopupProps {
   onClose: () => void;
   onSelectCat?: (cat: AncestryTreeCat) => void;
   onReplacePartner?: (cat: AncestryTreeCat) => void;
+  onAssignRandomPartner?: (cat: AncestryTreeCat) => void;
 }
 
-export function CatPopup({ cat, tree, onClose, onSelectCat, onReplacePartner }: CatPopupProps) {
+export function CatPopup({ cat, tree, onClose, onSelectCat, onReplacePartner, onAssignRandomPartner }: CatPopupProps) {
   const previewUrl = useMemo(() => {
     const encoded = encodeCatShare({
       params: cat.params as unknown as Record<string, unknown>,
@@ -142,7 +143,7 @@ export function CatPopup({ cat, tree, onClose, onSelectCat, onReplacePartner }: 
               </div>
             )}
 
-            {partner && (
+            {partner ? (
               <div className="glass-card p-4">
                 <h3 className="mb-2 flex items-center gap-2 font-semibold">
                   <Heart className="size-4" /> Partner
@@ -168,6 +169,23 @@ export function CatPopup({ cat, tree, onClose, onSelectCat, onReplacePartner }: 
                     </button>
                   )}
                 </div>
+              </div>
+            ) : onAssignRandomPartner && (
+              <div className="glass-card p-4">
+                <h3 className="mb-2 flex items-center gap-2 font-semibold">
+                  <UserPlus className="size-4" /> No Partner
+                </h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                  This cat doesn&apos;t have a partner yet. Assign one to generate offspring.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onAssignRandomPartner(cat)}
+                  className="flex items-center justify-center gap-2 w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                >
+                  <Dices className="size-4" />
+                  Assign Random Partner
+                </button>
               </div>
             )}
 
