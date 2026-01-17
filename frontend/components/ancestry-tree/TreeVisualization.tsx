@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useRef, useEffect } from "react";
-import dagre from "dagre";
+import ELK from "elkjs/lib/elk.bundled.js";
 
 import type { AncestryTreeCat, SerializedAncestryTree } from "@/lib/ancestry-tree/types";
 import { getAncestors, findCatById } from "@/lib/ancestry-tree/familyChartAdapter";
@@ -26,145 +26,189 @@ interface PositionedNode {
 
 interface PositionedEdge {
   id: string;
-  points: Array<{ x: number; y: number }>;
+  sourceX: number;
+  sourceY: number;
+  targetX: number;
+  targetY: number;
   type: "couple" | "parent-child";
   highlighted: boolean;
 }
 
-interface DagreNodeLabel {
+interface LayoutResult {
+  nodes: PositionedNode[];
+  edges: PositionedEdge[];
   width: number;
   height: number;
-  cat: AncestryTreeCat;
-  x: number;
-  y: number;
 }
 
-function layoutTree(
+const elk = new ELK();
+
+async function layoutTreeWithElk(
   tree: SerializedAncestryTree,
   highlightedIds: Set<string>
-): { nodes: PositionedNode[]; edges: PositionedEdge[]; width: number; height: number } {
-  const g = new dagre.graphlib.Graph();
-
-  // Set graph properties for compact layout
-  g.setGraph({
-    rankdir: "TB", // Top to bottom
-    nodesep: 15,   // Horizontal spacing between nodes
-    ranksep: 80,   // Vertical spacing between ranks
-    marginx: 20,
-    marginy: 20,
-    ranker: "tight-tree", // More compact ranking
-  });
-
-  g.setDefaultEdgeLabel(() => ({}));
+): Promise<LayoutResult> {
+  if (tree.cats.length === 0) {
+    return { nodes: [], edges: [], width: 0, height: 0 };
+  }
 
   const catMap = new Map<string, AncestryTreeCat>();
   for (const cat of tree.cats) {
     catMap.set(cat.id, cat);
   }
 
+  // Build ELK graph
+  const elkNodes: Array<{
+    id: string;
+    width: number;
+    height: number;
+  }> = [];
+
+  const elkEdges: Array<{
+    id: string;
+    sources: string[];
+    targets: string[];
+  }> = [];
+
+  // Track edge metadata for later
+  const edgeMetadata = new Map<string, { type: "couple" | "parent-child" }>();
+
   // Add all cat nodes
   for (const cat of tree.cats) {
-    g.setNode(cat.id, {
+    elkNodes.push({
+      id: cat.id,
       width: NODE_WIDTH,
       height: NODE_HEIGHT,
-      cat,
     });
   }
 
-  // Track edges for later
-  const edgeList: Array<{ from: string; to: string; type: "couple" | "parent-child" }> = [];
-
   // Add couple edges (horizontal connections)
   const processedCouples = new Set<string>();
+  let edgeCounter = 0;
+
   for (const cat of tree.cats) {
     if (cat.partnerId) {
       const coupleKey = [cat.id, cat.partnerId].sort().join("-");
       if (!processedCouples.has(coupleKey)) {
         processedCouples.add(coupleKey);
-        // For couples, we want them on the same rank
-        // Use a constraint edge with weight
-        g.setEdge(cat.id, cat.partnerId, {
-          weight: 10,  // High weight to keep together
-          minlen: 1,
+        const edgeId = `couple-${edgeCounter++}`;
+        elkEdges.push({
+          id: edgeId,
+          sources: [cat.id],
+          targets: [cat.partnerId],
         });
-        edgeList.push({ from: cat.id, to: cat.partnerId, type: "couple" });
+        edgeMetadata.set(edgeId, { type: "couple" });
       }
     }
   }
 
   // Add parent-child edges
   for (const cat of tree.cats) {
+    // Connect from mother to child
     if (cat.motherId) {
-      g.setEdge(cat.motherId, cat.id, { minlen: 1 });
-      edgeList.push({ from: cat.motherId, to: cat.id, type: "parent-child" });
+      const edgeId = `parent-${edgeCounter++}`;
+      elkEdges.push({
+        id: edgeId,
+        sources: [cat.motherId],
+        targets: [cat.id],
+      });
+      edgeMetadata.set(edgeId, { type: "parent-child" });
     }
+    // Connect from father to child (only if different from mother)
     if (cat.fatherId && cat.fatherId !== cat.motherId) {
-      g.setEdge(cat.fatherId, cat.id, { minlen: 1 });
-      edgeList.push({ from: cat.fatherId, to: cat.id, type: "parent-child" });
+      const edgeId = `parent-${edgeCounter++}`;
+      elkEdges.push({
+        id: edgeId,
+        sources: [cat.fatherId],
+        targets: [cat.id],
+      });
+      edgeMetadata.set(edgeId, { type: "parent-child" });
     }
   }
 
-  // Run dagre layout
-  dagre.layout(g);
+  const elkGraph = {
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": "DOWN",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "60",
+      "elk.spacing.nodeNode": "15",
+      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+      "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
+      "elk.layered.compaction.postCompaction.strategy": "EDGE_LENGTH",
+      "elk.layered.compaction.connectedComponents": "true",
+      "elk.separateConnectedComponents": "false",
+      "elk.padding": "[top=20,left=20,bottom=20,right=20]",
+    },
+    children: elkNodes,
+    edges: elkEdges,
+  };
+
+  const layoutedGraph = await elk.layout(elkGraph);
 
   // Extract positioned nodes
   const nodes: PositionedNode[] = [];
-  for (const nodeId of g.nodes()) {
-    const node = g.node(nodeId) as DagreNodeLabel | undefined;
-    if (node?.cat) {
+  for (const elkNode of layoutedGraph.children ?? []) {
+    const cat = catMap.get(elkNode.id);
+    if (cat && elkNode.x !== undefined && elkNode.y !== undefined) {
       nodes.push({
-        id: nodeId,
-        x: node.x - NODE_WIDTH / 2,  // dagre gives center, we want top-left
-        y: node.y - NODE_HEIGHT / 2,
-        cat: node.cat,
+        id: elkNode.id,
+        x: elkNode.x,
+        y: elkNode.y,
+        cat,
       });
     }
   }
 
-  // Extract edges with their routed points
+  // Extract edges with positions
   const edges: PositionedEdge[] = [];
-  let edgeCounter = 0;
+  const nodePositions = new Map<string, { x: number; y: number }>();
+  for (const node of nodes) {
+    nodePositions.set(node.id, { x: node.x + NODE_WIDTH / 2, y: node.y + NODE_HEIGHT / 2 });
+  }
 
-  for (const { from, to, type } of edgeList) {
-    const edge = g.edge(from, to);
-    if (edge) {
-      const fromNode = g.node(from) as DagreNodeLabel | undefined;
-      const toNode = g.node(to) as DagreNodeLabel | undefined;
+  for (const elkEdge of layoutedGraph.edges ?? []) {
+    const metadata = edgeMetadata.get(elkEdge.id);
+    if (!metadata) continue;
 
-      // Build points array
-      let points: Array<{ x: number; y: number }> = [];
+    const sourceId = elkEdge.sources[0];
+    const targetId = elkEdge.targets[0];
+    const sourcePos = nodePositions.get(sourceId);
+    const targetPos = nodePositions.get(targetId);
 
-      if (edge.points && edge.points.length > 0) {
-        points = edge.points;
-      } else if (fromNode && toNode) {
-        // Fallback: direct line
-        points = [
-          { x: fromNode.x, y: fromNode.y },
-          { x: toNode.x, y: toNode.y },
-        ];
-      }
-
-      const highlighted = highlightedIds.has(from) && highlightedIds.has(to);
-
+    if (sourcePos && targetPos) {
+      const highlighted = highlightedIds.has(sourceId) && highlightedIds.has(targetId);
       edges.push({
-        id: `edge-${edgeCounter++}`,
-        points,
-        type,
+        id: elkEdge.id,
+        sourceX: sourcePos.x,
+        sourceY: sourcePos.y,
+        targetX: targetPos.x,
+        targetY: targetPos.y,
+        type: metadata.type,
         highlighted,
       });
     }
   }
 
-  // Get graph dimensions
-  const graphInfo = g.graph();
-  const width = (graphInfo.width ?? 800) + 40;
-  const height = (graphInfo.height ?? 600) + 40;
+  // Calculate dimensions from node positions
+  let maxX = 0;
+  let maxY = 0;
+  for (const node of nodes) {
+    maxX = Math.max(maxX, node.x + NODE_WIDTH);
+    maxY = Math.max(maxY, node.y + NODE_HEIGHT);
+  }
 
-  return { nodes, edges, width, height };
+  return {
+    nodes,
+    edges,
+    width: maxX + 40,
+    height: maxY + 40,
+  };
 }
 
 export function TreeVisualization({ tree, onCatClick }: TreeVisualizationProps) {
   const [hoveredCatId, setHoveredCatId] = useState<string | null>(null);
+  const [layout, setLayout] = useState<LayoutResult | null>(null);
+  const [isLayouting, setIsLayouting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -193,10 +237,23 @@ export function TreeVisualization({ tree, onCatClick }: TreeVisualizationProps) 
     return ids;
   }, [hoveredCatId, tree]);
 
-  // Layout the tree
-  const { nodes, edges, width, height } = useMemo(() => {
-    if (tree.cats.length === 0) return { nodes: [], edges: [], width: 0, height: 0 };
-    return layoutTree(tree, highlightedIds);
+  // Layout the tree with ELK (async)
+  useEffect(() => {
+    if (tree.cats.length === 0) {
+      setLayout({ nodes: [], edges: [], width: 0, height: 0 });
+      return;
+    }
+
+    setIsLayouting(true);
+    layoutTreeWithElk(tree, highlightedIds)
+      .then((result) => {
+        setLayout(result);
+        setIsLayouting(false);
+      })
+      .catch((err) => {
+        console.error("ELK layout error:", err);
+        setIsLayouting(false);
+      });
   }, [tree, highlightedIds]);
 
   const handleHover = useCallback((catId: string | null) => {
@@ -259,11 +316,27 @@ export function TreeVisualization({ tree, onCatClick }: TreeVisualizationProps) 
     );
   }
 
-  // Helper to build SVG path from points
-  const buildPath = (points: Array<{ x: number; y: number }>) => {
-    if (points.length < 2) return "";
-    const [first, ...rest] = points;
-    return `M ${first.x} ${first.y} ` + rest.map(p => `L ${p.x} ${p.y}`).join(" ");
+  if (isLayouting || !layout) {
+    return (
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        <p>Laying out tree...</p>
+      </div>
+    );
+  }
+
+  const { nodes, edges, width, height } = layout;
+
+  // Build SVG path for edges
+  const buildEdgePath = (edge: PositionedEdge) => {
+    if (edge.type === "couple") {
+      // Horizontal line for couples
+      return `M ${edge.sourceX} ${edge.sourceY} L ${edge.targetX} ${edge.targetY}`;
+    } else {
+      // Curved path for parent-child
+      const midY = (edge.sourceY + edge.targetY) / 2;
+      return `M ${edge.sourceX} ${edge.sourceY}
+              C ${edge.sourceX} ${midY}, ${edge.targetX} ${midY}, ${edge.targetX} ${edge.targetY}`;
+    }
   };
 
   return (
@@ -326,15 +399,15 @@ export function TreeVisualization({ tree, onCatClick }: TreeVisualizationProps) 
               return (
                 <g key={edge.id}>
                   <path
-                    d={buildPath(edge.points)}
+                    d={buildEdgePath(edge)}
                     fill="none"
                     stroke={color}
                     strokeWidth={edge.highlighted ? 3 : 2}
                   />
-                  {isCouple && edge.points.length >= 2 && (
+                  {isCouple && (
                     <text
-                      x={(edge.points[0].x + edge.points[edge.points.length - 1].x) / 2}
-                      y={(edge.points[0].y + edge.points[edge.points.length - 1].y) / 2 - 8}
+                      x={(edge.sourceX + edge.targetX) / 2}
+                      y={(edge.sourceY + edge.targetY) / 2 - 8}
                       textAnchor="middle"
                       fill={color}
                       fontSize={12}
