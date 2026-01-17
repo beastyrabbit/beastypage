@@ -9,6 +9,7 @@
  */
 
 import type * as adoption from "../adoption.js";
+import type * as ancestryTree from "../ancestryTree.js";
 import type * as catShares from "../catShares.js";
 import type * as catdex from "../catdex.js";
 import type * as coinflipper from "../coinflipper.js";
@@ -38,6 +39,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   adoption: typeof adoption;
+  ancestryTree: typeof ancestryTree;
   catShares: typeof catShares;
   catdex: typeof catdex;
   coinflipper: typeof coinflipper;
