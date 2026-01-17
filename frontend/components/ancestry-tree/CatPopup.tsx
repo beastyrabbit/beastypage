@@ -5,7 +5,7 @@ import Image from "next/image";
 import { X, Heart, Users, Dna } from "lucide-react";
 import type { AncestryTreeCat, SerializedAncestryTree } from "@/lib/ancestry-tree/types";
 import { encodeCatShare } from "@/lib/catShare";
-import { findCatById, getAncestors, getSiblings } from "@/lib/ancestry-tree/familyChartAdapter";
+import { findCatById, getSiblings } from "@/lib/ancestry-tree/familyChartAdapter";
 
 interface CatPopupProps {
   cat: AncestryTreeCat;

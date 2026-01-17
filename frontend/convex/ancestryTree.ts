@@ -45,15 +45,28 @@ export const save = mutation({
 
     if (existing) {
       // Update existing tree
-      await ctx.db.patch(existing._id, {
+      const patch: {
+        name: string;
+        foundingMotherId: string;
+        foundingFatherId: string;
+        cats: typeof args.cats;
+        config: typeof args.config;
+        updatedAt: number;
+        creatorName?: string;
+      } = {
         name: args.name,
         foundingMotherId: args.foundingMotherId,
         foundingFatherId: args.foundingFatherId,
         cats: args.cats,
         config: args.config,
-        creatorName: args.creatorName,
         updatedAt: now
-      });
+      };
+
+      if (args.creatorName !== undefined) {
+        patch.creatorName = args.creatorName;
+      }
+
+      await ctx.db.patch(existing._id, patch);
       return { id: existing._id, slug: args.slug };
     }
 

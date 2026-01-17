@@ -251,8 +251,13 @@ export class AncestryTreeManager {
             // Find or generate a partner
             let partner: AncestryTreeCat | undefined;
 
-            // First try to find an unpartnered male from the same litter
-            partner = males.find((m) => !m.partnerId && m.fatherId !== female.fatherId);
+            // First try to find an unpartnered male from the same litter (full siblings only)
+            partner = males.find((m) =>
+              !m.partnerId &&
+              m.fatherId === female.fatherId &&
+              m.motherId === female.motherId &&
+              m.id !== female.id
+            );
 
             if (!partner) {
               // Generate a new partner from outside the family

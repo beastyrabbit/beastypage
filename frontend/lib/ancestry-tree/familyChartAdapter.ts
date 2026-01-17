@@ -103,14 +103,22 @@ export function getDescendants(
   if (!cat) return [];
 
   const descendants: AncestryTreeCat[] = [];
+  const visited = new Set<string>([catId]);
   const queue = [...cat.childrenIds];
 
   while (queue.length > 0) {
     const childId = queue.shift()!;
+    if (visited.has(childId)) continue;
+    visited.add(childId);
+
     const child = findCatById(tree, childId);
     if (child) {
       descendants.push(child);
-      queue.push(...child.childrenIds);
+      for (const grandchildId of child.childrenIds) {
+        if (!visited.has(grandchildId)) {
+          queue.push(grandchildId);
+        }
+      }
     }
   }
 

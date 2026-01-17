@@ -35,13 +35,24 @@ export function TreeVisualization({ tree, onCatClick, highlightedCatId }: TreeVi
     return keys.length === 0 ? -1 : Math.max(...keys);
   }, [generations]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = -e.deltaY * 0.001;
-    setTransform((prev) => ({
-      ...prev,
-      scale: Math.min(Math.max(prev.scale + delta, 0.25), 2),
-    }));
+  // Use non-passive wheel listener to allow preventDefault
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = -e.deltaY * 0.001;
+      setTransform((prev) => ({
+        ...prev,
+        scale: Math.min(Math.max(prev.scale + delta, 0.25), 2),
+      }));
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+    };
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -195,7 +206,6 @@ export function TreeVisualization({ tree, onCatClick, highlightedCatId }: TreeVi
       <div
         ref={containerRef}
         className="h-full w-full cursor-grab active:cursor-grabbing"
-        onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

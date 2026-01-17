@@ -74,10 +74,13 @@ export function TreeConfigPanel({
             value={localConfig.minChildren}
             onChange={(e) => {
               const val = parseInt(e.target.value, 10);
-              handleChange("minChildren", val);
-              if (val > localConfig.maxChildren) {
-                handleChange("maxChildren", val);
-              }
+              const newConfig = {
+                ...localConfig,
+                minChildren: val,
+                maxChildren: Math.max(localConfig.maxChildren, val),
+              };
+              setLocalConfig(newConfig);
+              onConfigChange(newConfig);
             }}
             className="w-full accent-amber-500"
           />
