@@ -187,16 +187,20 @@ export function inheritGenetics(
 }
 
 export function geneticsToParams(genetics: CatGenetics, baseParams: Partial<CatParams>): CatParams {
+  // Spread baseParams first, then override with genetics-derived values
+  // This ensures genetics takes precedence over baseParams for trait fields
+  const { peltName: _, colour: _c, eyeColour: _e, skinColour: _s, whitePatches: _w, isTortie: _t, ...allowedOverrides } = baseParams;
   return {
     spriteNumber: baseParams.spriteNumber ?? 0,
+    shading: baseParams.shading ?? true,
+    reverse: baseParams.reverse ?? false,
+    ...allowedOverrides,
+    // Genetics-derived values take precedence
     peltName: genetics.pelt.expressed,
     colour: genetics.colour.expressed,
     eyeColour: genetics.eyeColour.expressed,
     skinColour: genetics.skinColour.expressed,
     whitePatches: genetics.whitePatches.expressed ?? undefined,
     isTortie: genetics.isTortie.expressed,
-    shading: baseParams.shading ?? true,
-    reverse: baseParams.reverse ?? false,
-    ...baseParams,
   };
 }

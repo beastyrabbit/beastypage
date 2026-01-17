@@ -30,7 +30,10 @@ export function TreeVisualization({ tree, onCatClick, highlightedCatId }: TreeVi
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
 
   const generations = useMemo(() => getCatsByGeneration(tree), [tree]);
-  const maxGeneration = useMemo(() => Math.max(...Array.from(generations.keys())), [generations]);
+  const maxGeneration = useMemo(() => {
+    const keys = Array.from(generations.keys());
+    return keys.length === 0 ? -1 : Math.max(...keys);
+  }, [generations]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();

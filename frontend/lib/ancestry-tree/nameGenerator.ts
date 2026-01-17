@@ -192,11 +192,13 @@ export function generateWarriorName(
   // Fallback: add a timestamp suffix to guarantee uniqueness
   const prefix = pickOne(PREFIXES);
   const uniqueSuffix = Date.now().toString(36).slice(-4);
-  const suffix = lifeStage === 'kit' ? 'kit' :
+  const baseSuffix = lifeStage === 'kit' ? 'kit' :
     lifeStage === 'apprentice' ? 'paw' :
     lifeStage === 'leader' ? 'star' :
     pickOne(SUFFIXES);
-  const full = `${capitalize(prefix)}${suffix}${uniqueSuffix}`;
+  // Include uniqueSuffix in suffix to maintain invariant: full === capitalize(prefix) + suffix
+  const suffix = `${baseSuffix}${uniqueSuffix}`;
+  const full = capitalize(prefix) + suffix;
 
   return { prefix, suffix, full };
 }

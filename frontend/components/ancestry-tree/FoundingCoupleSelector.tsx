@@ -204,7 +204,7 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
         <div className="flex-1 overflow-y-auto p-4">
           {filteredCats.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              {profiles === undefined ? "Loading..." : "No cats found in history"}
+              {profilesQuery === undefined ? "Loading..." : "No cats found in history"}
             </p>
           ) : (
             <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 md:grid-cols-6">

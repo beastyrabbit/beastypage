@@ -193,17 +193,21 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
       if (!tree) return;
 
       const updatedTree = { ...tree, name, creatorName };
-      await saveTreeMutation({
-        slug: updatedTree.slug,
-        name: updatedTree.name,
-        foundingMotherId: updatedTree.foundingMotherId,
-        foundingFatherId: updatedTree.foundingFatherId,
-        cats: updatedTree.cats,
-        config: updatedTree.config,
-        creatorName: updatedTree.creatorName,
-      });
-
-      setTree(updatedTree);
+      try {
+        await saveTreeMutation({
+          slug: updatedTree.slug,
+          name: updatedTree.name,
+          foundingMotherId: updatedTree.foundingMotherId,
+          foundingFatherId: updatedTree.foundingFatherId,
+          cats: updatedTree.cats,
+          config: updatedTree.config,
+          creatorName: updatedTree.creatorName,
+        });
+        setTree(updatedTree);
+      } catch (error) {
+        console.error("Failed to save tree:", error);
+        throw error;
+      }
     },
     [tree, saveTreeMutation]
   );
