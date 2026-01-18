@@ -96,12 +96,11 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
       }
     }
 
-    // Deduplicate by cat data hash
+    // Deduplicate by unique cat ID
     const seen = new Set<string>();
     return cats.filter((cat) => {
-      const key = JSON.stringify(cat.catData).slice(0, 200);
-      if (seen.has(key)) return false;
-      seen.add(key);
+      if (seen.has(cat.id)) return false;
+      seen.add(cat.id);
       return true;
     });
   }, [profilesQuery]);

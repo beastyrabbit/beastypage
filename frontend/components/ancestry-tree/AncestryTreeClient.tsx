@@ -388,8 +388,10 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
       if (!tree || !isSpriteMapperReady) return;
 
       setIsGenerating(true);
+      let manager: AncestryTreeManager | null = null;
+      let originalConfig: ReturnType<AncestryTreeManager["getTree"]>["config"] | null = null;
       try {
-        const manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
+        manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
 
         // Get fresh cat data from the deserialized tree (not from potentially stale state)
         const currentCat = manager.getCat(cat.id);
@@ -400,7 +402,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         }
 
         // Temporarily set config to generate exactly 1 child
-        const originalConfig = { ...manager.getTree().config };
+        originalConfig = { ...manager.getTree().config };
         manager.setConfig({ minChildren: 1, maxChildren: 1 });
 
         // Determine mother and father based on the specified partner
@@ -409,9 +411,6 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
 
         // Generate one child with optional forced gender
         manager.generateOffspring(motherId, fatherId, currentCat.generation + 1, forcedGender);
-
-        // Restore original config
-        manager.setConfig(originalConfig);
 
         const serialized = manager.serialize();
         setTree(serialized);
@@ -424,6 +423,10 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
       } catch (error) {
         console.error("Failed to add child:", error);
       } finally {
+        // Always restore original config if it was changed
+        if (manager && originalConfig) {
+          manager.setConfig(originalConfig);
+        }
         setIsGenerating(false);
       }
     },
@@ -1017,12 +1020,8 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
       {/* Sidebar for cat details */}
       <CatSidebar
         cat={selectedCat}
-        tree={tree}
         isOpen={selectedCat !== null}
         onClose={() => setSelectedCat(null)}
-        onSelectCat={handleSelectCatFromPopup}
-        onAssignRandomPartner={handleAssignRandomPartner}
-        onAddChildWithPartner={handleAddChildWithPartner}
         onEditRelations={handleEditRelations}
         isEditingRelations={isEditingRelations}
         onChangePose={handleChangePose}

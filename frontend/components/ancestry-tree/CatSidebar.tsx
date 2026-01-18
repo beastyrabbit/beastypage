@@ -4,17 +4,13 @@ import { useMemo } from "react";
 import Image from "next/image";
 import { X, Dna, GitBranch, SkipForward, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AncestryTreeCat, SerializedAncestryTree } from "@/lib/ancestry-tree/types";
+import type { AncestryTreeCat } from "@/lib/ancestry-tree/types";
 import { encodeCatShare } from "@/lib/catShare";
 
 interface CatSidebarProps {
   cat: AncestryTreeCat | null;
-  tree: SerializedAncestryTree;
   isOpen: boolean;
   onClose: () => void;
-  onSelectCat?: (cat: AncestryTreeCat) => void;
-  onAssignRandomPartner?: (cat: AncestryTreeCat) => void;
-  onAddChildWithPartner?: (cat: AncestryTreeCat, partnerId: string) => void;
   onEditRelations?: () => void;
   isEditingRelations?: boolean;
   onChangePose?: (cat: AncestryTreeCat, newSpriteNumber: number) => void;
@@ -55,7 +51,7 @@ export function CatSidebar({
     warrior: "Warrior",
     leader: "Leader",
     elder: "Elder",
-  }[cat.lifeStage];
+  }[cat.lifeStage] ?? cat.lifeStage ?? "Unknown";
 
   return (
     <>
@@ -88,14 +84,20 @@ export function CatSidebar({
           {/* Cat Sprite */}
           <div className="flex flex-col items-center gap-3">
             <div className="relative overflow-hidden rounded-xl bg-black/30 shadow-xl">
-              <Image
-                src={previewUrl ?? ""}
-                alt={cat.name.full}
-                width={200}
-                height={200}
-                className="pixelated"
-                unoptimized
-              />
+              {previewUrl ? (
+                <Image
+                  src={previewUrl}
+                  alt={cat.name.full}
+                  width={200}
+                  height={200}
+                  className="pixelated"
+                  unoptimized
+                />
+              ) : (
+                <div className="w-[200px] h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                  No preview
+                </div>
+              )}
             </div>
             {/* Next Pose Button */}
             {onChangePose && (

@@ -273,7 +273,7 @@ export const remove = mutation({
       .first();
 
     if (!existing) {
-      throw new Error(`Tree with slug ${args.slug} not found`);
+      return { success: false, error: "not_found" } as const;
     }
 
     // Check password if tree is protected
@@ -288,6 +288,6 @@ export const remove = mutation({
     }
 
     await ctx.db.delete(existing._id);
-    return { success: true };
+    return { success: true } as const;
   }
 });

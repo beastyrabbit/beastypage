@@ -34,7 +34,6 @@
 /* Make card images pixelated for cat sprites */
 .family-chart-wrapper .f3 .card img {
   image-rendering: pixelated !important;
-  image-rendering: crisp-edges !important;
 }
 
 /* Square image container with rounded corners */
@@ -71,7 +70,6 @@
   width: 64px;
   height: 64px;
   image-rendering: pixelated;
-  image-rendering: crisp-edges;
   object-fit: contain;
 }
 

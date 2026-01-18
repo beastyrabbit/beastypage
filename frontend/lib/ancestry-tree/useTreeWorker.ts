@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import type { MutationPool } from './treeManager';
 import type {
   FoundingCoupleInput,
@@ -49,6 +49,17 @@ export function useTreeWorker(): UseTreeWorkerReturn {
     setIsGenerating(false);
   }, []);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
+      rejectRef.current = null;
+    };
+  }, []);
+
   const generateTree = useCallback(
     (
       config: TreeGenerationConfig,
@@ -56,6 +67,11 @@ export function useTreeWorker(): UseTreeWorkerReturn {
       mutationPool: MutationPool
     ): Promise<SerializedAncestryTree> => {
       return new Promise((resolve, reject) => {
+        // Reject any previous pending promise before starting a new run
+        if (rejectRef.current) {
+          rejectRef.current(new Error('Superseded by new generation request'));
+        }
+
         // Cancel any existing worker
         if (workerRef.current) {
           workerRef.current.terminate();

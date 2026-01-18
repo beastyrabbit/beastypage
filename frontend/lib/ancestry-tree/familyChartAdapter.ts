@@ -145,18 +145,31 @@ export function getAncestors(
   if (!cat) return [];
 
   const ancestors: AncestryTreeCat[] = [];
+  const visited = new Set<string>([catId]);
   const queue: string[] = [];
 
-  if (cat.motherId) queue.push(cat.motherId);
-  if (cat.fatherId) queue.push(cat.fatherId);
+  if (cat.motherId && !visited.has(cat.motherId)) {
+    visited.add(cat.motherId);
+    queue.push(cat.motherId);
+  }
+  if (cat.fatherId && !visited.has(cat.fatherId)) {
+    visited.add(cat.fatherId);
+    queue.push(cat.fatherId);
+  }
 
   while (queue.length > 0) {
     const parentId = queue.shift()!;
     const parent = findCatById(tree, parentId);
     if (parent) {
       ancestors.push(parent);
-      if (parent.motherId) queue.push(parent.motherId);
-      if (parent.fatherId) queue.push(parent.fatherId);
+      if (parent.motherId && !visited.has(parent.motherId)) {
+        visited.add(parent.motherId);
+        queue.push(parent.motherId);
+      }
+      if (parent.fatherId && !visited.has(parent.fatherId)) {
+        visited.add(parent.fatherId);
+        queue.push(parent.fatherId);
+      }
     }
   }
 

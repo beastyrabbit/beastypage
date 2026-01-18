@@ -31,6 +31,7 @@ export function SaveTreeDialog({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
 
   // Check if the current slug exists and has a password
   const slugCheck = useQuery(api.ancestryTree.checkSlug, { slug: currentSlug });
@@ -84,12 +85,15 @@ export function SaveTreeDialog({
   }, [savedSlug, currentSlug]);
 
   const handleCopyUrl = useCallback(async () => {
+    setCopyError(false);
     try {
       await navigator.clipboard.writeText(getTreeUrl());
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy URL:", err);
+      setCopyError(true);
+      setTimeout(() => setCopyError(false), 3000);
     }
   }, [getTreeUrl]);
 
@@ -135,11 +139,13 @@ export function SaveTreeDialog({
                 <button
                   type="button"
                   onClick={handleCopyUrl}
-                  className="shrink-0 rounded-md p-2 transition-colors hover:bg-white/10"
-                  title="Copy URL"
+                  className={`shrink-0 rounded-md p-2 transition-colors hover:bg-white/10 ${copyError ? "text-red-400" : ""}`}
+                  title={copyError ? "Failed to copy" : "Copy URL"}
                 >
                   {copied ? (
                     <Check className="size-4 text-emerald-400" />
+                  ) : copyError ? (
+                    <X className="size-4" />
                   ) : (
                     <Copy className="size-4" />
                   )}
