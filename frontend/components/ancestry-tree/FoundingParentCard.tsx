@@ -5,7 +5,7 @@ import Image from "next/image";
 import { RefreshCw, Loader2 } from "lucide-react";
 import type { CatParams } from "@/lib/cat-v3/types";
 import type { CatName } from "@/lib/ancestry-tree/types";
-import { encodeCatShare } from "@/lib/catShare";
+import { getParamsPreviewUrl } from "@/lib/ancestry-tree/utils";
 
 interface FoundingParentCardProps {
   gender: "F" | "M";
@@ -26,18 +26,7 @@ export function FoundingParentCard({
 }: FoundingParentCardProps) {
   const previewUrl = useMemo(() => {
     if (!params) return null;
-    const encoded = encodeCatShare({
-      params: params as unknown as Record<string, unknown>,
-      accessorySlots: params.accessories ?? [],
-      scarSlots: params.scars ?? [],
-      tortieSlots: params.tortie ?? [],
-      counts: {
-        accessories: params.accessories?.length ?? 0,
-        scars: params.scars?.length ?? 0,
-        tortie: params.tortie?.length ?? 0,
-      },
-    });
-    return `/api/preview/_?cat=${encodeURIComponent(encoded)}`;
+    return getParamsPreviewUrl(params);
   }, [params]);
 
   const genderIcon = gender === "F" ? "♀" : "♂";

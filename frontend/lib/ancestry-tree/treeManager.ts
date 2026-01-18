@@ -160,8 +160,8 @@ export class AncestryTreeManager {
   private applyOffspringOptions(params: CatParams, options: OffspringOptions): CatParams {
     const result = { ...params };
 
-    // Apply accessory chance
-    if (options.accessoryChance > 0 && Math.random() < options.accessoryChance) {
+    // Apply accessory chance (only if maxAccessories > 0)
+    if (options.maxAccessories > 0 && options.accessoryChance > 0 && Math.random() < options.accessoryChance) {
       const count = Math.floor(Math.random() * options.maxAccessories) + 1;
       const accessories = this.pickAccessories(count);
       if (accessories.length > 0) {
@@ -170,8 +170,8 @@ export class AncestryTreeManager {
       }
     }
 
-    // Apply scar chance
-    if (options.scarChance > 0 && Math.random() < options.scarChance) {
+    // Apply scar chance (only if maxScars > 0)
+    if (options.maxScars > 0 && options.scarChance > 0 && Math.random() < options.scarChance) {
       const count = Math.floor(Math.random() * options.maxScars) + 1;
       const scars = this.pickScars(count);
       if (scars.length > 0) {

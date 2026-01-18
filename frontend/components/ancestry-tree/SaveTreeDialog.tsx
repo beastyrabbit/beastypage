@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { X, Save, Loader2, Copy, Check, Lock, ExternalLink } from "lucide-react";
@@ -32,6 +32,18 @@ export function SaveTreeDialog({
   const [savedSlug, setSavedSlug] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
+
+  // Refs for timeout cleanup
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    };
+  }, []);
 
   // Check if the current slug exists and has a password
   const slugCheck = useQuery(api.ancestryTree.checkSlug, { slug: currentSlug });
@@ -85,15 +97,19 @@ export function SaveTreeDialog({
   }, [savedSlug, currentSlug]);
 
   const handleCopyUrl = useCallback(async () => {
+    // Clear any existing timeouts
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+
     setCopyError(false);
     try {
       await navigator.clipboard.writeText(getTreeUrl());
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy URL:", err);
       setCopyError(true);
-      setTimeout(() => setCopyError(false), 3000);
+      errorTimeoutRef.current = setTimeout(() => setCopyError(false), 3000);
     }
   }, [getTreeUrl]);
 

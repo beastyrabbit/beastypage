@@ -627,9 +627,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
           setHasPassword(true);
         }
 
-        // Update URL to include the slug (use history.pushState for seamless update)
+        // Update URL to include the slug using Next.js router
         const newUrl = `/projects/warrior-cats/ancestry-tree/${updatedTree.slug}`;
-        window.history.pushState({ slug: updatedTree.slug }, "", newUrl);
+        router.replace(newUrl);
 
         return { success: true, slug: result.slug, isNew: result.isNew };
       } catch (error) {
@@ -637,7 +637,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
       }
     },
-    [tree, saveTreeMutation]
+    [tree, saveTreeMutation, router]
   );
 
   const handleBackToConfig = useCallback(() => {

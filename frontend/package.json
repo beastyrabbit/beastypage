@@ -37,6 +37,8 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@types/d3-flextree": "^2.1.4",
+    "@types/d3-hierarchy": "^3.1.7",
     "@types/node": "^25.0.2",
     "@types/pixelmatch": "^5.2.6",
     "@types/react": "^19.2.2",
