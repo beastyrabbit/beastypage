@@ -67,6 +67,15 @@ const COLOUR_PALETTE_MODES: Array<{ id: string; label: string }> = [
   { id: "bold", label: "Bold" },
   { id: "darker", label: "Darker" },
   { id: "blackout", label: "Blackout" },
+  { id: "mononoke", label: "Princess Mononoke" },
+  { id: "howl", label: "Howl's Moving Castle" },
+  { id: "demonslayer", label: "Demon Slayer" },
+  { id: "titanic", label: "Titanic" },
+  { id: "deathnote", label: "Death Note" },
+  { id: "slime", label: "Reincarnated as a Slime" },
+  { id: "ghostintheshell", label: "Ghost in the Shell" },
+  { id: "mushishi", label: "Mushishi" },
+  { id: "chisweethome", label: "Chi's Sweet Home" },
   { id: "all", label: "All" },
 ];
 

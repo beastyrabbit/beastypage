@@ -7,7 +7,21 @@ import { VisualBuilderClient, DEFAULT_PARAMS, type VisualBuilderInitialPayload }
 
 import type { Id } from "@/convex/_generated/dataModel";
 
-type PaletteMode = "off" | "mood" | "bold" | "darker" | "blackout";
+type PaletteMode =
+  | "off"
+  | "mood"
+  | "bold"
+  | "darker"
+  | "blackout"
+  | "mononoke"
+  | "howl"
+  | "demonslayer"
+  | "titanic"
+  | "deathnote"
+  | "slime"
+  | "ghostintheshell"
+  | "mushishi"
+  | "chisweethome";
 
 type TortieLayer = {
   pattern?: string;
@@ -149,7 +163,11 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
 
   const palette = coerceString(catData["basePalette"])?.toLowerCase();
   const tortiePalette = coerceString(catData["tortiePalette"])?.toLowerCase();
-  const paletteModes: PaletteMode[] = ["off", "mood", "bold", "darker", "blackout"];
+  const paletteModes: PaletteMode[] = [
+    "off", "mood", "bold", "darker", "blackout",
+    "mononoke", "howl", "demonslayer", "titanic", "deathnote",
+    "slime", "ghostintheshell", "mushishi", "chisweethome"
+  ];
 
   const slugValue = shareSlug ?? record.slug ?? record.shareToken ?? null;
   return {

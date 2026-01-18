@@ -51,8 +51,24 @@ import {
 // portable payload for the old viewer and future React viewer work.
 // @ts-ignore -- legacy JS module without types.
 import { encodeCatShare, createCatShare } from "@/lib/catShare";
+import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
+import type { PaletteId } from "@/lib/palettes";
 
-type ExtendedMode = "base" | "mood" | "bold" | "darker" | "blackout";
+type ExtendedMode =
+  | "base"
+  | "mood"
+  | "bold"
+  | "darker"
+  | "blackout"
+  | "mononoke"
+  | "howl"
+  | "demonslayer"
+  | "titanic"
+  | "deathnote"
+  | "slime"
+  | "ghostintheshell"
+  | "mushishi"
+  | "chisweethome";
 export type AfterlifeOption = "off" | "dark10" | "star10" | "both10" | "darkForce" | "starForce";
 
 interface TortieSlot {
@@ -3876,25 +3892,12 @@ export function SingleCatPlusClient({
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground/80">
                   <Palette className="size-3" /> Colour Palettes
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {(["base", "mood", "bold", "darker", "blackout"] as ExtendedMode[]).map((modeKey) => {
-                    const active =
-                      modeKey === "base" ? includeBaseColours : extendedModes.has(modeKey);
-                    return (
-                      <button
-                        key={modeKey}
-                        type="button"
-                        onClick={() => handleToggleExtended(modeKey)}
-                        className={`rounded-full border px-4 py-1 text-xs font-semibold transition ${active
-                            ? "border-primary/60 bg-primary/20 text-foreground"
-                            : "border-border/60 bg-background/70"
-                          }`}
-                      >
-                        {modeKey === "base" ? "Base" : modeKey.charAt(0).toUpperCase() + modeKey.slice(1)}
-                      </button>
-                    );
-                  })}
-                </div>
+                <PaletteMultiSelect
+                  selected={extendedModes as Set<PaletteId>}
+                  onChange={(newSet) => setExtendedModes(newSet as Set<ExtendedMode>)}
+                  includeClassic={includeBaseColours}
+                  onClassicChange={setIncludeBaseColours}
+                />
               </div>
             </div>
           </aside>

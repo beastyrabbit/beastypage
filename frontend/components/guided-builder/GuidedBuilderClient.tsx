@@ -13,7 +13,21 @@ import type { CatGeneratorApi, SpriteMapperApi } from "@/components/cat-builder/
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import { canvasToDataUrl, cloneParams, formatName, getColourSwatch } from "@/components/cat-builder/utils";
 
-type PaletteMode = "off" | "mood" | "bold" | "darker" | "blackout";
+type PaletteMode =
+  | "off"
+  | "mood"
+  | "bold"
+  | "darker"
+  | "blackout"
+  | "mononoke"
+  | "howl"
+  | "demonslayer"
+  | "titanic"
+  | "deathnote"
+  | "slime"
+  | "ghostintheshell"
+  | "mushishi"
+  | "chisweethome";
 
 type StepId =
   | "colour"
@@ -115,6 +129,15 @@ const PALETTE_CONTROLS: { id: PaletteMode; label: string }[] = [
   { id: "bold", label: "Bold" },
   { id: "darker", label: "Darker" },
   { id: "blackout", label: "Blackout" },
+  { id: "mononoke", label: "Mononoke" },
+  { id: "howl", label: "Howl" },
+  { id: "demonslayer", label: "Demon Slayer" },
+  { id: "titanic", label: "Titanic" },
+  { id: "deathnote", label: "Death Note" },
+  { id: "slime", label: "Slime" },
+  { id: "ghostintheshell", label: "GitS" },
+  { id: "mushishi", label: "Mushishi" },
+  { id: "chisweethome", label: "Chi" },
 ];
 
 const DISPLAY_CANVAS_SIZE = 540;

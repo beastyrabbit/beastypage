@@ -1,0 +1,17 @@
+import type { PaletteCategory } from './types';
+
+export const mononokePalette: PaletteCategory = {
+  id: 'mononoke',
+  label: 'Princess Mononoke',
+  description: 'Forest spirits, earth tones, and mystical colors from Studio Ghibli',
+  colors: {
+    MONONOKE_OCEAN: { multiply: [3, 50, 78] },
+    MONONOKE_SANBLOOD: { multiply: [199, 65, 72] },
+    MONONOKE_KODAMA: { multiply: [219, 185, 160] },
+    MONONOKE_GOLDLEAF: { multiply: [255, 235, 124] },
+    MONONOKE_ASHITAKA: { multiply: [143, 84, 40] },
+    MONONOKE_FORESTDARK: { multiply: [23, 59, 83] },
+    MONONOKE_CURSE: { multiply: [203, 68, 75] },
+    MONONOKE_SPIRIT: { multiply: [240, 245, 250], screen: [255, 255, 255, 0.15] },
+  },
+};

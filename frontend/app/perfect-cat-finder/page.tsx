@@ -10,7 +10,11 @@ import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { Loader2, Trophy, ClipboardCopy, ExternalLink, X } from "lucide-react";
 import { createCatShare, encodeCatShare } from "@/lib/catShare";
 
-const PALETTE_MODES = ["off", "mood", "bold", "darker", "blackout"] as const;
+const PALETTE_MODES = [
+  "off", "mood", "bold", "darker", "blackout",
+  "mononoke", "howl", "demonslayer", "titanic", "deathnote",
+  "slime", "ghostintheshell", "mushishi", "chisweethome"
+] as const;
 const NEW_CAT_PROBABILITY = 0.4;
 
 function randomInt(maxInclusive: number): number {

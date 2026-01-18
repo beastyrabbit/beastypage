@@ -40,6 +40,13 @@ const TOOLS: ToolCard[] = [
     href: "/color-palette-creator",
   },
   {
+    title: "Cat Color Palettes",
+    icon: "🐱",
+    description:
+      "Browse all experimental color palettes for cat generation including anime-inspired themes.",
+    href: "/cat-color-palettes",
+  },
+  {
     title: "Mood Board",
     icon: "🎞️",
     description:

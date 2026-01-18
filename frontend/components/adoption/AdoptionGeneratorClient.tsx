@@ -438,6 +438,33 @@ export function AdoptionGeneratorClient() {
                 <button type="button" className="palette-toggle" data-extended-mode="blackout" aria-pressed="false">
                   Blackout
                 </button>
+                <button type="button" className="palette-toggle" data-extended-mode="mononoke" aria-pressed="false">
+                  Mononoke
+                </button>
+                <button type="button" className="palette-toggle" data-extended-mode="howl" aria-pressed="false">
+                  Howl
+                </button>
+                <button type="button" className="palette-toggle" data-extended-mode="demonslayer" aria-pressed="false">
+                  Demon Slayer
+                </button>
+                <button type="button" className="palette-toggle" data-extended-mode="titanic" aria-pressed="false">
+                  Titanic
+                </button>
+                <button type="button" className="palette-toggle" data-extended-mode="deathnote" aria-pressed="false">
+                  Death Note
+                </button>
+                <button type="button" className="palette-toggle" data-extended-mode="slime" aria-pressed="false">
+                  Slime
+                </button>
+                <button type="button" className="palette-toggle" data-extended-mode="ghostintheshell" aria-pressed="false">
+                  GitS
+                </button>
+                <button type="button" className="palette-toggle" data-extended-mode="mushishi" aria-pressed="false">
+                  Mushishi
+                </button>
+                <button type="button" className="palette-toggle" data-extended-mode="chisweethome" aria-pressed="false">
+                  Chi
+                </button>
                 <button type="button" className="palette-reset" data-extended-reset>
                   Clear
                 </button>

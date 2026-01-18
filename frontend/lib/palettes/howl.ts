@@ -1,0 +1,17 @@
+import type { PaletteCategory } from './types';
+
+export const howlPalette: PaletteCategory = {
+  id: 'howl',
+  label: "Howl's Moving Castle",
+  description: 'Magical starlight, warm meadows, and enchanted twilight from Studio Ghibli',
+  colors: {
+    HOWL_STARLIGHT: { multiply: [197, 133, 244] },
+    HOWL_CALCIFER: { multiply: [234, 196, 26] },
+    HOWL_COAT: { multiply: [119, 55, 166] },
+    HOWL_MEADOW: { multiply: [92, 148, 156] },
+    HOWL_CASTLE: { multiply: [52, 41, 83] },
+    HOWL_SUNSET: { multiply: [232, 141, 167] },
+    HOWL_DECK: { multiply: [212, 212, 164] },
+    HOWL_NIGHTSKY: { multiply: [60, 81, 89] },
+  },
+};

@@ -28,6 +28,8 @@ import { FoundingCoupleSelector } from "./FoundingCoupleSelector";
 import { SaveTreeDialog } from "./SaveTreeDialog";
 import { FoundingParentCard } from "./FoundingParentCard";
 import { OffspringOptionsPanel } from "./OffspringOptionsPanel";
+import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
+import type { PaletteId } from "@/lib/palettes";
 import { SliderWithInput } from "./SliderWithInput";
 import "./family-chart-custom.css";
 
@@ -888,37 +890,24 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                   <Palette className="size-4 text-purple-400" />
                   Color Palettes
                 </h3>
-                <div className="flex flex-wrap gap-2">
-                  {(["off", "mood", "bold", "darker", "blackout"] as PaletteMode[]).map((mode) => {
-                    const modes = config.paletteModes ?? ["off"];
-                    const isSelected = modes.includes(mode);
-                    return (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => {
-                          let newModes: PaletteMode[];
-                          if (isSelected) {
-                            // Remove mode, but keep at least one
-                            newModes = modes.filter((m) => m !== mode);
-                            if (newModes.length === 0) newModes = ["off"];
-                          } else {
-                            // Add mode
-                            newModes = [...modes, mode];
-                          }
-                          handleConfigChange({ ...config, paletteModes: newModes });
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                          isSelected
-                            ? "bg-purple-500 text-white"
-                            : "bg-white/10 hover:bg-white/20"
-                        }`}
-                      >
-                        {mode === "off" ? "Classic" : mode.charAt(0).toUpperCase() + mode.slice(1)}
-                      </button>
-                    );
-                  })}
-                </div>
+                <PaletteMultiSelect
+                  selected={new Set((config.paletteModes ?? ['off']).filter((m): m is PaletteId => m !== 'off'))}
+                  onChange={(newSet) => {
+                    const modes = config.paletteModes ?? ['off'];
+                    const hasClassic = modes.includes('off');
+                    const newModes: PaletteMode[] = hasClassic ? ['off', ...Array.from(newSet) as PaletteMode[]] : [...Array.from(newSet) as PaletteMode[]];
+                    if (newModes.length === 0) newModes.push('off');
+                    handleConfigChange({ ...config, paletteModes: newModes });
+                  }}
+                  includeClassic={(config.paletteModes ?? ['off']).includes('off')}
+                  onClassicChange={(include) => {
+                    const modes = config.paletteModes ?? ['off'];
+                    const otherModes = modes.filter((m) => m !== 'off') as PaletteMode[];
+                    const newModes: PaletteMode[] = include ? ['off', ...otherModes] : otherModes;
+                    if (newModes.length === 0) newModes.push('off');
+                    handleConfigChange({ ...config, paletteModes: newModes });
+                  }}
+                />
                 <p className="text-xs text-muted-foreground">
                   Select multiple palettes - each cat picks randomly from enabled options.
                 </p>

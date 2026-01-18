@@ -6,6 +6,9 @@
 
 // No longer importing individual sprite paths - we use sprite sheets exclusively
 
+// Import experimental color palettes from centralized module
+import { getAllColorDefs, getAllCategories, getPaletteIds } from '../palettes';
+
 class SpriteMapper {
     constructor() {
         this.spriteMap = new Map();
@@ -44,114 +47,9 @@ class SpriteMapper {
         this.lineartStyles = [];
 
         // Extended palette applied dynamically on white base sprites
-        this.experimentalColourDefs = {
-            AQUA: { baseColour: 'WHITE', multiply: [96, 212, 255] },
-            AMETHYST: { baseColour: 'WHITE', multiply: [168, 120, 255] },
-            APRICOT: { baseColour: 'WHITE', multiply: [255, 198, 150], screen: [255, 220, 190, 0.25] },
-            BURGUNDY: { baseColour: 'WHITE', multiply: [120, 40, 70], screen: [160, 60, 90, 0.25] },
-            CERULEAN: { baseColour: 'WHITE', multiply: [90, 160, 254] },
-            CHARTREUSE: { baseColour: 'WHITE', multiply: [184, 255, 80], screen: [210, 255, 120, 0.2] },
-            COBALT: { baseColour: 'WHITE', multiply: [80, 118, 232] },
-            CORAL: { baseColour: 'WHITE', multiply: [255, 148, 130], screen: [255, 190, 170, 0.25] },
-            CRIMSON: { baseColour: 'WHITE', multiply: [200, 32, 64], screen: [220, 80, 110, 0.25] },
-            DAWN: { baseColour: 'WHITE', multiply: [247, 214, 214], screen: [255, 230, 230, 0.2] },
-            ELECTRICBLUE: { baseColour: 'WHITE', multiply: [70, 145, 255], screen: [110, 180, 255, 0.22] },
-            EMERALD: { baseColour: 'WHITE', multiply: [56, 190, 125] },
-            FERN: { baseColour: 'WHITE', multiply: [170, 214, 150], screen: [195, 236, 182, 0.22] },
-            FOREST: { baseColour: 'WHITE', multiply: [88, 150, 88], screen: [30, 60, 30, 0.2] },
-            FUCHSIA: { baseColour: 'WHITE', multiply: [255, 103, 218] },
-            GLAZEDBLUE: { baseColour: 'WHITE', multiply: [175, 210, 235], screen: [204, 232, 255, 0.22] },
-            GOLDLEAF: { baseColour: 'WHITE', multiply: [240, 203, 120], screen: [255, 226, 170, 0.2] },
-            HOTPINK: { baseColour: 'WHITE', multiply: [255, 80, 150], screen: [255, 120, 190, 0.2] },
-            INDIGO: { baseColour: 'WHITE', multiply: [76, 63, 170], screen: [120, 110, 210, 0.2] },
-            LAVENDER: { baseColour: 'WHITE', multiply: [186, 160, 255] },
-            LEMONADE: { baseColour: 'WHITE', multiply: [255, 232, 180], screen: [255, 245, 214, 0.2] },
-            LIME: { baseColour: 'WHITE', multiply: [200, 255, 110], screen: [220, 255, 150, 0.2] },
-            MAGENTA: { baseColour: 'WHITE', multiply: [226, 71, 174] },
-            MANGO: { baseColour: 'WHITE', multiply: [255, 204, 140], screen: [255, 225, 175, 0.22] },
-            MIST: { baseColour: 'WHITE', multiply: [210, 230, 243], screen: [230, 245, 255, 0.18] },
-            MINT: { baseColour: 'WHITE', multiply: [155, 233, 202] },
-            NAVY: { baseColour: 'WHITE', multiply: [43, 58, 120], screen: [90, 102, 180, 0.25] },
-            NECTARINE: { baseColour: 'WHITE', multiply: [255, 188, 140], screen: [255, 213, 178, 0.22] },
-            NEONBLUE: { baseColour: 'WHITE', multiply: [60, 120, 255], screen: [120, 180, 255, 0.25] },
-            NEONGREEN: { baseColour: 'WHITE', multiply: [120, 255, 120], screen: [150, 255, 170, 0.22] },
-            NEONPINK: { baseColour: 'WHITE', multiply: [255, 70, 190], screen: [255, 140, 220, 0.22] },
-            NEONPURPLE: { baseColour: 'WHITE', multiply: [180, 70, 255], screen: [210, 130, 255, 0.22] },
-            PEACH: { baseColour: 'WHITE', multiply: [255, 210, 175], screen: [255, 235, 210, 0.2] },
-            PASTELBLUE: { baseColour: 'WHITE', multiply: [190, 220, 255], screen: [220, 235, 255, 0.18] },
-            PASTELMINT: { baseColour: 'WHITE', multiply: [190, 255, 227], screen: [210, 255, 235, 0.18] },
-            PASTELPINK: { baseColour: 'WHITE', multiply: [255, 200, 225], screen: [255, 220, 235, 0.18] },
-            PASTELPURPLE: { baseColour: 'WHITE', multiply: [220, 200, 255], screen: [235, 220, 255, 0.18] },
-            PASTELYELLOW: { baseColour: 'WHITE', multiply: [255, 240, 180], screen: [255, 250, 210, 0.18] },
-            PERIWINKLE: { baseColour: 'WHITE', multiply: [158, 167, 250] },
-            PLUM: { baseColour: 'WHITE', multiply: [158, 82, 158], screen: [200, 140, 200, 0.2] },
-            ROYALPURPLE: { baseColour: 'WHITE', multiply: [104, 63, 192], screen: [150, 115, 220, 0.2] },
-            SAND: { baseColour: 'WHITE', multiply: [235, 214, 170], screen: [245, 230, 190, 0.18] },
-            SCARLET: { baseColour: 'WHITE', multiply: [255, 60, 40], screen: [255, 110, 90, 0.22] },
-            SEAFOAM: { baseColour: 'WHITE', multiply: [126, 230, 207] },
-            SKYBLUE: { baseColour: 'WHITE', multiply: [122, 196, 255] },
-            SPRINGGREEN: { baseColour: 'WHITE', multiply: [115, 224, 130] },
-            SUNSETORANGE: { baseColour: 'WHITE', multiply: [255, 120, 70], screen: [255, 170, 120, 0.22] },
-            TEAL: { baseColour: 'WHITE', multiply: [70, 192, 196] },
-            TURQUOISE: { baseColour: 'WHITE', multiply: [72, 210, 208] },
-            WATERLILY: { baseColour: 'WHITE', multiply: [198, 225, 215], screen: [220, 240, 230, 0.16] },
-            WISTERIA: { baseColour: 'WHITE', multiply: [210, 190, 255], screen: [230, 210, 255, 0.18] },
-            ZEST: { baseColour: 'WHITE', multiply: [255, 200, 120], screen: [255, 220, 160, 0.2] },
-            ZIRCON: { baseColour: 'WHITE', multiply: [210, 232, 255], screen: [230, 245, 255, 0.16] },
-            MIDNIGHT: { baseColour: 'WHITE', multiply: [23, 29, 58] },
-            OBSIDIAN: { baseColour: 'WHITE', multiply: [18, 21, 29] },
-            DEEPSEA: { baseColour: 'WHITE', multiply: [27, 51, 78] },
-            NIGHTFALL: { baseColour: 'WHITE', multiply: [38, 34, 68] },
-            SHADOWPURPLE: { baseColour: 'WHITE', multiply: [46, 34, 78] },
-            DARKORCHID: { baseColour: 'WHITE', multiply: [58, 26, 78] },
-            STORMBLUE: { baseColour: 'WHITE', multiply: [39, 55, 91] },
-            DARKTEAL: { baseColour: 'WHITE', multiply: [32, 78, 78] },
-            EVERGREEN: { baseColour: 'WHITE', multiply: [32, 65, 46] },
-            FORESTSHADOW: { baseColour: 'WHITE', multiply: [39, 55, 39] },
-            MOSSY: { baseColour: 'WHITE', multiply: [52, 65, 46] },
-            DEEPFUCHSIA: { baseColour: 'WHITE', multiply: [78, 26, 65] },
-            GARNET: { baseColour: 'WHITE', multiply: [84, 29, 42] },
-            RAVEN: { baseColour: 'WHITE', multiply: [26, 26, 32] },
-            COBALTSTORM: { baseColour: 'WHITE', multiply: [42, 58, 98] },
-            TWILIGHTBLUE: { baseColour: 'WHITE', multiply: [55, 58, 94] },
-            VELVETPLUM: { baseColour: 'WHITE', multiply: [58, 39, 72] },
-            INDIGONIGHT: { baseColour: 'WHITE', multiply: [36, 39, 81] },
-            MULBERRY: { baseColour: 'WHITE', multiply: [72, 32, 58] },
-            CHARCOAL: { baseColour: 'WHITE', multiply: [46, 46, 52] },
-            SMOKESLATE: { baseColour: 'WHITE', multiply: [58, 65, 72] },
-            DUSKROSE: { baseColour: 'WHITE', multiply: [78, 46, 58] },
-            BRONZELEAF: { baseColour: 'WHITE', multiply: [91, 62, 36] },
-            DARKSUNSET: { baseColour: 'WHITE', multiply: [91, 46, 36] },
-            MIDNIGHTTEAL: { baseColour: 'WHITE', multiply: [26, 72, 72] },
-            OCEANDEPTHS: { baseColour: 'WHITE', multiply: [32, 62, 88] },
-            SHADOWMINT: { baseColour: 'WHITE', multiply: [58, 84, 72] },
-            NIGHTSKY: { baseColour: 'WHITE', multiply: [46, 52, 84] },
-            ASHWOOD: { baseColour: 'WHITE', multiply: [78, 72, 58] },
-            DEEPRUBY: { baseColour: 'WHITE', multiply: [98, 29, 46] },
-            BLACKOUTBLUE: { baseColour: 'WHITE', multiply: [10, 12, 26], screen: [30, 36, 76, 0.08] },
-            BLACKOUTPURPLE: { baseColour: 'WHITE', multiply: [12, 10, 24], screen: [54, 30, 80, 0.08] },
-            BLACKOUTRED: { baseColour: 'WHITE', multiply: [22, 8, 14], screen: [80, 28, 40, 0.08] },
-            BLACKOUTTEAL: { baseColour: 'WHITE', multiply: [8, 20, 22], screen: [36, 80, 82, 0.08] },
-            BLACKOUTGREEN: { baseColour: 'WHITE', multiply: [12, 24, 12], screen: [56, 90, 48, 0.08] },
-            BLACKOUTGOLD: { baseColour: 'WHITE', multiply: [24, 18, 8], screen: [96, 72, 36, 0.08] },
-            STARLESS_NAVY: { baseColour: 'WHITE', multiply: [9, 12, 28], screen: [28, 40, 88, 0.07] },
-            NEBULA_INDIGO: { baseColour: 'WHITE', multiply: [11, 10, 26], screen: [36, 30, 84, 0.07] },
-            UMBRAL_VIOLET: { baseColour: 'WHITE', multiply: [14, 9, 22], screen: [60, 28, 80, 0.08] },
-            CRYPTIC_CRIMSON: { baseColour: 'WHITE', multiply: [22, 9, 14], screen: [92, 30, 42, 0.08] },
-            ABYSSAL_TEAL: { baseColour: 'WHITE', multiply: [8, 18, 20], screen: [32, 76, 80, 0.08] },
-            MOURNING_EMERALD: { baseColour: 'WHITE', multiply: [12, 22, 14], screen: [50, 90, 56, 0.08] },
-            SHADOW_SAPPHIRE: { baseColour: 'WHITE', multiply: [10, 13, 30], screen: [34, 44, 92, 0.07] },
-            NOCTURNE_MAGENTA: { baseColour: 'WHITE', multiply: [18, 8, 20], screen: [88, 28, 78, 0.08] },
-            PHANTOM_COPPER: { baseColour: 'WHITE', multiply: [20, 14, 10], screen: [90, 70, 50, 0.08] },
-            ECLIPSE_SKY: { baseColour: 'WHITE', multiply: [12, 16, 24], screen: [46, 58, 90, 0.07] }
-        };
-
-        this.experimentalColourCategories = {
-            mood: ['AQUA', 'APRICOT', 'CORAL', 'DAWN', 'FERN', 'GLAZEDBLUE', 'GOLDLEAF', 'LAVENDER', 'LEMONADE', 'MANGO', 'MINT', 'MIST', 'PEACH', 'PASTELBLUE', 'PASTELMINT', 'PASTELPINK', 'PASTELPURPLE', 'PASTELYELLOW', 'PERIWINKLE', 'SEAFOAM', 'SPRINGGREEN', 'WATERLILY', 'WISTERIA', 'ZIRCON'],
-            bold: ['CHARTREUSE', 'CERULEAN', 'COBALT', 'ELECTRICBLUE', 'EMERALD', 'FUCHSIA', 'HOTPINK', 'LIME', 'MAGENTA', 'NEONBLUE', 'NEONGREEN', 'NEONPINK', 'NEONPURPLE', 'SKYBLUE', 'SUNSETORANGE', 'TEAL', 'TURQUOISE', 'ZEST', 'SAND', 'SCARLET', 'NECTARINE'],
-            darker: ['MIDNIGHT', 'OBSIDIAN', 'DEEPSEA', 'NIGHTFALL', 'SHADOWPURPLE', 'DARKORCHID', 'STORMBLUE', 'DARKTEAL', 'EVERGREEN', 'FORESTSHADOW', 'MOSSY', 'DEEPFUCHSIA', 'GARNET', 'RAVEN', 'COBALTSTORM', 'TWILIGHTBLUE', 'VELVETPLUM', 'INDIGONIGHT', 'MULBERRY', 'CHARCOAL', 'SMOKESLATE', 'DUSKROSE', 'BRONZELEAF', 'DARKSUNSET', 'MIDNIGHTTEAL', 'OCEANDEPTHS', 'SHADOWMINT', 'NIGHTSKY', 'ASHWOOD', 'DEEPRUBY'],
-            blackout: ['BLACKOUTBLUE', 'BLACKOUTPURPLE', 'BLACKOUTRED', 'BLACKOUTTEAL', 'BLACKOUTGREEN', 'BLACKOUTGOLD', 'STARLESS_NAVY', 'NEBULA_INDIGO', 'UMBRAL_VIOLET', 'CRYPTIC_CRIMSON', 'ABYSSAL_TEAL', 'MOURNING_EMERALD', 'SHADOW_SAPPHIRE', 'NOCTURNE_MAGENTA', 'PHANTOM_COPPER', 'ECLIPSE_SKY']
-        };
+        // Color definitions are loaded from the centralized palettes module
+        this.experimentalColourDefs = getAllColorDefs();
+        this.experimentalColourCategories = getAllCategories();
     }
     
     /**
@@ -467,11 +365,9 @@ class SpriteMapper {
         this.whitePatchesTints = ['none', 'offwhite', 'cream', 'darkcream', 'gray', 'pink'];
         this.vitiligo = ['VITILIGO', 'VITILIGOTWO', 'MOON', 'PHANTOM', 'KARPATI', 'BLEACHED', 'SMOKEY', 'POWDER'];
 
-        this.experimentalColourCategories = {
-            mood: ['AQUA', 'APRICOT', 'CORAL', 'DAWN', 'FERN', 'GLAZEDBLUE', 'GOLDLEAF', 'LAVENDER', 'LEMONADE', 'MANGO', 'MINT', 'MIST', 'PEACH', 'PASTELBLUE', 'PASTELMINT', 'PASTELPINK', 'PASTELPURPLE', 'PASTELYELLOW', 'PERIWINKLE', 'SEAFOAM', 'SPRINGGREEN', 'WATERLILY', 'WISTERIA', 'ZIRCON'],
-            bold: ['CHARTREUSE', 'CERULEAN', 'COBALT', 'ELECTRICBLUE', 'EMERALD', 'FUCHSIA', 'HOTPINK', 'LIME', 'MAGENTA', 'NEONBLUE', 'NEONGREEN', 'NEONPINK', 'NEONPURPLE', 'SKYBLUE', 'SUNSETORANGE', 'TEAL', 'TURQUOISE', 'ZEST', 'SAND', 'SCARLET', 'NECTARINE'],
-            darker: ['MIDNIGHT', 'OBSIDIAN', 'DEEPSEA', 'NIGHTFALL', 'SHADOWPURPLE', 'DARKORCHID', 'STORMBLUE', 'DARKTEAL', 'EVERGREEN', 'FORESTSHADOW', 'MOSSY', 'DEEPFUCHSIA', 'GARNET', 'RAVEN', 'COBALTSTORM', 'TWILIGHTBLUE', 'VELVETPLUM', 'INDIGONIGHT', 'MULBERRY', 'CHARCOAL', 'SMOKESLATE', 'DUSKROSE', 'BRONZELEAF', 'DARKSUNSET', 'MIDNIGHTTEAL', 'OCEANDEPTHS', 'SHADOWMINT', 'NIGHTSKY', 'ASHWOOD', 'DEEPRUBY']
-        };
+        // Use centralized palettes module for consistency
+        this.experimentalColourDefs = getAllColorDefs();
+        this.experimentalColourCategories = getAllCategories();
 
         this.loaded = true;
     }
@@ -630,7 +526,8 @@ class SpriteMapper {
         const normalized = String(mode).toLowerCase();
         if (normalized === 'off') return [];
         if (normalized === 'soft') return ['mood'];
-        if (['mood', 'bold', 'darker', 'blackout'].includes(normalized)) {
+        // Check if it's a valid palette category from our centralized module
+        if (this.experimentalColourCategories && this.experimentalColourCategories[normalized]) {
             return [normalized];
         }
         return [];

@@ -13,7 +13,21 @@ import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "@/compone
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import { canvasToDataUrl, cloneParams, formatName, getColourSwatch } from "@/components/cat-builder/utils";
 
-type PaletteMode = "off" | "mood" | "bold" | "darker" | "blackout";
+type PaletteMode =
+  | "off"
+  | "mood"
+  | "bold"
+  | "darker"
+  | "blackout"
+  | "mononoke"
+  | "howl"
+  | "demonslayer"
+  | "titanic"
+  | "deathnote"
+  | "slime"
+  | "ghostintheshell"
+  | "mushishi"
+  | "chisweethome";
 
 export const DEFAULT_PARAMS: CatParams = {
   spriteNumber: 8,
@@ -37,6 +51,15 @@ const PALETTE_CONTROLS: { id: PaletteMode; label: string }[] = [
   { id: "bold", label: "Bold" },
   { id: "darker", label: "Darker" },
   { id: "blackout", label: "Blackout" },
+  { id: "mononoke", label: "Mononoke" },
+  { id: "howl", label: "Howl" },
+  { id: "demonslayer", label: "Demon Slayer" },
+  { id: "titanic", label: "Titanic" },
+  { id: "deathnote", label: "Death Note" },
+  { id: "slime", label: "Slime" },
+  { id: "ghostintheshell", label: "GitS" },
+  { id: "mushishi", label: "Mushishi" },
+  { id: "chisweethome", label: "Chi" },
 ];
 
 const MAX_TORTIE_LAYERS = 6;
@@ -1789,7 +1812,11 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     }
     try {
       setRandomizing(true);
-      const paletteModes: PaletteMode[] = ["off", "mood", "bold", "darker", "blackout"];
+      const paletteModes: PaletteMode[] = [
+        "off", "mood", "bold", "darker", "blackout",
+        "mononoke", "howl", "demonslayer", "titanic", "deathnote",
+        "slime", "ghostintheshell", "mushishi", "chisweethome"
+      ];
       const pickMode = () => paletteModes[Math.floor(Math.random() * paletteModes.length)];
       const requestedPalette = pickMode();
       const requestedTortiePalette = pickMode();

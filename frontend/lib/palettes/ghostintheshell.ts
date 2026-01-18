@@ -1,0 +1,17 @@
+import type { PaletteCategory } from './types';
+
+export const ghostintheshellPalette: PaletteCategory = {
+  id: 'ghostintheshell',
+  label: 'Ghost in the Shell',
+  description: 'Cyberpunk neon, digital consciousness, and dystopian tech',
+  colors: {
+    GITS_NEON: { multiply: [4, 172, 238] },
+    GITS_PURPLE: { multiply: [132, 116, 251] },
+    GITS_DARKBLUE: { multiply: [8, 68, 140] },
+    GITS_SLATE: { multiply: [90, 91, 156] },
+    GITS_MAUVE: { multiply: [204, 172, 188] },
+    GITS_DEEP: { multiply: [55, 44, 92] },
+    GITS_CYBER: { multiply: [0, 255, 159] },
+    GITS_MATRIX: { multiply: [0, 184, 255] },
+  },
+};
