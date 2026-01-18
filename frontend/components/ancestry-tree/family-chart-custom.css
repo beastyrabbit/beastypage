@@ -310,3 +310,70 @@
   stroke: rgba(99, 102, 241, 0.5) !important;
   stroke-dasharray: 6, 3 !important;
 }
+
+/* ==========================================
+   Custom Slider Styling
+   ========================================== */
+
+/* Amber-accented slider */
+.slider-amber {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.slider-amber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.slider-amber::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 10px rgba(245, 158, 11, 0.5);
+}
+
+.slider-amber::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+.slider-amber::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.slider-amber::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 10px rgba(245, 158, 11, 0.5);
+}
+
+.slider-amber::-moz-range-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+/* Focus state for accessibility */
+.slider-amber:focus {
+  outline: none;
+}
+
+.slider-amber:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3), 0 2px 6px rgba(245, 158, 11, 0.4);
+}

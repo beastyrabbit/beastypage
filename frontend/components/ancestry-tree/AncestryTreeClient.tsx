@@ -26,6 +26,8 @@ import { FoundingCoupleSelector } from "./FoundingCoupleSelector";
 import { SaveTreeDialog } from "./SaveTreeDialog";
 import { FoundingParentCard } from "./FoundingParentCard";
 import { OffspringOptionsPanel } from "./OffspringOptionsPanel";
+import { SliderWithInput } from "./SliderWithInput";
+import "./family-chart-custom.css";
 
 interface AncestryTreeClientProps {
   initialTree?: SerializedAncestryTree;
@@ -547,33 +549,23 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
                   Tree Settings
                 </h2>
 
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="depth" className="flex justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">Generations</span>
-                      <span className="font-medium">{config.depth}</span>
-                    </label>
-                    <input
-                      type="range"
-                      id="depth"
-                      min={1}
-                      max={6}
-                      value={config.depth}
-                      onChange={(e) =>
-                        handleConfigChange({ ...config, depth: parseInt(e.target.value, 10) })
-                      }
-                      className="w-full accent-amber-500"
-                    />
-                  </div>
+                <div className="space-y-5">
+                  <SliderWithInput
+                    label="Generations"
+                    value={config.depth}
+                    onChange={(val) => handleConfigChange({ ...config, depth: val })}
+                    min={1}
+                    max={30}
+                    description="Higher values create larger trees exponentially"
+                  />
 
                   <div>
-                    <label htmlFor="genderRatio" className="flex justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">Male Ratio</span>
-                      <span className="font-medium">{Math.round(config.genderRatio * 100)}%</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm text-muted-foreground">Male Ratio</label>
+                      <span className="text-sm font-medium tabular-nums">{Math.round(config.genderRatio * 100)}%</span>
+                    </div>
                     <input
                       type="range"
-                      id="genderRatio"
                       min={0}
                       max={100}
                       value={Math.round(config.genderRatio * 100)}
@@ -583,54 +575,37 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
                           genderRatio: parseInt(e.target.value, 10) / 100,
                         })
                       }
-                      className="w-full accent-amber-500"
+                      className="slider-amber w-full"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="minChildren" className="flex justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Min Children</span>
-                        <span className="font-medium">{config.minChildren}</span>
-                      </label>
-                      <input
-                        type="range"
-                        id="minChildren"
-                        min={1}
-                        max={5}
-                        value={config.minChildren}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value, 10);
-                          handleConfigChange({
-                            ...config,
-                            minChildren: val,
-                            maxChildren: Math.max(config.maxChildren, val),
-                          });
-                        }}
-                        className="w-full accent-amber-500"
-                      />
-                    </div>
+                    <SliderWithInput
+                      label="Min Children"
+                      value={config.minChildren}
+                      onChange={(val) =>
+                        handleConfigChange({
+                          ...config,
+                          minChildren: val,
+                          maxChildren: Math.max(config.maxChildren, val),
+                        })
+                      }
+                      min={0}
+                      max={50}
+                    />
 
-                    <div>
-                      <label htmlFor="maxChildren" className="flex justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Max Children</span>
-                        <span className="font-medium">{config.maxChildren}</span>
-                      </label>
-                      <input
-                        type="range"
-                        id="maxChildren"
-                        min={config.minChildren}
-                        max={8}
-                        value={config.maxChildren}
-                        onChange={(e) =>
-                          handleConfigChange({
-                            ...config,
-                            maxChildren: parseInt(e.target.value, 10),
-                          })
-                        }
-                        className="w-full accent-amber-500"
-                      />
-                    </div>
+                    <SliderWithInput
+                      label="Max Children"
+                      value={config.maxChildren}
+                      onChange={(val) =>
+                        handleConfigChange({
+                          ...config,
+                          maxChildren: Math.max(val, config.minChildren),
+                        })
+                      }
+                      min={1}
+                      max={50}
+                    />
                   </div>
                 </div>
               </div>

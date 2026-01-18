@@ -79,6 +79,43 @@ const PREFIXES: string[] = [
   'Hollow', 'Solid', 'Dense', 'Loose', 'Tight', 'Open', 'Hidden', 'Lost',
   'Found', 'Wandering', 'Roaming', 'Drifting', 'Floating', 'Sinking', 'Diving',
   'Leaping', 'Jumping', 'Tumbling', 'Rolling', 'Spinning', 'Dancing',
+
+  // Additional Flora (50+)
+  'Yarrow', 'Tansy', 'Fennel', 'Dock', 'Coltsfoot', 'Comfrey', 'Borage',
+  'Catmint', 'Mayweed', 'Ragwort', 'Bindweed', 'Mallow', 'Chicory', 'Dandelion',
+  'Buttercup', 'Bluebell', 'Foxglove', 'Snapdragon', 'Cornflower', 'Larkspur',
+  'Meadowsweet', 'Campion', 'Betony', 'Agrimony', 'Vervain', 'Chamomile',
+  'Cowslip', 'Oxlip', 'Snowdrop', 'Crocus', 'Daffodil', 'Hyacinth', 'Tulip',
+  'Hemlock', 'Nightshade', 'Aconite', 'Wolfsbane', 'Monkshood', 'Hellebore',
+  'Yew', 'Elder', 'Blackthorn', 'Whitethorn', 'Hawthorn', 'Dogwood', 'Spindle',
+  'Buckthorn', 'Privet', 'Honeysuckle', 'Clematis',
+
+  // Additional Fauna (50+)
+  'Adder', 'Asp', 'Basilisk', 'Boar', 'Buck', 'Bull', 'Colt', 'Cub',
+  'Doe', 'Drake', 'Fawn', 'Foal', 'Hart', 'Hind', 'Kid', 'Lamb',
+  'Leveret', 'Mare', 'Pup', 'Ram', 'Stag', 'Stallion', 'Whelp',
+  'Cuckoo', 'Curlew', 'Dunlin', 'Egret', 'Grebe', 'Gull', 'Harrier',
+  'Ibis', 'Jackdaw', 'Kestrel', 'Kingfisher', 'Lapwing', 'Merlin', 'Nightjar',
+  'Peregrine', 'Pheasant', 'Plover', 'Quail', 'Redwing', 'Rook', 'Sandpiper',
+  'Snipe', 'Stork', 'Tern', 'Warbler', 'Woodcock', 'Yellowhammer',
+
+  // Minerals/Gems (30+)
+  'Crystal', 'Diamond', 'Ruby', 'Sapphire', 'Opal', 'Pearl', 'Topaz',
+  'Garnet', 'Amethyst', 'Quartz', 'Jasper', 'Agate', 'Obsidian', 'Basalt',
+  'Pumice', 'Chalk', 'Limestone', 'Sandstone', 'Shale', 'Mica', 'Pyrite',
+  'Galena', 'Ore', 'Nugget', 'Shard', 'Splinter', 'Chip', 'Fragment',
+  'Jewel', 'Gem',
+
+  // Celestial/Cosmic (25+)
+  'Meteor', 'Asteroid', 'Nebula', 'Galaxy', 'Nova', 'Pulsar', 'Quasar',
+  'Zenith', 'Nadir', 'Apex', 'Equinox', 'Solstice', 'Orbit', 'Phase',
+  'Crescent', 'Gibbous', 'Quarter', 'Half', 'Full', 'Waning', 'Waxing',
+  'Corona', 'Halo', 'Nimbus', 'Aura',
+
+  // Sound/Music (20+)
+  'Chord', 'Note', 'Pitch', 'Tone', 'Harmonic', 'Discord', 'Cadence',
+  'Tempo', 'Rhythm', 'Meter', 'Verse', 'Stanza', 'Chorus', 'Refrain',
+  'Lullaby', 'Ballad', 'Dirge', 'Anthem', 'Hymn', 'Canticle',
 ];
 
 const SUFFIXES: string[] = [
@@ -165,6 +202,38 @@ const SUFFIXES: string[] = [
   'tundra', 'desert', 'oasis', 'jungle', 'forest', 'wood', 'shade', 'canopy',
   'clearing', 'path', 'trail', 'road', 'bridge', 'ford', 'crossing', 'pass',
   'gate', 'gap', 'breach', 'break', 'split', 'crack', 'fissure', 'rift',
+
+  // Appearance/Markings (40+)
+  'bluff', 'tuft', 'ring', 'band', 'bar', 'collar', 'bib', 'vest', 'cape',
+  'mantle', 'crown', 'cap', 'hood', 'veil', 'shroud', 'cloak', 'wrap',
+  'splotch', 'smudge', 'smear', 'blur', 'haze', 'fleck', 'dot', 'point',
+  'diamond', 'circle', 'swirl', 'curl', 'coil', 'spiral', 'wave', 'zigzag',
+  'chevron', 'arrow', 'lance', 'spear', 'shield', 'crest', 'banner',
+
+  // Emotions/States (35+)
+  'joy', 'sorrow', 'rage', 'fury', 'wrath', 'peace', 'calm', 'serenity',
+  'hope', 'despair', 'grief', 'bliss', 'agony', 'ecstasy', 'fervor', 'zeal',
+  'pride', 'shame', 'glory', 'honor', 'valor', 'courage', 'fear', 'dread',
+  'love', 'hate', 'scorn', 'spite', 'malice', 'grace', 'mercy', 'vengeance',
+  'spite', 'envy', 'greed',
+
+  // Additional Body/Physical (30+)
+  'haunch', 'rump', 'loin', 'shank', 'hock', 'dewclaw', 'carpal', 'tarsal',
+  'pinna', 'tragus', 'iris', 'pupil', 'lens', 'cornea', 'sclera', 'retina',
+  'maw', 'gullet', 'crop', 'gizzard', 'liver', 'kidney', 'spleen', 'bladder',
+  'sinew', 'tendon', 'ligament', 'cartilage', 'marrow', 'membrane',
+
+  // Celestial/Cosmic (25+)
+  'moon', 'sun', 'star', 'comet', 'meteor', 'nova', 'nebula', 'void',
+  'cosmos', 'abyss', 'chasm', 'vortex', 'maelstrom', 'cyclone', 'tempest',
+  'zenith', 'apex', 'summit', 'pinnacle', 'vertex', 'crest', 'crown', 'cap',
+  'horizon', 'eclipse',
+
+  // Materials/Textures (25+)
+  'silk', 'satin', 'velvet', 'wool', 'cotton', 'linen', 'hemp', 'jute',
+  'leather', 'suede', 'fleece', 'felt', 'gauze', 'mesh', 'net', 'web',
+  'lace', 'ribbon', 'thread', 'yarn', 'cord', 'rope', 'twine', 'string',
+  'fiber',
 ];
 
 const LIFE_STAGE_SUFFIXES: Record<LifeStage, string> = {
