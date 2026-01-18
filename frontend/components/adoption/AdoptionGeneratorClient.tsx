@@ -6,6 +6,8 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
 import { AdoptionMetadataPanel, AdoptionMetadata } from "@/components/adoption/AdoptionMetadataPanel";
+import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
+import type { PaletteId } from "@/lib/palettes";
 import type { Id } from "@/convex/_generated/dataModel";
 import { toId } from "@/convex/utils";
 
@@ -79,6 +81,8 @@ export function AdoptionGeneratorClient() {
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [metadataSaving, setMetadataSaving] = useState(false);
   const [speed, setSpeed] = useState<string>("normal");
+  const [selectedPalettes, setSelectedPalettes] = useState<Set<PaletteId>>(new Set());
+  const [includeClassic, setIncludeClassic] = useState(true);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -230,6 +234,16 @@ export function AdoptionGeneratorClient() {
     const detail = { value: speed };
     group.dispatchEvent(new CustomEvent("sl-change", { detail, bubbles: true }));
   }, [speed]);
+
+  // Dispatch custom event when palette selection changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const detail = {
+      selectedModes: Array.from(selectedPalettes),
+      includeBase: includeClassic,
+    };
+    window.dispatchEvent(new CustomEvent("adoption-palette-change", { detail }));
+  }, [selectedPalettes, includeClassic]);
 
   useEffect(() => {
     if (saveState !== "saved") return;
@@ -420,54 +434,15 @@ export function AdoptionGeneratorClient() {
                 </div>
               </label>
             </div>
-            <div className="control-row palette-toggle-row" id="extendedPaletteControls">
-              <span className="setting-label">Additional Colors:</span>
-              <div className="palette-toggle-buttons">
-                <button type="button" className="palette-toggle active" data-extended-mode="base" aria-pressed="true">
-                  Base
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="mood" aria-pressed="false">
-                  Mood
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="bold" aria-pressed="false">
-                  Bold
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="darker" aria-pressed="false">
-                  Darker
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="blackout" aria-pressed="false">
-                  Blackout
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="mononoke" aria-pressed="false">
-                  Princess Mononoke
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="howl" aria-pressed="false">
-                  Howl&apos;s Moving Castle
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="demonslayer" aria-pressed="false">
-                  Demon Slayer
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="titanic" aria-pressed="false">
-                  Titanic
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="deathnote" aria-pressed="false">
-                  Death Note
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="slime" aria-pressed="false">
-                  Reincarnated as a Slime
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="ghostintheshell" aria-pressed="false">
-                  Ghost in the Shell
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="mushishi" aria-pressed="false">
-                  Mushishi
-                </button>
-                <button type="button" className="palette-toggle" data-extended-mode="chisweethome" aria-pressed="false">
-                  Chi&apos;s Sweet Home
-                </button>
-                <button type="button" className="palette-reset" data-extended-reset>
-                  Clear
-                </button>
+            <div className="control-row" id="extendedPaletteControls">
+              <span className="setting-label">Color Palettes:</span>
+              <div className="palette-select-wrap" style={{ flex: 1, maxWidth: 320 }}>
+                <PaletteMultiSelect
+                  selected={selectedPalettes}
+                  onChange={setSelectedPalettes}
+                  includeClassic={includeClassic}
+                  onClassicChange={setIncludeClassic}
+                />
               </div>
             </div>
           </div>

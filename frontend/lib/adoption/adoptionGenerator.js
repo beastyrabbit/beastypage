@@ -55,8 +55,8 @@ export class AdoptionGenerator {
         this.catCountDisplay = document.getElementById('catCountDisplay');
         this.catGrid = document.getElementById('catGrid');
         this.removalTip = document.getElementById('removalTip');
-        this.paletteButtons = Array.from(document.querySelectorAll('[data-extended-mode]'));
-        this.paletteReset = document.querySelector('[data-extended-reset]');
+        // Palette selection is now handled via React PaletteMultiSelect component
+        // which dispatches 'adoption-palette-change' events
         this.cardTemplate = document.getElementById('catCardTemplate');
 
         this.selectedExtendedModes = new Set();
@@ -171,30 +171,16 @@ export class AdoptionGenerator {
             });
         }
 
-        if (this.paletteButtons.length) {
-            this.paletteButtons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const mode = btn.dataset.extendedMode;
-                    if (!mode) return;
-                    if (mode === 'base') {
-                        this.includeBaseColours = !this.includeBaseColours;
-                    } else if (this.selectedExtendedModes.has(mode)) {
-                        this.selectedExtendedModes.delete(mode);
-                    } else {
-                        this.selectedExtendedModes.add(mode);
-                    }
-                    this.onPaletteChange();
-                });
-            });
-        }
-
-        if (this.paletteReset) {
-            this.paletteReset.addEventListener('click', () => {
-                this.includeBaseColours = true;
-                this.selectedExtendedModes.clear();
-                this.onPaletteChange();
-            });
-        }
+        // Listen for palette changes from React PaletteMultiSelect component
+        window.addEventListener('adoption-palette-change', (event) => {
+            const { selectedModes, includeBase } = event.detail ?? {};
+            this.includeBaseColours = includeBase ?? true;
+            this.selectedExtendedModes.clear();
+            if (Array.isArray(selectedModes)) {
+                selectedModes.forEach(mode => this.selectedExtendedModes.add(mode));
+            }
+            this.onPaletteChange();
+        });
 
         if (this.catGrid) {
             this.catGrid.addEventListener('click', (event) => {
@@ -1248,19 +1234,7 @@ export class AdoptionGenerator {
     }
 
     updateExtendedPaletteButtons() {
-        if (!this.paletteButtons.length) return;
-        this.paletteButtons.forEach(btn => {
-            const mode = btn.dataset.extendedMode;
-            if (!mode) return;
-            let isActive;
-            if (mode === 'base') {
-                isActive = this.includeBaseColours;
-            } else {
-                isActive = this.selectedExtendedModes.has(mode);
-            }
-            btn.classList.toggle('active', isActive);
-            btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-        });
+        // No-op: Palette UI is now controlled by React PaletteMultiSelect component
     }
 
     ensureLayerDepth(params, layerConfig) {
