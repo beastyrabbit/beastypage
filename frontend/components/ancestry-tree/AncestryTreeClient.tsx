@@ -292,8 +292,6 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
   // Add a child to a couple with a specific partner
   const handleAddChildWithPartner = useCallback(
     async (cat: AncestryTreeCat, partnerId: string) => {
-      console.log("[handleAddChildWithPartner] Called with cat:", cat.name.full, "partnerId:", partnerId);
-
       if (!tree || !isSpriteMapperReady) return;
 
       setIsGenerating(true);
@@ -316,11 +314,8 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
         const motherId = currentCat.gender === "F" ? currentCat.id : partnerId;
         const fatherId = currentCat.gender === "M" ? currentCat.id : partnerId;
 
-        console.log("[handleAddChildWithPartner] Creating child - motherId:", motherId, "fatherId:", fatherId);
-
         // Generate one child
-        const newChildren = manager.generateOffspring(motherId, fatherId, currentCat.generation + 1);
-        console.log("[handleAddChildWithPartner] Created child:", newChildren[0]?.name.full, "with motherId:", newChildren[0]?.motherId, "fatherId:", newChildren[0]?.fatherId);
+        manager.generateOffspring(motherId, fatherId, currentCat.generation + 1);
 
         // Restore original config
         manager.setConfig(originalConfig);
@@ -383,19 +378,34 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
         await handleAssignRandomPartner(parentCat);
       } else {
         // Add child (son or daughter are handled the same - gender is random)
-        // Use the otherParentId from the graph placeholder if available, otherwise fall back to last partner
         const partnerIds = parentCat.partnerIds ?? [];
-        if (otherParentId) {
-          // Use the specific partner from the clicked "Add Son/Daughter" placeholder
-          await handleAddChildWithPartner(parentCat, otherParentId);
-        } else if (partnerIds.length > 0) {
-          // Fallback: use the last partner
-          const partnerId = partnerIds[partnerIds.length - 1];
-          await handleAddChildWithPartner(parentCat, partnerId);
+
+        // The library's other_parent_id might not match our cat IDs directly
+        // Check if it's a valid cat ID in the tree, otherwise fall back to parent's partners
+        let validPartnerId: string | undefined;
+
+        if (otherParentId && tree) {
+          // Check if otherParentId exists in the tree
+          const partnerExists = tree.cats.some(c => c.id === otherParentId);
+          if (partnerExists) {
+            validPartnerId = otherParentId;
+          }
+        }
+
+        if (validPartnerId) {
+          await handleAddChildWithPartner(parentCat, validPartnerId);
+        } else if (partnerIds.length === 1) {
+          // Single partner - use it
+          await handleAddChildWithPartner(parentCat, partnerIds[0]);
+        } else if (partnerIds.length > 1) {
+          // Multiple partners but invalid otherParentId - use the last partner as fallback
+          // TODO: Better heuristic for determining which partner based on graph position
+          console.warn("[handleAddRelativeFromGraph] Could not determine partner, using last partner");
+          await handleAddChildWithPartner(parentCat, partnerIds[partnerIds.length - 1]);
         }
       }
     },
-    [handleAssignRandomPartner, handleAddChildWithPartner]
+    [handleAssignRandomPartner, handleAddChildWithPartner, tree]
   );
 
   // Handle pose change for a cat
