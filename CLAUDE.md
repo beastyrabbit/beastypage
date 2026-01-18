@@ -70,11 +70,10 @@ Both packages share the same version and are managed by Release Please:
 ## Git Hooks
 
 ```bash
-pip install pre-commit && pre-commit install --hook-type pre-commit --hook-type pre-push
+pip install pre-commit && pre-commit install
 ```
 
 **Pre-commit:** gitleaks (secrets), ruff (Python), tsc (TypeScript)
-**Pre-push:** CodeRabbit AI code review (may take 7-30+ minutes)
 
 ## Development Workflow
 
