@@ -68,7 +68,8 @@ type ExtendedMode =
   | "slime"
   | "ghostintheshell"
   | "mushishi"
-  | "chisweethome";
+  | "chisweethome"
+  | "fma";
 export type AfterlifeOption = "off" | "dark10" | "star10" | "both10" | "darkForce" | "starForce";
 
 interface TortieSlot {

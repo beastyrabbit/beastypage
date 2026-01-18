@@ -7,7 +7,7 @@
 // No longer importing individual sprite paths - we use sprite sheets exclusively
 
 // Import experimental color palettes from centralized module
-import { getAllColorDefs, getAllCategories, getPaletteIds } from '../palettes';
+import { getAllColorDefs, getAllCategories } from '../palettes';
 
 class SpriteMapper {
     constructor() {
@@ -555,11 +555,17 @@ class SpriteMapper {
         return this.experimentalColourDefs?.[name.toUpperCase()] || null;
     }
 
-    getColourOptions(mode = 'off') {
+    getColourOptions(mode = 'off', includeBase = true) {
         const baseColours = this.getColours();
         const modes = this.normalizeExperimentalModes(mode);
         if (modes.length === 0) {
             return baseColours;
+        }
+
+        // If not including base colors, only return the experimental colors
+        if (!includeBase) {
+            const extras = this.getExperimentalColoursByMode(modes);
+            return extras.length > 0 ? extras : baseColours; // Fallback to base if no extras
         }
 
         const combined = new Set(baseColours);

@@ -9,6 +9,7 @@ import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { createCatShare } from "@/lib/catShare";
 import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
+import { PaletteSingleSelect } from "@/components/common/PaletteSingleSelect";
 import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "@/components/cat-builder/types";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import { canvasToDataUrl, cloneParams, formatName, getColourSwatch } from "@/components/cat-builder/utils";
@@ -27,7 +28,14 @@ type PaletteMode =
   | "slime"
   | "ghostintheshell"
   | "mushishi"
-  | "chisweethome";
+  | "chisweethome"
+  | "fma";
+
+const VALID_PALETTE_IDS: PaletteMode[] = [
+  "off", "mood", "bold", "darker", "blackout",
+  "mononoke", "howl", "demonslayer", "titanic", "deathnote",
+  "slime", "ghostintheshell", "mushishi", "chisweethome", "fma",
+];
 
 export const DEFAULT_PARAMS: CatParams = {
   spriteNumber: 8,
@@ -44,23 +52,6 @@ export const DEFAULT_PARAMS: CatParams = {
   scars: [],
   whitePatchesTint: "none",
 };
-
-const PALETTE_CONTROLS: { id: PaletteMode; label: string }[] = [
-  { id: "off", label: "Classic" },
-  { id: "mood", label: "Mood" },
-  { id: "bold", label: "Bold" },
-  { id: "darker", label: "Darker" },
-  { id: "blackout", label: "Blackout" },
-  { id: "mononoke", label: "Mononoke" },
-  { id: "howl", label: "Howl" },
-  { id: "demonslayer", label: "Demon Slayer" },
-  { id: "titanic", label: "Titanic" },
-  { id: "deathnote", label: "Death Note" },
-  { id: "slime", label: "Slime" },
-  { id: "ghostintheshell", label: "GitS" },
-  { id: "mushishi", label: "Mushishi" },
-  { id: "chisweethome", label: "Chi" },
-];
 
 const MAX_TORTIE_LAYERS = 6;
 const DISPLAY_CANVAS_SIZE = 540;
@@ -354,8 +345,9 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   const getPaletteForMode = useCallback((mode: PaletteMode) => {
     const mapperInstance = mapper ?? spriteMapperRef.current;
     if (!mapperInstance) return [];
-    const options = mapperInstance.getColourOptions?.(mode) ?? mapperInstance.getColours();
-    console.log("[visual-builder] getPaletteForMode", { mode, optionsLength: options?.length, options });
+    // When a specific palette is selected (not 'off'), show only that palette's colors
+    const includeBase = mode === "off";
+    const options = mapperInstance.getColourOptions?.(mode, includeBase) ?? mapperInstance.getColours();
     return options;
   }, [mapper]);
 
@@ -366,19 +358,9 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     }
     const palette = getPaletteForMode(experimentalColourMode);
     if (palette.length > 0) {
-      console.log("[visual-builder] palette colours", {
-        mode: experimentalColourMode,
-        colours: palette,
-        currentColour: params.colour,
-      });
       return palette;
     }
     const base = mapperInstance.getColours?.() ?? [];
-    console.log("[visual-builder] fallback palette", {
-      mode: experimentalColourMode,
-      colours: base,
-      currentColour: params.colour,
-    });
     return base.length > 0 ? base : [params.colour ?? DEFAULT_PARAMS.colour];
   }, [experimentalColourMode, getPaletteForMode, mapper, params.colour]);
 
@@ -578,22 +560,9 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     [getPaletteForMode, tortiePaletteMode]
   );
 
-  const renderPaletteControls = useCallback((mode: PaletteMode, onChange: (value: PaletteMode) => void) => (
-    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-      <span className="font-semibold text-neutral-300">Palette:</span>
-      {PALETTE_CONTROLS.map((palette) => (
-        <button
-          key={palette.id}
-          type="button"
-          className={cn(
-            "rounded-full border border-slate-700/60 px-3 py-1 transition",
-            mode === palette.id ? "border-amber-400 bg-amber-500/20 text-amber-100" : "hover:border-amber-300/70"
-          )}
-          onClick={() => onChange(palette.id)}
-        >
-          {palette.label}
-        </button>
-      ))}
+  const renderPaletteDropdown = useCallback((mode: PaletteMode, onChange: (value: PaletteMode) => void) => (
+    <div className="flex items-center gap-2">
+      <PaletteSingleSelect value={mode} onChange={onChange} label="Palette:" className="min-w-[200px]" />
     </div>
   ), []);
 
@@ -612,7 +581,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       <header className="space-y-1">
         <h2 className="text-xl font-semibold text-white">Base colour</h2>
         <p className="text-sm text-neutral-300">Pick the primary coat colour, including experimental palettes.</p>
-      {renderPaletteControls(experimentalColourMode, handleBasePaletteChange)}
+      {renderPaletteDropdown(experimentalColourMode, handleBasePaletteChange)}
       </header>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {paletteColours.map((colour) => {
@@ -827,8 +796,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 const colourContent = (
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                      <span className="font-semibold text-neutral-300">Palette:</span>
-                      {renderPaletteControls(tortiePaletteMode, handleTortiePaletteChange)}
+                      {renderPaletteDropdown(tortiePaletteMode, handleTortiePaletteChange)}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {tortiePalette.map((colour) => {
@@ -994,7 +962,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     handleTortiePaletteChange,
     handleTortieToggle,
     handleUpdateLayer,
-    renderPaletteControls,
+    renderPaletteDropdown,
     tortieLayers,
     tortiePalette,
     tortiePaletteMode,
@@ -1812,12 +1780,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     }
     try {
       setRandomizing(true);
-      const paletteModes: PaletteMode[] = [
-        "off", "mood", "bold", "darker", "blackout",
-        "mononoke", "howl", "demonslayer", "titanic", "deathnote",
-        "slime", "ghostintheshell", "mushishi", "chisweethome"
-      ];
-      const pickMode = () => paletteModes[Math.floor(Math.random() * paletteModes.length)];
+      const pickMode = () => VALID_PALETTE_IDS[Math.floor(Math.random() * VALID_PALETTE_IDS.length)];
       const requestedPalette = pickMode();
       const requestedTortiePalette = pickMode();
       const random = await randomizer({
@@ -1845,7 +1808,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       const determinePaletteMode = (candidate: unknown, fallback: PaletteMode) => {
         if (typeof candidate !== "string") return fallback;
         const lower = candidate.toLowerCase() as PaletteMode;
-        return PALETTE_CONTROLS.some((entry) => entry.id === lower) ? lower : fallback;
+        return VALID_PALETTE_IDS.includes(lower) ? lower : fallback;
       };
 
       const nextPaletteMode = determinePaletteMode(

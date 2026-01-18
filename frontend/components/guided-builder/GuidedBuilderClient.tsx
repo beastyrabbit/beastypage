@@ -27,7 +27,8 @@ type PaletteMode =
   | "slime"
   | "ghostintheshell"
   | "mushishi"
-  | "chisweethome";
+  | "chisweethome"
+  | "fma";
 
 type StepId =
   | "colour"
@@ -138,6 +139,7 @@ const PALETTE_CONTROLS: { id: PaletteMode; label: string }[] = [
   { id: "ghostintheshell", label: "GitS" },
   { id: "mushishi", label: "Mushishi" },
   { id: "chisweethome", label: "Chi" },
+  { id: "fma", label: "FMA" },
 ];
 
 const DISPLAY_CANVAS_SIZE = 540;

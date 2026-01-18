@@ -13,5 +13,12 @@ export const chisweethomePalette: PaletteCategory = {
     CHI_EYES: { multiply: [107, 142, 78] },
     CHI_NOSE: { multiply: [255, 182, 176] },
     CHI_SUNNY: { multiply: [255, 245, 212] },
+    CHI_LIGHTGREY: { multiply: [200, 200, 200] },
+    CHI_LILAC: { multiply: [200, 180, 210] },
+    CHI_PEACH: { multiply: [255, 218, 200] },
+    CHI_MINT: { multiply: [180, 220, 200] },
+    CHI_SKYBLUE: { multiply: [180, 210, 240] },
+    CHI_WARMWHITE: { multiply: [255, 252, 245] },
+    CHI_COCOA: { multiply: [140, 110, 90] },
   },
 };

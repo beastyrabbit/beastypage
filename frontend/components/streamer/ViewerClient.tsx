@@ -38,6 +38,7 @@ const COLOUR_MODE_LABELS: Record<string, string> = {
   ghostintheshell: "Ghost in the Shell",
   mushishi: "Mushishi",
   chisweethome: "Chi's Sweet Home",
+  fma: "Fullmetal Alchemist",
   all: "All",
 };
 

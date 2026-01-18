@@ -21,6 +21,7 @@ import { slimePalette } from './slime';
 import { ghostintheshellPalette } from './ghostintheshell';
 import { mushishiPalette } from './mushishi';
 import { chisweethomePalette } from './chisweethome';
+import { fmaPalette } from './fma';
 
 /**
  * All additional palettes in display order
@@ -41,6 +42,7 @@ export const ADDITIONAL_PALETTES: PaletteCategory[] = [
   ghostintheshellPalette,
   mushishiPalette,
   chisweethomePalette,
+  fmaPalette,
 ];
 
 /**
@@ -60,6 +62,7 @@ export const PALETTES_BY_ID: Record<PaletteId, PaletteCategory> = {
   ghostintheshell: ghostintheshellPalette,
   mushishi: mushishiPalette,
   chisweethome: chisweethomePalette,
+  fma: fmaPalette,
 };
 
 /**

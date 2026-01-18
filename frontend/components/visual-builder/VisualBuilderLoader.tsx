@@ -21,7 +21,8 @@ type PaletteMode =
   | "slime"
   | "ghostintheshell"
   | "mushishi"
-  | "chisweethome";
+  | "chisweethome"
+  | "fma";
 
 type TortieLayer = {
   pattern?: string;
@@ -166,7 +167,7 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
   const paletteModes: PaletteMode[] = [
     "off", "mood", "bold", "darker", "blackout",
     "mononoke", "howl", "demonslayer", "titanic", "deathnote",
-    "slime", "ghostintheshell", "mushishi", "chisweethome"
+    "slime", "ghostintheshell", "mushishi", "chisweethome", "fma"
   ];
 
   const slugValue = shareSlug ?? record.slug ?? record.shareToken ?? null;

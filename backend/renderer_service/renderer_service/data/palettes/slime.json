@@ -1,7 +1,7 @@
 {
   "id": "slime",
   "label": "Reincarnated as a Slime",
-  "description": "Rimuru's world of monsters, spirits, and magical creatures",
+  "description": "Rimuru's Tempest nation of monsters, spirits, and magical creatures",
   "colors": {
     "SLIME_RIMURU": { "multiply": [147, 185, 232] },
     "SLIME_TEMPEST": { "multiply": [58, 113, 164] },
@@ -10,6 +10,13 @@
     "SLIME_BENIMARU": { "multiply": [231, 96, 110] },
     "SLIME_SOUEI": { "multiply": [73, 126, 193] },
     "SLIME_GOBLIN": { "multiply": [166, 182, 120] },
-    "SLIME_VELDORA": { "multiply": [103, 105, 117] }
+    "SLIME_VELDORA": { "multiply": [103, 105, 117] },
+    "SLIME_SHION": { "multiply": [150, 100, 180] },
+    "SLIME_MILIM": { "multiply": [255, 130, 170] },
+    "SLIME_DIABLO": { "multiply": [40, 30, 40] },
+    "SLIME_SHUNA": { "multiply": [255, 200, 200] },
+    "SLIME_GABIRU": { "multiply": [100, 180, 100] },
+    "SLIME_RANGA": { "multiply": [50, 50, 60] },
+    "SLIME_GREAT": { "multiply": [200, 180, 100] }
   }
 }

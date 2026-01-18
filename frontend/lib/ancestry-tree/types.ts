@@ -81,7 +81,8 @@ export type PaletteMode =
   | 'slime'
   | 'ghostintheshell'
   | 'mushishi'
-  | 'chisweethome';
+  | 'chisweethome'
+  | 'fma';
 
 export interface TreeGenerationConfig {
   minChildren: number;

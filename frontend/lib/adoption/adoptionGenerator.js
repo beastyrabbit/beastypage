@@ -1173,11 +1173,13 @@ export class AdoptionGenerator {
         };
     }
 
-    getColourOptions(mode = this.getExperimentalModeValue()) {
+    getColourOptions(mode = this.getExperimentalModeValue(), includeBase) {
         const experimental = typeof spriteMapper.getExperimentalColoursByMode === 'function'
             ? spriteMapper.getExperimentalColoursByMode(mode) || []
             : [];
-        const base = this.includeBaseColours && typeof spriteMapper.getColours === 'function'
+        // Use includeBase parameter if provided, otherwise fall back to this.includeBaseColours
+        const shouldIncludeBase = includeBase !== undefined ? includeBase : this.includeBaseColours;
+        const base = shouldIncludeBase && typeof spriteMapper.getColours === 'function'
             ? spriteMapper.getColours()
             : [];
         const combined = new Set();

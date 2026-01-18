@@ -76,6 +76,7 @@ const COLOUR_PALETTE_MODES: Array<{ id: string; label: string }> = [
   { id: "ghostintheshell", label: "Ghost in the Shell" },
   { id: "mushishi", label: "Mushishi" },
   { id: "chisweethome", label: "Chi's Sweet Home" },
+  { id: "fma", label: "Fullmetal Alchemist" },
   { id: "all", label: "All" },
 ];
 

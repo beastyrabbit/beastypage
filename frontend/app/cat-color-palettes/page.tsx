@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, Palette, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
+import { Palette, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHero } from '@/components/common/PageHero';
 import { ADDITIONAL_PALETTES, type PaletteCategory } from '@/lib/palettes';
@@ -72,77 +72,41 @@ function ColorCard({
   );
 }
 
-function PaletteSection({
-  palette,
-  defaultExpanded = true,
-}: {
-  palette: PaletteCategory;
-  defaultExpanded?: boolean;
-}) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+function PaletteSection({ palette }: { palette: PaletteCategory }) {
   const colors = Object.entries(palette.colors);
 
   return (
     <div className="glass-card overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center justify-between px-6 py-4 text-left transition hover:bg-muted/30"
-      >
-        <div>
-          <h2 className="flex items-center gap-2 text-lg font-bold">
-            <Palette className="size-5 text-primary" />
-            {palette.label}
-            <span className="text-sm font-normal text-muted-foreground">
-              ({colors.length} colors)
-            </span>
-          </h2>
-          {palette.description && (
-            <p className="mt-1 text-sm text-muted-foreground">{palette.description}</p>
-          )}
-        </div>
-        {expanded ? (
-          <ChevronUp className="size-5 text-muted-foreground" />
-        ) : (
-          <ChevronDown className="size-5 text-muted-foreground" />
+      <div className="px-6 py-4">
+        <h2 className="flex items-center gap-2 text-lg font-bold">
+          <Palette className="size-5 text-primary" />
+          {palette.label}
+          <span className="text-sm font-normal text-muted-foreground">
+            ({colors.length} colors)
+          </span>
+        </h2>
+        {palette.description && (
+          <p className="mt-1 text-sm text-muted-foreground">{palette.description}</p>
         )}
-      </button>
+      </div>
 
-      {expanded && (
-        <div className="border-t border-border/30 px-6 py-4">
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
-            {colors.map(([name, def]) => (
-              <ColorCard
-                key={name}
-                name={name}
-                rgb={def.multiply}
-                screen={def.screen}
-              />
-            ))}
-          </div>
+      <div className="border-t border-border/30 px-6 py-4">
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+          {colors.map(([name, def]) => (
+            <ColorCard
+              key={name}
+              name={name}
+              rgb={def.multiply}
+              screen={def.screen}
+            />
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
 export default function CatColorPalettesPage() {
-  const [search, setSearch] = useState('');
-  const [expandAll, setExpandAll] = useState(true);
-
-  // Filter palettes by search
-  const filteredPalettes = useMemo(() => {
-    if (!search.trim()) return ADDITIONAL_PALETTES;
-    const lower = search.toLowerCase();
-    return ADDITIONAL_PALETTES.filter(
-      (p) =>
-        p.label.toLowerCase().includes(lower) ||
-        p.description?.toLowerCase().includes(lower) ||
-        Object.keys(p.colors).some((colorName) =>
-          colorName.toLowerCase().includes(lower)
-        )
-    );
-  }, [search]);
-
   // Count total colors
   const totalColors = useMemo(
     () => ADDITIONAL_PALETTES.reduce((sum, p) => sum + Object.keys(p.colors).length, 0),
@@ -158,47 +122,11 @@ export default function CatColorPalettesPage() {
           description={`Browse ${ADDITIONAL_PALETTES.length} experimental color palettes with ${totalColors} unique colors for cat generation. Click any color to copy its hex code.`}
         />
 
-        {/* Controls */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          {/* Search */}
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search palettes or colors..."
-              className="w-full rounded-lg border border-border/50 bg-background/70 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary/50"
-            />
-          </div>
-
-          {/* Expand/Collapse All */}
-          <button
-            onClick={() => setExpandAll(!expandAll)}
-            className="shrink-0 rounded-lg border border-border/50 px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-muted"
-          >
-            {expandAll ? 'Collapse All' : 'Expand All'}
-          </button>
-        </div>
-
         {/* Palette sections */}
         <div className="space-y-4">
-          {filteredPalettes.map((palette) => (
-            <PaletteSection
-              key={palette.id}
-              palette={palette}
-              defaultExpanded={expandAll}
-            />
+          {ADDITIONAL_PALETTES.map((palette) => (
+            <PaletteSection key={palette.id} palette={palette} />
           ))}
-
-          {filteredPalettes.length === 0 && (
-            <div className="glass-card py-12 text-center">
-              <Palette className="mx-auto size-12 text-muted-foreground/50" />
-              <p className="mt-4 text-muted-foreground">
-                No palettes match &quot;{search}&quot;
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Info footer */}

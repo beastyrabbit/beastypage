@@ -49,4 +49,5 @@ export type PaletteId =
   | 'slime'
   | 'ghostintheshell'
   | 'mushishi'
-  | 'chisweethome';
+  | 'chisweethome'
+  | 'fma';

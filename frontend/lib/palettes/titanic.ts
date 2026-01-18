@@ -13,5 +13,12 @@ export const titanicPalette: PaletteCategory = {
     TITANIC_STARLIGHT: { multiply: [172, 196, 212] },
     TITANIC_CREAM: { multiply: [252, 188, 116] },
     TITANIC_DEPTHS: { multiply: [52, 52, 60] },
+    TITANIC_TEAL: { multiply: [112, 163, 164] },
+    TITANIC_LAVENDER: { multiply: [200, 166, 199] },
+    TITANIC_CORAL: { multiply: [200, 133, 132] },
+    TITANIC_STEELBLUE: { multiply: [70, 130, 180] },
+    TITANIC_ICEBERG: { multiply: [175, 200, 220] },
+    TITANIC_MAHOGANY: { multiply: [100, 60, 40] },
+    TITANIC_CHAMPAGNE: { multiply: [240, 220, 180] },
   },
 };

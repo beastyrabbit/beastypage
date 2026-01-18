@@ -13,7 +13,7 @@ import { createCatShare, encodeCatShare } from "@/lib/catShare";
 const PALETTE_MODES = [
   "off", "mood", "bold", "darker", "blackout",
   "mononoke", "howl", "demonslayer", "titanic", "deathnote",
-  "slime", "ghostintheshell", "mushishi", "chisweethome"
+  "slime", "ghostintheshell", "mushishi", "chisweethome", "fma"
 ] as const;
 const NEW_CAT_PROBABILITY = 0.4;
 
