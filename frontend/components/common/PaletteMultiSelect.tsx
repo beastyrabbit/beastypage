@@ -174,13 +174,19 @@ export function PaletteMultiSelect({
                           className="flex items-center gap-1 rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-foreground"
                         >
                           {opt?.label ?? id}
-                          <button
-                            type="button"
+                          <span
+                            role="button"
+                            tabIndex={0}
                             onClick={(e) => removeOption(id, e)}
-                            className="rounded-full hover:bg-primary/30"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                removeOption(id, e as unknown as React.MouseEvent);
+                              }
+                            }}
+                            className="cursor-pointer rounded-full hover:bg-primary/30"
                           >
                             <X className="size-3" />
-                          </button>
+                          </span>
                         </span>
                       );
                     })}
