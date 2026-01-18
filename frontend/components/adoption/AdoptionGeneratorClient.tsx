@@ -439,10 +439,10 @@ export function AdoptionGeneratorClient() {
                   Blackout
                 </button>
                 <button type="button" className="palette-toggle" data-extended-mode="mononoke" aria-pressed="false">
-                  Mononoke
+                  Princess Mononoke
                 </button>
                 <button type="button" className="palette-toggle" data-extended-mode="howl" aria-pressed="false">
-                  Howl
+                  Howl&apos;s Moving Castle
                 </button>
                 <button type="button" className="palette-toggle" data-extended-mode="demonslayer" aria-pressed="false">
                   Demon Slayer
@@ -454,16 +454,16 @@ export function AdoptionGeneratorClient() {
                   Death Note
                 </button>
                 <button type="button" className="palette-toggle" data-extended-mode="slime" aria-pressed="false">
-                  Slime
+                  Reincarnated as a Slime
                 </button>
                 <button type="button" className="palette-toggle" data-extended-mode="ghostintheshell" aria-pressed="false">
-                  GitS
+                  Ghost in the Shell
                 </button>
                 <button type="button" className="palette-toggle" data-extended-mode="mushishi" aria-pressed="false">
                   Mushishi
                 </button>
                 <button type="button" className="palette-toggle" data-extended-mode="chisweethome" aria-pressed="false">
-                  Chi
+                  Chi&apos;s Sweet Home
                 </button>
                 <button type="button" className="palette-reset" data-extended-reset>
                   Clear
