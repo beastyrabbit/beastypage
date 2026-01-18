@@ -43,16 +43,16 @@ interface ParentPreview {
 
 /**
  * Estimate the number of cats that will be generated.
- * This is a rough estimate based on average children per couple.
+ * This is a rough estimate based on average children per couple and partner chance.
  */
-function estimateCatCount(depth: number, avgChildren: number): number {
+function estimateCatCount(depth: number, avgChildren: number, partnerChance: number): number {
   let total = 2; // founding couple
   let couples = 1;
   for (let i = 1; i <= depth; i++) {
     const children = Math.round(couples * avgChildren);
     total += children;
-    // ~50% female, ~20% have multiple partners (average 1.2 partners)
-    couples = Math.floor(children * 0.5 * 1.2);
+    // ~50% female, partnerChance determines how many get partners, ~20% have multiple partners
+    couples = Math.floor(children * 0.5 * partnerChance * 1.2);
   }
   return total;
 }
@@ -595,7 +595,7 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
                   {/* Tree Size Estimate */}
                   {(() => {
                     const avgChildren = (config.minChildren + config.maxChildren) / 2;
-                    const estimated = estimateCatCount(config.depth, avgChildren);
+                    const estimated = estimateCatCount(config.depth, avgChildren, config.partnerChance ?? 1);
                     const isLarge = estimated > 1000;
                     const isHuge = estimated > 5000;
                     return (
@@ -693,6 +693,29 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
                       min={1}
                       max={50}
                     />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm text-muted-foreground">Partner Chance</label>
+                      <span className="text-sm font-medium tabular-nums">{Math.round((config.partnerChance ?? 1) * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={Math.round((config.partnerChance ?? 1) * 100)}
+                      onChange={(e) =>
+                        handleConfigChange({
+                          ...config,
+                          partnerChance: parseInt(e.target.value, 10) / 100,
+                        })
+                      }
+                      className="slider-amber w-full"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Chance for each female to find a partner and have children
+                    </p>
                   </div>
                 </div>
               </div>

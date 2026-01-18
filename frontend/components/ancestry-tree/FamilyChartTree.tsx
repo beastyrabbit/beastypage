@@ -304,14 +304,21 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
       }
     });
 
-    // Initial render
-    chart.updateTree({ initial: true });
-
-    // Set initial main ID using the correct API
-    const mainDatum = chart.getMainDatum();
-    if (mainDatum) {
-      currentMainIdRef.current = mainDatum.id as string;
-      onMainIdChangeRef.current?.(mainDatum.id as string);
+    // Initial render - center on founding mother for better initial view
+    // This prevents the "zoomed out too far" issue with large trees
+    if (rootId) {
+      chart.updateMainId(rootId);
+      chart.updateTree({ initial: true, tree_position: "main_to_middle" });
+      currentMainIdRef.current = rootId;
+      onMainIdChangeRef.current?.(rootId);
+    } else {
+      chart.updateTree({ initial: true });
+      // Set initial main ID using the correct API
+      const mainDatum = chart.getMainDatum();
+      if (mainDatum) {
+        currentMainIdRef.current = mainDatum.id as string;
+        onMainIdChangeRef.current?.(mainDatum.id as string);
+      }
     }
 
     chartRef.current = chart;

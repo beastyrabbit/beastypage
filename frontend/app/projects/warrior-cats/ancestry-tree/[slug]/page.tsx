@@ -64,6 +64,7 @@ export default async function ViewAncestryTreePage({ params }: PageParams) {
   }
 
   // Convert database format to SerializedAncestryTree
+  // Add default for partnerChance if missing (for older trees)
   const tree: SerializedAncestryTree = {
     id: treeData._id,
     slug: treeData.slug,
@@ -71,7 +72,10 @@ export default async function ViewAncestryTreePage({ params }: PageParams) {
     foundingMotherId: treeData.foundingMotherId,
     foundingFatherId: treeData.foundingFatherId,
     cats: treeData.cats as AncestryTreeCat[],
-    config: treeData.config,
+    config: {
+      partnerChance: 1.0, // Default for old trees without this field
+      ...treeData.config,
+    },
     createdAt: treeData.createdAt,
     updatedAt: treeData.updatedAt,
     creatorName: treeData.creatorName,

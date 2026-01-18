@@ -440,6 +440,7 @@ export class AncestryTreeManager {
       // Pair up children for next generation (if not last generation)
       if (generation < depth) {
         const females = children.filter((c) => c.gender === 'F');
+        const { partnerChance } = this.tree.config;
 
         // Collect all potential partners from this generation (males from any family)
         const allMalesThisGen = Array.from(this.tree.cats.values()).filter(
@@ -448,6 +449,12 @@ export class AncestryTreeManager {
 
         // Create couples from children (age them up to warriors)
         for (const female of females) {
+          // Check if this female gets a partner based on partnerChance
+          if (Math.random() >= partnerChance) {
+            // This female doesn't get a partner - skip to next
+            continue;
+          }
+
           female.lifeStage = 'warrior';
           female.name = {
             prefix: female.name.prefix,
