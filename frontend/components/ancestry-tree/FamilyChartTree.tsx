@@ -55,11 +55,12 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     return convertToFamilyChartFormat(tree);
   }, [tree]);
 
-  // Stable refs for callbacks - synced via useEffect to comply with React rules
+  // Stable refs for callbacks and data - synced via useEffect to comply with React rules
   const onSelectCatRef = useRef(onSelectCat);
   const onAddRelativeRef = useRef(onAddRelative);
   const onMainIdChangeRef = useRef(onMainIdChange);
   const onEditModeChangedRef = useRef(onEditModeChanged);
+  const chartDataRef = useRef(chartData);
 
   useEffect(() => {
     onSelectCatRef.current = onSelectCat;
@@ -68,42 +69,78 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     onEditModeChangedRef.current = onEditModeChanged;
   }, [onSelectCat, onAddRelative, onMainIdChange, onEditModeChanged]);
 
+  // Keep chartData ref current for use in event handlers
+  useEffect(() => {
+    chartDataRef.current = chartData;
+  }, [chartData]);
+
   // Find root cat ID
   const rootId = useMemo(() => {
     // The founding mother is typically the "root" for full graph view
     return tree.foundingMotherId;
   }, [tree.foundingMotherId]);
 
+  // Helper function to safely get the main datum
+  const safeGetMainDatum = (): ReturnType<ReturnType<typeof f3.createChart>["getMainDatum"]> | null => {
+    if (!chartRef.current) return null;
+    try {
+      return chartRef.current.getMainDatum();
+    } catch {
+      // getMainDatum() throws "Main datum not found" when no main datum exists
+      return null;
+    }
+  };
+
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
     startAddRelative: () => {
       // Use the editTree API to show add-relative options on the graph
-      if (editTreeRef.current && chartRef.current) {
-        try {
-          // Ensure the main ID is synced with the current chart data
-          // This re-establishes the main datum after data updates
-          if (currentMainIdRef.current) {
-            chartRef.current.updateMainId(currentMainIdRef.current);
-          }
+      if (!editTreeRef.current || !chartRef.current) return;
 
-          // Get the currently selected cat's datum
-          const mainDatum = chartRef.current.getMainDatum();
+      // Step 1: Ensure the main ID is synced with the current chart data
+      if (currentMainIdRef.current) {
+        try {
+          chartRef.current.updateMainId(currentMainIdRef.current);
+        } catch {
+          // updateMainId can fail if the ID doesn't exist in the data
+        }
+      }
+
+      // Step 2: Try to get the main datum
+      let mainDatum = safeGetMainDatum();
+
+      // Step 3: If no main datum, try updating the tree first
+      if (!mainDatum) {
+        try {
+          chartRef.current.updateTree({ tree_position: "inherit" });
+          mainDatum = safeGetMainDatum();
+        } catch {
+          // Tree update failed
+        }
+      }
+
+      // Step 4: If still no main datum, fall back to first cat in data
+      if (!mainDatum && chartData.length > 0) {
+        const fallbackId = currentMainIdRef.current || chartData[0].id;
+        try {
+          chartRef.current.updateMainId(fallbackId);
+          chartRef.current.updateTree({ tree_position: "main_to_middle" });
+          mainDatum = safeGetMainDatum();
           if (mainDatum) {
-            editTreeRef.current.addRelative(mainDatum);
+            currentMainIdRef.current = fallbackId;
+            onMainIdChangeRef.current?.(fallbackId);
           }
+        } catch {
+          // Fallback also failed
+        }
+      }
+
+      // Step 5: Start add-relative mode if we have a valid datum
+      if (mainDatum && editTreeRef.current) {
+        try {
+          editTreeRef.current.addRelative(mainDatum);
         } catch (error) {
-          // If the datum can't be found (stale reference after tree update),
-          // try to recover by updating the tree first
-          console.warn("[FamilyChartTree] addRelative failed, attempting recovery:", error);
-          try {
-            chartRef.current.updateTree({ tree_position: "inherit" });
-            const mainDatum = chartRef.current.getMainDatum();
-            if (mainDatum && editTreeRef.current) {
-              editTreeRef.current.addRelative(mainDatum);
-            }
-          } catch (retryError) {
-            console.error("[FamilyChartTree] Failed to start add-relative mode:", retryError);
-          }
+          console.error("[FamilyChartTree] Failed to start add-relative mode:", error);
         }
       }
     },
@@ -144,7 +181,7 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
       }
     },
     getCurrentMainId: () => currentMainIdRef.current,
-  }), [rootId]);
+  }), [rootId, chartData]);
 
   // Initialize chart
   useEffect(() => {
@@ -209,8 +246,10 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
 
       if (newRelData && onAddRelativeRef.current) {
         // User clicked "Add Son", "Add Daughter", or "Add Spouse" placeholder
-        // Find the parent cat from the chartData using rel_id
-        const parentDatum = chartData.find(datum => datum.id === newRelData.rel_id);
+        // Find the parent cat from the current chartData using rel_id
+        // Note: Use chartDataRef.current to get the latest data (not stale closure)
+        const currentChartData = chartDataRef.current;
+        const parentDatum = currentChartData.find(datum => datum.id === newRelData.rel_id);
         const parentCatData = parentDatum?.data as unknown as CustomData | undefined;
 
         if (parentCatData?.catData) {
