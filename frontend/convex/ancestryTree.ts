@@ -2,31 +2,163 @@ import { mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
 
 /**
- * SECURITY NOTE: This is a simple hash function providing basic ownership protection.
- * It is NOT cryptographically secure and should NOT be used for sensitive authentication.
+ * Password hashing utilities using Web Crypto PBKDF2
  *
- * This is intentionally lightweight protection to prevent casual overwrites of trees.
- * For production-grade security, implement password hashing via Convex actions using
- * argon2 or bcrypt with proper salt handling and constant-time comparison.
- *
- * Trade-offs accepted for this use case:
- * - No protection against determined attackers
- * - Predictable hash output (no random salt)
- * - Not suitable for authentication systems
- *
- * This is acceptable here because:
- * - Trees are not sensitive data
- * - Password is optional convenience feature
- * - Main goal is preventing accidental overwrites
+ * - Uses PBKDF2 with SHA-256 and 100,000 iterations
+ * - Random 16-byte salt per password
+ * - Constant-time comparison to prevent timing attacks
+ * - Stored format: "pbkdf2$<iterations>$<base64-salt>$<base64-hash>"
  */
-function simpleHash(str: string): string {
+
+const PBKDF2_ITERATIONS = 100_000;
+const SALT_LENGTH = 16;
+const KEY_LENGTH = 32;
+
+/**
+ * Generate a cryptographically secure random salt
+ */
+function generateSalt(): Uint8Array {
+  const salt = new Uint8Array(SALT_LENGTH);
+  crypto.getRandomValues(salt);
+  return salt;
+}
+
+/**
+ * Convert Uint8Array to base64 string
+ */
+function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Convert base64 string to Uint8Array
+ */
+function fromBase64(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
+ * Convert Uint8Array to ArrayBuffer (needed for Web Crypto API)
+ */
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.length);
+  const view = new Uint8Array(buffer);
+  view.set(bytes);
+  return buffer;
+}
+
+/**
+ * Derive a key from password and salt using PBKDF2
+ */
+async function deriveKey(password: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
+  const encoder = new TextEncoder();
+  const passwordBytes = encoder.encode(password);
+
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    passwordBytes,
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: toArrayBuffer(salt),
+      iterations: iterations,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    KEY_LENGTH * 8
+  );
+
+  return new Uint8Array(derivedBits);
+}
+
+/**
+ * Hash a password with a random salt
+ * Returns format: "pbkdf2$<iterations>$<base64-salt>$<base64-hash>"
+ */
+async function hashPassword(password: string): Promise<string> {
+  const salt = generateSalt();
+  const hash = await deriveKey(password, salt, PBKDF2_ITERATIONS);
+  return `pbkdf2$${PBKDF2_ITERATIONS}$${toBase64(salt)}$${toBase64(hash)}`;
+}
+
+/**
+ * Constant-time comparison of two byte arrays
+ * Prevents timing attacks by always comparing all bytes
+ */
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a[i] ^ b[i];
+  }
+  return result === 0;
+}
+
+/**
+ * Verify a password against a stored hash
+ * Supports both new PBKDF2 format and legacy simple hash format
+ */
+async function verifyPassword(provided: string, stored: string): Promise<boolean> {
+  // Handle legacy simple hash format (for backwards compatibility)
+  if (!stored.startsWith("pbkdf2$")) {
+    // Legacy format: "hash-salt" from simpleHash
+    // Temporarily support old hashes during migration
+    const legacyHash = legacySimpleHash(provided);
+    // Use constant-time comparison even for legacy
+    const encoder = new TextEncoder();
+    const a = encoder.encode(legacyHash);
+    const b = encoder.encode(stored);
+    return constantTimeEqual(a, b);
+  }
+
+  // Parse PBKDF2 format: "pbkdf2$iterations$salt$hash"
+  const parts = stored.split("$");
+  if (parts.length !== 4 || parts[0] !== "pbkdf2") {
+    return false;
+  }
+
+  const iterations = parseInt(parts[1], 10);
+  if (isNaN(iterations) || iterations < 1) {
+    return false;
+  }
+
+  const salt = fromBase64(parts[2]);
+  const storedHash = fromBase64(parts[3]);
+
+  // Derive key from provided password
+  const derivedHash = await deriveKey(provided, salt, iterations);
+
+  // Constant-time comparison
+  return constantTimeEqual(derivedHash, storedHash);
+}
+
+/**
+ * Legacy hash function for backwards compatibility during migration
+ * @deprecated Use hashPassword instead
+ */
+function legacySimpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
-  // Add salt based on string length and first/last chars for basic protection
   const salt = str.length + (str.charCodeAt(0) || 0) + (str.charCodeAt(str.length - 1) || 0);
   return `${hash.toString(36)}-${salt.toString(36)}`;
 }
@@ -92,8 +224,8 @@ export const save = mutation({
         if (!args.password) {
           return { success: false, error: "password_required" } as const;
         }
-        const providedHash = simpleHash(args.password);
-        if (providedHash !== existing.passwordHash) {
+        const isValid = await verifyPassword(args.password, existing.passwordHash);
+        if (!isValid) {
           return { success: false, error: "invalid_password" } as const;
         }
       }
@@ -123,7 +255,7 @@ export const save = mutation({
 
       // If setting a new password on an unprotected tree
       if (args.password && !existing.passwordHash) {
-        patch.passwordHash = simpleHash(args.password);
+        patch.passwordHash = await hashPassword(args.password);
       }
 
       await ctx.db.patch(existing._id, patch);
@@ -158,7 +290,7 @@ export const save = mutation({
     }
 
     if (args.password) {
-      insertData.passwordHash = simpleHash(args.password);
+      insertData.passwordHash = await hashPassword(args.password);
     }
 
     const id = await ctx.db.insert("ancestry_tree", insertData);
@@ -257,8 +389,8 @@ export const update = mutation({
       if (!args.password) {
         return { success: false, error: "password_required" } as const;
       }
-      const providedHash = simpleHash(args.password);
-      if (providedHash !== existing.passwordHash) {
+      const isValid = await verifyPassword(args.password, existing.passwordHash);
+      if (!isValid) {
         return { success: false, error: "invalid_password" } as const;
       }
     }
@@ -297,8 +429,8 @@ export const remove = mutation({
       if (!args.password) {
         return { success: false, error: "password_required" } as const;
       }
-      const providedHash = simpleHash(args.password);
-      if (providedHash !== existing.passwordHash) {
+      const isValid = await verifyPassword(args.password, existing.passwordHash);
+      if (!isValid) {
         return { success: false, error: "invalid_password" } as const;
       }
     }
