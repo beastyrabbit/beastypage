@@ -57,10 +57,10 @@ function parseCatName(catName: string | null | undefined): { prefix: string; suf
     }
   }
 
-  // Generic suffix detection
+  // Generic suffix detection - preserve original casing
   if (trimmed.length >= 4) {
     const prefix = trimmed.slice(0, Math.ceil(trimmed.length / 2));
-    const suffix = trimmed.slice(Math.ceil(trimmed.length / 2)).toLowerCase();
+    const suffix = trimmed.slice(Math.ceil(trimmed.length / 2));
     return { prefix, suffix, full: trimmed };
   }
 

@@ -262,7 +262,10 @@ export const update = mutation({
 });
 
 export const remove = mutation({
-  args: { slug: v.string() },
+  args: {
+    slug: v.string(),
+    password: v.optional(v.string())
+  },
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("ancestry_tree")
@@ -271,6 +274,17 @@ export const remove = mutation({
 
     if (!existing) {
       throw new Error(`Tree with slug ${args.slug} not found`);
+    }
+
+    // Check password if tree is protected
+    if (existing.passwordHash) {
+      if (!args.password) {
+        return { success: false, error: "password_required" } as const;
+      }
+      const providedHash = simpleHash(args.password);
+      if (providedHash !== existing.passwordHash) {
+        return { success: false, error: "invalid_password" } as const;
+      }
     }
 
     await ctx.db.delete(existing._id);

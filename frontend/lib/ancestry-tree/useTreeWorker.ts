@@ -32,10 +32,15 @@ interface UseTreeWorkerReturn {
 
 export function useTreeWorker(): UseTreeWorkerReturn {
   const workerRef = useRef<Worker | null>(null);
+  const rejectRef = useRef<((reason: Error) => void) | null>(null);
   const [progress, setProgress] = useState<TreeProgress | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const cancel = useCallback(() => {
+    if (rejectRef.current) {
+      rejectRef.current(new Error('Cancelled'));
+      rejectRef.current = null;
+    }
     if (workerRef.current) {
       workerRef.current.terminate();
       workerRef.current = null;
@@ -55,6 +60,9 @@ export function useTreeWorker(): UseTreeWorkerReturn {
         if (workerRef.current) {
           workerRef.current.terminate();
         }
+
+        // Store reject ref for cancel
+        rejectRef.current = reject;
 
         setIsGenerating(true);
         setProgress(null);
@@ -82,12 +90,14 @@ export function useTreeWorker(): UseTreeWorkerReturn {
             setProgress(null);
             worker.terminate();
             workerRef.current = null;
+            rejectRef.current = null;
             resolve(data.tree);
           } else if (data.type === 'error') {
             setIsGenerating(false);
             setProgress(null);
             worker.terminate();
             workerRef.current = null;
+            rejectRef.current = null;
             reject(new Error(data.error));
           }
         };
@@ -97,6 +107,7 @@ export function useTreeWorker(): UseTreeWorkerReturn {
           setProgress(null);
           worker.terminate();
           workerRef.current = null;
+          rejectRef.current = null;
           reject(new Error(`Worker error: ${error.message}`));
         };
 

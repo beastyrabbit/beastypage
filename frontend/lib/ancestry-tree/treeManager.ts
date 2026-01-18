@@ -690,8 +690,7 @@ export class AncestryTreeManager {
       name
     );
 
-    // Add to tree
-    this.tree.cats.set(newParent.id, newParent);
+    // Note: createCat already adds the cat to this.tree.cats
 
     // Update child's parent reference
     if (parentType === 'father') {
@@ -768,9 +767,11 @@ export class AncestryTreeManager {
         newPartner.childrenIds.push(childId);
       }
 
-      // Recursively update descendants (use first partner for recalculation)
+      // Recursively update descendants for all partners
       if (child.partnerIds.length > 0 && child.childrenIds.length > 0) {
-        this.recalculateDescendants(child.id, child.partnerIds[0]);
+        for (const partnerId of child.partnerIds) {
+          this.recalculateDescendants(child.id, partnerId);
+        }
       }
     }
   }

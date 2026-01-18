@@ -56,8 +56,14 @@ export default async function ViewAncestryTreePage({ params }: PageParams) {
     notFound();
   }
 
-  const convex = new ConvexHttpClient(convexUrl);
-  const treeData = await convex.query(api.ancestryTree.getBySlug, { slug });
+  let treeData;
+  try {
+    const convex = new ConvexHttpClient(convexUrl);
+    treeData = await convex.query(api.ancestryTree.getBySlug, { slug });
+  } catch (error) {
+    console.error("Failed to fetch ancestry tree:", error);
+    notFound();
+  }
 
   if (!treeData) {
     notFound();
