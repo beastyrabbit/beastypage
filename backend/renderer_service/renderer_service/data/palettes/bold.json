@@ -1,0 +1,28 @@
+{
+  "id": "bold",
+  "label": "Bold",
+  "description": "Vibrant, saturated colors for striking designs",
+  "colors": {
+    "CHARTREUSE": { "multiply": [184, 255, 80], "screen": [210, 255, 120, 0.2] },
+    "CERULEAN": { "multiply": [90, 160, 254] },
+    "COBALT": { "multiply": [80, 118, 232] },
+    "ELECTRICBLUE": { "multiply": [70, 145, 255], "screen": [110, 180, 255, 0.22] },
+    "EMERALD": { "multiply": [56, 190, 125] },
+    "FUCHSIA": { "multiply": [255, 103, 218] },
+    "HOTPINK": { "multiply": [255, 80, 150], "screen": [255, 120, 190, 0.2] },
+    "LIME": { "multiply": [200, 255, 110], "screen": [220, 255, 150, 0.2] },
+    "MAGENTA": { "multiply": [226, 71, 174] },
+    "NEONBLUE": { "multiply": [60, 120, 255], "screen": [120, 180, 255, 0.25] },
+    "NEONGREEN": { "multiply": [120, 255, 120], "screen": [150, 255, 170, 0.22] },
+    "NEONPINK": { "multiply": [255, 70, 190], "screen": [255, 140, 220, 0.22] },
+    "NEONPURPLE": { "multiply": [180, 70, 255], "screen": [210, 130, 255, 0.22] },
+    "SKYBLUE": { "multiply": [122, 196, 255] },
+    "SUNSETORANGE": { "multiply": [255, 120, 70], "screen": [255, 170, 120, 0.22] },
+    "TEAL": { "multiply": [70, 192, 196] },
+    "TURQUOISE": { "multiply": [72, 210, 208] },
+    "ZEST": { "multiply": [255, 214, 140], "screen": [255, 240, 180, 0.2] },
+    "SAND": { "multiply": [235, 214, 170], "screen": [245, 230, 190, 0.18] },
+    "SCARLET": { "multiply": [255, 60, 40], "screen": [255, 110, 90, 0.22] },
+    "NECTARINE": { "multiply": [255, 188, 140], "screen": [255, 213, 178, 0.22] }
+  }
+}
