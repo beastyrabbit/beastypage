@@ -1,6 +1,6 @@
 [project]
 name = "renderer-service"
-version = "1.3.2"
+version = "1.3.3"
 description = "FastAPI service that wraps the Lifegen sprite renderer for CatGenerator V3"
 authors = [{name = "BeastyRabbit Tools", email = "devnull@example.com"}]
 readme = "README.md"
