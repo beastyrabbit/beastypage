@@ -1,9 +1,7 @@
 export { AncestryTreeClient } from './AncestryTreeClient';
-export { TreeVisualization } from './TreeVisualization';
-export { TreeConfigPanel } from './TreeConfigPanel';
+export { FamilyChartTree, type FamilyChartTreeRef, type TreeOrientation, type RelativeType } from './FamilyChartTree';
+export { CatSidebar } from './CatSidebar';
 export { CatNode } from './CatNode';
-export { FamilyTreeNode } from './FamilyTreeNode';
-export { CatPopup } from './CatPopup';
 export { FoundingCoupleSelector } from './FoundingCoupleSelector';
 export { SaveTreeDialog } from './SaveTreeDialog';
 export { FoundingParentCard } from './FoundingParentCard';

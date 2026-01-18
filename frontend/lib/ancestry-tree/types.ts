@@ -45,7 +45,7 @@ export interface AncestryTreeCat {
   params: CatParams;
   motherId: CatId | null;
   fatherId: CatId | null;
-  partnerId: CatId | null;
+  partnerIds: CatId[];
   childrenIds: CatId[];
   genetics: CatGenetics;
   source: CatSource;

@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Save, Loader2, ArrowLeft, Trees, Dices, History, Settings, RefreshCw, Palette } from "lucide-react";
+import { Save, Loader2, ArrowLeft, Trees, Dices, History, Settings, RefreshCw, Palette, ArrowUpDown, ArrowLeftRight, Maximize2 } from "lucide-react";
 
 import type {
   AncestryTreeCat,
@@ -20,9 +20,8 @@ import { generateRandomParamsV3, ensureSpriteMapper } from "@/lib/cat-v3/randomG
 import { generateWarriorName } from "@/lib/ancestry-tree/nameGenerator";
 import type { CatParams } from "@/lib/cat-v3/types";
 
-import { TreeVisualization } from "./TreeVisualization";
-import { TreeConfigPanel } from "./TreeConfigPanel";
-import { CatPopup } from "./CatPopup";
+import { FamilyChartTree, type TreeOrientation, type FamilyChartTreeRef, type RelativeType } from "./FamilyChartTree";
+import { CatSidebar } from "./CatSidebar";
 import { FoundingCoupleSelector } from "./FoundingCoupleSelector";
 import { SaveTreeDialog } from "./SaveTreeDialog";
 import { FoundingParentCard } from "./FoundingParentCard";
@@ -50,6 +49,11 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [isSpriteMapperReady, setIsSpriteMapperReady] = useState(false);
+  const [orientation, setOrientation] = useState<TreeOrientation>("vertical");
+  const [currentMainId, setCurrentMainId] = useState<string | null>(null);
+  const [isEditingRelations, setIsEditingRelations] = useState(false);
+  const [chartRedrawKey, setChartRedrawKey] = useState(0);
+  const familyChartRef = useRef<FamilyChartTreeRef>(null);
 
   // Parent preview state for config screen
   const [motherPreview, setMotherPreview] = useState<ParentPreview | null>(null);
@@ -255,6 +259,7 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
     [tree, isSpriteMapperReady]
   );
 
+  // Assign a random partner to a cat without one
   const handleAssignRandomPartner = useCallback(
     async (cat: AncestryTreeCat) => {
       if (!tree || !isSpriteMapperReady) return;
@@ -264,12 +269,17 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
         const newPartnerParams = await generateRandomParamsV3();
         const manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
 
-        // Assign partner and generate children
-        manager.assignPartner(cat.id, newPartnerParams, undefined, true);
+        // Assign partner without generating children
+        manager.assignPartner(cat.id, newPartnerParams, undefined, false);
 
         const serialized = manager.serialize();
         setTree(serialized);
-        setSelectedCat(null);
+
+        // Update selectedCat with fresh data from the new tree (don't close sidebar)
+        const updatedCat = serialized.cats.find((c) => c.id === cat.id);
+        if (updatedCat) {
+          setSelectedCat(updatedCat);
+        }
       } catch (error) {
         console.error("Failed to assign partner:", error);
       } finally {
@@ -277,6 +287,140 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
       }
     },
     [tree, isSpriteMapperReady]
+  );
+
+  // Add a child to a couple with a specific partner
+  const handleAddChildWithPartner = useCallback(
+    async (cat: AncestryTreeCat, partnerId: string) => {
+      console.log("[handleAddChildWithPartner] Called with cat:", cat.name.full, "partnerId:", partnerId);
+
+      if (!tree || !isSpriteMapperReady) return;
+
+      setIsGenerating(true);
+      try {
+        const manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
+
+        // Get fresh cat data from the deserialized tree (not from potentially stale state)
+        const currentCat = manager.getCat(cat.id);
+        if (!currentCat) {
+          console.error("Cat not found");
+          setIsGenerating(false);
+          return;
+        }
+
+        // Temporarily set config to generate exactly 1 child
+        const originalConfig = { ...manager.getTree().config };
+        manager.setConfig({ minChildren: 1, maxChildren: 1 });
+
+        // Determine mother and father based on the specified partner
+        const motherId = currentCat.gender === "F" ? currentCat.id : partnerId;
+        const fatherId = currentCat.gender === "M" ? currentCat.id : partnerId;
+
+        console.log("[handleAddChildWithPartner] Creating child - motherId:", motherId, "fatherId:", fatherId);
+
+        // Generate one child
+        const newChildren = manager.generateOffspring(motherId, fatherId, currentCat.generation + 1);
+        console.log("[handleAddChildWithPartner] Created child:", newChildren[0]?.name.full, "with motherId:", newChildren[0]?.motherId, "fatherId:", newChildren[0]?.fatherId);
+
+        // Restore original config
+        manager.setConfig(originalConfig);
+
+        const serialized = manager.serialize();
+        setTree(serialized);
+
+        // Update selectedCat with fresh data (so sidebar shows updated children)
+        const updatedCat = serialized.cats.find((c) => c.id === cat.id);
+        if (updatedCat) {
+          setSelectedCat(updatedCat);
+        }
+      } catch (error) {
+        console.error("Failed to add child:", error);
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [tree, isSpriteMapperReady]
+  );
+
+  // Handle mainId changes from the chart
+  const handleMainIdChange = useCallback((mainId: string | null) => {
+    setCurrentMainId(mainId);
+  }, []);
+
+  // Handle edit mode changes from the chart (e.g., when clicking a different card cancels edit mode)
+  const handleEditModeChanged = useCallback((isEditing: boolean) => {
+    setIsEditingRelations(isEditing);
+  }, []);
+
+  // Handle edit relations button click - toggles add-relative mode on graph
+  const handleEditRelations = useCallback(() => {
+    if (isEditingRelations) {
+      // Stop editing - cancel the add-relative mode
+      setIsEditingRelations(false);
+      familyChartRef.current?.stopAddRelative();
+    } else {
+      // Start editing
+      setIsEditingRelations(true);
+      familyChartRef.current?.startAddRelative();
+    }
+  }, [isEditingRelations]);
+
+  // Handle show full graph button click - forces complete chart redraw
+  const handleShowFullGraph = useCallback(() => {
+    // Reset to root cat and force chart recreation
+    setCurrentMainId(tree?.foundingMotherId ?? null);
+    setChartRedrawKey((k) => k + 1);
+  }, [tree?.foundingMotherId]);
+
+  // Handle add relative from graph placeholder click
+  const handleAddRelativeFromGraph = useCallback(
+    async (type: RelativeType, parentCat: AncestryTreeCat, otherParentId?: string) => {
+      // Stop edit mode after adding
+      setIsEditingRelations(false);
+
+      if (type === "spouse") {
+        // Add new spouse (supports multiple spouses)
+        await handleAssignRandomPartner(parentCat);
+      } else {
+        // Add child (son or daughter are handled the same - gender is random)
+        // Use the otherParentId from the graph placeholder if available, otherwise fall back to last partner
+        const partnerIds = parentCat.partnerIds ?? [];
+        if (otherParentId) {
+          // Use the specific partner from the clicked "Add Son/Daughter" placeholder
+          await handleAddChildWithPartner(parentCat, otherParentId);
+        } else if (partnerIds.length > 0) {
+          // Fallback: use the last partner
+          const partnerId = partnerIds[partnerIds.length - 1];
+          await handleAddChildWithPartner(parentCat, partnerId);
+        }
+      }
+    },
+    [handleAssignRandomPartner, handleAddChildWithPartner]
+  );
+
+  // Handle pose change for a cat
+  const handleChangePose = useCallback(
+    (cat: AncestryTreeCat, newSpriteNumber: number) => {
+      if (!tree) return;
+
+      // Update the cat's sprite number in the tree
+      const updatedCats = tree.cats.map((c) =>
+        c.id === cat.id
+          ? { ...c, params: { ...c.params, spriteNumber: newSpriteNumber } }
+          : c
+      );
+
+      setTree({ ...tree, cats: updatedCats });
+
+      // Update selectedCat if it's the same cat
+      if (selectedCat?.id === cat.id) {
+        setSelectedCat({
+          ...cat,
+          params: { ...cat.params, spriteNumber: newSpriteNumber },
+        });
+      }
+    },
+    [tree, selectedCat]
   );
 
   const handleSaveTree = useCallback(
@@ -557,13 +701,55 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
           Back to Config
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">
             {tree.name} &bull; {tree.cats.length} cats
           </span>
+
+          {/* Orientation Toggle */}
+          <div className="flex items-center gap-1 rounded-lg bg-white/5 p-1">
+            <button
+              type="button"
+              onClick={() => setOrientation("vertical")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                orientation === "vertical"
+                  ? "bg-amber-600 text-white"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/10"
+              }`}
+              title="Vertical layout"
+            >
+              <ArrowUpDown className="size-3.5" />
+              Vertical
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrientation("horizontal")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                orientation === "horizontal"
+                  ? "bg-amber-600 text-white"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/10"
+              }`}
+              title="Horizontal layout"
+            >
+              <ArrowLeftRight className="size-3.5" />
+              Horizontal
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Show Full Graph button - only visible when viewing a subtree */}
+          {currentMainId && tree && currentMainId !== tree.foundingMotherId && (
+            <button
+              type="button"
+              onClick={handleShowFullGraph}
+              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+              title="Show the complete family tree from the founding couple"
+            >
+              <Maximize2 className="size-4" />
+              Show Full Graph
+            </button>
+          )}
           <button
             type="button"
             onClick={handleRegenerate}
@@ -586,24 +772,31 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
 
       {/* Tree Visualization */}
       <div className="flex-1 glass-card m-4 overflow-hidden">
-        <TreeVisualization
+        <FamilyChartTree
+          key={chartRedrawKey}
+          ref={familyChartRef}
           tree={tree}
-          onCatClick={handleCatClick}
-          highlightedCatId={selectedCat?.id}
+          orientation={orientation}
+          onSelectCat={handleCatClick}
+          onAddRelative={handleAddRelativeFromGraph}
+          onMainIdChange={handleMainIdChange}
+          onEditModeChanged={handleEditModeChanged}
         />
       </div>
 
-      {/* Modals */}
-      {selectedCat && tree && (
-        <CatPopup
-          cat={selectedCat}
-          tree={tree}
-          onClose={() => setSelectedCat(null)}
-          onSelectCat={handleSelectCatFromPopup}
-          onReplacePartner={handleReplacePartner}
-          onAssignRandomPartner={handleAssignRandomPartner}
-        />
-      )}
+      {/* Sidebar for cat details */}
+      <CatSidebar
+        cat={selectedCat}
+        tree={tree}
+        isOpen={selectedCat !== null}
+        onClose={() => setSelectedCat(null)}
+        onSelectCat={handleSelectCatFromPopup}
+        onAssignRandomPartner={handleAssignRandomPartner}
+        onAddChildWithPartner={handleAddChildWithPartner}
+        onEditRelations={handleEditRelations}
+        isEditingRelations={isEditingRelations}
+        onChangePose={handleChangePose}
+      />
 
       {showSaveDialog && tree && (
         <SaveTreeDialog

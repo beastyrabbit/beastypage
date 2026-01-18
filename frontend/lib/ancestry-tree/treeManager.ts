@@ -117,8 +117,8 @@ export class AncestryTreeManager {
     // Must be opposite gender
     if (cat.gender === potentialPartner.gender) return false;
 
-    // Must not already have a partner
-    if (potentialPartner.partnerId) return false;
+    // Must not already be paired with this cat
+    if (potentialPartner.partnerIds.includes(cat.id)) return false;
 
     const relationship = this.getRelationship(cat, potentialPartner);
 
@@ -254,7 +254,7 @@ export class AncestryTreeManager {
       params,
       motherId,
       fatherId,
-      partnerId: null,
+      partnerIds: [],
       childrenIds: [],
       genetics,
       source,
@@ -298,8 +298,8 @@ export class AncestryTreeManager {
     );
 
     // Link partners
-    mother.partnerId = father.id;
-    father.partnerId = mother.id;
+    mother.partnerIds.push(father.id);
+    father.partnerIds.push(mother.id);
 
     this.tree.foundingMotherId = mother.id;
     this.tree.foundingFatherId = father.id;
@@ -413,7 +413,7 @@ export class AncestryTreeManager {
 
           // Collect all potential partners from this generation (males from any family)
           const allMalesThisGen = Array.from(this.tree.cats.values()).filter(
-            (c) => c.gender === 'M' && c.generation === gen && !c.partnerId
+            (c) => c.gender === 'M' && c.generation === gen && c.partnerIds.length === 0
           );
 
           // Create couples from children (age them up to warriors)
@@ -483,13 +483,12 @@ export class AncestryTreeManager {
                   partner.name.suffix;
               }
 
-              // For multiple partners, only link the first one as "primary" partner
-              if (p === 0) {
-                female.partnerId = partner.id;
-                partner.partnerId = female.id;
-              } else {
-                // Secondary partners don't have the female linked back (polyandry style)
-                partner.partnerId = female.id;
+              // Link both partners (supports multiple spouses)
+              if (!female.partnerIds.includes(partner.id)) {
+                female.partnerIds.push(partner.id);
+              }
+              if (!partner.partnerIds.includes(female.id)) {
+                partner.partnerIds.push(female.id);
               }
 
               newCouples.push({ motherId: female.id, fatherId: partner.id });
@@ -514,13 +513,14 @@ export class AncestryTreeManager {
       throw new Error('Cat not found');
     }
 
-    // Remove old partner link
-    if (cat.partnerId) {
-      const oldPartner = this.tree.cats.get(cat.partnerId);
+    // Remove old partner links (clear all existing partners)
+    for (const oldPartnerId of cat.partnerIds) {
+      const oldPartner = this.tree.cats.get(oldPartnerId);
       if (oldPartner) {
-        oldPartner.partnerId = null;
+        oldPartner.partnerIds = oldPartner.partnerIds.filter(id => id !== cat.id);
       }
     }
+    cat.partnerIds = [];
 
     // Create new partner
     const newPartnerGender: Gender = cat.gender === 'F' ? 'M' : 'F';
@@ -541,8 +541,8 @@ export class AncestryTreeManager {
     newPartner.lifeStage = cat.lifeStage;
 
     // Link partners
-    cat.partnerId = newPartner.id;
-    newPartner.partnerId = cat.id;
+    cat.partnerIds.push(newPartner.id);
+    newPartner.partnerIds.push(cat.id);
 
     // Recalculate descendants if they had children
     if (cat.childrenIds.length > 0) {
@@ -568,11 +568,7 @@ export class AncestryTreeManager {
       throw new Error('Cat not found');
     }
 
-    if (cat.partnerId) {
-      throw new Error('Cat already has a partner. Use replacePartner instead.');
-    }
-
-    // Create new partner
+    // Create new partner (allows multiple spouses)
     const newPartnerGender: Gender = cat.gender === 'F' ? 'M' : 'F';
     const newPartnerGenetics = createGeneticsFromParams(newPartnerParams, newPartnerGender);
 
@@ -590,9 +586,9 @@ export class AncestryTreeManager {
 
     newPartner.lifeStage = cat.lifeStage;
 
-    // Link partners
-    cat.partnerId = newPartner.id;
-    newPartner.partnerId = cat.id;
+    // Link partners (add to arrays for multiple spouse support)
+    cat.partnerIds.push(newPartner.id);
+    newPartner.partnerIds.push(cat.id);
 
     // Generate offspring if requested and not at max depth
     if (generateChildren && cat.generation < this.tree.config.depth) {
@@ -650,9 +646,9 @@ export class AncestryTreeManager {
         newPartner.childrenIds.push(childId);
       }
 
-      // Recursively update descendants
-      if (child.partnerId && child.childrenIds.length > 0) {
-        this.recalculateDescendants(child.id, child.partnerId);
+      // Recursively update descendants (use first partner for recalculation)
+      if (child.partnerIds.length > 0 && child.childrenIds.length > 0) {
+        this.recalculateDescendants(child.id, child.partnerIds[0]);
       }
     }
   }
@@ -674,13 +670,26 @@ export class AncestryTreeManager {
 
   static deserialize(data: SerializedAncestryTree, mutationPool?: MutationPool): AncestryTreeManager {
     const manager = new AncestryTreeManager(mutationPool);
+
+    // Migrate cats from old partnerId format to new partnerIds array format
+    const migratedCats = data.cats.map((cat) => {
+      // If cat already has partnerIds array, use it; otherwise migrate from partnerId
+      const legacyCat = cat as AncestryTreeCat & { partnerId?: string | null };
+      const partnerIds = cat.partnerIds ?? (legacyCat.partnerId ? [legacyCat.partnerId] : []);
+
+      return {
+        ...cat,
+        partnerIds,
+      };
+    });
+
     manager.tree = {
       id: data.id,
       slug: data.slug,
       name: data.name,
       foundingMotherId: data.foundingMotherId,
       foundingFatherId: data.foundingFatherId,
-      cats: new Map(data.cats.map((cat) => [cat.id, cat])),
+      cats: new Map(migratedCats.map((cat) => [cat.id, cat])),
       config: data.config,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,

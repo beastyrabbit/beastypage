@@ -253,7 +253,7 @@ export default defineSchema({
       params: v.any(),
       motherId: v.union(v.string(), v.null()),
       fatherId: v.union(v.string(), v.null()),
-      partnerId: v.union(v.string(), v.null()),
+      partnerIds: v.array(v.string()),
       childrenIds: v.array(v.string()),
       genetics: v.any(),
       source: v.string(),

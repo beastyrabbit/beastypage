@@ -1,10 +1,12 @@
 import type { AncestryTreeCat, SerializedAncestryTree } from './types';
+import { encodeCatShare } from '@/lib/catShare';
 
 export interface FamilyChartDatum {
   id: string;
   data: {
     id: string;
-    name: string;
+    'first name': string;
+    'last name': string;
     gender: 'M' | 'F';
     generation: number;
     lifeStage: string;
@@ -12,49 +14,56 @@ export interface FamilyChartDatum {
     catData: AncestryTreeCat;
   };
   rels: {
-    spouses?: string[];
-    father?: string;
-    mother?: string;
-    children?: string[];
+    parents: string[];
+    spouses: string[];
+    children: string[];
   };
 }
 
+function buildPreviewUrl(cat: AncestryTreeCat): string {
+  const encoded = encodeCatShare({
+    params: cat.params as unknown as Record<string, unknown>,
+    accessorySlots: cat.params.accessories ?? [],
+    scarSlots: cat.params.scars ?? [],
+    tortieSlots: cat.params.tortie ?? [],
+    counts: {
+      accessories: cat.params.accessories?.length ?? 0,
+      scars: cat.params.scars?.length ?? 0,
+      tortie: cat.params.tortie?.length ?? 0,
+    },
+  });
+  return `/api/preview/_?cat=${encodeURIComponent(encoded)}`;
+}
+
 export function convertToFamilyChartFormat(
-  tree: SerializedAncestryTree,
-  catAvatars?: Map<string, string>
+  tree: SerializedAncestryTree
 ): FamilyChartDatum[] {
   const data: FamilyChartDatum[] = [];
 
   for (const cat of tree.cats) {
+    // Build parents array from mother/father
+    const parents: string[] = [];
+    if (cat.motherId) parents.push(cat.motherId);
+    if (cat.fatherId) parents.push(cat.fatherId);
+
     const datum: FamilyChartDatum = {
       id: cat.id,
       data: {
         id: cat.id,
-        name: cat.name.full,
+        'first name': cat.name.prefix,
+        'last name': cat.name.suffix,
         gender: cat.gender,
         generation: cat.generation,
         lifeStage: cat.lifeStage,
-        avatar: catAvatars?.get(cat.id),
+        avatar: buildPreviewUrl(cat),
         catData: cat,
       },
-      rels: {},
+      rels: {
+        parents,
+        spouses: cat.partnerIds ?? [],
+        children: cat.childrenIds ?? [],
+      },
     };
-
-    if (cat.partnerId) {
-      datum.rels.spouses = [cat.partnerId];
-    }
-
-    if (cat.motherId) {
-      datum.rels.mother = cat.motherId;
-    }
-
-    if (cat.fatherId) {
-      datum.rels.father = cat.fatherId;
-    }
-
-    if (cat.childrenIds.length > 0) {
-      datum.rels.children = cat.childrenIds;
-    }
 
     data.push(datum);
   }
