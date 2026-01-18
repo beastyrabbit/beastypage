@@ -8,13 +8,8 @@ import { api } from "@/convex/_generated/api";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { encodeCatShare } from "@/lib/catShare";
 
-type CatSource = "profile" | "batch";
-
 interface HistoryCat {
   id: string;
-  source: CatSource;
-  batchId?: string;
-  batchIndex?: number;
   catName: string | null;
   creatorName: string | null;
   previewUrl: string;
@@ -77,24 +72,22 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
   const [selectedFather, setSelectedFather] = useState<HistoryCat | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Query both profiles and batches
+  // Query only single cat profiles (not batches or trees)
   const profilesQuery = useQuery(api.mapper.listHistory, { limit: 200 });
-  const batchesQuery = useQuery(api.adoption.listBatches, { limit: 100 });
 
-  // Combine and flatten all cats
+  // Filter to only single cat profiles
   const allCats = useMemo(() => {
     const cats: HistoryCat[] = [];
 
-    // Add individual profiles (excluding those linked to ancestry trees)
     if (profilesQuery) {
       for (const profile of profilesQuery) {
-        // Skip profiles that are part of an adoption batch (they'll be included from batches)
-        // Skip profiles that appear to be ancestry tree entries (no catData or explicitly marked)
+        // Skip profiles without cat data
         if (!profile.cat_data) continue;
+        // Skip profiles that are part of an adoption batch
+        if (profile.adoptionBatchId) continue;
 
         cats.push({
           id: profile.id,
-          source: "profile",
           catName: profile.catName || null,
           creatorName: profile.creatorName || null,
           previewUrl: getPreviewUrl(profile.cat_data as Record<string, unknown>),
@@ -103,44 +96,15 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
       }
     }
 
-    // Flatten batches to individual cats
-    if (batchesQuery) {
-      for (const batch of batchesQuery) {
-        // Skip ancestry tree batches (check settings or title)
-        const isAncestryBatch =
-          batch.title?.toLowerCase().includes("ancestry") ||
-          batch.title?.toLowerCase().includes("tree") ||
-          (batch.settings as Record<string, unknown>)?.source === "ancestry_tree";
-
-        if (isAncestryBatch) continue;
-
-        for (const cat of batch.cats) {
-          if (!cat.catData) continue;
-
-          cats.push({
-            id: `batch-${batch.id}-${cat.index}`,
-            source: "batch",
-            batchId: batch.id,
-            batchIndex: cat.index,
-            catName: cat.catName || cat.label || null,
-            creatorName: cat.creatorName || batch.creatorName || null,
-            previewUrl: getPreviewUrl(cat.catData as Record<string, unknown>),
-            catData: cat.catData as Record<string, unknown>,
-          });
-        }
-      }
-    }
-
-    // Deduplicate by preview URL (rough heuristic)
+    // Deduplicate by cat data hash
     const seen = new Set<string>();
     return cats.filter((cat) => {
-      // Use a combination of catData hash for deduplication
       const key = JSON.stringify(cat.catData).slice(0, 200);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  }, [profilesQuery, batchesQuery]);
+  }, [profilesQuery]);
 
   const filteredCats = useMemo(() => {
     if (!searchTerm.trim()) return allCats;
@@ -176,18 +140,18 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
     onSelect({
       mother: {
         params: motherParams,
-        historyProfileId: selectedMother.source === "profile" ? selectedMother.id : undefined,
+        historyProfileId: selectedMother.id,
         name: parseCatName(selectedMother.catName),
       },
       father: {
         params: fatherParams,
-        historyProfileId: selectedFather.source === "profile" ? selectedFather.id : undefined,
+        historyProfileId: selectedFather.id,
         name: parseCatName(selectedFather.catName),
       },
     });
   };
 
-  const isLoading = profilesQuery === undefined || batchesQuery === undefined;
+  const isLoading = profilesQuery === undefined;
 
   return (
     <div
@@ -276,7 +240,7 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
             />
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Showing {filteredCats.length} cats from history and adoption batches
+            Showing {filteredCats.length} cats from history
           </p>
         </div>
 
@@ -314,9 +278,6 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
                   <span className="text-xs truncate max-w-full">
                     {cat.catName ?? "Unnamed"}
                   </span>
-                  {cat.source === "batch" && (
-                    <span className="text-[10px] text-muted-foreground">from batch</span>
-                  )}
                 </button>
               ))}
             </div>

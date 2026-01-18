@@ -264,9 +264,18 @@ export default defineSchema({
       minChildren: v.number(),
       maxChildren: v.number(),
       depth: v.number(),
-      genderRatio: v.number()
+      genderRatio: v.number(),
+      partnerChance: v.optional(v.number()),
+      paletteModes: v.optional(v.array(v.string())),
+      offspringOptions: v.optional(v.object({
+        accessoryChance: v.number(),
+        maxAccessories: v.number(),
+        scarChance: v.number(),
+        maxScars: v.number()
+      }))
     }),
     creatorName: v.optional(v.string()),
+    passwordHash: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number()
   })

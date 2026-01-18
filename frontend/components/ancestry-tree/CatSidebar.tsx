@@ -2,11 +2,10 @@
 
 import { useMemo } from "react";
 import Image from "next/image";
-import { X, Heart, Users, Dna, UserPlus, ChevronRight, Dices, Baby, GitBranch, SkipForward, Square } from "lucide-react";
+import { X, Dna, GitBranch, SkipForward, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AncestryTreeCat, SerializedAncestryTree } from "@/lib/ancestry-tree/types";
 import { encodeCatShare } from "@/lib/catShare";
-import { findCatById, getSiblings } from "@/lib/ancestry-tree/familyChartAdapter";
 
 interface CatSidebarProps {
   cat: AncestryTreeCat | null;
@@ -23,12 +22,8 @@ interface CatSidebarProps {
 
 export function CatSidebar({
   cat,
-  tree,
   isOpen,
   onClose,
-  onSelectCat,
-  onAssignRandomPartner,
-  onAddChildWithPartner,
   onEditRelations,
   isEditingRelations,
   onChangePose,
@@ -50,13 +45,6 @@ export function CatSidebar({
   }, [cat]);
 
   if (!cat) return null;
-
-  // Defensive: handle cases where partnerIds/childrenIds might be undefined from stale state
-  const partners = (cat.partnerIds ?? []).map((id) => findCatById(tree, id)).filter(Boolean) as AncestryTreeCat[];
-  const mother = cat.motherId ? findCatById(tree, cat.motherId) : null;
-  const father = cat.fatherId ? findCatById(tree, cat.fatherId) : null;
-  const siblings = getSiblings(tree, cat.id);
-  const children = (cat.childrenIds ?? []).map((id) => findCatById(tree, id)).filter(Boolean) as AncestryTreeCat[];
 
   const genderIcon = cat.gender === "F" ? "♀" : "♂";
   const genderColor = cat.gender === "F" ? "text-pink-400" : "text-blue-400";
@@ -163,162 +151,154 @@ export function CatSidebar({
             </div>
           )}
 
-          {/* Genetics */}
-          <div className="glass-card p-4">
-            <h3 className="mb-2 flex items-center gap-2 font-semibold text-sm">
+          {/* Genetics - with alleles */}
+          <div className="glass-card p-4 space-y-3">
+            <h3 className="flex items-center gap-2 font-semibold text-sm">
               <Dna className="size-4" /> Genetics
             </h3>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-              <dt className="text-muted-foreground">Pelt</dt>
-              <dd>{cat.genetics.pelt.expressed}</dd>
-              <dt className="text-muted-foreground">Colour</dt>
-              <dd>{cat.genetics.colour.expressed}</dd>
-              <dt className="text-muted-foreground">Eye Colour</dt>
-              <dd>{cat.genetics.eyeColour.expressed}</dd>
-              <dt className="text-muted-foreground">Skin</dt>
-              <dd>{cat.genetics.skinColour.expressed}</dd>
-              {cat.genetics.whitePatches.expressed && (
-                <>
-                  <dt className="text-muted-foreground">White Patches</dt>
-                  <dd>{cat.genetics.whitePatches.expressed}</dd>
-                </>
-              )}
-              <dt className="text-muted-foreground">Tortie</dt>
-              <dd>{cat.genetics.isTortie.expressed ? "Yes" : "No"}</dd>
-            </dl>
-          </div>
 
-          {/* Parents */}
-          {(mother || father) && (
-            <div className="glass-card p-4">
-              <h3 className="mb-2 flex items-center gap-2 font-semibold text-sm">
-                <Users className="size-4" /> Parents
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {mother && (
-                  <CatButton cat={mother} onClick={() => onSelectCat?.(mother)} />
-                )}
-                {father && (
-                  <CatButton cat={father} onClick={() => onSelectCat?.(father)} />
-                )}
+            {/* Legend */}
+            <div className="flex gap-3 text-[10px] text-muted-foreground border-b border-white/10 pb-2">
+              <span><span className="text-emerald-400">●</span> Active</span>
+              <span><span className="text-amber-400/60">●</span> Carried</span>
+              <span><span className="text-blue-400">D</span> Dominant</span>
+              <span><span className="text-purple-400">R</span> Recessive</span>
+            </div>
+
+            {/* Pelt */}
+            <GeneticTraitDisplay
+              label="Pelt"
+              allele1={cat.genetics.pelt.allele1}
+              allele2={cat.genetics.pelt.allele2}
+              expressed={cat.genetics.pelt.expressed}
+              getDominance={getPeltDominance}
+            />
+
+            {/* Colour */}
+            <GeneticTraitDisplay
+              label="Colour"
+              allele1={cat.genetics.colour.allele1}
+              allele2={cat.genetics.colour.allele2}
+              expressed={cat.genetics.colour.expressed}
+            />
+
+            {/* Eye Colour */}
+            <GeneticTraitDisplay
+              label="Eyes"
+              allele1={cat.genetics.eyeColour.allele1}
+              allele2={cat.genetics.eyeColour.allele2}
+              expressed={cat.genetics.eyeColour.expressed}
+            />
+
+            {/* Skin */}
+            <GeneticTraitDisplay
+              label="Skin"
+              allele1={cat.genetics.skinColour.allele1}
+              allele2={cat.genetics.skinColour.allele2}
+              expressed={cat.genetics.skinColour.expressed}
+            />
+
+            {/* White Patches */}
+            {(cat.genetics.whitePatches.allele1 || cat.genetics.whitePatches.allele2) && (
+              <GeneticTraitDisplay
+                label="White"
+                allele1={cat.genetics.whitePatches.allele1 ?? "none"}
+                allele2={cat.genetics.whitePatches.allele2 ?? "none"}
+                expressed={cat.genetics.whitePatches.expressed ?? "none"}
+              />
+            )}
+
+            {/* Tortie */}
+            <div className="pt-2 border-t border-white/10">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Tortie Gene</span>
+                <span className={cat.genetics.isTortie.expressed ? "text-pink-400" : "text-muted-foreground"}>
+                  {cat.genetics.isTortie.expressed ? "Expressed" :
+                   (cat.genetics.isTortie.allele1 || cat.genetics.isTortie.allele2) ? "Carried" : "None"}
+                </span>
               </div>
-            </div>
-          )}
-
-          {/* Partners with their children */}
-          {partners.length > 0 && (
-            <div className="glass-card p-4 space-y-4">
-              <h3 className="flex items-center gap-2 font-semibold text-sm">
-                <Heart className="size-4" /> {partners.length === 1 ? "Partner & Children" : `Partners & Children (${partners.length})`}
-              </h3>
-              {partners.map((partner) => {
-                // Get children that belong to this specific partner pair
-                const partnerChildren = children.filter((child) => {
-                  const otherParentId = cat.gender === "F" ? child.fatherId : child.motherId;
-                  return otherParentId === partner.id;
-                });
-                const genderColor = partner.gender === "F" ? "text-pink-400" : "text-blue-400";
-                const genderSymbol = partner.gender === "F" ? "♀" : "♂";
-
-                return (
-                  <div key={partner.id} className="rounded-lg bg-white/5 p-3 space-y-2">
-                    {/* Partner header */}
-                    <div className="flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={() => onSelectCat?.(partner)}
-                        className="flex items-center gap-2 text-sm font-medium hover:text-amber-400 transition-colors"
-                      >
-                        <span className={genderColor}>{genderSymbol}</span>
-                        {partner.name.full}
-                        <ChevronRight className="size-3 opacity-50" />
-                      </button>
-                      {onAddChildWithPartner && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            console.log("[CatSidebar] Add Child clicked for partner:", partner.name.full, "id:", partner.id);
-                            onAddChildWithPartner(cat, partner.id);
-                          }}
-                          className="flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-emerald-700"
-                        >
-                          <Baby className="size-3" />
-                          Add Child
-                        </button>
-                      )}
-                    </div>
-                    {/* Children with this partner */}
-                    {partnerChildren.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 pl-4 border-l border-white/10">
-                        {partnerChildren.map((child) => (
-                          <CatButton key={child.id} cat={child} onClick={() => onSelectCat?.(child)} />
-                        ))}
-                      </div>
-                    )}
-                    {partnerChildren.length === 0 && (
-                      <p className="text-xs text-muted-foreground pl-4 border-l border-white/10">
-                        No children yet
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Add Partner - always available */}
-          {onAssignRandomPartner && (
-            <div className="glass-card p-4">
-              <h3 className="mb-2 flex items-center gap-2 font-semibold text-sm">
-                <UserPlus className="size-4" /> {partners.length === 0 ? "No Partner" : "Add Another Partner"}
-              </h3>
-              {partners.length === 0 && (
-                <p className="text-xs text-muted-foreground mb-3">
-                  This cat doesn&apos;t have a partner yet.
+              {cat.gender === "M" && (cat.genetics.isTortie.allele1 || cat.genetics.isTortie.allele2) && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Sex-linked: Males rarely express tortie (0.3%)
                 </p>
               )}
-              <button
-                type="button"
-                onClick={() => onAssignRandomPartner(cat)}
-                className="flex items-center justify-center gap-2 w-full rounded-lg bg-pink-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-pink-700"
-              >
-                <Dices className="size-4" />
-                {partners.length === 0 ? "Assign Random Partner" : "Add Random Partner"}
-              </button>
             </div>
-          )}
 
-          {/* Siblings */}
-          {siblings.length > 0 && (
-            <div className="glass-card p-4">
-              <h3 className="mb-2 font-semibold text-sm">Siblings ({siblings.length})</h3>
-              <div className="flex flex-wrap gap-2">
-                {siblings.map((sibling) => (
-                  <CatButton key={sibling.id} cat={sibling} onClick={() => onSelectCat?.(sibling)} />
+            {/* Tortie Details */}
+            {cat.genetics.isTortie.expressed && cat.params.tortie && cat.params.tortie.length > 0 && (
+              <div className="pt-2 border-t border-white/10 space-y-2">
+                <div className="text-xs text-muted-foreground">Tortie Layers ({cat.params.tortie.filter(Boolean).length})</div>
+                {cat.params.tortie.filter(Boolean).map((layer, idx) => (
+                  <div key={idx} className="text-xs bg-white/5 rounded px-2 py-1">
+                    <span className="text-pink-300">Layer {idx + 1}:</span>{" "}
+                    <span className="text-amber-300">{layer!.pattern}</span> +{" "}
+                    <span className="text-emerald-300">{layer!.colour}</span>{" "}
+                    <span className="text-muted-foreground">({layer!.mask})</span>
+                  </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
         </div>
       </div>
     </>
   );
 }
 
-// Reusable cat button component
-function CatButton({ cat, onClick }: { cat: AncestryTreeCat; onClick: () => void }) {
-  const genderColor = cat.gender === "F" ? "text-pink-400" : "text-blue-400";
-  const genderSymbol = cat.gender === "F" ? "♀" : "♂";
+// Dominant pelts (patterns) vs recessive (solid colors)
+const DOMINANT_PELTS = new Set([
+  'Tabby', 'Mackerel', 'Classic', 'Ticked', 'Spotted', 'Rosette', 'Sokoke',
+  'Marbled', 'Bengal', 'Speckled', 'Agouti',
+]);
+
+const RECESSIVE_PELTS = new Set([
+  'SingleColour', 'Single', 'Solid',
+]);
+
+function getPeltDominance(allele: string): 'D' | 'R' | null {
+  if (DOMINANT_PELTS.has(allele)) return 'D';
+  if (RECESSIVE_PELTS.has(allele)) return 'R';
+  return null;
+}
+
+// Component to display a genetic trait with both alleles
+function GeneticTraitDisplay({
+  label,
+  allele1,
+  allele2,
+  expressed,
+  getDominance,
+}: {
+  label: string;
+  allele1: string;
+  allele2: string;
+  expressed: string;
+  getDominance?: (allele: string) => 'D' | 'R' | null;
+}) {
+  const isHeterozygous = allele1 !== allele2;
+  const dom1 = getDominance?.(allele1);
+  const dom2 = getDominance?.(allele2);
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-2 text-xs transition-colors hover:bg-white/10 group"
-    >
-      <span className={genderColor}>{genderSymbol}</span>
-      <span>{cat.name.full}</span>
-      <ChevronRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-    </button>
+    <div className="text-xs">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="text-emerald-400 font-medium">{expressed}</span>
+      </div>
+      {isHeterozygous && (
+        <div className="flex gap-2 text-[10px] pl-2">
+          <span className={allele1 === expressed ? "text-emerald-400/80" : "text-amber-400/60"}>
+            {allele1}
+            {dom1 && <span className={dom1 === 'D' ? "text-blue-400 ml-0.5" : "text-purple-400 ml-0.5"}>{dom1}</span>}
+          </span>
+          <span className="text-muted-foreground">×</span>
+          <span className={allele2 === expressed ? "text-emerald-400/80" : "text-amber-400/60"}>
+            {allele2}
+            {dom2 && <span className={dom2 === 'D' ? "text-blue-400 ml-0.5" : "text-purple-400 ml-0.5"}>{dom2}</span>}
+          </span>
+        </div>
+      )}
+    </div>
   );
 }

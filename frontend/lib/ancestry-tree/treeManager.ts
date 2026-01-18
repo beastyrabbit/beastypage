@@ -4,6 +4,7 @@ import type {
   AncestryTreeCat,
   CatGenetics,
   CatId,
+  CatName,
   FoundingCoupleInput,
   Gender,
   LifeStage,
@@ -291,7 +292,8 @@ export class AncestryTreeManager {
   generateOffspring(
     motherId: CatId,
     fatherId: CatId,
-    generation: number
+    generation: number,
+    forcedGender?: Gender
   ): AncestryTreeCat[] {
     const mother = this.tree.cats.get(motherId);
     const father = this.tree.cats.get(fatherId);
@@ -306,7 +308,8 @@ export class AncestryTreeManager {
     const children: AncestryTreeCat[] = [];
 
     for (let i = 0; i < childCount; i++) {
-      const gender: Gender = Math.random() < genderRatio ? 'M' : 'F';
+      // Use forced gender for first child if provided, otherwise random
+      const gender: Gender = (i === 0 && forcedGender) ? forcedGender : (Math.random() < genderRatio ? 'M' : 'F');
 
       const childGenetics = inheritGenetics(
         mother.genetics,
@@ -641,6 +644,83 @@ export class AncestryTreeManager {
 
     this.tree.updatedAt = Date.now();
     return newPartner;
+  }
+
+  /**
+   * Adds a parent (father or mother) to a cat that doesn't have one.
+   * This is useful for extending the tree upward from the founding couple.
+   */
+  addParent(
+    childId: CatId,
+    parentParams: CatParams,
+    parentType: 'father' | 'mother',
+    parentName?: CatName
+  ): AncestryTreeCat | null {
+    const child = this.tree.cats.get(childId);
+    if (!child) return null;
+
+    // Check if parent already exists
+    if (parentType === 'father' && child.fatherId) {
+      console.warn('[addParent] Cat already has a father');
+      return null;
+    }
+    if (parentType === 'mother' && child.motherId) {
+      console.warn('[addParent] Cat already has a mother');
+      return null;
+    }
+
+    const parentGender: Gender = parentType === 'father' ? 'M' : 'F';
+    const name = parentName ?? generateWarriorName('warrior');
+
+    // Create genetics from params
+    const genetics = createGeneticsFromParams(parentParams, parentGender);
+
+    // Parent is one generation above the child
+    const parentGeneration = child.generation - 1;
+
+    const newParent = this.createCat(
+      parentParams,
+      parentGender,
+      parentGeneration,
+      null, // No grandparents
+      null,
+      genetics,
+      'generated',
+      undefined,
+      name
+    );
+
+    // Add to tree
+    this.tree.cats.set(newParent.id, newParent);
+
+    // Update child's parent reference
+    if (parentType === 'father') {
+      child.fatherId = newParent.id;
+    } else {
+      child.motherId = newParent.id;
+    }
+
+    // Add child to parent's children list
+    newParent.childrenIds.push(child.id);
+
+    // If the child has the other parent, make them partners
+    const otherParentId = parentType === 'father' ? child.motherId : child.fatherId;
+    if (otherParentId) {
+      const otherParent = this.tree.cats.get(otherParentId);
+      if (otherParent) {
+        newParent.partnerIds.push(otherParentId);
+        if (!otherParent.partnerIds.includes(newParent.id)) {
+          otherParent.partnerIds.push(newParent.id);
+        }
+        // Add child to other parent's children if not already there
+        if (!otherParent.childrenIds.includes(child.id)) {
+          otherParent.childrenIds.push(child.id);
+        }
+      }
+    }
+
+    this.tree.updatedAt = Date.now();
+    return newParent;
   }
 
   private recalculateDescendants(parentId: CatId, newPartnerId: CatId): void {

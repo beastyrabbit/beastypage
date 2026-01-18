@@ -8,7 +8,7 @@ import { getServerConvexUrl } from "@/lib/convexUrl";
 
 import { PageHero } from "@/components/common/PageHero";
 import { AncestryTreeClient } from "@/components/ancestry-tree";
-import type { SerializedAncestryTree, AncestryTreeCat } from "@/lib/ancestry-tree/types";
+import type { SerializedAncestryTree, AncestryTreeCat, PaletteMode } from "@/lib/ancestry-tree/types";
 
 type PageParams = {
   params: Promise<{ slug: string }>;
@@ -75,6 +75,7 @@ export default async function ViewAncestryTreePage({ params }: PageParams) {
     config: {
       partnerChance: 1.0, // Default for old trees without this field
       ...treeData.config,
+      paletteModes: treeData.config.paletteModes as PaletteMode[] | undefined,
     },
     createdAt: treeData.createdAt,
     updatedAt: treeData.updatedAt,
@@ -109,7 +110,7 @@ export default async function ViewAncestryTreePage({ params }: PageParams) {
         }
       />
 
-      <AncestryTreeClient initialTree={tree} />
+      <AncestryTreeClient initialTree={tree} initialHasPassword={treeData.hasPassword} />
     </main>
   );
 }

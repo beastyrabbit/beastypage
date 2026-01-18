@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Save, Loader2, ArrowLeft, Trees, Dices, History, Settings, RefreshCw, Palette, ArrowUpDown, ArrowLeftRight, Maximize2 } from "lucide-react";
@@ -32,6 +33,7 @@ import "./family-chart-custom.css";
 
 interface AncestryTreeClientProps {
   initialTree?: SerializedAncestryTree;
+  initialHasPassword?: boolean;
 }
 
 type ViewMode = "config" | "tree";
@@ -43,27 +45,42 @@ interface ParentPreview {
 
 /**
  * Estimate the number of cats that will be generated.
- * This is a rough estimate based on average children per couple and partner chance.
+ * Accounts for: children, outsider partners (~89% of partners), and multiple partners (20% get 2).
  */
 function estimateCatCount(depth: number, avgChildren: number, partnerChance: number): number {
+  const MULTIPLE_PARTNERS_CHANCE = 0.20;
+  const OUTSIDER_CHANCE = 0.89; // 89% chance partner is a newly generated outsider
+  const avgPartnersPerChild = 1 * (1 - MULTIPLE_PARTNERS_CHANCE) + 2 * MULTIPLE_PARTNERS_CHANCE; // 1.2
+
   let total = 2; // founding couple
   let couples = 1;
-  for (let i = 1; i <= depth; i++) {
+
+  for (let gen = 1; gen <= depth; gen++) {
     const children = Math.round(couples * avgChildren);
-    total += children;
-    // ~50% female, partnerChance determines how many get partners, ~20% have multiple partners
-    couples = Math.floor(children * 0.5 * partnerChance * 1.2);
+    total += children; // children born this generation
+
+    // Each child has partnerChance to find a partner, averaging 1.2 partners each
+    // ~89% of partners are outsiders (new cats added to the tree)
+    const expectedPartnerRelationships = children * partnerChance * avgPartnersPerChild;
+    const outsiderPartners = Math.round(expectedPartnerRelationships * OUTSIDER_CHANCE);
+    total += outsiderPartners;
+
+    // Number of couples for next generation
+    couples = Math.round(expectedPartnerRelationships);
   }
+
   return total;
 }
 
-export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
+export function AncestryTreeClient({ initialTree, initialHasPassword }: AncestryTreeClientProps) {
+  const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>(initialTree ? "tree" : "config");
   const [tree, setTree] = useState<SerializedAncestryTree | null>(initialTree ?? null);
   const [config, setConfig] = useState<TreeGenerationConfig>(
     initialTree?.config ?? DEFAULT_TREE_CONFIG
   );
   const [selectedCat, setSelectedCat] = useState<AncestryTreeCat | null>(null);
+  const [hasPassword, setHasPassword] = useState(initialHasPassword ?? false);
 
   // Use Web Worker for tree generation
   const { generateTree: generateTreeWorker, progress: workerProgress, isGenerating: isWorkerGenerating, cancel: cancelWorker } = useTreeWorker();
@@ -367,7 +384,7 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
 
   // Add a child to a couple with a specific partner
   const handleAddChildWithPartner = useCallback(
-    async (cat: AncestryTreeCat, partnerId: string) => {
+    async (cat: AncestryTreeCat, partnerId: string, forcedGender?: "M" | "F") => {
       if (!tree || !isSpriteMapperReady) return;
 
       setIsGenerating(true);
@@ -390,8 +407,8 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
         const motherId = currentCat.gender === "F" ? currentCat.id : partnerId;
         const fatherId = currentCat.gender === "M" ? currentCat.id : partnerId;
 
-        // Generate one child
-        manager.generateOffspring(motherId, fatherId, currentCat.generation + 1);
+        // Generate one child with optional forced gender
+        manager.generateOffspring(motherId, fatherId, currentCat.generation + 1, forcedGender);
 
         // Restore original config
         manager.setConfig(originalConfig);
@@ -443,6 +460,35 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
     setChartRedrawKey((k) => k + 1);
   }, [tree?.foundingMotherId]);
 
+  // Handle adding a parent (father or mother) to a cat
+  const handleAddParent = useCallback(
+    async (cat: AncestryTreeCat, parentType: 'father' | 'mother') => {
+      if (!tree || !isSpriteMapperReady) return;
+
+      setIsGenerating(true);
+      try {
+        const newParentParams = await generateRandomParamsV3();
+        const manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
+
+        manager.addParent(cat.id, newParentParams, parentType);
+
+        const serialized = manager.serialize();
+        setTree(serialized);
+
+        // Update selectedCat with fresh data
+        const updatedCat = serialized.cats.find((c) => c.id === cat.id);
+        if (updatedCat) {
+          setSelectedCat(updatedCat);
+        }
+      } catch (error) {
+        console.error(`Failed to add ${parentType}:`, error);
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [tree, isSpriteMapperReady]
+  );
+
   // Handle add relative from graph placeholder click
   const handleAddRelativeFromGraph = useCallback(
     async (type: RelativeType, parentCat: AncestryTreeCat, otherParentId?: string) => {
@@ -452,12 +498,14 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
       if (type === "spouse") {
         // Add new spouse (supports multiple spouses)
         await handleAssignRandomPartner(parentCat);
+      } else if (type === "father" || type === "mother") {
+        // Add a parent to the cat
+        await handleAddParent(parentCat, type);
       } else {
-        // Add child (son or daughter are handled the same - gender is random)
-        const partnerIds = parentCat.partnerIds ?? [];
+        // Add child - respect the son/daughter choice
+        const forcedGender: "M" | "F" = type === "son" ? "M" : "F";
 
-        // The library's other_parent_id might not match our cat IDs directly
-        // Check if it's a valid cat ID in the tree, otherwise fall back to parent's partners
+        // Check if otherParentId references a valid existing spouse
         let validPartnerId: string | undefined;
 
         if (otherParentId && tree) {
@@ -469,19 +517,51 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
         }
 
         if (validPartnerId) {
-          await handleAddChildWithPartner(parentCat, validPartnerId);
-        } else if (partnerIds.length === 1) {
-          // Single partner - use it
-          await handleAddChildWithPartner(parentCat, partnerIds[0]);
-        } else if (partnerIds.length > 1) {
-          // Multiple partners but invalid otherParentId - use the last partner as fallback
-          // TODO: Better heuristic for determining which partner based on graph position
-          console.warn("[handleAddRelativeFromGraph] Could not determine partner, using last partner");
-          await handleAddChildWithPartner(parentCat, partnerIds[partnerIds.length - 1]);
+          // Specific spouse indicated - add child with that spouse
+          await handleAddChildWithPartner(parentCat, validPartnerId, forcedGender);
+        } else {
+          // No specific spouse - create new spouse first, then add child
+          if (!tree || !isSpriteMapperReady) return;
+
+          setIsGenerating(true);
+          try {
+            const newPartnerParams = await generateRandomParamsV3();
+            const manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
+
+            // First, assign a partner (without generating offspring)
+            manager.assignPartner(parentCat.id, newPartnerParams, undefined, false);
+
+            // Then generate a child with the correct gender
+            const currentCat = manager.getCat(parentCat.id);
+            if (currentCat && currentCat.partnerIds.length > 0) {
+              const newPartnerId = currentCat.partnerIds[currentCat.partnerIds.length - 1];
+              const motherId = currentCat.gender === "F" ? currentCat.id : newPartnerId;
+              const fatherId = currentCat.gender === "M" ? currentCat.id : newPartnerId;
+
+              // Temporarily set config to generate exactly 1 child
+              const originalConfig = { ...manager.getTree().config };
+              manager.setConfig({ minChildren: 1, maxChildren: 1 });
+              manager.generateOffspring(motherId, fatherId, currentCat.generation + 1, forcedGender);
+              manager.setConfig(originalConfig);
+            }
+
+            const serialized = manager.serialize();
+            setTree(serialized);
+
+            // Update selectedCat with fresh data
+            const updatedCat = serialized.cats.find((c) => c.id === parentCat.id);
+            if (updatedCat) {
+              setSelectedCat(updatedCat);
+            }
+          } catch (error) {
+            console.error("Failed to add spouse and child:", error);
+          } finally {
+            setIsGenerating(false);
+          }
         }
       }
     },
-    [handleAssignRandomPartner, handleAddChildWithPartner, tree]
+    [handleAssignRandomPartner, handleAddChildWithPartner, handleAddParent, tree, isSpriteMapperReady]
   );
 
   // Handle pose change for a cat
@@ -510,12 +590,12 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
   );
 
   const handleSaveTree = useCallback(
-    async (name: string, creatorName: string) => {
-      if (!tree) return;
+    async (name: string, creatorName: string, password?: string): Promise<{ success: boolean; error?: string; slug?: string; isNew?: boolean }> => {
+      if (!tree) return { success: false, error: "No tree to save" };
 
       const updatedTree = { ...tree, name, creatorName };
       try {
-        await saveTreeMutation({
+        const result = await saveTreeMutation({
           slug: updatedTree.slug,
           name: updatedTree.name,
           foundingMotherId: updatedTree.foundingMotherId,
@@ -523,11 +603,28 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
           cats: updatedTree.cats,
           config: updatedTree.config,
           creatorName: updatedTree.creatorName,
+          password,
         });
+
+        if (!result.success) {
+          return { success: false, error: result.error };
+        }
+
         setTree(updatedTree);
+
+        // If password was set on new tree, track it
+        if (password && result.isNew) {
+          setHasPassword(true);
+        }
+
+        // Update URL to include the slug (use history.pushState for seamless update)
+        const newUrl = `/projects/warrior-cats/ancestry-tree/${updatedTree.slug}`;
+        window.history.pushState({ slug: updatedTree.slug }, "", newUrl);
+
+        return { success: true, slug: result.slug, isNew: result.isNew };
       } catch (error) {
         console.error("Failed to save tree:", error);
-        throw error;
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
       }
     },
     [tree, saveTreeMutation]
@@ -633,9 +730,9 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
                     return (
                       <div className={`text-center text-sm ${isHuge ? "text-red-400" : isLarge ? "text-amber-400" : "text-muted-foreground"}`}>
                         {isHuge ? (
-                          <span>⚠️ Very large tree: ~{estimated.toLocaleString()} cats estimated. May take a while.</span>
+                          <span>🚫 ~{estimated.toLocaleString()} cats — too large to render, will not load</span>
                         ) : isLarge ? (
-                          <span>⚡ Large tree: ~{estimated.toLocaleString()} cats estimated</span>
+                          <span>⚠️ ~{estimated.toLocaleString()} cats — may not load properly</span>
                         ) : (
                           <span>~{estimated.toLocaleString()} cats estimated</span>
                         )}
@@ -873,18 +970,16 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Show Full Graph button - only visible when viewing a subtree */}
-          {currentMainId && tree && currentMainId !== tree.foundingMotherId && (
-            <button
-              type="button"
-              onClick={handleShowFullGraph}
-              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
-              title="Show the complete family tree from the founding couple"
-            >
-              <Maximize2 className="size-4" />
-              Show Full Graph
-            </button>
-          )}
+          {/* Zoom to Parents button - always visible */}
+          <button
+            type="button"
+            onClick={handleShowFullGraph}
+            className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+            title="Zoom to the founding couple"
+          >
+            <Maximize2 className="size-4" />
+            Zoom to Parents
+          </button>
           <button
             type="button"
             onClick={handleRegenerate}
@@ -937,6 +1032,8 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
         <SaveTreeDialog
           currentName={tree.name}
           currentCreator={tree.creatorName}
+          currentSlug={tree.slug}
+          hasPassword={hasPassword}
           onSave={handleSaveTree}
           onClose={() => setShowSaveDialog(false)}
         />

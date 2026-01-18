@@ -11,7 +11,7 @@ import { convertToFamilyChartFormat } from "@/lib/ancestry-tree/familyChartAdapt
 
 export type TreeOrientation = "vertical" | "horizontal";
 
-export type RelativeType = "son" | "daughter" | "spouse";
+export type RelativeType = "son" | "daughter" | "spouse" | "father" | "mother";
 
 export interface FamilyChartTreeRef {
   startAddRelative: () => void;
@@ -147,27 +147,17 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     stopAddRelative: () => {
       // Cancel the add-relative mode and clean up placeholder cards
       if (editTreeRef.current && chartRef.current) {
-        // Access the addRelativeInstance to clean up
+        // Access the addRelativeInstance to properly cancel
         const editTree = editTreeRef.current as unknown as {
           addRelativeInstance?: {
             is_active: boolean;
-            cleanUp: (data?: unknown[]) => unknown[];
-            datum: unknown;
-            cancelCallback?: (datum: unknown) => void;
+            onCancel: () => void;
           };
         };
 
         if (editTree.addRelativeInstance?.is_active) {
-          // Call cleanUp to remove placeholder cards from data
-          editTree.addRelativeInstance.cleanUp();
-
-          // Call cancelCallback if available
-          if (editTree.addRelativeInstance.cancelCallback && editTree.addRelativeInstance.datum) {
-            editTree.addRelativeInstance.cancelCallback(editTree.addRelativeInstance.datum);
-          }
-
-          // Update the tree to reflect changes
-          chartRef.current.updateTree({ tree_position: "inherit" });
+          // Call onCancel to properly reset state and clean up placeholders
+          editTree.addRelativeInstance.onCancel();
         }
       }
     },
@@ -205,7 +195,8 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     const chart = f3.createChart(container, chartData)
       .setTransitionTime(300)
       .setCardXSpacing(220)
-      .setCardYSpacing(150);
+      .setCardYSpacing(150)
+      .setSingleParentEmptyCard(false);  // Hide empty spouse placeholder cards (the "ADD" cards)
 
     // Set orientation
     if (orientation === "horizontal") {
@@ -253,9 +244,12 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
         const parentCatData = parentDatum?.data as unknown as CustomData | undefined;
 
         if (parentCatData?.catData) {
+          // Map rel_type from library to our RelativeType
           let relType: RelativeType = "son";
           if (newRelData.rel_type === "daughter") relType = "daughter";
           else if (newRelData.rel_type === "spouse") relType = "spouse";
+          else if (newRelData.rel_type === "father") relType = "father";
+          else if (newRelData.rel_type === "mother") relType = "mother";
 
           // Cancel the add-relative mode after generating
           if (editTreeRef.current?.isAddingRelative()) {
@@ -279,15 +273,16 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
       f3Card.onCardClickDefault(e, d);
 
       // If we were in add-relative mode, cancel it since user clicked a different card
+      // IMPORTANT: Must call onCancel() not just cleanUp() to properly reset is_active state
       const editTree = editTreeRef.current as unknown as {
         addRelativeInstance?: {
           is_active: boolean;
-          cleanUp: (data?: unknown[]) => unknown[];
+          onCancel: () => void;
         };
       } | null;
       if (editTree?.addRelativeInstance?.is_active) {
-        editTree.addRelativeInstance.cleanUp();
-        chart.updateTree({ tree_position: "inherit" });
+        editTree.addRelativeInstance.onCancel();
+        // Note: onCancel() already calls cleanUp() and resets is_active
         // Notify parent that edit mode was cancelled
         onEditModeChangedRef.current?.(false);
       }
