@@ -20,8 +20,7 @@ function generateId(): string {
 }
 
 // Relationship constants
-const COUSIN_MARRIAGE_CHANCE = 0.01; // 1% chance for cousin marriages
-const MULTIPLE_PARTNERS_CHANCE = 0.20; // 20% chance for females to have multiple partners
+const MULTIPLE_PARTNERS_CHANCE = 0.20; // 20% chance for multiple partners
 
 function generateSlug(): string {
   return `tree-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -108,31 +107,6 @@ export class AncestryTreeManager {
     }
 
     return grandparents;
-  }
-
-  /**
-   * Check if a cat is eligible to be a partner for another cat.
-   * Never allows siblings.
-   * Allows cousins only with COUSIN_MARRIAGE_CHANCE probability.
-   */
-  private isEligiblePartner(cat: AncestryTreeCat, potentialPartner: AncestryTreeCat): boolean {
-    // Must be opposite gender
-    if (cat.gender === potentialPartner.gender) return false;
-
-    // Must not already be paired with this cat
-    if (potentialPartner.partnerIds.includes(cat.id)) return false;
-
-    const relationship = this.getRelationship(cat, potentialPartner);
-
-    // Never allow siblings
-    if (relationship === 'sibling') return false;
-
-    // Cousins only with 1% chance
-    if (relationship === 'cousin') {
-      return Math.random() < COUSIN_MARRIAGE_CHANCE;
-    }
-
-    return true;
   }
 
   constructor(mutationPool?: MutationPool) {
@@ -439,47 +413,60 @@ export class AncestryTreeManager {
 
       // Pair up children for next generation (if not last generation)
       if (generation < depth) {
-        const females = children.filter((c) => c.gender === 'F');
         const { partnerChance } = this.tree.config;
 
-        // Collect all potential partners from this generation (males from any family)
-        const allMalesThisGen = Array.from(this.tree.cats.values()).filter(
-          (c) => c.gender === 'M' && c.generation === generation && c.partnerIds.length === 0
-        );
+        // Partner source chances
+        const COUSIN_CHANCE = 0.01;        // 1% chance to marry a cousin
+        const DISTANT_RELATIVE_CHANCE = 0.10;  // 10% chance to marry a distant relative
 
-        // Create couples from children (age them up to warriors)
-        for (const female of females) {
-          // Check if this female gets a partner based on partnerChance
-          if (Math.random() >= partnerChance) {
-            // This female doesn't get a partner - skip to next
-            continue;
-          }
+        // Process each child - both males and females have equal chance to find partners
+        for (const child of children) {
+          // Skip if already partnered
+          if (child.partnerIds.length > 0) continue;
 
-          female.lifeStage = 'warrior';
-          female.name = {
-            prefix: female.name.prefix,
+          // Check if this child finds a partner based on partnerChance
+          if (Math.random() >= partnerChance) continue;
+
+          // Age up to warrior
+          child.lifeStage = 'warrior';
+          child.name = {
+            prefix: child.name.prefix,
             suffix: pickOne(['fur', 'pelt', 'tail', 'claw', 'heart', 'stripe', 'leaf', 'storm', 'wing', 'shine']),
             full: '',
           };
-          female.name.full = female.name.prefix.charAt(0).toUpperCase() +
-            female.name.prefix.slice(1).toLowerCase() +
-            female.name.suffix;
+          child.name.full = child.name.prefix.charAt(0).toUpperCase() +
+            child.name.prefix.slice(1).toLowerCase() +
+            child.name.suffix;
 
-          // Determine how many partners this female will have
-          // 20% chance for multiple partners (2 partners)
+          // Determine partner count (20% chance for multiple partners)
           const hasMultiplePartners = Math.random() < MULTIPLE_PARTNERS_CHANCE;
           const partnerCount = hasMultiplePartners ? 2 : 1;
 
           for (let p = 0; p < partnerCount; p++) {
-            // Find or generate a partner
+            // Roll for partner source
+            const roll = Math.random();
             let partner: AncestryTreeCat | undefined;
 
-            // Try to find an eligible partner (never siblings, very rarely cousins)
-            partner = allMalesThisGen.find((m) => this.isEligiblePartner(female, m));
+            // Get all potential partners from the tree (opposite gender, unpartnered, same generation)
+            const oppositeGender: Gender = child.gender === 'F' ? 'M' : 'F';
+            const allPotentialPartners = Array.from(this.tree.cats.values()).filter(
+              (c) => c.gender === oppositeGender &&
+                     c.generation === generation &&
+                     c.partnerIds.length === 0 &&
+                     c.id !== child.id
+            );
+
+            if (roll < COUSIN_CHANCE) {
+              // Try to find a cousin (1% chance)
+              partner = allPotentialPartners.find((c) => this.getRelationship(child, c) === 'cousin');
+            } else if (roll < COUSIN_CHANCE + DISTANT_RELATIVE_CHANCE) {
+              // Try to find a distant relative - someone from tree who isn't sibling or cousin (10% chance)
+              partner = allPotentialPartners.find((c) => this.getRelationship(child, c) === 'unrelated');
+            }
+            // else: outsider (89% chance) - partner stays undefined
 
             if (!partner) {
-              // Generate a new partner from outside the family
-              const partnerGender: Gender = 'M';
+              // Generate an outsider partner
               const tortiePool = {
                 pelts: this.mutationPool.pelts,
                 colours: this.mutationPool.colours,
@@ -487,11 +474,11 @@ export class AncestryTreeManager {
               };
               const partnerGenetics = createGeneticsFromParams(
                 {
-                  ...geneticsToParams(female.genetics, {}, tortiePool),
+                  ...geneticsToParams(child.genetics, {}, tortiePool),
                   peltName: this.mutationPool.pelts.length > 0 ? pickOne(this.mutationPool.pelts) : 'Tabby',
                   colour: this.mutationPool.colours.length > 0 ? pickOne(this.mutationPool.colours) : 'BLACK',
                 },
-                partnerGender
+                oppositeGender
               );
 
               const spriteNumber = this.mutationPool.spriteNumbers.length > 0
@@ -500,7 +487,7 @@ export class AncestryTreeManager {
 
               partner = this.createCat(
                 geneticsToParams(partnerGenetics, { spriteNumber }, tortiePool),
-                partnerGender,
+                oppositeGender,
                 generation,
                 null,
                 null,
@@ -509,7 +496,7 @@ export class AncestryTreeManager {
               partner.lifeStage = 'warrior';
               catsGenerated++;
             } else {
-              // Age up the male partner found from the tree
+              // Age up the partner found from the tree
               partner.lifeStage = 'warrior';
               partner.name = {
                 prefix: partner.name.prefix,
@@ -521,15 +508,18 @@ export class AncestryTreeManager {
                 partner.name.suffix;
             }
 
-            // Link both partners (supports multiple spouses)
-            if (!female.partnerIds.includes(partner.id)) {
-              female.partnerIds.push(partner.id);
+            // Link both partners
+            if (!child.partnerIds.includes(partner.id)) {
+              child.partnerIds.push(partner.id);
             }
-            if (!partner.partnerIds.includes(female.id)) {
-              partner.partnerIds.push(female.id);
+            if (!partner.partnerIds.includes(child.id)) {
+              partner.partnerIds.push(child.id);
             }
 
-            newCouples.push({ motherId: female.id, fatherId: partner.id });
+            // Add to couples list (female first for consistency)
+            const motherId = child.gender === 'F' ? child.id : partner.id;
+            const fatherId = child.gender === 'M' ? child.id : partner.id;
+            newCouples.push({ motherId, fatherId });
           }
         }
       }
