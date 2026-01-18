@@ -16,6 +16,7 @@ import type {
 } from "@/lib/ancestry-tree/types";
 import { DEFAULT_TREE_CONFIG, DEFAULT_OFFSPRING_OPTIONS } from "@/lib/ancestry-tree/types";
 import { AncestryTreeManager, type MutationPool } from "@/lib/ancestry-tree/treeManager";
+import { useTreeWorker, type TreeProgress } from "@/lib/ancestry-tree/useTreeWorker";
 import { generateRandomParamsV3, ensureSpriteMapper } from "@/lib/cat-v3/randomGenerator";
 import { generateWarriorName } from "@/lib/ancestry-tree/nameGenerator";
 import type { CatParams } from "@/lib/cat-v3/types";
@@ -40,6 +41,22 @@ interface ParentPreview {
   name: CatName;
 }
 
+/**
+ * Estimate the number of cats that will be generated.
+ * This is a rough estimate based on average children per couple.
+ */
+function estimateCatCount(depth: number, avgChildren: number): number {
+  let total = 2; // founding couple
+  let couples = 1;
+  for (let i = 1; i <= depth; i++) {
+    const children = Math.round(couples * avgChildren);
+    total += children;
+    // ~50% female, ~20% have multiple partners (average 1.2 partners)
+    couples = Math.floor(children * 0.5 * 1.2);
+  }
+  return total;
+}
+
 export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
   const [viewMode, setViewMode] = useState<ViewMode>(initialTree ? "tree" : "config");
   const [tree, setTree] = useState<SerializedAncestryTree | null>(initialTree ?? null);
@@ -47,6 +64,9 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
     initialTree?.config ?? DEFAULT_TREE_CONFIG
   );
   const [selectedCat, setSelectedCat] = useState<AncestryTreeCat | null>(null);
+
+  // Use Web Worker for tree generation
+  const { generateTree: generateTreeWorker, progress: workerProgress, isGenerating: isWorkerGenerating, cancel: cancelWorker } = useTreeWorker();
   const [isGenerating, setIsGenerating] = useState(false);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -113,14 +133,12 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
     async (input: FoundingCoupleInput) => {
       setIsGenerating(true);
       try {
-        const manager = new AncestryTreeManager(mutationPoolRef.current);
-        manager.setConfig(config);
-        manager.setName("Unnamed Tree");
-
-        manager.initializeFoundingCouple(input);
-        manager.generateFullTree();
-
-        const serialized = manager.serialize();
+        // Use Web Worker for non-blocking generation
+        const serialized = await generateTreeWorker(
+          config,
+          input,
+          mutationPoolRef.current
+        );
         setTree(serialized);
         setViewMode("tree");
       } catch (error) {
@@ -129,7 +147,7 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
         setIsGenerating(false);
       }
     },
-    [config]
+    [config, generateTreeWorker]
   );
 
   // Pick a random palette from enabled modes
@@ -217,19 +235,43 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
   const handleRegenerate = useCallback(async () => {
     if (!tree || !isSpriteMapperReady) return;
 
+    // Extract founding couple from current tree
+    const foundingMother = tree.cats.find((c) => c.id === tree.foundingMotherId);
+    const foundingFather = tree.cats.find((c) => c.id === tree.foundingFatherId);
+
+    if (!foundingMother || !foundingFather) {
+      console.error("Founding couple not found in tree");
+      return;
+    }
+
+    const foundingCouple: FoundingCoupleInput = {
+      mother: {
+        params: foundingMother.params,
+        name: foundingMother.name,
+        historyProfileId: foundingMother.historyProfileId,
+      },
+      father: {
+        params: foundingFather.params,
+        name: foundingFather.name,
+        historyProfileId: foundingFather.historyProfileId,
+      },
+    };
+
     setIsGenerating(true);
     try {
-      const manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
-      manager.setConfig(config);
-      manager.generateFullTree();
-      const serialized = manager.serialize();
+      // Use Web Worker for non-blocking generation
+      const serialized = await generateTreeWorker(
+        config,
+        foundingCouple,
+        mutationPoolRef.current
+      );
       setTree(serialized);
     } catch (error) {
       console.error("Failed to regenerate tree:", error);
     } finally {
       setIsGenerating(false);
     }
-  }, [tree, config, isSpriteMapperReady]);
+  }, [tree, config, isSpriteMapperReady, generateTreeWorker]);
 
   const handleCatClick = useCallback((cat: AncestryTreeCat) => {
     setSelectedCat(cat);
@@ -524,20 +566,65 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
                 </div>
               </div>
 
-              {/* Generate Button */}
-              <button
-                type="button"
-                onClick={handleGenerateFromPreview}
-                disabled={!motherPreview || !fatherPreview || isGenerating}
-                className="w-full flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-5 text-lg font-semibold text-white transition-all hover:from-amber-500 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-              >
-                {isGenerating ? (
-                  <Loader2 className="size-6 animate-spin" />
-                ) : (
-                  <Trees className="size-6" />
-                )}
-                Generate Ancestry Tree
-              </button>
+              {/* Generation Progress or Generate Button */}
+              {(isGenerating || isWorkerGenerating) && workerProgress ? (
+                <div className="glass-card p-6 text-center space-y-4">
+                  <Loader2 className="size-8 animate-spin mx-auto text-amber-500" />
+                  <p className="text-lg font-medium">
+                    Generating Generation {workerProgress.generation} of {workerProgress.total}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {workerProgress.catCount.toLocaleString()} cats created...
+                  </p>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 transition-all duration-300"
+                      style={{ width: `${(workerProgress.generation / workerProgress.total) * 100}%` }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={cancelWorker}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Tree Size Estimate */}
+                  {(() => {
+                    const avgChildren = (config.minChildren + config.maxChildren) / 2;
+                    const estimated = estimateCatCount(config.depth, avgChildren);
+                    const isLarge = estimated > 1000;
+                    const isHuge = estimated > 5000;
+                    return (
+                      <div className={`text-center text-sm ${isHuge ? "text-red-400" : isLarge ? "text-amber-400" : "text-muted-foreground"}`}>
+                        {isHuge ? (
+                          <span>⚠️ Very large tree: ~{estimated.toLocaleString()} cats estimated. May take a while.</span>
+                        ) : isLarge ? (
+                          <span>⚡ Large tree: ~{estimated.toLocaleString()} cats estimated</span>
+                        ) : (
+                          <span>~{estimated.toLocaleString()} cats estimated</span>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <button
+                    type="button"
+                    onClick={handleGenerateFromPreview}
+                    disabled={!motherPreview || !fatherPreview || isGenerating || isWorkerGenerating}
+                    className="w-full flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-5 text-lg font-semibold text-white transition-all hover:from-amber-500 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                  >
+                    {isGenerating || isWorkerGenerating ? (
+                      <Loader2 className="size-6 animate-spin" />
+                    ) : (
+                      <Trees className="size-6" />
+                    )}
+                    Generate Ancestry Tree
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Right Column - Settings */}
