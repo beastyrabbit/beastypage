@@ -7,6 +7,7 @@ export interface FamilyChartDatum {
     id: string;
     'first name': string;
     'last name': string;
+    'full name': string;
     gender: 'M' | 'F';
     generation: number;
     lifeStage: string;
@@ -52,6 +53,7 @@ export function convertToFamilyChartFormat(
         id: cat.id,
         'first name': cat.name.prefix,
         'last name': cat.name.suffix,
+        'full name': cat.name.full,
         gender: cat.gender,
         generation: cat.generation,
         lifeStage: cat.lifeStage,

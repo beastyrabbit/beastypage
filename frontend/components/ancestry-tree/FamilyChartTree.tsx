@@ -214,10 +214,10 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
       chart.setOrientationVertical();
     }
 
-    // Setup card display - show name in two lines
+    // Setup card display - show full name on one line
     const f3Card = chart.setCardHtml()
       .setStyle("imageRect")
-      .setCardDisplay([["first name"], ["last name"]])
+      .setCardDisplay([["full name"]])
       .setCardImageField("avatar")
       .setOnHoverPathToMain();
 

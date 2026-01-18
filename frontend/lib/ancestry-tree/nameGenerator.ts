@@ -82,61 +82,89 @@ const PREFIXES: string[] = [
 ];
 
 const SUFFIXES: string[] = [
-  // Body Parts (50+)
+  // Body Parts (60+)
   'fur', 'pelt', 'coat', 'tail', 'claw', 'fang', 'tooth', 'whisker', 'ear',
   'eye', 'eyes', 'nose', 'face', 'jaw', 'muzzle', 'snout', 'cheek', 'chin',
   'throat', 'neck', 'chest', 'belly', 'back', 'flank', 'side', 'shoulder',
   'leg', 'paw', 'foot', 'pad', 'toe', 'heel', 'ankle', 'wrist', 'spine',
   'rib', 'bone', 'skull', 'head', 'brow', 'crown', 'heart', 'soul', 'spirit',
-  'stripe', 'spot', 'patch', 'mark', 'scar', 'scratch', 'nick',
+  'stripe', 'spot', 'patch', 'mark', 'scar', 'scratch', 'nick', 'mask',
+  'blaze', 'tip', 'tuft', 'streak', 'dapple', 'speckle', 'freckle',
 
-  // Nature - Plants (30+)
+  // Nature - Plants (50+)
   'leaf', 'petal', 'bloom', 'blossom', 'flower', 'thorn', 'briar', 'bramble',
   'berry', 'seed', 'stem', 'branch', 'twig', 'bark', 'root', 'moss', 'fern',
   'grass', 'reed', 'rush', 'vine', 'weed', 'herb', 'sprout', 'bud', 'acorn',
-  'nettle', 'thistle', 'clover', 'ivy',
+  'nettle', 'thistle', 'clover', 'ivy', 'willow', 'oak', 'pine', 'cedar',
+  'maple', 'birch', 'alder', 'aspen', 'holly', 'hazel', 'laurel', 'sage',
+  'mint', 'basil', 'thyme', 'rose', 'lily', 'daisy', 'poppy', 'orchid',
 
-  // Nature - Weather/Sky (25+)
+  // Nature - Weather/Sky (40+)
   'storm', 'cloud', 'rain', 'snow', 'frost', 'ice', 'hail', 'mist', 'fog',
   'dew', 'wind', 'breeze', 'gale', 'thunder', 'lightning', 'flash', 'spark',
   'flame', 'fire', 'blaze', 'ember', 'ash', 'smoke', 'shadow', 'light',
+  'flare', 'glow', 'shine', 'shimmer', 'glint', 'gleam', 'ray', 'beam',
+  'bolt', 'crack', 'rumble', 'whisper', 'howl', 'gust', 'squall',
 
-  // Nature - Water (20+)
+  // Nature - Water (35+)
   'stream', 'river', 'creek', 'brook', 'spring', 'pool', 'pond', 'lake',
   'wave', 'ripple', 'splash', 'drop', 'drip', 'fall', 'falls', 'rapid',
-  'current', 'tide', 'shore', 'bank',
+  'current', 'tide', 'shore', 'bank', 'spray', 'foam', 'mist', 'eddy',
+  'whirl', 'swirl', 'surge', 'flow', 'flood', 'wash', 'wake', 'drift',
+  'dip', 'dive', 'swim',
 
-  // Nature - Earth (25+)
+  // Nature - Earth (40+)
   'stone', 'rock', 'boulder', 'pebble', 'dust', 'sand', 'mud', 'clay',
   'earth', 'ground', 'soil', 'dirt', 'gravel', 'slate', 'flint', 'crag',
   'cliff', 'ridge', 'peak', 'hill', 'valley', 'hollow', 'cave', 'den', 'burrow',
+  'ledge', 'shelf', 'slope', 'gorge', 'canyon', 'ravine', 'gully', 'dune',
+  'mesa', 'bluff', 'knoll', 'mound', 'pit', 'quarry', 'chasm',
 
-  // Actions/Movement (40+)
+  // Actions/Movement (60+)
   'flight', 'leap', 'jump', 'bound', 'spring', 'dash', 'run', 'sprint',
   'chase', 'hunt', 'strike', 'slash', 'swipe', 'bite', 'snap', 'snarl',
   'growl', 'hiss', 'screech', 'call', 'cry', 'song', 'howl', 'yowl', 'wail',
   'step', 'stride', 'tread', 'walk', 'stalk', 'prowl', 'creep', 'sneak',
-  'pounce', 'crouch', 'rest', 'sleep', 'dream', 'wish', 'hope',
+  'pounce', 'crouch', 'rest', 'sleep', 'dream', 'wish', 'hope', 'surge',
+  'charge', 'rush', 'bolt', 'dart', 'dive', 'soar', 'glide', 'swoop',
+  'twist', 'spin', 'whirl', 'flip', 'tumble', 'roll', 'slide', 'skid',
+  'climb', 'fall', 'drop', 'rise', 'float',
 
-  // Qualities (30+)
-  'shine', 'gleam', 'glow', 'shimmer', 'glimmer', 'sparkle', 'glitter', 'flash',
-  'dazzle', 'blaze', 'flare', 'beam', 'ray', 'shade', 'dark', 'night',
-  'dawn', 'dusk', 'moon', 'sun', 'star', 'sky', 'cloud', 'weather', 'breeze',
-  'storm', 'thunder', 'lightning', 'rainbow', 'aurora',
+  // Qualities/Descriptive (50+)
+  'shine', 'gleam', 'glow', 'shimmer', 'glimmer', 'sparkle', 'glitter',
+  'dazzle', 'flare', 'beam', 'ray', 'shade', 'dark', 'night',
+  'dawn', 'dusk', 'moon', 'sun', 'star', 'sky', 'weather',
+  'storm', 'thunder', 'lightning', 'rainbow', 'aurora', 'haze', 'blur',
+  'swift', 'quick', 'fast', 'slow', 'soft', 'hard', 'sharp', 'bright',
+  'dim', 'pale', 'deep', 'high', 'low', 'long', 'short', 'wild',
+  'calm', 'fierce', 'gentle', 'bold', 'shy',
 
-  // Abstract/Concepts (25+)
-  'song', 'call', 'cry', 'whisper', 'murmur', 'roar', 'shriek', 'scream',
+  // Abstract/Sounds (35+)
+  'song', 'whisper', 'murmur', 'roar', 'shriek', 'scream',
   'silence', 'echo', 'voice', 'sound', 'noise', 'tune', 'melody', 'harmony',
   'rhythm', 'beat', 'pulse', 'breath', 'sigh', 'gasp', 'snore', 'purr', 'rumble',
+  'chime', 'ring', 'toll', 'hum', 'buzz', 'chirp', 'trill', 'coo', 'croak',
+  'rasp', 'crack', 'snap',
 
-  // Time/Seasons (15+)
-  'dawn', 'dusk', 'night', 'day', 'morning', 'evening', 'noon', 'midnight',
-  'spring', 'summer', 'fall', 'winter', 'season', 'moon', 'sun',
+  // Time/Seasons (20+)
+  'morning', 'evening', 'noon', 'midnight',
+  'autumn', 'equinox', 'solstice', 'harvest',
+  'twilight', 'daybreak', 'nightfall', 'sundown', 'moonrise', 'starlight',
+  'frost', 'thaw', 'bloom', 'wilt', 'fade', 'glow',
 
-  // Fauna (20+)
+  // Fauna/Animal Parts (35+)
   'wing', 'feather', 'talon', 'beak', 'scale', 'fin', 'gill', 'antler',
-  'horn', 'hoof', 'mane', 'tuft', 'plume', 'quill', 'barb', 'spine',
-  'shell', 'hide', 'skin', 'wool',
+  'horn', 'hoof', 'mane', 'tuft', 'plume', 'quill', 'barb',
+  'shell', 'hide', 'skin', 'wool', 'down', 'crest', 'crown', 'frill',
+  'snout', 'tusk', 'fang', 'claw', 'pad', 'print', 'track', 'trail',
+  'nest', 'perch', 'roost', 'lair',
+
+  // Additional Nature (40+)
+  'meadow', 'field', 'glade', 'grove', 'copse', 'thicket', 'brush', 'scrub',
+  'marsh', 'swamp', 'bog', 'fen', 'moor', 'heath', 'prairie', 'steppe',
+  'tundra', 'desert', 'oasis', 'jungle', 'forest', 'wood', 'shade', 'canopy',
+  'clearing', 'path', 'trail', 'road', 'bridge', 'ford', 'crossing', 'pass',
+  'gate', 'gap', 'breach', 'break', 'split', 'crack', 'fissure', 'rift',
 ];
 
 const LIFE_STAGE_SUFFIXES: Record<LifeStage, string> = {

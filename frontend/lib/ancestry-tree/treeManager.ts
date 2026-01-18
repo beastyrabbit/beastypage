@@ -242,7 +242,11 @@ export class AncestryTreeManager {
     historyProfileId?: string,
     existingName?: { prefix: string; suffix: string; full: string }
   ): AncestryTreeCat {
-    const lifeStage: LifeStage = generation === 0 ? 'warrior' : 'kit';
+    // Founders are warriors, offspring get random life stages for variety
+    // (This breaks Warrior Cats lore where all kits have 'kit' suffix, but gives more name variety)
+    const lifeStage: LifeStage = generation === 0
+      ? 'warrior'
+      : (['kit', 'apprentice', 'warrior'] as const)[Math.floor(Math.random() * 3)];
     const name = existingName ?? generateWarriorName(lifeStage, this.usedNames);
     this.usedNames.add(name.full.toLowerCase());
 
