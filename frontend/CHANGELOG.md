@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.2](https://github.com/beastyrabbit/beastypage/compare/v1.6.1...v1.6.2) (2026-01-18)
+
+
+### Bug Fixes
+
+* add missing jimp dependency ([1c03795](https://github.com/beastyrabbit/beastypage/commit/1c03795aa549b70e8185e9c3d2c47655d704fa1c))
+* sync bun.lock with package.json ([9f6b833](https://github.com/beastyrabbit/beastypage/commit/9f6b833e5f94e56f48d57e23bdefe3e4e97c0a3c))
+
 ## [1.6.1](https://github.com/beastyrabbit/beastypage/compare/v1.6.0...v1.6.1) (2026-01-18)
 
 
