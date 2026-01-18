@@ -79,10 +79,31 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     startAddRelative: () => {
       // Use the editTree API to show add-relative options on the graph
       if (editTreeRef.current && chartRef.current) {
-        // Get the currently selected cat's datum
-        const mainDatum = chartRef.current.getMainDatum();
-        if (mainDatum) {
-          editTreeRef.current.addRelative(mainDatum);
+        try {
+          // Ensure the main ID is synced with the current chart data
+          // This re-establishes the main datum after data updates
+          if (currentMainIdRef.current) {
+            chartRef.current.updateMainId(currentMainIdRef.current);
+          }
+
+          // Get the currently selected cat's datum
+          const mainDatum = chartRef.current.getMainDatum();
+          if (mainDatum) {
+            editTreeRef.current.addRelative(mainDatum);
+          }
+        } catch (error) {
+          // If the datum can't be found (stale reference after tree update),
+          // try to recover by updating the tree first
+          console.warn("[FamilyChartTree] addRelative failed, attempting recovery:", error);
+          try {
+            chartRef.current.updateTree({ tree_position: "inherit" });
+            const mainDatum = chartRef.current.getMainDatum();
+            if (mainDatum && editTreeRef.current) {
+              editTreeRef.current.addRelative(mainDatum);
+            }
+          } catch (retryError) {
+            console.error("[FamilyChartTree] Failed to start add-relative mode:", retryError);
+          }
         }
       }
     },
@@ -280,7 +301,19 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     if (prevDataLengthRef.current === 0) return;
 
     chartRef.current.updateData(chartData);
+
+    // Re-establish main ID after data update to prevent stale datum references
+    // This ensures getMainDatum() returns a valid datum from the new data
+    if (currentMainIdRef.current) {
+      // Verify the main ID still exists in the new data
+      const mainIdExists = chartData.some(d => d.id === currentMainIdRef.current);
+      if (mainIdExists) {
+        chartRef.current.updateMainId(currentMainIdRef.current);
+      }
+    }
+
     chartRef.current.updateTree({ tree_position: "inherit" });
+    prevDataLengthRef.current = chartData.length;
   }, [chartData]);
 
   if (chartData.length === 0) {
