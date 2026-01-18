@@ -38,9 +38,25 @@ export interface TreeErrorMessage {
 
 export type TreeWorkerResponse = TreeProgressMessage | TreeCompleteMessage | TreeErrorMessage;
 
+export interface TreeCancelMessage {
+  type: 'cancel';
+}
+
+export type TreeWorkerMessage = TreeWorkerRequest | TreeCancelMessage;
+
+// Track cancellation state
+let cancelled = false;
+
 // Worker entry point
-self.onmessage = (event: MessageEvent<TreeWorkerRequest>) => {
-  const { config, foundingCouple, mutationPool } = event.data;
+self.onmessage = (event: MessageEvent<TreeWorkerMessage>) => {
+  // Handle cancellation message
+  if ('type' in event.data && event.data.type === 'cancel') {
+    cancelled = true;
+    return;
+  }
+
+  const { config, foundingCouple, mutationPool } = event.data as TreeWorkerRequest;
+  cancelled = false;
 
   try {
     // Create manager with mutation pool
@@ -56,6 +72,16 @@ self.onmessage = (event: MessageEvent<TreeWorkerRequest>) => {
 
     // Generate each generation with progress reporting
     for (let gen = 1; gen <= config.depth; gen++) {
+      // Check for cancellation between generations
+      if (cancelled) {
+        const errorMessage: TreeErrorMessage = {
+          type: 'error',
+          error: 'Cancelled',
+        };
+        self.postMessage(errorMessage);
+        return;
+      }
+
       manager.generateGeneration(gen);
 
       // Report progress
@@ -66,6 +92,16 @@ self.onmessage = (event: MessageEvent<TreeWorkerRequest>) => {
         catCount: manager.getAllCats().length,
       };
       self.postMessage(progressMessage);
+    }
+
+    // Final cancellation check before sending result
+    if (cancelled) {
+      const errorMessage: TreeErrorMessage = {
+        type: 'error',
+        error: 'Cancelled',
+      };
+      self.postMessage(errorMessage);
+      return;
     }
 
     // Return completed tree

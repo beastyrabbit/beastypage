@@ -5,7 +5,7 @@ import Image from "next/image";
 import { X, Dna, GitBranch, SkipForward, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AncestryTreeCat } from "@/lib/ancestry-tree/types";
-import { encodeCatShare } from "@/lib/catShare";
+import { getCatPreviewUrl, MAX_SPRITE_POSE } from "@/lib/ancestry-tree/utils";
 
 interface CatSidebarProps {
   cat: AncestryTreeCat | null;
@@ -26,18 +26,7 @@ export function CatSidebar({
 }: CatSidebarProps) {
   const previewUrl = useMemo(() => {
     if (!cat) return null;
-    const encoded = encodeCatShare({
-      params: cat.params as unknown as Record<string, unknown>,
-      accessorySlots: cat.params.accessories ?? [],
-      scarSlots: cat.params.scars ?? [],
-      tortieSlots: cat.params.tortie ?? [],
-      counts: {
-        accessories: cat.params.accessories?.length ?? 0,
-        scars: cat.params.scars?.length ?? 0,
-        tortie: cat.params.tortie?.length ?? 0,
-      },
-    });
-    return `/api/preview/_?cat=${encodeURIComponent(encoded)}`;
+    return getCatPreviewUrl(cat);
   }, [cat]);
 
   if (!cat) return null;
@@ -105,13 +94,13 @@ export function CatSidebar({
                 type="button"
                 onClick={() => {
                   const currentPose = cat.params.spriteNumber ?? 0;
-                  const nextPose = currentPose >= 20 ? 0 : currentPose + 1;
+                  const nextPose = currentPose >= MAX_SPRITE_POSE ? 0 : currentPose + 1;
                   onChangePose(cat, nextPose);
                 }}
                 className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/20"
               >
                 <SkipForward className="size-3.5" />
-                Next Pose ({cat.params.spriteNumber ?? 0}/20)
+                Next Pose ({cat.params.spriteNumber ?? 0}/{MAX_SPRITE_POSE})
               </button>
             )}
             {/* Basic Info - one line */}

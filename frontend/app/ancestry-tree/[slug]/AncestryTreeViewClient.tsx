@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "convex/react";
@@ -68,6 +68,22 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
   const record = useQuery(api.ancestryTree.getBySlug, { slug }) as AncestryTreeRecord | null | undefined;
   const [focusedPreview, setFocusedPreview] = useState<{ label: string; url: string } | null>(null);
   const [groupByGeneration, setGroupByGeneration] = useState(true);
+
+  // Close modal on Escape key
+  const closePreview = useCallback(() => setFocusedPreview(null), []);
+
+  useEffect(() => {
+    if (!focusedPreview) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closePreview();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [focusedPreview, closePreview]);
 
   const enrichedCats = useMemo(() => {
     if (!record?.cats?.length) return [];
@@ -210,13 +226,13 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
           onClick={(event) => {
             if (event.target !== event.currentTarget) return;
-            setFocusedPreview(null);
+            closePreview();
           }}
         >
           <div className="relative w-full max-w-4xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
             <button
               type="button"
-              onClick={() => setFocusedPreview(null)}
+              onClick={closePreview}
               aria-label="Close preview"
               className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
             >

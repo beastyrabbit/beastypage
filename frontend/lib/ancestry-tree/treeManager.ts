@@ -15,6 +15,7 @@ import type {
 import { DEFAULT_TREE_CONFIG, DEFAULT_OFFSPRING_OPTIONS } from './types';
 import { createGeneticsFromParams, inheritGenetics, geneticsToParams } from './genetics';
 import { generateWarriorName, pickOne } from './nameGenerator';
+import { WARRIOR_SUFFIXES } from './utils';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -434,7 +435,7 @@ export class AncestryTreeManager {
           child.lifeStage = 'warrior';
           child.name = {
             prefix: child.name.prefix,
-            suffix: pickOne(['fur', 'pelt', 'tail', 'claw', 'heart', 'stripe', 'leaf', 'storm', 'wing', 'shine']),
+            suffix: pickOne([...WARRIOR_SUFFIXES]),
             full: '',
           };
           child.name.full = child.name.prefix.charAt(0).toUpperCase() +

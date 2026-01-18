@@ -3,7 +3,7 @@
 import { memo, useMemo, forwardRef } from "react";
 import Image from "next/image";
 import type { AncestryTreeCat } from "@/lib/ancestry-tree/types";
-import { encodeCatShare } from "@/lib/catShare";
+import { getCatPreviewUrl } from "@/lib/ancestry-tree/utils";
 
 interface CatNodeProps {
   cat: AncestryTreeCat;
@@ -36,20 +36,7 @@ export const CatNode = memo(
   ) {
     const pixelSize = SIZE_MAP[size];
 
-    const previewUrl = useMemo(() => {
-      const encoded = encodeCatShare({
-        params: cat.params as unknown as Record<string, unknown>,
-        accessorySlots: cat.params.accessories ?? [],
-        scarSlots: cat.params.scars ?? [],
-        tortieSlots: cat.params.tortie ?? [],
-        counts: {
-          accessories: cat.params.accessories?.length ?? 0,
-          scars: cat.params.scars?.length ?? 0,
-          tortie: cat.params.tortie?.length ?? 0,
-        },
-      });
-      return `/api/preview/_?cat=${encodeURIComponent(encoded)}`;
-    }, [cat.params]);
+    const previewUrl = useMemo(() => getCatPreviewUrl(cat), [cat]);
 
     const genderIcon = cat.gender === "F" ? "♀" : "♂";
     const genderColor = cat.gender === "F" ? "text-pink-400" : "text-blue-400";

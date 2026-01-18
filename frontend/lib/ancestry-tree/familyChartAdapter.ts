@@ -62,8 +62,8 @@ export function convertToFamilyChartFormat(
       },
       rels: {
         parents,
-        spouses: cat.partnerIds ?? [],
-        children: cat.childrenIds ?? [],
+        spouses: [...(cat.partnerIds ?? [])],
+        children: [...(cat.childrenIds ?? [])],
       },
     };
 

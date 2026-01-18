@@ -193,7 +193,7 @@ function inheritTortieData(
  * Generate tortie layers from inherited genetics
  * Returns 1-4 layers randomly, using inherited patterns/masks/colours
  */
-function generateTortieLayers(
+export function generateTortieLayers(
   tortieData: TortieGenetics,
   mutationPool: { pelts: string[]; colours: string[]; tortieMasks: string[] }
 ): TortieLayer[] {
@@ -411,6 +411,3 @@ export function geneticsToParams(
 
   return result;
 }
-
-// Export for use in tree manager
-export { generateTortieLayers };

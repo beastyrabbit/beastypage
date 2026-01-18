@@ -89,6 +89,24 @@ export const DEFAULT_TREE_CONFIG: TreeGenerationConfig = {
   paletteModes: ['off'],  // Classic only by default
 };
 
+/**
+ * Create a fresh copy of the default tree config to avoid shared mutation
+ */
+export function createDefaultTreeConfig(): TreeGenerationConfig {
+  return {
+    ...DEFAULT_TREE_CONFIG,
+    offspringOptions: { ...DEFAULT_OFFSPRING_OPTIONS },
+    paletteModes: [...(DEFAULT_TREE_CONFIG.paletteModes ?? ['off'])],
+  };
+}
+
+/**
+ * Create a fresh copy of the default offspring options
+ */
+export function createDefaultOffspringOptions(): OffspringOptions {
+  return { ...DEFAULT_OFFSPRING_OPTIONS };
+}
+
 export interface AncestryTree {
   id: string;
   slug: string;

@@ -1,8 +1,24 @@
 import { mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
 
-// Simple hash function for password (not cryptographically secure, but good enough for this use case)
-// In production, you'd want to use a proper hashing library via an action
+/**
+ * SECURITY NOTE: This is a simple hash function providing basic ownership protection.
+ * It is NOT cryptographically secure and should NOT be used for sensitive authentication.
+ *
+ * This is intentionally lightweight protection to prevent casual overwrites of trees.
+ * For production-grade security, implement password hashing via Convex actions using
+ * argon2 or bcrypt with proper salt handling and constant-time comparison.
+ *
+ * Trade-offs accepted for this use case:
+ * - No protection against determined attackers
+ * - Predictable hash output (no random salt)
+ * - Not suitable for authentication systems
+ *
+ * This is acceptable here because:
+ * - Trees are not sensitive data
+ * - Password is optional convenience feature
+ * - Main goal is preventing accidental overwrites
+ */
 function simpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {

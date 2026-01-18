@@ -176,7 +176,7 @@ export function HistoryClient() {
     created: tree.createdAt ?? null,
     slug: tree.slug,
     catCount: tree.catCount,
-    depth: tree.config.depth,
+    depth: tree.config?.depth ?? 0,
     hasPassword: tree.hasPassword,
     previewCats: tree.previewCats ?? [],
   }));

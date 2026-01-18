@@ -88,6 +88,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [isSpriteMapperReady, setIsSpriteMapperReady] = useState(false);
+  const [spriteMapperError, setSpriteMapperError] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<TreeOrientation>("vertical");
   const [currentMainId, setCurrentMainId] = useState<string | null>(null);
   const [isEditingRelations, setIsEditingRelations] = useState(false);
@@ -131,8 +132,10 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
           tortieMasks: mapper.getTortieMasks(),
         };
         setIsSpriteMapperReady(true);
+        setSpriteMapperError(null);
       } catch (error) {
         console.error("Failed to initialize sprite mapper:", error);
+        setSpriteMapperError("Failed to load sprite data. Please refresh the page.");
       }
     }
     initSpriteMapper();
@@ -201,7 +204,11 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
 
   // Pick a random palette from enabled modes
   const getRandomPaletteMode = useCallback(() => {
-    const modes = config.paletteModes ?? ['off'];
+    const modes = config.paletteModes;
+    // Treat empty array or undefined as no special modes - fall back to 'off'
+    if (!modes || modes.length === 0) {
+      return 'off';
+    }
     return modes[Math.floor(Math.random() * modes.length)];
   }, [config.paletteModes]);
 
@@ -641,7 +648,19 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
   if (viewMode === "config" || !tree) {
     return (
       <div className="w-full">
-        {!isSpriteMapperReady ? (
+        {spriteMapperError ? (
+          <div className="flex flex-col items-center justify-center gap-4 py-20">
+            <div className="text-red-400 text-lg font-medium">Failed to load sprite data</div>
+            <p className="text-muted-foreground text-sm">{spriteMapperError}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
+        ) : !isSpriteMapperReady ? (
           <div className="flex items-center justify-center gap-3 py-20">
             <Loader2 className="size-8 animate-spin text-amber-500" />
             <span className="text-muted-foreground">Loading sprite data...</span>
@@ -730,31 +749,34 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                     const estimated = estimateCatCount(config.depth, avgChildren, config.partnerChance ?? 1);
                     const isLarge = estimated > 1000;
                     const isHuge = estimated > 5000;
+                    const isTooLarge = estimated > 5000;
                     return (
-                      <div className={`text-center text-sm ${isHuge ? "text-red-400" : isLarge ? "text-amber-400" : "text-muted-foreground"}`}>
-                        {isHuge ? (
-                          <span>🚫 ~{estimated.toLocaleString()} cats — too large to render, will not load</span>
-                        ) : isLarge ? (
-                          <span>⚠️ ~{estimated.toLocaleString()} cats — may not load properly</span>
-                        ) : (
-                          <span>~{estimated.toLocaleString()} cats estimated</span>
-                        )}
-                      </div>
+                      <>
+                        <div className={`text-center text-sm ${isHuge ? "text-red-400" : isLarge ? "text-amber-400" : "text-muted-foreground"}`}>
+                          {isHuge ? (
+                            <span>🚫 ~{estimated.toLocaleString()} cats — too large to render, will not load</span>
+                          ) : isLarge ? (
+                            <span>⚠️ ~{estimated.toLocaleString()} cats — may not load properly</span>
+                          ) : (
+                            <span>~{estimated.toLocaleString()} cats estimated</span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleGenerateFromPreview}
+                          disabled={!motherPreview || !fatherPreview || isGenerating || isWorkerGenerating || isTooLarge}
+                          className="w-full flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-5 text-lg font-semibold text-white transition-all hover:from-amber-500 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                        >
+                          {isGenerating || isWorkerGenerating ? (
+                            <Loader2 className="size-6 animate-spin" />
+                          ) : (
+                            <Trees className="size-6" />
+                          )}
+                          {isTooLarge ? "Tree Too Large" : "Generate Ancestry Tree"}
+                        </button>
+                      </>
                     );
                   })()}
-                  <button
-                    type="button"
-                    onClick={handleGenerateFromPreview}
-                    disabled={!motherPreview || !fatherPreview || isGenerating || isWorkerGenerating}
-                    className="w-full flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-5 text-lg font-semibold text-white transition-all hover:from-amber-500 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                  >
-                    {isGenerating || isWorkerGenerating ? (
-                      <Loader2 className="size-6 animate-spin" />
-                    ) : (
-                      <Trees className="size-6" />
-                    )}
-                    Generate Ancestry Tree
-                  </button>
                   <button
                     type="button"
                     onClick={handleGenerateBaseFromPreview}

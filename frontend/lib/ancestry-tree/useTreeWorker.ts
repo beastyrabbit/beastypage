@@ -42,6 +42,8 @@ export function useTreeWorker(): UseTreeWorkerReturn {
       rejectRef.current = null;
     }
     if (workerRef.current) {
+      // Send cooperative cancel signal before terminating
+      workerRef.current.postMessage({ type: 'cancel' });
       workerRef.current.terminate();
       workerRef.current = null;
     }
@@ -53,6 +55,7 @@ export function useTreeWorker(): UseTreeWorkerReturn {
   useEffect(() => {
     return () => {
       if (workerRef.current) {
+        workerRef.current.postMessage({ type: 'cancel' });
         workerRef.current.terminate();
         workerRef.current = null;
       }
