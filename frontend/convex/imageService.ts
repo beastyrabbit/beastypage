@@ -4,7 +4,7 @@ import type { ActionCtx } from "./_generated/server.js";
 import type { Id } from "./_generated/dataModel.js";
 import { v } from "convex/values";
 import { api } from "./_generated/api.js";
-import sharp from "sharp";
+import { Jimp } from "jimp";
 
 type Variant = "default" | "custom";
 
@@ -91,16 +91,29 @@ async function generateThumbnail(
 
     const buffer = await response.arrayBuffer();
 
-    // Get original image metadata
-    const originalMetadata = await sharp(Buffer.from(buffer)).metadata();
+    // Read the original image with Jimp
+    const image = await Jimp.read(Buffer.from(buffer));
+    const originalWidth = image.width;
+    const originalHeight = image.height;
 
-    // Resize with sharp (256px max dimension, 85% quality)
-    const processed = await sharp(Buffer.from(buffer))
-      .resize(256, 256, { fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
+    // Resize with Jimp (256px max dimension, maintain aspect ratio)
+    const maxDim = 256;
+    let newWidth = originalWidth;
+    let newHeight = originalHeight;
 
-    const processedMetadata = await sharp(processed).metadata();
+    if (originalWidth > maxDim || originalHeight > maxDim) {
+      if (originalWidth > originalHeight) {
+        newWidth = maxDim;
+        newHeight = Math.round((originalHeight / originalWidth) * maxDim);
+      } else {
+        newHeight = maxDim;
+        newWidth = Math.round((originalWidth / originalHeight) * maxDim);
+      }
+      image.resize({ w: newWidth, h: newHeight });
+    }
+
+    // Convert to JPEG with 85% quality
+    const processed = await image.getBuffer("image/jpeg", { quality: 85 });
 
     // Store the thumbnail
     const thumbStorageId = await ctx.storage.store(
@@ -114,14 +127,14 @@ async function generateThumbnail(
       payload: {
         thumbStorageId,
         thumbName,
-        thumbWidth: processedMetadata.width,
-        thumbHeight: processedMetadata.height,
-        width: originalMetadata.width,
-        height: originalMetadata.height,
+        thumbWidth: newWidth,
+        thumbHeight: newHeight,
+        width: originalWidth,
+        height: originalHeight,
       },
     };
   } catch (error) {
-    console.warn("Error generating thumbnail with sharp", { catId, variant, error });
+    console.warn("Error generating thumbnail with jimp", { catId, variant, error });
     return null;
   }
 }

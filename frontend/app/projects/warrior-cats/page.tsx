@@ -40,11 +40,11 @@ const TOOLS: ToolCard[] = [
     href: "/guided-builder",
   },
   {
-    title: "ClanGen History Explorer",
-    icon: "📜",
+    title: "Ancestry Tree",
+    icon: "🌳",
     description:
-      "Interactive timeline, family trees, and profiles from ClanGen save files.",
-    comingSoon: true,
+      "Create interactive family trees with trait inheritance across generations.",
+    href: "/projects/warrior-cats/ancestry-tree",
   },
   {
     title: "Catdex",

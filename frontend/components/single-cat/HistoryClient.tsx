@@ -7,6 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Loader2, ArrowUpRight, Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { encodeCatShare } from "@/lib/catShare";
+import { HistoryAncestryTreeCard } from "./HistoryAncestryTreeCard";
 
 type SortMode = "newest" | "oldest" | "name";
 
@@ -18,6 +19,12 @@ type AdoptionHistoryCat = {
   previewUrl: string | null;
   fullUrl: string | null;
   viewerUrl: string | null;
+};
+
+type TreePreviewCat = {
+  id: string;
+  name: string;
+  params: Record<string, unknown>;
 };
 
 type HistoryItem =
@@ -32,6 +39,18 @@ type HistoryItem =
       fullUrl: string | null;
       slug: string;
       cats: AdoptionHistoryCat[];
+    }
+  | {
+      kind: "tree";
+      id: string;
+      title: string;
+      creator: string | null;
+      created: number | null;
+      slug: string;
+      catCount: number;
+      depth: number;
+      hasPassword: boolean;
+      previewCats: TreePreviewCat[];
     };
 
 function cleanDisplay(value: string | null | undefined): string {
@@ -70,9 +89,11 @@ export function HistoryClient() {
 
   const profilesQuery = useQuery(api.mapper.listHistory, { limit: 200 });
   const batchesQuery = useQuery(api.adoption.listBatches, { limit: 120 });
+  const treesQuery = useQuery(api.ancestryTree.list, { limit: 50 });
 
   const profiles = profilesQuery ?? [];
   const batches = batchesQuery ?? [];
+  const trees = treesQuery ?? [];
 
   const singleItems: HistoryItem[] = profiles
     .filter((profile) => !profile.adoptionBatchId)
@@ -147,7 +168,20 @@ export function HistoryClient() {
     };
   });
 
-  const allItems = useMemo(() => [...singleItems, ...adoptionItems], [singleItems, adoptionItems]);
+  const treeItems: HistoryItem[] = trees.map((tree) => ({
+    kind: "tree" as const,
+    id: tree.id,
+    title: cleanDisplay(tree.name) || "Ancestry Tree",
+    creator: cleanDisplay(tree.creatorName) || null,
+    created: tree.createdAt ?? null,
+    slug: tree.slug,
+    catCount: tree.catCount,
+    depth: tree.config?.depth ?? 0,
+    hasPassword: tree.hasPassword,
+    previewCats: tree.previewCats ?? [],
+  }));
+
+  const allItems = useMemo(() => [...singleItems, ...adoptionItems, ...treeItems], [singleItems, adoptionItems, treeItems]);
 
   const filteredItems = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -180,7 +214,7 @@ export function HistoryClient() {
     });
   }, [filteredItems, sortMode]);
 
-  if (profilesQuery === undefined || batchesQuery === undefined) {
+  if (profilesQuery === undefined || batchesQuery === undefined || treesQuery === undefined) {
     return (
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center gap-3 px-6 py-16 text-muted-foreground">
         <Loader2 className="size-6 animate-spin text-primary" />
@@ -194,10 +228,13 @@ export function HistoryClient() {
       <section className="flex flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground/80">
           <span className="rounded-full border border-amber-400/40 bg-amber-500/15 px-3 py-1 font-semibold text-amber-200/90">
-            {sortedItems.length.toLocaleString()} saved cats
+            {sortedItems.length.toLocaleString()} entries
           </span>
           <span className="rounded-full border border-amber-400/30 bg-slate-950/60 px-3 py-1 text-foreground/80">
-            {adoptionItems.length.toLocaleString()} adoption batches
+            {adoptionItems.length.toLocaleString()} batches
+          </span>
+          <span className="rounded-full border border-green-400/30 bg-slate-950/60 px-3 py-1 text-foreground/80">
+            {treeItems.length.toLocaleString()} trees
           </span>
         </div>
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -308,6 +345,9 @@ type HistoryCardProps = {
 function HistoryCard({ item, onPreview }: HistoryCardProps) {
   if (item.kind === "adoption") {
     return <HistoryAdoptionCard item={item} onPreview={onPreview} />;
+  }
+  if (item.kind === "tree") {
+    return <HistoryAncestryTreeCard item={item} onPreview={onPreview} />;
   }
   return <HistorySingleCard item={item} onPreview={onPreview} />;
 }

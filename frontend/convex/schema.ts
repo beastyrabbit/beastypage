@@ -234,5 +234,51 @@ export default defineSchema({
     createdAt: v.number()
   })
     .index("byClient", ["clientId", "createdAt"])
-    .index("byCats", ["catAId", "catBId", "createdAt"])
+    .index("byCats", ["catAId", "catBId", "createdAt"]),
+
+  ancestry_tree: defineTable({
+    slug: v.string(),
+    name: v.string(),
+    foundingMotherId: v.string(),
+    foundingFatherId: v.string(),
+    cats: v.array(v.object({
+      id: v.string(),
+      name: v.object({
+        prefix: v.string(),
+        suffix: v.string(),
+        full: v.string()
+      }),
+      gender: v.union(v.literal("M"), v.literal("F")),
+      lifeStage: v.string(),
+      params: v.any(),
+      motherId: v.union(v.string(), v.null()),
+      fatherId: v.union(v.string(), v.null()),
+      partnerIds: v.array(v.string()),
+      childrenIds: v.array(v.string()),
+      genetics: v.any(),
+      source: v.string(),
+      historyProfileId: v.optional(v.string()),
+      generation: v.number()
+    })),
+    config: v.object({
+      minChildren: v.number(),
+      maxChildren: v.number(),
+      depth: v.number(),
+      genderRatio: v.number(),
+      partnerChance: v.optional(v.number()),
+      paletteModes: v.optional(v.array(v.string())),
+      offspringOptions: v.optional(v.object({
+        accessoryChance: v.number(),
+        maxAccessories: v.number(),
+        scarChance: v.number(),
+        maxScars: v.number()
+      }))
+    }),
+    creatorName: v.optional(v.string()),
+    passwordHash: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("bySlug", ["slug"])
+    .index("byCreated", ["createdAt"])
 });
