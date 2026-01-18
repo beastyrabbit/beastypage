@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/beastyrabbit/beastypage/compare/v1.3.1...v1.3.2) (2026-01-18)
+
+
+### Bug Fixes
+
+* address CodeRabbit review issues ([880e8e9](https://github.com/beastyrabbit/beastypage/commit/880e8e921c8a973a5af77c9bbdedf76b9a8815f7))
+
 ## [1.3.1](https://github.com/beastyrabbit/beastypage/compare/v1.3.0...v1.3.1) (2026-01-16)
 
 
