@@ -1,8 +1,8 @@
 # BeastyPage - Development Guidelines
 
-## Commit Messages & Versioning
+## Commit Messages
 
-This project uses **Release Please** for automated versioning. Commits must follow the **Conventional Commits** format.
+Commits should follow the **Conventional Commits** format for clarity.
 
 ### Conventional Commits Format
 
@@ -15,57 +15,57 @@ This project uses **Release Please** for automated versioning. Commits must foll
 
 ### Common Prefixes
 
-| Prefix | Description | Version Bump |
-|--------|-------------|--------------|
-| `feat:` | New feature | Minor (1.3.0 → 1.4.0) |
-| `fix:` | Bug fix | Patch (1.3.0 → 1.3.1) |
-| `feat!:` or `BREAKING CHANGE:` | Breaking change | Major (1.3.0 → 2.0.0) |
-| `chore:` | Maintenance tasks | No bump (batched) |
-| `docs:` | Documentation only | No bump (batched) |
-| `style:` | Code style changes | No bump (batched) |
-| `refactor:` | Code refactoring | No bump (batched) |
-| `test:` | Adding/updating tests | No bump (batched) |
-| `ci:` | CI/CD changes | No bump (batched) |
-
-### How Release Please Works
-
-1. **You**: Create feature branch, make changes, open PR with Conventional Commit title
-2. **You**: Merge your feature PR to main
-3. **Release Please**: Auto-creates/updates a "Release PR" with version bump + CHANGELOG
-4. **You** (when ready): Merge the Release PR
-5. **Release Please**: Creates git tag → triggers Docker image build
+| Prefix | Description |
+|--------|-------------|
+| `feat:` | New feature |
+| `fix:` | Bug fix |
+| `chore:` | Maintenance tasks |
+| `docs:` | Documentation only |
+| `style:` | Code style changes |
+| `refactor:` | Code refactoring |
+| `test:` | Adding/updating tests |
+| `ci:` | CI/CD changes |
 
 ### Examples
 
 ```bash
-# Feature (minor bump)
 git commit -m "feat: add dark mode toggle"
-
-# Bug fix (patch bump)
 git commit -m "fix: correct wheel spin animation"
-
-# Breaking change (major bump)
-git commit -m "feat!: redesign API response format"
-
-# No version bump
 git commit -m "chore: update dependencies"
-git commit -m "docs: add API documentation"
 ```
+
+## Versioning & Releases
+
+Releases are triggered manually by pushing a git tag.
+
+### Creating a Release
+
+When you're ready to release a new version:
+
+```bash
+# Create and push a version tag
+git tag v1.7.0
+git push origin v1.7.0
+```
+
+This triggers the Docker build workflow which:
+- Builds both frontend and renderer images
+- Tags them with the version (e.g., `1.7.0`, `1.7`)
+- Pushes to GitHub Container Registry
+
+### Docker Build Triggers
+
+| Trigger | What builds | Image tags |
+|---------|-------------|------------|
+| Push to `main` | Only changed packages | `latest`, commit SHA |
+| Push `v*` tag | Both packages | Version (e.g., `1.7.0`), `1.7` |
+| Manual dispatch | Selected packages | `latest`, commit SHA |
 
 ## Project Structure
 
 - `frontend/` - Next.js application (see `frontend/CLAUDE.md` for details)
 - `backend/renderer_service/` - Cat card renderer service (Python/FastAPI)
 - `.github/workflows/` - CI/CD pipelines
-
-### Versioned Packages
-
-Both packages share the same version and are managed by Release Please:
-
-| Package | Version File | Type |
-|---------|--------------|------|
-| `frontend` | `frontend/package.json` | node |
-| `backend/renderer_service` | `backend/renderer_service/pyproject.toml` | python |
 
 ## Git Hooks
 
@@ -80,4 +80,4 @@ pip install pre-commit && pre-commit install
 1. Create a feature branch from `main`
 2. Make changes with Conventional Commit messages
 3. Open a PR and merge to `main`
-4. Release Please handles versioning automatically
+4. When ready to release, push a version tag (e.g., `git tag v1.7.0 && git push origin v1.7.0`)
