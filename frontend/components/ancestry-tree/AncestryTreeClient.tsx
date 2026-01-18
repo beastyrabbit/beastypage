@@ -150,6 +150,38 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
     [config, generateTreeWorker]
   );
 
+  // Generate base tree (founding couple only, no descendants)
+  const generateBaseTreeFromCouple = useCallback(
+    (input: FoundingCoupleInput) => {
+      setIsGenerating(true);
+      try {
+        const manager = new AncestryTreeManager(mutationPoolRef.current);
+        manager.setConfig(config);
+        manager.setName("Unnamed Tree");
+        manager.initializeFoundingCouple(input);
+        // Don't call generateFullTree() - just keep the founding couple
+
+        const serialized = manager.serialize();
+        setTree(serialized);
+        setViewMode("tree");
+      } catch (error) {
+        console.error("Failed to generate base tree:", error);
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [config]
+  );
+
+  // Generate base tree from preview parents
+  const handleGenerateBaseFromPreview = useCallback(() => {
+    if (!motherPreview || !fatherPreview) return;
+    generateBaseTreeFromCouple({
+      mother: { params: motherPreview.params, name: motherPreview.name },
+      father: { params: fatherPreview.params, name: fatherPreview.name },
+    });
+  }, [motherPreview, fatherPreview, generateBaseTreeFromCouple]);
+
   // Pick a random palette from enabled modes
   const getRandomPaletteMode = useCallback(() => {
     const modes = config.paletteModes ?? ['off'];
@@ -622,6 +654,14 @@ export function AncestryTreeClient({ initialTree }: AncestryTreeClientProps) {
                       <Trees className="size-6" />
                     )}
                     Generate Ancestry Tree
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerateBaseFromPreview}
+                    disabled={!motherPreview || !fatherPreview || isGenerating || isWorkerGenerating}
+                    className="w-full flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-sm font-medium transition-colors hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Generate Base Tree (Parents Only)
                   </button>
                 </div>
               )}
