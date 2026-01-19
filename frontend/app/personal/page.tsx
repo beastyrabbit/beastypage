@@ -64,7 +64,7 @@ export default function PersonalLanding() {
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-16">
       <PageHero
         eyebrow="About BeastyRabbit"
-        title={<>Hey there, I'm <span className="text-gradient-personal animate-shimmer bg-[length:200%_auto]">Beasty.</span></>}
+        title={<>Hey there, I&apos;m <span className="text-gradient-personal animate-shimmer bg-[length:200%_auto]">Beasty.</span></>}
         description="Germany-based streamer building a cozy English-first space for tech deep dives, offbeat gadgets, and nostalgic games."
       >
         <Link

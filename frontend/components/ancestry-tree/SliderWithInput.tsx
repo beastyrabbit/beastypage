@@ -34,6 +34,7 @@ export function SliderWithInput({
   // Sync input value when external value changes (and not editing)
   useEffect(() => {
     if (!isEditing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional sync of controlled input
       setInputValue(String(value));
     }
   }, [value, isEditing]);
