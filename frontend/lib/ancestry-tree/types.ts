@@ -67,7 +67,22 @@ export const DEFAULT_OFFSPRING_OPTIONS: OffspringOptions = {
   maxScars: 1,
 };
 
-export type PaletteMode = 'off' | 'mood' | 'bold' | 'darker' | 'blackout';
+export type PaletteMode =
+  | 'off'
+  | 'mood'
+  | 'bold'
+  | 'darker'
+  | 'blackout'
+  | 'mononoke'
+  | 'howl'
+  | 'demonslayer'
+  | 'titanic'
+  | 'deathnote'
+  | 'slime'
+  | 'ghostintheshell'
+  | 'mushishi'
+  | 'chisweethome'
+  | 'fma';
 
 export interface TreeGenerationConfig {
   minChildren: number;

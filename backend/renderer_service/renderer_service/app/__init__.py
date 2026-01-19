@@ -115,7 +115,9 @@ class RendererSupervisor:
         self._ensure_circuit()
         loop = asyncio.get_running_loop()
         future: asyncio.Future = loop.create_future()
-        job = QueueJob(execute=fn, future=future, kind=kind, enqueued_at=time.monotonic())
+        job = QueueJob(
+            execute=fn, future=future, kind=kind, enqueued_at=time.monotonic()
+        )
         try:
             self.queue.put_nowait(job)
         except asyncio.QueueFull as exc:
@@ -155,8 +157,12 @@ class RendererSupervisor:
             "total_enqueued": self.total_enqueued,
             "total_completed": self.total_completed,
             "total_failed": self.total_failed,
-            "circuit_open": bool(self.circuit_open_until and now < self.circuit_open_until),
-            "circuit_reset_in": max(0.0, self.circuit_open_until - now) if self.circuit_open_until else 0.0,
+            "circuit_open": bool(
+                self.circuit_open_until and now < self.circuit_open_until
+            ),
+            "circuit_reset_in": max(0.0, self.circuit_open_until - now)
+            if self.circuit_open_until
+            else 0.0,
             "worker_count": self.worker_count,
         }
 
@@ -166,10 +172,16 @@ def create_app() -> FastAPI:
     pipeline = RenderPipeline(canvas_size=settings.default_canvas_size)
     supervisor = RendererSupervisor(
         pipeline,
-        max_queue_size=settings.max_queue_size if hasattr(settings, "max_queue_size") else 120,
+        max_queue_size=settings.max_queue_size
+        if hasattr(settings, "max_queue_size")
+        else 120,
         worker_count=settings.worker_count if hasattr(settings, "worker_count") else 4,
-        circuit_failure_threshold=settings.circuit_failure_threshold if hasattr(settings, "circuit_failure_threshold") else 8,
-        circuit_reset_seconds=settings.circuit_reset_seconds if hasattr(settings, "circuit_reset_seconds") else 12,
+        circuit_failure_threshold=settings.circuit_failure_threshold
+        if hasattr(settings, "circuit_failure_threshold")
+        else 8,
+        circuit_reset_seconds=settings.circuit_reset_seconds
+        if hasattr(settings, "circuit_reset_seconds")
+        else 12,
     )
 
     app.add_middleware(
@@ -234,6 +246,11 @@ def create_app() -> FastAPI:
     def diff(_: DiffRequest) -> DiffResponse:  # pragma: no cover - placeholder
         raise NotImplementedError("V2 vs V3 diffing is not implemented yet")
 
+    @app.get("/palettes")
+    def get_palettes() -> list[dict]:
+        """Return all available color palettes with their metadata and colors."""
+        return pipeline.mapper.get_palette_metadata()
+
     return app
 
 
@@ -242,7 +259,9 @@ def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderRe
     params = {**payload.params}
     params.setdefault("spriteNumber", payload.spriteNumber)
     collect_layers = request.options.collect_layers if request.options else False
-    include_layer_images = request.options.include_layer_images if request.options else False
+    include_layer_images = (
+        request.options.include_layer_images if request.options else False
+    )
 
     result = pipeline.render(params, collect_layers=collect_layers)
     image_bytes = _image_to_data_url(result.composed)
@@ -256,7 +275,9 @@ def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderRe
                 "duration_ms": layer.duration_ms,
                 "diagnostics": layer.diagnostics,
                 "blend_mode": layer.blend_mode,
-                "image": _image_to_data_url(layer.image) if include_layer_images else None,
+                "image": _image_to_data_url(layer.image)
+                if include_layer_images
+                else None,
             }
             for layer in result.layers
         ]
@@ -265,7 +286,9 @@ def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderRe
     )
 
 
-def _render_batch(pipeline: RenderPipeline, request: BatchRenderRequest) -> BatchRenderResponse:
+def _render_batch(
+    pipeline: RenderPipeline, request: BatchRenderRequest
+) -> BatchRenderResponse:
     base_params = {**request.payload.params}
     base_params.setdefault("spriteNumber", request.payload.spriteNumber)
 
@@ -305,7 +328,10 @@ def _render_batch(pipeline: RenderPipeline, request: BatchRenderRequest) -> Batc
 
     sources = None
     if batch_result.sources:
-        sources = [FrameSource(id=frame_id, image=_image_to_data_url(image)) for frame_id, image in batch_result.sources]
+        sources = [
+            FrameSource(id=frame_id, image=_image_to_data_url(image))
+            for frame_id, image in batch_result.sources
+        ]
 
     return BatchRenderResponse(
         sheet=sheet_data,

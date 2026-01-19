@@ -5,7 +5,7 @@ export interface SpriteMapperApi {
   init(): Promise<boolean>;
   getSprites(): number[];
   getPeltNames(): string[];
-  getColourOptions(mode?: unknown): string[];
+  getColourOptions(mode?: unknown, includeBase?: boolean): string[];
   getExperimentalColoursByMode?(mode: string): string[];
   getColours(): string[];
   getEyeColours(): string[];

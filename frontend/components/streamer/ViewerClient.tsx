@@ -29,6 +29,16 @@ const COLOUR_MODE_LABELS: Record<string, string> = {
   bold: "Bold",
   darker: "Darker",
   blackout: "Blackout",
+  mononoke: "Princess Mononoke",
+  howl: "Howl's Moving Castle",
+  demonslayer: "Demon Slayer",
+  titanic: "Titanic",
+  deathnote: "Death Note",
+  slime: "Reincarnated as a Slime",
+  ghostintheshell: "Ghost in the Shell",
+  mushishi: "Mushishi",
+  chisweethome: "Chi's Sweet Home",
+  fma: "Fullmetal Alchemist",
   all: "All",
 };
 

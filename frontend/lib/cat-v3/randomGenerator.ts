@@ -33,7 +33,7 @@ const RANDOM_CONFIG = config as GenerationConfig;
 interface SpriteMapperApi {
   loaded: boolean;
   init(): Promise<boolean>;
-  getColourOptions(mode?: unknown): string[];
+  getColourOptions(mode?: unknown, includeBase?: boolean): string[];
   getColours(): string[];
   getPeltNames(): string[];
   getTints(): string[];

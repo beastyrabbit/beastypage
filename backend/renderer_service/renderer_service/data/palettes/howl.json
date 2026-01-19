@@ -1,0 +1,22 @@
+{
+  "id": "howl",
+  "label": "Howl's Moving Castle",
+  "description": "Calcifer's warmth, Howl's magic, Sophie's journey, and enchanted Ghibli skies",
+  "colors": {
+    "HOWL_CALCIFER": { "multiply": [255, 99, 71] },
+    "HOWL_FLAME": { "multiply": [234, 196, 26] },
+    "HOWL_GOLD": { "multiply": [255, 215, 0] },
+    "HOWL_WIZARDBLUE": { "multiply": [0, 115, 168] },
+    "HOWL_SKYBLUE": { "multiply": [96, 125, 139] },
+    "HOWL_STARLIGHT": { "multiply": [197, 133, 244] },
+    "HOWL_COAT": { "multiply": [119, 55, 166] },
+    "HOWL_DEEPVIOLET": { "multiply": [77, 41, 142] },
+    "HOWL_LAVENDER": { "multiply": [188, 140, 204] },
+    "HOWL_MEADOW": { "multiply": [92, 148, 156] },
+    "HOWL_SOPHIE": { "multiply": [120, 44, 44] },
+    "HOWL_CASTLE": { "multiply": [52, 41, 83] },
+    "HOWL_WASTES": { "multiply": [60, 81, 89] },
+    "HOWL_SUNSET": { "multiply": [232, 141, 167] },
+    "HOWL_CREAM": { "multiply": [212, 212, 164] }
+  }
+}

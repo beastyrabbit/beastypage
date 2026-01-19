@@ -1,0 +1,31 @@
+{
+  "id": "mood",
+  "label": "Mood",
+  "description": "Soft, pastel tones for gentle aesthetics",
+  "colors": {
+    "AQUA": { "multiply": [96, 212, 255] },
+    "APRICOT": { "multiply": [255, 198, 150], "screen": [255, 220, 190, 0.25] },
+    "CORAL": { "multiply": [255, 148, 130], "screen": [255, 190, 170, 0.25] },
+    "DAWN": { "multiply": [247, 214, 214], "screen": [255, 230, 230, 0.2] },
+    "FERN": { "multiply": [170, 214, 150], "screen": [195, 236, 182, 0.22] },
+    "GLAZEDBLUE": { "multiply": [175, 210, 235], "screen": [204, 232, 255, 0.22] },
+    "GOLDLEAF": { "multiply": [240, 203, 120], "screen": [255, 226, 170, 0.2] },
+    "LAVENDER": { "multiply": [186, 160, 255] },
+    "LEMONADE": { "multiply": [255, 232, 180], "screen": [255, 245, 214, 0.2] },
+    "MANGO": { "multiply": [255, 204, 140], "screen": [255, 225, 175, 0.22] },
+    "MINT": { "multiply": [155, 233, 202] },
+    "MIST": { "multiply": [210, 230, 243], "screen": [230, 245, 255, 0.18] },
+    "PEACH": { "multiply": [255, 210, 175], "screen": [255, 235, 210, 0.2] },
+    "PASTELBLUE": { "multiply": [190, 220, 255], "screen": [220, 235, 255, 0.18] },
+    "PASTELMINT": { "multiply": [190, 255, 227], "screen": [210, 255, 235, 0.18] },
+    "PASTELPINK": { "multiply": [255, 200, 225], "screen": [255, 220, 235, 0.18] },
+    "PASTELPURPLE": { "multiply": [220, 200, 255], "screen": [235, 220, 255, 0.18] },
+    "PASTELYELLOW": { "multiply": [255, 240, 180], "screen": [255, 250, 210, 0.18] },
+    "PERIWINKLE": { "multiply": [158, 167, 250] },
+    "SEAFOAM": { "multiply": [126, 230, 207] },
+    "SPRINGGREEN": { "multiply": [115, 224, 130] },
+    "WATERLILY": { "multiply": [198, 225, 215], "screen": [220, 240, 230, 0.16] },
+    "WISTERIA": { "multiply": [210, 190, 255], "screen": [230, 210, 255, 0.18] },
+    "ZIRCON": { "multiply": [220, 240, 255], "screen": [235, 245, 255, 0.14] }
+  }
+}
