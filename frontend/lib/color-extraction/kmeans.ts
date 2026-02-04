@@ -309,10 +309,9 @@ function findBestPosition(
     return { x: centroid.x, y: centroid.y };
   }
 
-  // Normalize spatial distance by image diagonal
-  const maxSpatialDist = Math.sqrt(
-    imageWidth * imageWidth + imageHeight * imageHeight
-  );
+  // Normalize spatial distance by image diagonal (guard against 0 for degenerate images)
+  const maxSpatialDist =
+    Math.sqrt(imageWidth * imageWidth + imageHeight * imageHeight) || 1;
   // Max possible color distance (black to white)
   const maxColorDist = Math.sqrt(255 * 255 * 3);
 
