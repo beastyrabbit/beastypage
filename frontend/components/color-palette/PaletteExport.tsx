@@ -14,6 +14,7 @@ import {
 } from "@/lib/color-extraction/color-utils";
 import { generateColorDisplayName } from "@/lib/color-extraction/color-names";
 import { createMultiColorSpotlightImage } from "@/lib/color-extraction/kmeans";
+import { generateACO } from "@/lib/color-extraction/palette-formats";
 
 interface PaletteExportProps {
   topColors: ExtractedColor[];
@@ -153,73 +154,6 @@ function collectAllColorsForExport(
   processColorSet(familyColors, "accent");
 
   return result;
-}
-
-/**
- * Generate ACO binary data (Adobe Photoshop Color Swatch)
- * Version 2 format with color names
- */
-function generateACO(colors: Array<{ rgb: RGB; name: string }>): ArrayBuffer {
-  // ACO v2 format:
-  // - Version: 2 (2 bytes, big-endian)
-  // - Color count: (2 bytes, big-endian)
-  // - For each color:
-  //   - Color space: 0 for RGB (2 bytes)
-  //   - R: 0-65535 (2 bytes)
-  //   - G: 0-65535 (2 bytes)
-  //   - B: 0-65535 (2 bytes)
-  //   - Unused: 0 (2 bytes)
-  //   - Name length: char count + 1 (4 bytes, big-endian)
-  //   - Name: UTF-16BE string + null terminator
-
-  // Calculate total size
-  let totalSize = 4; // version (2) + count (2)
-  for (const color of colors) {
-    totalSize += 10; // color data
-    totalSize += 4; // name length
-    totalSize += (color.name.length + 1) * 2; // UTF-16BE + null
-  }
-
-  const buffer = new ArrayBuffer(totalSize);
-  const view = new DataView(buffer);
-
-  // Version 2 header (big-endian)
-  view.setUint16(0, 2, false);
-  view.setUint16(2, colors.length, false);
-
-  let offset = 4;
-  for (const color of colors) {
-    // Color space: 0 = RGB
-    view.setUint16(offset, 0, false);
-    offset += 2;
-
-    // RGB values scaled from 0-255 to 0-65535
-    view.setUint16(offset, color.rgb.r * 257, false);
-    offset += 2;
-    view.setUint16(offset, color.rgb.g * 257, false);
-    offset += 2;
-    view.setUint16(offset, color.rgb.b * 257, false);
-    offset += 2;
-
-    // Unused
-    view.setUint16(offset, 0, false);
-    offset += 2;
-
-    // Name length (including null terminator)
-    view.setUint32(offset, color.name.length + 1, false);
-    offset += 4;
-
-    // Name as UTF-16BE
-    for (let i = 0; i < color.name.length; i++) {
-      view.setUint16(offset, color.name.charCodeAt(i), false);
-      offset += 2;
-    }
-    // Null terminator
-    view.setUint16(offset, 0, false);
-    offset += 2;
-  }
-
-  return buffer;
 }
 
 export function PaletteExport({
@@ -382,45 +316,31 @@ export function PaletteExport({
     toast.success("Palette PNG downloaded!");
   }, [topColors, familyColors, brightnessFactors, hueShifts]);
 
-  const downloadColorSet = useCallback(
-    (format: ExportFormat) => {
-      const allColors = collectAllColorsForExport(
-        topColors,
-        familyColors,
-        brightnessFactors,
-        hueShifts
-      );
+  const downloadACO = useCallback(() => {
+    const allColors = collectAllColorsForExport(
+      topColors,
+      familyColors,
+      brightnessFactors,
+      hueShifts
+    );
 
-      if (allColors.length === 0) {
-        toast.error("No colors to export");
-        return;
-      }
+    if (allColors.length === 0) {
+      toast.error("No colors to export");
+      return;
+    }
 
-      let buffer: ArrayBuffer;
-      let mimeType: string;
+    const buffer = generateACO(allColors);
 
-      switch (format.id) {
-        case "aco":
-          buffer = generateACO(allColors);
-          mimeType = "application/octet-stream";
-          break;
-        default:
-          return;
-      }
+    const blob = new Blob([buffer], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.download = `color-palette-${Date.now()}.aco`;
+    link.href = url;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-      // Create and trigger download
-      const blob = new Blob([buffer], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.download = `color-palette-${Date.now()}${format.extension}`;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
-
-      toast.success(`Color set downloaded as ${format.extension.replace(/^\./, "").toUpperCase()}`);
-    },
-    [topColors, familyColors, brightnessFactors, hueShifts]
-  );
+    toast.success("Color set downloaded as ACO");
+  }, [topColors, familyColors, brightnessFactors, hueShifts]);
 
   const generateSpotlightPNG = useCallback(() => {
     if (!image) {
@@ -457,9 +377,9 @@ export function PaletteExport({
     } else if (selectedFormat.id === "spotlight") {
       generateSpotlightPNG();
     } else {
-      downloadColorSet(selectedFormat);
+      downloadACO();
     }
-  }, [selectedFormat, generatePalettePNG, generateSpotlightPNG, downloadColorSet]);
+  }, [selectedFormat, generatePalettePNG, generateSpotlightPNG, downloadACO]);
 
   const handleFormatSelect = useCallback((format: ExportFormat) => {
     setSelectedFormat(format);

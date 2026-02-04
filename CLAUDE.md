@@ -107,9 +107,15 @@ docker push ghcr.io/beastyrabbit/beastypage-frontend:latest
 ## Kubernetes Deployment
 
 Kubeconfig: `~/projects/kub-homelab/talos/kubeconfig`
+Helmrelease: `~/projects/kub-homelab/cluster/homelab/apps/webpage/beastypage/helmrelease.yaml`
 
-After updating helmrelease in kub-homelab:
+Full deploy sequence after updating the helmrelease image tag:
 ```bash
+# 1. Commit and push the helmrelease change in kub-homelab
+# 2. Reconcile git source so Flux sees the new commit
+flux --kubeconfig=~/projects/kub-homelab/talos/kubeconfig reconcile source git flux-system
+# 3. Reconcile the helmrelease
 flux --kubeconfig=~/projects/kub-homelab/talos/kubeconfig reconcile helmrelease beastypage -n webpage
-kubectl --kubeconfig=~/projects/kub-homelab/talos/kubeconfig rollout restart deployment/beastypage-frontend -n webpage
+# 4. Verify pod image
+kubectl --kubeconfig=~/projects/kub-homelab/talos/kubeconfig get pods -n webpage -l app.kubernetes.io/component=frontend -o jsonpath='{.items[*].spec.containers[*].image}'
 ```

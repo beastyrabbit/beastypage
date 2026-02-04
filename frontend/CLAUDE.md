@@ -105,6 +105,13 @@ bun test                 # Run tests
 bun test --watch         # Watch mode
 ```
 
+### Palette System
+
+- Palette types are centralized in `lib/palettes/types.ts` — `PaletteId`, `PaletteMode`, `PaletteCategory`
+- `PaletteCategory.id` is typed as `PaletteId` (not `string`) for compile-time safety
+- Adding a new palette: create file, add to `pure/index.ts` or `index.ts`, add ID to `PaletteId` union in `types.ts`
+- Never duplicate `PaletteMode` type — always import from `@/lib/palettes`
+
 ## Important Files
 
 - `app/layout.tsx` - Root layout with providers

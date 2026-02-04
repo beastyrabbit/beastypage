@@ -2,7 +2,7 @@
  * Color utility functions for conversions and adjustments
  */
 
-import type { RGB, HSL } from "./types";
+import type { RGB, HSL, HSV, CMYK, OKLCH } from "./types";
 
 /**
  * Convert RGB to HEX
@@ -102,6 +102,105 @@ export function hslToRgb(hsl: HSL): RGB {
 }
 
 /**
+ * Convert RGB to HSV
+ */
+export function rgbToHsv(rgb: RGB): HSV {
+  const r = rgb.r / 255;
+  const g = rgb.g / 255;
+  const b = rgb.b / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+
+  let h = 0;
+  if (d !== 0) {
+    switch (max) {
+      case r:
+        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        break;
+      case g:
+        h = ((b - r) / d + 2) / 6;
+        break;
+      case b:
+        h = ((r - g) / d + 4) / 6;
+        break;
+    }
+  }
+
+  const s = max === 0 ? 0 : d / max;
+
+  return {
+    h: Math.round(h * 360),
+    s: Math.round(s * 100),
+    v: Math.round(max * 100),
+  };
+}
+
+/**
+ * Convert RGB to CMYK (approximate, no ICC profile)
+ */
+export function rgbToCmyk(rgb: RGB): CMYK {
+  const r = rgb.r / 255;
+  const g = rgb.g / 255;
+  const b = rgb.b / 255;
+
+  const k = 1 - Math.max(r, g, b);
+  if (k === 1) {
+    return { c: 0, m: 0, y: 0, k: 100 };
+  }
+
+  return {
+    c: Math.round(((1 - r - k) / (1 - k)) * 100),
+    m: Math.round(((1 - g - k) / (1 - k)) * 100),
+    y: Math.round(((1 - b - k) / (1 - k)) * 100),
+    k: Math.round(k * 100),
+  };
+}
+
+/**
+ * Convert RGB to OKLCH via linear sRGB → LMS → OKLAB → OKLCH
+ */
+export function rgbToOklch(rgb: RGB): OKLCH {
+  // sRGB to linear sRGB
+  const linearize = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+
+  const lr = linearize(rgb.r);
+  const lg = linearize(rgb.g);
+  const lb = linearize(rgb.b);
+
+  // Linear sRGB to LMS (using OKLab matrix)
+  const l_ = 0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb;
+  const m_ = 0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb;
+  const s_ = 0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb;
+
+  // Cube root
+  const l1 = Math.cbrt(l_);
+  const m1 = Math.cbrt(m_);
+  const s1 = Math.cbrt(s_);
+
+  // LMS to OKLAB
+  const L = 0.2104542553 * l1 + 0.7936177850 * m1 - 0.0040720468 * s1;
+  const a = 1.9779984951 * l1 - 2.4285922050 * m1 + 0.4505937099 * s1;
+  const bVal = 0.0259040371 * l1 + 0.7827717662 * m1 - 0.8086757660 * s1;
+
+  // OKLAB to OKLCH
+  const C = Math.sqrt(a * a + bVal * bVal);
+  // Hue is undefined for achromatic colors; default to 0
+  let H = C < 0.002 ? 0 : (Math.atan2(bVal, a) * 180) / Math.PI;
+  if (H < 0) H += 360;
+
+  return {
+    l: Math.round(L * 1000) / 1000,
+    c: Math.round(C * 1000) / 1000,
+    h: Math.round(H * 10) / 10,
+  };
+}
+
+/**
  * Adjust brightness of a color
  * @param rgb - RGB color
  * @param amount - Percentage change (-100 to 100)
@@ -158,7 +257,7 @@ export function isBlackOrWhite(rgb: RGB, threshold = 15): boolean {
  * Get contrasting text color (black or white) for a background
  */
 export function getContrastColor(rgb: RGB): string {
-  // Using relative luminance formula
+  // Using perceived brightness (Rec. 601 luma)
   const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
   return luminance > 0.5 ? "#000000" : "#ffffff";
 }
