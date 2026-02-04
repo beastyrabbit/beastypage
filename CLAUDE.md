@@ -67,13 +67,16 @@ This triggers the Docker build workflow which:
 - `backend/renderer_service/` - Cat card renderer service (Python/FastAPI)
 - `.github/workflows/` - CI/CD pipelines
 
-## Git Hooks
+## Git Hooks (Lefthook)
 
 ```bash
-pip install pre-commit && pre-commit install
+lefthook install
 ```
 
-**Pre-commit:** gitleaks (secrets), ruff (Python), tsc (TypeScript)
+Hooks defined in `lefthook.yml`:
+- **gitleaks** - Scans staged changes for secrets
+- **ruff-lint** / **ruff-format** - Lints and formats Python in `backend/`
+- **tsc** - Type-checks TypeScript in `frontend/`
 
 ## Development Workflow
 
