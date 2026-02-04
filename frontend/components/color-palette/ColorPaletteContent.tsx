@@ -10,11 +10,12 @@ import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { ColorPaletteClient } from "./ColorPaletteClient";
 
 const EXPORT_SIZE = 700;
-const VALID_SPRITES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
+// Sprites 3 and 4 are forbidden (see FORBIDDEN_SPRITES in cat-builder/types.ts)
+const VALID_SPRITES = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18] as const;
 const GRID_COLS = 5;
 const GRID_ROWS = 3;
-const SPRITE_SIZE = 50; // Size of each sprite in the grid
-const ALL_SPRITES_SIZE = GRID_COLS * SPRITE_SIZE; // 250px wide grid
+const SPRITE_SIZE = 50;
+const ALL_SPRITES_SIZE = GRID_COLS * SPRITE_SIZE;
 
 type SpriteSelection = number | "all";
 
@@ -26,7 +27,7 @@ export function ColorPaletteContent() {
 
   const [initialImage, setInitialImage] = useState<string | null>(null);
   const [generatorReady, setGeneratorReady] = useState(false);
-  const [selectedSprite, setSelectedSprite] = useState<SpriteSelection>(8); // Default sprite
+  const [selectedSprite, setSelectedSprite] = useState<SpriteSelection>(8);
   const [isRendering, setIsRendering] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
@@ -103,7 +104,6 @@ export function ColorPaletteContent() {
 
     ctx.imageSmoothingEnabled = false;
 
-    // Render each sprite and place in grid
     for (let i = 0; i < VALID_SPRITES.length; i++) {
       const spriteNumber = VALID_SPRITES[i];
       const col = i % GRID_COLS;
@@ -178,7 +178,7 @@ export function ColorPaletteContent() {
     setDropdownOpen(!dropdownOpen);
   }, [dropdownOpen]);
 
-  // Close dropdown when clicking outside
+  // Close dropdown on click outside, scroll, resize, or Escape key
   useEffect(() => {
     if (!dropdownOpen) return;
 
@@ -192,8 +192,26 @@ export function ColorPaletteContent() {
       }
     };
 
+    const handleClose = () => setDropdownOpen(false);
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDropdownOpen(false);
+        buttonRef.current?.focus();
+      }
+    };
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleClose, true);
+    window.addEventListener("resize", handleClose);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleClose, true);
+      window.removeEventListener("resize", handleClose);
+    };
   }, [dropdownOpen]);
 
   // Sprite selector component (only shown when using slug)

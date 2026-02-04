@@ -345,14 +345,10 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
     handleDotSelect(index, "accent");
   }, [handleDotSelect]);
 
-  // Get hovered color for spotlight overlay (uses the actual variation color if available)
-  const hoveredColor: RGB | null = selection.hoveredColorRgb;
-
   const hasColors = state.topColors.length > 0;
 
   return (
     <div className="flex flex-col gap-8">
-      {/* Upload area - show when no image */}
       {!state.image && (
         <ImageUploader
           onImageLoad={handleImageLoad}
@@ -361,16 +357,14 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
         />
       )}
 
-      {/* Main content area - show when image loaded */}
       {state.image && (
         <>
-          {/* Image canvas - FULL WIDTH */}
           <ImageCanvas
             imageDataUrl={state.imageDataUrl!}
             imageDimensions={getScaledDimensions(state.image)}
             colors={state.topColors}
             familyColors={state.familyColors}
-            hoveredColor={hoveredColor}
+            hoveredColor={selection.hoveredColorRgb}
             selectedDotIndex={selection.selectedDotIndex}
             selectedDotType={selection.selectedDotType}
             highlightedDotIndex={selection.highlightedDotIndex}
@@ -379,7 +373,6 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
             onDotSelect={handleDotSelect}
           />
 
-          {/* Controls bar with sliders */}
           <div className="glass-card flex flex-wrap items-center gap-4 p-4 sm:gap-6 sm:p-6">
             <PaletteSliders
               topColorCount={state.topColorCount}
@@ -430,10 +423,8 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
             </div>
           </div>
 
-          {/* Palette section - FULL WIDTH with side-by-side grids */}
           {hasColors && (
             <div className="glass-card p-6">
-              {/* Settings accordion above the palettes */}
               <div className="mb-6 pb-6 border-b border-border/30">
                 <PaletteSettings
                   brightnessFactors={state.brightnessFactors}
@@ -446,7 +437,6 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
               </div>
 
               <div className="grid gap-8 lg:grid-cols-2">
-                {/* Dominant Colors */}
                 <PaletteGrid
                   colors={state.topColors}
                   brightnessFactors={state.brightnessFactors}
@@ -459,7 +449,6 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
                   onColorSelect={handleDominantSelect}
                 />
 
-                {/* Accent Colors */}
                 {state.familyColors.length > 0 && (
                   <PaletteGrid
                     colors={state.familyColors}
