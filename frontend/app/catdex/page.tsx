@@ -276,7 +276,7 @@ export default function CatdexPage() {
       setActiveCat(cat);
       setActiveVariant(imageVariant);
       track("catdex_card_viewed", {
-        card_number: typeof cat.card_number === "number" ? cat.card_number : 0,
+        card_number: cardNumberToInt(cat) ?? 0,
         season: cat.seasonRaw?.season_name ?? "unknown",
         rarity: cat.rarityRaw?.rarity_name ?? "unknown",
       });
