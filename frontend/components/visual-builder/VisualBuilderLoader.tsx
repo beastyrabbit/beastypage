@@ -3,26 +3,10 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
-import { VisualBuilderClient, DEFAULT_PARAMS, type VisualBuilderInitialPayload } from "@/components/visual-builder/VisualBuilderClient";
+import { VisualBuilderClient, DEFAULT_PARAMS, VALID_PALETTE_IDS, type VisualBuilderInitialPayload } from "@/components/visual-builder/VisualBuilderClient";
 
 import type { Id } from "@/convex/_generated/dataModel";
-
-type PaletteMode =
-  | "off"
-  | "mood"
-  | "bold"
-  | "darker"
-  | "blackout"
-  | "mononoke"
-  | "howl"
-  | "demonslayer"
-  | "titanic"
-  | "deathnote"
-  | "slime"
-  | "ghostintheshell"
-  | "mushishi"
-  | "chisweethome"
-  | "fma";
+import type { PaletteMode } from "@/lib/palettes";
 
 type TortieLayer = {
   pattern?: string;
@@ -164,11 +148,6 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
 
   const palette = coerceString(catData["basePalette"])?.toLowerCase();
   const tortiePalette = coerceString(catData["tortiePalette"])?.toLowerCase();
-  const paletteModes: PaletteMode[] = [
-    "off", "mood", "bold", "darker", "blackout",
-    "mononoke", "howl", "demonslayer", "titanic", "deathnote",
-    "slime", "ghostintheshell", "mushishi", "chisweethome", "fma"
-  ];
 
   const slugValue = shareSlug ?? record.slug ?? record.shareToken ?? null;
   return {
@@ -176,8 +155,8 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
     tortie: tortieLayers,
     accessories,
     scars,
-    paletteMode: paletteModes.includes(palette as PaletteMode) ? (palette as PaletteMode) : undefined,
-    tortiePaletteMode: paletteModes.includes(tortiePalette as PaletteMode) ? (tortiePalette as PaletteMode) : undefined,
+    paletteMode: VALID_PALETTE_IDS.includes(palette as PaletteMode) ? (palette as PaletteMode) : undefined,
+    tortiePaletteMode: VALID_PALETTE_IDS.includes(tortiePalette as PaletteMode) ? (tortiePalette as PaletteMode) : undefined,
     slug: slugValue,
     shareUrl: slugValue
       ? shareSlug

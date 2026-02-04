@@ -4,9 +4,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Search, Palette } from 'lucide-react';
 import { usePaletteOptions } from './usePaletteOptions';
-
-// PaletteMode is 'off' (classic) or one of the additional palette IDs
-export type PaletteMode = 'off' | 'mood' | 'bold' | 'darker' | 'blackout' | 'mononoke' | 'howl' | 'demonslayer' | 'titanic' | 'deathnote' | 'slime' | 'ghostintheshell' | 'mushishi' | 'chisweethome' | 'fma';
+import type { PaletteMode } from '@/lib/palettes';
 
 interface PaletteSingleSelectProps {
   value: PaletteMode;

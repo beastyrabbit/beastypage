@@ -19,23 +19,6 @@ export interface FullPaletteColorDef {
   screen?: [number, number, number, number];
 }
 
-export interface PaletteCategory {
-  id: string;
-  label: string;
-  description?: string;
-  colors: Record<string, PaletteColorDef>;
-}
-
-/**
- * Convert a PaletteColorDef to FullPaletteColorDef for spriteMapper
- */
-export function toFullColorDef(def: PaletteColorDef): FullPaletteColorDef {
-  return {
-    baseColour: 'WHITE',
-    ...def,
-  };
-}
-
 export type PaletteId =
   | 'mood'
   | 'bold'
@@ -50,4 +33,47 @@ export type PaletteId =
   | 'ghostintheshell'
   | 'mushishi'
   | 'chisweethome'
-  | 'fma';
+  | 'fma'
+  // Pure/monochromatic palettes
+  | 'ocean-depths'
+  | 'midnight-velvet'
+  | 'arctic-waters'
+  | 'emerald-forest'
+  | 'jade-mist'
+  | 'electric-grass'
+  | 'golden-hour'
+  | 'ember-glow'
+  | 'crimson-flame'
+  | 'rose-garden'
+  | 'neon-blossom'
+  | 'royal-amethyst'
+  | 'twilight-haze'
+  | 'espresso-bean'
+  | 'desert-sand'
+  | 'storm-cloud'
+  | 'coral-reef'
+  | 'tropical-lagoon'
+  | 'midnight-wine'
+  | 'peach-sorbet';
+
+/**
+ * PaletteMode is 'off' (classic/original colours) or a specific palette ID
+ */
+export type PaletteMode = 'off' | PaletteId;
+
+export interface PaletteCategory {
+  id: PaletteId;
+  label: string;
+  description?: string;
+  colors: Record<string, PaletteColorDef>;
+}
+
+/**
+ * Convert a PaletteColorDef to FullPaletteColorDef for spriteMapper
+ */
+export function toFullColorDef(def: PaletteColorDef): FullPaletteColorDef {
+  return {
+    baseColour: 'WHITE',
+    ...def,
+  };
+}

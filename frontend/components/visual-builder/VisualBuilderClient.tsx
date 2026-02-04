@@ -15,28 +15,10 @@ import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "@/compone
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import { canvasToDataUrl, cloneParams, formatName, getColourSwatch } from "@/components/cat-builder/utils";
 
-type PaletteMode =
-  | "off"
-  | "mood"
-  | "bold"
-  | "darker"
-  | "blackout"
-  | "mononoke"
-  | "howl"
-  | "demonslayer"
-  | "titanic"
-  | "deathnote"
-  | "slime"
-  | "ghostintheshell"
-  | "mushishi"
-  | "chisweethome"
-  | "fma";
+import type { PaletteMode } from "@/lib/palettes";
+import { getPaletteIds } from "@/lib/palettes";
 
-const VALID_PALETTE_IDS: PaletteMode[] = [
-  "off", "mood", "bold", "darker", "blackout",
-  "mononoke", "howl", "demonslayer", "titanic", "deathnote",
-  "slime", "ghostintheshell", "mushishi", "chisweethome", "fma",
-];
+export const VALID_PALETTE_IDS: PaletteMode[] = ["off", ...getPaletteIds()];
 
 export const DEFAULT_PARAMS: CatParams = {
   spriteNumber: 8,

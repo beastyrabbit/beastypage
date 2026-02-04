@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ADDITIONAL_PALETTES, getPaletteMetadata, type PaletteId } from '@/lib/palettes';
+import { ADDITIONAL_PALETTES, type PaletteId } from '@/lib/palettes';
 
 export interface PaletteOption {
   id: PaletteId;
@@ -22,7 +22,7 @@ export function usePaletteOptions(): PaletteOption[] {
         .map(([, def]) => def.multiply);
 
       return {
-        id: palette.id as PaletteId,
+        id: palette.id,
         label: palette.label,
         description: palette.description,
         colorCount: colorEntries.length,
@@ -36,7 +36,7 @@ export function usePaletteOptions(): PaletteOption[] {
  * Get all palette IDs for validation
  */
 export function getAllPaletteIds(): PaletteId[] {
-  return ADDITIONAL_PALETTES.map((p) => p.id as PaletteId);
+  return ADDITIONAL_PALETTES.map((p) => p.id);
 }
 
 /**
