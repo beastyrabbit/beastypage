@@ -18,6 +18,7 @@ import {
   Vote,
 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
+import { track } from "@/lib/analytics";
 
 import { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
@@ -454,6 +455,7 @@ export function HostClient() {
         setActiveSessionId(record.id);
         updateSessionQueryParam(record.id);
         setStatusMessage("New session created. Share the viewer link to begin.");
+        track("stream_session_created", { is_host: true });
       }
     setLocalState({ params: initialParams, history: [] });
   } catch (error) {
@@ -495,18 +497,20 @@ export function HostClient() {
   );
 
   const handleToggleSignups = useCallback(async () => {
+    const currentlyOpen = localState.params._signupsOpen !== false;
     await updateSessionParams((draft) => {
-      const open = draft._signupsOpen !== false;
-      draft._signupsOpen = !open;
+      draft._signupsOpen = !currentlyOpen;
     });
-  }, [updateSessionParams]);
+    track("stream_signups_toggled", { enabled: !currentlyOpen });
+  }, [updateSessionParams, localState.params._signupsOpen]);
 
   const handleToggleVotes = useCallback(async () => {
+    const currentlyOpen = localState.params._votesOpen === true;
     await updateSessionParams((draft) => {
-      const open = draft._votesOpen === true;
-      draft._votesOpen = !open;
+      draft._votesOpen = !currentlyOpen;
     });
-  }, [updateSessionParams]);
+    track("stream_voting_toggled", { enabled: !currentlyOpen });
+  }, [updateSessionParams, localState.params._votesOpen]);
 
   const handleToggleDuplicateIps = useCallback(async () => {
     if (!session || !activeSessionId) return;
@@ -565,6 +569,7 @@ export function HostClient() {
           },
         });
         setStatusMessage("Streamer vote recorded.");
+        track("stream_vote_cast", { is_streamer: true });
       } catch (error) {
         console.warn("Failed to record streamer vote", error);
         const message = error instanceof Error ? error.message : "Streamer vote failed.";
@@ -708,6 +713,7 @@ export function HostClient() {
     setCoinFlipping(false);
     setVoteSent(false);
     setCoinFlipId(0);
+    track("stream_coinflip_used", {});
   }, [tiePair.length]);
 
   const executeCoinFlip = useCallback(() => {
@@ -900,6 +906,7 @@ export function HostClient() {
         setFinalShareInfo({ slug, url });
         setFinalizeModalOpen(false);
         setStatusMessage('Session completed and saved to history.');
+        track("stream_session_finalized", { participant_count: participants.length });
       } catch (error) {
         console.error('Failed to finalize session', error);
         setFinalizeError(error instanceof Error ? error.message : 'Unable to save the final cat.');
@@ -915,6 +922,7 @@ export function HostClient() {
       localState.params,
       setLocalState,
       updateSession,
+      participants.length,
     ]
   );
 
@@ -1019,7 +1027,10 @@ export function HostClient() {
                 </code>
                 <button
                   type="button"
-                  onClick={() => navigator.clipboard.writeText(viewerLink)}
+                  onClick={() => {
+                    navigator.clipboard.writeText(viewerLink);
+                    track("stream_viewer_link_copied", {});
+                  }}
                   className="inline-flex items-center gap-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-semibold transition hover:bg-border/20"
                 >
                   <ClipboardCopy className="size-4" /> Copy

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 
 type LengthPreset = "quick" | "normal" | "long";
 type SpeedPreset = "fast" | "normal" | "slow";
@@ -263,6 +264,7 @@ export function PaletteSpinnerClient() {
       setIsSpinning(false);
       return;
     }
+    track("palette_spinner_spun", {});
     const target = LENGTH_PRESETS[length];
     setTargetSpins(target);
     setSpinCount(0);
@@ -310,7 +312,10 @@ export function PaletteSpinnerClient() {
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setLength(value)}
+                  onClick={() => {
+                    setLength(value);
+                    track("palette_spinner_range_changed", { range_type: "length" });
+                  }}
                   className={cn(
                     "rounded-full border px-3 py-1 capitalize transition",
                     length === value

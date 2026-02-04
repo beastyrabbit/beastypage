@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Save, Loader2, ArrowLeft, Trees, Dices, History, Settings, RefreshCw, Palette, ArrowUpDown, ArrowLeftRight, Maximize2 } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 import type {
   AncestryTreeCat,
@@ -152,7 +153,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
   }, []);
 
   const generateTreeFromCouple = useCallback(
-    async (input: FoundingCoupleInput) => {
+    async (input: FoundingCoupleInput, method: "random" | "history" = "random") => {
       setIsGenerating(true);
       try {
         // Use Web Worker for non-blocking generation
@@ -163,6 +164,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         );
         setTree(serialized);
         setViewMode("tree");
+        track("ancestry_tree_created", { method });
       } catch (error) {
         console.error("Failed to generate tree:", error);
       } finally {
@@ -285,7 +287,8 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
   const handleHistorySelect = useCallback(
     async (input: FoundingCoupleInput) => {
       setShowHistoryPicker(false);
-      await generateTreeFromCouple(input);
+      track("ancestry_parents_selected", { source: "history" });
+      await generateTreeFromCouple(input, "history");
     },
     [generateTreeFromCouple]
   );
@@ -429,6 +432,8 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         if (updatedCat) {
           setSelectedCat(updatedCat);
         }
+
+        track("ancestry_offspring_generated", { count: 1, generation: currentCat.generation + 1 });
       } catch (error) {
         console.error("Failed to add child:", error);
       } finally {
@@ -597,6 +602,8 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
           params: { ...cat.params, spriteNumber: newSpriteNumber },
         });
       }
+
+      track("ancestry_cat_edited", { edit_type: "pose_change" });
     },
     [tree, selectedCat]
   );
@@ -632,6 +639,11 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         // Update URL to include the slug using Next.js router
         const newUrl = `/projects/warrior-cats/ancestry-tree/${updatedTree.slug}`;
         router.replace(newUrl);
+
+        track("ancestry_tree_saved", {
+          has_name: name.length > 0 && name !== "Unnamed Tree",
+          has_creator: creatorName.length > 0,
+        });
 
         return { success: true, slug: result.slug, isNew: result.isNew };
       } catch (error) {

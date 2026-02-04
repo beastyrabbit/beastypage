@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
+import { track } from "@/lib/analytics";
 import { AdoptionMetadataPanel, AdoptionMetadata } from "@/components/adoption/AdoptionMetadataPanel";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import type { PaletteId } from "@/lib/palettes";
@@ -133,6 +134,7 @@ export function AdoptionGeneratorClient() {
           setLastSavedToken(null);
           setLastSavedAt(null);
           setLastSavedId(null);
+          track("adoption_round_started", { cat_count: 0, round_number: 1 });
         },
         onRevealComplete: () => {
           setGenerationComplete(true);
@@ -144,6 +146,8 @@ export function AdoptionGeneratorClient() {
             return;
           }
           lastTokenRef.current = payloadToken;
+          const catCount = payload.totalFinalCats ?? payload.cats.length;
+          track("adoption_finalized", { cat_count: catCount, total_rounds: 1 });
           setSaveState("saving");
           try {
             const catsPayload: AdoptionCatPayload[] = await Promise.all(

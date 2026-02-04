@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "convex/react";
@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api";
 import { Loader2, ArrowUpRight, Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { encodeCatShare } from "@/lib/catShare";
 import { HistoryAncestryTreeCard } from "./HistoryAncestryTreeCard";
+import { track } from "@/lib/analytics";
 
 type SortMode = "newest" | "oldest" | "name";
 
@@ -86,10 +87,39 @@ export function HistoryClient() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [focusedPreview, setFocusedPreview] = useState<{ url: string; title: string } | null>(null);
+  const hasTrackedView = useRef(false);
+  const searchDebounceRef = useRef<number | null>(null);
 
   const profilesQuery = useQuery(api.mapper.listHistory, { limit: 200 });
   const batchesQuery = useQuery(api.adoption.listBatches, { limit: 120 });
   const treesQuery = useQuery(api.ancestryTree.list, { limit: 50 });
+
+  // Track page view once data is loaded
+  useEffect(() => {
+    if (!hasTrackedView.current && profilesQuery !== undefined) {
+      hasTrackedView.current = true;
+      track("history_viewed", {});
+    }
+  }, [profilesQuery]);
+
+  // Debounced search tracking
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchTerm(value);
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current);
+    }
+    if (value.trim()) {
+      searchDebounceRef.current = window.setTimeout(() => {
+        track("history_searched", {});
+      }, 500);
+    }
+  }, []);
+
+  // Track sort mode changes
+  const handleSortChange = useCallback((mode: SortMode) => {
+    setSortMode(mode);
+    track("history_filtered", { filter_type: mode });
+  }, []);
 
   const profiles = profilesQuery ?? [];
   const batches = batchesQuery ?? [];
@@ -246,7 +276,7 @@ export function HistoryClient() {
               <input
                 type="search"
                 value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
+                onChange={(event) => handleSearchChange(event.target.value)}
                 placeholder="Search by name, creator, or slug"
                 className="w-full rounded-xl border border-border/50 bg-background px-4 py-3 text-sm text-foreground focus:border-primary focus:outline-none"
               />
@@ -275,7 +305,7 @@ export function HistoryClient() {
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => setSortMode(option.value)}
+                  onClick={() => handleSortChange(option.value)}
                   className={`rounded-full border px-4 py-1.5 text-xs font-semibold transition ${
                     sortMode === option.value
                       ? "border-primary/60 bg-primary/20 text-foreground"
@@ -295,7 +325,10 @@ export function HistoryClient() {
           <HistoryCard
             key={item.id}
             item={item}
-            onPreview={(title, url) => setFocusedPreview({ title, url })}
+            onPreview={(title, url) => {
+              setFocusedPreview({ title, url });
+              track("history_item_clicked", {});
+            }}
           />
         ))}
       </section>

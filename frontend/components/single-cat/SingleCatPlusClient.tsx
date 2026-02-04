@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import {
   ArrowUpRight,
   Copy,
@@ -3142,6 +3143,14 @@ export function SingleCatPlusClient({
         timestamp: typeof performance !== "undefined" ? performance.now() : Date.now(),
       });
       setIsGenerating(false);
+      track("single_cat_generated", {
+        mode: modeRef.current,
+        accessories: countsResult.accessories > 0,
+        scars: countsResult.scars > 0,
+        torties: countsResult.tortie > 0,
+        afterlife: afterlifeMode !== "off",
+        speed: speedMultiplierRef.current,
+      });
       window.setTimeout(() => {
         if (generationIdRef.current === token) {
           setRollerExpanded(false);
@@ -3282,6 +3291,7 @@ export function SingleCatPlusClient({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       showToast("Downloaded PNG");
+      track("single_cat_exported", { format: "download-png" });
     }, "image/png");
   }, [showToast]);
 
@@ -3343,6 +3353,7 @@ export function SingleCatPlusClient({
         showToast,
         (message) => setError(message)
       );
+      track("single_cat_exported", { format: `copy-${size}px` });
     },
     [showToast]
   );
@@ -3444,6 +3455,7 @@ export function SingleCatPlusClient({
     try {
       await navigator.clipboard.writeText(url);
       showToast("Share link copied!");
+      track("single_cat_shared", {});
     } catch (err) {
       console.warn("Clipboard failed, showing prompt", err);
       window.prompt("Copy this link", url);
@@ -3801,7 +3813,10 @@ export function SingleCatPlusClient({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setMode("flashy")}
+                    onClick={() => {
+                      setMode("flashy");
+                      track("single_cat_mode_changed", { mode: "flashy" });
+                    }}
                     className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${mode === "flashy"
                         ? "border-primary/60 bg-primary/15 text-foreground"
                         : "border-border/60 bg-background/70"
@@ -3811,7 +3826,10 @@ export function SingleCatPlusClient({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMode("calm")}
+                    onClick={() => {
+                      setMode("calm");
+                      track("single_cat_mode_changed", { mode: "calm" });
+                    }}
                     className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${mode === "calm"
                         ? "border-primary/60 bg-primary/15 text-foreground"
                         : "border-border/60 bg-background/70"

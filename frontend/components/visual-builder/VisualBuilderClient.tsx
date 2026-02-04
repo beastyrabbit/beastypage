@@ -7,6 +7,7 @@ import { useMutation } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import { createCatShare } from "@/lib/catShare";
 import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
 import { PaletteSingleSelect } from "@/components/common/PaletteSingleSelect";
@@ -203,6 +204,12 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   }, [generator]);
 
   useEffect(() => {
+    // Track once on mount - we want the initial state, not re-tracking when initialCat changes
+    track("visual_builder_opened", { from_share: Boolean(initialCat?.slug) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (!initialCat || initialisedRef.current) return;
     initialisedRef.current = true;
     const mergedParams = cloneParams({ ...DEFAULT_PARAMS, ...initialCat.params });
@@ -333,13 +340,16 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     })();
   }, [params, rendererReady]);
 
-  const updateParams = useCallback((mutator: (draft: CatParams) => void) => {
+  const updateParams = useCallback((mutator: (draft: CatParams) => void, traitInfo?: { trait_type: string; value: string }) => {
     markShareDirty();
     setParams((prev) => {
       const draft = cloneParams(prev);
       mutator(draft);
       return draft;
     });
+    if (traitInfo) {
+      track("visual_builder_trait_selected", traitInfo);
+    }
   }, [markShareDirty]);
 
   const getPaletteForMode = useCallback((mode: PaletteMode) => {
@@ -1367,6 +1377,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
 
   const toggleAccessory = useCallback(
     (value: string) => {
+      const wasPresent = (params.accessories ?? []).includes(value);
       updateParams((draft) => {
         const set = new Set(draft.accessories ?? []);
         if (set.has(value)) {
@@ -1378,8 +1389,13 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         draft.accessory = draft.accessories[0] ?? undefined;
       });
       markShareDirty();
+      if (wasPresent) {
+        track("visual_builder_accessory_removed", { accessory: value });
+      } else {
+        track("visual_builder_accessory_added", { accessory: value });
+      }
     },
-    [markShareDirty, updateParams]
+    [markShareDirty, params.accessories, updateParams]
   );
 
   const toggleScar = useCallback(
@@ -1728,6 +1744,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       setLockedShareSlug(preferredSlug);
       await ensureCopied(url);
       setStatusMessage("Saved to history!");
+      track("visual_builder_shared", {});
       if (typeof window !== "undefined") {
         window.history.replaceState(null, "", url);
       }
@@ -1747,6 +1764,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     link.href = previewUrl;
     link.download = "visual-builder-cat.png";
     link.click();
+    track("visual_builder_exported", { format: "download-png" });
   }, [previewUrl]);
 
   const handleReset = useCallback(() => {

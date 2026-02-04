@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AlertTriangle, Vote, Users } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
+import { track } from "@/lib/analytics";
 
 import { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
@@ -296,6 +297,7 @@ export function ViewerClient() {
           fingerprint: fingerprint ?? undefined,
         });
         setStatusMessage("Checked in! You can vote when polls are open.");
+        track("stream_viewer_joined", {});
       } catch (error) {
         const message = extractErrorMessage(error) ?? "Unable to join right now.";
         setNameError(message);
@@ -319,6 +321,7 @@ export function ViewerClient() {
           votedBy: toId("stream_participants", participant.id),
         });
         setStatusMessage("Vote recorded!");
+        track("stream_vote_cast", { is_streamer: false });
       } catch (error) {
         console.error("Vote failed", error);
         const message = extractErrorMessage(error) ?? "Unable to record your vote. Try again.";
