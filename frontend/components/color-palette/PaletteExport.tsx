@@ -316,35 +316,31 @@ export function PaletteExport({
     toast.success("Palette PNG downloaded!");
   }, [topColors, familyColors, brightnessFactors, hueShifts]);
 
-  const downloadColorSet = useCallback(
-    (format: ExportFormat) => {
-      const allColors = collectAllColorsForExport(
-        topColors,
-        familyColors,
-        brightnessFactors,
-        hueShifts
-      );
+  const downloadACO = useCallback(() => {
+    const allColors = collectAllColorsForExport(
+      topColors,
+      familyColors,
+      brightnessFactors,
+      hueShifts
+    );
 
-      if (allColors.length === 0) {
-        toast.error("No colors to export");
-        return;
-      }
+    if (allColors.length === 0) {
+      toast.error("No colors to export");
+      return;
+    }
 
-      const buffer = generateACO(allColors);
+    const buffer = generateACO(allColors);
 
-      // Create and trigger download
-      const blob = new Blob([buffer], { type: "application/octet-stream" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.download = `color-palette-${Date.now()}${format.extension}`;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
+    const blob = new Blob([buffer], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.download = `color-palette-${Date.now()}.aco`;
+    link.href = url;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 
-      toast.success(`Color set downloaded as ${format.extension.replace(/^\./, "").toUpperCase()}`);
-    },
-    [topColors, familyColors, brightnessFactors, hueShifts]
-  );
+    toast.success("Color set downloaded as ACO");
+  }, [topColors, familyColors, brightnessFactors, hueShifts]);
 
   const generateSpotlightPNG = useCallback(() => {
     if (!image) {
@@ -381,9 +377,9 @@ export function PaletteExport({
     } else if (selectedFormat.id === "spotlight") {
       generateSpotlightPNG();
     } else {
-      downloadColorSet(selectedFormat);
+      downloadACO();
     }
-  }, [selectedFormat, generatePalettePNG, generateSpotlightPNG, downloadColorSet]);
+  }, [selectedFormat, generatePalettePNG, generateSpotlightPNG, downloadACO]);
 
   const handleFormatSelect = useCallback((format: ExportFormat) => {
     setSelectedFormat(format);
