@@ -11,7 +11,7 @@ import { ColorPaletteClient } from "./ColorPaletteClient";
 
 const EXPORT_SIZE = 700;
 // Exclude forbidden sprites (see FORBIDDEN_SPRITES in cat-builder/types.ts: 0, 1, 2, 3, 4, 19, 20)
-const VALID_SPRITES = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18] as const;
+const VALID_SPRITES = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] as const;
 const GRID_COLS = 5;
 const GRID_ROWS = 3;
 const SPRITE_SIZE = 50;
