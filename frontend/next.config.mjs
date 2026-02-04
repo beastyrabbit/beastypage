@@ -66,6 +66,7 @@ if (process.env.NEXT_SHOW_CONFIG_LOGS === "1") {
 
 const nextConfig = {
   output: "standalone",
+  skipTrailingSlashRedirect: true,
   allowedDevOrigins,
   images: {
     remotePatterns,
@@ -75,6 +76,19 @@ const nextConfig = {
   },
   turbopack: {
     root: projectRoot,
+  },
+  async rewrites() {
+    // Proxy PostHog requests through /bubu to avoid ad-blockers
+    return [
+      {
+        source: "/bubu/static/:path*",
+        destination: "https://eu-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/bubu/:path*",
+        destination: "https://eu.i.posthog.com/:path*",
+      },
+    ];
   },
   async redirects() {
     return [
