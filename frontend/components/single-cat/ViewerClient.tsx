@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Copy,
   Loader2,
+  Palette,
   Sparkles,
 } from "lucide-react";
 
@@ -547,6 +548,19 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     [downloadDataUrl]
   );
 
+  const handleOpenPaletteCreator = useCallback(() => {
+    const catSlug = meta?.slug ?? meta?.shareToken;
+    if (!catSlug) return;
+
+    // Pass dark forest state so palette page can render correctly
+    const params = new URLSearchParams({ slug: catSlug });
+    if (!showDarkForestTint && catPayload?.params?.darkForest) {
+      params.set("darkForest", "false");
+    }
+
+    window.open(`/color-palette-creator?${params.toString()}`, "_blank");
+  }, [meta, catPayload, showDarkForestTint]);
+
   const catDisplayName = useMemo(() => {
     const metaName = meta?.catName?.trim();
     if (metaName) return metaName;
@@ -629,13 +643,21 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                 height={DISPLAY_CANVAS_SIZE}
                 className="aspect-square w-full rounded-2xl border border-border/30 bg-background"
               />
-              <div className="mt-4 flex justify-center">
+              <div className="mt-4 flex justify-center gap-2">
                 <button
                   type="button"
                   onClick={handleCopyMainSprite}
                   className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary"
                 >
                   <Copy className="size-3" /> Copy sprite
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenPaletteCreator}
+                  disabled={!meta?.slug && !meta?.shareToken}
+                  className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Palette className="size-3" /> Color Palette
                 </button>
               </div>
             </div>

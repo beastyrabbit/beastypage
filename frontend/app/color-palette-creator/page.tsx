@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { PageHero } from "@/components/common/PageHero";
-import { ColorPaletteClient } from "@/components/color-palette/ColorPaletteClient";
+import { ColorPaletteContent } from "@/components/color-palette/ColorPaletteContent";
 
 export const metadata: Metadata = {
   title: "Color Palette Creator | Projects | BeastyRabbit",
@@ -31,7 +32,9 @@ export default function ColorPaletteCreatorPage() {
         description="Extract dominant colors from any image. Drag crosshairs to pick new colors, hover swatches to highlight matching regions."
       />
 
-      <ColorPaletteClient />
+      <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+        <ColorPaletteContent />
+      </Suspense>
     </main>
   );
 }

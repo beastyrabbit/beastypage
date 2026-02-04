@@ -60,11 +60,16 @@ const INITIAL_SELECTION: SelectionState = {
   hoveredColorRgb: null,
 };
 
-export function ColorPaletteClient() {
+interface ColorPaletteClientProps {
+  initialImageUrl?: string | null;
+}
+
+export function ColorPaletteClient({ initialImageUrl }: ColorPaletteClientProps) {
   const [state, setState] = useState<PaletteState>(INITIAL_STATE);
   const [selection, setSelection] = useState<SelectionState>(INITIAL_SELECTION);
   const extractionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasExtractedRef = useRef(false);
+  const initialLoadAttemptedRef = useRef(false);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -106,6 +111,14 @@ export function ColorPaletteClient() {
       toast.error(err instanceof Error ? err.message : "Failed to load image");
     }
   }, []);
+
+  // Auto-load image from URL prop on mount
+  useEffect(() => {
+    if (initialImageUrl && !state.image && !initialLoadAttemptedRef.current) {
+      initialLoadAttemptedRef.current = true;
+      handleImageLoad(initialImageUrl);
+    }
+  }, [initialImageUrl, state.image, handleImageLoad]);
 
   // Fetch color names from API and update state
   const fetchAndUpdateColorNames = useCallback(async (
