@@ -106,7 +106,7 @@ docker push ghcr.io/beastyrabbit/beastypage-frontend:latest
 
 ## Kubernetes Deployment
 
-Kubeconfig: `~/projects/kub-homelab/talos/kubeconfig`
+Kubeconfig: `/home/beasty/projects/kub-homelab/talos/kubeconfig` (do NOT use `~` — flux CLI does not expand it)
 Helmrelease: `~/projects/kub-homelab/cluster/homelab/apps/webpage/beastypage/helmrelease.yaml`
 
 Full deploy sequence after updating the helmrelease image tag:
