@@ -2,10 +2,10 @@
  * Palette aggregator - single source of truth for all experimental color palettes
  */
 
-import type { PaletteCategory, PaletteColorDef, FullPaletteColorDef, PaletteId } from './types';
+import type { PaletteCategory, PaletteColorDef, FullPaletteColorDef, PaletteId, PaletteMode } from './types';
 import { toFullColorDef } from './types';
 
-// Existing palettes
+// Base palettes
 import { moodPalette } from './mood';
 import { boldPalette } from './bold';
 import { darkerPalette } from './darker';
@@ -22,6 +22,9 @@ import { ghostintheshellPalette } from './ghostintheshell';
 import { mushishiPalette } from './mushishi';
 import { chisweethomePalette } from './chisweethome';
 import { fmaPalette } from './fma';
+
+// Pure/monochromatic palettes
+import { PURE_PALETTES } from './pure';
 
 /**
  * All additional palettes in display order
@@ -43,33 +46,22 @@ export const ADDITIONAL_PALETTES: PaletteCategory[] = [
   mushishiPalette,
   chisweethomePalette,
   fmaPalette,
+  // Pure/monochromatic palettes
+  ...PURE_PALETTES,
 ];
 
 /**
  * Map of palette ID to palette category for quick lookups
  */
-export const PALETTES_BY_ID: Record<PaletteId, PaletteCategory> = {
-  mood: moodPalette,
-  bold: boldPalette,
-  darker: darkerPalette,
-  blackout: blackoutPalette,
-  mononoke: mononokePalette,
-  howl: howlPalette,
-  demonslayer: demonslayerPalette,
-  titanic: titanicPalette,
-  deathnote: deathnotePalette,
-  slime: slimePalette,
-  ghostintheshell: ghostintheshellPalette,
-  mushishi: mushishiPalette,
-  chisweethome: chisweethomePalette,
-  fma: fmaPalette,
-};
+export const PALETTES_BY_ID = Object.fromEntries(
+  ADDITIONAL_PALETTES.map((p) => [p.id, p]),
+) as Record<PaletteId, PaletteCategory>;
 
 /**
  * Get all palette IDs
  */
 export function getPaletteIds(): PaletteId[] {
-  return ADDITIONAL_PALETTES.map((p) => p.id as PaletteId);
+  return ADDITIONAL_PALETTES.map((p) => p.id);
 }
 
 /**
@@ -112,7 +104,7 @@ export function getPaletteById(id: PaletteId): PaletteCategory | undefined {
  */
 export function getPaletteMetadata(): Array<{ id: PaletteId; label: string; description?: string }> {
   return ADDITIONAL_PALETTES.map((p) => ({
-    id: p.id as PaletteId,
+    id: p.id,
     label: p.label,
     description: p.description,
   }));
@@ -163,4 +155,4 @@ export function isExperimentalColor(colorName: string): boolean {
 }
 
 // Re-export types
-export type { PaletteCategory, PaletteColorDef, FullPaletteColorDef, PaletteId };
+export type { PaletteCategory, PaletteColorDef, FullPaletteColorDef, PaletteId, PaletteMode };
