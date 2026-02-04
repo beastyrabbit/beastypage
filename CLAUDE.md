@@ -83,4 +83,5 @@ Hooks defined in `lefthook.yml`:
 1. Create a feature branch from `main`
 2. Make changes with Conventional Commit messages
 3. Open a PR and merge to `main`
-4. When ready to release, push a version tag (e.g., `git tag v1.7.0 && git push origin v1.7.0`)
+4. **After merging, create a version tag** (check latest with `git tag --sort=-v:refname | head -1`)
+5. Push the tag to trigger a release (e.g., `git tag v1.7.0 && git push origin v1.7.0`)
