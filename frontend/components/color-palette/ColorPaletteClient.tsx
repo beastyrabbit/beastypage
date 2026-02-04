@@ -62,9 +62,11 @@ const INITIAL_SELECTION: SelectionState = {
 
 interface ColorPaletteClientProps {
   initialImageUrl?: string | null;
+  toolbarLeft?: React.ReactNode;
+  isExternalLoading?: boolean;
 }
 
-export function ColorPaletteClient({ initialImageUrl }: ColorPaletteClientProps) {
+export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoading }: ColorPaletteClientProps) {
   const [state, setState] = useState<PaletteState>(INITIAL_STATE);
   const [selection, setSelection] = useState<SelectionState>(INITIAL_SELECTION);
   const extractionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -112,13 +114,16 @@ export function ColorPaletteClient({ initialImageUrl }: ColorPaletteClientProps)
     }
   }, []);
 
-  // Auto-load image from URL prop on mount
+  // Auto-load image from URL prop (on mount and when URL changes)
+  const lastLoadedUrlRef = useRef<string | null>(null);
   useEffect(() => {
-    if (initialImageUrl && !state.image && !initialLoadAttemptedRef.current) {
+    if (initialImageUrl && initialImageUrl !== lastLoadedUrlRef.current) {
+      lastLoadedUrlRef.current = initialImageUrl;
       initialLoadAttemptedRef.current = true;
+      hasExtractedRef.current = false; // Reset extraction flag for new image
       handleImageLoad(initialImageUrl);
     }
-  }, [initialImageUrl, state.image, handleImageLoad]);
+  }, [initialImageUrl, handleImageLoad]);
 
   // Fetch color names from API and update state
   const fetchAndUpdateColorNames = useCallback(async (
@@ -387,10 +392,11 @@ export function ColorPaletteClient({ initialImageUrl }: ColorPaletteClientProps)
             <div className="flex-1" />
 
             <div className="flex gap-3">
+              {toolbarLeft}
               <button
                 onClick={handleReset}
                 className="flex items-center gap-2 rounded-xl border border-border/50 px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:border-foreground/30 hover:text-foreground"
-                disabled={state.isProcessing}
+                disabled={state.isProcessing || isExternalLoading}
               >
                 <RotateCcw className="size-4" />
                 <span className="hidden sm:inline">Reset</span>
