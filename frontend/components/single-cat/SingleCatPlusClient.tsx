@@ -15,6 +15,7 @@ import {
   ArrowUpRight,
   Copy,
   Download,
+  ExternalLink,
   Loader2,
   Palette,
   RefreshCw,
@@ -3910,6 +3911,15 @@ export function SingleCatPlusClient({
               <div className="space-y-3">
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground/80">
                   <Palette className="size-3" /> Colour Palettes
+                  <a
+                    href="/cat-color-palettes"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-auto text-muted-foreground/60 transition-colors hover:text-amber-400"
+                    title="View all colour palettes"
+                  >
+                    <ExternalLink className="size-3" />
+                  </a>
                 </p>
                 <PaletteMultiSelect
                   selected={extendedModes as Set<PaletteId>}
