@@ -85,3 +85,31 @@ Hooks defined in `lefthook.yml`:
 3. Open a PR and merge to `main`
 4. **After merging, create a version tag** (check latest with `git tag --sort=-v:refname | head -1`)
 5. Push the tag to trigger a release (e.g., `git tag v1.7.0 && git push origin v1.7.0`)
+
+## Local Docker Builds
+
+Build and push frontend locally (faster than GitHub Actions):
+
+```bash
+cd frontend
+docker build \
+  --build-arg NEXT_PUBLIC_POSTHOG_KEY=$POSTHOG_KEY \
+  --build-arg NEXT_PUBLIC_POSTHOG_HOST=/bubu \
+  --build-arg CONVEX_DEPLOYMENT=prod:standing-crane-709 \
+  -t ghcr.io/beastyrabbit/beastypage-frontend:$VERSION .
+docker tag ghcr.io/beastyrabbit/beastypage-frontend:$VERSION ghcr.io/beastyrabbit/beastypage-frontend:latest
+docker push ghcr.io/beastyrabbit/beastypage-frontend:$VERSION
+docker push ghcr.io/beastyrabbit/beastypage-frontend:latest
+```
+
+**Note:** GitHub Actions secrets (like `NEXT_PUBLIC_POSTHOG_HOST`) are baked into images at build time, overriding Dockerfile ARG defaults. To change build-time values, update the GitHub secret, not just the code.
+
+## Kubernetes Deployment
+
+Kubeconfig: `~/projects/kub-homelab/talos/kubeconfig`
+
+After updating helmrelease in kub-homelab:
+```bash
+flux --kubeconfig=~/projects/kub-homelab/talos/kubeconfig reconcile helmrelease beastypage -n webpage
+kubectl --kubeconfig=~/projects/kub-homelab/talos/kubeconfig rollout restart deployment/beastypage-frontend -n webpage
+```
