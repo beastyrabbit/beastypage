@@ -78,7 +78,8 @@ function PaletteDownload({ palette }: { palette: PaletteCategory }) {
       const blob = new Blob([data], { type: 'application/octet-stream' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.download = `${palette.label}.aco`;
+      const safeName = palette.label.replace(/[/\\:*?"<>|]/g, '_');
+      link.download = `${safeName}.aco`;
       link.href = url;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
