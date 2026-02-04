@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 import { RotateCcw, Loader2 } from "lucide-react";
 
 import type { ExtractedColor, PaletteState, RGB } from "@/lib/color-extraction/types";
@@ -95,6 +96,7 @@ export function ColorPaletteClient() {
       }));
       hasExtractedRef.current = false;
       setSelection(INITIAL_SELECTION);
+      track("palette_creator_image_uploaded", {});
     } catch (err) {
       setState((prev) => ({
         ...prev,

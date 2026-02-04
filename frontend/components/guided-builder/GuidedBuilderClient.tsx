@@ -8,6 +8,7 @@ import { Download, Loader2, RefreshCw, Share2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { useMutation } from "convex/react";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
 import type { CatGeneratorApi, SpriteMapperApi } from "@/components/cat-builder/types";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
@@ -172,6 +173,10 @@ export function GuidedBuilderClient() {
   useEffect(() => {
     spriteMapperRef.current = mapper ?? null;
   }, [mapper]);
+
+  useEffect(() => {
+    track("guided_builder_started", {});
+  }, []);
 
   useEffect(() => {
     if (!options) return;
@@ -865,9 +870,12 @@ export function GuidedBuilderClient() {
     link.href = previewUrl;
     link.download = "guided-cat.png";
     link.click();
+    track("guided_builder_exported", {});
   }, [previewUrl]);
 
   const handleReset = useCallback(() => {
+    const currentStepIndex = unlockedSteps.indexOf(activeStep);
+    track("guided_builder_reset", { at_step: currentStepIndex >= 0 ? currentStepIndex + 1 : 0 });
     setParams(DEFAULT_PARAMS);
     setTortieLayers([]);
     setDesiredTortieLayers(0);
@@ -878,7 +886,7 @@ export function GuidedBuilderClient() {
     setUnlockedSteps(["colour"]);
     setActiveStep("colour");
     setShareInfo(null);
-  }, []);
+  }, [activeStep, unlockedSteps]);
 
   const stepIndexDisplay = useMemo(() => {
     const index = unlockedSteps.indexOf(activeStep);
@@ -1625,17 +1633,27 @@ export function GuidedBuilderClient() {
     }
 
     markStepState(activeStep, snapshot, tortieLayers);
+    const stepIndex = unlockedSteps.indexOf(activeStep);
+    track("guided_builder_step_completed", {
+      step_name: activeStep,
+      step_number: stepIndex >= 0 ? stepIndex + 1 : 0,
+    });
+
     const nextStepId = unlockNextRelevantStep(activeStep, snapshot);
     if (nextStepId) {
       setActiveStep(nextStepId);
       return;
     }
 
+    track("guided_builder_completed", {
+      has_name: false,
+      has_creator: false,
+    });
     void handleShare({ copy: false }).then((url) => {
       if (!url) return;
       router.push(url);
     });
-  }, [activeStep, evaluateStep, handleShare, markStepState, params, router, tortieLayers, unlockNextRelevantStep]);
+  }, [activeStep, evaluateStep, handleShare, markStepState, params, router, tortieLayers, unlockNextRelevantStep, unlockedSteps]);
 
   if (loadingOptions) {
     return (

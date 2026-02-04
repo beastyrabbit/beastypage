@@ -8,6 +8,7 @@ import type { SeasonPayload } from "@/convex/seasons";
 import type { RarityPayload } from "@/convex/rarities";
 import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
 import { Search, Sparkles, X } from "lucide-react";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
@@ -84,6 +85,23 @@ export default function CatdexPage() {
 
   const submitHoldTimerRef = useRef<number | null>(null);
   const submitHoldTriggeredRef = useRef(false);
+  const searchTrackTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!search) return;
+    if (searchTrackTimerRef.current) {
+      window.clearTimeout(searchTrackTimerRef.current);
+    }
+    searchTrackTimerRef.current = window.setTimeout(() => {
+      const isRange = /\d+\s*-\s*\d+/.test(search);
+      track("catdex_searched", { query_type: isRange ? "number_range" : "text" });
+    }, 500);
+    return () => {
+      if (searchTrackTimerRef.current) {
+        window.clearTimeout(searchTrackTimerRef.current);
+      }
+    };
+  }, [search]);
 
   const clearSubmitHold = useCallback(() => {
     if (submitHoldTimerRef.current) {
@@ -99,6 +117,7 @@ export default function CatdexPage() {
       submitHoldTimerRef.current = null;
       submitHoldTriggeredRef.current = true;
       setMassUploadOpen(true);
+      track("catdex_mass_upload_triggered", {});
     }, MASS_UPLOAD_HOLD_MS);
   }, [clearSubmitHold]);
 
@@ -110,6 +129,7 @@ export default function CatdexPage() {
       return;
     }
     setSubmitOpen(true);
+    track("catdex_submit_modal_opened", {});
   }, []);
 
   const handleSubmitButtonPointerDown = useCallback(
@@ -255,6 +275,11 @@ export default function CatdexPage() {
     (cat: CatdexPayload) => {
       setActiveCat(cat);
       setActiveVariant(imageVariant);
+      track("catdex_card_viewed", {
+        card_number: cardNumberToInt(cat) ?? 0,
+        season: cat.seasonRaw?.season_name ?? "unknown",
+        rarity: cat.rarityRaw?.rarity_name ?? "unknown",
+      });
     },
     [imageVariant]
   );
@@ -304,7 +329,10 @@ export default function CatdexPage() {
           <select
             className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
             value={seasonFilter}
-            onChange={(event) => setSeasonFilter(event.target.value)}
+            onChange={(event) => {
+              setSeasonFilter(event.target.value);
+              track("catdex_filtered", { filter_type: "season", value: event.target.value });
+            }}
           >
             <option value="all">All seasons</option>
             {seasons.map((season) => (
@@ -316,7 +344,10 @@ export default function CatdexPage() {
           <select
             className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
             value={rarityFilter}
-            onChange={(event) => setRarityFilter(event.target.value)}
+            onChange={(event) => {
+              setRarityFilter(event.target.value);
+              track("catdex_filtered", { filter_type: "rarity", value: event.target.value });
+            }}
           >
             <option value="all">All rarities</option>
             {rarities.map((rarity) => (
@@ -328,7 +359,12 @@ export default function CatdexPage() {
           <select
             className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
             value={sortKey}
-            onChange={(event) => setSortKey(event.target.value as SortKey)}
+            onChange={(event) => {
+              const newSortKey = event.target.value as SortKey;
+              setSortKey(newSortKey);
+              const [field, direction] = newSortKey.split("-") as [string, "asc" | "desc"];
+              track("catdex_sorted", { sort_by: field, direction });
+            }}
           >
             <option value="updated-desc">Recently updated</option>
             <option value="number-asc">Number ↑</option>
@@ -351,7 +387,10 @@ export default function CatdexPage() {
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"
                 )}
-                onClick={() => setImageVariant("default")}
+                onClick={() => {
+                  setImageVariant("default");
+                  track("catdex_image_variant_toggled", { variant: "default" });
+                }}
               >
                 Default art
               </button>
@@ -363,7 +402,10 @@ export default function CatdexPage() {
                     ? "bg-primary text-primary-foreground"
                     : "bg-muted text-muted-foreground"
                 )}
-                onClick={() => setImageVariant("custom")}
+                onClick={() => {
+                  setImageVariant("custom");
+                  track("catdex_image_variant_toggled", { variant: "custom" });
+                }}
               >
                 Custom art
               </button>
@@ -780,6 +822,13 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
         defaultFile,
         customFile
       });
+      const matchedSeason = seasons.find((s) => s.id === seasonId);
+      const matchedRarity = rarities.find((r) => r.id === rarityId);
+      track("catdex_card_submitted", {
+        season: matchedSeason?.season_name ?? "unknown",
+        rarity: matchedRarity?.rarity_name ?? "unknown",
+        has_custom_art: Boolean(customFile),
+      });
       setStatus("Submission received! We'll review it shortly.");
       setCatName("");
       setCardNumber("");
@@ -1071,6 +1120,7 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
 
     if (failed === 0) {
       setStatus(`Uploaded ${success} card${success === 1 ? "" : "s"}.`);
+      track("catdex_mass_upload_submitted", { card_count: success });
       setEntries((prev) => {
         prev.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
         return [];
@@ -1079,6 +1129,9 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
     } else {
       const summary = [`${success} succeeded`, `${failed} failed`].join(", ");
       setStatus(summary);
+      if (success > 0) {
+        track("catdex_mass_upload_submitted", { card_count: success });
+      }
     }
 
     setBusy(false);

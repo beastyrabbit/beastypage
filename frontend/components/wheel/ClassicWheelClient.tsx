@@ -5,6 +5,7 @@ import { Wheel } from "spin-wheel";
 import confetti from "canvas-confetti";
 import { RefreshCw, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
@@ -310,6 +311,7 @@ export function ClassicWheelClient() {
       };
       setWasForced(typeof forcedIndex === "number");
       setIsSpinning(true);
+      track("wheel_spin_started", {});
 
       const duration = 4000 + Math.random() * 2000;
       const revolutions = 5 + Math.floor(Math.random() * 5);
@@ -330,6 +332,10 @@ export function ClassicWheelClient() {
         setWasForced(stored.forced);
         setModalOpen(true);
         triggerCelebration(stored.prize);
+        track("wheel_spin_completed", {
+          prize_name: stored.prize.name,
+          was_forced: stored.forced,
+        });
       };
 
       wheelRef.current.spinToItem(selection.index, duration, false, revolutions, 1);

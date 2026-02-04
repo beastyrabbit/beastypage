@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { ScoreRecord } from "@/convex/coinflipper";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import { RotateCcw, Sparkles, Trophy } from "lucide-react";
 import Link from "next/link";
 
@@ -89,6 +90,7 @@ export default function CoinflipPage() {
       setScoreSubmitted(false);
       setSubmitError(null);
       setFlipSeed((value) => value + 1);
+      track("coinflip_call_made", { call: choice });
 
       const outcome: FlipSide = Math.random() < 0.5 ? "heads" : "tails";
 
@@ -100,15 +102,20 @@ export default function CoinflipPage() {
         setDisplayFace(outcome);
         setLastResult(outcome);
         if (outcome === choice) {
-          setCurrentScore((value) => value + 1);
+          setCurrentScore((value) => {
+            const newStreak = value + 1;
+            track("coinflip_won", { streak: newStreak });
+            return newStreak;
+          });
           setGameState("ready");
         } else {
+          track("coinflip_lost", { final_streak: currentScore });
           setGameState("lost");
         }
         flipTimerRef.current = null;
       }, FLIP_DURATION_MS);
     },
-    [gameState, resetRun]
+    [currentScore, gameState, resetRun]
   );
 
   const handleSubmitScore = useCallback(
@@ -129,6 +136,7 @@ export default function CoinflipPage() {
         setSubmitError(null);
         await submitScore({ name, score: currentScore });
         setScoreSubmitted(true);
+        track("coinflip_score_submitted", { score: currentScore, name_length: name.length });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to submit score.";
         setSubmitError(message);
@@ -263,7 +271,11 @@ export default function CoinflipPage() {
               <Trophy className="size-5 text-amber-500" />
               <h2 className="text-lg font-semibold">Top streaks</h2>
             </div>
-            <Link href="/coinflip/highscores" className="text-sm font-medium text-primary hover:underline">
+            <Link
+              href="/coinflip/highscores"
+              className="text-sm font-medium text-primary hover:underline"
+              onClick={() => track("coinflip_leaderboard_viewed", {})}
+            >
               View all
             </Link>
           </div>

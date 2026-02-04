@@ -3,6 +3,7 @@
 import { useMemo, useCallback } from "react";
 import { Copy, Sun, Palette } from "lucide-react";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 
 import type { ExtractedColor } from "@/lib/color-extraction/types";
 import {
@@ -43,6 +44,7 @@ export function PaletteGrid({
     try {
       await navigator.clipboard.writeText(hex);
       toast.success(`Copied: ${hex}`);
+      track("palette_color_copied", {});
     } catch {
       toast.error("Failed to copy");
     }

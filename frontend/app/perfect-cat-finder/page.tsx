@@ -8,6 +8,7 @@ import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { renderCatV3 } from "@/lib/cat-v3/api";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { Loader2, Trophy, ClipboardCopy, ExternalLink, X } from "lucide-react";
+import { track } from "@/lib/analytics";
 import { createCatShare, encodeCatShare } from "@/lib/catShare";
 
 const PALETTE_MODES = [
@@ -267,6 +268,7 @@ export default function PerfectCatFinderPage() {
         setMatchup(normalized);
         setPoolSize(response.totalCats);
         normalized.forEach((cat) => void ensurePreview(cat));
+        track("perfect_cat_matchup_loaded", {});
       } else {
         setMatchup([]);
         setPoolSize(response.totalCats);
@@ -292,6 +294,7 @@ export default function PerfectCatFinderPage() {
       const loser = matchup.find((cat) => cat.id !== winner.id);
       if (!loser) return;
       setVoteBusy(true);
+      track("perfect_cat_vote", {});
       try {
         await submitVote({
           clientId,
@@ -322,6 +325,7 @@ export default function PerfectCatFinderPage() {
         if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
           await navigator.clipboard.write([new ClipboardItem({ [blob.type || "image/png"]: blob })]);
           showMessage("Sprite copied to clipboard");
+          track("perfect_cat_copied", {});
         } else {
           const link = document.createElement("a");
           link.href = preview.url;
@@ -330,6 +334,7 @@ export default function PerfectCatFinderPage() {
           link.click();
           document.body.removeChild(link);
           showMessage("Sprite downloaded");
+          track("perfect_cat_downloaded", {});
         }
       } catch (copyError) {
         console.error("Failed to copy sprite", copyError);
@@ -379,6 +384,7 @@ export default function PerfectCatFinderPage() {
         throw new Error("Unable to determine builder URL");
       }
 
+      track("perfect_cat_opened_in_builder", {});
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (shareError) {
       console.error("Failed to open cat in builder", shareError);
@@ -435,6 +441,7 @@ export default function PerfectCatFinderPage() {
               onInspect={(entry) => {
                 setSelectedCat(entry);
                 void ensurePreview(entry);
+                track("perfect_cat_inspected", { from: "matchup" });
               }}
             />
           ))
@@ -486,6 +493,7 @@ export default function PerfectCatFinderPage() {
                           onClick={() => {
                             setSelectedCat(entry);
                             void ensurePreview(entry);
+                            track("perfect_cat_inspected", { from: "leaderboard" });
                           }}
                           className="group flex items-center justify-center rounded-xl border border-border/50 bg-background/80 p-1 transition hover:border-primary/50"
                         >

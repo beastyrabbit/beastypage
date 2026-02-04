@@ -7,6 +7,7 @@ import { useMutation } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import { createCatShare } from "@/lib/catShare";
 import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
 import { PaletteSingleSelect } from "@/components/common/PaletteSingleSelect";
@@ -203,6 +204,12 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   }, [generator]);
 
   useEffect(() => {
+    // Track once on mount - we want the initial state, not re-tracking when initialCat changes
+    track("visual_builder_opened", { from_share: Boolean(initialCat?.slug) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     if (!initialCat || initialisedRef.current) return;
     initialisedRef.current = true;
     const mergedParams = cloneParams({ ...DEFAULT_PARAMS, ...initialCat.params });
@@ -333,13 +340,16 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     })();
   }, [params, rendererReady]);
 
-  const updateParams = useCallback((mutator: (draft: CatParams) => void) => {
+  const updateParams = useCallback((mutator: (draft: CatParams) => void, traitInfo?: { trait_type: string; value: string }) => {
     markShareDirty();
     setParams((prev) => {
       const draft = cloneParams(prev);
       mutator(draft);
       return draft;
     });
+    if (traitInfo) {
+      track("visual_builder_trait_selected", traitInfo);
+    }
   }, [markShareDirty]);
 
   const getPaletteForMode = useCallback((mode: PaletteMode) => {
@@ -595,7 +605,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               className="text-left"
               onClick={() => updateParams((draft) => {
                 draft.colour = colour;
-              })}
+              }, { trait_type: "colour", value: colour })}
             >
               <PreviewSprite
                 cacheKey={previewKey}
@@ -638,7 +648,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               className="text-left"
               onClick={() => updateParams((draft) => {
                 draft.peltName = pelt;
-              })}
+              }, { trait_type: "pelt", value: pelt })}
             >
               <PreviewSprite
                 cacheKey={previewKey}
@@ -990,7 +1000,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 )}
                 onClick={() => updateParams((draft) => {
                   draft.eyeColour = eye;
-                })}
+                }, { trait_type: "eye_colour", value: eye })}
               >
                 {formatName(eye)}
               </button>
@@ -1008,7 +1018,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               )}
               onClick={() => updateParams((draft) => {
                 draft.eyeColour2 = undefined;
-              })}
+              }, { trait_type: "eye_colour_secondary", value: "none" })}
             >
               None
             </button>
@@ -1022,7 +1032,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 )}
                 onClick={() => updateParams((draft) => {
                   draft.eyeColour2 = eye;
-                })}
+                }, { trait_type: "eye_colour_secondary", value: eye })}
               >
                 {formatName(eye)}
               </button>
@@ -1061,13 +1071,14 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       selected: boolean,
       mutate: (draft: CatParams) => void,
       size = 280,
-      badge?: ReactNode
+      badge?: ReactNode,
+      traitInfo?: { trait_type: string; value: string }
     ) => (
       <button
         key={key}
         type="button"
         className="text-left"
-        onClick={() => updateParams((draft) => mutate(draft))}
+        onClick={() => updateParams((draft) => mutate(draft), traitInfo)}
       >
         <PreviewSprite cacheKey={key} mutate={mutate} label={label} selected={selected} size={size} badge={badge} />
         <p className={cn("mt-2 text-xs", selected ? "font-semibold text-amber-100" : "text-neutral-300")}>{label}</p>
@@ -1078,7 +1089,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       id: "white" | "points" | "vitiligo" | "tint";
       title: string;
       summary: string;
-      options: { key: string; label: string; selected: boolean; mutate: (draft: CatParams) => void; badge?: ReactNode }[];
+      options: { key: string; label: string; selected: boolean; mutate: (draft: CatParams) => void; badge?: ReactNode; traitInfo: { trait_type: string; value: string } }[];
     }[] = [
       {
         id: "white",
@@ -1094,6 +1105,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               mutate: (draft: CatParams) => {
                 draft.whitePatches = isNone ? undefined : (value as string);
               },
+              traitInfo: { trait_type: "white_patches", value: value ?? "none" },
             };
           }),
         ],
@@ -1112,6 +1124,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               mutate: (draft: CatParams) => {
                 draft.points = isNone ? undefined : (value as string);
               },
+              traitInfo: { trait_type: "points", value: value ?? "none" },
             };
           }),
         ],
@@ -1130,6 +1143,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               mutate: (draft: CatParams) => {
                 draft.vitiligo = isNone ? undefined : (value as string);
               },
+              traitInfo: { trait_type: "vitiligo", value: value ?? "none" },
             };
           }),
         ],
@@ -1156,6 +1170,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               draft.whitePatchesTint = option;
             },
             badge,
+            traitInfo: { trait_type: "white_patches_tint", value: option },
           };
         }),
       },
@@ -1191,7 +1206,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               {expanded && (
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {group.options.map((option) =>
-                    renderPreviewOption(option.key, option.label, option.selected, option.mutate, 280, option.badge)
+                    renderPreviewOption(option.key, option.label, option.selected, option.mutate, 280, option.badge, option.traitInfo)
                   )}
                 </div>
               )}
@@ -1230,7 +1245,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                   className="text-left"
                   onClick={() => updateParams((draft) => {
                     draft.skinColour = skin;
-                  })}
+                  }, { trait_type: "skin_colour", value: skin })}
                 >
                   <PreviewSprite
                     cacheKey={previewKey}
@@ -1259,7 +1274,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               className="text-left"
               onClick={() => updateParams((draft) => {
                 draft.tint = "none";
-              })}
+              }, { trait_type: "tint", value: "none" })}
             >
               <PreviewSprite
                 cacheKey={`tint-none-${tintKeyBase}`}
@@ -1282,7 +1297,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                   className="text-left"
                   onClick={() => updateParams((draft) => {
                     draft.tint = tint;
-                  })}
+                  }, { trait_type: "tint", value: tint })}
                 >
                 <PreviewSprite
                   cacheKey={previewKey}
@@ -1340,7 +1355,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
             type="button"
             onClick={() => updateParams((draft) => {
               draft.shading = !draft.shading;
-            })}
+            }, { trait_type: "shading", value: params.shading ? "off" : "on" })}
             className={cn(
               "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition",
               params.shading ? "border-amber-400 bg-amber-500/25 text-amber-100" : "border-slate-700 bg-slate-900/60 text-neutral-200 hover:border-amber-300/70"
@@ -1352,7 +1367,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
             type="button"
             onClick={() => updateParams((draft) => {
               draft.reverse = !draft.reverse;
-            })}
+            }, { trait_type: "reverse", value: params.reverse ? "off" : "on" })}
             className={cn(
               "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition",
               params.reverse ? "border-amber-400 bg-amber-500/25 text-amber-100" : "border-slate-700 bg-slate-900/60 text-neutral-200 hover:border-amber-300/70"
@@ -1367,6 +1382,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
 
   const toggleAccessory = useCallback(
     (value: string) => {
+      const wasPresent = (params.accessories ?? []).includes(value);
       updateParams((draft) => {
         const set = new Set(draft.accessories ?? []);
         if (set.has(value)) {
@@ -1378,8 +1394,13 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         draft.accessory = draft.accessories[0] ?? undefined;
       });
       markShareDirty();
+      if (wasPresent) {
+        track("visual_builder_accessory_removed", { accessory: value });
+      } else {
+        track("visual_builder_accessory_added", { accessory: value });
+      }
     },
-    [markShareDirty, updateParams]
+    [markShareDirty, params.accessories, updateParams]
   );
 
   const toggleScar = useCallback(
@@ -1595,7 +1616,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
             )}
             onClick={() => updateParams((draft) => {
               draft.spriteNumber = sprite;
-            })}
+            }, { trait_type: "pose", value: String(sprite) })}
           >
             <PreviewSprite
               cacheKey={`pose-option-${sprite}`}
@@ -1728,6 +1749,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       setLockedShareSlug(preferredSlug);
       await ensureCopied(url);
       setStatusMessage("Saved to history!");
+      track("visual_builder_shared", {});
       if (typeof window !== "undefined") {
         window.history.replaceState(null, "", url);
       }
@@ -1747,6 +1769,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     link.href = previewUrl;
     link.download = "visual-builder-cat.png";
     link.click();
+    track("visual_builder_exported", { format: "download-png" });
   }, [previewUrl]);
 
   const handleReset = useCallback(() => {

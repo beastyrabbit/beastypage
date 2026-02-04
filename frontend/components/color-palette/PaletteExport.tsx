@@ -4,6 +4,7 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Download, Loader2, ChevronDown, Check } from "lucide-react";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 
 import type { ExtractedColor, RGB } from "@/lib/color-extraction/types";
 import {
@@ -450,6 +451,7 @@ export function PaletteExport({
   }, [image, topColors, familyColors]);
 
   const handleExport = useCallback(() => {
+    track("palette_creator_exported", { format: selectedFormat.id });
     if (selectedFormat.id === "png") {
       generatePalettePNG();
     } else if (selectedFormat.id === "spotlight") {
