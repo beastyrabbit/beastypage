@@ -12,6 +12,9 @@ import type {
 import { rgbToHex, rgbToHsl, isBlackOrWhite, colorDistance } from "./color-utils";
 import { getImagePixels } from "./image-processing";
 
+/** Max possible Euclidean RGB distance (black to white) */
+const MAX_COLOR_DIST = Math.sqrt(255 * 255 * 3);
+
 const DEFAULT_OPTIONS: Required<KMeansOptions> = {
   k: 6,
   maxIterations: 20,
@@ -51,12 +54,12 @@ export function extractColors(
   const effectiveK = Math.min(opts.k, uniqueCount);
 
   // Run K-Means
-  const { centroids, clusters } = kMeans(pixels, effectiveK, opts.maxIterations);
+  const { clusters } = kMeans(pixels, effectiveK, opts.maxIterations);
 
   // Convert centroids to ExtractedColor format
   const totalPixels = pixels.length;
-  const colors = centroids
-    .map((c, idx) => ({
+  const colors = clusters
+    .map(({ centroid: c, members }) => ({
       hex: rgbToHex({ r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) }),
       rgb: {
         r: Math.round(c.r),
@@ -68,7 +71,7 @@ export function extractColors(
         g: Math.round(c.g),
         b: Math.round(c.b),
       }),
-      position: findBestPosition(c, clusters.get(idx) || [], width, height),
+      position: findBestPosition(c, members, width, height),
       prevalence: Math.round((c.count / totalPixels) * 100),
     }))
     .sort((a, b) => b.prevalence - a.prevalence);
@@ -213,7 +216,7 @@ function updateCentroids(
       if (previousCentroids[idx]) {
         newCentroids.push({ ...previousCentroids[idx], count: 0 });
       } else {
-        // Fallback: shouldn't happen, but use first non-empty cluster's mean if it does
+        // Fallback: shouldn't happen, but use neutral gray at origin if it does
         newCentroids.push({ r: 128, g: 128, b: 128, x: 0, y: 0, count: 0 });
       }
       return;
@@ -257,9 +260,14 @@ function hasConverged(
   return true;
 }
 
+/** K-Means result pairing each centroid with its assigned cluster pixels. */
+interface KMeansCluster {
+  readonly centroid: Centroid;
+  readonly members: readonly PixelData[];
+}
+
 interface KMeansResult {
-  centroids: Centroid[];
-  clusters: Map<number, PixelData[]>;
+  readonly clusters: readonly KMeansCluster[];
 }
 
 /**
@@ -273,35 +281,45 @@ function kMeans(
   let centroids = initializeCentroids(pixels, k);
 
   for (let i = 0; i < maxIterations; i++) {
-    const clusters = assignPixels(pixels, centroids);
-    const newCentroids = updateCentroids(clusters, centroids);
+    const assigned = assignPixels(pixels, centroids);
+    const newCentroids = updateCentroids(assigned, centroids);
 
     if (hasConverged(centroids, newCentroids)) {
-      return { centroids: newCentroids, clusters };
+      // assigned was used to compute newCentroids, so they are index-aligned.
+      // Convergence guarantees old/new centroids differ by < threshold (~1 unit),
+      // so cluster assignments are effectively correct for newCentroids.
+      return buildResult(newCentroids, assigned);
     }
 
     centroids = newCentroids;
   }
 
   // Final assignment to get correct counts
-  const finalClusters = assignPixels(pixels, centroids);
+  const finalAssigned = assignPixels(pixels, centroids);
+  return buildResult(updateCentroids(finalAssigned, centroids), finalAssigned);
+}
+
+function buildResult(
+  centroids: Centroid[],
+  clusterMap: Map<number, PixelData[]>
+): KMeansResult {
   return {
-    centroids: updateCentroids(finalClusters, centroids),
-    clusters: finalClusters,
+    clusters: centroids.map((centroid, idx) => ({
+      centroid,
+      members: clusterMap.get(idx) ?? [],
+    })),
   };
 }
 
 /**
- * Find the best dot position for a centroid.
- * Uses a combined score of spatial proximity (to centroid center)
- * and color similarity (to centroid average color).
- * This ensures dots land on actual pixels of the matched color
- * rather than the averaged center-of-mass which may fall on
- * unrelated pixels (especially common with pixel art).
+ * Find the best dot position for a centroid by scoring cluster pixels on
+ * spatial proximity and color similarity. This ensures dots land on actual
+ * pixels of the matched color rather than the averaged center-of-mass which
+ * may fall on unrelated pixels (especially common with pixel art).
  */
 function findBestPosition(
   centroid: Centroid,
-  clusterPixels: PixelData[],
+  clusterPixels: readonly PixelData[],
   imageWidth: number,
   imageHeight: number
 ): { x: number; y: number } {
@@ -309,30 +327,21 @@ function findBestPosition(
     return { x: centroid.x, y: centroid.y };
   }
 
-  // Normalize spatial distance by image diagonal (guard against 0 for degenerate images)
   const maxSpatialDist =
     Math.sqrt(imageWidth * imageWidth + imageHeight * imageHeight) || 1;
-  // Max possible color distance (black to white)
-  const maxColorDist = Math.sqrt(255 * 255 * 3);
 
   let bestScore = Infinity;
   let bestPixel = clusterPixels[0];
 
   for (const p of clusterPixels) {
-    // Spatial distance to centroid center (normalized 0-1)
     const dx = p.x - centroid.x;
     const dy = p.y - centroid.y;
     const spatialDist = Math.sqrt(dx * dx + dy * dy) / maxSpatialDist;
+    const normalizedColorDist = colorDistance(p, centroid) / MAX_COLOR_DIST;
 
-    // Color distance to centroid average color (normalized 0-1)
-    const dr = p.r - centroid.r;
-    const dg = p.g - centroid.g;
-    const db = p.b - centroid.b;
-    const colorDist = Math.sqrt(dr * dr + dg * dg + db * db) / maxColorDist;
-
-    // Combined score: weight spatial proximity more (0.6) than color match (0.4)
-    // since k-means already grouped by color similarity
-    const score = 0.6 * spatialDist + 0.4 * colorDist;
+    // Weight spatial proximity (0.6) more than color (0.4) since
+    // k-means already grouped by color similarity
+    const score = 0.6 * spatialDist + 0.4 * normalizedColorDist;
 
     if (score < bestScore) {
       bestScore = score;
@@ -598,10 +607,10 @@ export function extractFamilyColors(
     const clusterCount = Math.min(opts.k * 2, uniqueCount);
 
     // Run K-Means
-    const { centroids, clusters } = kMeans(pixels, clusterCount, opts.maxIterations);
+    const { clusters } = kMeans(pixels, clusterCount, opts.maxIterations);
 
     // Convert to colors and sort by brightness (brightest first, like Python version)
-    const allColors = centroids.map((c, idx) => ({
+    const allColors = clusters.map(({ centroid: c, members }) => ({
       hex: rgbToHex({ r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) }),
       rgb: {
         r: Math.round(c.r),
@@ -613,7 +622,7 @@ export function extractFamilyColors(
         g: Math.round(c.g),
         b: Math.round(c.b),
       }),
-      position: findBestPosition(c, clusters.get(idx) || [], width, height),
+      position: findBestPosition(c, members, width, height),
       prevalence: Math.round((c.count / pixels.length) * 100),
       brightness: colorBrightness({
         r: Math.round(c.r),
