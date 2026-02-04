@@ -14,11 +14,11 @@ COPY . .
 
 # Build-time env vars for Next.js (passed via --build-arg)
 ARG CONVEX_DEPLOYMENT
-# Use placeholder for Convex URL - replaced at runtime by entrypoint script
-# Must be a valid URL format for next.config.mjs URL parsing at build time
+# Use placeholders - replaced at runtime by entrypoint script
+# Must be valid formats for Next.js parsing at build time
 ARG NEXT_PUBLIC_CONVEX_URL=https://placeholder.convex.cloud
-ARG NEXT_PUBLIC_POSTHOG_KEY
-ARG NEXT_PUBLIC_POSTHOG_HOST
+ARG NEXT_PUBLIC_POSTHOG_KEY=phc_PLACEHOLDER_KEY
+ARG NEXT_PUBLIC_POSTHOG_HOST=https://placeholder.posthog.com
 
 ENV CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
 ENV NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}
