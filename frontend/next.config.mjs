@@ -53,14 +53,6 @@ const allowedDevOrigins = (() => {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname);
-const posthogStandinRelative = (() => {
-  const absolutePath = path.join(projectRoot, "lib/posthog-standin.ts");
-  const relativePath = path
-    .relative(projectRoot, absolutePath)
-    .split(path.sep)
-    .join("/");
-  return relativePath.startsWith(".") ? relativePath : `./${relativePath}`;
-})();
 
 if (process.env.NEXT_SHOW_CONFIG_LOGS === "1") {
   const fs = await import("node:fs");
@@ -83,9 +75,6 @@ const nextConfig = {
   },
   turbopack: {
     root: projectRoot,
-    resolveAlias: {
-      "posthog-js": posthogStandinRelative,
-    },
   },
   async redirects() {
     return [
