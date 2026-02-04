@@ -71,7 +71,6 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
   const [selection, setSelection] = useState<SelectionState>(INITIAL_SELECTION);
   const extractionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasExtractedRef = useRef(false);
-  const initialLoadAttemptedRef = useRef(false);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -119,7 +118,6 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
   useEffect(() => {
     if (initialImageUrl && initialImageUrl !== lastLoadedUrlRef.current) {
       lastLoadedUrlRef.current = initialImageUrl;
-      initialLoadAttemptedRef.current = true;
       hasExtractedRef.current = false; // Reset extraction flag for new image
       handleImageLoad(initialImageUrl);
     }
