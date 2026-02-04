@@ -1,0 +1,14 @@
+pre-commit:
+  commands:
+    gitleaks:
+      run: gitleaks git --staged --no-banner
+      fail_text: "Secrets detected! Remove before committing."
+    ruff-lint:
+      glob: "backend/**/*.py"
+      run: ruff check --fix {staged_files}
+    ruff-format:
+      glob: "backend/**/*.py"
+      run: ruff format {staged_files}
+    tsc:
+      glob: "frontend/**/*.{ts,tsx}"
+      run: cd frontend && bunx tsc --noEmit
