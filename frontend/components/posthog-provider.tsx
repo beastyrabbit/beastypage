@@ -4,7 +4,7 @@ import posthog from "posthog-js";
 import { ReactNode, useEffect } from "react";
 
 const KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-const HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://eu.i.posthog.com";
+const HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "/bubu";
 
 function isLocalHost(hostname: string | undefined) {
   if (!hostname) return false;
@@ -36,7 +36,8 @@ export function PosthogProvider({ children }: { children: ReactNode }) {
     if (!(posthog as unknown as { __loaded?: boolean }).__loaded) {
       posthog.init(KEY, {
         api_host: HOST,
-        // 'history_change' auto-captures $pageview on SPA navigation AND $pageleave
+        ui_host: "https://eu.posthog.com",
+        // Auto-capture $pageview on SPA navigation; pageleave enabled separately below
         capture_pageview: "history_change",
         capture_pageleave: true,
         persistence: "localStorage",
@@ -49,5 +50,5 @@ export function PosthogProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return <>{children}</>;
+  return children;
 }
