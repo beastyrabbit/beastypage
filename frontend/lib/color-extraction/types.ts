@@ -2,16 +2,40 @@
  * Types for the Color Palette Creator
  */
 
+/** RGB color with channels in 0-255 integer range */
 export interface RGB {
   r: number;
   g: number;
   b: number;
 }
 
+/** HSL color: h 0-360 degrees, s 0-100 percent, l 0-100 percent */
 export interface HSL {
   h: number;
   s: number;
   l: number;
+}
+
+/** HSV color: h 0-360 degrees, s 0-100 percent, v 0-100 percent */
+export interface HSV {
+  h: number;
+  s: number;
+  v: number;
+}
+
+/** CMYK color: all channels 0-100 percent */
+export interface CMYK {
+  c: number;
+  m: number;
+  y: number;
+  k: number;
+}
+
+/** OKLCH color: l 0-1 lightness, c 0-~0.4 chroma, h 0-360 degrees */
+export interface OKLCH {
+  l: number;
+  c: number;
+  h: number;
 }
 
 export interface ExtractedColor {
