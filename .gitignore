@@ -13,6 +13,12 @@ yarn-error.log*
 .env*
 frontend/.env.local
 
+# MCP config (contains API keys)
+.mcp.json
+
+# Claude Code local settings
+.claude/
+
 
 # Frontend build artifacts
 frontend/node_modules/
