@@ -119,11 +119,11 @@ const LEGACY_MODE_CARDS: LegacyCard[] = [
     comingSoon: true,
   },
   {
-    title: "Palette Spinner",
-    icon: "🌀",
+    title: "Palette Generator",
+    icon: "✨",
     description:
-      "Spin through colour palettes with smooth transitions and range controls.",
-    href: "/palette-spinner",
+      "Generate harmonious color palettes instantly. Build a collection and export in multiple formats.",
+    href: "/palette-generator",
   },
   {
     title: "Coinflip Challenge",

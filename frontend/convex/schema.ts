@@ -236,6 +236,15 @@ export default defineSchema({
     .index("byClient", ["clientId", "createdAt"])
     .index("byCats", ["catAId", "catBId", "createdAt"]),
 
+  palette_generator_settings: defineTable({
+    slug: v.string(),
+    config: v.any(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("bySlug", ["slug"])
+    .index("byCreated", ["createdAt"]),
+
   ancestry_tree: defineTable({
     slug: v.string(),
     name: v.string(),

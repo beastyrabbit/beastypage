@@ -197,7 +197,7 @@ export function VariantBar<T>({
 
   return (
     <>
-      <div className="relative z-10 rounded-2xl border border-border/40 bg-background/60 backdrop-blur px-4 py-2.5">
+      <div className="relative z-30 rounded-2xl border border-border/40 bg-background/60 backdrop-blur px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <div ref={dropdownRef} className="relative">
             <button
