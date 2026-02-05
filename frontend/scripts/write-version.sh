@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Writes the latest git tag into lib/dash/version.ts for build-time version tracking.
-set -euo pipefail
+set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT="$SCRIPT_DIR/../lib/dash/version.ts"

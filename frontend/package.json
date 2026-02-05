@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "test": "vitest",
-    "prebuild": "bash scripts/write-version.sh && bun scripts/generate-registry.ts",
+    "prebuild": "sh scripts/write-version.sh && bun scripts/generate-registry.ts",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
