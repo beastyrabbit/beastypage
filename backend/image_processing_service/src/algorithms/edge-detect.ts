@@ -11,22 +11,15 @@ export async function edgeDetect(
   const threshold = Math.max(0, Math.min(255, Math.round(Number(params.threshold) || 30)));
   const invert = params.invert === true;
 
-  const image = sharp(buffer).greyscale().ensureAlpha();
-  const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
-  const src = new Uint8Array(data.buffer);
-
-  const w = info.width;
-  const h = info.height;
-  // Source is greyscale + alpha = 2 channels after ensureAlpha...
-  // Actually sharp greyscale().ensureAlpha() gives 2 channels
-  // Let's use a different approach: convert to greyscale first, then process
-  const greyImage = sharp(buffer).greyscale();
-  const { data: greyData, info: greyInfo } = await greyImage.raw().toBuffer({ resolveWithObject: true });
+  const { data: greyData, info: greyInfo } = await sharp(buffer)
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
   const grey = new Uint8Array(greyData.buffer);
 
   const gw = greyInfo.width;
   const gh = greyInfo.height;
-  const channels = greyInfo.channels; // 1 for greyscale
+  const channels = greyInfo.channels;
   const out = new Uint8Array(gw * gh * 4);
 
   function getGrey(x: number, y: number): number {

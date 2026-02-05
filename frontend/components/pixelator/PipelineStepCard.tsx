@@ -197,7 +197,7 @@ export function PipelineStepCard({
                   } else {
                     onUpdate(step.id, {
                       blendWith: {
-                        stepId: previousSteps[0]?.id ?? "original",
+                        stepId: previousSteps.at(-1)?.id ?? "original",
                         mode: "normal",
                         opacity: 0.5,
                       },

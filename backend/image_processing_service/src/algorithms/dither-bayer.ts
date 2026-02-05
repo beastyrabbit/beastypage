@@ -24,8 +24,8 @@ function generateBayer8(): number[][] {
       let yc = y;
       for (let bit = size >> 1; bit > 0; bit >>= 1) {
         v = (v << 2) | (((xc & bit) !== 0 ? 2 : 0) ^ ((yc & bit) !== 0 ? 3 : 0));
-        xc >>= 0;
-        yc >>= 0;
+        xc >>= 1;
+        yc >>= 1;
       }
       matrix[y]![x] = v;
     }
