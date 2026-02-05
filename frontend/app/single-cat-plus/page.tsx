@@ -43,8 +43,8 @@ function SingleCatPlusContent() {
     const scars = parseRange(searchParams.get("scars"), RANGE_FALLBACKS.scars);
     const torties = parseRange(searchParams.get("torties"), RANGE_FALLBACKS.torties);
     const afterlife = parseAfterlife(searchParams.get("afterlife"), "dark10");
-    const speed = searchParams.get("speed")?.trim() || undefined;
-    return { mode, accessories, scars, torties, afterlife, speed };
+    const variantSlug = searchParams.get("variant")?.trim() || searchParams.get("speed")?.trim() || undefined;
+    return { mode, accessories, scars, torties, afterlife, variantSlug };
   }, [searchParams]);
 
   return (
@@ -54,7 +54,7 @@ function SingleCatPlusContent() {
       defaultScarRange={params.scars}
       defaultTortieRange={params.torties}
       defaultAfterlife={params.afterlife}
-      speedSlug={params.speed}
+      variantSlug={params.variantSlug}
     />
   );
 }
