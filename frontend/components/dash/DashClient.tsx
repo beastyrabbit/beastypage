@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useVariants } from "@/utils/variants";
@@ -26,19 +26,19 @@ export function DashClient() {
   const [editing, setEditing] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
-  const [slugLoaded, setSlugLoaded] = useState(false);
+  const slugLoadedRef = useRef(false);
 
   // Sync settings from active variant
   useEffect(() => {
     if (activeVariant) {
-      setSettings(parseDashPayload(activeVariant.settings));
+      queueMicrotask(() => setSettings(parseDashPayload(activeVariant.settings)));
     }
   }, [activeVariant]);
 
   // Load from slug query param
   useEffect(() => {
-    if (!slugParam || slugLoaded) return;
-    setSlugLoaded(true);
+    if (!slugParam || slugLoadedRef.current) return;
+    slugLoadedRef.current = true;
     fetch(`/api/dash-settings?slug=${encodeURIComponent(slugParam)}`, { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error("Not found");
@@ -54,7 +54,7 @@ export function DashClient() {
       .catch(() => {
         toast.error("Failed to load shared dashboard");
       });
-  }, [slugParam, slugLoaded, createVariant]);
+  }, [slugParam, createVariant]);
 
   // Auto-enter edit mode when no widgets are placed and no variant is active
   useEffect(() => {
