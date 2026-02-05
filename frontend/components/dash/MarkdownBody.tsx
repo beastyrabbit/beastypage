@@ -96,7 +96,7 @@ function markdownToHtml(md: string): string {
       const codeLines: string[] = [];
       i++;
       while (i < lines.length && !lines[i].startsWith("```")) {
-        codeLines.push(lines[i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
+        codeLines.push(escapeHtml(lines[i]));
         i++;
       }
       if (i < lines.length) i++; // skip closing ``` (guard unclosed blocks)
@@ -108,9 +108,9 @@ function markdownToHtml(md: string): string {
     }
 
     // GitHub-style admonitions: > [!NOTE], > [!WARNING], etc.
-    if (/^>\s*\[!(NOTE|TIP|WARNING|CAUTION|IMPORTANT)\]/.test(line)) {
-      const match = line.match(/^>\s*\[!(NOTE|TIP|WARNING|CAUTION|IMPORTANT)\]/);
-      const type = match![1].toLowerCase();
+    const admonitionMatch = line.match(/^>\s*\[!(NOTE|TIP|WARNING|CAUTION|IMPORTANT)\]/);
+    if (admonitionMatch) {
+      const type = admonitionMatch[1].toLowerCase();
       const bodyLines: string[] = [];
       i++;
       while (i < lines.length && lines[i].startsWith(">")) {
@@ -188,7 +188,11 @@ function markdownToHtml(md: string): string {
   return out.join("\n");
 }
 
-export function MarkdownBody({ content }: { content: string }) {
+interface MarkdownBodyProps {
+  content: string;
+}
+
+export function MarkdownBody({ content }: MarkdownBodyProps) {
   // Content is sanitized (script tags, on* attrs, javascript: URLs removed)
   // before being set as innerHTML. Source is GitHub Releases API.
   const html = sanitize(markdownToHtml(content));

@@ -36,40 +36,41 @@ export function DashClient() {
         setSettings(parseDashPayload(activeVariant.settings));
         setEditing(false);
       });
-    } else if (!slugParam) {
-      // Only auto-enter edit mode when variant store has loaded and there's truly
-      // no active variant and no slug import pending
-      queueMicrotask(() => {
-        setSettings((prev) => {
-          if (prev.widgets.length === 0) {
-            setEditing(true);
-          }
-          return prev;
-        });
-      });
     }
+  }, [activeVariant]);
+
+  // Auto-enter edit mode when there are no widgets and no variant or slug pending
+  useEffect(() => {
+    if (!activeVariant && !slugParam && settings.widgets.length === 0) {
+      queueMicrotask(() => setEditing(true));
+    }
+    // Only trigger on variant/slug changes, not on every settings mutation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeVariant, slugParam]);
 
   // Load from slug query param
   useEffect(() => {
     if (!slugParam || slugLoadedRef.current) return;
     slugLoadedRef.current = true;
+    let cancelled = false;
     fetch(`/api/dash-settings?slug=${encodeURIComponent(slugParam)}`, { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error("Not found");
         return res.json() as Promise<{ config?: unknown }>;
       })
       .then((data) => {
-        if (!data.config) return;
+        if (cancelled || !data.config) return;
         const imported = parseDashPayload(data.config);
         const v = createVariant(`Import ${slugParam.slice(0, 7)}`, imported);
         setSettings(v.settings);
         toast.success("Dashboard imported");
       })
       .catch((error) => {
+        if (cancelled) return;
         console.error(`[DashClient] Failed to import dashboard slug="${slugParam}"`, error);
         toast.error("Failed to load shared dashboard");
       });
+    return () => { cancelled = true; };
   }, [slugParam, createVariant]);
 
   // Resolve widget IDs to tool metadata
@@ -86,10 +87,12 @@ export function DashClient() {
     settings.lastSeenVersion !== null &&
     settings.lastSeenVersion !== APP_VERSION;
 
-  // Dirty detection
-  const isDirty = activeVariant
-    ? !dashSettingsEqual(settings, parseDashPayload(activeVariant.settings))
-    : !dashSettingsEqual(settings, DEFAULT_DASH_SETTINGS);
+  // Re-parse active variant settings once (memoized) to avoid repeated work during dirty checks
+  const baseSettings = useMemo(
+    () => (activeVariant ? parseDashPayload(activeVariant.settings) : DEFAULT_DASH_SETTINGS),
+    [activeVariant],
+  );
+  const isDirty = !dashSettingsEqual(settings, baseSettings);
 
   // Widget actions
   const handleAddWidget = useCallback((id: string) => {
@@ -122,8 +125,7 @@ export function DashClient() {
   }, []);
 
   const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
-    if (type === "error") toast.error(message);
-    else toast.success(message);
+    toast[type](message);
   }, []);
 
   const copyText = useCallback(async (text: string, successMessage: string) => {

@@ -52,5 +52,11 @@ export function parseDashPayload(payload: unknown): DashSettings {
 // ---------------------------------------------------------------------------
 
 export function dashSettingsEqual(a: DashSettings, b: DashSettings): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  if (a.v !== b.v) return false;
+  if (a.lastSeenVersion !== b.lastSeenVersion) return false;
+  if (a.widgets.length !== b.widgets.length) return false;
+  for (let i = 0; i < a.widgets.length; i++) {
+    if (a.widgets[i] !== b.widgets[i]) return false;
+  }
+  return true;
 }

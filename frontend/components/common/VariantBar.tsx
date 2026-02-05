@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { UseVariantsReturn } from "../../utils/variants";
+import type { UseVariantsReturn } from "@/utils/variants";
 
 interface VariantBarProps<T> {
   variants: UseVariantsReturn<T>;
@@ -190,6 +190,10 @@ export function VariantBar<T>({
       return;
     }
     // Second click — confirmed
+    if (confirmTimerRef.current) {
+      clearTimeout(confirmTimerRef.current);
+      confirmTimerRef.current = null;
+    }
     deleteVariant(activeVariant.id);
     showToast("Variant deleted");
     setManageOpen(false);
@@ -317,9 +321,7 @@ export function VariantBar<T>({
               onClick={() => setManageOpen(false)}
               className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition"
             >
-              <svg className="size-4" viewBox="0 0 16 16" fill="none">
-                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
+              <X className="size-4" />
             </button>
 
             <h2 className="mb-5 text-sm font-semibold text-foreground">Manage Variants</h2>

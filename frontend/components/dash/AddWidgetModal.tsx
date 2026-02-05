@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
+import { X } from "lucide-react";
 import { TOOL_REGISTRY } from "@/lib/dash/registry.generated";
 import type { ToolCategory, ToolWidgetMeta } from "@/lib/dash/types";
 
@@ -55,9 +56,7 @@ export function AddWidgetModal({ open, onClose, onSelect, placedIds }: AddWidget
           onClick={onClose}
           className="absolute right-4 top-4 text-muted-foreground hover:text-foreground transition"
         >
-          <svg className="size-4" viewBox="0 0 16 16" fill="none">
-            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
+          <X className="size-4" />
         </button>
 
         <h2 className="mb-5 text-sm font-semibold text-foreground">Add a Tool</h2>

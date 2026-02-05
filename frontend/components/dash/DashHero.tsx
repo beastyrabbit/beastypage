@@ -19,7 +19,16 @@ interface DashHeroProps {
 const HERO_BUTTON_CLASS =
   "inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-emerald-100 transition-all hover:border-emerald-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(52,211,153,0.2)]";
 
-export function DashHero({ version, hasNewVersion, onOpenReleaseNotes, editing, onToggleEditing, hasVariant, opening, onOpen }: DashHeroProps) {
+export function DashHero({
+  version,
+  hasNewVersion,
+  onOpenReleaseNotes,
+  editing,
+  onToggleEditing,
+  hasVariant,
+  opening,
+  onOpen,
+}: DashHeroProps) {
   return (
     <section className="relative rounded-3xl overflow-hidden">
       {/* Banner Background */}
