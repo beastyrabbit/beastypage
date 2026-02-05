@@ -5,8 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "test": "vitest",
+    "prebuild": "bash scripts/write-version.sh && bun scripts/generate-registry.ts",
     "build": "next build",
     "start": "next start",
+    "typecheck": "tsc --noEmit",
     "lint": "bunx eslint .",
     "convex:dev": "convex dev",
     "deploy": "bunx convex deploy",
