@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { toast } from "sonner";
 import { detectGrid } from "@/lib/pixelator/api";
 
 interface PixelArtDetectorProps {
@@ -30,7 +31,9 @@ export function PixelArtDetector({
       const result = await detectGrid(imageDataUrl);
       setConfidence(result.confidence);
       onGridDetected(result.gridSize);
-    } catch {
+    } catch (err) {
+      console.error("Grid detection failed:", err);
+      toast.error(err instanceof Error ? err.message : "Grid detection failed");
       setConfidence(null);
       onGridDetected(null);
     } finally {

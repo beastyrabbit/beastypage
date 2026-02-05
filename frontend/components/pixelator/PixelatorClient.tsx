@@ -72,8 +72,12 @@ const AUTO_PROCESS_DELAY = 600;
 // ---------------------------------------------------------------------------
 
 async function copyText(text: string, successMessage: string) {
-  await navigator.clipboard.writeText(text);
-  toast.success(successMessage);
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(successMessage);
+  } catch {
+    toast.error("Failed to copy to clipboard");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -234,6 +238,7 @@ export function PixelatorClient() {
         }));
       } catch (err) {
         if (controller.signal.aborted) return;
+        console.error("Processing failed:", err);
         const msg = err instanceof Error ? err.message : "Processing failed";
         setState((prev) => ({ ...prev, processing: false, error: msg }));
         toast.error(msg);
@@ -361,32 +366,12 @@ export function PixelatorClient() {
 
             {/* Mode toggle + actions */}
             <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
-                <button
-                  onClick={() =>
-                    setState((prev) => ({ ...prev, processMode: "preview" }))
-                  }
-                  className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
-                    state.processMode === "preview"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Preview
-                </button>
-                <button
-                  onClick={() =>
-                    setState((prev) => ({ ...prev, processMode: "full" }))
-                  }
-                  className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
-                    state.processMode === "full"
-                      ? "bg-amber-600 text-white shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Full Image
-                </button>
-              </div>
+              <ModeToggle
+                current={state.processMode}
+                onChange={(mode) =>
+                  setState((prev) => ({ ...prev, processMode: mode }))
+                }
+              />
 
               {state.processing && (
                 <span className="text-sm text-muted-foreground animate-pulse">
@@ -436,5 +421,41 @@ export function PixelatorClient() {
         </DndContext>
       )}
     </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mode toggle — switches between "preview" and "full" processing
+// ---------------------------------------------------------------------------
+
+interface ModeToggleProps {
+  current: ProcessMode;
+  onChange: (mode: ProcessMode) => void;
+}
+
+const MODE_OPTIONS: Array<{
+  mode: ProcessMode;
+  label: string;
+  activeClass: string;
+}> = [
+  { mode: "preview", label: "Preview", activeClass: "bg-primary text-primary-foreground shadow-sm" },
+  { mode: "full", label: "Full Image", activeClass: "bg-amber-600 text-white shadow-sm" },
+];
+
+function ModeToggle({ current, onChange }: ModeToggleProps): React.ReactNode {
+  return (
+    <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
+      {MODE_OPTIONS.map(({ mode, label, activeClass }) => (
+        <button
+          key={mode}
+          onClick={() => onChange(mode)}
+          className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
+            current === mode ? activeClass : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }

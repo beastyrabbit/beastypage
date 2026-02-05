@@ -22,7 +22,8 @@ interface PeriodResult {
  * that destroy the periodic pattern.
  */
 export async function detectGrid(buffer: Buffer): Promise<GridDetectionResult> {
-  const { data, info } = await sharp(buffer).raw().toBuffer({ resolveWithObject: true });
+  // Force sRGB (3 channels) so grayscale/RGBA images work correctly
+  const { data, info } = await sharp(buffer).toColourspace("srgb").raw().toBuffer({ resolveWithObject: true });
   const px = new Uint8Array(data.buffer);
   const w = info.width;
   const h = info.height;
@@ -35,31 +36,42 @@ export async function detectGrid(buffer: Buffer): Promise<GridDetectionResult> {
     return { detected: false, gridSize: null, confidence: 0 };
   }
 
-  let gridSize: number;
-  let confidence: number;
-
-  if (hPeriod !== null && vPeriod !== null) {
-    if (Math.abs(hPeriod.size - vPeriod.size) <= 1) {
-      // Both axes agree — average them
-      gridSize = Math.round((hPeriod.size + vPeriod.size) / 2);
-      confidence = (hPeriod.consistency + vPeriod.consistency) / 2;
-    } else {
-      // Disagreement — pick the one with higher consistency
-      const pick = hPeriod.consistency >= vPeriod.consistency ? hPeriod : vPeriod;
-      gridSize = pick.size;
-      confidence = pick.consistency * 0.7;
-    }
-  } else {
-    const pick = (hPeriod ?? vPeriod)!;
-    gridSize = pick.size;
-    confidence = pick.consistency * 0.8;
-  }
+  const { gridSize, confidence } = combinePeriods(hPeriod, vPeriod);
 
   return {
     detected: true,
     gridSize,
     confidence: Math.max(0.1, Math.min(1, confidence)),
   };
+}
+
+/**
+ * Combine horizontal and vertical period measurements into a single
+ * grid size and confidence value.
+ *
+ * When both axes agree (within +-1), averages them for accuracy.
+ * When they disagree, picks the more consistent axis with a penalty.
+ * When only one axis detected a period, uses it with a small penalty.
+ */
+function combinePeriods(
+  hPeriod: PeriodResult | null,
+  vPeriod: PeriodResult | null,
+): { gridSize: number; confidence: number } {
+  if (hPeriod !== null && vPeriod !== null) {
+    if (Math.abs(hPeriod.size - vPeriod.size) <= 1) {
+      return {
+        gridSize: Math.round((hPeriod.size + vPeriod.size) / 2),
+        confidence: (hPeriod.consistency + vPeriod.consistency) / 2,
+      };
+    }
+    // Disagreement -- pick the axis with higher consistency
+    const pick = hPeriod.consistency >= vPeriod.consistency ? hPeriod : vPeriod;
+    return { gridSize: pick.size, confidence: pick.consistency * 0.7 };
+  }
+
+  // Only one axis detected a period
+  const pick = (hPeriod ?? vPeriod)!;
+  return { gridSize: pick.size, confidence: pick.consistency * 0.8 };
 }
 
 /**
@@ -91,18 +103,20 @@ function findPeriod(
   const scanStep = Math.max(1, Math.floor(other / maxScanLines));
   const scanCount = Math.ceil(other / scanStep);
 
+  // Precompute strides so the hot inner loop is branch-free.
+  // Horizontal: adjacent columns in the same row  (step between neighbors = ch)
+  // Vertical:   adjacent rows in the same column  (step between neighbors = w * ch)
+  const isHorizontal = dir === "horizontal";
+  const neighborStride = isHorizontal ? ch : w * ch;
+
   const edgeRate = new Float64Array(length);
   for (let i = 1; i < length; i++) {
     let changes = 0;
     for (let j = 0; j < other; j += scanStep) {
-      let o1: number, o2: number;
-      if (dir === "horizontal") {
-        o1 = (j * w + (i - 1)) * ch;
-        o2 = (j * w + i) * ch;
-      } else {
-        o1 = ((i - 1) * w + j) * ch;
-        o2 = (i * w + j) * ch;
-      }
+      const o1 = isHorizontal
+        ? (j * w + (i - 1)) * ch
+        : ((i - 1) * w + j) * ch;
+      const o2 = o1 + neighborStride;
       if (
         px[o1] !== px[o2] ||
         px[o1 + 1] !== px[o2 + 1] ||

@@ -139,17 +139,23 @@ export async function fetchRandomWikimediaImage(
 ): Promise<string> {
   const categories = CATEGORY_MAP[type];
 
+  let lastError: Error | null = null;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)]!;
 
-    const titles = await searchImages(randomCategory);
-    if (titles.length === 0) continue;
+    try {
+      const titles = await searchImages(randomCategory);
+      if (titles.length === 0) continue;
 
-    const randomTitle = titles[Math.floor(Math.random() * titles.length)];
-    return getImageUrl(randomTitle);
+      const randomTitle = titles[Math.floor(Math.random() * titles.length)]!;
+      return await getImageUrl(randomTitle);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      continue;
+    }
   }
 
-  throw new Error(`No images found after ${MAX_RETRIES} attempts — try again`);
+  throw lastError ?? new Error(`No images found after ${MAX_RETRIES} attempts — try again`);
 }
 
 /**
