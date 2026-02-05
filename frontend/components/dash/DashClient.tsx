@@ -106,6 +106,10 @@ export function DashClient() {
     }));
   }, []);
 
+  const handleReorderWidgets = useCallback((widgetIds: string[]) => {
+    setSettings((prev) => ({ ...prev, widgets: widgetIds }));
+  }, []);
+
   const handleApplyConfig = useCallback((config: DashSettings) => {
     setSettings(parseDashPayload(config));
   }, []);
@@ -195,6 +199,7 @@ export function DashClient() {
           editing={editing}
           onAddClick={() => setAddModalOpen(true)}
           onRemove={handleRemoveWidget}
+          onReorder={handleReorderWidgets}
         />
       )}
 
