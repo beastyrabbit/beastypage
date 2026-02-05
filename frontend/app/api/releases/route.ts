@@ -16,7 +16,11 @@ export async function GET() {
     }
 
     const raw: unknown = await res.json();
-    const items = Array.isArray(raw) ? raw : [];
+    if (!Array.isArray(raw)) {
+      console.error(`GitHub releases API returned non-array response: ${typeof raw}`);
+      return NextResponse.json({ error: "Unexpected response format from GitHub" }, { status: 502 });
+    }
+    const items = raw;
     const releases = items.map((entry: unknown) => {
       const r = entry as Record<string, unknown>;
       return {

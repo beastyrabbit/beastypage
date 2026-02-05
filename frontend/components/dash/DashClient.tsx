@@ -59,7 +59,11 @@ export function DashClient() {
         return res.json() as Promise<{ config?: unknown }>;
       })
       .then((data) => {
-        if (cancelled || !data.config) return;
+        if (cancelled) return;
+        if (!data.config) {
+          toast.error("Shared dashboard has no configuration");
+          return;
+        }
         const imported = parseDashPayload(data.config);
         const v = createVariant(`Import ${slugParam.slice(0, 7)}`, imported);
         setSettings(v.settings);
@@ -147,7 +151,10 @@ export function DashClient() {
         cache: "no-store",
         body: JSON.stringify({ config: settings }),
       });
-      if (!response.ok) throw new Error("Failed to export");
+      if (!response.ok) {
+        const body = await response.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error ?? `HTTP ${response.status}`);
+      }
       const json = (await response.json()) as { slug?: string };
       const slug = json.slug?.trim();
       if (!slug) throw new Error("No slug returned");

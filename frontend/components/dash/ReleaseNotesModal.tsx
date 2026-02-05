@@ -101,9 +101,13 @@ export function ReleaseNotesModal({ open, onClose }: ReleaseNotesModalProps) {
 
         {!loading && releases.map((release) => {
           const expanded = expandedTags.has(release.tag);
-          const date = release.publishedAt
-            ? new Date(release.publishedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-            : "";
+          let date = "";
+          if (release.publishedAt) {
+            const parsed = new Date(release.publishedAt);
+            if (!isNaN(parsed.getTime())) {
+              date = parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+            }
+          }
           return (
             <div key={release.tag} className="mb-3 rounded-xl border border-border/30 overflow-hidden">
               <button
