@@ -61,6 +61,10 @@ This triggers the Docker build workflow which:
 | Push `v*` tag | Both packages | Version (e.g., `1.7.0`), `1.7` |
 | Manual dispatch | Selected packages | `latest`, commit SHA |
 
+## Icons
+
+When adding icons, always prefer [itshover icons](https://www.itshover.com/) before falling back to other icon libraries (e.g., Lucide, Heroicons, etc.).
+
 ## Project Structure
 
 - `frontend/` - Next.js application (see `frontend/CLAUDE.md` for details)

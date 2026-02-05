@@ -137,12 +137,19 @@ type PerfectCatInspectedProps = {
 };
 
 // Palette Tools
-type PaletteSpinnerRangeChangedProps = {
-  range_type: string;
-};
-
 type PaletteCreatorExportedProps = {
   format: string;
+};
+
+type PaletteGeneratorGeneratedProps = {
+  mode: string;
+  count: number;
+  source: "colorapi" | "fallback";
+};
+
+type PaletteGeneratorExportedProps = {
+  format: string;
+  palette_count: number;
 };
 
 // Ancestry Tree
@@ -267,12 +274,12 @@ type AnalyticsEventMap = {
   perfect_cat_opened_in_builder: Record<string, never>;
 
   // Palette Tools
-  palette_spinner_spun: Record<string, never>;
-  palette_spinner_range_changed: PaletteSpinnerRangeChangedProps;
   palette_creator_image_uploaded: Record<string, never>;
   palette_creator_color_picked: Record<string, never>;
   palette_creator_exported: PaletteCreatorExportedProps;
   palette_color_copied: Record<string, never>;
+  palette_generator_generated: PaletteGeneratorGeneratedProps;
+  palette_generator_exported: PaletteGeneratorExportedProps;
 
   // Ancestry Tree
   ancestry_tree_created: AncestryTreeCreatedProps;
@@ -328,10 +335,8 @@ export function track<K extends keyof AnalyticsEventMap>(
       posthog.capture(event, properties);
     }
   } catch (error) {
-    // Analytics failures should never crash the app
-    if (process.env.NODE_ENV === "development") {
-      console.warn(`[Analytics] Failed to track "${event}":`, error);
-    }
+    // Analytics failures should never crash the app, but we need visibility
+    console.warn(`[Analytics] Failed to track "${event}":`, error);
   }
 }
 

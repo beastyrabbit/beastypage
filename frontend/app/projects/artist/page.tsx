@@ -26,11 +26,11 @@ export const metadata: Metadata = {
 
 const TOOLS: ToolCard[] = [
   {
-    title: "Palette Spinner",
-    icon: "🌀",
+    title: "Palette Generator",
+    icon: "✨",
     description:
-      "Spin through colour palettes with smooth transitions and range controls.",
-    href: "/palette-spinner",
+      "Generate harmonious color palettes instantly. Build a collection and export in multiple formats.",
+    href: "/palette-generator",
   },
   {
     title: "Color Palette Creator",
@@ -72,10 +72,10 @@ export default function ArtistCategory() {
         description="Palettes, mood boards, and inspiration tools designed for artists."
       >
         <Link
-          href="/palette-spinner"
+          href="/palette-generator"
           className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:-translate-y-1 hover:shadow-primary/40 hover:scale-105 animate-pulse-glow"
         >
-          Open Palette Spinner <ArrowRight className="size-4" />
+          Open Palette Generator <ArrowRight className="size-4" />
         </Link>
       </PageHero>
 
