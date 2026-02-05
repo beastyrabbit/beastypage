@@ -1,15 +1,15 @@
-FROM oven/bun:1 AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
-COPY package.json bun.lock* ./
-RUN bun install --frozen-lockfile --production
+COPY package.json ./
+RUN npm install --omit=dev
 
 COPY tsconfig.json ./
 COPY src/ src/
 
 # ---- Runtime ----
-FROM oven/bun:1-slim
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -23,4 +23,4 @@ ENV PORT=8002
 
 EXPOSE 8002
 
-CMD ["bun", "run", "src/index.ts"]
+CMD ["node", "--experimental-strip-types", "src/index.ts"]

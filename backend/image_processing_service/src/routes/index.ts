@@ -28,7 +28,7 @@ routes.get("/health", (c) => {
     status: "ok",
     uptime: Date.now() - startTime,
     version: "1.0.0",
-    memory: { used: process.memoryUsage.rss() },
+    memory: { used: process.memoryUsage().rss },
   };
   return c.json(body);
 });

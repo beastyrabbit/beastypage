@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { serve } from "@hono/node-server";
 import { config } from "./config.ts";
 import { errorHandler } from "./middleware/error-handler.ts";
 import { routes } from "./routes/index.ts";
@@ -20,18 +21,17 @@ app.route("/", routes);
 // ---------------------------------------------------------------------------
 // Serve
 // ---------------------------------------------------------------------------
-const server = Bun.serve({
-  port: config.port,
+const server = serve({
   fetch: app.fetch,
-  maxRequestBodySize: config.maxImageSize + 1024 * 1024, // image + overhead
+  port: config.port,
 });
 
-console.log(`[image-processing] listening on http://localhost:${server.port}`);
+console.log(`[image-processing] listening on http://localhost:${config.port}`);
 
 // Graceful shutdown
 function shutdown() {
   console.log("[image-processing] shutting down...");
-  server.stop(true);
+  server.close();
   process.exit(0);
 }
 
