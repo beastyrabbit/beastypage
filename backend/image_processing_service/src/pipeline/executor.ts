@@ -59,6 +59,12 @@ export async function executePipeline(
       const outMeta = await sharp(output).metadata();
       const blendMeta = await sharp(blendSource).metadata();
 
+      if (!outMeta.width || !outMeta.height || !blendMeta.width || !blendMeta.height) {
+        throw new ProcessingError(
+          `Step "${step.id}" blend: unable to read dimensions from output or blend source`,
+        );
+      }
+
       let resizedBlendSource = blendSource;
       if (outMeta.width !== blendMeta.width || outMeta.height !== blendMeta.height) {
         resizedBlendSource = await sharp(blendSource)
@@ -93,13 +99,12 @@ export async function executePipeline(
       finalSharp = finalSharp.png();
   }
 
-  const finalBuffer = await finalSharp.toBuffer();
-  const meta = await sharp(finalBuffer).metadata();
+  const { data: finalBuffer, info: finalInfo } = await finalSharp.toBuffer({ resolveWithObject: true });
 
   return {
     result: finalBuffer,
     stepsProcessed,
-    width: meta.width ?? 0,
-    height: meta.height ?? 0,
+    width: finalInfo.width,
+    height: finalInfo.height,
   };
 }

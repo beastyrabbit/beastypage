@@ -2,7 +2,7 @@ FROM node:22-slim AS builder
 
 WORKDIR /app
 
-COPY package.json ./
+COPY package.json bun.lock ./
 RUN npm install --omit=dev
 
 COPY tsconfig.json ./

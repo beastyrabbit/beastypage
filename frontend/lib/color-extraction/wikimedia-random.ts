@@ -145,12 +145,16 @@ export async function fetchRandomWikimediaImage(
 
     try {
       const titles = await searchImages(randomCategory);
-      if (titles.length === 0) continue;
+      if (titles.length === 0) {
+        console.warn(`[wikimedia] Category "${randomCategory}" returned no results (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        continue;
+      }
 
       const randomTitle = titles[Math.floor(Math.random() * titles.length)]!;
       return await getImageUrl(randomTitle);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`[wikimedia] Attempt ${attempt + 1}/${MAX_RETRIES} failed:`, lastError.message);
       continue;
     }
   }

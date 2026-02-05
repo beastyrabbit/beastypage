@@ -20,8 +20,11 @@ export async function blockAverage(
   );
 
   const meta = await sharp(buffer).metadata();
-  const w = meta.width ?? 1;
-  const h = meta.height ?? 1;
+  if (!meta.width || !meta.height) {
+    throw new Error("Unable to read image dimensions in block-average step");
+  }
+  const w = meta.width;
+  const h = meta.height;
 
   const smallW = Math.max(1, Math.round(w / blockSize));
   const smallH = Math.max(1, Math.round(h / blockSize));

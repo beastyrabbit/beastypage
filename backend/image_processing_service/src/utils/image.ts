@@ -54,8 +54,11 @@ export async function downscaleForPreview(
   maxDimension: number,
 ): Promise<{ buffer: Buffer; width: number; height: number }> {
   const meta = await sharp(buffer).metadata();
-  const w = meta.width ?? 0;
-  const h = meta.height ?? 0;
+  const w = meta.width;
+  const h = meta.height;
+  if (!w || !h) {
+    throw new ProcessingError("Unable to read image dimensions for preview downscale");
+  }
 
   if (w <= maxDimension && h <= maxDimension) {
     return { buffer, width: w, height: h };

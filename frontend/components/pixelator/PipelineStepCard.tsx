@@ -54,14 +54,6 @@ export function PipelineStepCard({
     })),
   ];
 
-  // Blend source options (same as input but excludes current step)
-  const blendSourceOptions = [
-    { value: "original", label: "Original" },
-    ...previousSteps.map((s, i) => ({
-      value: s.id,
-      label: `Step ${i + 1}: ${s.label}`,
-    })),
-  ];
 
   return (
     <div
@@ -226,7 +218,7 @@ export function PipelineStepCard({
                     }
                     className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
                   >
-                    {blendSourceOptions.map((opt) => (
+                    {inputOptions.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>

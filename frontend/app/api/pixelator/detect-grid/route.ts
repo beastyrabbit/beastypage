@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const config = {
+  api: { bodyParser: { sizeLimit: "60mb" } },
+};
+
 const BACKEND_BASE = (
   process.env.IMAGE_PROCESSING_INTERNAL_URL ?? "http://127.0.0.1:8002"
 ).replace(/\/$/, "");
@@ -31,6 +35,11 @@ export async function POST(request: NextRequest) {
     clearTimeout(timeout);
 
     const data = await upstream.text();
+
+    if (!upstream.ok) {
+      console.error(`[pixelator-proxy] detect-grid upstream returned ${upstream.status}:`, data.slice(0, 500));
+    }
+
     return new NextResponse(data, {
       status: upstream.status,
       headers: {
