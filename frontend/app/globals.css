@@ -595,3 +595,23 @@
     transform: scale(1.02);
   }
 }
+
+/* react-colorful overrides for palette generator color picker */
+.react-colorful {
+  width: 180px !important;
+  height: 180px !important;
+}
+.react-colorful__saturation {
+  border-radius: 8px !important;
+  margin-bottom: 8px !important;
+}
+.react-colorful__hue {
+  height: 10px !important;
+  border-radius: 5px !important;
+}
+.react-colorful__saturation-pointer,
+.react-colorful__hue-pointer {
+  width: 16px !important;
+  height: 16px !important;
+  border-width: 2px !important;
+}

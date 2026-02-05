@@ -148,6 +148,10 @@ export function exportPalettes(
     case "css":
       exportPaletteCSS(palettes, displayFormat, suffix);
       break;
+    default: {
+      const _exhaustive: never = format;
+      throw new Error(`Unknown export format: ${_exhaustive}`);
+    }
   }
 }
 

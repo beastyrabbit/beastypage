@@ -124,7 +124,8 @@ export function PaletteGeneratorClient() {
     try {
       await navigator.clipboard.writeText(text);
       toast.success(successMessage);
-    } catch {
+    } catch (error) {
+      console.error("[PaletteGenerator] Clipboard write failed", error);
       toast.error("Clipboard unavailable");
     }
   }, []);

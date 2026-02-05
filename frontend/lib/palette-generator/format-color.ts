@@ -49,8 +49,7 @@ export function formatColor(
     }
     default: {
       const _exhaustive: never = format;
-      const val = rgbToHex(rgb).toUpperCase();
-      return { display: val, clipboard: val };
+      throw new Error(`Unknown display format: ${_exhaustive}`);
     }
   }
 }

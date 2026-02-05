@@ -4,15 +4,16 @@ import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { HexColorPicker } from "react-colorful";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { hexToRgb, getContrastColor } from "@/lib/color-extraction/color-utils";
 import { formatColor } from "@/lib/palette-generator/format-color";
 import { exportPalettes } from "@/lib/palette-generator/export-utils";
-import { PaletteExportMenu, type ExportFormat } from "./PaletteExportMenu";
+import { PaletteExportMenu } from "./PaletteExportMenu";
 import CopyIcon from "@/components/ui/copy-icon";
 import XIcon from "@/components/ui/x-icon";
 import { track } from "@/lib/analytics";
-import type { GeneratedPalette, DisplayFormat } from "@/lib/palette-generator/types";
+import type { GeneratedPalette, DisplayFormat, ExportFormat } from "@/lib/palette-generator/types";
 
 interface PaletteCardProps {
   palette: GeneratedPalette;
@@ -65,8 +66,9 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
 
     const updatePosition = () => {
       const rect = trigger.getBoundingClientRect();
-      const pickerWidth = 180 + 24; // react-colorful (180px) + wrapper p-3 (24px)
-      const pickerHeight = 222; // react-colorful (180px) + wrapper padding (24px) + margin/gap (18px)
+      // Keep in sync with the picker wrapper's p-3 class and globals.css overrides
+      const pickerWidth = 180 + 24; // react-colorful (180px) + p-3 padding (12px * 2)
+      const pickerHeight = 222; // empirically measured: picker + padding + hue bar + internal spacing
 
       // Center horizontally on the trigger, clamp to viewport
       let left = rect.left + rect.width / 2 - pickerWidth / 2;
@@ -123,7 +125,7 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
         copyTimeoutRef.current = setTimeout(() => setCopiedIndex(null), 1200);
       } catch (error) {
         console.error("[PaletteGenerator] Clipboard write failed", error);
-        showToast("Clipboard unavailable");
+        toast.error("Clipboard unavailable");
       }
     },
     [displayFormat, showToast],
@@ -136,7 +138,7 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
       showToast("Palette copied");
     } catch (error) {
       console.error("[PaletteGenerator] Clipboard write failed", error);
-      showToast("Clipboard unavailable");
+      toast.error("Clipboard unavailable");
     }
   }, [palette, displayFormat, showToast]);
 
@@ -148,7 +150,7 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
         track("palette_generator_exported", { format, palette_count: 1 });
       } catch (error) {
         console.error(`[PaletteGenerator] Export as ${format} failed`, error);
-        showToast("Export failed. Please try again.");
+        toast.error(`${format.toUpperCase()} export failed. Please try again.`);
       }
     },
     [palette, displayFormat, showToast],
@@ -329,27 +331,6 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
         </div>
       </div>
 
-      {/* Scoped styles for react-colorful */}
-      <style>{`
-        .react-colorful {
-          width: 180px !important;
-          height: 180px !important;
-        }
-        .react-colorful__saturation {
-          border-radius: 8px !important;
-          margin-bottom: 8px !important;
-        }
-        .react-colorful__hue {
-          height: 10px !important;
-          border-radius: 5px !important;
-        }
-        .react-colorful__saturation-pointer,
-        .react-colorful__hue-pointer {
-          width: 16px !important;
-          height: 16px !important;
-          border-width: 2px !important;
-        }
-      `}</style>
     </motion.div>
   );
 }

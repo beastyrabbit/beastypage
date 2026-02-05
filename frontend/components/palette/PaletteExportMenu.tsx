@@ -5,12 +5,17 @@ import { cn } from "@/lib/utils";
 import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
 import type { ExportFormat } from "@/lib/palette-generator/types";
 
-export type { ExportFormat };
-
 interface PaletteExportMenuProps {
   onExport: (format: ExportFormat) => void;
   label?: string;
 }
+
+const EXPORT_FORMATS: { key: ExportFormat; label: string; desc: string }[] = [
+  { key: "png", label: "PNG", desc: "Color strip image" },
+  { key: "aco", label: "ACO", desc: "Adobe swatch file" },
+  { key: "json", label: "JSON", desc: "Structured data" },
+  { key: "css", label: "CSS", desc: "CSS custom properties" },
+];
 
 export function PaletteExportMenu({ onExport, label = "Export" }: PaletteExportMenuProps) {
   const [open, setOpen] = useState(false);
@@ -35,13 +40,6 @@ export function PaletteExportMenu({ onExport, label = "Export" }: PaletteExportM
     [onExport],
   );
 
-  const formats: { key: ExportFormat; label: string; desc: string }[] = [
-    { key: "png", label: "PNG", desc: "Color strip image" },
-    { key: "aco", label: "ACO", desc: "Adobe swatch file" },
-    { key: "json", label: "JSON", desc: "Structured data" },
-    { key: "css", label: "CSS", desc: "CSS custom properties" },
-  ];
-
   return (
     <div ref={ref} className="relative">
       <button
@@ -54,7 +52,7 @@ export function PaletteExportMenu({ onExport, label = "Export" }: PaletteExportM
       </button>
       {open && (
         <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-xl border border-border/50 bg-background/95 py-1 shadow-xl backdrop-blur">
-          {formats.map((f) => (
+          {EXPORT_FORMATS.map((f) => (
             <button
               key={f.key}
               type="button"

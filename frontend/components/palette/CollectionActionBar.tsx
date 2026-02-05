@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import CopyIcon from "@/components/ui/copy-icon";
 import XIcon from "@/components/ui/x-icon";
 import { track } from "@/lib/analytics";
-import { PaletteExportMenu, type ExportFormat } from "./PaletteExportMenu";
-import type { GeneratedPalette, DisplayFormat } from "@/lib/palette-generator/types";
+import { PaletteExportMenu } from "./PaletteExportMenu";
+import type { GeneratedPalette, DisplayFormat, ExportFormat } from "@/lib/palette-generator/types";
 import {
   exportPalettes,
   buildClipboardText,
@@ -39,7 +40,7 @@ export function CollectionActionBar({
       showToast("All palettes copied");
     } catch (error) {
       console.error("[PaletteGenerator] Clipboard write failed", error);
-      showToast("Clipboard unavailable");
+      toast.error("Clipboard unavailable");
     }
   }, [palettes, displayFormat, showToast]);
 
@@ -51,7 +52,7 @@ export function CollectionActionBar({
         track("palette_generator_exported", { format, palette_count: palettes.length });
       } catch (error) {
         console.error(`[PaletteGenerator] Export as ${format} failed`, error);
-        showToast("Export failed. Please try again.");
+        toast.error(`${format.toUpperCase()} export failed. Please try again.`);
       }
     },
     [palettes, displayFormat, showToast],
