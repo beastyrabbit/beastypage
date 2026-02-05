@@ -181,7 +181,10 @@ def create_app() -> FastAPI:
             {"url": "/api/renderer", "description": "Frontend proxy"},
         ],
         openapi_tags=[
-            {"name": "rendering", "description": "Single and batch cat sprite rendering"},
+            {
+                "name": "rendering",
+                "description": "Single and batch cat sprite rendering",
+            },
             {"name": "palettes", "description": "Color palette discovery"},
             {"name": "diagnostics", "description": "Health and operational metrics"},
         ],
@@ -223,7 +226,12 @@ def create_app() -> FastAPI:
         status_label = "degraded" if metrics["circuit_open"] else "ok"
         return {"status": status_label, "metrics": metrics}
 
-    @app.post("/render", response_model=RenderResponse, tags=["rendering"], summary="Render a single cat sprite")
+    @app.post(
+        "/render",
+        response_model=RenderResponse,
+        tags=["rendering"],
+        summary="Render a single cat sprite",
+    )
     async def render(request: RenderRequest) -> RenderResponse:
         try:
             return await supervisor.submit(
@@ -241,7 +249,12 @@ def create_app() -> FastAPI:
                 detail="Renderer recovering from failures. Please retry.",
             ) from None
 
-    @app.post("/render/batch", response_model=BatchRenderResponse, tags=["rendering"], summary="Render a batch spritesheet")
+    @app.post(
+        "/render/batch",
+        response_model=BatchRenderResponse,
+        tags=["rendering"],
+        summary="Render a batch spritesheet",
+    )
     async def render_batch(request: BatchRenderRequest) -> BatchRenderResponse:
         try:
             return await supervisor.submit(
@@ -259,7 +272,12 @@ def create_app() -> FastAPI:
                 detail="Renderer recovering from failures. Please retry.",
             ) from None
 
-    @app.post("/diff", response_model=DiffResponse, tags=["rendering"], summary="V2 vs V3 visual diff (not yet implemented)")
+    @app.post(
+        "/diff",
+        response_model=DiffResponse,
+        tags=["rendering"],
+        summary="V2 vs V3 visual diff (not yet implemented)",
+    )
     def diff(_: DiffRequest) -> DiffResponse:  # pragma: no cover - placeholder
         raise NotImplementedError("V2 vs V3 diffing is not implemented yet")
 

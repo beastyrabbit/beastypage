@@ -1,24 +1,39 @@
 import { z } from "zod";
+
 import {
-  ProcessRequest,
-  ProcessResponse,
   DetectGridRequest,
   DetectGridResponse,
   HealthResponse,
+  ProcessRequest,
+  ProcessResponse,
 } from "./models.ts";
 
-function schemaRef(name: string) {
+function schemaRef(name: string): { $ref: string } {
   return { $ref: `#/components/schemas/${name}` };
 }
 
-function toJsonSchema(schema: z.ZodType) {
-  // Strip Zod-specific keys that aren't valid OpenAPI 3.1
-  const raw = z.toJSONSchema(schema);
-  const { $schema, ...rest } = raw as Record<string, unknown>;
+function jsonContent(schemaName: string) {
+  return { content: { "application/json": { schema: schemaRef(schemaName) } } };
+}
+
+function jsonRequestBody(schemaName: string) {
+  return { required: true as const, ...jsonContent(schemaName) };
+}
+
+function toJsonSchema(schema: z.ZodType): Record<string, unknown> {
+  const { $schema, ...rest } = z.toJSONSchema(schema) as Record<
+    string,
+    unknown
+  >;
   return rest;
 }
 
-export function generateOpenAPISpec() {
+const VALIDATION_ERRORS = {
+  "400": { description: "Invalid request" },
+  "422": { description: "Validation error" },
+} as const;
+
+export function generateOpenAPISpec(): Record<string, unknown> {
   return {
     openapi: "3.1.0",
     info: {
@@ -46,9 +61,7 @@ export function generateOpenAPISpec() {
           responses: {
             "200": {
               description: "Service status and uptime",
-              content: {
-                "application/json": { schema: schemaRef("HealthResponse") },
-              },
+              ...jsonContent("HealthResponse"),
             },
           },
         },
@@ -61,21 +74,13 @@ export function generateOpenAPISpec() {
           description:
             "Accepts a base64 data-URL image and a list of processing steps. " +
             "Returns the processed image as a data-URL with timing metadata.",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": { schema: schemaRef("ProcessRequest") },
-            },
-          },
+          requestBody: jsonRequestBody("ProcessRequest"),
           responses: {
             "200": {
               description: "Processed image and metadata",
-              content: {
-                "application/json": { schema: schemaRef("ProcessResponse") },
-              },
+              ...jsonContent("ProcessResponse"),
             },
-            "400": { description: "Invalid request (bad image or pipeline)" },
-            "422": { description: "Validation error" },
+            ...VALIDATION_ERRORS,
           },
         },
       },
@@ -87,21 +92,13 @@ export function generateOpenAPISpec() {
           description:
             "Analyzes an image to detect if it contains a regular grid of sprites " +
             "and returns the estimated grid size and confidence score.",
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": { schema: schemaRef("DetectGridRequest") },
-            },
-          },
+          requestBody: jsonRequestBody("DetectGridRequest"),
           responses: {
             "200": {
               description: "Grid detection results",
-              content: {
-                "application/json": { schema: schemaRef("DetectGridResponse") },
-              },
+              ...jsonContent("DetectGridResponse"),
             },
-            "400": { description: "Invalid request" },
-            "422": { description: "Validation error" },
+            ...VALIDATION_ERRORS,
           },
         },
       },
