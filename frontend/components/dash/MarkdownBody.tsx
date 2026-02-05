@@ -1,5 +1,15 @@
 "use client";
 
+// Escape HTML special characters to prevent XSS when embedding text in HTML.
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // Sanitize HTML string: strip script tags, on* attributes, and javascript: URLs.
 // Content originates from GitHub Releases API (trusted source) and passes through
 // our own markdown-to-HTML converter, so the sanitizer is a defense-in-depth measure.
@@ -8,31 +18,43 @@ function sanitize(html: string): string {
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/\bon\w+\s*=\s*"[^"]*"/gi, "")
     .replace(/\bon\w+\s*=\s*'[^']*'/gi, "")
+    .replace(/\bon\w+\s*=\s*[^\s>]*/gi, "")
     .replace(/href\s*=\s*"javascript:[^"]*"/gi, 'href="#"')
     .replace(/href\s*=\s*'javascript:[^']*'/gi, "href='#'");
 }
 
 function inlineMarkdown(text: string): string {
-  let out = text;
+  // Extract inline code spans first (they should not be processed for bold/italic)
+  const codeSpans: string[] = [];
+  let out = text.replace(/`([^`]+)`/g, (_m, code: string) => {
+    const idx = codeSpans.length;
+    codeSpans.push(`<code class="rounded bg-white/10 px-1 py-0.5 text-[0.85em]">${escapeHtml(code)}</code>`);
+    return `\x00CODE${idx}\x00`;
+  });
+
+  // HTML-escape remaining text before applying markdown transformations
+  out = escapeHtml(out);
+
   // Bold
   out = out.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   out = out.replace(/__(.+?)__/g, "<strong>$1</strong>");
   // Italic
   out = out.replace(/\*(.+?)\*/g, "<em>$1</em>");
   out = out.replace(/_(.+?)_/g, "<em>$1</em>");
-  // Inline code
-  out = out.replace(/`([^`]+)`/g, '<code class="rounded bg-white/10 px-1 py-0.5 text-[0.85em]">$1</code>');
-  // Images — escape content before embedding
+  // Images — attributes already escaped by escapeHtml above
   out = out.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt: string, src: string) => {
-    const safeAlt = alt.replace(/"/g, "&quot;");
-    const safeSrc = src.replace(/"/g, "&quot;");
-    return `<img src="${safeSrc}" alt="${safeAlt}" class="max-w-full rounded" />`;
+    const safeSrc = src.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
+    return `<img src="${escapeHtml(safeSrc)}" alt="${alt}" class="max-w-full rounded" />`;
   });
-  // Links — escape content before embedding
+  // Links — label is already HTML-escaped, escape href
   out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, href: string) => {
-    const safeHref = href.replace(/"/g, "&quot;");
-    return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer" class="underline text-emerald-400 hover:text-emerald-300">${label}</a>`;
+    const safeHref = href.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
+    return `<a href="${escapeHtml(safeHref)}" target="_blank" rel="noopener noreferrer" class="underline text-emerald-400 hover:text-emerald-300">${label}</a>`;
   });
+
+  // Restore code spans
+  out = out.replace(/\x00CODE(\d+)\x00/g, (_m, idx: string) => codeSpans[parseInt(idx, 10)]);
+
   return out;
 }
 

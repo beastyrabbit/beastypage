@@ -51,7 +51,8 @@ export function DashClient() {
         setSettings(v.settings);
         toast.success("Dashboard imported");
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error(`[DashClient] Failed to import dashboard slug="${slugParam}"`, error);
         toast.error("Failed to load shared dashboard");
       });
   }, [slugParam, createVariant]);

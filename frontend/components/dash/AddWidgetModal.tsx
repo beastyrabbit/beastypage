@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { TOOL_REGISTRY } from "@/lib/dash/registry.generated";
 import type { ToolCategory, ToolWidgetMeta } from "@/lib/dash/types";
 
@@ -20,14 +21,26 @@ interface AddWidgetModalProps {
 }
 
 export function AddWidgetModal({ open, onClose, onSelect, placedIds }: AddWidgetModalProps) {
-  if (!open) return null;
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
 
-  const grouped = new Map<ToolCategory, ToolWidgetMeta[]>();
-  for (const tool of TOOL_REGISTRY) {
-    const list = grouped.get(tool.category) ?? [];
-    list.push(tool);
-    grouped.set(tool.category, list);
-  }
+  const grouped = useMemo(() => {
+    const map = new Map<ToolCategory, ToolWidgetMeta[]>();
+    for (const tool of TOOL_REGISTRY) {
+      const list = map.get(tool.category) ?? [];
+      list.push(tool);
+      map.set(tool.category, list);
+    }
+    return map;
+  }, []);
+
+  if (!open) return null;
 
   return (
     <div
