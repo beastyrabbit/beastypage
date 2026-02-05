@@ -75,6 +75,18 @@ This triggers the Docker build workflow which:
 
 When adding icons, always prefer [itshover icons](https://www.itshover.com/) before falling back to other icon libraries (e.g., Lucide, Heroicons, etc.).
 
+## Playwright Screenshots
+
+Always save Playwright screenshots to `.playwright-mcp/` (already gitignored). Never save screenshots to the repo root — they will pollute `git status`.
+
+```ts
+// Good
+await page.screenshot({ path: '.playwright-mcp/my-screenshot.png' });
+
+// Bad — saves to repo root, gets picked up by git
+await page.screenshot({ path: 'my-screenshot.png' });
+```
+
 ## Project Structure
 
 - `frontend/` - Next.js application (see `frontend/CLAUDE.md` for details)
