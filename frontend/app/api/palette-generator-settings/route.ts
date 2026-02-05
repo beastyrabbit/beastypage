@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { getServerConvexUrl } from "@/lib/convexUrl";
+import { parsePaletteGeneratorPayload } from "@/utils/paletteGeneratorVariants";
 
 export async function GET(request: NextRequest) {
   const slug = request.nextUrl.searchParams.get("slug");
@@ -51,10 +52,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing config" }, { status: 400 });
   }
 
+  // Validate and sanitize config before persisting to prevent bloat/malformed data
+  const sanitizedConfig = parsePaletteGeneratorPayload(payload.config);
+
   try {
     const convex = new ConvexHttpClient(convexUrl);
     const result = await convex.mutation(api.paletteGeneratorSettings.save, {
-      config: payload.config,
+      config: sanitizedConfig,
       slug: typeof payload.slug === "string" && payload.slug.trim() ? payload.slug.trim() : undefined,
     });
     return NextResponse.json({ slug: result.slug, id: result.id, updated: result.updated });

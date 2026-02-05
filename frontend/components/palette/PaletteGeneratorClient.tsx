@@ -68,7 +68,8 @@ export function PaletteGeneratorClient() {
   });
 
   // Persist collection to standalone localStorage only when no variant is active.
-  // When a variant is active, collection is saved as part of the variant on manual save.
+  // When a variant is active, collection is included in snapshotConfig and saved
+  // through VariantBar's save action (which calls variants.save(snapshotConfig)).
   useEffect(() => {
     if (!collectionInitialized.current) return;
     if (variants.activeVariant) return;
