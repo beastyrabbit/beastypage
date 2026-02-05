@@ -1,4 +1,4 @@
-export type NavAccent = "projects" | "stream" | "collection" | "personal";
+export type NavAccent = "dash" | "projects" | "stream" | "collection" | "personal";
 
 export type NavItem = {
   key: NavAccent;
@@ -7,6 +7,7 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
+  { key: "dash", label: "Dash", href: "/dash" },
   { key: "projects", label: "Projects", href: "/projects" },
   { key: "stream", label: "Stream Tools", href: "/stream" },
   { key: "collection", label: "Collection", href: "/collection" },
