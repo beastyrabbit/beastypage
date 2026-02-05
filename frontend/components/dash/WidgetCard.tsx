@@ -25,8 +25,10 @@ export function WidgetCard({ tool, editing, onRemove, index }: WidgetCardProps) 
   } = useSortable({ id: tool.id, disabled: !editing });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+    // Use Translate (not Transform) — only applies translate, avoids scale/rotate conflicts
+    transform: CSS.Translate.toString(transform),
+    // When actively dragging, kill CSS transitions so movement is instant
+    transition: isDragging ? "none" : transition,
     animationDelay: `${index * 50}ms`,
   };
 
@@ -35,8 +37,10 @@ export function WidgetCard({ tool, editing, onRemove, index }: WidgetCardProps) 
       ref={setNodeRef}
       style={style}
       className={cn(
-        "glass-card relative flex h-full flex-col gap-3 p-5 transition-all duration-500 overflow-hidden group hover:-translate-y-1 hover:shadow-2xl hover:border-emerald-400/30 animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards",
-        isDragging && "opacity-50 z-50 shadow-2xl scale-105",
+        "glass-card relative flex h-full flex-col gap-3 p-5 overflow-hidden group animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards",
+        // Only apply hover transitions when NOT dragging
+        !isDragging && "transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:border-emerald-400/30",
+        isDragging && "opacity-50 z-50 shadow-2xl",
       )}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
