@@ -12,6 +12,9 @@ export function SiteFooter() {
           <Link href="https://twitch.tv/BeastyRabbit" target="_blank" className="hover:text-foreground">
             Twitch
           </Link>
+          <Link href="https://github.com/beastyrabbit/beastypage/issues/new" target="_blank" className="hover:text-foreground">
+            Report Issue
+          </Link>
         </div>
       </div>
     </footer>
