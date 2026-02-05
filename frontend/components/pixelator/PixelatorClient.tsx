@@ -270,9 +270,9 @@ export function PixelatorClient() {
 
       if (!over) return;
 
-      // Dropping from toolbox into pipeline
+      // Dropping from toolbox — add step regardless of which pipeline element caught the drop
       const opType = active.data.current?.operationType as OperationType | undefined;
-      if (opType && over.id === "pipeline-droppable") {
+      if (opType) {
         addStep(opType);
         return;
       }
