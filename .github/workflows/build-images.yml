@@ -94,7 +94,7 @@ jobs:
             CONVEX_DEPLOYMENT=${{ secrets.CONVEX_DEPLOYMENT }}
             NEXT_PUBLIC_POSTHOG_KEY=${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
             NEXT_PUBLIC_POSTHOG_HOST=${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
-            APP_VERSION=${{ github.ref_name }}
+            APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
