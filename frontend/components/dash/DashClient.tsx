@@ -34,7 +34,10 @@ export function DashClient() {
   useEffect(() => {
     variantSyncedRef.current = true;
     if (activeVariant) {
-      queueMicrotask(() => setSettings(parseDashPayload(activeVariant.settings)));
+      queueMicrotask(() => {
+        setSettings(parseDashPayload(activeVariant.settings));
+        setEditing(false);
+      });
     } else if (!slugParam) {
       // Only auto-enter edit mode when variant store has loaded and there's truly
       // no active variant and no slug import pending
