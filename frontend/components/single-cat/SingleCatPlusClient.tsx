@@ -1541,7 +1541,7 @@ export function SingleCatPlusClient({
     return !settingsEqual(snapshotConfig, variants.activeVariant.settings);
   }, [snapshotConfig, variants.activeVariant]);
 
-  // Restore active variant on mount (skip when URL slug takes priority)
+  // Apply active variant settings after hydration from localStorage (skip when URL slug takes priority)
   const variantRestoredRef = useRef(false);
   useEffect(() => {
     if (variantRestoredRef.current) return;

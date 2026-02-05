@@ -154,7 +154,7 @@ export function parseConvexPayload(payload: unknown): PageVariantSettings {
   }
   const data = payload as Record<string, unknown>;
 
-  // v2 payload has v === 2 and all top-level keys
+  // v2 payload: v === 2 with "mode" and "timing" required; other keys fall back to defaults
   if (data.v === 2 && "mode" in data && "timing" in data) {
     const modes = data.extendedModes;
     return {
