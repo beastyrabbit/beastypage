@@ -4,32 +4,36 @@ import { z } from "zod";
 // Shared enums
 // ---------------------------------------------------------------------------
 
-export const OperationType = z.enum([
-  "block-average",
-  "nearest-neighbor",
-  "dither-bayer",
-  "dither-floyd-steinberg",
-  "dither-atkinson",
-  "quantize",
-  "jitter",
-  "edge-detect",
-]);
+export const OperationType = z
+  .enum([
+    "block-average",
+    "nearest-neighbor",
+    "dither-bayer",
+    "dither-floyd-steinberg",
+    "dither-atkinson",
+    "quantize",
+    "jitter",
+    "edge-detect",
+  ])
+  .describe("Pixel-art processing algorithm");
 export type OperationType = z.infer<typeof OperationType>;
 
-export const BlendMode = z.enum([
-  "normal",
-  "multiply",
-  "add",
-  "screen",
-  "overlay",
-  "soft-light",
-]);
+export const BlendMode = z
+  .enum([
+    "normal",
+    "multiply",
+    "add",
+    "screen",
+    "overlay",
+    "soft-light",
+  ])
+  .describe("Layer blending mode");
 export type BlendMode = z.infer<typeof BlendMode>;
 
-export const OutputFormat = z.enum(["png", "jpeg", "webp"]);
+export const OutputFormat = z.enum(["png", "jpeg", "webp"]).describe("Output image format");
 export type OutputFormat = z.infer<typeof OutputFormat>;
 
-export const ProcessMode = z.enum(["preview", "full"]);
+export const ProcessMode = z.enum(["preview", "full"]).describe("Processing mode — preview downscales before processing");
 export type ProcessMode = z.infer<typeof ProcessMode>;
 
 // ---------------------------------------------------------------------------
@@ -61,13 +65,15 @@ export const Pipeline = z.object({
 // Request / Response
 // ---------------------------------------------------------------------------
 
-export const ProcessRequest = z.object({
-  image: z.string().startsWith("data:image/"),
-  pipeline: Pipeline,
-  mode: ProcessMode,
-  outputFormat: OutputFormat.optional().default("png"),
-  outputQuality: z.number().int().min(1).max(100).optional().default(90),
-});
+export const ProcessRequest = z
+  .object({
+    image: z.string().startsWith("data:image/").describe("Base64 data-URL of the source image"),
+    pipeline: Pipeline,
+    mode: ProcessMode,
+    outputFormat: OutputFormat.optional().default("png"),
+    outputQuality: z.number().int().min(1).max(100).optional().default(90).describe("JPEG/WebP quality (1-100)"),
+  })
+  .describe("Image processing request");
 export type ProcessRequest = z.infer<typeof ProcessRequest>;
 
 export const ProcessResponse = z.object({
@@ -80,9 +86,11 @@ export const ProcessResponse = z.object({
   }),
 });
 
-export const DetectGridRequest = z.object({
-  image: z.string().startsWith("data:image/"),
-});
+export const DetectGridRequest = z
+  .object({
+    image: z.string().startsWith("data:image/").describe("Base64 data-URL of the image to analyze"),
+  })
+  .describe("Grid detection request");
 export type DetectGridRequest = z.infer<typeof DetectGridRequest>;
 
 export const DetectGridResponse = z.object({
