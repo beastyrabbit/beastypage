@@ -48,16 +48,17 @@ import {
   isParamTimingKey,
   stepCountsToMetrics,
 } from "../../utils/spinTiming";
+import { useVariants } from "../../utils/variants";
 import {
-  usePageVariants,
-  parseConvexPayload,
-  settingsEqual,
-  type PageVariantSettings,
+  parseSingleCatPayload,
+  singleCatSettingsEqual,
+  migrateSingleCatTiming,
+  type SingleCatSettings,
   type AfterlifeOption,
   type ExtendedMode,
   type LayerRange,
-} from "../../utils/pageVariants";
-import { VariantBar } from "./VariantBar";
+} from "../../utils/singleCatVariants";
+import { VariantBar } from "../common/VariantBar";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
 // @ts-ignore -- legacy JS module without types.
@@ -65,7 +66,7 @@ import { encodeCatShare, createCatShare } from "@/lib/catShare";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import type { PaletteId } from "@/lib/palettes";
 
-export type { AfterlifeOption } from "../../utils/pageVariants";
+export type { AfterlifeOption } from "../../utils/singleCatVariants";
 
 interface TortieSlot {
   mask: string;
@@ -1377,7 +1378,10 @@ export function SingleCatPlusClient({
   const [timingConfig, setTimingConfig] = useState<SpinTimingConfig>(DEFAULT_TIMING_CONFIG);
 
   // Page variant management
-  const variants = usePageVariants();
+  const variants = useVariants<SingleCatSettings>({
+    storageKey: "singleCatPlus.variants",
+    migrate: migrateSingleCatTiming,
+  });
   const [timingModalOpen, setTimingModalOpen] = useState(false);
   const [lastTimingSnapshot, setLastTimingSnapshot] = useState<TimingSnapshot | null>(null);
   const [speedMultiplier, setSpeedMultiplier] = useState(1.0);
@@ -1507,7 +1511,7 @@ export function SingleCatPlusClient({
   // Variant snapshot / apply / dirty detection
   // ---------------------------------------------------------------------------
 
-  const snapshotConfig = useMemo((): PageVariantSettings => ({
+  const snapshotConfig = useMemo((): SingleCatSettings => ({
     v: 2,
     mode,
     timing: timingConfig,
@@ -1522,7 +1526,7 @@ export function SingleCatPlusClient({
     creatorName: creatorNameDraft,
   }), [mode, timingConfig, speedMultiplier, accessoryRange, scarRange, tortieRange, afterlifeMode, extendedModes, includeBaseColours, catNameDraft, creatorNameDraft]);
 
-  const applyVariantConfig = useCallback((settings: PageVariantSettings) => {
+  const applyVariantConfig = useCallback((settings: SingleCatSettings) => {
     setMode(settings.mode);
     setTimingConfig(settings.timing);
     setSpeedMultiplier(settings.speedMultiplier);
@@ -1538,7 +1542,7 @@ export function SingleCatPlusClient({
 
   const variantDirty = useMemo(() => {
     if (!variants.activeVariant) return false;
-    return !settingsEqual(snapshotConfig, variants.activeVariant.settings);
+    return !singleCatSettingsEqual(snapshotConfig, variants.activeVariant.settings);
   }, [snapshotConfig, variants.activeVariant]);
 
   // Apply active variant settings after hydration from localStorage (skip when URL slug takes priority)
@@ -1746,7 +1750,7 @@ export function SingleCatPlusClient({
           showToast("Preset payload missing config");
           return;
         }
-        const settings = parseConvexPayload(json.config);
+        const settings = parseSingleCatPayload(json.config);
         applyVariantConfig(settings);
         showToast("Settings loaded from URL");
       } catch (error) {
@@ -3430,13 +3434,15 @@ export function SingleCatPlusClient({
 
   return (
     <div className="grid gap-10">
-      <VariantBar
+      <VariantBar<SingleCatSettings>
         variants={variants}
         snapshotConfig={snapshotConfig}
         applyConfig={applyVariantConfig}
         isDirty={variantDirty}
         showToast={showToast}
         copyText={copyText}
+        apiPath="/api/single-cat-settings"
+        parsePayload={parseSingleCatPayload}
       />
       <div className="glass-card px-6 py-8">
         <div className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,420px)] xl:items-start">
