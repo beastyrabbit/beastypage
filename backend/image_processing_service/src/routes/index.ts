@@ -18,6 +18,7 @@ import { config } from "../config.ts";
 import { generateOpenAPISpec } from "../openapi.ts";
 
 const startTime = Date.now();
+const openApiSpec = generateOpenAPISpec();
 
 export const routes = new Hono();
 
@@ -25,7 +26,7 @@ export const routes = new Hono();
 // GET /openapi.json
 // ---------------------------------------------------------------------------
 routes.get("/openapi.json", (c) => {
-  return c.json(generateOpenAPISpec());
+  return c.json(openApiSpec);
 });
 
 // ---------------------------------------------------------------------------

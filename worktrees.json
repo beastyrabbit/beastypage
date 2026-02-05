@@ -1,0 +1,10 @@
+{
+  "setup-worktree": [
+    "cp $ROOT_WORKTREE_PATH/.env.local .env.local",
+    "cp $ROOT_WORKTREE_PATH/frontend/.env.local frontend/.env.local",
+    "bun install",
+    "cd frontend && bun install",
+    "cd backend/renderer_service && uv sync",
+    "cd backend/image_processing_service && bun install"
+  ]
+}
