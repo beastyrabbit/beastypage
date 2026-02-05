@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -27,7 +27,6 @@ import {
 } from "@/lib/pixelator/types";
 import { useVariants } from "@/utils/variants";
 import {
-  DEFAULT_PIXELATOR_SETTINGS,
   parsePixelatorPayload,
   pixelatorSettingsEqual,
   type PixelatorSettings,
@@ -51,6 +50,7 @@ interface PixelatorState {
   pixelArtMode: boolean;
   pixelArtGridSize: number | null;
   lastDuration: number | null;
+  processMode: ProcessMode;
 }
 
 const INITIAL_STATE: PixelatorState = {
@@ -62,7 +62,10 @@ const INITIAL_STATE: PixelatorState = {
   pixelArtMode: false,
   pixelArtGridSize: null,
   lastDuration: null,
+  processMode: "preview",
 };
+
+const AUTO_PROCESS_DELAY = 600;
 
 // ---------------------------------------------------------------------------
 // Clipboard helper
@@ -197,14 +200,20 @@ export function PixelatorClient() {
 
   // ---- Processing ----
   const handleProcess = useCallback(
-    async (mode: ProcessMode) => {
-      if (!state.imageDataUrl || state.steps.length === 0) return;
+    async (mode: ProcessMode, image: string, steps: PipelineStep[]) => {
+      const enabledSteps = steps.filter((s) => s.enabled);
+      if (!image || enabledSteps.length === 0) return;
 
-      const enabledSteps = state.steps.filter((s) => s.enabled);
-      if (enabledSteps.length === 0) {
-        toast.error("No enabled steps in pipeline");
-        return;
-      }
+      // Fix inputSource refs that point to disabled/missing steps
+      const enabledIds = new Set(enabledSteps.map((s) => s.id));
+      const sanitizedSteps = enabledSteps.map((s, i) => {
+        if (s.inputSource !== "original" && !enabledIds.has(s.inputSource)) {
+          // Fall back to previous enabled step or "original"
+          const prev = i > 0 ? enabledSteps[i - 1]! : null;
+          return { ...s, inputSource: prev?.id ?? "original" };
+        }
+        return s;
+      });
 
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -213,11 +222,7 @@ export function PixelatorClient() {
       setState((prev) => ({ ...prev, processing: true, error: null }));
 
       try {
-        const res = await processImage(
-          state.imageDataUrl,
-          { steps: enabledSteps },
-          mode,
-        );
+        const res = await processImage(image, { steps: sanitizedSteps }, mode);
 
         if (controller.signal.aborted) return;
 
@@ -234,8 +239,27 @@ export function PixelatorClient() {
         toast.error(msg);
       }
     },
-    [state.imageDataUrl, state.steps],
+    [],
   );
+
+  // ---- Auto-process on pipeline changes ----
+  const stepsFingerprint = useMemo(
+    () => JSON.stringify(state.steps),
+    [state.steps],
+  );
+
+  useEffect(() => {
+    if (!state.imageDataUrl || state.steps.length === 0) return;
+    const enabledSteps = state.steps.filter((s) => s.enabled);
+    if (enabledSteps.length === 0) return;
+
+    const timer = setTimeout(() => {
+      handleProcess(state.processMode, state.imageDataUrl!, state.steps);
+    }, AUTO_PROCESS_DELAY);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepsFingerprint, state.imageDataUrl, state.processMode, handleProcess]);
 
   // ---- Pixel art detection ----
   const handleGridDetected = useCallback((gridSize: number | null) => {
@@ -331,24 +355,45 @@ export function PixelatorClient() {
                   lastDuration: null,
                 }))
               }
+              showGrid={state.pixelArtMode}
+              gridSize={state.pixelArtGridSize}
             />
 
-            {/* Action buttons */}
+            {/* Mode toggle + actions */}
             <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => handleProcess("preview")}
-                disabled={state.processing || state.steps.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-primary/30 disabled:opacity-50 disabled:hover:translate-y-0"
-              >
-                {state.processing ? "Processing..." : "Process Preview"}
-              </button>
-              <button
-                onClick={() => handleProcess("full")}
-                disabled={state.processing || state.steps.length === 0}
-                className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-amber-600/30 disabled:opacity-50 disabled:hover:translate-y-0"
-              >
-                Process Full Image
-              </button>
+              <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
+                <button
+                  onClick={() =>
+                    setState((prev) => ({ ...prev, processMode: "preview" }))
+                  }
+                  className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
+                    state.processMode === "preview"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Preview
+                </button>
+                <button
+                  onClick={() =>
+                    setState((prev) => ({ ...prev, processMode: "full" }))
+                  }
+                  className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
+                    state.processMode === "full"
+                      ? "bg-amber-600 text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Full Image
+                </button>
+              </div>
+
+              {state.processing && (
+                <span className="text-sm text-muted-foreground animate-pulse">
+                  Processing...
+                </span>
+              )}
+
               {state.resultDataUrl && (
                 <button
                   onClick={handleExport}

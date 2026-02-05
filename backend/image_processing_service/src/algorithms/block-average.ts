@@ -26,8 +26,14 @@ export async function blockAverage(
   const smallW = Math.max(1, Math.round(w / blockSize));
   const smallH = Math.max(1, Math.round(h / blockSize));
 
-  return sharp(buffer)
+  // Two separate sharp calls — chaining .resize() twice on one pipeline
+  // causes sharp to only apply the last resize.
+  const small = await sharp(buffer)
     .resize(smallW, smallH, { fit: "fill", kernel: "lanczos3" })
+    .png()
+    .toBuffer();
+
+  return sharp(small)
     .resize(w, h, { fit: "fill", kernel: "nearest" })
     .png()
     .toBuffer();

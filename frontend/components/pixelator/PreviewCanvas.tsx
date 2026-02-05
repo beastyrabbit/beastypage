@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 interface PreviewCanvasProps {
   originalUrl: string;
@@ -8,6 +8,8 @@ interface PreviewCanvasProps {
   processing: boolean;
   lastDuration: number | null;
   onChangeImage: () => void;
+  showGrid: boolean;
+  gridSize: number | null;
 }
 
 export function PreviewCanvas({
@@ -16,10 +18,64 @@ export function PreviewCanvas({
   processing,
   lastDuration,
   onChangeImage,
+  showGrid,
+  gridSize,
 }: PreviewCanvasProps) {
   const [showOriginal, setShowOriginal] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [imgDims, setImgDims] = useState<{ w: number; h: number; naturalW: number } | null>(null);
 
   const displayUrl = showOriginal ? originalUrl : (resultUrl ?? originalUrl);
+
+  const handleImgLoad = useCallback(() => {
+    const el = imgRef.current;
+    if (el) {
+      setImgDims({
+        w: el.clientWidth,
+        h: el.clientHeight,
+        naturalW: el.naturalWidth,
+      });
+    }
+  }, []);
+
+  // Build SVG grid overlay pattern.
+  // gridSize is in original-image pixels — scale to displayed size.
+  const scaledGrid =
+    imgDims && gridSize
+      ? gridSize * (imgDims.w / imgDims.naturalW)
+      : null;
+
+  const gridOverlay =
+    showGrid && scaledGrid && scaledGrid > 1 && imgDims ? (
+      <svg
+        className="pointer-events-none absolute"
+        style={{
+          width: imgDims.w,
+          height: imgDims.h,
+          left: "50%",
+          top: "50%",
+          transform: "translate(-50%, -50%)",
+        }}
+        viewBox={`0 0 ${imgDims.w} ${imgDims.h}`}
+      >
+        <defs>
+          <pattern
+            id="grid-pattern"
+            width={scaledGrid}
+            height={scaledGrid}
+            patternUnits="userSpaceOnUse"
+          >
+            <path
+              d={`M ${scaledGrid} 0 L 0 0 0 ${scaledGrid}`}
+              fill="none"
+              stroke="rgba(255,0,255,0.5)"
+              strokeWidth="1"
+            />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid-pattern)" />
+      </svg>
+    ) : null;
 
   return (
     <div className="glass-card overflow-hidden">
@@ -35,11 +91,14 @@ export function PreviewCanvas({
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
+          ref={imgRef}
           src={displayUrl}
           alt={showOriginal ? "Original image" : "Processed result"}
           className="max-h-[500px] w-auto object-contain"
           style={{ imageRendering: "pixelated" }}
+          onLoad={handleImgLoad}
         />
+        {gridOverlay}
       </div>
 
       {/* Controls bar */}
