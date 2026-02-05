@@ -1,6 +1,7 @@
 // Scans app/**/widget.ts files and generates the tool registry.
 // Run: bun scripts/generate-registry.ts
 import { resolve, relative } from "path";
+import type { ToolWidgetMeta } from "../lib/dash/types";
 
 const ROOT = resolve(import.meta.dir, "..");
 const OUT = resolve(ROOT, "lib/dash/registry.generated.ts");
@@ -8,21 +9,13 @@ const OUT = resolve(ROOT, "lib/dash/registry.generated.ts");
 const glob = new Bun.Glob("app/**/widget.ts");
 const paths = [...glob.scanSync({ cwd: ROOT, absolute: true })].sort();
 
-interface WidgetEntry {
-  id: string;
-  title: string;
-  description: string;
-  icon: string;
-  href: string;
-  category: string;
-}
-
 interface WidgetModule {
-  default: WidgetEntry;
-  extras?: WidgetEntry[];
+  default: ToolWidgetMeta;
+  extras?: ToolWidgetMeta[];
 }
 
-const entries: WidgetEntry[] = [];
+const entries: ToolWidgetMeta[] = [];
+const seenIds = new Set<string>();
 
 for (const abs of paths) {
   const mod = (await import(abs)) as WidgetModule;
@@ -30,11 +23,22 @@ for (const abs of paths) {
     console.warn(`Skipping ${relative(ROOT, abs)}: no default export with id`);
     continue;
   }
+  if (seenIds.has(mod.default.id)) {
+    console.error(`Duplicate widget ID "${mod.default.id}" in ${relative(ROOT, abs)}`);
+    process.exit(1);
+  }
+  seenIds.add(mod.default.id);
   entries.push(mod.default);
   // Support additional widget entries (e.g. preset variants) via named export
   if (Array.isArray(mod.extras)) {
     for (const extra of mod.extras) {
-      if (extra?.id) entries.push(extra);
+      if (!extra?.id) continue;
+      if (seenIds.has(extra.id)) {
+        console.error(`Duplicate widget ID "${extra.id}" in ${relative(ROOT, abs)} extras`);
+        process.exit(1);
+      }
+      seenIds.add(extra.id);
+      entries.push(extra);
     }
   }
 }

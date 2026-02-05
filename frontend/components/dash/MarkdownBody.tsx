@@ -16,11 +16,17 @@ function escapeHtml(text: string): string {
 function sanitize(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<iframe[\s\S]*?(<\/iframe>|\/?>)/gi, "")
+    .replace(/<object[\s\S]*?(<\/object>|\/?>)/gi, "")
+    .replace(/<embed[\s\S]*?\/?>|<embed[\s\S]*?<\/embed>/gi, "")
+    .replace(/<form[\s\S]*?(<\/form>|\/?>)/gi, "")
     .replace(/\bon\w+\s*=\s*"[^"]*"/gi, "")
     .replace(/\bon\w+\s*=\s*'[^']*'/gi, "")
     .replace(/\bon\w+\s*=\s*[^\s>]*/gi, "")
     .replace(/href\s*=\s*"javascript:[^"]*"/gi, 'href="#"')
-    .replace(/href\s*=\s*'javascript:[^']*'/gi, "href='#'");
+    .replace(/href\s*=\s*'javascript:[^']*'/gi, "href='#'")
+    .replace(/(?:src|href)\s*=\s*"data:[^"]*"/gi, 'src=""')
+    .replace(/(?:src|href)\s*=\s*'data:[^']*'/gi, "src=''");
 }
 
 function inlineMarkdown(text: string): string {
@@ -58,6 +64,24 @@ function inlineMarkdown(text: string): string {
   return out;
 }
 
+const ADMONITION_COLORS: Record<string, string> = {
+  note: "border-blue-500/40 bg-blue-500/10",
+  tip: "border-emerald-500/40 bg-emerald-500/10",
+  warning: "border-yellow-500/40 bg-yellow-500/10",
+  caution: "border-red-500/40 bg-red-500/10",
+  important: "border-purple-500/40 bg-purple-500/10",
+};
+
+const HEADING_SIZES = [
+  "",
+  "text-xl font-bold",
+  "text-lg font-bold",
+  "text-base font-semibold",
+  "text-sm font-semibold",
+  "text-sm font-medium",
+  "text-xs font-medium",
+];
+
 function markdownToHtml(md: string): string {
   const lines = md.split("\n");
   const out: string[] = [];
@@ -75,7 +99,7 @@ function markdownToHtml(md: string): string {
         codeLines.push(lines[i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
         i++;
       }
-      i++; // skip closing ```
+      if (i < lines.length) i++; // skip closing ``` (guard unclosed blocks)
       const safeLang = lang.replace(/"/g, "&quot;");
       out.push(
         `<pre class="rounded-lg bg-black/40 p-3 text-xs overflow-x-auto"><code${safeLang ? ` data-lang="${safeLang}"` : ""}>${codeLines.join("\n")}</code></pre>`,
@@ -93,15 +117,8 @@ function markdownToHtml(md: string): string {
         bodyLines.push(lines[i].replace(/^>\s?/, ""));
         i++;
       }
-      const colorMap: Record<string, string> = {
-        note: "border-blue-500/40 bg-blue-500/10",
-        tip: "border-emerald-500/40 bg-emerald-500/10",
-        warning: "border-yellow-500/40 bg-yellow-500/10",
-        caution: "border-red-500/40 bg-red-500/10",
-        important: "border-purple-500/40 bg-purple-500/10",
-      };
       out.push(
-        `<div class="border-l-2 ${colorMap[type] ?? ""} rounded-r px-3 py-2 text-sm my-2"><strong class="capitalize">${type}</strong><br/>${inlineMarkdown(bodyLines.join("<br/>"))}</div>`,
+        `<div class="border-l-2 ${ADMONITION_COLORS[type] ?? ""} rounded-r px-3 py-2 text-sm my-2"><strong class="capitalize">${type}</strong><br/>${inlineMarkdown(bodyLines.join("<br/>"))}</div>`,
       );
       continue;
     }
@@ -123,8 +140,7 @@ function markdownToHtml(md: string): string {
     const headingMatch = line.match(/^(#{1,6})\s+(.+)/);
     if (headingMatch) {
       const level = headingMatch[1].length;
-      const sizes = ["", "text-xl font-bold", "text-lg font-bold", "text-base font-semibold", "text-sm font-semibold", "text-sm font-medium", "text-xs font-medium"];
-      out.push(`<h${level} class="${sizes[level]} mt-3 mb-1">${inlineMarkdown(headingMatch[2])}</h${level}>`);
+      out.push(`<h${level} class="${HEADING_SIZES[level]} mt-3 mb-1">${inlineMarkdown(headingMatch[2])}</h${level}>`);
       i++;
       continue;
     }

@@ -31,10 +31,8 @@ export function WidgetCard({ tool, editing, onRemove, index }: WidgetCardProps) 
         </button>
       )}
 
-      <div className="flex items-start justify-between">
-        <div className="text-3xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
-          {tool.icon}
-        </div>
+      <div className="text-3xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
+        {tool.icon}
       </div>
 
       <div className="relative z-10">

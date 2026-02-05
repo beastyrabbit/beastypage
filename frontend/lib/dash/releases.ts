@@ -6,5 +6,9 @@ export async function fetchReleases(): Promise<ReleaseNote[]> {
     throw new Error(`Releases API returned ${res.status}`);
   }
   const data: unknown = await res.json();
-  return Array.isArray(data) ? (data as ReleaseNote[]) : [];
+  if (!Array.isArray(data)) {
+    console.error("[fetchReleases] Expected array, got:", typeof data);
+    return [];
+  }
+  return data as ReleaseNote[];
 }

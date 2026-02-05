@@ -10,7 +10,7 @@ interface VariantBarProps<T> {
   snapshotConfig: T;
   applyConfig: (settings: T) => void;
   isDirty: boolean;
-  showToast: (message: string) => void;
+  showToast: (message: string, type?: "success" | "error") => void;
   copyText: (text: string, successMessage: string) => Promise<void>;
   apiPath: string;
   parsePayload: (payload: unknown) => T;
@@ -137,7 +137,7 @@ export function VariantBar<T>({
       showToast("Exported successfully");
     } catch (error) {
       console.error("handleExport", error);
-      showToast(error instanceof Error ? error.message : "Export failed");
+      showToast(error instanceof Error ? error.message : "Export failed", "error");
     } finally {
       setExporting(false);
     }
@@ -146,7 +146,7 @@ export function VariantBar<T>({
   const handleImport = useCallback(async () => {
     const normalized = importSlug.trim();
     if (!normalized) {
-      showToast("Enter a slug to import");
+      showToast("Enter a slug to import", "error");
       return;
     }
     setImporting(true);
@@ -157,12 +157,12 @@ export function VariantBar<T>({
       );
       if (!response.ok) {
         console.warn(`handleImport: server returned ${response.status} for slug "${normalized}"`);
-        showToast(response.status === 404 ? "Slug not found" : "Failed to load");
+        showToast(response.status === 404 ? "Slug not found" : "Failed to load", "error");
         return;
       }
       const json = (await response.json()) as { config?: unknown };
       if (!json.config) {
-        showToast("Invalid config");
+        showToast("Invalid config", "error");
         return;
       }
       const settings = parsePayload(json.config);
@@ -173,7 +173,7 @@ export function VariantBar<T>({
       setManageOpen(false);
     } catch (error) {
       console.error("handleImport", error);
-      showToast(error instanceof Error ? error.message : "Import failed");
+      showToast(error instanceof Error ? error.message : "Import failed", "error");
     } finally {
       setImporting(false);
     }

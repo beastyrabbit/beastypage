@@ -31,6 +31,10 @@ export const save = mutation({
     const now = Date.now();
     const trimmed = args.slug?.trim();
 
+    if (trimmed && !/^[A-Za-z0-9]{1,20}$/.test(trimmed)) {
+      throw new Error("Invalid slug format");
+    }
+
     if (trimmed) {
       const existing = await ctx.db
         .query("dash_settings")

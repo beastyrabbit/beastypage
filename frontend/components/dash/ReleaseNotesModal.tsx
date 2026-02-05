@@ -32,11 +32,8 @@ export function ReleaseNotesModal({ open, onClose }: ReleaseNotesModalProps) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setLoading(true);
-      setError(null);
-    });
+    setLoading(true);
+    setError(null);
     fetchReleases()
       .then((data) => {
         if (cancelled) return;

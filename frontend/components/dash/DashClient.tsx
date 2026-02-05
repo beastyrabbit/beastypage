@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useVariants } from "@/utils/variants";
@@ -8,7 +8,7 @@ import { VariantBar } from "@/components/common/VariantBar";
 import { TOOL_MAP } from "@/lib/dash/registry.generated";
 import { APP_VERSION } from "@/lib/dash/version";
 import { DEFAULT_DASH_SETTINGS, parseDashPayload, dashSettingsEqual } from "@/utils/dashVariants";
-import type { DashSettings } from "@/lib/dash/types";
+import type { DashSettings, ToolWidgetMeta } from "@/lib/dash/types";
 import { DashHero } from "./DashHero";
 import { WidgetGrid } from "./WidgetGrid";
 import { AddWidgetModal } from "./AddWidgetModal";
@@ -28,11 +28,9 @@ export function DashClient() {
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const [opening, setOpening] = useState(false);
   const slugLoadedRef = useRef(false);
-  const variantSyncedRef = useRef(false);
 
   // Sync settings from active variant
   useEffect(() => {
-    variantSyncedRef.current = true;
     if (activeVariant) {
       queueMicrotask(() => {
         setSettings(parseDashPayload(activeVariant.settings));
@@ -76,7 +74,7 @@ export function DashClient() {
 
   // Resolve widget IDs to tool metadata
   const resolvedWidgets = useMemo(
-    () => settings.widgets.map((id) => TOOL_MAP.get(id)).filter(Boolean) as NonNullable<ReturnType<typeof TOOL_MAP.get>>[],
+    () => settings.widgets.map((id) => TOOL_MAP.get(id)).filter(Boolean) as ToolWidgetMeta[],
     [settings.widgets],
   );
 
@@ -119,15 +117,17 @@ export function DashClient() {
     }
   }, []);
 
-  const showToast = useCallback((message: string) => {
-    toast.success(message);
+  const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
+    if (type === "error") toast.error(message);
+    else toast.success(message);
   }, []);
 
   const copyText = useCallback(async (text: string, successMessage: string) => {
     try {
       await navigator.clipboard.writeText(text);
       toast.success(successMessage);
-    } catch {
+    } catch (err) {
+      console.error("[DashClient] copyText failed", err);
       toast.error("Failed to copy");
     }
   }, []);
