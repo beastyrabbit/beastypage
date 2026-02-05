@@ -39,7 +39,7 @@ export interface PageVariantSettings {
   scarRange: LayerRange;
   tortieRange: LayerRange;
   afterlifeMode: AfterlifeOption;
-  extendedModes: string[]; // Set<ExtendedMode> serialized as sorted array
+  extendedModes: ExtendedMode[];
   includeBaseColours: boolean;
   catName: string;
   creatorName: string;
@@ -166,7 +166,7 @@ export function parseConvexPayload(payload: unknown): PageVariantSettings {
       scarRange: isValidRange(data.scarRange) ? data.scarRange as LayerRange : DEFAULT_VARIANT_SETTINGS.scarRange,
       tortieRange: isValidRange(data.tortieRange) ? data.tortieRange as LayerRange : DEFAULT_VARIANT_SETTINGS.tortieRange,
       afterlifeMode: isAfterlifeOption(data.afterlifeMode) ? data.afterlifeMode : DEFAULT_VARIANT_SETTINGS.afterlifeMode,
-      extendedModes: Array.isArray(modes) ? (modes as string[]).filter((m) => typeof m === "string").sort() : [],
+      extendedModes: Array.isArray(modes) ? (modes as string[]).filter((m): m is ExtendedMode => EXTENDED_MODE_VALUES.has(m)).sort() : [],
       includeBaseColours: typeof data.includeBaseColours === "boolean" ? data.includeBaseColours : true,
       catName: typeof data.catName === "string" ? data.catName : "",
       creatorName: typeof data.creatorName === "string" ? data.creatorName : "",
@@ -182,6 +182,12 @@ function isValidRange(value: unknown): value is LayerRange {
   const r = value as Record<string, unknown>;
   return typeof r.min === "number" && typeof r.max === "number" && r.min >= 0 && r.max >= r.min;
 }
+
+const EXTENDED_MODE_VALUES: Set<string> = new Set([
+  "base", "mood", "bold", "darker", "blackout", "mononoke", "howl",
+  "demonslayer", "titanic", "deathnote", "slime", "ghostintheshell",
+  "mushishi", "chisweethome", "fma",
+]);
 
 const AFTERLIFE_VALUES: AfterlifeOption[] = ["off", "dark10", "star10", "both10", "darkForce", "starForce"];
 function isAfterlifeOption(value: unknown): value is AfterlifeOption {
@@ -235,6 +241,7 @@ export function loadVariantStore(): VariantStore {
       };
       const store: VariantStore = { activeId: variant.id, variants: [variant] };
       localStorage.setItem(VARIANT_STORE_KEY, JSON.stringify(store));
+      localStorage.removeItem(OLD_TIMING_KEY);
       return store;
     }
   } catch {

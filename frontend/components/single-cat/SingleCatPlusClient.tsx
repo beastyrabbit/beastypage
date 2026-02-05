@@ -52,9 +52,10 @@ import {
   usePageVariants,
   parseConvexPayload,
   settingsEqual,
-  DEFAULT_VARIANT_SETTINGS,
   type PageVariantSettings,
-  type PageVariant,
+  type AfterlifeOption,
+  type ExtendedMode,
+  type LayerRange,
 } from "../../utils/pageVariants";
 import { VariantBar } from "./VariantBar";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
@@ -64,23 +65,7 @@ import { encodeCatShare, createCatShare } from "@/lib/catShare";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import type { PaletteId } from "@/lib/palettes";
 
-type ExtendedMode =
-  | "base"
-  | "mood"
-  | "bold"
-  | "darker"
-  | "blackout"
-  | "mononoke"
-  | "howl"
-  | "demonslayer"
-  | "titanic"
-  | "deathnote"
-  | "slime"
-  | "ghostintheshell"
-  | "mushishi"
-  | "chisweethome"
-  | "fma";
-export type AfterlifeOption = "off" | "dark10" | "star10" | "both10" | "darkForce" | "starForce";
+export type { AfterlifeOption } from "../../utils/pageVariants";
 
 interface TortieSlot {
   mask: string;
@@ -147,10 +132,6 @@ const DEFAULT_SPRITE_NUMBER = 8;
 const PLACEHOLDER_COLOUR = "GINGER";
 const GLOBAL_PRESETS: Array<keyof TimingPresetSet> = ["slow", "normal", "fast"];
 const SUBSET_LIMIT = 20;
-interface LayerRange {
-  min: number;
-  max: number;
-}
 
 type LayerGroup = "accessories" | "scars" | "torties";
 
@@ -1549,7 +1530,7 @@ export function SingleCatPlusClient({
     setScarRange(settings.scarRange);
     setTortieRange(settings.tortieRange);
     setAfterlifeMode(settings.afterlifeMode);
-    setExtendedModes(new Set(settings.extendedModes as ExtendedMode[]));
+    setExtendedModes(new Set(settings.extendedModes));
     setIncludeBaseColours(settings.includeBaseColours);
     setCatNameDraft(settings.catName);
     setCreatorNameDraft(settings.creatorName);
@@ -1560,14 +1541,15 @@ export function SingleCatPlusClient({
     return !settingsEqual(snapshotConfig, variants.activeVariant.settings);
   }, [snapshotConfig, variants.activeVariant]);
 
-  // Restore active variant on mount
+  // Restore active variant on mount (skip when URL slug takes priority)
   const variantRestoredRef = useRef(false);
   useEffect(() => {
     if (variantRestoredRef.current) return;
+    if (variantSlug) return;
     if (!variants.activeVariant) return;
     variantRestoredRef.current = true;
     applyVariantConfig(variants.activeVariant.settings);
-  }, [variants.activeVariant, applyVariantConfig]);
+  }, [variantSlug, variants.activeVariant, applyVariantConfig]);
 
   // Warn before unload when dirty
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -34,8 +34,20 @@ export function VariantBar({
   const [importSlug, setImportSlug] = useState("");
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [dropdownOpen]);
 
   const handleSelectVariant = useCallback(
     (id: string | null) => {
@@ -150,7 +162,7 @@ export function VariantBar({
     <div className="relative z-10 rounded-2xl border border-border/40 bg-background/60 backdrop-blur px-4 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
         {/* Variant dropdown */}
-        <div className="relative" ref={dropdownRef}>
+        <div ref={dropdownRef} className="relative">
           <button
             type="button"
             onClick={() => setDropdownOpen((o) => !o)}
