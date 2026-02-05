@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Pencil, Check, Github } from "lucide-react";
+import { Pencil, Check, Github, ExternalLink, Loader2 } from "lucide-react";
 import { DiscordInviteButton } from "@/components/common/DiscordInviteButton";
 
 interface DashHeroProps {
@@ -11,12 +11,15 @@ interface DashHeroProps {
   onOpenReleaseNotes: () => void;
   editing: boolean;
   onToggleEditing: () => void;
+  hasVariant: boolean;
+  opening: boolean;
+  onOpen: () => void;
 }
 
 const HERO_BUTTON_CLASS =
   "inline-flex items-center gap-2 rounded-full border border-emerald-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-emerald-100 transition-all hover:border-emerald-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(52,211,153,0.2)]";
 
-export function DashHero({ version, hasNewVersion, onOpenReleaseNotes, editing, onToggleEditing }: DashHeroProps) {
+export function DashHero({ version, hasNewVersion, onOpenReleaseNotes, editing, onToggleEditing, hasVariant, opening, onOpen }: DashHeroProps) {
   return (
     <section className="relative rounded-3xl overflow-hidden">
       {/* Banner Background */}
@@ -59,6 +62,17 @@ export function DashHero({ version, hasNewVersion, onOpenReleaseNotes, editing, 
               {hasNewVersion && (
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpen}
+              disabled={!hasVariant || opening}
+              title={hasVariant ? "Open shareable link" : "No variant"}
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:border-white/20 hover:bg-white/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {opening ? <Loader2 className="size-3 animate-spin" /> : <ExternalLink className="size-3" />}
+              Open
             </button>
 
             <button

@@ -43,7 +43,6 @@ export function VariantBar<T>({
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [lastExportedSlug, setLastExportedSlug] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -143,30 +142,6 @@ export function VariantBar<T>({
       setExporting(false);
     }
   }, [apiPath, snapshotConfig, showToast]);
-
-  const handleShare = useCallback(async () => {
-    if (!shareBaseUrl) return;
-    setSharing(true);
-    try {
-      const response = await fetch(apiPath, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({ config: snapshotConfig }),
-      });
-      if (!response.ok) throw new Error("Failed to export");
-      const json = (await response.json()) as { slug?: string };
-      const slug = json.slug?.trim();
-      if (!slug) throw new Error("No slug returned");
-      const url = `${window.location.origin}${shareBaseUrl}?slug=${slug}`;
-      await copyText(url, "Share link copied to clipboard");
-    } catch (error) {
-      console.error("handleShare", error);
-      showToast(error instanceof Error ? error.message : "Share failed");
-    } finally {
-      setSharing(false);
-    }
-  }, [apiPath, snapshotConfig, shareBaseUrl, copyText, showToast]);
 
   const handleImport = useCallback(async () => {
     const normalized = importSlug.trim();
@@ -315,18 +290,6 @@ export function VariantBar<T>({
           <button type="button" onClick={handleNew} className={buttonClass}>
             + New
           </button>
-
-          {shareBaseUrl && (
-            <button
-              type="button"
-              onClick={handleShare}
-              disabled={sharing}
-              className={buttonClass}
-            >
-              {sharing && <Loader2 className="size-3 animate-spin" />}
-              Share
-            </button>
-          )}
 
           <button
             type="button"

@@ -26,6 +26,7 @@ export function DashClient() {
   const [editing, setEditing] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
+  const [opening, setOpening] = useState(false);
   const slugLoadedRef = useRef(false);
   const variantSyncedRef = useRef(false);
 
@@ -128,6 +129,28 @@ export function DashClient() {
     }
   }, []);
 
+  const handleOpen = useCallback(async () => {
+    setOpening(true);
+    try {
+      const response = await fetch("/api/dash-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ config: settings }),
+      });
+      if (!response.ok) throw new Error("Failed to export");
+      const json = (await response.json()) as { slug?: string };
+      const slug = json.slug?.trim();
+      if (!slug) throw new Error("No slug returned");
+      window.open(`/dash?slug=${slug}`, "_blank");
+    } catch (error) {
+      console.error("[DashClient] handleOpen", error);
+      toast.error("Failed to generate share link");
+    } finally {
+      setOpening(false);
+    }
+  }, [settings]);
+
   return (
     <>
       <VariantBar
@@ -139,7 +162,6 @@ export function DashClient() {
         copyText={copyText}
         apiPath="/api/dash-settings"
         parsePayload={parseDashPayload}
-        shareBaseUrl="/dash"
       />
 
       <DashHero
@@ -148,6 +170,9 @@ export function DashClient() {
         onOpenReleaseNotes={() => setReleaseNotesOpen(true)}
         editing={editing}
         onToggleEditing={() => setEditing((e) => !e)}
+        hasVariant={!!activeVariant}
+        opening={opening}
+        onOpen={handleOpen}
       />
 
       {resolvedWidgets.length === 0 && !editing ? (
