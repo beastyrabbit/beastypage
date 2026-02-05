@@ -8,18 +8,21 @@ const OUT = resolve(ROOT, "lib/dash/registry.generated.ts");
 const glob = new Bun.Glob("app/**/widget.ts");
 const paths = [...glob.scanSync({ cwd: ROOT, absolute: true })].sort();
 
-interface WidgetModule {
-  default: {
-    id: string;
-    title: string;
-    description: string;
-    icon: string;
-    href: string;
-    category: string;
-  };
+interface WidgetEntry {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  href: string;
+  category: string;
 }
 
-const entries: WidgetModule["default"][] = [];
+interface WidgetModule {
+  default: WidgetEntry;
+  extras?: WidgetEntry[];
+}
+
+const entries: WidgetEntry[] = [];
 
 for (const abs of paths) {
   const mod = (await import(abs)) as WidgetModule;
@@ -28,6 +31,12 @@ for (const abs of paths) {
     continue;
   }
   entries.push(mod.default);
+  // Support additional widget entries (e.g. preset variants) via named export
+  if (Array.isArray(mod.extras)) {
+    for (const extra of mod.extras) {
+      if (extra?.id) entries.push(extra);
+    }
+  }
 }
 
 entries.sort((a, b) => a.id.localeCompare(b.id));

@@ -11,6 +11,14 @@ export const TOOL_REGISTRY: ToolWidgetMeta[] = [
     "category": "gacha"
   },
   {
+    "id": "ancestry-tree",
+    "title": "Ancestry Tree",
+    "description": "Create interactive family trees with trait inheritance across generations.",
+    "icon": "🌳",
+    "href": "/projects/warrior-cats/ancestry-tree",
+    "category": "warrior-cats"
+  },
+  {
     "id": "cat-color-palettes",
     "title": "Cat Color Palettes",
     "description": "Browse all experimental color palettes for cat generation including anime-inspired themes.",
@@ -81,6 +89,22 @@ export const TOOL_REGISTRY: ToolWidgetMeta[] = [
     "icon": "🔲",
     "href": "/pixelator",
     "category": "artist"
+  },
+  {
+    "id": "single-cat-calm",
+    "title": "Single Cat (Less Spin)",
+    "description": "Calm typewriter-style reveal where traits appear one by one.",
+    "icon": "🎯",
+    "href": "/single-cat-plus?mode=calm",
+    "category": "gacha"
+  },
+  {
+    "id": "single-cat-generator",
+    "title": "Single Cat Generator",
+    "description": "Airport flip-board chaos with rapid spins before the final reveal.",
+    "icon": "✨",
+    "href": "/single-cat-plus?mode=flashy&accessories=1-1&scars=1-1&torties=1-1&afterlife=off",
+    "category": "gacha"
   },
   {
     "id": "single-cat-plus",
