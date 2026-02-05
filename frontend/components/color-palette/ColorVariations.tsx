@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { Copy, Sun, Palette } from "lucide-react";
+import { Sun } from "lucide-react";
+import CopyIcon from "@/components/ui/copy-icon";
+import PaintIcon from "@/components/ui/paint-icon";
 import { toast } from "sonner";
 
 import type { ExtractedColor } from "@/lib/color-extraction/types";
@@ -87,9 +89,9 @@ export function ColorVariations({ color }: ColorVariationsProps) {
                   style={{ backgroundColor: variation.hex }}
                 >
                   <div className="flex size-full items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
-                    <Copy
-                      className="size-4"
-                      style={{ color: getContrastColor(hexToRgb(variation.hex)) }}
+                    <CopyIcon
+                      size={16}
+                      color={getContrastColor(hexToRgb(variation.hex))}
                     />
                   </div>
                 </div>
@@ -104,7 +106,7 @@ export function ColorVariations({ color }: ColorVariationsProps) {
         {/* Hue variations */}
         <div>
           <div className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
-            <Palette className="size-4" />
+            <PaintIcon size={16} />
             Hue Shift
           </div>
           <div className="flex flex-wrap gap-2">
@@ -120,9 +122,9 @@ export function ColorVariations({ color }: ColorVariationsProps) {
                   style={{ backgroundColor: variation.hex }}
                 >
                   <div className="flex size-full items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
-                    <Copy
-                      className="size-4"
-                      style={{ color: getContrastColor(hexToRgb(variation.hex)) }}
+                    <CopyIcon
+                      size={16}
+                      color={getContrastColor(hexToRgb(variation.hex))}
                     />
                   </div>
                 </div>

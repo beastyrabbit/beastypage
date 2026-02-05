@@ -13,16 +13,16 @@ import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
 import {
   ArrowUpRight,
-  Copy,
   Download,
-  ExternalLink,
   Loader2,
-  Palette,
-  RefreshCw,
-  Share2,
-  Sparkles,
-  X,
 } from "lucide-react";
+import CopyIcon from "@/components/ui/copy-icon";
+import ExternalLinkIcon from "@/components/ui/external-link-icon";
+import PaintIcon from "@/components/ui/paint-icon";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
+import XIcon from "@/components/ui/x-icon";
 import type { Id } from "@/convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -3605,7 +3605,7 @@ export function SingleCatPlusClient({
                 onClick={generateCatPlus}
                 disabled={generationDisabled || isGenerating}
               >
-                <RefreshCw className="size-4" />
+                <RefreshIcon size={16} />
                 {initializing ? "Loading" : isGenerating ? "Rolling..." : "Generate Cat"}
               </button>
               <button
@@ -3623,7 +3623,7 @@ export function SingleCatPlusClient({
                 onClick={() => exportCat()}
                 disabled={initializing}
               >
-                <Copy className="size-4" />
+                <CopyIcon size={16} />
                 Copy 700×700
               </button>
               {hasTint && (
@@ -3634,7 +3634,7 @@ export function SingleCatPlusClient({
                   disabled={initializing}
                   title="Shift+click the canvas for a shortcut"
                 >
-                  <Copy className="size-4" />
+                  <CopyIcon size={16} />
                   Copy (No Tint)
                 </button>
               )}
@@ -3652,7 +3652,7 @@ export function SingleCatPlusClient({
                 <div className="flex min-h-[1.5rem] items-center gap-2 text-xs text-muted-foreground">
                   {rollerActiveValue ? (
                     <>
-                      <Sparkles className="size-3" />
+                      <SparklesIcon size={12} />
                       <span className="font-mono uppercase tracking-wide text-primary">
                         {rollerActiveValue}
                       </span>
@@ -3732,7 +3732,7 @@ export function SingleCatPlusClient({
                   onClick={handleCopyShareLink}
                   disabled={!catStateRef.current}
                 >
-                  <Share2 className="size-4" /> Copy Share Link
+                  <SendHorizontalIcon size={16} /> Copy Share Link
                 </button>
                 <button
                   type="button"
@@ -3740,7 +3740,7 @@ export function SingleCatPlusClient({
                   onClick={handleOpenShareViewer}
                   disabled={!catStateRef.current}
                 >
-                  <Sparkles className="size-4" /> Open Share Viewer
+                  <SparklesIcon size={16} /> Open Share Viewer
                 </button>
               </div>
               <div className="mt-4 grid gap-3 rounded-xl border border-border/40 bg-background/50 p-4">
@@ -3780,7 +3780,7 @@ export function SingleCatPlusClient({
                     onClick={handleSaveMeta}
                     disabled={saveHistoryDisabled}
                   >
-                    <Sparkles className="size-4" /> Save to History
+                    <SparklesIcon size={16} /> Save to History
                   </button>
                   <Link
                     href="/history"
@@ -3910,7 +3910,7 @@ export function SingleCatPlusClient({
 
               <div className="space-y-3">
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground/80">
-                  <Palette className="size-3" /> Colour Palettes
+                  <PaintIcon size={12} /> Colour Palettes
                   <a
                     href="/cat-color-palettes"
                     target="_blank"
@@ -3918,7 +3918,7 @@ export function SingleCatPlusClient({
                     className="ml-auto text-muted-foreground/60 transition-colors hover:text-amber-400"
                     title="View all colour palettes"
                   >
-                    <ExternalLink className="size-3" />
+                    <ExternalLinkIcon size={12} />
                   </a>
                 </p>
                 <PaletteMultiSelect
@@ -3997,7 +3997,7 @@ export function SingleCatPlusClient({
               aria-label="Close sprite gallery"
               className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
             >
-              <X className="size-4" />
+              <XIcon size={16} />
             </button>
             <div className="flex flex-col gap-6">
               <div>
@@ -4072,7 +4072,7 @@ export function SingleCatPlusClient({
               className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
               aria-label="Close timing settings"
             >
-              <X className="size-4" />
+              <XIcon size={16} />
             </button>
             <div className="max-h-[80vh] overflow-y-auto px-6 pb-8 pt-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -4303,7 +4303,7 @@ export function SingleCatPlusClient({
               className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
               aria-label="Close settings saved dialog"
             >
-              <X className="size-4" />
+              <XIcon size={16} />
             </button>
             <div className="space-y-4">
               <div>

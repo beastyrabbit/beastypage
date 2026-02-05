@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check, Search, Palette } from 'lucide-react';
+import DownChevron from '@/components/ui/down-chevron';
+import CheckedIcon from '@/components/ui/checked-icon';
+import MagnifierIcon from '@/components/ui/magnifier-icon';
+import PaintIcon from '@/components/ui/paint-icon';
 import { usePaletteOptions } from './usePaletteOptions';
 import type { PaletteMode } from '@/lib/palettes';
 
@@ -154,14 +157,15 @@ export function PaletteSingleSelect({
         className={`flex min-h-[36px] items-center justify-between gap-2 rounded-lg border border-slate-700/60 bg-slate-900/80 px-3 py-1.5 text-left text-sm transition hover:border-slate-600 ${className}`}
       >
         <div className="flex items-center gap-2">
-          <Palette className="size-4 text-slate-400" />
+          <PaintIcon size={16} className="text-slate-400" />
           <span className="font-medium text-slate-100">{selectedOption.label}</span>
           {selectedOption.previewColors.length > 0 && (
             <ColorSwatch colors={selectedOption.previewColors} />
           )}
         </div>
-        <ChevronDown
-          className={`size-4 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        <DownChevron
+          size={16}
+          className={`shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -183,7 +187,7 @@ export function PaletteSingleSelect({
             {showSearch && (
               <div className="border-b border-slate-700/30 p-2">
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+                  <MagnifierIcon size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -216,7 +220,7 @@ export function PaletteSingleSelect({
                           : 'border-slate-600 bg-slate-800'
                       }`}
                     >
-                      {isSelected && <Check className="size-3" />}
+                      {isSelected && <CheckedIcon size={12} />}
                     </div>
                     <div className="flex-1 overflow-hidden">
                       <div className="flex items-center gap-2">

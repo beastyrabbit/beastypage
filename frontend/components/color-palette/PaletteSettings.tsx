@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Settings, ChevronDown, RotateCcw, Sun, Palette, Filter, Pencil } from "lucide-react";
+import { Sun, Filter } from "lucide-react";
+import GearIcon from "@/components/ui/gear-icon";
+import DownChevron from "@/components/ui/down-chevron";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import PaintIcon from "@/components/ui/paint-icon";
+import PenIcon from "@/components/ui/pen-icon";
 
 interface PaletteSettingsProps {
   brightnessFactors: number[];
@@ -104,7 +109,7 @@ export function PaletteSettings({
       >
         <div className="flex items-center gap-3">
           <div className="rounded-lg bg-muted/50 p-1.5">
-            <Settings className="size-4 text-muted-foreground" />
+            <GearIcon size={16} className="text-muted-foreground" />
           </div>
           <div>
             <span className="text-sm font-medium">Variation Settings</span>
@@ -113,8 +118,9 @@ export function PaletteSettings({
             </p>
           </div>
         </div>
-        <ChevronDown
-          className={`size-5 text-muted-foreground transition-transform duration-200 ${
+        <DownChevron
+          size={20}
+          className={`text-muted-foreground transition-transform duration-200 ${
             isExpanded ? "rotate-180" : ""
           }`}
         />
@@ -159,7 +165,7 @@ export function PaletteSettings({
                       : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  <Pencil className="size-3" />
+                  <PenIcon size={12} />
                   Custom
                 </button>
               </div>
@@ -206,7 +212,7 @@ export function PaletteSettings({
             {/* Hue Presets */}
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                <Palette className="size-3.5" />
+                <PaintIcon size={14} />
                 Hue Shift Variation
               </div>
               <div className="flex flex-wrap gap-2">
@@ -234,7 +240,7 @@ export function PaletteSettings({
                       : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  <Pencil className="size-3" />
+                  <PenIcon size={12} />
                   Custom
                 </button>
               </div>
@@ -301,7 +307,7 @@ export function PaletteSettings({
               onClick={resetToDefaults}
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-border/50 py-2 text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
             >
-              <RotateCcw className="size-3" />
+              <RefreshIcon size={12} />
               Reset to Defaults
             </button>
           </div>

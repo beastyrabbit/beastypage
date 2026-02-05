@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
-import { Download, Loader2, RefreshCw, Share2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -338,7 +341,7 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
         <h1 className="text-2xl font-semibold">Timeline unavailable</h1>
         <p className="mt-3 text-sm">{error}</p>
         <Link href="/guided-builder" className="mt-5 inline-flex items-center gap-2 rounded-xl border border-red-500/50 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/20">
-          <RefreshCw className="size-4" />
+          <RefreshIcon size={16} />
           Back to builder
         </Link>
       </div>
@@ -360,7 +363,7 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
             href="/guided-builder"
             className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:border-amber-400/60 hover:text-amber-100"
           >
-            <RefreshCw className="size-4" />
+            <RefreshIcon size={16} />
             Create a new build
           </Link>
         </header>
@@ -450,7 +453,7 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
                   link.click();
                 }}
               >
-                <Download className="size-4" />
+                <ArrowBigDownDashIcon size={16} />
                 Download sprite
               </button>
               <button
@@ -467,7 +470,7 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
                   }
                 }}
               >
-                <Share2 className="size-4" />
+                <SendHorizontalIcon size={16} />
                 Copy data URL
               </button>
             </div>

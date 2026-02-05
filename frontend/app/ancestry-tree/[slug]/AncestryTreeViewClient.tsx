@@ -5,7 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AlertTriangle, ArrowLeft, ArrowUpRight, Loader2, Lock, Trees, X } from "lucide-react";
+import { ArrowUpRight, Loader2, Trees } from "lucide-react";
+import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
+import ArrowBackIcon from "@/components/ui/arrow-back-icon";
+import LockIcon from "@/components/ui/lock-icon";
+import XIcon from "@/components/ui/x-icon";
 import { encodeCatShare } from "@/lib/catShare";
 
 interface TreeCat {
@@ -124,10 +128,10 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
   if (record === null) {
     return (
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-4 px-6 py-16 text-center text-muted-foreground">
-        <AlertTriangle className="size-8 text-red-300" />
+        <TriangleAlertIcon size={32} className="text-red-300" />
         <p className="text-base">That ancestry tree could not be found.</p>
         <Link href="/history" className="inline-flex items-center gap-2 text-sm text-primary">
-          <ArrowLeft className="size-4" /> Back to History
+          <ArrowBackIcon size={16} /> Back to History
         </Link>
       </div>
     );
@@ -137,14 +141,14 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-green-500/30 bg-gradient-to-br from-green-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(34,197,94,0.15)]">
         <Link href="/history" className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-green-200/80 transition hover:text-green-100">
-          <ArrowLeft className="size-3" /> Back to History
+          <ArrowBackIcon size={12} /> Back to History
         </Link>
         <div className="mt-3 flex items-center gap-3">
           <Trees className="size-8 text-green-400" />
           <h1 className="text-4xl font-semibold text-white sm:text-5xl">{treeName}</h1>
           {record.hasPassword && (
             <span title="Password protected">
-              <Lock className="size-5 text-amber-400" />
+              <LockIcon size={20} className="text-amber-400" />
             </span>
           )}
         </div>
@@ -236,7 +240,7 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
               aria-label="Close preview"
               className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
             >
-              <X className="size-4" />
+              <XIcon size={16} />
             </button>
             <div className="flex flex-col items-center gap-6">
               <h2 className="text-xl font-semibold text-foreground">{focusedPreview.label}</h2>

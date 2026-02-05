@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { ChevronDown } from "lucide-react";
+import DownChevron from "@/components/ui/down-chevron";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { ColorPaletteClient } from "./ColorPaletteClient";
 
@@ -227,7 +227,7 @@ export function ColorPaletteContent() {
         <span>
           {selectedSprite === "all" ? "All Sprites" : `Sprite ${selectedSprite}`}
         </span>
-        <ChevronDown className={`size-4 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+        <DownChevron size={16} className={`transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
       </button>
 
       {dropdownOpen && createPortal(

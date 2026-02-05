@@ -11,14 +11,14 @@ import { cn } from "@/lib/utils";
 import type { TortieLayer } from "@/lib/cat-v3/types";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import {
-  AlertTriangle,
   ArrowUpRight,
-  ChevronDown,
-  Copy,
   Loader2,
-  Palette,
-  Sparkles,
 } from "lucide-react";
+import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
+import DownChevron from "@/components/ui/down-chevron";
+import CopyIcon from "@/components/ui/copy-icon";
+import PaintIcon from "@/components/ui/paint-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
 
 type ViewerClientProps = {
   slug?: string | null;
@@ -604,7 +604,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
               onClick={handleCopyShare}
               className="inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/20 px-4 py-2 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/25"
             >
-              Copy share link <Copy className="size-3" />
+              Copy share link <CopyIcon size={12} />
             </button>
           ) : null}
           {builderBaseUrl ? (
@@ -628,7 +628,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
 
       {error && (
         <div className="flex flex-col items-center gap-2 rounded-3xl border border-red-500/30 bg-red-950/40 px-6 py-10 text-sm text-red-100">
-          <AlertTriangle className="size-6" />
+          <TriangleAlertIcon />
           <span>{error}</span>
         </div>
       )}
@@ -649,7 +649,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                   onClick={handleCopyMainSprite}
                   className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary"
                 >
-                  <Copy className="size-3" /> Copy sprite
+                  <CopyIcon size={12} /> Copy sprite
                 </button>
                 <button
                   type="button"
@@ -657,7 +657,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                   disabled={!meta?.slug && !meta?.shareToken}
                   className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-4 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Palette className="size-3" /> Color Palette
+                  <PaintIcon size={12} /> Color Palette
                 </button>
               </div>
             </div>
@@ -665,7 +665,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
             <div className="flex flex-col gap-6">
               <div className="rounded-3xl border border-border/40 bg-background/70 p-5">
                 <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <Sparkles className="size-4 text-primary" /> Trait Breakdown
+                  <SparklesIcon size={16} className="text-primary" /> Trait Breakdown
                 </h2>
                 <div className="grid gap-2">
                   {traitRows.map((row) => {
@@ -737,9 +737,10 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                     {spriteVariantsSubtitle}
                   </p>
                 </div>
-                <ChevronDown
+                <DownChevron
+                  size={16}
                   className={cn(
-                    "size-4 text-muted-foreground transition-transform",
+                    "text-muted-foreground transition-transform",
                     spriteVariantsOpen ? "rotate-180" : "rotate-0"
                   )}
                 />
@@ -785,7 +786,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                         onClick={() => handleCopyVariantSprite(variant.dataUrl, `${variant.name || "sprite"}.png`)}
                         className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary"
                       >
-                        <Copy className="size-3" /> Copy sprite
+                        <CopyIcon size={12} /> Copy sprite
                       </button>
                     </div>
                   ))}

@@ -1,12 +1,15 @@
 import Link from "next/link";
-import { ArrowRight, PawPrint, Sparkles, Palette, Gamepad2 } from "lucide-react";
+import { PawPrint, Gamepad2 } from "lucide-react";
+import ArrowNarrowRightIcon from "@/components/ui/arrow-narrow-right-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
+import PaintIcon from "@/components/ui/paint-icon";
 
 import type { ProjectCategory, ProjectCategoryConfig } from "@/components/site-nav-config";
 
-const CATEGORY_ICONS: Record<ProjectCategory, React.ComponentType<{ className?: string }>> = {
+const CATEGORY_ICONS: Record<ProjectCategory, React.ComponentType<{ className?: string; size?: number }>> = {
   "warrior-cats": PawPrint,
-  gacha: Sparkles,
-  artist: Palette,
+  gacha: SparklesIcon,
+  artist: PaintIcon,
   games: Gamepad2,
 };
 
@@ -46,7 +49,7 @@ export function CategoryCard({ category, toolPreviews, toolCount, index }: Categ
       <div className="relative z-10 flex items-start justify-between">
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-white/10 p-3 transition-colors group-hover:bg-white/15">
-            <Icon className="size-6 text-foreground/80 group-hover:text-foreground" />
+            <Icon size={24} className="text-foreground/80 group-hover:text-foreground" />
           </div>
           <div>
             <h3 className={`text-xl font-bold text-foreground group-hover:text-gradient-${category.key} transition-colors`}>
@@ -80,7 +83,7 @@ export function CategoryCard({ category, toolPreviews, toolCount, index }: Categ
 
       {/* CTA */}
       <span className="relative z-10 mt-auto inline-flex items-center gap-1 pt-2 text-xs font-bold text-primary transition-transform group-hover:translate-x-2">
-        Explore {category.label} <ArrowRight className="size-3" />
+        Explore {category.label} <ArrowNarrowRightIcon size={12} />
       </span>
     </Link>
   );

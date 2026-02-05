@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback } from "react";
-import { Copy, Check } from "lucide-react";
+import CopyIcon from "@/components/ui/copy-icon";
+import CheckedIcon from "@/components/ui/checked-icon";
 import { toast } from "sonner";
 
 import type { ExtractedColor } from "@/lib/color-extraction/types";
@@ -79,7 +80,7 @@ export function ColorSwatch({
           className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-xs transition-colors hover:bg-primary/10"
         >
           <span className="font-mono font-semibold">{color.hex.toUpperCase()}</span>
-          <Copy className="size-3 opacity-50 group-hover:opacity-100" />
+          <CopyIcon size={12} className="opacity-50 group-hover:opacity-100" />
         </button>
 
         {/* RGB */}
@@ -93,7 +94,7 @@ export function ColorSwatch({
           <span className="font-mono">
             {color.rgb.r}, {color.rgb.g}, {color.rgb.b}
           </span>
-          <Copy className="size-3 opacity-0 group-hover:opacity-50" />
+          <CopyIcon size={12} className="opacity-0 group-hover:opacity-50" />
         </button>
 
         {/* HSL */}
@@ -107,14 +108,14 @@ export function ColorSwatch({
           <span className="font-mono">
             {color.hsl.h}°, {color.hsl.s}%, {color.hsl.l}%
           </span>
-          <Copy className="size-3 opacity-0 group-hover:opacity-50" />
+          <CopyIcon size={12} className="opacity-0 group-hover:opacity-50" />
         </button>
       </div>
 
       {/* Selected indicator */}
       {isSelected && (
         <div className="absolute right-2 top-2 rounded-full bg-primary p-1">
-          <Check className="size-3 text-primary-foreground" />
+          <CheckedIcon size={12} className="text-primary-foreground" />
         </div>
       )}
     </div>

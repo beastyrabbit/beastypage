@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Lock, Trees, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowUpRight, Trees, ChevronLeft } from "lucide-react";
+import LockIcon from "@/components/ui/lock-icon";
+import RightChevron from "@/components/ui/right-chevron";
 import { encodeCatShare } from "@/lib/catShare";
 
 type TreePreviewCat = {
@@ -86,7 +88,7 @@ export function HistoryAncestryTreeCard({ item, onPreview }: HistoryAncestryTree
         </span>
         {item.hasPassword && (
           <span className="absolute right-3 top-3 z-10" title="Password protected">
-            <Lock className="size-4 text-amber-400" />
+            <LockIcon size={16} className="text-amber-400" />
           </span>
         )}
         {totalCats > 1 && (
@@ -106,7 +108,7 @@ export function HistoryAncestryTreeCard({ item, onPreview }: HistoryAncestryTree
             aria-label="Next cat"
             className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white transition hover:bg-black/80"
           >
-            <ChevronRight className="size-5" />
+            <RightChevron size={20} />
           </button>
         )}
         <button

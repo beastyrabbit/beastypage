@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { X, Search } from "lucide-react";
+import XIcon from "@/components/ui/x-icon";
+import MagnifierIcon from "@/components/ui/magnifier-icon";
 import Image from "next/image";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -168,7 +169,7 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
             onClick={onClose}
             className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
           >
-            <X className="size-5" />
+            <XIcon size={20} />
           </button>
         </div>
 
@@ -192,7 +193,7 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
                   onClick={() => setSelectedMother(null)}
                   className="text-muted-foreground hover:text-foreground"
                 >
-                  <X className="size-4" />
+                  <XIcon size={16} />
                 </button>
               </div>
             ) : (
@@ -217,7 +218,7 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
                   onClick={() => setSelectedFather(null)}
                   className="text-muted-foreground hover:text-foreground"
                 >
-                  <X className="size-4" />
+                  <XIcon size={16} />
                 </button>
               </div>
             ) : (
@@ -229,7 +230,7 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
         {/* Search bar */}
         <div className="p-4 border-b border-white/10">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <MagnifierIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               value={searchTerm}

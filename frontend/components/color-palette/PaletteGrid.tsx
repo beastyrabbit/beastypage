@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useCallback } from "react";
-import { Copy, Sun, Palette } from "lucide-react";
+import { Sun } from "lucide-react";
+import CopyIcon from "@/components/ui/copy-icon";
+import PaintIcon from "@/components/ui/paint-icon";
 import { toast } from "sonner";
 import { track } from "@/lib/analytics";
 
@@ -146,9 +148,9 @@ export function PaletteGrid({
 
               {/* Copy icon on hover */}
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-xl">
-                <Copy
-                  className="size-4"
-                  style={{ color: getContrastColor(color.rgb) }}
+                <CopyIcon
+                  size={16}
+                  color={getContrastColor(color.rgb)}
                 />
               </div>
 
@@ -207,9 +209,9 @@ export function PaletteGrid({
                     title={`${generateColorDisplayName(rowIndex, colors[rowIndex].name || "Loading...", type, { brightnessMultiplier: cell.factor })} - ${cell.hex}\nClick to copy`}
                   >
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
-                      <Copy
-                        className="size-3"
-                        style={{ color: getContrastColor(cellRgb) }}
+                      <CopyIcon
+                        size={12}
+                        color={getContrastColor(cellRgb)}
                       />
                     </div>
                   </button>
@@ -236,7 +238,7 @@ export function PaletteGrid({
       {/* Hue variations grid - full width */}
       <div>
         <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <Palette className="size-3.5" />
+          <PaintIcon size={14} />
           Hue Shift
         </div>
         <div className="flex flex-col gap-1">
@@ -276,9 +278,9 @@ export function PaletteGrid({
                     title={`${generateColorDisplayName(rowIndex, colors[rowIndex].name || "Loading...", type, { hueShift: cell.shift })} - ${cell.hex}\nClick to copy`}
                   >
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
-                      <Copy
-                        className="size-3"
-                        style={{ color: getContrastColor(cellRgb) }}
+                      <CopyIcon
+                        size={12}
+                        color={getContrastColor(cellRgb)}
                       />
                     </div>
                   </button>

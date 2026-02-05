@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PawPrint, Sparkles, Palette, Gamepad2 } from "lucide-react";
+import { PawPrint, Gamepad2 } from "lucide-react";
+import SparklesIcon from "@/components/ui/sparkles-icon";
+import PaintIcon from "@/components/ui/paint-icon";
 
 import { cn } from "@/lib/utils";
 import { PROJECT_CATEGORIES, type ProjectCategory } from "@/components/site-nav-config";
 
-const CATEGORY_ICONS: Record<ProjectCategory, React.ComponentType<{ className?: string }>> = {
+const CATEGORY_ICONS: Record<ProjectCategory, React.ComponentType<{ className?: string; size?: number }>> = {
   "warrior-cats": PawPrint,
-  gacha: Sparkles,
-  artist: Palette,
+  gacha: SparklesIcon,
+  artist: PaintIcon,
   games: Gamepad2,
 };
 
@@ -41,7 +43,7 @@ export function ProjectsSubNav() {
                     : "border border-white/5 bg-white/5 text-muted-foreground hover:border-white/10 hover:bg-white/10 hover:text-foreground"
                 )}
               >
-                <Icon className="size-4" />
+                <Icon size={16} />
                 <span className="whitespace-nowrap">{category.label}</span>
               </Link>
             );

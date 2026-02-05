@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, Vote, Users } from "lucide-react";
+import { Vote } from "lucide-react";
+import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
+import UsersIcon from "@/components/ui/users-icon";
 import { useMutation, useQuery } from "convex/react";
 import { track } from "@/lib/analytics";
 
@@ -386,7 +388,7 @@ export function ViewerClient() {
                   : "border-amber-400/40 bg-amber-400/10 text-amber-100"
               )}
             >
-              <Users className="size-3" /> {signupsOpen ? "Sign ups open" : "Sign ups closed"}
+              <UsersIcon size={12} /> {signupsOpen ? "Sign ups open" : "Sign ups closed"}
             </span>
             <span
               className={cn(
@@ -448,7 +450,7 @@ export function ViewerClient() {
                 disabled={!signupsOpen}
                 className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:translate-y-0.5 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Users className="size-4" /> Check in
+                <UsersIcon size={16} /> Check in
               </button>
             </div>
             {nameError && <p className="text-xs text-destructive">{nameError}</p>}
@@ -460,7 +462,7 @@ export function ViewerClient() {
 
         {votingStatus.code !== "ready" && votingStatus.reason && (
           <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 px-4 py-3 text-sm text-muted-foreground">
-            <AlertTriangle className="size-4" /> {votingStatus.reason}
+            <TriangleAlertIcon size={16} /> {votingStatus.reason}
           </div>
         )}
       </section>

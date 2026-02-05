@@ -5,7 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AlertTriangle, ArrowLeft, ArrowUpRight, Loader2, X } from "lucide-react";
+import { ArrowUpRight, Loader2 } from "lucide-react";
+import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
+import ArrowBackIcon from "@/components/ui/arrow-back-icon";
+import XIcon from "@/components/ui/x-icon";
 import { encodeCatShare } from "@/lib/catShare";
 import type { TortieLayer } from "@/lib/cat-v3/types";
 
@@ -134,10 +137,10 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
   if (record === null) {
     return (
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-4 px-6 py-16 text-center text-muted-foreground">
-        <AlertTriangle className="size-8 text-red-300" />
+        <TriangleAlertIcon size={32} className="text-red-300" />
         <p className="text-base">That adoption batch could not be found.</p>
         <Link href="/" className="inline-flex items-center gap-2 text-sm text-primary">
-          <ArrowLeft className="size-4" /> Return home
+          <ArrowBackIcon size={16} /> Return home
         </Link>
       </div>
     );
@@ -147,7 +150,7 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
         <Link href="/" className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-amber-200/80 transition hover:text-amber-100">
-          <ArrowLeft className="size-3" /> Back to hub
+          <ArrowBackIcon size={12} /> Back to hub
         </Link>
         <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">{batchTitle}</h1>
         <p className="mt-3 max-w-2xl text-sm text-neutral-200/85 sm:text-base">
@@ -255,7 +258,7 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
               aria-label="Close preview"
               className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
             >
-              <X className="size-4" />
+              <XIcon size={16} />
             </button>
             <div className="flex flex-col items-center gap-6">
               <h2 className="text-xl font-semibold text-foreground">{focusedPreview.label}</h2>

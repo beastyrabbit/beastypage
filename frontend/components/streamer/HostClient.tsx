@@ -5,18 +5,18 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowRight,
-  CheckCircle2,
   ClipboardCopy,
-  ExternalLink,
   Loader2,
-  RefreshCw,
   ShieldAlert,
-  Sparkles,
   Square,
-  Users,
   Vote,
 } from "lucide-react";
+import ArrowNarrowRightIcon from "@/components/ui/arrow-narrow-right-icon";
+import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
+import ExternalLinkIcon from "@/components/ui/external-link-icon";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
+import UsersIcon from "@/components/ui/users-icon";
 import { useMutation, useQuery } from "convex/react";
 import { track } from "@/lib/analytics";
 
@@ -999,7 +999,7 @@ export function HostClient() {
               disabled={pending}
               className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:translate-y-0.5 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Sparkles className="size-4" /> Start new session
+              <SparklesIcon size={16} /> Start new session
             </button>
             {session?.status === "live" && (
               <button
@@ -1040,7 +1040,7 @@ export function HostClient() {
                   target="_blank"
                   className="inline-flex items-center gap-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-semibold transition hover:bg-border/20"
                 >
-                  <ExternalLink className="size-4" /> Open
+                  <ExternalLinkIcon size={16} /> Open
                 </Link>
               </div>
             ) : (
@@ -1084,13 +1084,13 @@ export function HostClient() {
                     target="_blank"
                     className="inline-flex items-center gap-1 rounded-lg border border-primary/50 px-3 py-2 text-xs font-semibold transition hover:bg-primary/10"
                   >
-                    <ExternalLink className="size-4" /> View
+                    <ExternalLinkIcon size={16} /> View
                   </Link>
                   <Link
                     href="/history"
                     className="inline-flex items-center gap-1 rounded-lg border border-primary/50 px-3 py-2 text-xs font-semibold transition hover:bg-primary/10"
                   >
-                    <ArrowRight className="size-3" /> History
+                    <ArrowNarrowRightIcon size={12} /> History
                   </Link>
                 </div>
               </div>
@@ -1175,7 +1175,7 @@ export function HostClient() {
                     : "border-amber-400/40 bg-amber-400/10 text-amber-100"
                 )}
               >
-                <Users className="size-3.5" /> {signupsOpen ? "Sign ups open" : "Sign ups closed"}
+                <UsersIcon size={14} /> {signupsOpen ? "Sign ups open" : "Sign ups closed"}
               </button>
               <button
                 type="button"
@@ -1329,7 +1329,7 @@ export function HostClient() {
                 disabled={!session || pending || hasUnresolvedTie || voteRows.length === 0 || (session?.params?._votesOpen ?? false) || session?.status === "completed"}
                 className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:translate-y-0.5 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <ArrowRight className="size-4" /> Next step
+                <ArrowNarrowRightIcon size={16} /> Next step
               </button>
               {hasUnresolvedTie && (
                 <span className="text-xs text-amber-300">Resolve the tie before advancing.</span>
@@ -1430,7 +1430,7 @@ export function HostClient() {
                             onClick={() => handleParticipantStatus(participant, "active")}
                             className="inline-flex items-center gap-1 rounded-full border border-border/50 px-3 py-1 text-xs font-semibold transition hover:bg-border/20"
                           >
-                            <CheckCircle2 className="size-3" /> Re-admit
+                            <FilledCheckedIcon size={12} /> Re-admit
                           </button>
                         )}
                       </div>
@@ -1462,7 +1462,7 @@ export function HostClient() {
                       onClick={() => handleResumeSession(item)}
                       className="inline-flex items-center gap-1 rounded-full border border-border/50 px-3 py-1 text-xs font-semibold transition hover:bg-border/20"
                     >
-                      <RefreshCw className="size-3" /> Resume
+                      <RefreshIcon size={12} /> Resume
                     </button>
                   </li>
                 ))}
@@ -1519,7 +1519,7 @@ export function HostClient() {
                 disabled={finalizeSaving}
                 className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:translate-y-0.5 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {finalizeSaving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} Save &amp; finish
+                {finalizeSaving ? <Loader2 className="size-4 animate-spin" /> : <FilledCheckedIcon size={16} />} Save &amp; finish
               </button>
             </div>
           </div>

@@ -4,7 +4,13 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Save, Loader2, ArrowLeft, Trees, Dices, History, Settings, RefreshCw, Palette, ArrowUpDown, ArrowLeftRight, Maximize2 } from "lucide-react";
+import { Save, Loader2, Trees, Dices, ArrowUpDown, ArrowLeftRight } from "lucide-react";
+import ArrowBackIcon from "@/components/ui/arrow-back-icon";
+import HistoryCircleIcon from "@/components/ui/history-circle-icon";
+import GearIcon from "@/components/ui/gear-icon";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import PaintIcon from "@/components/ui/paint-icon";
+import ExpandIcon from "@/components/ui/expand-icon";
 import { track } from "@/lib/analytics";
 
 import type {
@@ -725,7 +731,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                     disabled={isGenerating}
                     className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-5 py-3 text-sm font-medium transition-colors hover:bg-white/10 disabled:opacity-50"
                   >
-                    <History className="size-4" />
+                    <HistoryCircleIcon size={16} />
                     From History
                   </button>
                 </div>
@@ -808,7 +814,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
               {/* Tree Settings */}
               <div className="glass-card p-6 space-y-5">
                 <h2 className="font-semibold text-xl flex items-center gap-2">
-                  <Settings className="size-5 text-amber-500" />
+                  <GearIcon size={20} className="text-amber-500" />
                   Tree Settings
                 </h2>
 
@@ -899,7 +905,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
               {/* Color Palette Mode */}
               <div className="glass-card p-6 space-y-4">
                 <h3 className="font-semibold flex items-center gap-2">
-                  <Palette className="size-4 text-purple-400" />
+                  <PaintIcon size={16} className="text-purple-400" />
                   Color Palettes
                 </h3>
                 <PaletteMultiSelect
@@ -955,7 +961,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
           onClick={handleBackToConfig}
           className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-white/10"
         >
-          <ArrowLeft className="size-4" />
+          <ArrowBackIcon size={16} />
           Back to Config
         </button>
 
@@ -1003,7 +1009,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
             title="Zoom to the founding couple"
           >
-            <Maximize2 className="size-4" />
+            <ExpandIcon size={16} />
             Zoom to Parents
           </button>
           <button
@@ -1012,7 +1018,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
             disabled={isGenerating}
             className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-medium transition-colors hover:bg-white/20 disabled:opacity-50"
           >
-            <RefreshCw className={`size-4 ${isGenerating ? "animate-spin" : ""}`} />
+            <RefreshIcon size={16} className={isGenerating ? "animate-spin" : ""} />
             Regenerate
           </button>
           <button

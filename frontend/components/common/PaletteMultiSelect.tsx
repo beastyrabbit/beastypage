@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, X, Check, Search, Palette } from 'lucide-react';
+import DownChevron from '@/components/ui/down-chevron';
+import XIcon from '@/components/ui/x-icon';
+import CheckedIcon from '@/components/ui/checked-icon';
+import MagnifierIcon from '@/components/ui/magnifier-icon';
+import PaintIcon from '@/components/ui/paint-icon';
 import { usePaletteOptions, type PaletteOption } from './usePaletteOptions';
 import type { PaletteId } from '@/lib/palettes';
 
@@ -152,7 +156,7 @@ export function PaletteMultiSelect({
         className={`flex min-h-[40px] w-full items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/70 px-3 py-2 text-left text-sm transition hover:border-border ${className}`}
       >
         <div className="flex flex-1 flex-wrap items-center gap-1.5">
-          <Palette className="size-4 text-muted-foreground" />
+          <PaintIcon size={16} className="text-muted-foreground" />
           {compact ? (
             <span className="text-foreground">{displayText}</span>
           ) : (
@@ -185,7 +189,7 @@ export function PaletteMultiSelect({
                             }}
                             className="cursor-pointer rounded-full hover:bg-primary/30"
                           >
-                            <X className="size-3" />
+                            <XIcon size={12} />
                           </span>
                         </span>
                       );
@@ -203,8 +207,9 @@ export function PaletteMultiSelect({
             </>
           )}
         </div>
-        <ChevronDown
-          className={`size-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        <DownChevron
+          size={16}
+          className={`shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -226,7 +231,7 @@ export function PaletteMultiSelect({
             {showSearch && (
               <div className="border-b border-border/30 p-2">
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <MagnifierIcon size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -255,7 +260,7 @@ export function PaletteMultiSelect({
                         : 'border-border bg-background'
                     }`}
                   >
-                    {includeClassic && <Check className="size-3" />}
+                    {includeClassic && <CheckedIcon size={12} />}
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-medium">Classic</div>
@@ -284,7 +289,7 @@ export function PaletteMultiSelect({
                         : 'border-border bg-background'
                   }`}
                 >
-                  {allSelected && <Check className="size-3" />}
+                  {allSelected && <CheckedIcon size={12} />}
                   {!allSelected && selectedCount > 0 && (
                     <div className="size-1.5 rounded-full bg-primary" />
                   )}
@@ -317,7 +322,7 @@ export function PaletteMultiSelect({
                           : 'border-border bg-background'
                       }`}
                     >
-                      {isSelected && <Check className="size-3" />}
+                      {isSelected && <CheckedIcon size={12} />}
                     </div>
                     <div className="flex-1 overflow-hidden">
                       <div className="flex items-center gap-2">

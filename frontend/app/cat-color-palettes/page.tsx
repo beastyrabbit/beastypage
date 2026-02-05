@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { Palette, Check, Download } from 'lucide-react';
+import ArrowBigDownDashIcon from '@/components/ui/arrow-big-down-dash-icon';
+import PaintIcon from '@/components/ui/paint-icon';
+import CheckedIcon from '@/components/ui/checked-icon';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PageHero } from '@/components/common/PageHero';
@@ -95,7 +97,7 @@ function PaletteDownload({ palette }: { palette: PaletteCategory }) {
       onClick={handleExport}
       className="flex h-7 items-center gap-1.5 rounded-md bg-primary/15 px-2.5 text-xs font-medium text-primary transition hover:bg-primary/25"
     >
-      <Download className="size-3" />
+      <ArrowBigDownDashIcon size={12} />
       ACO
     </button>
   );
@@ -147,7 +149,7 @@ function ColorCard({
       </div>
       {copied && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-          <Check className="size-6 text-white" />
+          <CheckedIcon size={24} className="text-white" />
         </div>
       )}
       {screen && (
@@ -179,7 +181,7 @@ function PaletteSection({
       <div className="flex items-start justify-between gap-4 px-6 py-4">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-bold">
-            <Palette className="size-5 text-primary" />
+            <PaintIcon size={20} className="text-primary" />
             {palette.label}
             <span className="text-sm font-normal text-muted-foreground">
               ({colors.length} colors)

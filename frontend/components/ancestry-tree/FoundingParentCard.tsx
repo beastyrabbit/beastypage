@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import Image from "next/image";
-import { RefreshCw, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import RefreshIcon from "@/components/ui/refresh-icon";
 import type { CatParams } from "@/lib/cat-v3/types";
 import type { CatName } from "@/lib/ancestry-tree/types";
 import { getParamsPreviewUrl } from "@/lib/ancestry-tree/utils";
@@ -71,7 +72,7 @@ export function FoundingParentCard({
         disabled={isLoading}
         className="flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-sm font-medium transition-colors hover:bg-white/20 disabled:opacity-50"
       >
-        <RefreshCw className={`size-4 ${isLoading ? "animate-spin" : ""}`} />
+        <RefreshIcon size={16} className={isLoading ? "animate-spin" : ""} />
         Reroll
       </button>
     </div>

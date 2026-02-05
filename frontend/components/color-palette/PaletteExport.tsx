@@ -2,7 +2,10 @@
 
 import { useCallback, useRef, useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Download, Loader2, ChevronDown, Check } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
+import DownChevron from "@/components/ui/down-chevron";
+import CheckedIcon from "@/components/ui/checked-icon";
 import { toast } from "sonner";
 import { track } from "@/lib/analytics";
 
@@ -413,7 +416,7 @@ export function PaletteExport({
               </>
             ) : (
               <>
-                <Download className="size-4" />
+                <ArrowBigDownDashIcon size={16} />
                 {selectedFormat.label}
               </>
             )}
@@ -425,7 +428,7 @@ export function PaletteExport({
             disabled={isProcessing || !hasColors}
             className="flex h-10 items-center justify-center rounded-r-lg border-l border-primary-foreground/20 bg-primary px-2 text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <ChevronDown className={`size-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
+            <DownChevron size={16} className={`transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
           </button>
         </div>
       </div>
@@ -447,8 +450,9 @@ export function PaletteExport({
               onClick={() => handleFormatSelect(format)}
               className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"
             >
-              <Check
-                className={`size-4 ${selectedFormat.id === format.id ? "text-primary" : "text-transparent"}`}
+              <CheckedIcon
+                size={16}
+                className={selectedFormat.id === format.id ? "text-primary" : "text-transparent"}
               />
               <span className={selectedFormat.id === format.id ? "font-medium text-foreground" : "text-muted-foreground"}>
                 {format.label}
