@@ -15,10 +15,19 @@ import {
   downscaleForPreview,
 } from "../utils/image.ts";
 import { config } from "../config.ts";
+import { generateOpenAPISpec } from "../openapi.ts";
 
 const startTime = Date.now();
+const openApiSpec = generateOpenAPISpec();
 
 export const routes = new Hono();
+
+// ---------------------------------------------------------------------------
+// GET /openapi.json
+// ---------------------------------------------------------------------------
+routes.get("/openapi.json", (c) => {
+  return c.json(openApiSpec);
+});
 
 // ---------------------------------------------------------------------------
 // GET /health

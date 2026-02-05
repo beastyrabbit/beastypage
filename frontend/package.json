@@ -17,6 +17,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@napi-rs/canvas": "^0.1.81",
+    "@scalar/nextjs-api-reference": "^0.9.18",
     "@tailwindcss/postcss": "4.1.18",
     "binpackingjs": "^3.0.2",
     "canvas-confetti": "^1.9.4",
