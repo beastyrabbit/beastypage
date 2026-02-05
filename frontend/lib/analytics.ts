@@ -152,21 +152,6 @@ type PaletteGeneratorExportedProps = {
   palette_count: number;
 };
 
-// Pixelator
-type PixelatorProcessedProps = {
-  mode: "preview" | "full";
-  step_count: number;
-  duration_ms: number;
-};
-
-type PixelatorExportedProps = {
-  format: string;
-};
-
-type PixelatorStepAddedProps = {
-  algorithm: string;
-};
-
 // Ancestry Tree
 type AncestryTreeCreatedProps = {
   method: "random" | "history";
@@ -295,13 +280,6 @@ type AnalyticsEventMap = {
   palette_color_copied: Record<string, never>;
   palette_generator_generated: PaletteGeneratorGeneratedProps;
   palette_generator_exported: PaletteGeneratorExportedProps;
-
-  // Pixelator
-  pixelator_image_uploaded: Record<string, never>;
-  pixelator_processed: PixelatorProcessedProps;
-  pixelator_exported: PixelatorExportedProps;
-  pixelator_step_added: PixelatorStepAddedProps;
-  pixelator_grid_detected: Record<string, never>;
 
   // Ancestry Tree
   ancestry_tree_created: AncestryTreeCreatedProps;
