@@ -8,6 +8,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
 import { toast } from "sonner";
 
 import { ImageUploader } from "@/components/color-palette/ImageUploader";
@@ -269,9 +270,21 @@ export function PixelatorClient() {
 
       if (!over) return;
 
+      // Dropping from toolbox into pipeline
       const opType = active.data.current?.operationType as OperationType | undefined;
       if (opType && over.id === "pipeline-droppable") {
         addStep(opType);
+        return;
+      }
+
+      // Reordering within pipeline
+      if (active.id !== over.id) {
+        setState((prev) => {
+          const oldIndex = prev.steps.findIndex((s) => s.id === active.id);
+          const newIndex = prev.steps.findIndex((s) => s.id === over.id);
+          if (oldIndex === -1 || newIndex === -1) return prev;
+          return { ...prev, steps: arrayMove(prev.steps, oldIndex, newIndex) };
+        });
       }
     },
     [addStep],
