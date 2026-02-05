@@ -4,7 +4,10 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AlertTriangle, CheckCircle2, ExternalLink, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
+import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
+import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import { track } from "@/lib/analytics";
 import { AdoptionMetadataPanel, AdoptionMetadata } from "@/components/adoption/AdoptionMetadataPanel";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
@@ -304,14 +307,14 @@ export function AdoptionGeneratorClient() {
       case "saved":
         return (
           <span className="inline-flex items-center gap-2 text-sm text-emerald-200">
-            <CheckCircle2 className="size-4" />
+            <FilledCheckedIcon size={16} />
             <span className="inline-flex items-center gap-1">
               Saved to history
               {lastSavedToken ? (
                 <>
                   :{" "}
                   <Link href={`/adoption/${lastSavedToken}`} className="inline-flex items-center gap-1 underline">
-                    view batch <ExternalLink className="size-3" />
+                    view batch <ExternalLinkIcon size={12} />
                   </Link>
                 </>
               ) : null}
@@ -324,7 +327,7 @@ export function AdoptionGeneratorClient() {
       case "error":
         return (
           <span className="inline-flex items-center gap-2 text-sm text-red-200">
-            <AlertTriangle className="size-4" /> Failed to save batch. Try again after regenerating.
+            <TriangleAlertIcon size={16} /> Failed to save batch. Try again after regenerating.
           </span>
         );
       default:

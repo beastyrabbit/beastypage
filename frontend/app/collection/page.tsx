@@ -7,7 +7,10 @@ import { api } from "@/convex/_generated/api";
 import type { CollectionEntry } from "@/convex/collection";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
-import { ExternalLink, Search, Sparkles, X } from "lucide-react";
+import ExternalLinkIcon from "@/components/ui/external-link-icon";
+import MagnifierIcon from "@/components/ui/magnifier-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
+import XIcon from "@/components/ui/x-icon";
 
 export default function CollectionPage() {
   const entries = useQuery(api.collection.list, {});
@@ -53,7 +56,7 @@ export default function CollectionPage() {
     return (
       <main className="flex min-h-screen items-center justify-center p-10">
         <div className="glass-card flex flex-col items-center gap-3 px-6 py-8 text-muted-foreground">
-          <Sparkles className="size-6 animate-spin" />
+          <SparklesIcon size={24} className="animate-spin" />
           <p>Loading gallery…</p>
         </div>
       </main>
@@ -88,7 +91,7 @@ export default function CollectionPage() {
 
       <section className="glass-card grid gap-4 p-6 sticky top-4 z-30 backdrop-blur-xl border-white/20 shadow-2xl">
         <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/40 px-4 py-3 transition-all focus-within:border-sky-500/50 focus-within:bg-black/60 focus-within:shadow-[0_0_20px_rgba(14,165,233,0.1)]">
-          <Search className="size-5 text-muted-foreground" />
+          <MagnifierIcon size={20} className="text-muted-foreground" />
           <input
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
             placeholder="Search by artist, animal, or link..."
@@ -138,7 +141,7 @@ export default function CollectionPage() {
                         className="inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground transition-all hover:bg-white/10 hover:text-white hover:border-white/20"
                         onClick={(event) => event.stopPropagation()}
                       >
-                        Visit artist <ExternalLink className="size-3" />
+                        Visit artist <ExternalLinkIcon size={12} />
                       </Link>
                     )}
                   </div>
@@ -165,7 +168,7 @@ export default function CollectionPage() {
               onClick={() => setActiveEntry(null)}
               aria-label="Close"
             >
-              <X className="size-5" />
+              <XIcon size={20} />
             </button>
             <div
               className="grid gap-6 p-6 md:grid-cols-[1.4fr,1fr]"
@@ -195,7 +198,7 @@ export default function CollectionPage() {
                       target="_blank"
                       className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-bold text-primary-foreground transition-all hover:opacity-90 hover:shadow-lg hover:shadow-primary/20 hover:-translate-y-0.5"
                     >
-                      Open full image <ExternalLink className="size-3" />
+                      Open full image <ExternalLinkIcon size={12} />
                     </a>
                   )}
                   {activeEntry.link && (
@@ -204,7 +207,7 @@ export default function CollectionPage() {
                       target="_blank"
                       className="inline-flex items-center gap-2 rounded-full border border-white/10 px-5 py-2.5 font-bold text-foreground transition-all hover:bg-white/10 hover:text-white hover:-translate-y-0.5"
                     >
-                      Visit artist <ExternalLink className="size-3" />
+                      Visit artist <ExternalLinkIcon size={12} />
                     </Link>
                   )}
                 </div>

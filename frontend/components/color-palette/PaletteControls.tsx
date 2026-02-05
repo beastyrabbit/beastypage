@@ -1,6 +1,8 @@
 "use client";
 
-import { Loader2, Sparkles, RotateCcw } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import SparklesIcon from "@/components/ui/sparkles-icon";
+import RefreshIcon from "@/components/ui/refresh-icon";
 
 interface PaletteControlsProps {
   colorCount: number;
@@ -66,7 +68,7 @@ export function PaletteControls({
           className="flex items-center gap-2 rounded-xl border border-border/50 px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:border-foreground/30 hover:text-foreground"
           disabled={isProcessing}
         >
-          <RotateCcw className="size-4" />
+          <RefreshIcon size={16} />
           <span className="hidden sm:inline">Reset</span>
         </button>
         <button
@@ -81,7 +83,7 @@ export function PaletteControls({
             </>
           ) : (
             <>
-              <Sparkles className="size-4" />
+              <SparklesIcon size={16} />
               {hasColors ? "Re-extract" : "Extract Colors"}
             </>
           )}

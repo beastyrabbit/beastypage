@@ -2,7 +2,13 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import Image from "next/image";
-import { ChevronDown, Copy, Download, Loader2, Minus, Plus, RefreshCw, Sparkles, X } from "lucide-react";
+import { Loader2, Minus, Plus } from "lucide-react";
+import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
+import DownChevron from "@/components/ui/down-chevron";
+import CopyIcon from "@/components/ui/copy-icon";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
+import XIcon from "@/components/ui/x-icon";
 import { useMutation } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
@@ -883,8 +889,9 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                               <span className="text-sm font-semibold text-white">{sub.title}</span>
                               <span className="text-xs text-neutral-300/80">Current: {sub.summary}</span>
                             </div>
-                            <ChevronDown
-                              className={cn("size-4 text-neutral-300 transition-transform", subExpanded ? "rotate-180" : "rotate-0")}
+                            <DownChevron
+                              size={16}
+                              className={cn("text-neutral-300 transition-transform", subExpanded ? "rotate-180" : "rotate-0")}
                             />
                           </button>
                           {subExpanded && sub.content}
@@ -918,8 +925,9 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                           </span>
                         </div>
                       </div>
-                      <ChevronDown
-                        className={cn("size-4 text-neutral-300 transition-transform", expanded ? "rotate-180" : "rotate-0")}
+                      <DownChevron
+                        size={16}
+                        className={cn("text-neutral-300 transition-transform", expanded ? "rotate-180" : "rotate-0")}
                       />
                     </button>
                     {currentLayers.length > 1 && (
@@ -928,7 +936,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                         onClick={() => handleRemoveLayer(layerIndex)}
                         className="inline-flex items-center gap-1 rounded-full border border-red-500/50 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-200 transition hover:bg-red-500/20"
                       >
-                        <X className="size-3" /> Remove
+                        <XIcon size={12} /> Remove
                       </button>
                     )}
                   </div>
@@ -1178,9 +1186,10 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                   <span className="text-sm font-semibold text-white">{group.title}</span>
                   <span className="text-xs text-neutral-300/80">Current: {group.summary}</span>
                 </div>
-                <ChevronDown
+                <DownChevron
+                  size={16}
                   className={cn(
-                    "size-4 text-neutral-300 transition-transform",
+                    "text-neutral-300 transition-transform",
                     expanded ? "rotate-180" : "rotate-0"
                   )}
                 />
@@ -1320,9 +1329,10 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                     <span className="text-sm font-semibold text-white">{group.title}</span>
                     <span className="text-xs text-neutral-300/80">Current: {group.summary}</span>
                   </div>
-                  <ChevronDown
+                  <DownChevron
+                    size={16}
                     className={cn(
-                      "size-4 text-neutral-300 transition-transform",
+                      "text-neutral-300 transition-transform",
                       expanded ? "rotate-180" : "rotate-0"
                     )}
                   />
@@ -1452,9 +1462,10 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                   <span className="text-sm font-semibold text-white">{group.label}</span>
                   <span className="text-xs text-neutral-300/80">{summary}</span>
                 </div>
-                <ChevronDown
+                <DownChevron
+                  size={16}
                   className={cn(
-                    "size-4 text-neutral-300 transition-transform",
+                    "text-neutral-300 transition-transform",
                     expanded ? "rotate-180" : "rotate-0"
                   )}
                 />
@@ -1535,9 +1546,10 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                   <span className="text-sm font-semibold text-white">{group.label}</span>
                   <span className="text-xs text-neutral-300/80">{summary}</span>
                 </div>
-                <ChevronDown
+                <DownChevron
+                  size={16}
                   className={cn(
-                    "size-4 text-neutral-300 transition-transform",
+                    "text-neutral-300 transition-transform",
                     expanded ? "rotate-180" : "rotate-0"
                   )}
                 />
@@ -1864,7 +1876,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   if (optionsError || rendererError) {
     return (
       <div className="mx-auto max-w-xl rounded-3xl border border-red-500/40 bg-red-500/10 px-6 py-12 text-center text-sm text-red-100">
-        <Sparkles className="mx-auto mb-3 size-6" />
+        <SparklesIcon className="mx-auto mb-3" />
         <p>
           {optionsError ?? rendererError ?? "Something went wrong while loading the builder. Please refresh and try again."}
         </p>
@@ -1953,7 +1965,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 disabled={shareBusy || isShareLocked}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Copy className="size-4" />
+                <CopyIcon size={16} />
                 {shareBusy ? "Preparing link…" : isShareLocked ? "Loaded share (read-only)" : "Save & Copy Link"}
               </button>
               <button
@@ -1962,7 +1974,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 disabled={!previewUrl}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-amber-300/70 hover:text-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Download className="size-4" />
+                <ArrowBigDownDashIcon size={16} />
                 Download PNG
               </button>
               <div className="flex flex-wrap gap-2">
@@ -1972,7 +1984,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                   disabled={randomizing}
                   className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm font-semibold text-neutral-200 transition hover:border-amber-300/70 hover:text-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <RefreshCw className={cn("size-4", randomizing && "animate-spin")} />
+                  <RefreshIcon size={16} className={cn(randomizing && "animate-spin")} />
                   Randomize
                 </button>
                 <button
@@ -1993,7 +2005,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                   }}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-amber-300/70 hover:text-amber-100"
                 >
-                  <Sparkles className="size-4" />
+                  <SparklesIcon size={16} />
                   Open legacy builder
                 </button>
               )}

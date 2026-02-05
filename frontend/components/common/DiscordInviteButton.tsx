@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useMutation } from "convex/react";
-import { CheckCircle2, Loader2, RefreshCcw, ShieldQuestion, X } from "lucide-react";
+import { Loader2, ShieldQuestion } from "lucide-react";
+import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import XIcon from "@/components/ui/x-icon";
 
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
@@ -331,7 +334,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
               className="absolute right-5 top-5 rounded-full bg-muted/60 p-1 text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
               aria-label="Close dialog"
             >
-              <X className="h-4 w-4" />
+              <XIcon size={16} />
             </button>
 
             <div className="space-y-5">
@@ -366,7 +369,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                       disabled={cooldownActive}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      <RefreshCcw className="h-3.5 w-3.5" />
+                      <RefreshIcon size={14} />
                       {cooldownActive && cooldownLabel ? `Try again in ${cooldownLabel}` : "Try another challenge"}
                     </button>
                   </div>
@@ -412,7 +415,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                         disabled={cooldownActive}
                         className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <RefreshCcw className="h-3.5 w-3.5" />
+                        <RefreshIcon size={14} />
                         {cooldownActive && cooldownLabel ? `Wait ${cooldownLabel}` : "New challenge"}
                       </button>
                     </div>
@@ -422,7 +425,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                 {status === "success" && inviteUrl ? (
                   <div className="space-y-4">
                     <div className="flex items-start gap-3 rounded-2xl border border-primary/40 bg-primary/12 px-4 py-3 text-sm text-foreground shadow-inner">
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <FilledCheckedIcon size={16} className="text-primary" />
                       <div>
                         <p className="font-semibold">Invite unlocked</p>
                         <p className="text-xs text-muted-foreground">Open the invite in a new tab or copy it for later.</p>

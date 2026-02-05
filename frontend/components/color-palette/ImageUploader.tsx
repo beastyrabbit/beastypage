@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Upload, Link as LinkIcon, Loader2, ImageIcon, Shuffle } from "lucide-react";
+import { Loader2, ImageIcon, Shuffle } from "lucide-react";
+import ArrowBigUpDashIcon from "@/components/ui/arrow-big-up-dash-icon";
+import LinkAnimatedIcon from "@/components/ui/link-icon";
 import { toast } from "sonner";
 
 import {
@@ -145,7 +147,7 @@ export function ImageUploader({
               }`}
             >
               {isDragging ? (
-                <Upload className="size-10 text-primary" />
+                <ArrowBigUpDashIcon size={40} className="text-primary" />
               ) : (
                 <ImageIcon className="size-10 text-primary" />
               )}
@@ -175,7 +177,7 @@ export function ImageUploader({
       <div className="glass-card p-6">
         <form onSubmit={handleUrlSubmit} className="flex flex-col gap-4 sm:flex-row">
           <div className="flex flex-1 items-center gap-3 rounded-xl border border-border/50 bg-background/50 px-4 py-3">
-            <LinkIcon className="size-5 text-muted-foreground" />
+            <LinkAnimatedIcon size={20} className="text-muted-foreground" />
             <input
               type="url"
               placeholder="Or paste an image URL..."

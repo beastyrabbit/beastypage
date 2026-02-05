@@ -3,7 +3,12 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { X, Save, Loader2, Copy, Check, Lock, ExternalLink } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
+import XIcon from "@/components/ui/x-icon";
+import CopyIcon from "@/components/ui/copy-icon";
+import CheckedIcon from "@/components/ui/checked-icon";
+import LockIcon from "@/components/ui/lock-icon";
+import ExternalLinkIcon from "@/components/ui/external-link-icon";
 
 interface SaveTreeDialogProps {
   currentName: string;
@@ -133,12 +138,12 @@ export function SaveTreeDialog({
             onClick={onClose}
             className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
           >
-            <X className="size-5" />
+            <XIcon size={20} />
           </button>
 
           <div className="text-center space-y-4">
             <div className="mx-auto w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
-              <Check className="size-6 text-emerald-400" />
+              <CheckedIcon className="text-emerald-400" />
             </div>
             <h2 className="text-xl font-bold">Tree Saved!</h2>
             <p className="text-sm text-muted-foreground">
@@ -159,11 +164,11 @@ export function SaveTreeDialog({
                   title={copyError ? "Failed to copy" : "Copy URL"}
                 >
                   {copied ? (
-                    <Check className="size-4 text-emerald-400" />
+                    <CheckedIcon size={16} className="text-emerald-400" />
                   ) : copyError ? (
-                    <X className="size-4" />
+                    <XIcon size={16} />
                   ) : (
-                    <Copy className="size-4" />
+                    <CopyIcon size={16} />
                   )}
                 </button>
                 <button
@@ -172,7 +177,7 @@ export function SaveTreeDialog({
                   className="shrink-0 rounded-md p-2 transition-colors hover:bg-white/10"
                   title="Open in new tab"
                 >
-                  <ExternalLink className="size-4" />
+                  <ExternalLinkIcon size={16} />
                 </button>
               </div>
             </div>
@@ -206,7 +211,7 @@ export function SaveTreeDialog({
           onClick={onClose}
           className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
         >
-          <X className="size-5" />
+          <XIcon size={20} />
         </button>
 
         <h2 className="mb-6 text-xl font-bold">Save Ancestry Tree</h2>
@@ -245,7 +250,7 @@ export function SaveTreeDialog({
             // Tree exists and has password - need to enter it to overwrite
             <div>
               <label htmlFor="password" className="flex items-center gap-2 text-sm font-medium mb-1">
-                <Lock className="size-3.5 text-amber-400" />
+                <LockIcon size={14} className="text-amber-400" />
                 Password to Overwrite
                 <span className="text-red-400">*</span>
               </label>
@@ -265,7 +270,7 @@ export function SaveTreeDialog({
             // New tree or unprotected tree - offer to set a password
             <div>
               <label htmlFor="newPassword" className="flex items-center gap-2 text-sm font-medium mb-1">
-                <Lock className="size-3.5" />
+                <LockIcon size={14} />
                 Set Password <span className="text-muted-foreground">(optional)</span>
               </label>
               <input

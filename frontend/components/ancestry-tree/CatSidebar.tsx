@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import Image from "next/image";
-import { X, Dna, GitBranch, SkipForward, Square } from "lucide-react";
+import { Dna, GitBranch, SkipForward, Square } from "lucide-react";
+import XIcon from "@/components/ui/x-icon";
 import { cn } from "@/lib/utils";
 import type { AncestryTreeCat } from "@/lib/ancestry-tree/types";
 import { getCatPreviewUrl, MAX_SPRITE_POSE } from "@/lib/ancestry-tree/utils";
@@ -64,7 +65,7 @@ export function CatSidebar({
             onClick={onClose}
             className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
           >
-            <X className="size-5" />
+            <XIcon size={20} />
           </button>
         </div>
 

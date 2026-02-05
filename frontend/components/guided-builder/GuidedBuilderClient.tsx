@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Download, Loader2, RefreshCw, Share2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
 
 import { api } from "@/convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -1692,7 +1695,7 @@ export function GuidedBuilderClient() {
               void handleShare({ copy: true });
             }}
           >
-            <Share2 className="size-4" />
+            <SendHorizontalIcon size={16} />
             Share timeline
           </button>
           <button
@@ -1700,7 +1703,7 @@ export function GuidedBuilderClient() {
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:border-amber-400/60 hover:text-amber-100"
             onClick={handleReset}
           >
-            <RefreshCw className="size-4" />
+            <RefreshIcon size={16} />
             Start over
           </button>
         </footer>
@@ -1737,7 +1740,7 @@ export function GuidedBuilderClient() {
               onClick={handleDownload}
               className="flex items-center justify-center gap-2 rounded-xl border border-amber-400/60 bg-amber-500/20 px-4 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/25"
             >
-              <Download className="size-4" />
+              <ArrowBigDownDashIcon size={16} />
               Download sprite
             </button>
           </div>

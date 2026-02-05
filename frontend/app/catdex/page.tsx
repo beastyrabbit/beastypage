@@ -10,7 +10,9 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
-import { Search, Sparkles, X } from "lucide-react";
+import MagnifierIcon from "@/components/ui/magnifier-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
+import XIcon from "@/components/ui/x-icon";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
 import Image from "next/image";
 
@@ -288,7 +290,7 @@ export default function CatdexPage() {
     return (
       <main className="flex min-h-screen items-center justify-center p-10">
         <div className="glass-card flex flex-col items-center gap-3 px-6 py-8 text-muted-foreground">
-          <Sparkles className="size-6 animate-spin" />
+          <SparklesIcon size={24} className="animate-spin" />
           <p>Loading Catdex…</p>
         </div>
       </main>
@@ -318,7 +320,7 @@ export default function CatdexPage() {
       <section className="glass-card grid gap-4 p-6">
         <div className="grid gap-4 lg:grid-cols-[1.2fr,repeat(3,minmax(0,1fr))]">
           <label className="flex items-center gap-3 rounded-xl border border-border bg-background px-3 py-2">
-            <Search className="size-4 text-muted-foreground" />
+            <MagnifierIcon size={16} className="text-muted-foreground" />
             <input
               className="flex-1 bg-transparent text-sm outline-none"
               placeholder="Search by name, owner, or number (ranges like 10-40)"
@@ -516,7 +518,7 @@ export default function CatdexPage() {
               onClick={handleCloseDrawer}
               aria-label="Close"
             >
-              <X className="size-4" />
+              <XIcon size={16} />
             </button>
             <div className="grid gap-6 p-6 md:grid-cols-[1.1fr,1fr]">
               <ProgressiveImage
@@ -867,7 +869,7 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
             onClick={onClose}
             aria-label="Close"
           >
-            <X className="size-4" />
+            <XIcon size={16} />
           </button>
         </header>
         <form className="grid gap-4 px-6 py-6" onSubmit={handleSubmit}>
@@ -1162,7 +1164,7 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
             onClick={onClose}
             aria-label="Close"
           >
-            <X className="size-4" />
+            <XIcon size={16} />
           </button>
         </header>
         <form className="grid gap-4 px-6 py-6" onSubmit={handleMassSubmit}>

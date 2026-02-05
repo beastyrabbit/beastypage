@@ -1,6 +1,7 @@
 "use client";
 
-import { Palette, Sparkles } from "lucide-react";
+import PaintIcon from "@/components/ui/paint-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
 
 interface PaletteSlidersProps {
   topColorCount: number;
@@ -22,7 +23,7 @@ export function PaletteSliders({
       {/* Top Colors slider */}
       <div className="flex flex-col gap-2">
         <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <Sparkles className="size-3.5" />
+          <SparklesIcon size={14} />
           Top Colors: {topColorCount}
         </label>
         <input
@@ -39,7 +40,7 @@ export function PaletteSliders({
       {/* Family Colors slider */}
       <div className="flex flex-col gap-2">
         <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <Palette className="size-3.5" />
+          <PaintIcon size={14} />
           Family Colors: {familyColorCount}
         </label>
         <input

@@ -1,6 +1,7 @@
 "use client";
 
-import { Sparkles, Sword } from "lucide-react";
+import { Sword } from "lucide-react";
+import SparklesIcon from "@/components/ui/sparkles-icon";
 import type { OffspringOptions } from "@/lib/ancestry-tree/types";
 
 interface OffspringOptionsPanelProps {
@@ -38,14 +39,14 @@ export function OffspringOptionsPanel({ options, onChange }: OffspringOptionsPan
   return (
     <div className="glass-card p-4 space-y-4">
       <h3 className="font-semibold flex items-center gap-2">
-        <Sparkles className="size-4 text-amber-500" />
+        <SparklesIcon size={16} className="text-amber-500" />
         Offspring Options
       </h3>
 
       {/* Accessory Options */}
       <div className="space-y-2">
         <div className="flex items-center gap-2 text-sm">
-          <Sparkles className="size-3.5 text-purple-400" />
+          <SparklesIcon size={14} className="text-purple-400" />
           <span className="text-muted-foreground">Accessory Chance</span>
         </div>
         <div className="flex flex-wrap gap-1">

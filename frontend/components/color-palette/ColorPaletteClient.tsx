@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { track } from "@/lib/analytics";
-import { RotateCcw, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import RefreshIcon from "@/components/ui/refresh-icon";
 
 import type { ExtractedColor, PaletteState, RGB } from "@/lib/color-extraction/types";
 import { extractColors, extractFamilyColors } from "@/lib/color-extraction/kmeans";
@@ -389,7 +390,7 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
                 className="flex items-center gap-2 rounded-xl border border-border/50 px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:border-foreground/30 hover:text-foreground"
                 disabled={state.isProcessing || isExternalLoading}
               >
-                <RotateCcw className="size-4" />
+                <RefreshIcon size={16} />
                 <span className="hidden sm:inline">Reset</span>
               </button>
 

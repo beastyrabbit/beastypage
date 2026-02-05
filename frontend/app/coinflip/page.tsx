@@ -6,7 +6,9 @@ import { api } from "@/convex/_generated/api";
 import type { ScoreRecord } from "@/convex/coinflipper";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
-import { RotateCcw, Sparkles, Trophy } from "lucide-react";
+import { Trophy } from "lucide-react";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
 import Link from "next/link";
 
 const FLIP_DURATION_MS = 1200;
@@ -176,7 +178,7 @@ export default function CoinflipPage() {
         <div className="glass-card flex flex-col gap-6 p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 text-foreground">
-              <Sparkles className="size-5" />
+              <SparklesIcon size={20} />
               <span className="text-lg font-semibold">Current streak</span>
             </div>
             <span className="rounded-full bg-primary px-4 py-1 text-lg font-bold text-primary-foreground">
@@ -223,7 +225,7 @@ export default function CoinflipPage() {
                 className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-foreground/10"
                 onClick={resetRun}
               >
-                <RotateCcw className="size-4" /> Try again
+                <RefreshIcon size={16} /> Try again
               </button>
             )}
           </div>

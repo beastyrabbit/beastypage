@@ -5,7 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Loader2, ArrowUpRight, Search, SlidersHorizontal, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ArrowUpRight, SlidersHorizontal, ChevronLeft } from "lucide-react";
+import MagnifierIcon from "@/components/ui/magnifier-icon";
+import XIcon from "@/components/ui/x-icon";
+import RightChevron from "@/components/ui/right-chevron";
 import { encodeCatShare } from "@/lib/catShare";
 import { HistoryAncestryTreeCard } from "./HistoryAncestryTreeCard";
 import { track } from "@/lib/analytics";
@@ -270,7 +273,7 @@ export function HistoryClient() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <label className="flex w-full flex-col gap-1 text-xs uppercase tracking-wide text-muted-foreground/70 md:max-w-md">
             <span className="flex items-center gap-2 text-[11px]">
-              <Search className="size-3" /> Search
+              <MagnifierIcon size={12} /> Search
             </span>
             <div className="relative">
               <input
@@ -348,7 +351,7 @@ export function HistoryClient() {
               aria-label="Close preview"
               className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
             >
-              <X className="size-4" />
+              <XIcon size={16} />
             </button>
             <div className="flex flex-col items-center gap-6">
               <h2 className="text-xl font-semibold text-foreground">{focusedPreview.title}</h2>
@@ -504,7 +507,7 @@ function HistoryAdoptionCard({ item, onPreview }: HistoryAdoptionCardProps) {
             aria-label="Next cat"
             className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-black/60 p-2 text-white transition hover:bg-black/80"
           >
-            <ChevronRight className="size-5" />
+            <RightChevron size={20} />
           </button>
         )}
         <button

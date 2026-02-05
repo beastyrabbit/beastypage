@@ -1,5 +1,6 @@
 "use client";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import { useQuery } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
@@ -178,7 +179,7 @@ export function VisualBuilderLoader({ slug }: VisualBuilderLoaderProps) {
   if (!slug) {
     return (
       <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center gap-3 px-6 text-sm text-muted-foreground">
-        <AlertTriangle className="size-6 text-red-400" />
+        <TriangleAlertIcon className="text-red-400" />
         <p>Missing share identifier.</p>
       </div>
     );
@@ -196,7 +197,7 @@ export function VisualBuilderLoader({ slug }: VisualBuilderLoaderProps) {
   if (!record) {
     return (
       <div className="mx-auto flex min-h-[60vh] max-w-lg flex-col items-center justify-center gap-3 px-6 text-sm text-muted-foreground">
-        <AlertTriangle className="size-6 text-red-400" />
+        <TriangleAlertIcon className="text-red-400" />
         <p>We couldn&apos;t find a cat with that link.</p>
       </div>
     );

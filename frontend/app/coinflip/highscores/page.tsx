@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { ArrowLeft, Trophy } from "lucide-react";
+import { Trophy } from "lucide-react";
+import ArrowBackIcon from "@/components/ui/arrow-back-icon";
 
 const MAX_RESULTS = 200;
 
@@ -23,7 +24,7 @@ export default function CoinflipHighscoresPage() {
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 py-12">
       <header className="flex flex-col gap-4">
         <Link href="/coinflip" className="flex items-center gap-2 text-sm font-medium text-primary hover:underline">
-          <ArrowLeft className="size-4" /> Back to game
+          <ArrowBackIcon size={16} /> Back to game
         </Link>
         <div>
           <span className="section-eyebrow">Coinflip Challenge</span>

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Wheel } from "spin-wheel";
 import confetti from "canvas-confetti";
-import { RefreshCw, Sparkles } from "lucide-react";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
 import { useMutation, useQuery } from "convex/react";
@@ -379,7 +380,7 @@ export function ClassicWheelClient() {
                 : "hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_18px_40px_rgba(253,230,138,0.45)] hover:from-amber-300/70 hover:to-amber-400/90"
             )}
           >
-            <Sparkles className="size-4" />
+            <SparklesIcon size={16} />
             {isSpinning ? "Spinning…" : "Spin the Wheel"}
           </button>
           <button
@@ -441,7 +442,7 @@ export function ClassicWheelClient() {
                   )}
                 >
                   <span>{prize.name}</span>
-                  <RefreshCw className="size-4" />
+                  <RefreshIcon size={16} />
                 </button>
               ))}
             </div>
@@ -460,7 +461,7 @@ export function ClassicWheelClient() {
               Close
             </button>
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-gradient-to-br from-amber-200/30 to-amber-500/40 shadow-[0_12px_30px_rgba(253,230,138,0.35)]">
-              <Sparkles className="size-7" style={{ color: winningPrize.color }} />
+              <SparklesIcon size={28} color={winningPrize.color} />
             </div>
             {wasForced && (
               <p className="mt-4 text-xs uppercase tracking-wide text-orange-300/80">Cheated spin</p>

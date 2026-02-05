@@ -7,7 +7,9 @@ import type { Id } from "@/convex/_generated/dataModel";
 import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { renderCatV3 } from "@/lib/cat-v3/api";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
-import { Loader2, Trophy, ClipboardCopy, ExternalLink, X } from "lucide-react";
+import { Loader2, Trophy, ClipboardCopy } from "lucide-react";
+import ExternalLinkIcon from "@/components/ui/external-link-icon";
+import XIcon from "@/components/ui/x-icon";
 import { track } from "@/lib/analytics";
 import { createCatShare, encodeCatShare } from "@/lib/catShare";
 
@@ -162,7 +164,7 @@ function CatCard({
           onClick={() => onInspect(cat)}
           className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-border/40 bg-background/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary/50 hover:text-primary"
         >
-          <ExternalLink className="size-3" /> Inspect
+          <ExternalLinkIcon size={12} /> Inspect
         </button>
         {preview.loading ? (
           <Loader2 className="size-6 animate-spin text-primary" />
@@ -532,7 +534,7 @@ export default function PerfectCatFinderPage() {
               onClick={() => setSelectedCat(null)}
               className="absolute right-3 top-3 rounded-full border border-border/40 bg-background/80 p-1 text-muted-foreground transition hover:text-foreground"
             >
-              <X className="size-4" />
+              <XIcon size={16} />
             </button>
             <div className="flex flex-col gap-4">
               <div className="text-sm uppercase tracking-[0.3em] text-muted-foreground">Top contender</div>
@@ -574,7 +576,7 @@ export default function PerfectCatFinderPage() {
                   onClick={() => { void handleOpenInBuilder(selectedCat); }}
                   className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
                 >
-                  <ExternalLink className="size-4" /> Open in visual builder
+                  <ExternalLinkIcon size={16} /> Open in visual builder
                 </button>
               </div>
             </div>
