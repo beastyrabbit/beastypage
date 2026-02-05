@@ -6,11 +6,14 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>&copy; {new Date().getFullYear()} Cat Gacha. Crafted with Convex, Next.js, and lots of cats.</p>
         <div className="flex flex-wrap items-center gap-4">
-          <Link href="https://github.com/BeastyTwitch" target="_blank" className="hover:text-foreground">
+          <Link href="https://github.com/BeastyTwitch" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             GitHub
           </Link>
-          <Link href="https://twitch.tv/BeastyRabbit" target="_blank" className="hover:text-foreground">
+          <Link href="https://twitch.tv/BeastyRabbit" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
             Twitch
+          </Link>
+          <Link href="https://github.com/beastyrabbit/beastypage/issues/new" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
+            Report Issue
           </Link>
         </div>
       </div>
