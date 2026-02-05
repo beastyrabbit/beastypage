@@ -1751,6 +1751,7 @@ export function SingleCatPlusClient({
         showToast("Settings loaded from URL");
       } catch (error) {
         console.error("Failed to autoload variant settings", error);
+        showToast("Failed to load settings from URL");
       }
     })();
   }, [variantSlug, applyVariantConfig, showToast]);

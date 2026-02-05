@@ -149,7 +149,7 @@ export function VariantBar({
       showToast("Variant imported");
     } catch (error) {
       console.error("handleImport", error);
-      showToast("Import failed");
+      showToast(error instanceof Error ? error.message : "Import failed");
     } finally {
       setImporting(false);
     }

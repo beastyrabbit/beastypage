@@ -221,8 +221,8 @@ export function loadVariantStore(): VariantStore {
         return parsed as VariantStore;
       }
     }
-  } catch {
-    // corrupted — fall through
+  } catch (error) {
+    console.error("Failed to load variant store from localStorage", error);
   }
 
   // Migrate from old timing key if present
@@ -244,8 +244,8 @@ export function loadVariantStore(): VariantStore {
       localStorage.removeItem(OLD_TIMING_KEY);
       return store;
     }
-  } catch {
-    // migration failed — fresh start
+  } catch (error) {
+    console.error("Failed to migrate v1 timing config to variant store", error);
   }
 
   return { activeId: null, variants: [] };
@@ -255,8 +255,8 @@ export function saveVariantStore(store: VariantStore): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(VARIANT_STORE_KEY, JSON.stringify(store));
-  } catch {
-    // quota exceeded or similar
+  } catch (error) {
+    console.error("Failed to persist variant store to localStorage", error);
   }
 }
 
