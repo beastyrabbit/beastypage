@@ -5,10 +5,10 @@ set -eu
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT="$SCRIPT_DIR/../lib/dash/version.ts"
 
-VERSION="$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")"
+VERSION="${APP_VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")}"
 
 cat > "$OUT" <<EOF
-export const APP_VERSION = "$VERSION";
+export const APP_VERSION: string = "$VERSION";
 EOF
 
 echo "Wrote APP_VERSION=$VERSION to lib/dash/version.ts"
