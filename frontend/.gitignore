@@ -30,5 +30,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # IntelliJ based IDEs
 .idea
 
+# temporary test data
+tmp/
+
 # Finder (MacOS) folder config
 .DS_Store

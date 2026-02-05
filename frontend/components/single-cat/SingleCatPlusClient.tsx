@@ -47,8 +47,16 @@ import {
   getPresetValues,
   isParamTimingKey,
   stepCountsToMetrics,
-  usePersistentTimingConfig,
 } from "../../utils/spinTiming";
+import {
+  usePageVariants,
+  parseConvexPayload,
+  settingsEqual,
+  DEFAULT_VARIANT_SETTINGS,
+  type PageVariantSettings,
+  type PageVariant,
+} from "../../utils/pageVariants";
+import { VariantBar } from "./VariantBar";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
 // @ts-ignore -- legacy JS module without types.
@@ -131,17 +139,6 @@ interface TimingSnapshot {
 
 type FetchPriority = "high" | "low" | "auto";
 
-type SettingsResult = {
-  slug: string;
-  autoUrl: string;
-  updated: boolean;
-};
-
-type SavedSettingsPayload = {
-  v: number;
-  timing: SpinTimingConfig;
-};
-
 const MAX_LAYER_VARIATIONS = 12;
 const MAX_SPINNY_VARIATIONS = Number.MAX_SAFE_INTEGER;
 const MAX_SPINNY_LAYER_VARIATIONS = Number.MAX_SAFE_INTEGER;
@@ -150,15 +147,6 @@ const DEFAULT_SPRITE_NUMBER = 8;
 const PLACEHOLDER_COLOUR = "GINGER";
 const GLOBAL_PRESETS: Array<keyof TimingPresetSet> = ["slow", "normal", "fast"];
 const SUBSET_LIMIT = 20;
-const SETTINGS_VERSION = 1;
-
-function clampPauseMs(value: unknown, fallback: number): number {
-  const num = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  const clamped = Math.round(num);
-  return Math.min(10000, Math.max(1000, clamped));
-}
-
 interface LayerRange {
   min: number;
   max: number;
@@ -1376,7 +1364,7 @@ type SingleCatPlusClientProps = {
   defaultScarRange?: LayerRange;
   defaultTortieRange?: LayerRange;
   defaultAfterlife?: AfterlifeOption;
-  speedSlug?: string;
+  variantSlug?: string;
 };
 
 export function SingleCatPlusClient({
@@ -1385,7 +1373,7 @@ export function SingleCatPlusClient({
   defaultScarRange = { min: 1, max: 1 },
   defaultTortieRange = { min: 1, max: 4 },
   defaultAfterlife = "dark10",
-  speedSlug,
+  variantSlug,
 }: SingleCatPlusClientProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
@@ -1394,7 +1382,7 @@ export function SingleCatPlusClient({
   const catStateRef = useRef<CatState | null>(null);
   const generationIdRef = useRef(0);
   const toastTimerRef = useRef<number | null>(null);
-  const speedSlugAppliedRef = useRef<string | null>(null);
+  const variantSlugAppliedRef = useRef<string | null>(null);
 
   const [initializing, setInitializing] = useState(true);
   const [initialError, setInitialError] = useState<string | null>(null);
@@ -1405,7 +1393,10 @@ export function SingleCatPlusClient({
   const [accessoryRange, setAccessoryRange] = useState<LayerRange>(defaultAccessoryRange);
   const [scarRange, setScarRange] = useState<LayerRange>(defaultScarRange);
   const [tortieRange, setTortieRange] = useState<LayerRange>(defaultTortieRange);
-  const [timingConfig, setTimingConfig] = usePersistentTimingConfig();
+  const [timingConfig, setTimingConfig] = useState<SpinTimingConfig>(DEFAULT_TIMING_CONFIG);
+
+  // Page variant management
+  const variants = usePageVariants();
   const [timingModalOpen, setTimingModalOpen] = useState(false);
   const [lastTimingSnapshot, setLastTimingSnapshot] = useState<TimingSnapshot | null>(null);
   const [speedMultiplier, setSpeedMultiplier] = useState(1.0);
@@ -1497,11 +1488,6 @@ export function SingleCatPlusClient({
   const [creatorNameDraft, setCreatorNameDraft] = useState("");
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaDirty, setMetaDirty] = useState(false);
-  const [settingsLoadSlug, setSettingsLoadSlug] = useState(() => speedSlug ?? "");
-  const [settingsLoadPending, setSettingsLoadPending] = useState(false);
-  const [settingsSavePending, setSettingsSavePending] = useState(false);
-  const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null);
-  const [settingsResult, setSettingsResult] = useState<SettingsResult | null>(null);
 
   const rollerValueClass = useMemo(() => {
     if (!rollerActiveValue) {
@@ -1535,6 +1521,63 @@ export function SingleCatPlusClient({
       toastTimerRef.current = null;
     }, 2400);
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Variant snapshot / apply / dirty detection
+  // ---------------------------------------------------------------------------
+
+  const snapshotConfig = useMemo((): PageVariantSettings => ({
+    v: 2,
+    mode,
+    timing: timingConfig,
+    speedMultiplier,
+    accessoryRange,
+    scarRange,
+    tortieRange,
+    afterlifeMode,
+    extendedModes: [...extendedModes].sort(),
+    includeBaseColours,
+    catName: catNameDraft,
+    creatorName: creatorNameDraft,
+  }), [mode, timingConfig, speedMultiplier, accessoryRange, scarRange, tortieRange, afterlifeMode, extendedModes, includeBaseColours, catNameDraft, creatorNameDraft]);
+
+  const applyVariantConfig = useCallback((settings: PageVariantSettings) => {
+    setMode(settings.mode);
+    setTimingConfig(settings.timing);
+    setSpeedMultiplier(settings.speedMultiplier);
+    setAccessoryRange(settings.accessoryRange);
+    setScarRange(settings.scarRange);
+    setTortieRange(settings.tortieRange);
+    setAfterlifeMode(settings.afterlifeMode);
+    setExtendedModes(new Set(settings.extendedModes as ExtendedMode[]));
+    setIncludeBaseColours(settings.includeBaseColours);
+    setCatNameDraft(settings.catName);
+    setCreatorNameDraft(settings.creatorName);
+  }, []);
+
+  const variantDirty = useMemo(() => {
+    if (!variants.activeVariant) return false;
+    return !settingsEqual(snapshotConfig, variants.activeVariant.settings);
+  }, [snapshotConfig, variants.activeVariant]);
+
+  // Restore active variant on mount
+  const variantRestoredRef = useRef(false);
+  useEffect(() => {
+    if (variantRestoredRef.current) return;
+    if (!variants.activeVariant) return;
+    variantRestoredRef.current = true;
+    applyVariantConfig(variants.activeVariant.settings);
+  }, [variants.activeVariant, applyVariantConfig]);
+
+  // Warn before unload when dirty
+  useEffect(() => {
+    if (!variantDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [variantDirty]);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -1685,157 +1728,6 @@ export function SingleCatPlusClient({
     setActiveGlobalPreset("normal");
   }, [setActiveGlobalPreset, setTimingConfig, timingConfig]);
 
-  const applyLoadedSettings = useCallback(
-    (payload: unknown) => {
-      if (!payload || typeof payload !== "object") {
-        throw new Error("Invalid settings payload");
-      }
-      const data = payload as SavedSettingsPayload;
-      if (data.v !== SETTINGS_VERSION) {
-        throw new Error("Unsupported settings version");
-      }
-      if (!data.timing || typeof data.timing !== "object") {
-        throw new Error("Missing timing configuration");
-      }
-      const incomingTiming = data.timing as SpinTimingConfig;
-      const incomingDelays = incomingTiming.delays ?? {};
-      const sanitizedDelays: Partial<Record<ParamTimingKey, number>> = {};
-      (Object.entries(incomingDelays) as Array<[string, unknown]>).forEach(([key, value]) => {
-        if (isParamTimingKey(key) && Number.isFinite(value)) {
-          sanitizedDelays[key] = Math.max(0, Number(value));
-        }
-      });
-
-      const incomingSubset = incomingTiming.subsetLimits ?? {};
-      const sanitizedSubset: Partial<Record<ParamTimingKey, boolean>> = {};
-      (Object.entries(incomingSubset) as Array<[string, unknown]>).forEach(([key, value]) => {
-        if (isParamTimingKey(key) && Boolean(value)) {
-          sanitizedSubset[key] = true;
-        }
-      });
-
-      const incomingPause = incomingTiming.pauseDelays ?? {} as Partial<{ flashyMs: number; calmMs: number }>;
-      const nextPause = {
-        flashyMs: clampPauseMs(incomingPause.flashyMs, defaultFlashyPauseMs),
-        calmMs: clampPauseMs(incomingPause.calmMs, defaultCalmPauseMs),
-      };
-
-      setTimingConfig({
-        allowFastFlips: Boolean(incomingTiming.allowFastFlips),
-        delays: { ...DEFAULT_TIMING_CONFIG.delays, ...sanitizedDelays },
-        subsetLimits: sanitizedSubset,
-        pauseDelays: nextPause,
-      });
-    },
-    [defaultCalmPauseMs, defaultFlashyPauseMs, setTimingConfig]
-  );
-
-  const loadSettingsBySlug = useCallback(
-    async (slug: string, options?: { silent?: boolean }) => {
-      const normalized = slug.trim();
-      if (!normalized) {
-        setSettingsLoadError("Enter a slug to load");
-        return null;
-      }
-      setSettingsLoadPending(true);
-      setSettingsLoadError(null);
-      try {
-        const response = await fetch(`/api/single-cat-settings?slug=${encodeURIComponent(normalized)}`, {
-          method: "GET",
-          cache: "no-store",
-        });
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error("No preset found for that slug");
-          }
-          throw new Error("Failed to load settings");
-        }
-        const json = (await response.json()) as { config?: unknown; slug: string };
-        if (!json.config) {
-          throw new Error("Preset payload missing config");
-        }
-        applyLoadedSettings(json.config);
-        setSettingsLoadSlug(normalized);
-        if (!options?.silent) {
-          showToast("Timing preset loaded");
-        }
-        return json;
-      } catch (error) {
-        console.error("loadSettingsBySlug", error);
-        const message = error instanceof Error ? error.message : "Failed to load settings";
-        setSettingsLoadError(message);
-        if (!options?.silent) {
-          showToast(message);
-        }
-        return null;
-      } finally {
-        setSettingsLoadPending(false);
-      }
-    },
-    [applyLoadedSettings, setSettingsLoadSlug, showToast]
-  );
-
-  const handleSaveSettings = useCallback(
-    async () => {
-      const configPayload: SavedSettingsPayload = {
-        v: SETTINGS_VERSION,
-        timing: {
-          allowFastFlips: timingConfig.allowFastFlips,
-          delays: timingConfig.delays,
-          subsetLimits: timingConfig.subsetLimits ?? {},
-          pauseDelays: {
-            flashyMs: clampPauseMs(timingConfig.pauseDelays?.flashyMs, defaultFlashyPauseMs),
-            calmMs: clampPauseMs(timingConfig.pauseDelays?.calmMs, defaultCalmPauseMs),
-          },
-        },
-      };
-
-      setSettingsSavePending(true);
-      try {
-        const response = await fetch("/api/single-cat-settings", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          cache: "no-store",
-          body: JSON.stringify({
-            slug: settingsLoadSlug.trim() || undefined,
-            config: configPayload,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to save settings");
-        }
-
-        const json = (await response.json()) as { slug?: string; updated?: boolean };
-        const slug = json.slug?.trim();
-        if (!slug) {
-          throw new Error("Response missing slug");
-        }
-
-        setSettingsLoadSlug(slug);
-
-        let autoUrl = `?speed=${encodeURIComponent(slug)}`;
-        if (typeof window !== "undefined") {
-          const current = new URL(window.location.href);
-          current.searchParams.set("speed", slug);
-          autoUrl = current.toString();
-        }
-
-        setSettingsResult({ slug, autoUrl, updated: Boolean(json.updated) });
-        showToast(json.updated ? "Timing preset updated" : "Timing preset saved");
-      } catch (error) {
-        console.error("handleSaveSettings", error);
-        const message = error instanceof Error ? error.message : "Failed to save settings";
-        showToast(message);
-      } finally {
-        setSettingsSavePending(false);
-      }
-    },
-    [defaultCalmPauseMs, defaultFlashyPauseMs, settingsLoadSlug, showToast, timingConfig]
-  );
-
   const copyText = useCallback(
     async (text: string, successMessage: string) => {
       try {
@@ -1852,20 +1744,34 @@ export function SingleCatPlusClient({
     [showToast]
   );
 
+  // Auto-load variant from URL slug on mount
   useEffect(() => {
-    if (speedSlug) {
-      setSettingsLoadSlug(speedSlug);
-    }
-  }, [speedSlug]);
-
-  useEffect(() => {
-    if (!speedSlug) return;
-    if (speedSlugAppliedRef.current === speedSlug) return;
-    speedSlugAppliedRef.current = speedSlug;
-    loadSettingsBySlug(speedSlug, { silent: true }).catch((error) => {
-      console.error("Failed to autoload timing settings", error);
-    });
-  }, [loadSettingsBySlug, speedSlug]);
+    if (!variantSlug) return;
+    if (variantSlugAppliedRef.current === variantSlug) return;
+    variantSlugAppliedRef.current = variantSlug;
+    (async () => {
+      try {
+        const response = await fetch(`/api/single-cat-settings?slug=${encodeURIComponent(variantSlug)}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          showToast(response.status === 404 ? "No preset found for that slug" : "Failed to load settings");
+          return;
+        }
+        const json = (await response.json()) as { config?: unknown; slug: string };
+        if (!json.config) {
+          showToast("Preset payload missing config");
+          return;
+        }
+        const settings = parseConvexPayload(json.config);
+        applyVariantConfig(settings);
+        showToast("Settings loaded from URL");
+      } catch (error) {
+        console.error("Failed to autoload variant settings", error);
+      }
+    })();
+  }, [variantSlug, applyVariantConfig, showToast]);
 
   const settleRoller = useCallback(
     async (
@@ -3541,6 +3447,14 @@ export function SingleCatPlusClient({
 
   return (
     <div className="grid gap-10">
+      <VariantBar
+        variants={variants}
+        snapshotConfig={snapshotConfig}
+        applyConfig={applyVariantConfig}
+        isDirty={variantDirty}
+        showToast={showToast}
+        copyText={copyText}
+      />
       <div className="glass-card px-6 py-8">
         <div className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,420px)] xl:items-start">
           <div className="flex flex-col gap-6">
@@ -4169,46 +4083,6 @@ export function SingleCatPlusClient({
                 </span>
               </div>
 
-              <div className="mt-6 space-y-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Saved Presets</p>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <input
-                    type="text"
-                    value={settingsLoadSlug}
-                    onChange={(event) => {
-                      setSettingsLoadSlug(event.target.value);
-                      setSettingsLoadError(null);
-                    }}
-                    placeholder="Enter slug to load or update"
-                    className="flex-1 rounded-lg border border-border/50 bg-background/80 px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => loadSettingsBySlug(settingsLoadSlug).catch(() => undefined)}
-                    disabled={settingsLoadPending}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {settingsLoadPending ? <Loader2 className="size-3 animate-spin" /> : null} Load Preset
-                  </button>
-                </div>
-                {settingsLoadError && (
-                  <p className="text-xs text-red-300">{settingsLoadError}</p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSaveSettings()}
-                    disabled={settingsSavePending}
-                    className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {settingsSavePending ? <Loader2 className="size-3 animate-spin" /> : null} Save Preset
-                  </button>
-                </div>
-                <p className="text-[11px] text-muted-foreground/70">
-                  Leave the slug blank to generate a new one, or enter an existing slug to update it.
-                </p>
-              </div>
-
               <div className="mt-6 overflow-hidden rounded-2xl border border-border/40">
                 <div className="grid grid-cols-[minmax(0,1.6fr)_100px_80px_110px_110px] gap-3 border-b border-border/40 bg-background/70 px-4 py-3 text-[0.65rem] uppercase tracking-wide text-muted-foreground/70">
                   <span>Parameter</span>
@@ -4282,68 +4156,6 @@ export function SingleCatPlusClient({
               <p className="mt-4 text-xs text-muted-foreground/70">
                 Minimum delay is {MIN_SAFE_STEP_MS}ms. Console logs include a full breakdown after each roll.
               </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {settingsResult && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 px-4 py-10"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setSettingsResult(null);
-            }
-          }}
-        >
-          <div className="relative w-full max-w-lg rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setSettingsResult(null)}
-              className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
-              aria-label="Close settings saved dialog"
-            >
-              <XIcon size={16} />
-            </button>
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Preset Saved</h2>
-                <p className="text-sm text-muted-foreground">
-                  {settingsResult.updated
-                    ? "Your preset was updated. Share the slug or use the autoload link to reuse it."
-                    : "Here’s your new timing preset slug. Share it or use the autoload link to restore these settings."}
-                </p>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Slug</p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 rounded-lg border border-border/50 bg-background/80 px-3 py-2 text-sm text-foreground">
-                    {settingsResult.slug}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => copyText(settingsResult.slug, "Slug copied")}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/70">Autoload link</p>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 truncate rounded-lg border border-border/50 bg-background/80 px-3 py-2 text-sm text-foreground">
-                    {settingsResult.autoUrl}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => copyText(settingsResult.autoUrl, "Link copied")}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
