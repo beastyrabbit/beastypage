@@ -128,27 +128,34 @@ async function getImageUrl(fileTitle: string): Promise<string> {
   }
 }
 
+const MAX_RETRIES = 10;
+
 /**
- * Fetch a random image URL from Wikimedia Commons
+ * Fetch a random image URL from Wikimedia Commons.
+ * Retries with different random categories up to MAX_RETRIES times.
  */
 export async function fetchRandomWikimediaImage(
   type: ImageCategory = "nature"
 ): Promise<string> {
-  // Pick a random category from the type
   const categories = CATEGORY_MAP[type];
-  const randomCategory = categories[Math.floor(Math.random() * categories.length)];
 
-  // Search for images in that category
-  const titles = await searchImages(randomCategory);
-  if (titles.length === 0) {
-    throw new Error(`No images found in category: ${randomCategory}`);
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)]!;
+
+    try {
+      const titles = await searchImages(randomCategory);
+      if (titles.length === 0) continue;
+
+      const randomTitle = titles[Math.floor(Math.random() * titles.length)]!;
+      return await getImageUrl(randomTitle);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      continue;
+    }
   }
 
-  // Pick a random title
-  const randomTitle = titles[Math.floor(Math.random() * titles.length)];
-
-  // Get the actual image URL
-  return getImageUrl(randomTitle);
+  throw lastError ?? new Error(`No images found after ${MAX_RETRIES} attempts — try again`);
 }
 
 /**
