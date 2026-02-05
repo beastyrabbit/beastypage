@@ -147,7 +147,7 @@ export function VariantBar({
     "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
-    <div className="rounded-2xl border border-border/40 bg-background/60 backdrop-blur px-4 py-2.5">
+    <div className="relative z-10 rounded-2xl border border-border/40 bg-background/60 backdrop-blur px-4 py-2.5">
       <div className="flex flex-wrap items-center gap-2">
         {/* Variant dropdown */}
         <div className="relative" ref={dropdownRef}>
