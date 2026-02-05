@@ -75,7 +75,7 @@ export function ReleaseNotesModal({ open, onClose }: ReleaseNotesModalProps) {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="relative mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-3xl border border-border/40 bg-background/95 p-6 shadow-2xl backdrop-blur">
+      <div className="relative mx-4 w-full max-w-3xl max-h-[80vh] overflow-y-auto rounded-3xl border border-border/40 bg-background/95 p-6 shadow-2xl backdrop-blur">
         <button
           type="button"
           onClick={handleClose}
