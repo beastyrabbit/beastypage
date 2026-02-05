@@ -22,6 +22,7 @@ export function parseDashPayload(payload: unknown): DashSettings {
   const data = payload as Record<string, unknown>;
 
   if (data.v !== 1) {
+    console.warn(`[parseDashPayload] Unsupported config version: ${String(data.v)}, falling back to defaults`);
     return { ...DEFAULT_DASH_SETTINGS };
   }
 
@@ -34,6 +35,10 @@ export function parseDashPayload(payload: unknown): DashSettings {
       seen.add(w);
       widgets.push(w);
     }
+  }
+  const droppedCount = rawWidgets.length - widgets.length;
+  if (droppedCount > 0) {
+    console.warn(`[parseDashPayload] Dropped ${droppedCount} unrecognized widget ID(s)`);
   }
 
   const lastSeenVersion =
