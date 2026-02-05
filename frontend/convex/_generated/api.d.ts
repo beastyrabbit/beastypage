@@ -22,6 +22,7 @@ import type * as init from "../init.js";
 import type * as mapper from "../mapper.js";
 import type * as paletteGeneratorSettings from "../paletteGeneratorSettings.js";
 import type * as perfectCats from "../perfectCats.js";
+import type * as pixelatorSettings from "../pixelatorSettings.js";
 import type * as previews from "../previews.js";
 import type * as rarities from "../rarities.js";
 import type * as seasons from "../seasons.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   mapper: typeof mapper;
   paletteGeneratorSettings: typeof paletteGeneratorSettings;
   perfectCats: typeof perfectCats;
+  pixelatorSettings: typeof pixelatorSettings;
   previews: typeof previews;
   rarities: typeof rarities;
   seasons: typeof seasons;

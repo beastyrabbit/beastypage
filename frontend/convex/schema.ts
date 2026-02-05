@@ -245,6 +245,15 @@ export default defineSchema({
     .index("bySlug", ["slug"])
     .index("byCreated", ["createdAt"]),
 
+  pixelator_settings: defineTable({
+    slug: v.string(),
+    config: v.any(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("bySlug", ["slug"])
+    .index("byCreated", ["createdAt"]),
+
   ancestry_tree: defineTable({
     slug: v.string(),
     name: v.string(),
