@@ -27,13 +27,26 @@ export function DashClient() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const slugLoadedRef = useRef(false);
+  const variantSyncedRef = useRef(false);
 
   // Sync settings from active variant
   useEffect(() => {
+    variantSyncedRef.current = true;
     if (activeVariant) {
       queueMicrotask(() => setSettings(parseDashPayload(activeVariant.settings)));
+    } else if (!slugParam) {
+      // Only auto-enter edit mode when variant store has loaded and there's truly
+      // no active variant and no slug import pending
+      queueMicrotask(() => {
+        setSettings((prev) => {
+          if (prev.widgets.length === 0) {
+            setEditing(true);
+          }
+          return prev;
+        });
+      });
     }
-  }, [activeVariant]);
+  }, [activeVariant, slugParam]);
 
   // Load from slug query param
   useEffect(() => {
@@ -56,13 +69,6 @@ export function DashClient() {
         toast.error("Failed to load shared dashboard");
       });
   }, [slugParam, createVariant]);
-
-  // Auto-enter edit mode when no widgets are placed and no variant is active
-  useEffect(() => {
-    if (!activeVariant && settings.widgets.length === 0 && !slugParam) {
-      queueMicrotask(() => setEditing(true));
-    }
-  }, [activeVariant, settings.widgets.length, slugParam]);
 
   // Resolve widget IDs to tool metadata
   const resolvedWidgets = useMemo(
@@ -133,6 +139,7 @@ export function DashClient() {
         copyText={copyText}
         apiPath="/api/dash-settings"
         parsePayload={parseDashPayload}
+        shareBaseUrl="/dash"
       />
 
       <DashHero

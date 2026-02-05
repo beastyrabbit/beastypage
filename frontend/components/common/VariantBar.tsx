@@ -14,6 +14,8 @@ interface VariantBarProps<T> {
   copyText: (text: string, successMessage: string) => Promise<void>;
   apiPath: string;
   parsePayload: (payload: unknown) => T;
+  /** When set, shows a "Copy Link" button after export that copies `shareBaseUrl?slug=<slug>` */
+  shareBaseUrl?: string;
 }
 
 export function VariantBar<T>({
@@ -25,6 +27,7 @@ export function VariantBar<T>({
   copyText,
   apiPath,
   parsePayload,
+  shareBaseUrl,
 }: VariantBarProps<T>) {
   const { store, activeVariant, createVariant, saveToActive, deleteVariant, renameVariant, setActive } = variants;
 
@@ -349,6 +352,15 @@ export function VariantBar<T>({
                     >
                       Copy
                     </button>
+                    {shareBaseUrl && (
+                      <button
+                        type="button"
+                        onClick={() => copyText(`${shareBaseUrl}?slug=${lastExportedSlug}`, "Share link copied")}
+                        className={buttonClass}
+                      >
+                        Copy Link
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
