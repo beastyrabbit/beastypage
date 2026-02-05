@@ -40,6 +40,13 @@ const TOOLS: ToolCard[] = [
     href: "/color-palette-creator",
   },
   {
+    title: "Pixelator",
+    icon: "🔲",
+    description:
+      "Transform images with a modular pixel art pipeline. Chain pixelation, dithering, quantization, and effects.",
+    href: "/pixelator",
+  },
+  {
     title: "Cat Color Palettes",
     icon: "🐱",
     description:

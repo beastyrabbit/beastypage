@@ -53,6 +53,16 @@ This triggers the Docker build workflow which:
 - Tags them with the version (e.g., `1.7.0`, `1.7`)
 - Pushes to GitHub Container Registry
 
+### Versioning Rules
+
+| Bump | When | Example |
+|------|------|---------|
+| **Major** (X.0.0) | Net-new page/route added (`frontend/app/*/page.tsx` creation) | `v2.0.0` |
+| **Minor** (X.Y.0) | Page overhauls/replacements, new functionality on existing pages, new components | `v1.13.0` |
+| **Patch** (X.Y.Z) | Bug fixes, small QoL improvements, dependency updates, chores | `v1.13.1` |
+
+> Replacing/overhauling an existing route (e.g., palette-spinner → palette-generator) is minor, not major.
+
 ### Docker Build Triggers
 
 | Trigger | What builds | Image tags |
