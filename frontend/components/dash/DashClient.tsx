@@ -19,7 +19,7 @@ export function DashClient() {
   const slugParam = searchParams.get("slug");
 
   const variants = useVariants<DashSettings>({ storageKey: "dash.variants" });
-  const { activeVariant, createVariant } = variants;
+  const { activeVariant, setVariantSlug, saveToActive } = variants;
 
   // Local working copy of settings
   const [settings, setSettings] = useState<DashSettings>({ ...DEFAULT_DASH_SETTINGS });
@@ -31,13 +31,13 @@ export function DashClient() {
 
   // Sync settings from active variant
   useEffect(() => {
-    if (activeVariant) {
+    if (activeVariant && !slugParam) {
       queueMicrotask(() => {
         setSettings(parseDashPayload(activeVariant.settings));
         setEditing(false);
       });
     }
-  }, [activeVariant]);
+  }, [activeVariant, slugParam]);
 
   // Auto-enter edit mode when there are no widgets and no variant or slug pending
   useEffect(() => {
@@ -65,9 +65,9 @@ export function DashClient() {
           return;
         }
         const imported = parseDashPayload(data.config);
-        const v = createVariant(`Import ${slugParam.slice(0, 7)}`, imported);
-        setSettings(v.settings);
-        toast.success("Dashboard imported");
+        setSettings(imported);
+        setEditing(false);
+        toast.success("Dashboard loaded");
       })
       .catch((error) => {
         if (cancelled) return;
@@ -75,7 +75,7 @@ export function DashClient() {
         toast.error("Failed to load shared dashboard");
       });
     return () => { cancelled = true; };
-  }, [slugParam, createVariant]);
+  }, [slugParam]);
 
   // Resolve widget IDs to tool metadata
   const resolvedWidgets = useMemo(
@@ -143,13 +143,26 @@ export function DashClient() {
   }, []);
 
   const handleOpen = useCallback(async () => {
+    // Fast path: clean variant with slug
+    if (activeVariant?.slug && !isDirty) {
+      window.open(`/dash?slug=${encodeURIComponent(activeVariant.slug)}`, "_blank");
+      return;
+    }
+
+    // Dirty or no slug: save locally first, then sync to DB
     setOpening(true);
     try {
+      if (activeVariant && isDirty) {
+        saveToActive(settings);
+      }
       const response = await fetch("/api/dash-settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ config: settings }),
+        body: JSON.stringify({
+          config: settings,
+          ...(activeVariant?.slug ? { slug: activeVariant.slug } : {}),
+        }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null) as { error?: string } | null;
@@ -158,14 +171,17 @@ export function DashClient() {
       const json = (await response.json()) as { slug?: string };
       const slug = json.slug?.trim();
       if (!slug) throw new Error("No slug returned");
-      window.open(`/dash?slug=${slug}`, "_blank");
+      if (activeVariant && !activeVariant.slug) {
+        setVariantSlug(activeVariant.id, slug);
+      }
+      window.open(`/dash?slug=${encodeURIComponent(slug)}`, "_blank");
     } catch (error) {
       console.error("[DashClient] handleOpen", error);
       toast.error("Failed to generate share link");
     } finally {
       setOpening(false);
     }
-  }, [settings]);
+  }, [activeVariant, isDirty, settings, saveToActive, setVariantSlug]);
 
   return (
     <>

@@ -29,7 +29,7 @@ export function VariantBar<T>({
   parsePayload,
   shareBaseUrl,
 }: VariantBarProps<T>) {
-  const { store, activeVariant, createVariant, saveToActive, deleteVariant, renameVariant, setActive } = variants;
+  const { store, activeVariant, createVariant, saveToActive, deleteVariant, renameVariant, setActive, setVariantSlug } = variants;
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -77,6 +77,26 @@ export function VariantBar<T>({
     };
   }, []);
 
+  // DB sync
+  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
+
+  const syncToDb = useCallback(async (config: T, existingSlug?: string) => {
+    const response = await fetch(apiPath, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ config, ...(existingSlug ? { slug: existingSlug } : {}) }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null) as { error?: string } | null;
+      throw new Error(body?.error ?? `Sync failed (HTTP ${response.status})`);
+    }
+    const json = (await response.json()) as { slug?: string; updated?: boolean };
+    const slug = json.slug?.trim();
+    if (!slug) throw new Error("No slug returned");
+    return { slug, updated: !!json.updated };
+  }, [apiPath]);
+
   const handleSelectVariant = useCallback(
     (id: string | null) => {
       setDropdownOpen(false);
@@ -93,16 +113,41 @@ export function VariantBar<T>({
     [store.variants, setActive, applyConfig],
   );
 
-  const handleNew = useCallback(() => {
+  const handleNew = useCallback(async () => {
     const name = `Variant ${store.variants.length + 1}`;
-    createVariant(name, snapshotConfig);
+    const variant = createVariant(name, snapshotConfig);
     showToast("Variant created");
-  }, [store.variants.length, snapshotConfig, createVariant, showToast]);
 
-  const handleSave = useCallback(() => {
+    setSyncingIds((prev) => new Set(prev).add(variant.id));
+    try {
+      const result = await syncToDb(snapshotConfig);
+      setVariantSlug(variant.id, result.slug);
+    } catch (error) {
+      console.error("[VariantBar] handleNew DB sync failed", error);
+      showToast("Sync failed — saved locally only", "error");
+    } finally {
+      setSyncingIds((prev) => { const next = new Set(prev); next.delete(variant.id); return next; });
+    }
+  }, [store.variants.length, snapshotConfig, createVariant, showToast, syncToDb, setVariantSlug]);
+
+  const handleSave = useCallback(async () => {
     saveToActive(snapshotConfig);
     showToast("Variant saved");
-  }, [snapshotConfig, saveToActive, showToast]);
+
+    if (!activeVariant) return;
+    const { id: variantId, slug: existingSlug } = activeVariant;
+
+    setSyncingIds((prev) => new Set(prev).add(variantId));
+    try {
+      const result = await syncToDb(snapshotConfig, existingSlug);
+      if (!existingSlug) setVariantSlug(variantId, result.slug);
+    } catch (error) {
+      console.error("[VariantBar] handleSave DB sync failed", error);
+      showToast("Saved locally, but cloud sync failed", "error");
+    } finally {
+      setSyncingIds((prev) => { const next = new Set(prev); next.delete(variantId); return next; });
+    }
+  }, [snapshotConfig, saveToActive, showToast, activeVariant, syncToDb, setVariantSlug]);
 
   const startRename = useCallback(() => {
     if (!activeVariant) return;
@@ -121,27 +166,25 @@ export function VariantBar<T>({
   }, [activeVariant, renameValue, renameVariant]);
 
   const handleExport = useCallback(async () => {
+    if (activeVariant?.slug && !isDirty && !syncingIds.has(activeVariant.id)) {
+      setLastExportedSlug(activeVariant.slug);
+      showToast("Share slug ready");
+      return;
+    }
+    // Fallback: POST to get a slug (no-variant mode or legacy)
     setExporting(true);
     try {
-      const response = await fetch(apiPath, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({ config: snapshotConfig }),
-      });
-      if (!response.ok) throw new Error("Failed to export");
-      const json = (await response.json()) as { slug?: string };
-      const slug = json.slug?.trim();
-      if (!slug) throw new Error("No slug returned");
-      setLastExportedSlug(slug);
+      const result = await syncToDb(snapshotConfig);
+      setLastExportedSlug(result.slug);
+      if (activeVariant) setVariantSlug(activeVariant.id, result.slug);
       showToast("Exported successfully");
     } catch (error) {
-      console.error("handleExport", error);
+      console.error("[VariantBar] handleExport failed", error);
       showToast(error instanceof Error ? error.message : "Export failed", "error");
     } finally {
       setExporting(false);
     }
-  }, [apiPath, snapshotConfig, showToast]);
+  }, [activeVariant, isDirty, syncingIds, snapshotConfig, syncToDb, showToast, setVariantSlug]);
 
   const handleImport = useCallback(async () => {
     const normalized = importSlug.trim();
@@ -273,6 +316,9 @@ export function VariantBar<T>({
                 >
                   {activeVariant.name}
                 </button>
+              )}
+              {syncingIds.has(activeVariant.id) && (
+                <Loader2 className="size-3 animate-spin text-muted-foreground" />
               )}
               {isDirty && (
                 <span className="size-2 rounded-full bg-amber-400" title="Unsaved changes" />

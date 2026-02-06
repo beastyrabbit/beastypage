@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export interface Variant<T> {
   id: string;
   name: string;
+  slug?: string;
   settings: T;
   createdAt: number;
   updatedAt: number;
@@ -72,6 +73,7 @@ export interface UseVariantsReturn<T> {
   deleteVariant: (id: string) => void;
   renameVariant: (id: string, name: string) => void;
   setActive: (id: string | null) => void;
+  setVariantSlug: (id: string, slug: string) => void;
 }
 
 interface UseVariantsOptions<T> {
@@ -180,5 +182,14 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
     setStore((prev) => ({ ...prev, activeId: id }));
   }, []);
 
-  return { store, activeVariant, createVariant, saveToActive, deleteVariant, renameVariant, setActive };
+  const setVariantSlug = useCallback((id: string, slug: string) => {
+    setStore((prev) => ({
+      ...prev,
+      variants: prev.variants.map((v) =>
+        v.id === id ? { ...v, slug } : v
+      ),
+    }));
+  }, []);
+
+  return { store, activeVariant, createVariant, saveToActive, deleteVariant, renameVariant, setActive, setVariantSlug };
 }
