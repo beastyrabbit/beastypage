@@ -166,7 +166,7 @@ export function VariantBar<T>({
   }, [activeVariant, renameValue, renameVariant]);
 
   const handleExport = useCallback(async () => {
-    if (activeVariant?.slug) {
+    if (activeVariant?.slug && !isDirty && !syncingIds.has(activeVariant.id)) {
       setLastExportedSlug(activeVariant.slug);
       showToast("Share slug ready");
       return;
@@ -184,7 +184,7 @@ export function VariantBar<T>({
     } finally {
       setExporting(false);
     }
-  }, [activeVariant, snapshotConfig, syncToDb, showToast, setVariantSlug]);
+  }, [activeVariant, isDirty, syncingIds, snapshotConfig, syncToDb, showToast, setVariantSlug]);
 
   const handleImport = useCallback(async () => {
     const normalized = importSlug.trim();
