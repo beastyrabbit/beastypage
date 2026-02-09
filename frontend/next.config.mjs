@@ -66,6 +66,7 @@ if (process.env.NEXT_SHOW_CONFIG_LOGS === "1") {
 
 const nextConfig = {
   output: "standalone",
+  serverExternalPackages: ["@napi-rs/canvas"],
   skipTrailingSlashRedirect: true,
   allowedDevOrigins,
   images: {
