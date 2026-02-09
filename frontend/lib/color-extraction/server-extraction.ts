@@ -185,6 +185,16 @@ function kMeans(pixels: PixelData[], k: number, maxIter: number): { clusters: re
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function colorBrightness(color: RGB): number {
+  return Math.sqrt(
+    0.299 * (color.r ** 2) + 0.587 * (color.g ** 2) + 0.114 * (color.b ** 2),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -215,6 +225,64 @@ export async function extractColorsServer(
       };
     })
     .sort((a, b) => b.prevalence - a.prevalence);
+}
+
+export async function extractFamilyColorsServer(
+  imageBuffer: Buffer,
+  topColors: ExtractedColor[],
+  options: KMeansOptions = { k: 6 },
+  similarityThreshold = 50,
+): Promise<ExtractedColor[]> {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+  const { data, width, height } = await getImagePixelsServer(imageBuffer);
+
+  function recursiveExtract(threshold: number): ExtractedColor[] {
+    const pixels = samplePixels(data, width, height, opts);
+
+    const uniqueCount = countUniqueColors(pixels);
+    if (uniqueCount < 2) return [];
+
+    const clusterCount = Math.min(opts.k * 2, uniqueCount);
+    const { clusters } = kMeans(pixels, clusterCount, opts.maxIterations);
+    const totalPixels = pixels.length;
+
+    const allColors = clusters.map(({ centroid: c }) => {
+      const rgb = { r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) };
+      return {
+        hex: rgbToHex(rgb),
+        rgb,
+        hsl: rgbToHsl(rgb),
+        position: { x: Math.round(c.x), y: Math.round(c.y) },
+        prevalence: Math.round((c.count / totalPixels) * 100),
+        brightness: colorBrightness(rgb),
+      };
+    });
+
+    // Sort by brightness (brightest first)
+    allColors.sort((a, b) => b.brightness - a.brightness);
+
+    // Filter out colors too similar to top colors
+    const familyColors: ExtractedColor[] = [];
+    for (const color of allColors) {
+      const isTooSimilar = topColors.some(
+        (topColor) => colorDistance(color.rgb, topColor.rgb) < threshold,
+      );
+      if (!isTooSimilar) {
+        const { brightness, ...colorWithoutBrightness } = color;
+        familyColors.push(colorWithoutBrightness);
+      }
+      if (familyColors.length >= opts.k) break;
+    }
+
+    // Retry with lower threshold if not enough colors
+    if (familyColors.length < opts.k && threshold > 5) {
+      return recursiveExtract(threshold - 5);
+    }
+
+    return familyColors;
+  }
+
+  return recursiveExtract(similarityThreshold);
 }
 
 export function generatePaletteImage(
@@ -251,8 +319,10 @@ function isNearWhite(rgb: RGB): boolean {
          rgb.b >= 255 - BLACK_WHITE_THRESHOLD;
 }
 
-function filterColors(colors: Array<{ hex: string; rgb: RGB }>): Array<{ hex: string; rgb: RGB }> {
-  const seen = new Set<string>();
+function filterColors(
+  colors: Array<{ hex: string; rgb: RGB }>,
+  seen: Set<string> = new Set<string>(),
+): Array<{ hex: string; rgb: RGB }> {
   return colors.filter((c) => {
     if (isNearBlack(c.rgb) || isNearWhite(c.rgb)) return false;
     const key = `${c.rgb.r},${c.rgb.g},${c.rgb.b}`;
@@ -265,77 +335,95 @@ function filterColors(colors: Array<{ hex: string; rgb: RGB }>): Array<{ hex: st
 /**
  * Generate a palette grid image matching the website PNG export.
  *
- * Layout: 3 sections (each SECTION_SIZE × SECTION_SIZE):
+ * Layout per color group: 3 sections (each SECTION_SIZE × SECTION_SIZE):
  *   1. Color strip — each color full-width, stacked vertically (reversed)
  *   2. Brightness grid — rows = colors (reversed), cols = brightness factors
  *   3. Hue grid — rows = colors (reversed), cols = hue shifts
+ *
+ * If familyColors is provided, its 3 sections are appended after the top colors.
  */
 export function generatePaletteGridImage(
   colors: Array<{ hex: string; rgb: RGB }>,
+  familyColors?: Array<{ hex: string; rgb: RGB }>,
 ): string {
-  const filtered = filterColors(colors);
-  if (filtered.length === 0) throw new Error('Cannot generate palette grid with zero colors');
+  // Use shared set for cross-group dedup (matching PaletteExport.tsx)
+  const seen = new Set<string>();
+  const filteredTop = filterColors(colors, seen);
+  const filteredFamily = familyColors ? filterColors(familyColors, seen) : [];
+
+  if (filteredTop.length === 0 && filteredFamily.length === 0) {
+    throw new Error('Cannot generate palette grid with zero colors');
+  }
 
   const SECTION_SIZE = 1000;
   const brightnessFactors = [0.5, 0.75, 1.0, 1.25, 1.5];
   const hueShifts = [0, 10, 20, 30];
-  const totalSections = 3; // strip + brightness + hue
+
+  const topSections = filteredTop.length > 0 ? 3 : 0;
+  const familySections = filteredFamily.length > 0 ? 3 : 0;
+  const totalSections = topSections + familySections;
 
   const canvas = createCanvas(SECTION_SIZE, SECTION_SIZE * totalSections);
   const ctx = canvas.getContext('2d');
 
   let yOffset = 0;
 
-  // Section 1: Vertical color strip (colors reversed, each full width)
-  const colorHeight = SECTION_SIZE / filtered.length;
-  filtered
-    .slice()
-    .reverse()
-    .forEach((color, index) => {
-      ctx.fillStyle = color.hex;
-      ctx.fillRect(0, yOffset + index * colorHeight, SECTION_SIZE, colorHeight);
-    });
-  yOffset += SECTION_SIZE;
-
-  // Section 2: Brightness grid (rows = colors reversed, cols = factors)
-  const bRowHeight = SECTION_SIZE / filtered.length;
-  const bColWidth = SECTION_SIZE / brightnessFactors.length;
-  filtered
-    .slice()
-    .reverse()
-    .forEach((color, rowIndex) => {
-      brightnessFactors.forEach((factor, colIndex) => {
-        const adjustment = (factor - 1) * 50;
-        const adjusted = adjustBrightness(color.rgb, adjustment);
-        ctx.fillStyle = rgbToHex(adjusted);
-        ctx.fillRect(
-          colIndex * bColWidth,
-          yOffset + rowIndex * bRowHeight,
-          bColWidth,
-          bRowHeight,
-        );
+  const drawGroupSections = (group: Array<{ hex: string; rgb: RGB }>) => {
+    // Section: Vertical color strip (colors reversed, each full width)
+    const colorHeight = SECTION_SIZE / group.length;
+    group
+      .slice()
+      .reverse()
+      .forEach((color, index) => {
+        ctx.fillStyle = color.hex;
+        ctx.fillRect(0, yOffset + index * colorHeight, SECTION_SIZE, colorHeight);
       });
-    });
-  yOffset += SECTION_SIZE;
+    yOffset += SECTION_SIZE;
 
-  // Section 3: Hue grid (rows = colors reversed, cols = shifts)
-  const hRowHeight = SECTION_SIZE / filtered.length;
-  const hColWidth = SECTION_SIZE / hueShifts.length;
-  filtered
-    .slice()
-    .reverse()
-    .forEach((color, rowIndex) => {
-      hueShifts.forEach((shift, colIndex) => {
-        const adjusted = adjustHue(color.rgb, shift);
-        ctx.fillStyle = rgbToHex(adjusted);
-        ctx.fillRect(
-          colIndex * hColWidth,
-          yOffset + rowIndex * hRowHeight,
-          hColWidth,
-          hRowHeight,
-        );
+    // Section: Brightness grid (rows = colors reversed, cols = factors)
+    const bRowHeight = SECTION_SIZE / group.length;
+    const bColWidth = SECTION_SIZE / brightnessFactors.length;
+    group
+      .slice()
+      .reverse()
+      .forEach((color, rowIndex) => {
+        brightnessFactors.forEach((factor, colIndex) => {
+          const adjustment = (factor - 1) * 50;
+          const adjusted = adjustBrightness(color.rgb, adjustment);
+          ctx.fillStyle = rgbToHex(adjusted);
+          ctx.fillRect(
+            colIndex * bColWidth,
+            yOffset + rowIndex * bRowHeight,
+            bColWidth,
+            bRowHeight,
+          );
+        });
       });
-    });
+    yOffset += SECTION_SIZE;
+
+    // Section: Hue grid (rows = colors reversed, cols = shifts)
+    const hRowHeight = SECTION_SIZE / group.length;
+    const hColWidth = SECTION_SIZE / hueShifts.length;
+    group
+      .slice()
+      .reverse()
+      .forEach((color, rowIndex) => {
+        hueShifts.forEach((shift, colIndex) => {
+          const adjusted = adjustHue(color.rgb, shift);
+          ctx.fillStyle = rgbToHex(adjusted);
+          ctx.fillRect(
+            colIndex * hColWidth,
+            yOffset + rowIndex * hRowHeight,
+            hColWidth,
+            hRowHeight,
+          );
+        });
+      });
+    yOffset += SECTION_SIZE;
+  };
+
+  if (filteredTop.length > 0) drawGroupSections(filteredTop);
+  if (filteredFamily.length > 0) drawGroupSections(filteredFamily);
 
   return canvas.toDataURL('image/png');
 }
