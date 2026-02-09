@@ -9,6 +9,7 @@ interface CatOptions {
   shading?: boolean;
   eye_colour?: string;
   discord_user_id?: string;
+  discord_username?: string;
 }
 
 export interface CatResponse {

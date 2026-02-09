@@ -238,11 +238,11 @@ export function generatePaletteImage(
 
 /**
  * Generate a full palette grid image with brightness and hue variations.
- * Matches the layout of the PaletteGrid component.
+ * Matches the layout of the PaletteGrid component (rows = colors, cols = factors/shifts).
  *
- * Row 0:     Main swatches          — N × 60×60px, hex label centered
- * Rows 1-5:  Brightness variations  — 5 × N × 60×40px (factors: 0.5, 0.75, 1.0, 1.25, 1.5)
- * Rows 6-9:  Hue shift variations   — 4 × N × 60×40px (shifts: 0°, 10°, 20°, 30°)
+ * Row 0:        Main swatches          — N columns × 1 row (60×60px each)
+ * Rows 1..N:    Brightness variations  — 5 columns (one per factor) × N rows (one per color)
+ * Rows N+1..2N: Hue shift variations   — 4 columns (one per shift) × N rows (one per color)
  */
 export function generatePaletteGridImage(
   colors: Array<{ hex: string; rgb: RGB }>,
@@ -251,17 +251,22 @@ export function generatePaletteGridImage(
   if (colors.length === 0) throw new Error('Cannot generate palette grid with zero colors');
 
   const mainSwatchHeight = 60;
-  const variantRowHeight = 40;
+  const variantCellHeight = 40;
   const brightnessFactors = [0.5, 0.75, 1.0, 1.25, 1.5];
   const hueShifts = [0, 10, 20, 30];
-  const labelGap = 20; // gap between sections for labels
+  const labelGap = 20;
   const sectionGap = 16;
+  const factorLabelHeight = 14; // space for column labels below grids
 
-  const totalWidth = swatchWidth * colors.length;
+  const mainWidth = swatchWidth * colors.length;
+  const brightnessWidth = swatchWidth * brightnessFactors.length;
+  const hueWidth = swatchWidth * hueShifts.length;
+  const totalWidth = Math.max(mainWidth, brightnessWidth, hueWidth);
+
   const totalHeight =
     mainSwatchHeight +
-    sectionGap + labelGap + (brightnessFactors.length * variantRowHeight) +
-    sectionGap + labelGap + (hueShifts.length * variantRowHeight);
+    sectionGap + labelGap + (colors.length * variantCellHeight) + factorLabelHeight +
+    sectionGap + labelGap + (colors.length * variantCellHeight) + factorLabelHeight;
 
   const canvas = createCanvas(totalWidth, totalHeight);
   const ctx = canvas.getContext('2d');
@@ -285,7 +290,7 @@ export function generatePaletteGridImage(
     ctx.fillText(colors[i].hex, x + swatchWidth / 2, mainSwatchHeight / 2);
   }
 
-  // Brightness section
+  // Brightness section — rows = colors, cols = factors
   let yOffset = mainSwatchHeight + sectionGap;
   ctx.fillStyle = '#aaaacc';
   ctx.font = 'bold 11px sans-serif';
@@ -294,26 +299,30 @@ export function generatePaletteGridImage(
   ctx.fillText('Brightness', 4, yOffset);
   yOffset += labelGap;
 
-  for (let f = 0; f < brightnessFactors.length; f++) {
-    const factor = brightnessFactors[f];
-    const adjustment = (factor - 1) * 50;
-    for (let i = 0; i < colors.length; i++) {
+  for (let i = 0; i < colors.length; i++) {
+    for (let f = 0; f < brightnessFactors.length; f++) {
+      const factor = brightnessFactors[f];
+      const adjustment = (factor - 1) * 50;
       const adjusted = adjustBrightness(colors[i].rgb, adjustment);
       const hex = rgbToHex(adjusted);
-      const x = i * swatchWidth;
+      const x = f * swatchWidth;
       ctx.fillStyle = hex;
-      ctx.fillRect(x, yOffset, swatchWidth, variantRowHeight);
+      ctx.fillRect(x, yOffset, swatchWidth, variantCellHeight);
     }
-    // Factor label on left edge
-    ctx.fillStyle = '#aaaacc';
-    ctx.font = '9px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(`${brightnessFactors[f]}x`, 2, yOffset + variantRowHeight - 2);
-    yOffset += variantRowHeight;
+    yOffset += variantCellHeight;
   }
 
-  // Hue shift section
+  // Factor column labels
+  for (let f = 0; f < brightnessFactors.length; f++) {
+    ctx.fillStyle = '#aaaacc';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${brightnessFactors[f]}x`, f * swatchWidth + swatchWidth / 2, yOffset + 2);
+  }
+  yOffset += factorLabelHeight;
+
+  // Hue shift section — rows = colors, cols = shifts
   yOffset += sectionGap;
   ctx.fillStyle = '#aaaacc';
   ctx.font = 'bold 11px sans-serif';
@@ -322,22 +331,25 @@ export function generatePaletteGridImage(
   ctx.fillText('Hue Shift', 4, yOffset);
   yOffset += labelGap;
 
-  for (let h = 0; h < hueShifts.length; h++) {
-    const shift = hueShifts[h];
-    for (let i = 0; i < colors.length; i++) {
+  for (let i = 0; i < colors.length; i++) {
+    for (let h = 0; h < hueShifts.length; h++) {
+      const shift = hueShifts[h];
       const adjusted = adjustHue(colors[i].rgb, shift);
       const hex = rgbToHex(adjusted);
-      const x = i * swatchWidth;
+      const x = h * swatchWidth;
       ctx.fillStyle = hex;
-      ctx.fillRect(x, yOffset, swatchWidth, variantRowHeight);
+      ctx.fillRect(x, yOffset, swatchWidth, variantCellHeight);
     }
-    // Shift label on left edge
+    yOffset += variantCellHeight;
+  }
+
+  // Shift column labels
+  for (let h = 0; h < hueShifts.length; h++) {
     ctx.fillStyle = '#aaaacc';
     ctx.font = '9px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(`+${hueShifts[h]}°`, 2, yOffset + variantRowHeight - 2);
-    yOffset += variantRowHeight;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`+${hueShifts[h]}°`, h * swatchWidth + swatchWidth / 2, yOffset + 2);
   }
 
   return canvas.toDataURL('image/png');

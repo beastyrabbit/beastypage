@@ -84,6 +84,7 @@ export async function handleCatCommand(
       shading: interaction.options.getBoolean("shading") ?? undefined,
       eye_colour: interaction.options.getString("eye_colour") ?? undefined,
       discord_user_id: interaction.user.id,
+      discord_username: interaction.user.displayName,
     };
 
     const result = await generateCat(options);

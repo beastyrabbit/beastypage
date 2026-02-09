@@ -127,10 +127,21 @@ export async function POST(request: NextRequest) {
       console.warn('[discord/random-cat] No Convex URL configured — skipping persistence');
     } else {
       const convex = new ConvexHttpClient(convexUrl);
-      const catData = { ...params, source: 'discordkitten' };
+      const catData = {
+        params: { ...params, source: 'discordkitten' },
+        accessorySlots: params.accessories ?? [],
+        scarSlots: params.scars ?? [],
+        tortieSlots: params.tortie ?? [],
+        counts: {
+          accessories: (params.accessories ?? []).length,
+          scars: (params.scars ?? []).length,
+          tortie: (params.tortie ?? []).length,
+        },
+      };
+      const discordUsername = typeof body.discord_username === 'string' ? body.discord_username : undefined;
       const result = await convex.mutation(api.mapper.create, {
         catData,
-        creatorName: 'Discord Bot',
+        creatorName: discordUsername || 'Discord',
       });
       slug = result.slug;
     }
