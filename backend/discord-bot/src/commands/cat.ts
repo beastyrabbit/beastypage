@@ -47,6 +47,30 @@ const COLOUR_NAMES = [
   "CHOCOLATE",
 ];
 
+const EYE_COLOURS = [
+  "YELLOW",
+  "AMBER",
+  "HAZEL",
+  "PALEGREEN",
+  "GREEN",
+  "BLUE",
+  "DARKBLUE",
+  "GREY",
+  "CYAN",
+  "EMERALD",
+  "HEATHERBLUE",
+  "SUNLITICE",
+  "COPPER",
+  "SAGE",
+  "COBALT",
+  "PALEBLUE",
+  "PALEYELLOW",
+  "GOLD",
+  "GREENYELLOW",
+  "BRONZE",
+  "SILVER",
+];
+
 export async function handleCatCommand(
   interaction: ChatInputCommandInteraction
 ): Promise<void> {
@@ -58,7 +82,10 @@ export async function handleCatCommand(
       pelt: interaction.options.getString("pelt") ?? undefined,
       colour: interaction.options.getString("colour") ?? undefined,
       shading: interaction.options.getBoolean("shading") ?? undefined,
-      tortie: interaction.options.getBoolean("tortie") ?? undefined,
+      eye_colour: interaction.options.getString("eye_colour") ?? undefined,
+      accessories: interaction.options.getInteger("accessories") ?? undefined,
+      scars: interaction.options.getInteger("scars") ?? undefined,
+      torties: interaction.options.getInteger("torties") ?? undefined,
     };
 
     const result = await generateCat(options);
@@ -93,6 +120,8 @@ export async function handleCatAutocomplete(
       choices = PELT_NAMES;
     } else if (focused.name === "colour") {
       choices = COLOUR_NAMES;
+    } else if (focused.name === "eye_colour") {
+      choices = EYE_COLOURS;
     } else {
       return;
     }

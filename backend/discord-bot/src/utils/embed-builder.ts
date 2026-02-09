@@ -7,17 +7,30 @@ export function buildCatEmbed(
   viewUrl: string | undefined,
   imageFilename: string
 ): EmbedBuilder {
+  const lines = [
+    `**Pelt:** ${params.peltName}`,
+    `**Colour:** ${params.colour}`,
+    `**Eye Colour:** ${params.eyeColour}`,
+    `**Sprite:** ${params.spriteNumber}`,
+    `**Shading:** ${params.shading ? "Yes" : "No"}`,
+  ];
+
+  const tortieCount = params.tortie?.length ?? 0;
+  lines.push(`**Tortie:** ${params.isTortie ? `Yes (${tortieCount} layer${tortieCount !== 1 ? "s" : ""})` : "No"}`);
+
+  const accCount = params.accessories?.filter(Boolean).length ?? 0;
+  lines.push(`**Accessories:** ${accCount}`);
+
+  const scarCount = params.scars?.filter(Boolean).length ?? 0;
+  lines.push(`**Scars:** ${scarCount}`);
+
+  if (params.darkForest) {
+    lines.push(`**Dark Forest:** Yes`);
+  }
+
   const embed = new EmbedBuilder()
     .setTitle(slug ? `Cat: ${slug}` : "Random Cat")
-    .setDescription(
-      [
-        `**Pelt:** ${params.peltName}`,
-        `**Colour:** ${params.colour}`,
-        `**Sprite:** ${params.spriteNumber}`,
-        `**Shading:** ${params.shading ? "Yes" : "No"}`,
-        `**Tortie:** ${params.isTortie ? "Yes" : "No"}`,
-      ].join("\n")
-    )
+    .setDescription(lines.join("\n"))
     .setImage(`attachment://${imageFilename}`)
     .setColor(0x7c3aed);
 

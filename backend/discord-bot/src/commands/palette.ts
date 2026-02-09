@@ -9,7 +9,7 @@ import { dataUrlToBase64 } from "../utils/data-url.js";
 
 function buildPaletteReply(result: PaletteResponse) {
   const imageBuffer = Buffer.from(dataUrlToBase64(result.paletteImage), "base64");
-  const filename = "palette-swatch.png";
+  const filename = "palette-grid.png";
   const attachment = new AttachmentBuilder(imageBuffer, { name: filename });
   const embed = buildPaletteEmbed(result.colors, result.customizeUrl, filename);
   return { embeds: [embed], files: [attachment] };

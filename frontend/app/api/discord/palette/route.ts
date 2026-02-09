@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { extractColorsServer, generatePaletteImage } from '@/lib/color-extraction/server-extraction';
+import { ConvexHttpClient } from 'convex/browser';
+import { api } from '@/convex/_generated/api';
+import { getServerConvexUrl } from '@/lib/convexUrl';
+import { extractColorsServer, generatePaletteGridImage } from '@/lib/color-extraction/server-extraction';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 const PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://beastypage.com';
@@ -113,10 +116,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Generate palette swatch image
+  // Generate full palette grid image (with brightness/hue variations)
   let paletteImage: string;
   try {
-    paletteImage = generatePaletteImage(colors);
+    paletteImage = generatePaletteGridImage(colors);
   } catch (error) {
     console.error('[discord/palette] Palette image generation failed', error);
     return NextResponse.json(
@@ -125,15 +128,44 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?imageUrl=${encodeURIComponent(imageUrl)}`;
+  // Store source image in Convex and save config with slug
+  const colorsPayload = colors.map((c) => ({
+    hex: c.hex,
+    rgb: c.rgb,
+    prevalence: c.prevalence,
+  }));
+
+  let slug: string | undefined;
+  let customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?imageUrl=${encodeURIComponent(imageUrl)}`;
+
+  try {
+    const convexUrl = getServerConvexUrl();
+    if (convexUrl) {
+      const convex = new ConvexHttpClient(convexUrl);
+
+      // Convert the fetched image buffer to a data URL for Convex storage
+      const contentType = 'image/png';
+      const base64 = imageBuffer.toString('base64');
+      const dataUrl = `data:${contentType};base64,${base64}`;
+
+      const result = await convex.action(
+        api.paletteGeneratorSettings.storeDiscordImage,
+        { dataUrl, colors: colorsPayload },
+      );
+      slug = result.slug;
+      customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?paletteSlug=${slug}`;
+    } else {
+      console.warn('[discord/palette] No Convex URL configured — skipping persistence');
+    }
+  } catch (error) {
+    // Non-fatal — we still return the palette even if storage fails
+    console.error('[discord/palette] Failed to store in Convex', error);
+  }
 
   return NextResponse.json({
-    colors: colors.map((c) => ({
-      hex: c.hex,
-      rgb: c.rgb,
-      prevalence: c.prevalence,
-    })),
+    colors: colorsPayload,
     paletteImage,
     customizeUrl,
+    slug,
   });
 }

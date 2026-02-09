@@ -27,8 +27,11 @@ export async function POST(request: NextRequest) {
   if (typeof body.sprite === 'number') overrides.sprite = body.sprite;
   if (typeof body.pelt === 'string') overrides.pelt = body.pelt;
   if (typeof body.colour === 'string') overrides.colour = body.colour;
+  if (typeof body.eye_colour === 'string') overrides.eyeColour = body.eye_colour;
   if (typeof body.shading === 'boolean') overrides.shading = body.shading;
-  if (typeof body.tortie === 'boolean') overrides.tortie = body.tortie;
+  if (typeof body.accessories === 'number') overrides.accessories = body.accessories;
+  if (typeof body.scars === 'number') overrides.scars = body.scars;
+  if (typeof body.torties === 'number') overrides.torties = body.torties;
 
   // Generate random params
   let params;
