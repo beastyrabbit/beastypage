@@ -7,7 +7,7 @@
 
 import { createCanvas, loadImage, type Image } from '@napi-rs/canvas';
 import type { ExtractedColor, KMeansOptions, PixelData, Centroid, RGB } from './types';
-import { rgbToHex, rgbToHsl, isBlackOrWhite, colorDistance, adjustBrightness, adjustHue, getContrastColor } from './color-utils';
+import { rgbToHex, rgbToHsl, isBlackOrWhite, colorDistance, adjustBrightness, adjustHue } from './color-utils';
 
 const MAX_DIMENSION = 1200;
 
@@ -236,121 +236,106 @@ export function generatePaletteImage(
   return canvas.toDataURL('image/png');
 }
 
+// Threshold for considering a color as near-black or near-white
+const BLACK_WHITE_THRESHOLD = 15;
+
+function isNearBlack(rgb: RGB): boolean {
+  return rgb.r <= BLACK_WHITE_THRESHOLD &&
+         rgb.g <= BLACK_WHITE_THRESHOLD &&
+         rgb.b <= BLACK_WHITE_THRESHOLD;
+}
+
+function isNearWhite(rgb: RGB): boolean {
+  return rgb.r >= 255 - BLACK_WHITE_THRESHOLD &&
+         rgb.g >= 255 - BLACK_WHITE_THRESHOLD &&
+         rgb.b >= 255 - BLACK_WHITE_THRESHOLD;
+}
+
+function filterColors(colors: Array<{ hex: string; rgb: RGB }>): Array<{ hex: string; rgb: RGB }> {
+  const seen = new Set<string>();
+  return colors.filter((c) => {
+    if (isNearBlack(c.rgb) || isNearWhite(c.rgb)) return false;
+    const key = `${c.rgb.r},${c.rgb.g},${c.rgb.b}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 /**
- * Generate a full palette grid image with brightness and hue variations.
- * Matches the layout of the PaletteGrid component (rows = colors, cols = factors/shifts).
+ * Generate a palette grid image matching the website PNG export.
  *
- * Row 0:        Main swatches          — N columns × 1 row (60×60px each)
- * Rows 1..N:    Brightness variations  — 5 columns (one per factor) × N rows (one per color)
- * Rows N+1..2N: Hue shift variations   — 4 columns (one per shift) × N rows (one per color)
+ * Layout: 3 sections (each SECTION_SIZE × SECTION_SIZE):
+ *   1. Color strip — each color full-width, stacked vertically (reversed)
+ *   2. Brightness grid — rows = colors (reversed), cols = brightness factors
+ *   3. Hue grid — rows = colors (reversed), cols = hue shifts
  */
 export function generatePaletteGridImage(
   colors: Array<{ hex: string; rgb: RGB }>,
-  swatchWidth = 60,
 ): string {
-  if (colors.length === 0) throw new Error('Cannot generate palette grid with zero colors');
+  const filtered = filterColors(colors);
+  if (filtered.length === 0) throw new Error('Cannot generate palette grid with zero colors');
 
-  const mainSwatchHeight = 60;
-  const variantCellHeight = 40;
+  const SECTION_SIZE = 1000;
   const brightnessFactors = [0.5, 0.75, 1.0, 1.25, 1.5];
   const hueShifts = [0, 10, 20, 30];
-  const labelGap = 20;
-  const sectionGap = 16;
-  const factorLabelHeight = 14; // space for column labels below grids
+  const totalSections = 3; // strip + brightness + hue
 
-  const mainWidth = swatchWidth * colors.length;
-  const brightnessWidth = swatchWidth * brightnessFactors.length;
-  const hueWidth = swatchWidth * hueShifts.length;
-  const totalWidth = Math.max(mainWidth, brightnessWidth, hueWidth);
-
-  const totalHeight =
-    mainSwatchHeight +
-    sectionGap + labelGap + (colors.length * variantCellHeight) + factorLabelHeight +
-    sectionGap + labelGap + (colors.length * variantCellHeight) + factorLabelHeight;
-
-  const canvas = createCanvas(totalWidth, totalHeight);
+  const canvas = createCanvas(SECTION_SIZE, SECTION_SIZE * totalSections);
   const ctx = canvas.getContext('2d');
 
-  // Background
-  ctx.fillStyle = '#1a1a2e';
-  ctx.fillRect(0, 0, totalWidth, totalHeight);
+  let yOffset = 0;
 
-  // Row 0: Main swatches with hex labels
-  for (let i = 0; i < colors.length; i++) {
-    const x = i * swatchWidth;
-    ctx.fillStyle = colors[i].hex;
-    ctx.fillRect(x, 0, swatchWidth, mainSwatchHeight);
+  // Section 1: Vertical color strip (colors reversed, each full width)
+  const colorHeight = SECTION_SIZE / filtered.length;
+  filtered
+    .slice()
+    .reverse()
+    .forEach((color, index) => {
+      ctx.fillStyle = color.hex;
+      ctx.fillRect(0, yOffset + index * colorHeight, SECTION_SIZE, colorHeight);
+    });
+  yOffset += SECTION_SIZE;
 
-    // Hex label
-    const textColor = getContrastColor(colors[i].rgb);
-    ctx.fillStyle = textColor;
-    ctx.font = 'bold 10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(colors[i].hex, x + swatchWidth / 2, mainSwatchHeight / 2);
-  }
+  // Section 2: Brightness grid (rows = colors reversed, cols = factors)
+  const bRowHeight = SECTION_SIZE / filtered.length;
+  const bColWidth = SECTION_SIZE / brightnessFactors.length;
+  filtered
+    .slice()
+    .reverse()
+    .forEach((color, rowIndex) => {
+      brightnessFactors.forEach((factor, colIndex) => {
+        const adjustment = (factor - 1) * 50;
+        const adjusted = adjustBrightness(color.rgb, adjustment);
+        ctx.fillStyle = rgbToHex(adjusted);
+        ctx.fillRect(
+          colIndex * bColWidth,
+          yOffset + rowIndex * bRowHeight,
+          bColWidth,
+          bRowHeight,
+        );
+      });
+    });
+  yOffset += SECTION_SIZE;
 
-  // Brightness section — rows = colors, cols = factors
-  let yOffset = mainSwatchHeight + sectionGap;
-  ctx.fillStyle = '#aaaacc';
-  ctx.font = 'bold 11px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText('Brightness', 4, yOffset);
-  yOffset += labelGap;
-
-  for (let i = 0; i < colors.length; i++) {
-    for (let f = 0; f < brightnessFactors.length; f++) {
-      const factor = brightnessFactors[f];
-      const adjustment = (factor - 1) * 50;
-      const adjusted = adjustBrightness(colors[i].rgb, adjustment);
-      const hex = rgbToHex(adjusted);
-      const x = f * swatchWidth;
-      ctx.fillStyle = hex;
-      ctx.fillRect(x, yOffset, swatchWidth, variantCellHeight);
-    }
-    yOffset += variantCellHeight;
-  }
-
-  // Factor column labels
-  for (let f = 0; f < brightnessFactors.length; f++) {
-    ctx.fillStyle = '#aaaacc';
-    ctx.font = '9px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`${brightnessFactors[f]}x`, f * swatchWidth + swatchWidth / 2, yOffset + 2);
-  }
-  yOffset += factorLabelHeight;
-
-  // Hue shift section — rows = colors, cols = shifts
-  yOffset += sectionGap;
-  ctx.fillStyle = '#aaaacc';
-  ctx.font = 'bold 11px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText('Hue Shift', 4, yOffset);
-  yOffset += labelGap;
-
-  for (let i = 0; i < colors.length; i++) {
-    for (let h = 0; h < hueShifts.length; h++) {
-      const shift = hueShifts[h];
-      const adjusted = adjustHue(colors[i].rgb, shift);
-      const hex = rgbToHex(adjusted);
-      const x = h * swatchWidth;
-      ctx.fillStyle = hex;
-      ctx.fillRect(x, yOffset, swatchWidth, variantCellHeight);
-    }
-    yOffset += variantCellHeight;
-  }
-
-  // Shift column labels
-  for (let h = 0; h < hueShifts.length; h++) {
-    ctx.fillStyle = '#aaaacc';
-    ctx.font = '9px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(`+${hueShifts[h]}°`, h * swatchWidth + swatchWidth / 2, yOffset + 2);
-  }
+  // Section 3: Hue grid (rows = colors reversed, cols = shifts)
+  const hRowHeight = SECTION_SIZE / filtered.length;
+  const hColWidth = SECTION_SIZE / hueShifts.length;
+  filtered
+    .slice()
+    .reverse()
+    .forEach((color, rowIndex) => {
+      hueShifts.forEach((shift, colIndex) => {
+        const adjusted = adjustHue(color.rgb, shift);
+        ctx.fillStyle = rgbToHex(adjusted);
+        ctx.fillRect(
+          colIndex * hColWidth,
+          yOffset + rowIndex * hRowHeight,
+          hColWidth,
+          hRowHeight,
+        );
+      });
+    });
 
   return canvas.toDataURL('image/png');
 }
