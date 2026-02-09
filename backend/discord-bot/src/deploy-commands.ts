@@ -7,57 +7,48 @@ import {
 } from "discord.js";
 import { config } from "./config.js";
 
-/** Shared cat-generation options applied to both /gen-discord-kitten and /cat */
-function buildCatCommand(name: string, description: string) {
-  return new SlashCommandBuilder()
-    .setName(name)
-    .setDescription(description)
-    .addIntegerOption((option) =>
-      option
-        .setName("sprite")
-        .setDescription("Sprite number")
-        .setMinValue(3)
-        .setMaxValue(18)
-        .setRequired(false)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("pelt")
-        .setDescription("Pelt pattern")
-        .setAutocomplete(true)
-        .setRequired(false)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("colour")
-        .setDescription("Fur colour")
-        .setAutocomplete(true)
-        .setRequired(false)
-    )
-    .addBooleanOption((option) =>
-      option
-        .setName("shading")
-        .setDescription("Enable shading")
-        .setRequired(false)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("eye_colour")
-        .setDescription("Eye colour")
-        .setAutocomplete(true)
-        .setRequired(false)
-    );
-}
+const genDiscordKittenCommand = new SlashCommandBuilder()
+  .setName("gen-discord-kitten")
+  .setDescription("Generate a random pixel cat with per-invocation overrides")
+  .addIntegerOption((option) =>
+    option
+      .setName("sprite")
+      .setDescription("Sprite number")
+      .setMinValue(3)
+      .setMaxValue(18)
+      .setRequired(false)
+  )
+  .addStringOption((option) =>
+    option
+      .setName("pelt")
+      .setDescription("Pelt pattern")
+      .setAutocomplete(true)
+      .setRequired(false)
+  )
+  .addStringOption((option) =>
+    option
+      .setName("colour")
+      .setDescription("Fur colour")
+      .setAutocomplete(true)
+      .setRequired(false)
+  )
+  .addBooleanOption((option) =>
+    option
+      .setName("shading")
+      .setDescription("Enable shading")
+      .setRequired(false)
+  )
+  .addStringOption((option) =>
+    option
+      .setName("eye_colour")
+      .setDescription("Eye colour")
+      .setAutocomplete(true)
+      .setRequired(false)
+  );
 
-const genDiscordKittenCommand = buildCatCommand(
-  "gen-discord-kitten",
-  "Generate a random pixel cat"
-);
-
-const catCommand = buildCatCommand(
-  "cat",
-  "Generate a random pixel cat (alias for /gen-discord-kitten)"
-);
+const catCommand = new SlashCommandBuilder()
+  .setName("cat")
+  .setDescription("Generate a random pixel cat using your /config settings");
 
 const paletteCommand = new SlashCommandBuilder()
   .setName("palette")
