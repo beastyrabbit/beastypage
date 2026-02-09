@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PawPrint, Gamepad2 } from "lucide-react";
+import { PawPrint, Gamepad2, Wrench } from "lucide-react";
 import ArrowNarrowRightIcon from "@/components/ui/arrow-narrow-right-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import PaintIcon from "@/components/ui/paint-icon";
@@ -11,6 +11,7 @@ const CATEGORY_ICONS: Record<ProjectCategory, React.ComponentType<{ className?: 
   gacha: SparklesIcon,
   artist: PaintIcon,
   games: Gamepad2,
+  tools: Wrench,
 };
 
 type ToolPreview = {
