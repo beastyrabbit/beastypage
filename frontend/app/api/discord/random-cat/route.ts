@@ -68,14 +68,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const renderResult = (await rendererRes.json()) as { imageDataUrl?: string };
-    if (!renderResult.imageDataUrl) {
+    const renderResult = (await rendererRes.json()) as { image?: string };
+    if (!renderResult.image) {
       return NextResponse.json(
         { error: 'Renderer returned no image' },
         { status: 502 },
       );
     }
-    imageDataUrl = renderResult.imageDataUrl;
+    imageDataUrl = renderResult.image;
   } catch (error) {
     console.error('[discord/random-cat] Renderer request failed', error);
     return NextResponse.json(
