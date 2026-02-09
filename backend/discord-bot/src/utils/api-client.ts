@@ -8,9 +8,7 @@ interface CatOptions {
   colour?: string;
   shading?: boolean;
   eye_colour?: string;
-  accessories?: number;
-  scars?: number;
-  torties?: number;
+  discord_user_id?: string;
 }
 
 export interface CatResponse {
@@ -28,6 +26,7 @@ export interface CatResponse {
     scars?: (string | null)[];
     tortie?: { mask?: string; pattern?: string; colour?: string }[];
     darkForest?: boolean;
+    dead?: boolean;
     source: string;
   };
 }
@@ -44,6 +43,19 @@ export interface PaletteResponse {
   colors: PaletteColor[];
   customizeUrl: string;
   slug?: string;
+}
+
+export interface UserConfig {
+  discordUserId: string;
+  accessoriesMin: number;
+  accessoriesMax: number;
+  scarsMin: number;
+  scarsMax: number;
+  tortiesMin: number;
+  tortiesMax: number;
+  darkForest: boolean;
+  starclan: boolean;
+  palettes: string[];
 }
 
 async function fetchWithTimeout(
@@ -105,4 +117,34 @@ export async function extractPalette(
   }
 
   return (await res.json()) as PaletteResponse;
+}
+
+export async function getUserConfig(
+  discordUserId: string
+): Promise<UserConfig> {
+  const url = `${config.frontendApiUrl}/api/discord/user-config?discordUserId=${encodeURIComponent(discordUserId)}`;
+  const res = await fetchWithTimeout(url, { method: "GET" });
+
+  if (!res.ok) {
+    const text = await readErrorBody(res);
+    throw new Error(`user-config GET error ${res.status}: ${text}`);
+  }
+
+  return (await res.json()) as UserConfig;
+}
+
+export async function updateUserConfig(
+  payload: Record<string, unknown>
+): Promise<void> {
+  const url = `${config.frontendApiUrl}/api/discord/user-config`;
+  const res = await fetchWithTimeout(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await readErrorBody(res);
+    throw new Error(`user-config PATCH error ${res.status}: ${text}`);
+  }
 }

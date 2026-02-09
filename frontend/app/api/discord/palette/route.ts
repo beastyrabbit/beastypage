@@ -5,7 +5,7 @@ import { getServerConvexUrl } from '@/lib/convexUrl';
 import { extractColorsServer, generatePaletteGridImage } from '@/lib/color-extraction/server-extraction';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
-const PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://beastypage.com';
+const PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://beastyrabbit.com';
 
 const BLOCKED_HOSTNAMES = new Set(['localhost', '0.0.0.0', '[::1]']);
 

@@ -5,6 +5,11 @@ import {
   handlePaletteCommand,
   handlePaletteContextMenu,
 } from "./commands/palette.js";
+import {
+  handleConfigCommand,
+  handleConfigAutocomplete,
+} from "./commands/config.js";
+import { handleHomepageCommand } from "./commands/homepage.js";
 
 process.on("unhandledRejection", (error) => {
   console.error("Unhandled rejection:", error);
@@ -22,18 +27,27 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.isChatInputCommand()) {
       switch (interaction.commandName) {
+        case "gen-discord-kitten":
         case "cat":
           await handleCatCommand(interaction);
           break;
         case "palette":
           await handlePaletteCommand(interaction);
           break;
+        case "config":
+          await handleConfigCommand(interaction);
+          break;
+        case "homepage":
+          await handleHomepageCommand(interaction);
+          break;
         default:
           console.warn(`Unknown command: ${interaction.commandName}`);
       }
     } else if (interaction.isAutocomplete()) {
-      if (interaction.commandName === "cat") {
+      if (interaction.commandName === "gen-discord-kitten" || interaction.commandName === "cat") {
         await handleCatAutocomplete(interaction);
+      } else if (interaction.commandName === "config") {
+        await handleConfigAutocomplete(interaction);
       }
     } else if (interaction.isMessageContextMenuCommand()) {
       if (interaction.commandName === "Extract Palette") {

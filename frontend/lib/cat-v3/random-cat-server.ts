@@ -9,6 +9,7 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { CatParams, TortieLayer, RandomGenerationOptions } from './types';
+import { getColorNamesForPalette, type PaletteId } from '@/lib/palettes';
 import config from './random-config.json';
 
 // ---------------------------------------------------------------------------
@@ -329,6 +330,18 @@ export interface DiscordCatOverrides {
   accessories?: number;  // pin slot count 0-4
   scars?: number;        // pin slot count 0-3
   torties?: number;      // pin layer count 0-4; 0 = force no tortie
+  // Ranges (from user config)
+  accessoriesMin?: number;
+  accessoriesMax?: number;
+  scarsMin?: number;
+  scarsMax?: number;
+  tortiesMin?: number;
+  tortiesMax?: number;
+  // Booleans
+  darkForest?: boolean;
+  starclan?: boolean;
+  // Palettes
+  palettes?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -356,13 +369,31 @@ export async function generateRandomParamsServer(
 
   const pelts = data.peltNames.filter((p) => p !== 'Tortie' && p !== 'Calico');
 
-  // Afterlife: 10% chance (matching "dark10" default from single-cat-plus)
-  const isDarkForest = Math.random() < 0.1;
+  // Resolve colour pool — include palette colours when specified
+  let colourPool: readonly string[] = data.colours;
+  if (overrides.palettes && overrides.palettes.length > 0) {
+    const paletteColours = new Set<string>();
+    for (const pid of overrides.palettes) {
+      for (const name of getColorNamesForPalette(pid as PaletteId)) {
+        paletteColours.add(name);
+      }
+    }
+    // When palettes are active, pick from palette colours only
+    if (paletteColours.size > 0) colourPool = Array.from(paletteColours);
+  }
+
+  // Afterlife: respect overrides, otherwise 10% chance
+  const isDarkForest =
+    overrides.darkForest === true ? true :
+    overrides.darkForest === false ? false :
+    Math.random() < 0.1;
 
   const params: CatParams = {
     spriteNumber,
     peltName: overrides.pelt && pelts.includes(overrides.pelt) ? overrides.pelt : pickOne(pelts),
-    colour: overrides.colour && data.colours.includes(overrides.colour) ? overrides.colour : pickOne(data.colours),
+    colour: overrides.colour && (data.colours.includes(overrides.colour) || colourPool.includes(overrides.colour))
+      ? overrides.colour
+      : pickOne(colourPool),
     tint: pickOne(data.tints),
     skinColour: pickOne(data.skinColours),
     eyeColour: overrides.eyeColour && data.eyeColours.includes(overrides.eyeColour)
@@ -373,6 +404,7 @@ export async function generateRandomParamsServer(
     isTortie: false,
     darkForest: isDarkForest,
     darkMode: isDarkForest,
+    dead: overrides.starclan === true ? true : undefined,
   };
 
   // Heterochromia
@@ -382,9 +414,9 @@ export async function generateRandomParamsServer(
     if (selected) params.eyeColour2 = selected;
   }
 
-  // Tortie — match single-cat-plus defaults (range 1-4)
-  // When overrides.torties is provided: 0 = force no tortie, >0 = force tortie with that count
-  // When omitted: 50% chance (per config) with random count 1-4
+  // Tortie — per-invocation override > user config range > random chance
+  const tortieMin = overrides.tortiesMin ?? 0;
+  const tortieMax = overrides.tortiesMax ?? 4;
   const tortieCount = overrides.torties ?? undefined;
   if (tortieCount === 0) {
     params.isTortie = false;
@@ -395,7 +427,7 @@ export async function generateRandomParamsServer(
   }
 
   if (params.isTortie) {
-    const slotCount = tortieCount ?? computeLayerCount(1, 4);
+    const slotCount = tortieCount ?? computeLayerCount(tortieMin, tortieMax);
     const tortieConfig = RANDOM_CONFIG.counts.tortie;
     const masks = data.tortieMasks;
     const uniqueMasks = tortieConfig.unique !== false;
@@ -411,7 +443,7 @@ export async function generateRandomParamsServer(
       tortiePatterns.push({
         mask,
         pattern: pickOne(pelts),
-        colour: pickOne(data.colours),
+        colour: pickOne(colourPool),
       });
       if (uniqueMasks && !availableMasks.length) break;
     }
@@ -424,7 +456,7 @@ export async function generateRandomParamsServer(
         tortiePatterns.push({
           mask: fallback,
           pattern: pickOne(pelts),
-          colour: pickOne(data.colours),
+          colour: pickOne(colourPool),
         });
       }
     }
@@ -458,8 +490,10 @@ export async function generateRandomParamsServer(
     }
   }
 
-  // Accessories — match single-cat-plus defaults (range 1-4)
-  const accSlots = overrides.accessories ?? computeLayerCount(1, 4);
+  // Accessories — per-invocation override > user config range > random
+  const accMin = overrides.accessoriesMin ?? 0;
+  const accMax = overrides.accessoriesMax ?? 4;
+  const accSlots = overrides.accessories ?? computeLayerCount(accMin, accMax);
   if (accSlots > 0 && data.accessories.length > 0) {
     const accConfig = RANDOM_CONFIG.counts.accessories;
     const uniqueAcc = accConfig.unique !== false;
@@ -479,8 +513,10 @@ export async function generateRandomParamsServer(
     }
   }
 
-  // Scars — match single-cat-plus defaults (range 1-1, always 1 slot)
-  const scarSlots = overrides.scars ?? computeLayerCount(1, 1);
+  // Scars — per-invocation override > user config range > random
+  const scarMin = overrides.scarsMin ?? 0;
+  const scarMax = overrides.scarsMax ?? 4;
+  const scarSlots = overrides.scars ?? computeLayerCount(scarMin, scarMax);
   if (scarSlots > 0 && data.scars.length > 0) {
     const scarsConfig = RANDOM_CONFIG.counts.scars;
     const uniqueScars = scarsConfig.unique !== false;

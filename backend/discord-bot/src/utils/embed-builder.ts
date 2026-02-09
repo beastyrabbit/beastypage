@@ -1,5 +1,5 @@
 import { EmbedBuilder } from "discord.js";
-import type { CatResponse, PaletteColor } from "./api-client.js";
+import type { CatResponse, PaletteColor, UserConfig } from "./api-client.js";
 
 export function buildCatEmbed(
   params: CatResponse["params"],
@@ -26,6 +26,9 @@ export function buildCatEmbed(
 
   if (params.darkForest) {
     lines.push(`**Dark Forest:** Yes`);
+  }
+  if (params.dead) {
+    lines.push(`**StarClan:** Yes`);
   }
 
   const embed = new EmbedBuilder()
@@ -54,5 +57,21 @@ export function buildPaletteEmbed(
     .setImage(`attachment://${imageFilename}`)
     .setURL(customizeUrl)
     .setFooter({ text: "Customize on BeastyPage" })
+    .setColor(0x7c3aed);
+}
+
+export function buildConfigEmbed(cfg: UserConfig): EmbedBuilder {
+  const lines = [
+    `**Accessories:** ${cfg.accessoriesMin}–${cfg.accessoriesMax}`,
+    `**Scars:** ${cfg.scarsMin}–${cfg.scarsMax}`,
+    `**Torties:** ${cfg.tortiesMin}–${cfg.tortiesMax}`,
+    `**Dark Forest:** ${cfg.darkForest ? "Always" : "Random (10%)"}`,
+    `**StarClan:** ${cfg.starclan ? "Always" : "Off"}`,
+    `**Palettes:** ${cfg.palettes.length > 0 ? cfg.palettes.join(", ") : "None (base colours)"}`,
+  ];
+
+  return new EmbedBuilder()
+    .setTitle("Your Cat Config")
+    .setDescription(lines.join("\n"))
     .setColor(0x7c3aed);
 }
