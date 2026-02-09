@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
       const dataUrl = `data:${contentType};base64,${base64}`;
 
       const result = await convex.action(
-        api.paletteGeneratorSettings.storeDiscordImage,
+        api.paletteGeneratorSettingsActions.storeDiscordImage,
         { dataUrl, colors: colorsPayload },
       );
       slug = result.slug;
