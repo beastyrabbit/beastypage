@@ -69,6 +69,33 @@ interface TraitRow {
   type?: "darkForest";
 }
 
+/**
+ * Normalize catData that may be in flat format (pre-v4.2.3 Discord cats)
+ * or the standard CatSharePayload format.
+ * Flat format: { spriteNumber, peltName, colour, ... } at the top level.
+ * Wrapped format: { params: {...}, accessorySlots: [...], ... }.
+ */
+function normalizeCatPayload(data: Record<string, unknown>): CatSharePayload {
+  if (data.params && typeof data.params === "object") {
+    return data as unknown as CatSharePayload;
+  }
+  // Flat format — wrap it
+  const accessories = Array.isArray(data.accessories) ? data.accessories as string[] : [];
+  const scars = Array.isArray(data.scars) ? data.scars as string[] : [];
+  const tortie = Array.isArray(data.tortie) ? data.tortie as (TortieLayer | null)[] : [];
+  return {
+    params: data,
+    accessorySlots: accessories,
+    scarSlots: scars,
+    tortieSlots: tortie,
+    counts: {
+      accessories: accessories.length,
+      scars: scars.length,
+      tortie: tortie.length,
+    },
+  };
+}
+
 const VALID_SPRITES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
 const DISPLAY_CANVAS_SIZE = 900;
 const PREVIEW_CANVAS_SIZE = 360;
@@ -185,7 +212,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       return;
     }
     if (mapperRecord.cat_data) {
-      setCatPayload(mapperRecord.cat_data);
+      setCatPayload(normalizeCatPayload(mapperRecord.cat_data as unknown as Record<string, unknown>));
       setMeta({
         shareToken: mapperRecord.shareToken ?? mapperRecord.slug ?? mapperRecord.id,
         slug: mapperRecord.slug ?? mapperRecord.shareToken ?? mapperRecord.id,

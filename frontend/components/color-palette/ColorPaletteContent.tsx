@@ -61,9 +61,19 @@ export function ColorPaletteContent() {
   );
 
   // Compute cat params with dark forest override
+  // Handles both wrapped format ({ params: {...} }) and flat format (pre-v4.2.3 Discord cats)
   const catParams = useMemo(() => {
-    if (!mapperRecord?.cat_data?.params) return null;
-    let params = mapperRecord.cat_data.params as Record<string, unknown>;
+    if (!mapperRecord?.cat_data) return null;
+    const data = mapperRecord.cat_data as Record<string, unknown>;
+    let params: Record<string, unknown>;
+    if (data.params && typeof data.params === "object") {
+      params = data.params as Record<string, unknown>;
+    } else if (data.spriteNumber !== undefined) {
+      // Flat format — the entire catData IS the params
+      params = data;
+    } else {
+      return null;
+    }
     if (darkForestParam === "false" && params.darkForest) {
       params = { ...params, darkForest: false, darkMode: false };
     }
