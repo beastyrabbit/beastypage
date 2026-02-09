@@ -32,7 +32,7 @@ type TreePreviewCat = {
 };
 
 type HistoryItem =
-  | { kind: "single"; id: string; title: string; creator: string | null; created: number | null; previewUrl: string | null; fullUrl: string | null; slug: string; variant: "single" | "guided"; href: string }
+  | { kind: "single"; id: string; title: string; creator: string | null; created: number | null; previewUrl: string | null; fullUrl: string | null; slug: string; variant: "single" | "guided" | "discordkitten"; href: string }
   | {
       kind: "adoption";
       id: string;
@@ -131,8 +131,13 @@ export function HistoryClient() {
   const singleItems: HistoryItem[] = profiles
     .filter((profile) => !profile.adoptionBatchId)
     .map((profile) => {
-      const mode = (profile.cat_data as { mode?: string } | null)?.mode ?? null;
-      const variant: "single" | "guided" = mode === "wizard-timeline" ? "guided" : "single";
+      const catData = profile.cat_data as Record<string, unknown> | null;
+      const mode = (catData as { mode?: string } | null)?.mode ?? null;
+      // Detect discordkitten source in both wrapped ({ params: { source } }) and flat ({ source }) formats
+      const source = (catData?.params as Record<string, unknown> | undefined)?.source ?? catData?.source;
+      const variant: "single" | "guided" | "discordkitten" =
+        source === "discordkitten" ? "discordkitten" :
+        mode === "wizard-timeline" ? "guided" : "single";
       const slug = profile.slug ?? profile.shareToken ?? profile.id;
       const href = variant === "guided" ? `/guided-builder/view/${slug}` : `/view/${slug}`;
       const previewUrl = getPreviewUrl(profile.id, null, profile.previews ?? undefined);
@@ -399,7 +404,7 @@ function HistorySingleCard({ item, onPreview }: HistorySingleCardProps) {
   const fullUrl = item.fullUrl ?? previewUrl;
   const creator = cleanDisplay(item.creator);
   const href = item.href;
-  const variantLabel = item.variant === "guided" ? "Guided" : "Single";
+  const variantLabel = item.variant === "guided" ? "Guided" : item.variant === "discordkitten" ? "Discord Kitten" : "Single";
   const actionLabel = item.variant === "guided" ? "Open tour" : "View";
 
   return (
