@@ -47,18 +47,18 @@ const RANDOM_CONFIG = config as GenerationConfig;
 // ---------------------------------------------------------------------------
 
 interface SpriteData {
-  peltNames: string[];
-  colours: string[];
-  eyeColours: string[];
-  skinColours: string[];
-  accessories: string[];
-  scars: string[];
-  tortieMasks: string[];
-  whitePatches: string[];
-  points: string[];
-  vitiligo: string[];
-  tints: string[];
-  whiteTints: string[];
+  readonly peltNames: readonly string[];
+  readonly colours: readonly string[];
+  readonly eyeColours: readonly string[];
+  readonly skinColours: readonly string[];
+  readonly accessories: readonly string[];
+  readonly scars: readonly string[];
+  readonly tortieMasks: readonly string[];
+  readonly whitePatches: readonly string[];
+  readonly points: readonly string[];
+  readonly vitiligo: readonly string[];
+  readonly tints: readonly string[];
+  readonly whiteTints: readonly string[];
 }
 
 let cachedData: SpriteData | null = null;
@@ -75,17 +75,22 @@ async function loadSpriteData(): Promise<SpriteData> {
   if (loadPromise) return loadPromise;
 
   loadPromise = (async () => {
-    const [indexRaw, peltRaw] = await Promise.all([
-      readFile(resolvePublicPath('sprite-data/spritesIndex.json'), 'utf-8'),
-      readFile(resolvePublicPath('sprite-data/peltInfo.json'), 'utf-8'),
-    ]);
+    try {
+      const [indexRaw, peltRaw] = await Promise.all([
+        readFile(resolvePublicPath('sprite-data/spritesIndex.json'), 'utf-8'),
+        readFile(resolvePublicPath('sprite-data/peltInfo.json'), 'utf-8'),
+      ]);
 
-    const spritesIndex = JSON.parse(indexRaw) as Record<string, unknown>;
-    const peltInfo = JSON.parse(peltRaw) as Record<string, string[]>;
+      const spritesIndex = JSON.parse(indexRaw) as Record<string, unknown>;
+      const peltInfo = JSON.parse(peltRaw) as Record<string, string[]>;
 
-    const data = extractLists(spritesIndex, peltInfo);
-    cachedData = data;
-    return data;
+      const data = extractLists(spritesIndex, peltInfo);
+      cachedData = data;
+      return data;
+    } catch (error) {
+      loadPromise = null; // Allow retry on next call
+      throw error;
+    }
   })();
 
   return loadPromise;
@@ -226,7 +231,7 @@ function roll(probability: number | undefined): boolean {
   return Math.random() < probability;
 }
 
-function pickOne<T>(items: T[]): T {
+function pickOne<T>(items: readonly T[]): T {
   if (!items.length) throw new Error('Attempted to pick from an empty list');
   return items[Math.floor(Math.random() * items.length)];
 }
@@ -353,13 +358,7 @@ export async function generateRandomParamsServer(
   };
 
   // Tortie
-  if (overrides.tortie === true) {
-    params.isTortie = true;
-  } else if (overrides.tortie === false) {
-    params.isTortie = false;
-  } else {
-    params.isTortie = roll(RANDOM_CONFIG.probabilities.isTortie);
-  }
+  params.isTortie = overrides.tortie ?? roll(RANDOM_CONFIG.probabilities.isTortie);
 
   // Heterochromia
   if (roll(RANDOM_CONFIG.probabilities.heterochromia)) {
@@ -377,7 +376,7 @@ export async function generateRandomParamsServer(
     );
     const masks = data.tortieMasks;
     const uniqueMasks = tortieConfig.unique !== false;
-    const availableMasks = uniqueMasks ? [...masks] : masks;
+    const availableMasks: string[] = [...masks];
     const layerProb = RANDOM_CONFIG.probabilities.tortieLayer ?? RANDOM_CONFIG.probabilities.isTortie ?? 0.5;
     const tortiePatterns: TortieLayer[] = [];
 
@@ -396,7 +395,7 @@ export async function generateRandomParamsServer(
 
     if (tortiePatterns.length === 0) {
       const fallback = uniqueMasks
-        ? drawUnique(availableMasks.length ? availableMasks : [...masks])
+        ? drawUnique(availableMasks.length ? availableMasks : [...masks] as string[])
         : pickOne(masks);
       if (fallback) {
         tortiePatterns.push({
@@ -441,7 +440,7 @@ export async function generateRandomParamsServer(
   const accSlots = determineSlotCount('accessories', accConfig, RANDOM_CONFIG.defaultSlots, options);
   if (accSlots > 0 && data.accessories.length > 0) {
     const uniqueAcc = accConfig.unique !== false;
-    const available = uniqueAcc ? [...data.accessories] : data.accessories;
+    const available: string[] = [...data.accessories];
     const accProb = RANDOM_CONFIG.probabilities.accessorySlot ?? RANDOM_CONFIG.probabilities.accessory ?? 0.5;
     const selected: string[] = [];
     for (let slot = 0; slot < accSlots; slot++) {
@@ -462,7 +461,7 @@ export async function generateRandomParamsServer(
   const scarSlots = determineSlotCount('scars', scarsConfig, RANDOM_CONFIG.defaultSlots, options);
   if (scarSlots > 0 && data.scars.length > 0) {
     const uniqueScars = scarsConfig.unique !== false;
-    const available = uniqueScars ? [...data.scars] : data.scars;
+    const available: string[] = [...data.scars];
     const scarProb = RANDOM_CONFIG.probabilities.scarSlot ?? RANDOM_CONFIG.probabilities.scar ?? 0.5;
     const selected: string[] = [];
     for (let slot = 0; slot < scarSlots; slot++) {

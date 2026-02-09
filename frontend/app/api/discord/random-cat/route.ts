@@ -12,10 +12,14 @@ const PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://beastypage.
 
 export async function POST(request: NextRequest) {
   let body: Record<string, unknown> = {};
-  try {
-    body = (await request.json()) as Record<string, unknown>;
-  } catch {
-    // empty body is fine — all fields are optional
+  const contentLength = request.headers.get('content-length');
+  const hasBody = contentLength !== null && contentLength !== '0';
+  if (hasBody) {
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
   }
 
   // Build overrides from request
@@ -81,10 +85,12 @@ export async function POST(request: NextRequest) {
   }
 
   // Save to Convex
-  let slug = '';
+  let slug: string | undefined;
   try {
     const convexUrl = getServerConvexUrl();
-    if (convexUrl) {
+    if (!convexUrl) {
+      console.warn('[discord/random-cat] No Convex URL configured — skipping persistence');
+    } else {
       const convex = new ConvexHttpClient(convexUrl);
       const catData = { ...params, source: 'discordkitten' };
       const result = await convex.mutation(api.mapper.create, {
@@ -103,7 +109,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     image: imageDataUrl,
     params: { ...params, source: 'discordkitten' },
-    slug: slug || undefined,
+    slug,
     viewUrl,
   });
 }

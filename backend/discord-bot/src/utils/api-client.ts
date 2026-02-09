@@ -21,13 +21,13 @@ export interface CatResponse {
     shading: boolean;
     isTortie: boolean;
     source: string;
-    [key: string]: unknown;
   };
 }
 
 export interface PaletteColor {
   hex: string;
   rgb: { r: number; g: number; b: number };
+  /** Percentage 0-100 */
   prevalence: number;
 }
 
@@ -45,8 +45,21 @@ async function fetchWithTimeout(
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Request timed out after ${TIMEOUT_MS}ms`);
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+async function readErrorBody(res: Response): Promise<string> {
+  try {
+    return await res.text();
+  } catch {
+    return "(unable to read response body)";
   }
 }
 
@@ -59,7 +72,7 @@ export async function generateCat(options: CatOptions): Promise<CatResponse> {
   });
 
   if (!res.ok) {
-    const text = await res.text();
+    const text = await readErrorBody(res);
     throw new Error(`random-cat API error ${res.status}: ${text}`);
   }
 
@@ -78,7 +91,7 @@ export async function extractPalette(
   });
 
   if (!res.ok) {
-    const text = await res.text();
+    const text = await readErrorBody(res);
     throw new Error(`palette API error ${res.status}: ${text}`);
   }
 

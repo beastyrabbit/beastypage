@@ -5,6 +5,7 @@ import {
 } from "discord.js";
 import { generateCat } from "../utils/api-client.js";
 import { buildCatEmbed } from "../utils/embed-builder.js";
+import { dataUrlToBase64 } from "../utils/data-url.js";
 
 const PELT_NAMES = [
   "SingleColour",
@@ -46,12 +47,6 @@ const COLOUR_NAMES = [
   "CHOCOLATE",
 ];
 
-/** Strip the data URL prefix to get raw base64. */
-function dataUrlToBase64(dataUrl: string): string {
-  const commaIndex = dataUrl.indexOf(",");
-  return commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
-}
-
 export async function handleCatCommand(
   interaction: ChatInputCommandInteraction
 ): Promise<void> {
@@ -82,30 +77,34 @@ export async function handleCatCommand(
     console.error("Error generating cat:", error);
     await interaction.editReply({
       content: "Failed to generate cat. Please try again later.",
-    });
+    }).catch(() => {});
   }
 }
 
 export async function handleCatAutocomplete(
   interaction: AutocompleteInteraction
 ): Promise<void> {
-  const focused = interaction.options.getFocused(true);
-  const input = focused.value.toLowerCase();
+  try {
+    const focused = interaction.options.getFocused(true);
+    const input = focused.value.toLowerCase();
 
-  let choices: string[];
-  if (focused.name === "pelt") {
-    choices = PELT_NAMES;
-  } else if (focused.name === "colour") {
-    choices = COLOUR_NAMES;
-  } else {
-    return;
+    let choices: string[];
+    if (focused.name === "pelt") {
+      choices = PELT_NAMES;
+    } else if (focused.name === "colour") {
+      choices = COLOUR_NAMES;
+    } else {
+      return;
+    }
+
+    const filtered = choices
+      .filter((c) => c.toLowerCase().includes(input))
+      .slice(0, 25);
+
+    await interaction.respond(
+      filtered.map((c) => ({ name: c, value: c }))
+    );
+  } catch (error) {
+    console.error("Autocomplete error:", error);
   }
-
-  const filtered = choices
-    .filter((c) => c.toLowerCase().includes(input))
-    .slice(0, 25);
-
-  await interaction.respond(
-    filtered.map((c) => ({ name: c, value: c }))
-  );
 }

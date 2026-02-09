@@ -4,10 +4,30 @@ import { extractColorsServer, generatePaletteImage } from '@/lib/color-extractio
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 const PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://beastypage.com';
 
+const BLOCKED_HOSTNAMES = new Set(['localhost', '0.0.0.0', '[::1]']);
+
+function isPrivateIp(hostname: string): boolean {
+  // IPv4 private ranges
+  if (/^127\./.test(hostname)) return true;
+  if (/^10\./.test(hostname)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) return true;
+  if (/^192\.168\./.test(hostname)) return true;
+  if (/^169\.254\./.test(hostname)) return true;
+  if (hostname === '0.0.0.0') return true;
+  // IPv6 loopback / link-local
+  if (hostname === '::1' || hostname === '[::1]') return true;
+  if (hostname.startsWith('fc') || hostname.startsWith('fd')) return true;
+  if (hostname.startsWith('fe80')) return true;
+  return false;
+}
+
 function isValidUrl(s: string): boolean {
   try {
     const url = new URL(s);
-    return url.protocol === 'http:' || url.protocol === 'https:';
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+    if (BLOCKED_HOSTNAMES.has(url.hostname)) return false;
+    if (isPrivateIp(url.hostname)) return false;
+    return true;
   } catch {
     return false;
   }
@@ -47,9 +67,9 @@ export async function POST(request: NextRequest) {
     }
 
     const contentType = res.headers.get('content-type') ?? '';
-    if (!contentType.startsWith('image/')) {
+    if (contentType && !contentType.startsWith('image/')) {
       return NextResponse.json(
-        { error: 'URL does not point to an image' },
+        { error: `URL returned content-type "${contentType}" which is not an image` },
         { status: 400 },
       );
     }

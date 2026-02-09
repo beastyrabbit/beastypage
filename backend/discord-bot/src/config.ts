@@ -8,7 +8,7 @@ function requiredEnv(name: string, defaultValue?: string): string {
 
 export const config = {
   discordBotToken: requiredEnv("DISCORD_BOT_TOKEN"),
-  discordClientId: requiredEnv("DISCORD_CLIENT_ID", "1470478917776441416"),
+  discordClientId: requiredEnv("DISCORD_CLIENT_ID"),
   discordGuildId: process.env.DISCORD_GUILD_ID || undefined,
   frontendApiUrl: requiredEnv("FRONTEND_API_URL"),
 } as const;

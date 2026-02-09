@@ -204,13 +204,16 @@ export async function extractColorsServer(
   const totalPixels = pixels.length;
 
   return clusters
-    .map(({ centroid: c }) => ({
-      hex: rgbToHex({ r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) }),
-      rgb: { r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) },
-      hsl: rgbToHsl({ r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) }),
-      position: { x: Math.round(c.x), y: Math.round(c.y) },
-      prevalence: Math.round((c.count / totalPixels) * 100),
-    }))
+    .map(({ centroid: c }) => {
+      const rgb = { r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) };
+      return {
+        hex: rgbToHex(rgb),
+        rgb,
+        hsl: rgbToHsl(rgb),
+        position: { x: Math.round(c.x), y: Math.round(c.y) },
+        prevalence: Math.round((c.count / totalPixels) * 100),
+      };
+    })
     .sort((a, b) => b.prevalence - a.prevalence);
 }
 
@@ -219,6 +222,7 @@ export function generatePaletteImage(
   swatchWidth = 60,
   swatchHeight = 60,
 ): string {
+  if (colors.length === 0) throw new Error('Cannot generate palette image with zero colors');
   const width = swatchWidth * colors.length;
   const height = swatchHeight;
   const canvas = createCanvas(width, height);

@@ -5,12 +5,7 @@ import {
 } from "discord.js";
 import { extractPalette, type PaletteResponse } from "../utils/api-client.js";
 import { buildPaletteEmbed } from "../utils/embed-builder.js";
-
-/** Strip the data URL prefix to get raw base64. */
-function dataUrlToBase64(dataUrl: string): string {
-  const commaIndex = dataUrl.indexOf(",");
-  return commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : dataUrl;
-}
+import { dataUrlToBase64 } from "../utils/data-url.js";
 
 function buildPaletteReply(result: PaletteResponse) {
   const imageBuffer = Buffer.from(dataUrlToBase64(result.paletteImage), "base64");
@@ -35,7 +30,7 @@ export async function handlePaletteCommand(
     console.error("Error extracting palette:", error);
     await interaction.editReply({
       content: "Failed to extract palette. Please try again later.",
-    });
+    }).catch(() => {});
   }
 }
 
@@ -54,7 +49,7 @@ export async function handlePaletteContextMenu(
     await interaction.reply({
       content: "No image found in this message.",
       ephemeral: true,
-    });
+    }).catch(() => {});
     return;
   }
 
@@ -67,6 +62,6 @@ export async function handlePaletteContextMenu(
     console.error("Error extracting palette:", error);
     await interaction.editReply({
       content: "Failed to extract palette. Please try again later.",
-    });
+    }).catch(() => {});
   }
 }
