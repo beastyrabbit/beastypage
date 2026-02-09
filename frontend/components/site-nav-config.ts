@@ -15,7 +15,7 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 // Projects sub-navigation categories
-export type ProjectCategory = "warrior-cats" | "gacha" | "artist" | "games";
+export type ProjectCategory = "warrior-cats" | "gacha" | "artist" | "games" | "tools";
 
 export type ProjectCategoryConfig = {
   key: ProjectCategory;
@@ -53,5 +53,12 @@ export const PROJECT_CATEGORIES: ProjectCategoryConfig[] = [
     href: "/projects/games",
     description: "Interactive challenges and playful experiments",
     icon: "gamepad",
+  },
+  {
+    key: "tools",
+    label: "Tools",
+    href: "/projects/tools",
+    description: "Bots, integrations, and utility tools for the community",
+    icon: "wrench",
   },
 ];

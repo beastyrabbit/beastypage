@@ -43,6 +43,9 @@ const CATEGORY_TOOLS = {
     { title: "Game of Life", icon: "🧬" },
     { title: "Perfect Cat", icon: "⚖️" },
   ],
+  tools: [
+    { title: "Discord Bot", icon: "🤖" },
+  ],
 };
 
 const CTA_LINKS = [
