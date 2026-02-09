@@ -12,3 +12,6 @@ pre-commit:
     tsc:
       glob: "frontend/**/*.{ts,tsx}"
       run: cd frontend && bunx tsc --noEmit
+    tsc-discord-bot:
+      glob: "backend/discord-bot/**/*.ts"
+      run: cd backend/discord-bot && npx tsc --noEmit
