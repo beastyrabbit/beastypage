@@ -42,6 +42,7 @@ export interface PaletteColor {
 export interface PaletteResponse {
   paletteImage: string; // data:image/png;base64,...
   colors: PaletteColor[];
+  familyColors?: PaletteColor[];
   customizeUrl: string;
   slug?: string;
 }

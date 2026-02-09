@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
 import { getServerConvexUrl } from '@/lib/convexUrl';
-import { extractColorsServer, generatePaletteGridImage } from '@/lib/color-extraction/server-extraction';
+import { extractColorsServer, extractFamilyColorsServer, generatePaletteGridImage } from '@/lib/color-extraction/server-extraction';
+import type { ExtractedColor } from '@/lib/color-extraction/types';
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 const PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://beastyrabbit.com';
@@ -116,10 +117,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Extract family/accent colors
+  let familyColors: ExtractedColor[] = [];
+  try {
+    familyColors = await extractFamilyColorsServer(imageBuffer, colors, { k: colorCount });
+  } catch (error) {
+    console.warn('[discord/palette] Family extraction failed, using top colors only', error);
+  }
+
   // Generate full palette grid image (with brightness/hue variations)
   let paletteImage: string;
   try {
-    paletteImage = generatePaletteGridImage(colors);
+    paletteImage = generatePaletteGridImage(colors, familyColors.length > 0 ? familyColors : undefined);
   } catch (error) {
     console.error('[discord/palette] Palette image generation failed', error);
     return NextResponse.json(
@@ -162,8 +171,15 @@ export async function POST(request: NextRequest) {
     console.error('[discord/palette] Failed to store in Convex', error);
   }
 
+  const familyColorsPayload = familyColors.map((c) => ({
+    hex: c.hex,
+    rgb: c.rgb,
+    prevalence: c.prevalence,
+  }));
+
   return NextResponse.json({
     colors: colorsPayload,
+    familyColors: familyColorsPayload.length > 0 ? familyColorsPayload : undefined,
     paletteImage,
     customizeUrl,
     slug,
