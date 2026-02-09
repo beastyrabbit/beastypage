@@ -7,7 +7,7 @@
 
 import { createCanvas, loadImage, type Image } from '@napi-rs/canvas';
 import type { ExtractedColor, KMeansOptions, PixelData, Centroid, RGB } from './types';
-import { rgbToHex, rgbToHsl, isBlackOrWhite, colorDistance } from './color-utils';
+import { rgbToHex, rgbToHsl, isBlackOrWhite, colorDistance, adjustBrightness, adjustHue, getContrastColor } from './color-utils';
 
 const MAX_DIMENSION = 1200;
 
@@ -231,6 +231,113 @@ export function generatePaletteImage(
   for (let i = 0; i < colors.length; i++) {
     ctx.fillStyle = colors[i].hex;
     ctx.fillRect(i * swatchWidth, 0, swatchWidth, height);
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
+/**
+ * Generate a full palette grid image with brightness and hue variations.
+ * Matches the layout of the PaletteGrid component.
+ *
+ * Row 0:     Main swatches          — N × 60×60px, hex label centered
+ * Rows 1-5:  Brightness variations  — 5 × N × 60×40px (factors: 0.5, 0.75, 1.0, 1.25, 1.5)
+ * Rows 6-9:  Hue shift variations   — 4 × N × 60×40px (shifts: 0°, 10°, 20°, 30°)
+ */
+export function generatePaletteGridImage(
+  colors: Array<{ hex: string; rgb: RGB }>,
+  swatchWidth = 60,
+): string {
+  if (colors.length === 0) throw new Error('Cannot generate palette grid with zero colors');
+
+  const mainSwatchHeight = 60;
+  const variantRowHeight = 40;
+  const brightnessFactors = [0.5, 0.75, 1.0, 1.25, 1.5];
+  const hueShifts = [0, 10, 20, 30];
+  const labelGap = 20; // gap between sections for labels
+  const sectionGap = 16;
+
+  const totalWidth = swatchWidth * colors.length;
+  const totalHeight =
+    mainSwatchHeight +
+    sectionGap + labelGap + (brightnessFactors.length * variantRowHeight) +
+    sectionGap + labelGap + (hueShifts.length * variantRowHeight);
+
+  const canvas = createCanvas(totalWidth, totalHeight);
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, totalWidth, totalHeight);
+
+  // Row 0: Main swatches with hex labels
+  for (let i = 0; i < colors.length; i++) {
+    const x = i * swatchWidth;
+    ctx.fillStyle = colors[i].hex;
+    ctx.fillRect(x, 0, swatchWidth, mainSwatchHeight);
+
+    // Hex label
+    const textColor = getContrastColor(colors[i].rgb);
+    ctx.fillStyle = textColor;
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(colors[i].hex, x + swatchWidth / 2, mainSwatchHeight / 2);
+  }
+
+  // Brightness section
+  let yOffset = mainSwatchHeight + sectionGap;
+  ctx.fillStyle = '#aaaacc';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('Brightness', 4, yOffset);
+  yOffset += labelGap;
+
+  for (let f = 0; f < brightnessFactors.length; f++) {
+    const factor = brightnessFactors[f];
+    const adjustment = (factor - 1) * 50;
+    for (let i = 0; i < colors.length; i++) {
+      const adjusted = adjustBrightness(colors[i].rgb, adjustment);
+      const hex = rgbToHex(adjusted);
+      const x = i * swatchWidth;
+      ctx.fillStyle = hex;
+      ctx.fillRect(x, yOffset, swatchWidth, variantRowHeight);
+    }
+    // Factor label on left edge
+    ctx.fillStyle = '#aaaacc';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`${brightnessFactors[f]}x`, 2, yOffset + variantRowHeight - 2);
+    yOffset += variantRowHeight;
+  }
+
+  // Hue shift section
+  yOffset += sectionGap;
+  ctx.fillStyle = '#aaaacc';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('Hue Shift', 4, yOffset);
+  yOffset += labelGap;
+
+  for (let h = 0; h < hueShifts.length; h++) {
+    const shift = hueShifts[h];
+    for (let i = 0; i < colors.length; i++) {
+      const adjusted = adjustHue(colors[i].rgb, shift);
+      const hex = rgbToHex(adjusted);
+      const x = i * swatchWidth;
+      ctx.fillStyle = hex;
+      ctx.fillRect(x, yOffset, swatchWidth, variantRowHeight);
+    }
+    // Shift label on left edge
+    ctx.fillStyle = '#aaaacc';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`+${hueShifts[h]}°`, 2, yOffset + variantRowHeight - 2);
+    yOffset += variantRowHeight;
   }
 
   return canvas.toDataURL('image/png');

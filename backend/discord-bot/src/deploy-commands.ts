@@ -38,10 +38,35 @@ const catCommand = new SlashCommandBuilder()
       .setDescription("Enable shading")
       .setRequired(false)
   )
-  .addBooleanOption((option) =>
+  .addStringOption((option) =>
     option
-      .setName("tortie")
-      .setDescription("Force tortie pattern")
+      .setName("eye_colour")
+      .setDescription("Eye colour")
+      .setAutocomplete(true)
+      .setRequired(false)
+  )
+  .addIntegerOption((option) =>
+    option
+      .setName("accessories")
+      .setDescription("Accessory slot count")
+      .setMinValue(0)
+      .setMaxValue(4)
+      .setRequired(false)
+  )
+  .addIntegerOption((option) =>
+    option
+      .setName("scars")
+      .setDescription("Scar slot count")
+      .setMinValue(0)
+      .setMaxValue(3)
+      .setRequired(false)
+  )
+  .addIntegerOption((option) =>
+    option
+      .setName("torties")
+      .setDescription("Tortie layer count (0 = none)")
+      .setMinValue(0)
+      .setMaxValue(4)
       .setRequired(false)
   );
 

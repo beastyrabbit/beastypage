@@ -7,7 +7,10 @@ interface CatOptions {
   pelt?: string;
   colour?: string;
   shading?: boolean;
-  tortie?: boolean;
+  eye_colour?: string;
+  accessories?: number;
+  scars?: number;
+  torties?: number;
 }
 
 export interface CatResponse {
@@ -18,8 +21,13 @@ export interface CatResponse {
     spriteNumber: number;
     peltName: string;
     colour: string;
+    eyeColour: string;
     shading: boolean;
     isTortie: boolean;
+    accessories?: (string | null)[];
+    scars?: (string | null)[];
+    tortie?: { mask?: string; pattern?: string; colour?: string }[];
+    darkForest?: boolean;
     source: string;
   };
 }
@@ -35,6 +43,7 @@ export interface PaletteResponse {
   paletteImage: string; // data:image/png;base64,...
   colors: PaletteColor[];
   customizeUrl: string;
+  slug?: string;
 }
 
 async function fetchWithTimeout(

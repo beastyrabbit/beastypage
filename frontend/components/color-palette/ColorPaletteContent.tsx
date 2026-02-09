@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import DownChevron from "@/components/ui/down-chevron";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { ColorPaletteClient } from "./ColorPaletteClient";
@@ -24,6 +25,7 @@ export function ColorPaletteContent() {
   const slug = searchParams.get("slug");
   const darkForestParam = searchParams.get("darkForest");
   const imageUrl = searchParams.get("imageUrl");
+  const paletteSlug = searchParams.get("paletteSlug");
 
   const [initialImage, setInitialImage] = useState<string | null>(null);
   const [generatorReady, setGeneratorReady] = useState(false);
@@ -39,6 +41,23 @@ export function ColorPaletteContent() {
   const mapperRecord = useQuery(
     api.mapper.getBySlug,
     slug ? { slugOrId: slug } : "skip"
+  );
+
+  // Load palette config from Convex if paletteSlug is provided
+  const paletteRecord = useQuery(
+    api.paletteGeneratorSettings.get,
+    paletteSlug ? { slug: paletteSlug } : "skip"
+  );
+
+  // Get image download URL from Convex storage for palette slug
+  const paletteConfig = paletteRecord?.config as
+    | { source: string; imageStorageId: string; colors: unknown[] }
+    | undefined;
+  const paletteImageUrl = useQuery(
+    api.paletteGeneratorSettings.getImageUrl,
+    paletteConfig?.imageStorageId
+      ? { storageId: paletteConfig.imageStorageId as Id<"_storage"> }
+      : "skip"
   );
 
   // Compute cat params with dark forest override
@@ -161,10 +180,17 @@ export function ColorPaletteContent() {
 
   // Handle direct image URL (for regular uploads)
   useEffect(() => {
-    if (imageUrl && !slug) {
+    if (imageUrl && !slug && !paletteSlug) {
       setInitialImage(imageUrl);
     }
-  }, [imageUrl, slug]);
+  }, [imageUrl, slug, paletteSlug]);
+
+  // Handle palette slug — load image from Convex storage
+  useEffect(() => {
+    if (paletteSlug && paletteImageUrl) {
+      setInitialImage(paletteImageUrl);
+    }
+  }, [paletteSlug, paletteImageUrl]);
 
   // Handle dropdown open with position calculation
   const handleDropdownToggle = useCallback(() => {
@@ -274,11 +300,18 @@ export function ColorPaletteContent() {
     </>
   ) : null;
 
-  // Show loading state while rendering sprite
+  // Show loading state while rendering sprite or loading palette
   if (slug && !initialImage) {
     return (
       <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
         {mapperRecord === undefined ? "Loading cat data..." : "Rendering sprite..."}
+      </div>
+    );
+  }
+  if (paletteSlug && !initialImage) {
+    return (
+      <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+        {paletteRecord === undefined ? "Loading palette..." : "Loading image..."}
       </div>
     );
   }

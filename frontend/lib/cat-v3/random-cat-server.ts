@@ -324,13 +324,22 @@ export interface DiscordCatOverrides {
   sprite?: number;
   pelt?: string;
   colour?: string;
+  eyeColour?: string;
   shading?: boolean;
-  tortie?: boolean;
+  accessories?: number;  // pin slot count 0-4
+  scars?: number;        // pin slot count 0-3
+  torties?: number;      // pin layer count 0-4; 0 = force no tortie
 }
 
 // ---------------------------------------------------------------------------
 // Main generation function
 // ---------------------------------------------------------------------------
+
+// Random integer in [min, max] — mirrors computeLayerCount from single-cat-plus
+function computeLayerCount(min: number, max: number): number {
+  if (min >= max) return min;
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
 
 export async function generateRandomParamsServer(
   overrides: DiscordCatOverrides = {},
@@ -347,20 +356,24 @@ export async function generateRandomParamsServer(
 
   const pelts = data.peltNames.filter((p) => p !== 'Tortie' && p !== 'Calico');
 
+  // Afterlife: 10% chance (matching "dark10" default from single-cat-plus)
+  const isDarkForest = Math.random() < 0.1;
+
   const params: CatParams = {
     spriteNumber,
     peltName: overrides.pelt && pelts.includes(overrides.pelt) ? overrides.pelt : pickOne(pelts),
     colour: overrides.colour && data.colours.includes(overrides.colour) ? overrides.colour : pickOne(data.colours),
     tint: pickOne(data.tints),
     skinColour: pickOne(data.skinColours),
-    eyeColour: pickOne(data.eyeColours),
+    eyeColour: overrides.eyeColour && data.eyeColours.includes(overrides.eyeColour)
+      ? overrides.eyeColour
+      : pickOne(data.eyeColours),
     shading: overrides.shading ?? roll(RANDOM_CONFIG.probabilities.shading),
     reverse: roll(RANDOM_CONFIG.probabilities.reverse),
     isTortie: false,
+    darkForest: isDarkForest,
+    darkMode: isDarkForest,
   };
-
-  // Tortie
-  params.isTortie = overrides.tortie ?? roll(RANDOM_CONFIG.probabilities.isTortie);
 
   // Heterochromia
   if (roll(RANDOM_CONFIG.probabilities.heterochromia)) {
@@ -369,13 +382,21 @@ export async function generateRandomParamsServer(
     if (selected) params.eyeColour2 = selected;
   }
 
-  // Tortie patterns
+  // Tortie — match single-cat-plus defaults (range 1-4)
+  // When overrides.torties is provided: 0 = force no tortie, >0 = force tortie with that count
+  // When omitted: 50% chance (per config) with random count 1-4
+  const tortieCount = overrides.torties ?? undefined;
+  if (tortieCount === 0) {
+    params.isTortie = false;
+  } else if (tortieCount !== undefined) {
+    params.isTortie = true;
+  } else {
+    params.isTortie = roll(RANDOM_CONFIG.probabilities.isTortie);
+  }
+
   if (params.isTortie) {
+    const slotCount = tortieCount ?? computeLayerCount(1, 4);
     const tortieConfig = RANDOM_CONFIG.counts.tortie;
-    const slotCount = Math.max(
-      1,
-      determineSlotCount('tortie', tortieConfig, RANDOM_CONFIG.defaultSlots, options),
-    );
     const masks = data.tortieMasks;
     const uniqueMasks = tortieConfig.unique !== false;
     const availableMasks: string[] = [...masks];
@@ -437,10 +458,10 @@ export async function generateRandomParamsServer(
     }
   }
 
-  // Accessories
-  const accConfig = RANDOM_CONFIG.counts.accessories;
-  const accSlots = determineSlotCount('accessories', accConfig, RANDOM_CONFIG.defaultSlots, options);
+  // Accessories — match single-cat-plus defaults (range 1-4)
+  const accSlots = overrides.accessories ?? computeLayerCount(1, 4);
   if (accSlots > 0 && data.accessories.length > 0) {
+    const accConfig = RANDOM_CONFIG.counts.accessories;
     const uniqueAcc = accConfig.unique !== false;
     const available: string[] = [...data.accessories];
     const accProb = RANDOM_CONFIG.probabilities.accessorySlot ?? RANDOM_CONFIG.probabilities.accessory ?? 0.5;
@@ -458,10 +479,10 @@ export async function generateRandomParamsServer(
     }
   }
 
-  // Scars
-  const scarsConfig = RANDOM_CONFIG.counts.scars;
-  const scarSlots = determineSlotCount('scars', scarsConfig, RANDOM_CONFIG.defaultSlots, options);
+  // Scars — match single-cat-plus defaults (range 1-1, always 1 slot)
+  const scarSlots = overrides.scars ?? computeLayerCount(1, 1);
   if (scarSlots > 0 && data.scars.length > 0) {
+    const scarsConfig = RANDOM_CONFIG.counts.scars;
     const uniqueScars = scarsConfig.unique !== false;
     const available: string[] = [...data.scars];
     const scarProb = RANDOM_CONFIG.probabilities.scarSlot ?? RANDOM_CONFIG.probabilities.scar ?? 0.5;

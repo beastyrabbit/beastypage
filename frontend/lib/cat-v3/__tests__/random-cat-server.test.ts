@@ -65,15 +65,15 @@ describe('generateRandomParamsServer', () => {
     expect(params.shading).toBe(true);
   });
 
-  it('applies tortie override true', async () => {
-    const params = await generateRandomParamsServer({ tortie: true });
+  it('applies torties override > 0 forces tortie', async () => {
+    const params = await generateRandomParamsServer({ torties: 2 });
     expect(params.isTortie).toBe(true);
     expect(params.tortie).toBeDefined();
     expect(Array.isArray(params.tortie)).toBe(true);
   });
 
-  it('applies tortie override false', async () => {
-    const params = await generateRandomParamsServer({ tortie: false });
+  it('applies torties override 0 forces no tortie', async () => {
+    const params = await generateRandomParamsServer({ torties: 0 });
     expect(params.isTortie).toBe(false);
   });
 
@@ -93,8 +93,8 @@ describe('generateRandomParamsServer', () => {
     expect(VALID_COLOURS).toContain(params.colour);
   });
 
-  it('generates tortie patterns when isTortie is true', async () => {
-    const params = await generateRandomParamsServer({ tortie: true });
+  it('generates tortie patterns when torties > 0', async () => {
+    const params = await generateRandomParamsServer({ torties: 2 });
     expect(params.tortie).toBeDefined();
     expect(params.tortie!.length).toBeGreaterThanOrEqual(1);
     expect(params.tortieMask).toBeDefined();
