@@ -263,6 +263,21 @@ export default defineSchema({
     .index("bySlug", ["slug"])
     .index("byCreated", ["createdAt"]),
 
+  discord_user_configs: defineTable({
+    discordUserId: v.string(),
+    accessoriesMin: v.number(),
+    accessoriesMax: v.number(),
+    scarsMin: v.number(),
+    scarsMax: v.number(),
+    tortiesMin: v.number(),
+    tortiesMax: v.number(),
+    darkForest: v.boolean(),
+    starclan: v.boolean(),
+    palettes: v.array(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("byDiscordUserId", ["discordUserId"]),
+
   ancestry_tree: defineTable({
     slug: v.string(),
     name: v.string(),

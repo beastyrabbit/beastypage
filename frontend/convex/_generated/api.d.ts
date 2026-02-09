@@ -16,6 +16,7 @@ import type * as coinflipper from "../coinflipper.js";
 import type * as collection from "../collection.js";
 import type * as crons from "../crons.js";
 import type * as dashSettings from "../dashSettings.js";
+import type * as discordUserConfig from "../discordUserConfig.js";
 import type * as discord from "../discord.js";
 import type * as imageService from "../imageService.js";
 import type * as importer from "../importer.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   collection: typeof collection;
   crons: typeof crons;
   dashSettings: typeof dashSettings;
+  discordUserConfig: typeof discordUserConfig;
   discord: typeof discord;
   imageService: typeof imageService;
   importer: typeof importer;

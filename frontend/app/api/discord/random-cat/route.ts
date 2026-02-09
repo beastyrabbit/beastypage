@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { api } from '@/convex/_generated/api';
 import { getServerConvexUrl } from '@/lib/convexUrl';
 import { RENDERER_BASE } from '@/app/api/renderer/_lib/proxy';
@@ -8,7 +9,9 @@ import {
   type DiscordCatOverrides,
 } from '@/lib/cat-v3/random-cat-server';
 
-const PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://beastypage.com';
+const DISCORD_IMAGE_SIZE = 500;
+
+const PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://beastyrabbit.com';
 
 export async function POST(request: NextRequest) {
   let body: Record<string, unknown> = {};
@@ -22,16 +25,38 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Build overrides from request
+  // Build overrides from per-invocation options
   const overrides: DiscordCatOverrides = {};
   if (typeof body.sprite === 'number') overrides.sprite = body.sprite;
   if (typeof body.pelt === 'string') overrides.pelt = body.pelt;
   if (typeof body.colour === 'string') overrides.colour = body.colour;
   if (typeof body.eye_colour === 'string') overrides.eyeColour = body.eye_colour;
   if (typeof body.shading === 'boolean') overrides.shading = body.shading;
-  if (typeof body.accessories === 'number') overrides.accessories = body.accessories;
-  if (typeof body.scars === 'number') overrides.scars = body.scars;
-  if (typeof body.torties === 'number') overrides.torties = body.torties;
+
+  // Fetch user config from Convex if discord_user_id is provided
+  const discordUserId = typeof body.discord_user_id === 'string' ? body.discord_user_id : undefined;
+  if (discordUserId) {
+    try {
+      const convexUrl = getServerConvexUrl();
+      if (convexUrl) {
+        const convex = new ConvexHttpClient(convexUrl);
+        const cfg = await convex.query(api.discordUserConfig.get, { discordUserId });
+        // User config provides defaults; per-invocation overrides take priority
+        overrides.accessoriesMin = cfg.accessoriesMin;
+        overrides.accessoriesMax = cfg.accessoriesMax;
+        overrides.scarsMin = cfg.scarsMin;
+        overrides.scarsMax = cfg.scarsMax;
+        overrides.tortiesMin = cfg.tortiesMin;
+        overrides.tortiesMax = cfg.tortiesMax;
+        overrides.darkForest = cfg.darkForest;
+        overrides.starclan = cfg.starclan;
+        if (cfg.palettes.length > 0) overrides.palettes = cfg.palettes;
+      }
+    } catch (error) {
+      // Non-fatal — proceed with defaults if config fetch fails
+      console.error('[discord/random-cat] Failed to fetch user config', error);
+    }
+  }
 
   // Generate random params
   let params;
@@ -78,7 +103,14 @@ export async function POST(request: NextRequest) {
         { status: 502 },
       );
     }
-    imageDataUrl = renderResult.image;
+    // Upscale the small pixel-art sprite to a Discord-friendly size
+    const rawDataUrl = renderResult.image;
+    const img = await loadImage(Buffer.from(rawDataUrl.split(',')[1], 'base64'));
+    const canvas = createCanvas(DISCORD_IMAGE_SIZE, DISCORD_IMAGE_SIZE);
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false; // nearest-neighbor for pixel art
+    ctx.drawImage(img, 0, 0, DISCORD_IMAGE_SIZE, DISCORD_IMAGE_SIZE);
+    imageDataUrl = canvas.toDataURL('image/png');
   } catch (error) {
     console.error('[discord/random-cat] Renderer request failed', error);
     return NextResponse.json(
