@@ -91,6 +91,7 @@ await page.screenshot({ path: 'my-screenshot.png' });
 
 - `frontend/` - Next.js application (see `frontend/CLAUDE.md` for details)
 - `backend/renderer_service/` - Cat card renderer service (Python/FastAPI)
+- `backend/discord-bot/` - Discord bot service (TypeScript/discord.js)
 - `.github/workflows/` - CI/CD pipelines
 
 ## Git Hooks (Lefthook)
@@ -103,6 +104,7 @@ Hooks defined in `lefthook.yml`:
 - **gitleaks** - Scans staged changes for secrets
 - **ruff-lint** / **ruff-format** - Lints and formats Python in `backend/`
 - **tsc** - Type-checks TypeScript in `frontend/`
+- **tsc-discord-bot** - Type-checks TypeScript in `backend/discord-bot/`
 
 ## Development Workflow
 
