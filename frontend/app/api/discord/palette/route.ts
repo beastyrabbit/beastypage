@@ -7,17 +7,19 @@ const PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? 'https://beastypage.
 const BLOCKED_HOSTNAMES = new Set(['localhost', '0.0.0.0', '[::1]']);
 
 function isPrivateIp(hostname: string): boolean {
+  // Strip IPv6 brackets so checks work for both [::1] and ::1
+  const h = hostname.replace(/^\[|\]$/g, '');
   // IPv4 private ranges
-  if (/^127\./.test(hostname)) return true;
-  if (/^10\./.test(hostname)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) return true;
-  if (/^192\.168\./.test(hostname)) return true;
-  if (/^169\.254\./.test(hostname)) return true;
-  if (hostname === '0.0.0.0') return true;
-  // IPv6 loopback / link-local
-  if (hostname === '::1' || hostname === '[::1]') return true;
-  if (hostname.startsWith('fc') || hostname.startsWith('fd')) return true;
-  if (hostname.startsWith('fe80')) return true;
+  if (/^127\./.test(h)) return true;
+  if (/^10\./.test(h)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  if (/^192\.168\./.test(h)) return true;
+  if (/^169\.254\./.test(h)) return true;
+  if (h === '0.0.0.0') return true;
+  // IPv6 loopback / link-local / unique-local
+  if (h === '::1') return true;
+  if (h.startsWith('fc') || h.startsWith('fd')) return true;
+  if (h.startsWith('fe80')) return true;
   return false;
 }
 

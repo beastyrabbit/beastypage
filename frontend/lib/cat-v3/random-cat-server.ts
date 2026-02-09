@@ -65,9 +65,11 @@ let cachedData: SpriteData | null = null;
 let loadPromise: Promise<SpriteData> | null = null;
 
 function resolvePublicPath(relativePath: string): string {
-  // Works both in dev (next dev) and built (standalone) mode
-  const root = process.cwd();
-  return path.join(root, 'public', relativePath);
+  // In both dev and standalone Docker builds, public/ is at ${cwd}/public.
+  // Standalone: Dockerfile copies public/ to /app/public, WORKDIR is /app.
+  // Dev: cwd is the frontend/ directory which contains public/.
+  const root = process.env.NEXT_PUBLIC_DIR ?? path.join(process.cwd(), 'public');
+  return path.join(root, relativePath);
 }
 
 async function loadSpriteData(): Promise<SpriteData> {
