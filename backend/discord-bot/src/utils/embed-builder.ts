@@ -39,7 +39,7 @@ export function buildCatEmbed(
 
   if (viewUrl) {
     embed.setURL(viewUrl);
-    embed.setFooter({ text: "View on BeastyPage" });
+    embed.setFooter({ text: "View on beastyrabbit.com" });
   }
 
   return embed;
@@ -56,7 +56,7 @@ export function buildPaletteEmbed(
     .setDescription(hexList)
     .setImage(`attachment://${imageFilename}`)
     .setURL(customizeUrl)
-    .setFooter({ text: "Customize on BeastyPage" })
+    .setFooter({ text: "Customize on beastyrabbit.com" })
     .setColor(0x7c3aed);
 }
 

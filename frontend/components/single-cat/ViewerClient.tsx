@@ -156,6 +156,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
 
   const [builderBaseUrl, setBuilderBaseUrl] = useState<string | null>(null);
   const [showDarkForestTint, setShowDarkForestTint] = useState(true);
+  const [traitsOpen, setTraitsOpen] = useState(false);
 
   const builderMeta = useMemo<BuilderMeta | null>(() => {
     if (!meta && !catPayload?.params) {
@@ -691,11 +692,35 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
 
             <div className="flex flex-col gap-6">
               <div className="rounded-3xl border border-border/40 bg-background/70 p-5">
-                <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <SparklesIcon size={16} className="text-primary" /> Trait Breakdown
-                </h2>
-                <div className="grid gap-2">
-                  {traitRows.map((row) => {
+                <button
+                  type="button"
+                  onClick={() => setTraitsOpen((prev) => !prev)}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/70 px-4 py-3 text-left transition hover:bg-background"
+                >
+                  <div className="flex items-center gap-2">
+                    <SparklesIcon size={16} className="text-primary" />
+                    <div>
+                      <h2 className="text-sm font-semibold text-foreground">Trait Breakdown</h2>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                        {traitRows.length > 0 ? `${traitRows.length} trait${traitRows.length !== 1 ? "s" : ""}` : "No traits available"}
+                      </p>
+                    </div>
+                  </div>
+                  <DownChevron
+                    size={16}
+                    className={cn(
+                      "text-muted-foreground transition-transform",
+                      traitsOpen ? "rotate-180" : "rotate-0"
+                    )}
+                  />
+                </button>
+                <div
+                  className={cn(
+                    "grid overflow-hidden transition-all duration-300",
+                    traitsOpen ? "mt-4 max-h-[9999px] gap-2" : "max-h-0 gap-0"
+                  )}
+                >
+                  {traitsOpen && traitRows.map((row) => {
                     if (row.type === "darkForest") {
                       return (
                         <div
@@ -743,7 +768,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                       </div>
                     );
                   })}
-                  {traitRows.length === 0 && (
+                  {traitsOpen && traitRows.length === 0 && (
                     <p className="text-sm text-muted-foreground">No trait information available.</p>
                   )}
                 </div>
