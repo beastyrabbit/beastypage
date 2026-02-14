@@ -3,7 +3,7 @@
   "version": "1.6.2",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3100",
     "test": "vitest",
     "prebuild": "sh scripts/write-version.sh && bun scripts/generate-registry.ts",
     "build": "next build",

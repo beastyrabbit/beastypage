@@ -47,7 +47,7 @@ frontend/
 ```bash
 # Use Bun for all package management
 bun install              # Install dependencies
-bun run dev              # Start dev server (port 3000)
+bun run dev              # Start dev server (port 3100)
 bun run build            # Production build
 bun run lint             # ESLint check
 bun run typecheck        # TypeScript check
@@ -111,6 +111,10 @@ bun test --watch         # Watch mode
 - `PaletteCategory.id` is typed as `PaletteId` (not `string`) for compile-time safety
 - Adding a new palette: create file, add to `pure/index.ts` or `index.ts`, add ID to `PaletteId` union in `types.ts`
 - Never duplicate `PaletteMode` type — always import from `@/lib/palettes`
+
+## Ports
+
+Dev server runs on port 3100, renderer service on 8001, image processing on 8002 (registered in `/home/beasty/projects/.ports`).
 
 ## Important Files
 

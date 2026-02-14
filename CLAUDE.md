@@ -87,6 +87,10 @@ await page.screenshot({ path: '.playwright-mcp/my-screenshot.png' });
 await page.screenshot({ path: 'my-screenshot.png' });
 ```
 
+## Ports
+
+Frontend dev server runs on port 3100, renderer service on 8001, image processing on 8002 (registered in `/home/beasty/projects/.ports`).
+
 ## Project Structure
 
 - `frontend/` - Next.js application (see `frontend/CLAUDE.md` for details)
