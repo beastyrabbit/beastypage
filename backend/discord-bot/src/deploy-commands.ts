@@ -4,12 +4,22 @@ import {
   SlashCommandBuilder,
   ContextMenuCommandBuilder,
   ApplicationCommandType,
+  ApplicationIntegrationType,
+  InteractionContextType,
 } from "discord.js";
 import { config } from "./config.js";
+
+const GUILD_INSTALL = ApplicationIntegrationType.GuildInstall;
+const USER_INSTALL = ApplicationIntegrationType.UserInstall;
+const GUILD_CONTEXT = InteractionContextType.Guild;
+const BOT_DM_CONTEXT = InteractionContextType.BotDM;
+const PRIVATE_CHANNEL_CONTEXT = InteractionContextType.PrivateChannel;
 
 const genDiscordKittenCommand = new SlashCommandBuilder()
   .setName("gen-discord-kitten")
   .setDescription("Generate a random pixel cat with per-invocation overrides")
+  .setIntegrationTypes(GUILD_INSTALL, USER_INSTALL)
+  .setContexts(GUILD_CONTEXT, BOT_DM_CONTEXT, PRIVATE_CHANNEL_CONTEXT)
   .addIntegerOption((option) =>
     option
       .setName("sprite")
@@ -48,11 +58,15 @@ const genDiscordKittenCommand = new SlashCommandBuilder()
 
 const catCommand = new SlashCommandBuilder()
   .setName("cat")
-  .setDescription("Generate a random pixel cat using your /config settings");
+  .setDescription("Generate a random pixel cat using your /config settings")
+  .setIntegrationTypes(GUILD_INSTALL, USER_INSTALL)
+  .setContexts(GUILD_CONTEXT, BOT_DM_CONTEXT, PRIVATE_CHANNEL_CONTEXT);
 
 const paletteCommand = new SlashCommandBuilder()
   .setName("palette")
   .setDescription("Extract color palette from an image")
+  .setIntegrationTypes(GUILD_INSTALL, USER_INSTALL)
+  .setContexts(GUILD_CONTEXT, BOT_DM_CONTEXT, PRIVATE_CHANNEL_CONTEXT)
   .addStringOption((option) =>
     option
       .setName("image_url")
@@ -71,6 +85,8 @@ const paletteCommand = new SlashCommandBuilder()
 const configCommand = new SlashCommandBuilder()
   .setName("config")
   .setDescription("Manage your cat generation preferences")
+  .setIntegrationTypes(GUILD_INSTALL)
+  .setContexts(GUILD_CONTEXT)
   .addSubcommand((sub) =>
     sub.setName("view").setDescription("View your current config")
   )
@@ -133,11 +149,15 @@ const configCommand = new SlashCommandBuilder()
 
 const homepageCommand = new SlashCommandBuilder()
   .setName("homepage")
-  .setDescription("Get a link to BeastyPage");
+  .setDescription("Get a link to BeastyPage")
+  .setIntegrationTypes(GUILD_INSTALL)
+  .setContexts(GUILD_CONTEXT);
 
 const contextMenuCommand = new ContextMenuCommandBuilder()
   .setName("Extract Palette")
-  .setType(ApplicationCommandType.Message);
+  .setType(ApplicationCommandType.Message)
+  .setIntegrationTypes(GUILD_INSTALL)
+  .setContexts(GUILD_CONTEXT);
 
 const commands = [
   genDiscordKittenCommand.toJSON(),
@@ -150,10 +170,19 @@ const commands = [
 
 const rest = new REST().setToken(config.discordBotToken);
 
-const args = process.argv.slice(2);
+const args = new Set(process.argv.slice(2));
+
+function requireGuildId(): string {
+  const guildId = config.discordGuildId;
+  if (!guildId) {
+    console.error("DISCORD_GUILD_ID is required for guild command operations.");
+    process.exit(1);
+  }
+  return guildId;
+}
 
 async function deployCommands() {
-  if (args.includes("--clear-global")) {
+  if (args.has("--clear-global")) {
     console.log("Clearing all global commands...");
     await rest.put(Routes.applicationCommands(config.discordClientId), {
       body: [],
@@ -162,18 +191,34 @@ async function deployCommands() {
     return;
   }
 
-  if (args.includes("--clear-guild")) {
-    const guildId = config.discordGuildId;
-    if (!guildId) {
-      console.error("DISCORD_GUILD_ID is required for --clear-guild");
-      process.exit(1);
-    }
+  if (args.has("--clear-guild")) {
+    const guildId = requireGuildId();
     console.log(`Clearing guild commands for ${guildId}...`);
     await rest.put(
       Routes.applicationGuildCommands(config.discordClientId, guildId),
       { body: [] }
     );
     console.log("Guild commands cleared.");
+    return;
+  }
+
+  const deployGlobal = args.has("--deploy-global");
+  const deployGuild = args.has("--deploy-guild");
+  if (deployGlobal && deployGuild) {
+    console.error("Use only one deploy scope flag: --deploy-global or --deploy-guild");
+    process.exit(1);
+  }
+
+  if (deployGuild) {
+    const guildId = requireGuildId();
+    console.log(
+      `Registering ${commands.length} guild application commands for ${guildId}...`
+    );
+    await rest.put(
+      Routes.applicationGuildCommands(config.discordClientId, guildId),
+      { body: commands }
+    );
+    console.log("Registered guild commands");
     return;
   }
 
