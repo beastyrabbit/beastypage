@@ -156,16 +156,6 @@ export function HostClient() {
 
   const session = useQuery(api.streamSessions.get, sessionArgs);
 
-  useEffect(() => {
-    if (!coinModalOpen) {
-      setCoinWinner(null);
-      setCoinResult(null);
-      setCoinFlipping(false);
-      setCoinFlipId(0);
-      setVoteSent(false);
-    }
-  }, [coinModalOpen]);
-
   const sessionList = useQuery(api.streamSessions.list, {
     exclude: "completed",
     limit: 20,

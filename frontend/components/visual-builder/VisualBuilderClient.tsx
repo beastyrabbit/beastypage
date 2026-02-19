@@ -64,6 +64,19 @@ interface SectionDefinition {
   render: () => ReactNode;
 }
 
+type PaletteDropdownProps = {
+  mode: PaletteMode;
+  onChange: (value: PaletteMode) => void;
+};
+
+function PaletteDropdown({ mode, onChange }: PaletteDropdownProps) {
+  return (
+    <div className="flex items-center gap-2">
+      <PaletteSingleSelect value={mode} onChange={onChange} label="Palette:" className="min-w-[200px]" />
+    </div>
+  );
+}
+
 export interface VisualBuilderInitialPayload {
   params: CatParams;
   tortie?: TortieLayer[];
@@ -580,12 +593,6 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     [getPaletteForMode, tortiePaletteMode]
   );
 
-  const renderPaletteDropdown = useCallback((mode: PaletteMode, onChange: (value: PaletteMode) => void) => (
-    <div className="flex items-center gap-2">
-      <PaletteSingleSelect value={mode} onChange={onChange} label="Palette:" className="min-w-[200px]" />
-    </div>
-  ), []);
-
   const handleBasePaletteChange = useCallback((value: PaletteMode) => {
     setExperimentalColourMode(value);
     markShareDirty();
@@ -601,7 +608,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       <header className="space-y-1">
         <h2 className="text-xl font-semibold text-white">Base colour</h2>
         <p className="text-sm text-neutral-300">Pick the primary coat colour, including experimental palettes.</p>
-      {renderPaletteDropdown(experimentalColourMode, handleBasePaletteChange)}
+        <PaletteDropdown mode={experimentalColourMode} onChange={handleBasePaletteChange} />
       </header>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {paletteColours.map((colour) => {
@@ -819,7 +826,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 const colourContent = (
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                      {renderPaletteDropdown(tortiePaletteMode, handleTortiePaletteChange)}
+                      <PaletteDropdown mode={tortiePaletteMode} onChange={handleTortiePaletteChange} />
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {tortiePalette.map((colour) => {
@@ -988,7 +995,6 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     handleTortiePaletteChange,
     handleTortieToggle,
     handleUpdateLayer,
-    renderPaletteDropdown,
     tortieLayers,
     tortiePalette,
     tortiePaletteMode,

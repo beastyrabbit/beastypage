@@ -1005,6 +1005,56 @@ interface LayerRangeSliderProps {
   onChange: (next: LayerRange) => void;
 }
 
+interface LayerRangeSelectorRowProps {
+  label: string;
+  type: "min" | "max";
+  selectedValue: number;
+  options: number[];
+  minValue: number;
+  onSelect: (next: number) => void;
+}
+
+function LayerRangeSelectorRow({
+  label,
+  type,
+  selectedValue,
+  options,
+  minValue,
+  onSelect,
+}: LayerRangeSelectorRowProps) {
+  return (
+    <div className="flex items-center gap-2" role="radiogroup" aria-label={`${label} ${type}`}>
+      <span className="w-10 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+        {type === "min" ? "Min" : "Max"}
+      </span>
+      <div className="flex flex-1 items-center gap-1 rounded-full border border-border/60 bg-background/70 p-1">
+        {options.map((option) => {
+          const isActive = selectedValue === option;
+          const isDisabled = type === "max" && option < minValue;
+          return (
+            <button
+              key={`${label}-${type}-${option}`}
+              type="button"
+              role="radio"
+              aria-checked={isActive}
+              disabled={isDisabled}
+              onClick={() => onSelect(option)}
+              className={cn(
+                "h-8 flex-1 rounded-md text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                isDisabled && "cursor-not-allowed opacity-40",
+                !isActive && !isDisabled && "bg-background text-muted-foreground hover:bg-primary/10",
+                isActive && "bg-primary text-primary-foreground shadow-inner"
+              )}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function LayerRangeSelector({ label, value, onChange }: LayerRangeSliderProps) {
   const summary = value.min === value.max ? `${value.min}` : `${value.min} – ${value.max}`;
   const options = useMemo(() => Array.from({ length: MAX_LAYER_VALUE + 1 }, (_, index) => index), []);
@@ -1026,50 +1076,28 @@ function LayerRangeSelector({ label, value, onChange }: LayerRangeSliderProps) {
     }
   };
 
-  const renderRow = (
-    type: "min" | "max",
-    selectedValue: number,
-    clickHandler: (next: number) => void
-  ) => (
-    <div className="flex items-center gap-2" role="radiogroup" aria-label={`${label} ${type}`}>
-      <span className="w-10 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-        {type === "min" ? "Min" : "Max"}
-      </span>
-      <div className="flex flex-1 items-center gap-1 rounded-full border border-border/60 bg-background/70 p-1">
-        {options.map((option) => {
-          const isActive = selectedValue === option;
-          const isDisabled = type === "max" && option < value.min;
-          return (
-            <button
-              key={`${label}-${type}-${option}`}
-              type="button"
-              role="radio"
-              aria-checked={isActive}
-              disabled={isDisabled}
-              onClick={() => clickHandler(option)}
-              className={cn(
-                "h-8 flex-1 rounded-md text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                isDisabled && "cursor-not-allowed opacity-40",
-                !isActive && !isDisabled && "bg-background text-muted-foreground hover:bg-primary/10",
-                isActive && "bg-primary text-primary-foreground shadow-inner"
-              )}
-            >
-              {option}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground/80">
         <span>{label}</span>
         <span className="font-mono text-muted-foreground/70">{summary}</span>
       </div>
-      {renderRow("min", clampLayerValue(value.min), handleMinSelect)}
-      {renderRow("max", clampLayerValue(value.max), handleMaxSelect)}
+      <LayerRangeSelectorRow
+        label={label}
+        type="min"
+        selectedValue={clampLayerValue(value.min)}
+        options={options}
+        minValue={value.min}
+        onSelect={handleMinSelect}
+      />
+      <LayerRangeSelectorRow
+        label={label}
+        type="max"
+        selectedValue={clampLayerValue(value.max)}
+        options={options}
+        minValue={value.min}
+        onSelect={handleMaxSelect}
+      />
     </div>
   );
 }
