@@ -121,6 +121,93 @@ const PALETTE_CONTROLS: { id: PaletteMode; label: string }[] = [
 
 const DISPLAY_CANVAS_SIZE = 540;
 
+type GuidedPreviewSpriteProps = {
+  cacheKey: string;
+  mutate: (draft: CatParams) => void;
+  size?: number;
+  label?: string;
+  badge?: ReactNode;
+  selected?: boolean;
+  rendererReady: boolean;
+  requestPreview: (key: string, mutator: (draft: CatParams) => void) => Promise<string | null>;
+  getCachedPreview: (key: string) => string | null;
+  hasCachedPreview: (key: string) => boolean;
+};
+
+function GuidedPreviewSprite({
+  cacheKey,
+  mutate,
+  size = 250,
+  label,
+  badge,
+  selected,
+  rendererReady,
+  requestPreview,
+  getCachedPreview,
+  hasCachedPreview,
+}: GuidedPreviewSpriteProps) {
+  const [src, setSrc] = useState<string | null>(() => getCachedPreview(cacheKey));
+  const [resolvedKey, setResolvedKey] = useState<string | null>(() =>
+    hasCachedPreview(cacheKey) ? cacheKey : null
+  );
+  const mutateRef = useRef(mutate);
+  const cachedSrc = getCachedPreview(cacheKey);
+  const loading = rendererReady && resolvedKey !== cacheKey && !cachedSrc;
+  const displaySrc = resolvedKey === cacheKey ? src : cachedSrc;
+
+  useEffect(() => {
+    mutateRef.current = mutate;
+  }, [mutate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!rendererReady) return;
+    (async () => {
+      const preview = await requestPreview(cacheKey, (draft) => mutateRef.current(draft));
+      if (cancelled) return;
+      setSrc(preview ?? null);
+      setResolvedKey(cacheKey);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cacheKey, rendererReady, requestPreview]);
+
+  return (
+    <div
+      className={cn(
+        "group relative block aspect-square w-full overflow-hidden rounded-2xl border transition",
+        selected ? "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)]" : "border-slate-700 hover:border-amber-300/70"
+      )}
+      style={{ backgroundColor: "rgba(8,11,18,0.88)", maxWidth: size }}
+    >
+      {displaySrc && !loading ? (
+        <Image
+          src={displaySrc}
+          alt={label ?? ""}
+          width={size}
+          height={size}
+          unoptimized
+          draggable={false}
+          style={{ imageRendering: "pixelated", width: "100%", height: "100%", objectFit: "contain" }}
+        />
+      ) : (
+        <Loader2 className="size-5 animate-spin text-amber-200" />
+      )}
+      {badge && (
+        <div className="pointer-events-none absolute left-2 top-2" aria-hidden>
+          {badge}
+        </div>
+      )}
+      {label && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-semibold uppercase tracking-wide text-amber-100 opacity-0 transition group-hover:opacity-100">
+          {label}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function GuidedBuilderClient() {
   const router = useRouter();
   const [params, setParams] = useState<CatParams>(DEFAULT_PARAMS);
@@ -324,82 +411,13 @@ export function GuidedBuilderClient() {
     [params, rendererReady]
   );
 
-  const PreviewSprite = ({
-    cacheKey,
-    mutate,
-    size = 250,
-    label,
-    badge,
-    selected,
-  }: {
-    cacheKey: string;
-    mutate: (draft: CatParams) => void;
-    size?: number;
-    label?: string;
-    badge?: ReactNode;
-    selected?: boolean;
-  }) => {
-    const [src, setSrc] = useState<string | null>(() => previewCacheRef.current.get(cacheKey) ?? null);
-    const [loading, setLoading] = useState<boolean>(!previewCacheRef.current.has(cacheKey));
-    const mutateRef = useRef(mutate);
-
-    useEffect(() => {
-      mutateRef.current = mutate;
-    }, [mutate]);
-
-    useEffect(() => {
-      let cancelled = false;
-      if (!rendererReady) return;
-      setLoading(!previewCacheRef.current.has(cacheKey));
-      (async () => {
-        const preview = await requestPreview(cacheKey, (draft) => mutateRef.current(draft));
-        if (cancelled) return;
-        if (preview) {
-          setSrc(preview);
-        }
-        setLoading(false);
-      })();
-      return () => {
-        cancelled = true;
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cacheKey, requestPreview, rendererReady]);
-
-    return (
-      <div
-        className={cn(
-          "group relative block aspect-square w-full overflow-hidden rounded-2xl border transition",
-          selected ? "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)]" : "border-slate-700 hover:border-amber-300/70"
-        )}
-        style={{ backgroundColor: "rgba(8,11,18,0.88)", maxWidth: size }}
-      >
-        {src && !loading ? (
-          <>
-            <Image
-              src={src}
-              alt={label ?? ""}
-              width={size}
-              height={size}
-              unoptimized
-              draggable={false}
-              style={{ imageRendering: "pixelated", width: "100%", height: "100%", objectFit: "contain" }}
-            />
-          </>
-        ) : (
-          <Loader2 className="size-5 animate-spin text-amber-200" />
-        )}
-        {badge && (
-          <div className="pointer-events-none absolute left-2 top-2" aria-hidden>
-            {badge}
-          </div>
-        )}
-        {label && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-semibold uppercase tracking-wide text-amber-100 opacity-0 transition group-hover:opacity-100">
-            {label}
-          </div>
-        )}
-      </div>
-    );
+  const getCachedPreview = useCallback((key: string) => previewCacheRef.current.get(key) ?? null, []);
+  const hasCachedPreview = useCallback((key: string) => previewCacheRef.current.has(key), []);
+  const previewSpriteSharedProps = {
+    rendererReady,
+    requestPreview,
+    getCachedPreview,
+    hasCachedPreview,
   };
 
   const buildTortiePreviewMutator = useCallback(
@@ -949,7 +967,8 @@ export function GuidedBuilderClient() {
             )}
             onClick={() => handleSelectPattern(pelt)}
           >
-            <PreviewSprite
+            <GuidedPreviewSprite
+              {...previewSpriteSharedProps}
               cacheKey={previewKey}
               mutate={(draft) => {
                 draft.peltName = pelt;
@@ -972,7 +991,7 @@ export function GuidedBuilderClient() {
           <p className="text-sm text-neutral-300">Unlock up to three layered coats for complex torties.</p>
         </div>
         <div className="flex items-center gap-3">
-          <label className="text-sm text-neutral-300">Tortie mode</label>
+          <span className="text-sm text-neutral-300">Tortie mode</span>
           <button
             type="button"
             className={cn(
@@ -1078,7 +1097,8 @@ export function GuidedBuilderClient() {
                     draft.pattern = pelt;
                   })}
                 >
-                  <PreviewSprite
+                  <GuidedPreviewSprite
+                    {...previewSpriteSharedProps}
                     cacheKey={previewKey}
                     mutate={buildTortiePreviewMutator(layerIndex, { pattern: pelt })}
                     label={label}
@@ -1137,7 +1157,8 @@ export function GuidedBuilderClient() {
                     draft.colour = colour;
                   })}
                 >
-                  <PreviewSprite
+                  <GuidedPreviewSprite
+                    {...previewSpriteSharedProps}
                     cacheKey={previewKey}
                     mutate={buildTortiePreviewMutator(layerIndex, { colour })}
                     label={label}
@@ -1175,7 +1196,8 @@ export function GuidedBuilderClient() {
                     draft.mask = mask;
                   })}
                 >
-                  <PreviewSprite
+                  <GuidedPreviewSprite
+                    {...previewSpriteSharedProps}
                     cacheKey={previewKey}
                     mutate={buildTortiePreviewMutator(layerIndex, { mask })}
                     label={label}
@@ -1270,7 +1292,15 @@ export function GuidedBuilderClient() {
         )}
         onClick={() => updateParams((draft) => mutate(draft), "accents")}
       >
-        <PreviewSprite cacheKey={key} mutate={mutate} label={label} selected={selected} size={size} badge={badge} />
+        <GuidedPreviewSprite
+          {...previewSpriteSharedProps}
+          cacheKey={key}
+          mutate={mutate}
+          label={label}
+          selected={selected}
+          size={size}
+          badge={badge}
+        />
         <span className="sr-only">{label}</span>
       </button>
     );
@@ -1466,7 +1496,8 @@ export function GuidedBuilderClient() {
                     )}
                     onClick={() => handleAccessoryToggle(option, !selected)}
                   >
-                    <PreviewSprite
+                    <GuidedPreviewSprite
+                      {...previewSpriteSharedProps}
                       cacheKey={previewKey}
                       mutate={(draft) => {
                         const set = new Set((draft.accessories ?? []).filter((x): x is string => x !== null));

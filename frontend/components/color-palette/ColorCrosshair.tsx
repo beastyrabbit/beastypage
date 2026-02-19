@@ -253,10 +253,11 @@ export function ColorCrosshair({
       }
     };
 
+    const passiveTouchOptions: AddEventListenerOptions = { passive: true };
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleEnd);
-    window.addEventListener("touchmove", handleTouchMove);
-    window.addEventListener("touchend", handleEnd);
+    window.addEventListener("touchmove", handleTouchMove, passiveTouchOptions);
+    window.addEventListener("touchend", handleEnd, passiveTouchOptions);
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
@@ -269,8 +270,10 @@ export function ColorCrosshair({
   const centerIndex = Math.floor(LOUPE_SIZE / 2);
 
   return (
-    <div
-      className={`absolute touch-none ${
+    <button
+      type="button"
+      aria-label={`Crosshair ${index + 1}`}
+      className={`absolute appearance-none border-0 bg-transparent p-0 touch-none ${
         isDragging ? "cursor-grabbing z-30" : "cursor-grab z-10"
       } ${isHighlighted || isSelected ? "z-20" : ""}`}
       style={{
@@ -375,6 +378,6 @@ export function ColorCrosshair({
             }}
           />
       </div>
-    </div>
+    </button>
   );
 }

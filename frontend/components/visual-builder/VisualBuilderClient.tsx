@@ -81,6 +81,90 @@ type VisualBuilderClientProps = {
   initialCat?: VisualBuilderInitialPayload | null;
 };
 
+type VisualBuilderPreviewSpriteProps = {
+  cacheKey: string;
+  mutate: (draft: CatParams) => void;
+  size?: number;
+  label?: string;
+  badge?: ReactNode;
+  selected?: boolean;
+  rendererReady: boolean;
+  requestPreview: (key: string, mutator: (draft: CatParams) => void) => Promise<string | null>;
+  getCachedPreview: (key: string) => string | null;
+  hasCachedPreview: (key: string) => boolean;
+};
+
+function VisualBuilderPreviewSprite({
+  cacheKey,
+  mutate,
+  size = 280,
+  label,
+  badge,
+  selected,
+  rendererReady,
+  requestPreview,
+  getCachedPreview,
+  hasCachedPreview,
+}: VisualBuilderPreviewSpriteProps) {
+  const [src, setSrc] = useState<string | null>(() => getCachedPreview(cacheKey));
+  const [resolvedKey, setResolvedKey] = useState<string | null>(() =>
+    hasCachedPreview(cacheKey) ? cacheKey : null
+  );
+  const mutateRef = useRef(mutate);
+  const cachedSrc = getCachedPreview(cacheKey);
+  const loading = rendererReady && resolvedKey !== cacheKey && !cachedSrc;
+  const displaySrc = resolvedKey === cacheKey ? src : cachedSrc;
+
+  useEffect(() => {
+    mutateRef.current = mutate;
+  }, [mutate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!rendererReady) return;
+    (async () => {
+      const preview = await requestPreview(cacheKey, (draft) => mutateRef.current(draft));
+      if (cancelled) return;
+      setSrc(preview ?? null);
+      setResolvedKey(cacheKey);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cacheKey, rendererReady, requestPreview]);
+
+  return (
+    <div
+      className={cn(
+        "relative flex aspect-square w-full max-w-[250px] items-center justify-center overflow-hidden rounded-2xl border bg-slate-900/60",
+        selected ? "border-amber-400 shadow-[0_0_14px_rgba(245,158,11,0.35)]" : "border-slate-800"
+      )}
+    >
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Loader2 className="size-5 animate-spin text-amber-200" />
+        </div>
+      )}
+      {displaySrc && (
+        <Image
+          src={displaySrc}
+          alt={label ?? "Preview"}
+          width={size}
+          height={size}
+          unoptimized
+          className={cn("h-full w-full object-contain", selected ? "opacity-100" : "opacity-90")}
+          style={{ imageRendering: "pixelated", width: "100%", height: "100%", objectFit: "contain" }}
+        />
+      )}
+      {badge && (
+        <div className="absolute right-2 top-2 rounded-full border border-black/50 bg-white/90 px-2 py-[2px] text-[10px] font-semibold text-slate-900 shadow">
+          {badge}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {}) {
   const [params, setParams] = useState<CatParams>(DEFAULT_PARAMS);
   const [tortieLayers, setTortieLayers] = useState<TortieLayer[]>([]);
@@ -450,79 +534,17 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     [params, rendererReady]
   );
 
-  const PreviewSprite = useMemo(() => {
-    function PreviewSpriteComponent({
-      cacheKey,
-      mutate,
-      size = 280,
-      label,
-      badge,
-      selected,
-    }: {
-      cacheKey: string;
-      mutate: (draft: CatParams) => void;
-      size?: number;
-      label?: string;
-      badge?: ReactNode;
-      selected?: boolean;
-    }) {
-      const [src, setSrc] = useState<string | null>(() => previewCacheRef.current.get(cacheKey) ?? null);
-      const [loading, setLoading] = useState<boolean>(!previewCacheRef.current.has(cacheKey));
-      const mutateRef = useRef(mutate);
-      useEffect(() => {
-        mutateRef.current = mutate;
-      }, [mutate]);
-      useEffect(() => {
-        let cancelled = false;
-        if (!rendererReady) return;
-        setLoading(!previewCacheRef.current.has(cacheKey));
-        (async () => {
-          const preview = await requestPreview(cacheKey, (draft) => mutateRef.current(draft));
-          if (cancelled) return;
-          if (preview) {
-            setSrc(preview);
-          }
-          setLoading(false);
-        })();
-        return () => {
-          cancelled = true;
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [cacheKey, requestPreview, rendererReady]);
-      return (
-        <div
-          className={cn(
-            "relative flex aspect-square w-full max-w-[250px] items-center justify-center overflow-hidden rounded-2xl border bg-slate-900/60",
-            selected ? "border-amber-400 shadow-[0_0_14px_rgba(245,158,11,0.35)]" : "border-slate-800"
-          )}
-        >
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="size-5 animate-spin text-amber-200" />
-            </div>
-          )}
-          {src && (
-            <Image
-              src={src}
-              alt={label ?? "Preview"}
-              width={size}
-              height={size}
-              unoptimized
-              className={cn("h-full w-full object-contain", selected ? "opacity-100" : "opacity-90")}
-              style={{ imageRendering: "pixelated", width: "100%", height: "100%", objectFit: "contain" }}
-            />
-          )}
-          {badge && (
-            <div className="absolute right-2 top-2 rounded-full border border-black/50 bg-white/90 px-2 py-[2px] text-[10px] font-semibold text-slate-900 shadow">
-              {badge}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    return PreviewSpriteComponent;
-  }, [rendererReady, requestPreview]);
+  const getCachedPreview = useCallback((key: string) => previewCacheRef.current.get(key) ?? null, []);
+  const hasCachedPreview = useCallback((key: string) => previewCacheRef.current.has(key), []);
+  const previewSpriteSharedProps = useMemo(
+    () => ({
+      rendererReady,
+      requestPreview,
+      getCachedPreview,
+      hasCachedPreview,
+    }),
+    [rendererReady, requestPreview, getCachedPreview, hasCachedPreview]
+  );
 
   const buildTortiePreviewMutator = useCallback(
     (layerIndex: number, overrides: Partial<TortieLayer>) => {
@@ -595,7 +617,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 draft.colour = colour;
               }, { trait_type: "colour", value: colour })}
             >
-              <PreviewSprite
+              <VisualBuilderPreviewSprite
+                {...previewSpriteSharedProps}
                 cacheKey={previewKey}
                 label={formatName(colour)}
                 mutate={(draft) => {
@@ -638,7 +661,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 draft.peltName = pelt;
               }, { trait_type: "pelt", value: pelt })}
             >
-              <PreviewSprite
+              <VisualBuilderPreviewSprite
+                {...previewSpriteSharedProps}
                 cacheKey={previewKey}
                 label={formatName(pelt)}
                 mutate={(draft) => {
@@ -777,7 +801,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                             draft.pattern = pattern;
                           })}
                         >
-                          <PreviewSprite
+                          <VisualBuilderPreviewSprite
+                            {...previewSpriteSharedProps}
                             cacheKey={previewKey}
                             mutate={buildTortiePreviewMutator(layerIndex, { pattern })}
                             label={formatName(pattern)}
@@ -810,7 +835,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                               draft.colour = colour;
                             })}
                           >
-                            <PreviewSprite
+                            <VisualBuilderPreviewSprite
+                              {...previewSpriteSharedProps}
                               cacheKey={previewKey}
                               mutate={buildTortiePreviewMutator(layerIndex, { colour })}
                               label={formatName(colour)}
@@ -845,7 +871,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                             draft.mask = mask;
                           })}
                         >
-                          <PreviewSprite
+                          <VisualBuilderPreviewSprite
+                            {...previewSpriteSharedProps}
                             cacheKey={previewKey}
                             mutate={buildTortiePreviewMutator(layerIndex, { mask })}
                             label={formatName(mask)}
@@ -953,7 +980,6 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
       </section>
     );
   }, [
-    PreviewSprite,
     buildTortiePreviewMutator,
     expandedLayer,
     expandedTortieSub,
@@ -968,6 +994,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     tortiePaletteMode,
     viewOptions,
     viewParams,
+    previewSpriteSharedProps,
   ]);
   const renderTortieSection = useCallback(() => tortieSection, [tortieSection]);
   const renderEyesSection = () => (
@@ -1070,7 +1097,15 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         className="text-left"
         onClick={() => updateParams((draft) => mutate(draft), traitInfo)}
       >
-        <PreviewSprite cacheKey={key} mutate={mutate} label={label} selected={selected} size={size} badge={badge} />
+        <VisualBuilderPreviewSprite
+          {...previewSpriteSharedProps}
+          cacheKey={key}
+          mutate={mutate}
+          label={label}
+          selected={selected}
+          size={size}
+          badge={badge}
+        />
         <p className={cn("mt-2 text-xs", selected ? "font-semibold text-amber-100" : "text-neutral-300")}>{label}</p>
       </button>
     );
@@ -1206,7 +1241,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         })}
       </section>
     );
-  }, [PreviewSprite, expandedMarking, experimentalColourMode, updateParams, viewOptions, viewParams]);
+  }, [expandedMarking, experimentalColourMode, updateParams, viewOptions, viewParams, previewSpriteSharedProps]);
 
   const renderMarkingsSection = useCallback(() => markingsSection, [markingsSection]);
   const renderSkinSection = () => {
@@ -1238,7 +1273,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                     draft.skinColour = skin;
                   }, { trait_type: "skin_colour", value: skin })}
                 >
-                  <PreviewSprite
+                  <VisualBuilderPreviewSprite
+                    {...previewSpriteSharedProps}
                     cacheKey={previewKey}
                     mutate={(draft) => {
                       draft.skinColour = skin;
@@ -1267,7 +1303,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 draft.tint = "none";
               }, { trait_type: "tint", value: "none" })}
             >
-              <PreviewSprite
+              <VisualBuilderPreviewSprite
+                {...previewSpriteSharedProps}
                 cacheKey={`tint-none-${tintKeyBase}`}
                 mutate={(draft) => {
                   draft.tint = "none";
@@ -1290,7 +1327,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                     draft.tint = tint;
                   }, { trait_type: "tint", value: tint })}
                 >
-                <PreviewSprite
+                <VisualBuilderPreviewSprite
+                  {...previewSpriteSharedProps}
                   cacheKey={previewKey}
                   mutate={(draft) => {
                     draft.tint = tint;
@@ -1488,7 +1526,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                             : "rounded-2xl border border-slate-800/70 bg-slate-900/60 hover:border-amber-300/70"
                         )}
                       >
-                        <PreviewSprite
+                        <VisualBuilderPreviewSprite
+                          {...previewSpriteSharedProps}
                           cacheKey={previewKey}
                           mutate={previewMutator(option)}
                           label={label}
@@ -1506,7 +1545,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         })}
       </section>
     );
-  }, [PreviewSprite, expandedAccessoryGroup, toggleAccessory, viewOptions, viewParams]);
+  }, [expandedAccessoryGroup, toggleAccessory, viewOptions, viewParams, previewSpriteSharedProps]);
   const renderAccessoriesSection = useCallback(() => accessoriesSection, [accessoriesSection]);
 
   const scarsSection = useMemo(() => {
@@ -1572,7 +1611,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                             : "rounded-2xl border border-slate-800/70 bg-slate-900/60 hover:border-amber-300/70"
                         )}
                       >
-                        <PreviewSprite
+                        <VisualBuilderPreviewSprite
+                          {...previewSpriteSharedProps}
                           cacheKey={previewKey}
                           mutate={previewMutator(option)}
                           label={label}
@@ -1590,7 +1630,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         })}
       </section>
     );
-  }, [PreviewSprite, expandedScarGroup, toggleScar, viewOptions, viewParams]);
+  }, [expandedScarGroup, toggleScar, viewOptions, viewParams, previewSpriteSharedProps]);
 
   const renderScarsSection = useCallback(() => scarsSection, [scarsSection]);
   const poseSection = useMemo(() => (
@@ -1612,7 +1652,8 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
               draft.spriteNumber = sprite;
             }, { trait_type: "pose", value: String(sprite) })}
           >
-            <PreviewSprite
+            <VisualBuilderPreviewSprite
+              {...previewSpriteSharedProps}
               cacheKey={`pose-option-${sprite}`}
               mutate={(draft) => {
                 draft.spriteNumber = sprite;
@@ -1625,7 +1666,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
         ))}
       </div>
     </section>
-  ), [PreviewSprite, params.spriteNumber, updateParams, viewOptions?.sprites]);
+  ), [params.spriteNumber, updateParams, viewOptions?.sprites, previewSpriteSharedProps]);
 
   const renderPoseSection = useCallback(() => poseSection, [poseSection]);
 
@@ -1919,8 +1960,11 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
             </div>
             <form className="mt-5 space-y-3 text-sm">
               <div className="space-y-1">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-neutral-400">Cat name</label>
+                <label htmlFor="visual-builder-cat-name" className="block text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  Cat name
+                </label>
                 <input
+                  id="visual-builder-cat-name"
                   value={catName}
                   disabled={isShareLocked}
                   onChange={(event) => {
@@ -1936,8 +1980,11 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
                 />
               </div>
               <div className="space-y-1">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-neutral-400">Creator</label>
+                <label htmlFor="visual-builder-creator-name" className="block text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  Creator
+                </label>
                 <input
+                  id="visual-builder-creator-name"
                   value={creatorName}
                   disabled={isShareLocked}
                   onChange={(event) => {

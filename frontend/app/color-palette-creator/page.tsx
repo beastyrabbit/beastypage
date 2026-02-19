@@ -15,7 +15,23 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ColorPaletteCreatorPage() {
+type ColorPaletteCreatorPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function firstSearchParam(value: string | string[] | undefined): string | null {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && value.length > 0) return value[0] ?? null;
+  return null;
+}
+
+export default async function ColorPaletteCreatorPage({ searchParams }: ColorPaletteCreatorPageProps) {
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const slug = firstSearchParam(resolvedSearchParams.slug)?.trim() ?? null;
+  const darkForestParam = firstSearchParam(resolvedSearchParams.darkForest)?.trim() ?? null;
+  const imageUrl = firstSearchParam(resolvedSearchParams.imageUrl) ?? null;
+  const paletteSlug = firstSearchParam(resolvedSearchParams.paletteSlug)?.trim() ?? null;
+
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <PageHero
@@ -33,7 +49,12 @@ export default function ColorPaletteCreatorPage() {
       />
 
       <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
-        <ColorPaletteContent />
+        <ColorPaletteContent
+          slug={slug}
+          darkForestParam={darkForestParam}
+          imageUrl={imageUrl}
+          paletteSlug={paletteSlug}
+        />
       </Suspense>
     </main>
   );

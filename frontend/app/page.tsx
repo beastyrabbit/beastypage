@@ -37,6 +37,7 @@ export default function HomePage() {
             src="/beasty-banner.png"
             alt=""
             fill
+            sizes="100vw"
             className="object-cover opacity-40"
             priority
           />

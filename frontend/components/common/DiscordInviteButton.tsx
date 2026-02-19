@@ -164,7 +164,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
             setAttemptCount(nextAttempt);
             const waitSeconds = getCooldownDuration(nextAttempt);
             const now = Date.now();
-            setCooldownUntil(now + waitSeconds * 1000);
+            setCooldownUntil(() => now + waitSeconds * 1000);
             setNowMs(now);
             setStatus("error");
             setInviteUrl(null);
@@ -189,7 +189,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         setAttemptCount(nextAttempt);
         const waitSeconds = getCooldownDuration(nextAttempt);
         const now = Date.now();
-        setCooldownUntil(now + waitSeconds * 1000);
+        setCooldownUntil(() => now + waitSeconds * 1000);
         setNowMs(now);
         setStatus("error");
         setInviteUrl(null);
@@ -325,7 +325,6 @@ export function DiscordInviteButton({ className }: { className?: string }) {
           aria-modal="true"
           aria-labelledby="discord-invite-title"
           className="relative w-full max-w-md transform overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-b from-background via-background/95 to-background shadow-[0_40px_120px_-30px_rgba(15,15,45,0.65)] ring-1 ring-border/40 transition-all duration-200 ease-out"
-          onClick={(event) => event.stopPropagation()}
         >
           <div ref={contentRef} className="max-h-[85dvh] overflow-auto px-6 pb-7 pt-8 sm:px-9 sm:pb-9">
             <button

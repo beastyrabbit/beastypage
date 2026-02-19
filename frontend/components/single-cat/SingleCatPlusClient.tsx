@@ -50,6 +50,7 @@ import {
 } from "../../utils/spinTiming";
 import { useVariants } from "../../utils/variants";
 import {
+  DEFAULT_SINGLE_CAT_SETTINGS,
   parseSingleCatPayload,
   singleCatSettingsEqual,
   migrateSingleCatTiming,
@@ -1347,6 +1348,8 @@ type SingleCatPlusClientProps = {
   defaultTortieRange?: LayerRange;
   defaultAfterlife?: AfterlifeOption;
   variantSlug?: string;
+  initialVariantSettings?: SingleCatSettings | null;
+  initialVariantLoadError?: string | null;
 };
 
 export function SingleCatPlusClient({
@@ -1356,6 +1359,8 @@ export function SingleCatPlusClient({
   defaultTortieRange = { min: 1, max: 4 },
   defaultAfterlife = "dark10",
   variantSlug,
+  initialVariantSettings = null,
+  initialVariantLoadError = null,
 }: SingleCatPlusClientProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
@@ -1364,18 +1369,50 @@ export function SingleCatPlusClient({
   const catStateRef = useRef<CatState | null>(null);
   const generationIdRef = useRef(0);
   const toastTimerRef = useRef<number | null>(null);
-  const variantSlugAppliedRef = useRef<string | null>(null);
+  const initialVariantLoadHandledRef = useRef(false);
 
   const [initializing, setInitializing] = useState(true);
   const [initialError, setInitialError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [mode, setMode] = useState<"flashy" | "calm">(defaultMode);
-  const [accessoryRange, setAccessoryRange] = useState<LayerRange>(defaultAccessoryRange);
-  const [scarRange, setScarRange] = useState<LayerRange>(defaultScarRange);
-  const [tortieRange, setTortieRange] = useState<LayerRange>(defaultTortieRange);
-  const [timingConfig, setTimingConfig] = useState<SpinTimingConfig>(DEFAULT_TIMING_CONFIG);
+  const initialSettings = useMemo<SingleCatSettings>(() => {
+    if (initialVariantSettings) {
+      return initialVariantSettings;
+    }
+    return {
+      ...DEFAULT_SINGLE_CAT_SETTINGS,
+      mode: defaultMode,
+      accessoryRange: { ...defaultAccessoryRange },
+      scarRange: { ...defaultScarRange },
+      tortieRange: { ...defaultTortieRange },
+      afterlifeMode: defaultAfterlife,
+      timing: {
+        ...DEFAULT_TIMING_CONFIG,
+        delays: { ...DEFAULT_TIMING_CONFIG.delays },
+        subsetLimits: { ...(DEFAULT_TIMING_CONFIG.subsetLimits ?? {}) },
+        pauseDelays: DEFAULT_TIMING_CONFIG.pauseDelays
+          ? {
+              flashyMs: DEFAULT_TIMING_CONFIG.pauseDelays.flashyMs,
+              calmMs: DEFAULT_TIMING_CONFIG.pauseDelays.calmMs,
+            }
+          : undefined,
+      },
+    };
+  }, [
+    defaultAccessoryRange,
+    defaultAfterlife,
+    defaultMode,
+    defaultScarRange,
+    defaultTortieRange,
+    initialVariantSettings,
+  ]);
+
+  const [mode, setMode] = useState<"flashy" | "calm">(initialSettings.mode);
+  const [accessoryRange, setAccessoryRange] = useState<LayerRange>(initialSettings.accessoryRange);
+  const [scarRange, setScarRange] = useState<LayerRange>(initialSettings.scarRange);
+  const [tortieRange, setTortieRange] = useState<LayerRange>(initialSettings.tortieRange);
+  const [timingConfig, setTimingConfig] = useState<SpinTimingConfig>(initialSettings.timing);
 
   // Page variant management
   const variants = useVariants<SingleCatSettings>({
@@ -1384,7 +1421,7 @@ export function SingleCatPlusClient({
   });
   const [timingModalOpen, setTimingModalOpen] = useState(false);
   const [lastTimingSnapshot, setLastTimingSnapshot] = useState<TimingSnapshot | null>(null);
-  const [speedMultiplier, setSpeedMultiplier] = useState(1.0);
+  const [speedMultiplier, setSpeedMultiplier] = useState(initialSettings.speedMultiplier);
   const speedMultiplierRef = useRef(1.0);
   const subsetLimits = useMemo(
     () => timingConfig.subsetLimits ?? (DEFAULT_TIMING_CONFIG.subsetLimits ?? {}),
@@ -1448,9 +1485,9 @@ export function SingleCatPlusClient({
       [key]: (actualDurationsRef.current[key] ?? 0) + deltaMs,
     };
   }, []);
-  const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(defaultAfterlife);
-  const [includeBaseColours, setIncludeBaseColours] = useState(true);
-  const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(() => new Set());
+  const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(initialSettings.afterlifeMode);
+  const [includeBaseColours, setIncludeBaseColours] = useState(initialSettings.includeBaseColours);
+  const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(() => new Set(initialSettings.extendedModes));
 
   const [rollerLabel, setRollerLabel] = useState<string | null>(null);
   const [rollerActiveValue, setRollerActiveValue] = useState<string | null>(null);
@@ -1469,8 +1506,8 @@ export function SingleCatPlusClient({
   const [toast, setToast] = useState<string | null>(null);
   const [rollerExpanded, setRollerExpanded] = useState(false);
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
-  const [catNameDraft, setCatNameDraft] = useState("");
-  const [creatorNameDraft, setCreatorNameDraft] = useState("");
+  const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
+  const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName);
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaDirty, setMetaDirty] = useState(false);
 
@@ -1609,7 +1646,7 @@ export function SingleCatPlusClient({
 
   const clearMirror = useCallback(() => { }, []);
 
-  const detectGlobalPreset = useCallback(() => {
+  const activeGlobalPreset = useMemo(() => {
     for (const presetKey of GLOBAL_PRESETS) {
       const matches = PARAM_TIMING_ORDER.every((param) => {
         const target = PARAM_TIMING_PRESETS[param]?.[presetKey];
@@ -1621,12 +1658,6 @@ export function SingleCatPlusClient({
     }
     return "custom" as const;
   }, [timingConfig.delays]);
-
-  const [activeGlobalPreset, setActiveGlobalPreset] = useState<ReturnType<typeof detectGlobalPreset>>(detectGlobalPreset);
-
-  useEffect(() => {
-    setActiveGlobalPreset(detectGlobalPreset());
-  }, [detectGlobalPreset]);
 
   const handleGlobalPreset = useCallback(
     (preset: keyof TimingPresetSet) => {
@@ -1641,7 +1672,6 @@ export function SingleCatPlusClient({
         ...timingConfig,
         delays: nextDelays,
       });
-      setActiveGlobalPreset(preset);
     },
     [setTimingConfig, timingConfig]
   );
@@ -1659,9 +1689,8 @@ export function SingleCatPlusClient({
           [key]: nextValue,
         },
       });
-      setActiveGlobalPreset("custom");
     },
-    [setTimingConfig, setActiveGlobalPreset, timingConfig]
+    [setTimingConfig, timingConfig]
   );
 
   const handlePauseChange = useCallback(
@@ -1677,9 +1706,8 @@ export function SingleCatPlusClient({
           [kind]: nextMs,
         },
       });
-      setActiveGlobalPreset("custom");
     },
-    [setActiveGlobalPreset, setTimingConfig, timingConfig]
+    [setTimingConfig, timingConfig]
   );
 
   const toggleSubsetLimit = useCallback(
@@ -1695,9 +1723,8 @@ export function SingleCatPlusClient({
         ...timingConfig,
         subsetLimits: nextLimits,
       });
-      setActiveGlobalPreset("custom");
     },
-    [setActiveGlobalPreset, setTimingConfig, subsetLimits, timingConfig]
+    [setTimingConfig, subsetLimits, timingConfig]
   );
 
   const handleResetTimings = useCallback(() => {
@@ -1711,8 +1738,7 @@ export function SingleCatPlusClient({
         calmMs: DEFAULT_TIMING_CONFIG.pauseDelays!.calmMs,
       },
     });
-    setActiveGlobalPreset("normal");
-  }, [setActiveGlobalPreset, setTimingConfig, timingConfig]);
+  }, [setTimingConfig, timingConfig]);
 
   const copyText = useCallback(
     async (text: string, successMessage: string) => {
@@ -1730,35 +1756,18 @@ export function SingleCatPlusClient({
     [showToast]
   );
 
-  // Auto-load variant from URL slug on mount
   useEffect(() => {
     if (!variantSlug) return;
-    if (variantSlugAppliedRef.current === variantSlug) return;
-    variantSlugAppliedRef.current = variantSlug;
-    (async () => {
-      try {
-        const response = await fetch(`/api/single-cat-settings?slug=${encodeURIComponent(variantSlug)}`, {
-          method: "GET",
-          cache: "no-store",
-        });
-        if (!response.ok) {
-          showToast(response.status === 404 ? "No preset found for that slug" : "Failed to load settings");
-          return;
-        }
-        const json = (await response.json()) as { config?: unknown; slug: string };
-        if (!json.config) {
-          showToast("Preset payload missing config");
-          return;
-        }
-        const settings = parseSingleCatPayload(json.config);
-        applyVariantConfig(settings);
-        showToast("Settings loaded from URL");
-      } catch (error) {
-        console.error("Failed to autoload variant settings", error);
-        showToast("Failed to load settings from URL");
-      }
-    })();
-  }, [variantSlug, applyVariantConfig, showToast]);
+    if (initialVariantLoadHandledRef.current) return;
+    initialVariantLoadHandledRef.current = true;
+    if (initialVariantLoadError) {
+      showToast(initialVariantLoadError);
+      return;
+    }
+    if (initialVariantSettings) {
+      showToast("Settings loaded from URL");
+    }
+  }, [initialVariantLoadError, initialVariantSettings, showToast, variantSlug]);
 
   const settleRoller = useCallback(
     async (
@@ -2063,7 +2072,6 @@ export function SingleCatPlusClient({
       renderCat,
       settleRoller,
       subsetLimits,
-      timingConfig,
       updateLayerRow,
       updateParamRow,
       readSpinState,
@@ -2245,7 +2253,6 @@ export function SingleCatPlusClient({
       renderCat,
       settleRoller,
       subsetLimits,
-      timingConfig,
       updateLayerRow,
       updateParamRow,
       readSpinState,
@@ -2469,11 +2476,11 @@ export function SingleCatPlusClient({
       addActualDuration,
       clearMirror,
       drawCanvas,
+      getDelayWithMultiplier,
       playFlip,
       renderCat,
       settleRoller,
       subsetLimits,
-      timingConfig,
       updateLayerRow,
       updateParamRow,
       readSpinState,
@@ -3160,7 +3167,9 @@ export function SingleCatPlusClient({
     readSpinState,
     createMapper,
     resetMetaDrafts,
-    timingConfig,
+    getDelayWithMultiplier,
+    timingConfig.allowFastFlips,
+    timingConfig.delays,
     subsetLimits,
     resetActualDurations,
     addActualDuration,
@@ -3598,9 +3607,9 @@ export function SingleCatPlusClient({
                       </p>
                       {rows.length ? (
                         <ul className="space-y-2">
-                          {rows.map((row, index) => (
+                          {rows.map((row) => (
                             <li
-                              key={`${group}-${index}`}
+                              key={`${group}-${row.label}`}
                               className={cn(
                                 "rounded-xl border px-3 py-2 transition",
                                 row.status === "active"
@@ -3814,7 +3823,7 @@ export function SingleCatPlusClient({
               <div className="space-y-3">
                 <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground/80">
                   <PaintIcon size={12} /> Colour Palettes
-                  <a
+                  <Link
                     href="/cat-color-palettes"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -3822,7 +3831,7 @@ export function SingleCatPlusClient({
                     title="View all colour palettes"
                   >
                     <ExternalLinkIcon size={12} />
-                  </a>
+                  </Link>
                 </p>
                 <PaletteMultiSelect
                   selected={extendedModes as Set<PaletteId>}
@@ -3892,6 +3901,14 @@ export function SingleCatPlusClient({
               setSpriteGalleryOpen(false);
             }
           }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setSpriteGalleryOpen(false);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="Close sprite gallery"
         >
           <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
             <button
@@ -3967,6 +3984,14 @@ export function SingleCatPlusClient({
               setTimingModalOpen(false);
             }
           }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setTimingModalOpen(false);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="Close timing settings"
         >
           <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
             <button
