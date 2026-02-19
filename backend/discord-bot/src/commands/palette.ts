@@ -7,6 +7,8 @@ import { extractPalette, type PaletteResponse } from "../utils/api-client.js";
 import { buildPaletteEmbed } from "../utils/embed-builder.js";
 import { dataUrlToBase64 } from "../utils/data-url.js";
 
+const IMAGE_URL_REGEX = /\.(png|jpe?g|gif|webp|bmp|tiff?)(\?|$)/i;
+
 function buildPaletteReply(result: PaletteResponse) {
   const imageBuffer = Buffer.from(dataUrlToBase64(result.paletteImage), "base64");
   const filename = "palette-grid.png";
@@ -39,9 +41,15 @@ export async function handlePaletteContextMenu(
 ): Promise<void> {
   const message = interaction.targetMessage;
 
+  const imageAttachment = message.attachments.find((attachment) => {
+    if (attachment.contentType?.startsWith("image/")) return true;
+    if (attachment.width !== null && attachment.height !== null) return true;
+    return IMAGE_URL_REGEX.test(attachment.url);
+  });
+
   // Find an image from attachments or embeds
   const imageUrl =
-    message.attachments.find((a) => a.contentType?.startsWith("image/"))?.url ??
+    imageAttachment?.url ??
     message.embeds.find((e) => e.image)?.image?.url ??
     message.embeds.find((e) => e.thumbnail)?.thumbnail?.url;
 

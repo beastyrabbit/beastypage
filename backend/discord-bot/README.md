@@ -20,7 +20,8 @@ FRONTEND_API_URL=https://beastyrabbit.com
 - Guild-only commands:
   - `/config`
   - `/homepage`
-  - `Extract Palette` message context command
+- `Extract Palette` message context command:
+  - Guild, bot DM, and private channels
 
 ## Deploy Commands
 

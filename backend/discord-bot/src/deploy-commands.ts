@@ -156,8 +156,8 @@ const homepageCommand = new SlashCommandBuilder()
 const contextMenuCommand = new ContextMenuCommandBuilder()
   .setName("Extract Palette")
   .setType(ApplicationCommandType.Message)
-  .setIntegrationTypes(GUILD_INSTALL)
-  .setContexts(GUILD_CONTEXT);
+  .setIntegrationTypes(GUILD_INSTALL, USER_INSTALL)
+  .setContexts(GUILD_CONTEXT, BOT_DM_CONTEXT, PRIVATE_CHANNEL_CONTEXT);
 
 const commands = [
   genDiscordKittenCommand.toJSON(),
