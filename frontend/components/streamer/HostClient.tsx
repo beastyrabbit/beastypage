@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ClipboardCopy,
   Loader2,
@@ -148,7 +148,6 @@ export function HostClient() {
   const { generator, ready: generatorReady } = useCatGenerator();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   const sessionArgs = useMemo(() => {
     if (!activeSessionId) return "skip" as const;
@@ -156,16 +155,6 @@ export function HostClient() {
   }, [activeSessionId]);
 
   const session = useQuery(api.streamSessions.get, sessionArgs);
-
-  useEffect(() => {
-    if (!coinModalOpen) {
-      setCoinWinner(null);
-      setCoinResult(null);
-      setCoinFlipping(false);
-      setCoinFlipId(0);
-      setVoteSent(false);
-    }
-  }, [coinModalOpen]);
 
   const sessionList = useQuery(api.streamSessions.list, {
     exclude: "completed",
@@ -246,10 +235,11 @@ export function HostClient() {
 
   const updateSessionQueryParam = useCallback(
     (sessionId: string | null) => {
+      if (typeof window === "undefined") return;
       if (!pathname) return;
-      const current = searchParams?.get("session") ?? null;
+      const params = new URLSearchParams(window.location.search);
+      const current = params.get("session");
       if (current === sessionId) return;
-      const params = new URLSearchParams(searchParams?.toString() ?? "");
       if (sessionId) {
         params.set("session", sessionId);
       } else {
@@ -258,15 +248,16 @@ export function HostClient() {
       const query = params.toString();
       router.replace(query ? `${pathname}?${query}` : pathname);
     },
-    [pathname, router, searchParams]
+    [pathname, router]
   );
 
   useEffect(() => {
-    const preselected = searchParams?.get("session");
+    if (typeof window === "undefined") return;
+    const preselected = new URLSearchParams(window.location.search).get("session");
     if (preselected && !activeSessionId) {
       setActiveSessionId(preselected);
     }
-  }, [searchParams, activeSessionId]);
+  }, [activeSessionId]);
 
   useEffect(() => {
     updateSessionQueryParam(activeSessionId ?? null);
@@ -379,17 +370,14 @@ export function HostClient() {
   }, [session?.params, currentStep]);
 
   const totalVotes = useMemo(() => voteRows.reduce((sum, row) => sum + row.count, 0), [voteRows]);
-  const activeParticipantCount = useMemo(
-    () => participants.filter((p) => (p.status ?? "active").toLowerCase() === "active").length,
-    [participants]
-  );
+  const activeParticipantCount = participants.filter((p) => (p.status ?? "active").toLowerCase() === "active").length;
 
   const leaderOption = useMemo(() => {
     if (!leaderKey) return null;
     return displayOptions.find((option) => option.key === leaderKey) ?? null;
   }, [leaderKey, displayOptions]);
 
-  const hasUnresolvedTie = useMemo(() => tieOptions.length > 1, [tieOptions]);
+  const hasUnresolvedTie = tieOptions.length > 1;
 
   const frontOption = tiePair[0]?.option ?? null;
   const backOption = tiePair[1]?.option ?? null;
@@ -1384,7 +1372,7 @@ export function HostClient() {
             ) : (
               <ol className="space-y-3">
                 {localState.history.map((entry, index) => (
-                  <li key={`${entry.step_id ?? entry.option_key ?? index}-${index}`} className="rounded-xl border border-border/40 bg-background/60 px-3 py-2">
+                  <li key={entry.step_id ?? entry.option_key ?? `${entry.title}-${entry.label}`} className="rounded-xl border border-border/40 bg-background/60 px-3 py-2">
                     <div className="text-xs uppercase tracking-wide text-muted-foreground">Step {index + 1}</div>
                     <div className="font-semibold text-foreground">{entry.title}</div>
                     <div className="text-xs text-muted-foreground">{entry.label}</div>
@@ -1607,7 +1595,7 @@ export function HostClient() {
                 {coinFlipping ? "Flipping" : voteSent ? "Vote recorded" : "Flip coin"}
               </button>
             </div>
-            <style jsx>{`
+            <style>{`
               .coin-stage {
                 perspective: 1200px;
                 width: ${PREVIEW_SIZE}px;

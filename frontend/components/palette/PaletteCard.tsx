@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { motion } from "motion/react";
+import { LazyMotion, domAnimation, m } from "motion/react";
 import { HexColorPicker } from "react-colorful";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -57,10 +57,7 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
 
   // Position the picker portal relative to the trigger button
   useLayoutEffect(() => {
-    if (pickerIndex === null) {
-      setPickerPos(null);
-      return;
-    }
+    if (pickerIndex === null) return;
     const trigger = triggerRefs.current[pickerIndex];
     if (!trigger) return;
 
@@ -158,6 +155,7 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
 
   const handlePickerOpen = useCallback((e: React.MouseEvent, index: number) => {
     e.stopPropagation();
+    setPickerPos(null);
     setPickerIndex((prev) => (prev === index ? null : index));
   }, []);
 
@@ -171,16 +169,18 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
   );
 
   const modeGradient = MODE_COLORS[palette.mode] ?? "from-gray-400 to-gray-500";
+  const swatchKeyCounts = new Map<string, number>();
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 16, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, x: -40, scale: 0.96 }}
-      transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-      className="group relative"
-    >
+    <LazyMotion features={domAnimation}>
+      <m.div
+        layout
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, x: -40, scale: 0.96 }}
+        transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+        className="group relative"
+      >
       {/* Card body */}
       <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] shadow-lg shadow-black/20 backdrop-blur-sm transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.05] hover:shadow-xl hover:shadow-black/30">
         {/* Color swatches — tall, with gaps */}
@@ -191,10 +191,12 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
             const { display } = formatColor(hex, displayFormat);
             const isCopied = copiedIndex === i;
             const isActive = hoveredIndex === i || pickerIndex === i;
+            const swatchCount = swatchKeyCounts.get(hex) ?? 0;
+            swatchKeyCounts.set(hex, swatchCount + 1);
 
             return (
               <div
-                key={`swatch-${i}`}
+                key={`${palette.id}-${hex}-${swatchCount}`}
                 className={cn(
                   "relative flex flex-1 transition-all duration-200",
                   i === 0 && "rounded-l-xl",
@@ -273,7 +275,6 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
                     ref={pickerRef}
                     className="fixed z-[9999]"
                     style={{ top: pickerPos.top, left: pickerPos.left }}
-                    onClick={(e) => e.stopPropagation()}
                   >
                     <div className="rounded-xl border border-white/10 bg-black/90 p-3 shadow-2xl backdrop-blur-xl">
                       <HexColorPicker color={hex} onChange={handleColorChange} />
@@ -331,6 +332,7 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
         </div>
       </div>
 
-    </motion.div>
+      </m.div>
+    </LazyMotion>
   );
 }

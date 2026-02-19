@@ -119,7 +119,122 @@ const PALETTE_CONTROLS: { id: PaletteMode; label: string }[] = [
   ...getPaletteMetadata().map((p) => ({ id: p.id, label: p.label })),
 ];
 
+type PaletteControlsProps = {
+  mode: PaletteMode;
+  onChange: (mode: PaletteMode) => void;
+};
+
+function PaletteControls({ mode, onChange }: PaletteControlsProps) {
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+      <span className="font-medium text-neutral-300">Palette:</span>
+      {PALETTE_CONTROLS.map((palette) => (
+        <button
+          key={palette.id}
+          type="button"
+          className={cn(
+            "rounded-full border px-3 py-1 transition",
+            mode === palette.id
+              ? "border-amber-400 bg-amber-500/20 text-amber-100"
+              : "border-slate-600 bg-slate-800/70 text-slate-200 hover:border-amber-400/70 hover:text-amber-100"
+          )}
+          onClick={() => onChange(palette.id)}
+        >
+          {palette.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const DISPLAY_CANVAS_SIZE = 540;
+
+type GuidedPreviewSpriteProps = {
+  cacheKey: string;
+  mutate: (draft: CatParams) => void;
+  size?: number;
+  label?: string;
+  badge?: ReactNode;
+  selected?: boolean;
+  rendererReady: boolean;
+  requestPreview: (key: string, mutator: (draft: CatParams) => void) => Promise<string | null>;
+  getCachedPreview: (key: string) => string | null;
+  hasCachedPreview: (key: string) => boolean;
+};
+
+function GuidedPreviewSprite({
+  cacheKey,
+  mutate,
+  size = 250,
+  label,
+  badge,
+  selected,
+  rendererReady,
+  requestPreview,
+  getCachedPreview,
+  hasCachedPreview,
+}: GuidedPreviewSpriteProps) {
+  const [src, setSrc] = useState<string | null>(() => getCachedPreview(cacheKey));
+  const [resolvedKey, setResolvedKey] = useState<string | null>(() =>
+    hasCachedPreview(cacheKey) ? cacheKey : null
+  );
+  const mutateRef = useRef(mutate);
+  const cachedSrc = getCachedPreview(cacheKey);
+  const loading = rendererReady && resolvedKey !== cacheKey && !cachedSrc;
+  const displaySrc = resolvedKey === cacheKey ? src : cachedSrc;
+
+  useEffect(() => {
+    mutateRef.current = mutate;
+  }, [mutate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!rendererReady) return;
+    (async () => {
+      const preview = await requestPreview(cacheKey, (draft) => mutateRef.current(draft));
+      if (cancelled) return;
+      setSrc(preview ?? null);
+      setResolvedKey(cacheKey);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cacheKey, rendererReady, requestPreview]);
+
+  return (
+    <div
+      className={cn(
+        "group relative block aspect-square w-full overflow-hidden rounded-2xl border transition",
+        selected ? "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)]" : "border-slate-700 hover:border-amber-300/70"
+      )}
+      style={{ backgroundColor: "rgba(8,11,18,0.88)", maxWidth: size }}
+    >
+      {displaySrc && !loading ? (
+        <Image
+          src={displaySrc}
+          alt={label ?? ""}
+          width={size}
+          height={size}
+          unoptimized
+          draggable={false}
+          style={{ imageRendering: "pixelated", width: "100%", height: "100%", objectFit: "contain" }}
+        />
+      ) : (
+        <Loader2 className="size-5 animate-spin text-amber-200" />
+      )}
+      {badge && (
+        <div className="pointer-events-none absolute left-2 top-2" aria-hidden>
+          {badge}
+        </div>
+      )}
+      {label && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-semibold uppercase tracking-wide text-amber-100 opacity-0 transition group-hover:opacity-100">
+          {label}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function GuidedBuilderClient() {
   const router = useRouter();
@@ -324,82 +439,13 @@ export function GuidedBuilderClient() {
     [params, rendererReady]
   );
 
-  const PreviewSprite = ({
-    cacheKey,
-    mutate,
-    size = 250,
-    label,
-    badge,
-    selected,
-  }: {
-    cacheKey: string;
-    mutate: (draft: CatParams) => void;
-    size?: number;
-    label?: string;
-    badge?: ReactNode;
-    selected?: boolean;
-  }) => {
-    const [src, setSrc] = useState<string | null>(() => previewCacheRef.current.get(cacheKey) ?? null);
-    const [loading, setLoading] = useState<boolean>(!previewCacheRef.current.has(cacheKey));
-    const mutateRef = useRef(mutate);
-
-    useEffect(() => {
-      mutateRef.current = mutate;
-    }, [mutate]);
-
-    useEffect(() => {
-      let cancelled = false;
-      if (!rendererReady) return;
-      setLoading(!previewCacheRef.current.has(cacheKey));
-      (async () => {
-        const preview = await requestPreview(cacheKey, (draft) => mutateRef.current(draft));
-        if (cancelled) return;
-        if (preview) {
-          setSrc(preview);
-        }
-        setLoading(false);
-      })();
-      return () => {
-        cancelled = true;
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [cacheKey, requestPreview, rendererReady]);
-
-    return (
-      <div
-        className={cn(
-          "group relative block aspect-square w-full overflow-hidden rounded-2xl border transition",
-          selected ? "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)]" : "border-slate-700 hover:border-amber-300/70"
-        )}
-        style={{ backgroundColor: "rgba(8,11,18,0.88)", maxWidth: size }}
-      >
-        {src && !loading ? (
-          <>
-            <Image
-              src={src}
-              alt={label ?? ""}
-              width={size}
-              height={size}
-              unoptimized
-              draggable={false}
-              style={{ imageRendering: "pixelated", width: "100%", height: "100%", objectFit: "contain" }}
-            />
-          </>
-        ) : (
-          <Loader2 className="size-5 animate-spin text-amber-200" />
-        )}
-        {badge && (
-          <div className="pointer-events-none absolute left-2 top-2" aria-hidden>
-            {badge}
-          </div>
-        )}
-        {label && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60 text-xs font-semibold uppercase tracking-wide text-amber-100 opacity-0 transition group-hover:opacity-100">
-            {label}
-          </div>
-        )}
-      </div>
-    );
+  const getCachedPreview = useCallback((key: string) => previewCacheRef.current.get(key) ?? null, []);
+  const hasCachedPreview = useCallback((key: string) => previewCacheRef.current.has(key), []);
+  const previewSpriteSharedProps = {
+    rendererReady,
+    requestPreview,
+    getCachedPreview,
+    hasCachedPreview,
   };
 
   const buildTortiePreviewMutator = useCallback(
@@ -872,43 +918,25 @@ export function GuidedBuilderClient() {
   const nextStepCandidate = useMemo(() => findNextStepId(activeStep, params), [activeStep, findNextStepId, params]);
   const nextButtonLabel = nextStepCandidate ? "Next step" : "Finish tour";
 
-  const renderPaletteControls = (mode: PaletteMode, onChange: (mode: PaletteMode) => void) => (
-    <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-      <span className="font-medium text-neutral-300">Palette:</span>
-      {PALETTE_CONTROLS.map((palette) => (
-        <button
-          key={palette.id}
-          type="button"
-          className={cn(
-            "rounded-full border px-3 py-1 transition",
-            mode === palette.id
-              ? "border-amber-400 bg-amber-500/20 text-amber-100"
-              : "border-slate-600 bg-slate-800/70 text-slate-200 hover:border-amber-400/70 hover:text-amber-100"
-          )}
-          onClick={() => onChange(palette.id)}
-        >
-          {palette.label}
-        </button>
-      ))}
-    </div>
-  );
-
   const renderColourStep = () => (
     <div className="space-y-4">
-      {renderPaletteControls(experimentalColourMode, (mode) => {
-        setExperimentalColourMode(mode);
-        setParams((prev) => {
-          const palette = getPaletteForMode(mode);
-          if (!palette.includes(prev.colour)) {
-            const fallback = palette[0] ?? prev.colour;
-            const next = cloneParams(prev);
-            next.colour = fallback;
-            markStepState("colour", next);
-            return next;
-          }
-          return prev;
-        });
-      })}
+      <PaletteControls
+        mode={experimentalColourMode}
+        onChange={(mode) => {
+          setExperimentalColourMode(mode);
+          setParams((prev) => {
+            const palette = getPaletteForMode(mode);
+            if (!palette.includes(prev.colour)) {
+              const fallback = palette[0] ?? prev.colour;
+              const next = cloneParams(prev);
+              next.colour = fallback;
+              markStepState("colour", next);
+              return next;
+            }
+            return prev;
+          });
+        }}
+      />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {paletteColours.map((colour) => (
           <button
@@ -949,7 +977,8 @@ export function GuidedBuilderClient() {
             )}
             onClick={() => handleSelectPattern(pelt)}
           >
-            <PreviewSprite
+            <GuidedPreviewSprite
+              {...previewSpriteSharedProps}
               cacheKey={previewKey}
               mutate={(draft) => {
                 draft.peltName = pelt;
@@ -972,7 +1001,7 @@ export function GuidedBuilderClient() {
           <p className="text-sm text-neutral-300">Unlock up to three layered coats for complex torties.</p>
         </div>
         <div className="flex items-center gap-3">
-          <label className="text-sm text-neutral-300">Tortie mode</label>
+          <span className="text-sm text-neutral-300">Tortie mode</span>
           <button
             type="button"
             className={cn(
@@ -1078,7 +1107,8 @@ export function GuidedBuilderClient() {
                     draft.pattern = pelt;
                   })}
                 >
-                  <PreviewSprite
+                  <GuidedPreviewSprite
+                    {...previewSpriteSharedProps}
                     cacheKey={previewKey}
                     mutate={buildTortiePreviewMutator(layerIndex, { pattern: pelt })}
                     label={label}
@@ -1094,29 +1124,32 @@ export function GuidedBuilderClient() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-sm font-semibold text-neutral-200">Colour</h3>
             <div className="sm:text-right">
-              {renderPaletteControls(tortiePaletteMode, (mode) => {
-                setTortiePaletteMode(mode);
-                setTortieLayers((prev) => {
-                  const palette = getPaletteForMode(mode);
-                  const fallback = palette[0] ?? params.colour;
-                  const updated = prev.map((entry, index) => {
-                    if (!entry) return entry;
-                    if (!entry.colour || !palette.includes(entry.colour)) {
-                      const mutation: Partial<TortieLayer> = { colour: fallback };
-                      if (index === layerIndex) {
-                        mutation.colour = fallback;
+              <PaletteControls
+                mode={tortiePaletteMode}
+                onChange={(mode) => {
+                  setTortiePaletteMode(mode);
+                  setTortieLayers((prev) => {
+                    const palette = getPaletteForMode(mode);
+                    const fallback = palette[0] ?? params.colour;
+                    const updated = prev.map((entry, index) => {
+                      if (!entry) return entry;
+                      if (!entry.colour || !palette.includes(entry.colour)) {
+                        const mutation: Partial<TortieLayer> = { colour: fallback };
+                        if (index === layerIndex) {
+                          mutation.colour = fallback;
+                        }
+                        return { ...entry, ...mutation };
                       }
-                      return { ...entry, ...mutation };
-                    }
-                    if (index === layerIndex) {
-                      return { ...entry };
-                    }
-                    return entry;
+                      if (index === layerIndex) {
+                        return { ...entry };
+                      }
+                      return entry;
+                    });
+                    setParams((prevParams) => ensureTortieSync(updated, prevParams));
+                    return updated;
                   });
-                  setParams((prevParams) => ensureTortieSync(updated, prevParams));
-                  return updated;
-                });
-              })}
+                }}
+              />
             </div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -1137,7 +1170,8 @@ export function GuidedBuilderClient() {
                     draft.colour = colour;
                   })}
                 >
-                  <PreviewSprite
+                  <GuidedPreviewSprite
+                    {...previewSpriteSharedProps}
                     cacheKey={previewKey}
                     mutate={buildTortiePreviewMutator(layerIndex, { colour })}
                     label={label}
@@ -1175,7 +1209,8 @@ export function GuidedBuilderClient() {
                     draft.mask = mask;
                   })}
                 >
-                  <PreviewSprite
+                  <GuidedPreviewSprite
+                    {...previewSpriteSharedProps}
                     cacheKey={previewKey}
                     mutate={buildTortiePreviewMutator(layerIndex, { mask })}
                     label={label}
@@ -1270,7 +1305,15 @@ export function GuidedBuilderClient() {
         )}
         onClick={() => updateParams((draft) => mutate(draft), "accents")}
       >
-        <PreviewSprite cacheKey={key} mutate={mutate} label={label} selected={selected} size={size} badge={badge} />
+        <GuidedPreviewSprite
+          {...previewSpriteSharedProps}
+          cacheKey={key}
+          mutate={mutate}
+          label={label}
+          selected={selected}
+          size={size}
+          badge={badge}
+        />
         <span className="sr-only">{label}</span>
       </button>
     );
@@ -1466,7 +1509,8 @@ export function GuidedBuilderClient() {
                     )}
                     onClick={() => handleAccessoryToggle(option, !selected)}
                   >
-                    <PreviewSprite
+                    <GuidedPreviewSprite
+                      {...previewSpriteSharedProps}
                       cacheKey={previewKey}
                       mutate={(draft) => {
                         const set = new Set((draft.accessories ?? []).filter((x): x is string => x !== null));
@@ -1565,33 +1609,6 @@ export function GuidedBuilderClient() {
     </div>
   );
 
-  const renderStepContent = () => {
-    switch (activeStepDefinition.type) {
-      case "colour":
-        return renderColourStep();
-      case "pattern":
-        return renderPatternStep();
-      case "tortie-toggle":
-        return renderTortieStep();
-      case "tortie-layer":
-        return renderTortieLayerStep(activeStepDefinition.layerIndex ?? 0);
-      case "eyes":
-        return renderEyesStep();
-      case "accents":
-        return renderAccentsStep();
-      case "skin-tint":
-        return renderSkinTintStep();
-      case "accessories":
-        return renderAccessoriesStep();
-      case "scars":
-        return renderScarsStep();
-      case "pose":
-        return renderPoseStep();
-      default:
-        return <div className="text-sm text-neutral-300/80">Step not implemented yet.</div>;
-    }
-  };
-
   const goToPreviousStep = useCallback(() => {
     const index = unlockedSteps.indexOf(activeStep);
     if (index > 0) {
@@ -1646,6 +1663,43 @@ export function GuidedBuilderClient() {
         Failed to load sprite metadata: {optionError}
       </div>
     );
+  }
+
+  let stepContent: ReactNode;
+  switch (activeStepDefinition.type) {
+    case "colour":
+      stepContent = renderColourStep();
+      break;
+    case "pattern":
+      stepContent = renderPatternStep();
+      break;
+    case "tortie-toggle":
+      stepContent = renderTortieStep();
+      break;
+    case "tortie-layer":
+      stepContent = renderTortieLayerStep(activeStepDefinition.layerIndex ?? 0);
+      break;
+    case "eyes":
+      stepContent = renderEyesStep();
+      break;
+    case "accents":
+      stepContent = renderAccentsStep();
+      break;
+    case "skin-tint":
+      stepContent = renderSkinTintStep();
+      break;
+    case "accessories":
+      stepContent = renderAccessoriesStep();
+      break;
+    case "scars":
+      stepContent = renderScarsStep();
+      break;
+    case "pose":
+      stepContent = renderPoseStep();
+      break;
+    default:
+      stepContent = <div className="text-sm text-neutral-300/80">Step not implemented yet.</div>;
+      break;
   }
 
   return (
@@ -1771,7 +1825,7 @@ export function GuidedBuilderClient() {
               </button>
             </div>
           </header>
-          <div className="mt-6 space-y-4">{renderStepContent()}</div>
+          <div className="mt-6 space-y-4">{stepContent}</div>
         </section>
       </main>
     </div>

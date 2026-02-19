@@ -1,6 +1,5 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
@@ -20,12 +19,19 @@ const ALL_SPRITES_SIZE = GRID_COLS * SPRITE_SIZE;
 
 type SpriteSelection = number | "all";
 
-export function ColorPaletteContent() {
-  const searchParams = useSearchParams();
-  const slug = searchParams.get("slug");
-  const darkForestParam = searchParams.get("darkForest");
-  const imageUrl = searchParams.get("imageUrl");
-  const paletteSlug = searchParams.get("paletteSlug");
+type ColorPaletteContentProps = {
+  slug?: string | null;
+  darkForestParam?: string | null;
+  imageUrl?: string | null;
+  paletteSlug?: string | null;
+};
+
+export function ColorPaletteContent({
+  slug = null,
+  darkForestParam = null,
+  imageUrl = null,
+  paletteSlug = null,
+}: ColorPaletteContentProps = {}) {
 
   const [initialImage, setInitialImage] = useState<string | null>(null);
   const [generatorReady, setGeneratorReady] = useState(false);

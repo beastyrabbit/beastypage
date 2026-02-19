@@ -121,8 +121,9 @@ describe('random generator parity', () => {
     const summaryV3 = emptySummary();
 
     for (let i = 0; i < SAMPLE_COUNT; i += 1) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const v2Params = await (catGenerator.generateRandomParams as (options?: any) => Promise<Record<string, unknown>>)({ ignoreForbiddenSprites: true });
+      const v2Params = await (
+        catGenerator.generateRandomParams as (options?: { ignoreForbiddenSprites?: boolean }) => Promise<Record<string, unknown>>
+      )({ ignoreForbiddenSprites: true });
       mergeSummaries(summaryV2, summarise(v2Params));
 
       const v3Params = await generateRandomParamsV3({ ignoreForbiddenSprites: true });

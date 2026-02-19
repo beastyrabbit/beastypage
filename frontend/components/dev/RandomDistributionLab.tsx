@@ -608,8 +608,84 @@ function DistributionChart({ definition, variantLabel, alternateLabel }: Distrib
     </div>
   );
 }
+
+type MetricSection = {
+  metric: MetricDefinition;
+  rows: MetricRow[];
+};
+
+interface SecondaryMetricsPanelProps {
+  sections: MetricSection[];
+  baselineId: string;
+}
+
+function SecondaryMetricsPanel({ sections, baselineId }: SecondaryMetricsPanelProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Additional metrics</h2>
+          <p className="text-xs text-neutral-400">White patch tints, heterochromia, and other secondary attributes.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded((prev) => !prev)}
+          className="rounded-full border border-slate-700 px-3 py-1 text-xs font-medium text-neutral-200 hover:border-emerald-400 hover:text-emerald-300"
+        >
+          {expanded ? 'Hide details' : 'Show details'}
+        </button>
+      </div>
+      {expanded && (
+        <div className="mt-4 space-y-6">
+          {sections.map((section) => (
+            <div key={section.metric.key} className="space-y-2 rounded-lg border border-slate-800/70 bg-slate-950/40 p-3">
+              <div className="text-sm font-semibold text-white">{section.metric.label}</div>
+              <div className="space-y-2">
+                {section.rows.map((row) => (
+                  <div key={`${section.metric.key}-${row.value}`} className="rounded-md border border-slate-800/60 bg-slate-900/60 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold text-white">{row.value}</span>
+                      <span className={`font-mono text-[11px] ${deltaClass(row.variantDelta)}`}>{formatDelta(row.variantDelta)}</span>
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {row.lines.map((line) => (
+                        <div key={line.simId} className="flex items-center gap-3">
+                          <span className="w-36 text-[11px] text-neutral-400">{line.label}</span>
+                          <div className="relative h-2 flex-1 rounded-full bg-slate-800/70">
+                            <span
+                              className="absolute left-0 top-0 h-2 rounded-full"
+                              style={{
+                                width: `${Math.max(0, Math.min(100, line.percent)).toFixed(2)}%`,
+                                backgroundColor: SIM_COLORS[line.simId] ?? '#94a3b8',
+                              }}
+                            />
+                          </div>
+                          <span className="w-14 text-right font-mono text-[11px] text-neutral-100">
+                            {formatPercent(line.percent)}
+                          </span>
+                          {line.simId !== baselineId && (
+                            <span className={`w-16 text-right font-mono text-[11px] ${deltaClass(line.deltaFromBaseline)}`}>
+                              {formatDelta(line.deltaFromBaseline)}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 export function RandomDistributionLab() {
-  const [iterationsInput, setIterationsInput] = useState<string>(DEFAULT_ITERATIONS.toString());
+  const sampleSizeInputId = 'random-distribution-sample-size';
+  const [iterationsInput, setIterationsInput] = useState<string>(() => DEFAULT_ITERATIONS.toString());
   const [countsMode, setCountsMode] = useState<CountStrategy>('weighted');
   const [includeAlternate, setIncludeAlternate] = useState<boolean>(false);
   const [results, setResults] = useState<SimulationBundle | null>(null);
@@ -642,21 +718,22 @@ export function RandomDistributionLab() {
 
     try {
       await ensureSpriteMapper();
-      const baseline = await runSimulation(
-        'V2 (legacy browser)',
-        'v2',
-        iterations,
-        undefined,
-        (state) => setProgress(state)
-      );
-
-      const primary = await runSimulation(
-        `V3 (${countsMode === 'uniform' ? 'uniform' : 'weighted'})`,
-        'v3',
-        iterations,
-        { countsMode },
-        (state) => setProgress(state)
-      );
+      const [baseline, primary] = await Promise.all([
+        runSimulation(
+          'V2 (legacy browser)',
+          'v2',
+          iterations,
+          undefined,
+          (state) => setProgress({ ...state, phase: `V2: ${state.phase}` })
+        ),
+        runSimulation(
+          `V3 (${countsMode === 'uniform' ? 'uniform' : 'weighted'})`,
+          'v3',
+          iterations,
+          { countsMode },
+          (state) => setProgress({ ...state, phase: `V3: ${state.phase}` })
+        ),
+      ]);
 
       let alternate: SimulationResult | null = null;
       if (includeAlternate) {
@@ -691,8 +768,6 @@ export function RandomDistributionLab() {
     if (results.alternate) list.push(results.alternate);
     return list;
   }, [results]);
-
-  const [showAllMetrics, setShowAllMetrics] = useState(false);
 
   const metricSections = useMemo(() => {
     if (!results) {
@@ -740,10 +815,6 @@ export function RandomDistributionLab() {
   }, [results, includeAlternate]);
 
   useEffect(() => {
-    setShowAllMetrics(false);
-  }, [results, countsMode, includeAlternate]);
-
-  useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) {
         clearTimeout(copyTimeoutRef.current);
@@ -786,9 +857,12 @@ export function RandomDistributionLab() {
 
       <section className="grid gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4 md:grid-cols-2">
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-neutral-200">Sample size</label>
+          <label htmlFor={sampleSizeInputId} className="block text-sm font-medium text-neutral-200">
+            Sample size
+          </label>
           <div className="flex gap-2">
             <input
+              id={sampleSizeInputId}
               type="number"
               min={1000}
               step={1000}
@@ -1021,64 +1095,11 @@ export function RandomDistributionLab() {
           </div>
 
           {metricSections.secondary.length > 0 && (
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-white">Additional metrics</h2>
-                  <p className="text-xs text-neutral-400">White patch tints, heterochromia, and other secondary attributes.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAllMetrics((prev) => !prev)}
-                  className="rounded-full border border-slate-700 px-3 py-1 text-xs font-medium text-neutral-200 hover:border-emerald-400 hover:text-emerald-300"
-                >
-                  {showAllMetrics ? 'Hide details' : 'Show details'}
-                </button>
-              </div>
-              {showAllMetrics && (
-                <div className="mt-4 space-y-6">
-                  {metricSections.secondary.map((section) => (
-                    <div key={section.metric.key} className="space-y-2 rounded-lg border border-slate-800/70 bg-slate-950/40 p-3">
-                      <div className="text-sm font-semibold text-white">{section.metric.label}</div>
-                      <div className="space-y-2">
-                        {section.rows.map((row) => (
-                          <div key={`${section.metric.key}-${row.value}`} className="rounded-md border border-slate-800/60 bg-slate-900/60 p-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-xs font-semibold text-white">{row.value}</span>
-                              <span className={`font-mono text-[11px] ${deltaClass(row.variantDelta)}`}>{formatDelta(row.variantDelta)}</span>
-                            </div>
-                            <div className="mt-2 space-y-2">
-                              {row.lines.map((line) => (
-                                <div key={line.simId} className="flex items-center gap-3">
-                                  <span className="w-36 text-[11px] text-neutral-400">{line.label}</span>
-                                  <div className="relative h-2 flex-1 rounded-full bg-slate-800/70">
-                                    <span
-                                      className="absolute left-0 top-0 h-2 rounded-full"
-                                      style={{
-                                        width: `${Math.max(0, Math.min(100, line.percent)).toFixed(2)}%`,
-                                        backgroundColor: SIM_COLORS[line.simId] ?? '#94a3b8',
-                                      }}
-                                    />
-                                  </div>
-                                  <span className="w-14 text-right font-mono text-[11px] text-neutral-100">
-                                    {formatPercent(line.percent)}
-                                  </span>
-                                  {line.simId !== baselineId && (
-                                    <span className={`w-16 text-right font-mono text-[11px] ${deltaClass(line.deltaFromBaseline)}`}>
-                                      {formatDelta(line.deltaFromBaseline)}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <SecondaryMetricsPanel
+              key={`${results.variant.id}-${countsMode}-${includeAlternate ? 'alt' : 'single'}`}
+              sections={metricSections.secondary}
+              baselineId={baselineId}
+            />
           )}
         </section>
       )}

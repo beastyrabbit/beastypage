@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Vote } from "lucide-react";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import UsersIcon from "@/components/ui/users-icon";
@@ -86,9 +85,11 @@ function extractErrorMessage(error: unknown): string | null {
   return null;
 }
 
-export function ViewerClient() {
-  const searchParams = useSearchParams();
-  const viewerKey = searchParams?.get("viewer")?.trim() ?? null;
+type ViewerClientProps = {
+  viewerKey?: string | null;
+};
+
+export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   const [viewerSession, setViewerSession] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
@@ -250,7 +251,7 @@ export function ViewerClient() {
     return votes.find((vote) => vote.option_meta?.participantId === participant.id) ?? null;
   }, [votes, participant]);
 
-  const totalVotes = useMemo(() => votes.length, [votes]);
+  const totalVotes = votes.length;
 
   const votingStatus = useMemo(() => {
     if (!session) return { code: "loading", reason: "Loading session…" } as const;
@@ -433,11 +434,15 @@ export function ViewerClient() {
           </div>
         ) : (
           <form onSubmit={handleNameSubmit} className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <label
+              htmlFor="viewer-display-name"
+              className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+            >
               Display name
             </label>
             <div className="flex gap-2">
               <input
+                id="viewer-display-name"
                 type="text"
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
@@ -582,7 +587,7 @@ export function ViewerClient() {
           {Array.isArray(session?.step_history) && session.step_history.length > 0 ? (
             session.step_history.map((entry, index) => (
               <div
-                key={`${entry.step_id ?? entry.option_key ?? index}-${index}`}
+                key={`${entry.step_id ?? "step"}-${entry.option_key ?? "option"}-${entry.title ?? "untitled"}-${entry.label ?? "choice"}`}
                 className="rounded-xl border border-border/50 bg-background/70 px-3 py-2"
               >
                 <div className="text-xs text-muted-foreground">Step {index + 1}</div>

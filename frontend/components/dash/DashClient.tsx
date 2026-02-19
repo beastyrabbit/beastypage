@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useVariants } from "@/utils/variants";
 import { VariantBar } from "@/components/common/VariantBar";
@@ -14,68 +13,62 @@ import { WidgetGrid } from "./WidgetGrid";
 import { AddWidgetModal } from "./AddWidgetModal";
 import { ReleaseNotesModal } from "./ReleaseNotesModal";
 
-export function DashClient() {
-  const searchParams = useSearchParams();
-  const slugParam = searchParams.get("slug");
+type DashClientProps = {
+  initialSlug?: string | null;
+  initialSettings?: DashSettings | null;
+  initialLoadError?: string | null;
+};
+
+export function DashClient({
+  initialSlug = null,
+  initialSettings = null,
+  initialLoadError = null,
+}: DashClientProps = {}) {
 
   const variants = useVariants<DashSettings>({ storageKey: "dash.variants" });
   const { activeVariant, setVariantSlug, saveToActive } = variants;
 
   // Local working copy of settings
-  const [settings, setSettings] = useState<DashSettings>({ ...DEFAULT_DASH_SETTINGS });
+  const [settings, setSettings] = useState<DashSettings>(() => (
+    initialSettings ? parseDashPayload(initialSettings) : { ...DEFAULT_DASH_SETTINGS }
+  ));
   const [editing, setEditing] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const [opening, setOpening] = useState(false);
-  const slugLoadedRef = useRef(false);
+  const initialLoadToastRef = useRef(false);
+
+  useEffect(() => {
+    if (initialLoadToastRef.current) return;
+    if (!initialSlug) return;
+    initialLoadToastRef.current = true;
+    if (initialLoadError) {
+      toast.error(initialLoadError);
+      return;
+    }
+    if (initialSettings) {
+      toast.success("Dashboard loaded");
+    }
+  }, [initialLoadError, initialSettings, initialSlug]);
 
   // Sync settings from active variant
   useEffect(() => {
-    if (activeVariant && !slugParam) {
+    if (activeVariant && !initialSlug) {
       queueMicrotask(() => {
         setSettings(parseDashPayload(activeVariant.settings));
         setEditing(false);
       });
     }
-  }, [activeVariant, slugParam]);
+  }, [activeVariant, initialSlug]);
 
   // Auto-enter edit mode when there are no widgets and no variant or slug pending
   useEffect(() => {
-    if (!activeVariant && !slugParam && settings.widgets.length === 0) {
+    if (!activeVariant && !initialSlug && settings.widgets.length === 0) {
       queueMicrotask(() => setEditing(true));
     }
     // Only trigger on variant/slug changes, not on every settings mutation
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeVariant, slugParam]);
-
-  // Load from slug query param
-  useEffect(() => {
-    if (!slugParam || slugLoadedRef.current) return;
-    slugLoadedRef.current = true;
-    let cancelled = false;
-    fetch(`/api/dash-settings?slug=${encodeURIComponent(slugParam)}`, { cache: "no-store" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Not found");
-        return res.json() as Promise<{ config?: unknown }>;
-      })
-      .then((data) => {
-        if (cancelled) return;
-        if (!data.config) {
-          toast.error("Shared dashboard has no configuration");
-          return;
-        }
-        const imported = parseDashPayload(data.config);
-        setSettings(imported);
-        setEditing(false);
-        toast.success("Dashboard loaded");
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        console.error(`[DashClient] Failed to import dashboard slug="${slugParam}"`, error);
-        toast.error("Failed to load shared dashboard");
-      });
-    return () => { cancelled = true; };
-  }, [slugParam]);
+  }, [activeVariant, initialSlug]);
 
   // Resolve widget IDs to tool metadata
   const resolvedWidgets = useMemo(
@@ -93,8 +86,13 @@ export function DashClient() {
 
   // Re-parse active variant settings once (memoized) to avoid repeated work during dirty checks
   const baseSettings = useMemo(
-    () => (activeVariant ? parseDashPayload(activeVariant.settings) : DEFAULT_DASH_SETTINGS),
-    [activeVariant],
+    () => {
+      if (initialSlug && initialSettings) {
+        return parseDashPayload(initialSettings);
+      }
+      return activeVariant ? parseDashPayload(activeVariant.settings) : DEFAULT_DASH_SETTINGS;
+    },
+    [activeVariant, initialSettings, initialSlug],
   );
   const isDirty = !dashSettingsEqual(settings, baseSettings);
 

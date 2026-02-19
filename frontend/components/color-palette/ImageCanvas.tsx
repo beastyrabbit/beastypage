@@ -1,11 +1,14 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from "react";
+import NextImage from "next/image";
 
 import type { ExtractedColor, RGB } from "@/lib/color-extraction/types";
 
 import { ColorCrosshair } from "./ColorCrosshair";
 import { SpotlightOverlay } from "./SpotlightOverlay";
+
+const EMPTY_EXTRACTED_COLORS: ExtractedColor[] = [];
 
 interface ImageCanvasProps {
   imageDataUrl: string;
@@ -25,7 +28,7 @@ export function ImageCanvas({
   imageDataUrl,
   imageDimensions,
   colors,
-  familyColors = [],
+  familyColors = EMPTY_EXTRACTED_COLORS,
   hoveredColor,
   selectedDotIndex,
   selectedDotType,
@@ -99,9 +102,12 @@ export function ImageCanvas({
         }}
       >
         {/* Base image */}
-        <img
+        <NextImage
           src={imageDataUrl}
           alt="Uploaded image for color extraction"
+          fill
+          unoptimized
+          sizes="100vw"
           className="block h-full w-full object-contain"
           draggable={false}
         />
@@ -117,7 +123,7 @@ export function ImageCanvas({
         {/* Crosshairs for dominant colors */}
         {colors.map((color, index) => (
           <ColorCrosshair
-            key={`dominant-${index}`}
+            key={`dominant-${color.hex}-${Math.round(color.position.x)}-${Math.round(color.position.y)}`}
             x={color.position.x}
             y={color.position.y}
             color={color.hex}
@@ -138,7 +144,7 @@ export function ImageCanvas({
         {/* Crosshairs for accent/family colors */}
         {familyColors.map((color, index) => (
           <ColorCrosshair
-            key={`accent-${index}`}
+            key={`accent-${color.hex}-${Math.round(color.position.x)}-${Math.round(color.position.y)}`}
             x={color.position.x}
             y={color.position.y}
             color={color.hex}
