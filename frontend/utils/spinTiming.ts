@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-
 type ParamId =
   | "colour"
   | "pelt"
@@ -259,23 +257,4 @@ export function saveTimingConfig(config: SpinTimingConfig) {
   } catch (error) {
     console.warn("Failed to persist spin timing config", error);
   }
-}
-
-export function usePersistentTimingConfig(): [SpinTimingConfig, (next: SpinTimingConfig) => void] {
-  const [config, setConfig] = useState<SpinTimingConfig>(DEFAULT_TIMING_CONFIG);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const restored = loadTimingConfig();
-    // Persisted settings are applied post-hydration to avoid SSR/client mismatches.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setConfig(restored);
-  }, []);
-
-  const update = (next: SpinTimingConfig) => {
-    setConfig(next);
-    saveTimingConfig(next);
-  };
-
-  return [config, update];
 }
