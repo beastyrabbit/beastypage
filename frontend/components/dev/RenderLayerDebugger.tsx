@@ -307,7 +307,9 @@ useEffect(() => {
       console.error(err);
       if (err instanceof Error && err.name === 'SyntaxError') {
         setError('Invalid JSON payload');
+        return;
       }
+      setError(err instanceof Error ? err.message : String(err));
     }
   }, [payloadText, runComparison]);
 

@@ -124,7 +124,7 @@ export function SaveTreeDialog({
   }, [getTreeUrl]);
 
   const handleOpenInNewTab = useCallback(() => {
-    window.open(getTreeUrl(), "_blank");
+    window.open(getTreeUrl(), "_blank", "noopener,noreferrer");
   }, [getTreeUrl]);
 
   // Success state

@@ -45,6 +45,11 @@ type MatchupResponse = {
 };
 
 type LeaderboardEntry = MatchupCat;
+type SeedResult = {
+  requested: number;
+  generated: number;
+  failed: number;
+};
 
 function useClientToken(key: string): string | null {
   const [token] = useState<string | null>(() => {
@@ -226,20 +231,29 @@ export default function PerfectCatFinderPage() {
   }, []);
 
   const seedCats = useCallback(
-    async (count: number) => {
-      if (!ready || !generator || count <= 0) return;
+    async (count: number): Promise<SeedResult> => {
+      if (!ready || !generator || count <= 0) {
+        return { requested: Math.max(0, count), generated: 0, failed: Math.max(0, count) };
+      }
       const payload: { params: CatRenderParams }[] = [];
+      let failed = 0;
       for (let i = 0; i < count; i += 1) {
         try {
           const catParams = await buildRandomCat(generator);
           payload.push({ params: catParams });
         } catch (err) {
+          failed += 1;
           console.error("Failed to generate random cat", err);
         }
       }
       if (payload.length) {
         await registerCats({ cats: payload });
       }
+      return {
+        requested: count,
+        generated: payload.length,
+        failed,
+      };
     },
     [generator, ready, registerCats]
   );
@@ -254,11 +268,31 @@ export default function PerfectCatFinderPage() {
 
       if (response.needsSeed > 0 && ready && generator) {
         const extra = Math.max(2, Math.ceil(response.needsSeed * 0.5));
-        await seedCats(response.needsSeed + extra);
+        const requested = response.needsSeed + extra;
+        const seedResult = await seedCats(requested);
+        if (seedResult.generated === 0) {
+          const failure = "Unable to seed new cats for matchup generation.";
+          track("perfect_cat_seed_failed", {
+            requested: seedResult.requested,
+            generated: seedResult.generated,
+            failed: seedResult.failed,
+            reason: "no_cats_generated",
+          });
+          throw new Error(failure);
+        }
         seeded = true;
       } else if (ready && generator && Math.random() < NEW_CAT_PROBABILITY) {
-        await seedCats(1 + Math.floor(Math.random() * 2));
-        seeded = true;
+        const seedResult = await seedCats(1 + Math.floor(Math.random() * 2));
+        if (seedResult.generated === 0) {
+          track("perfect_cat_seed_failed", {
+            requested: seedResult.requested,
+            generated: seedResult.generated,
+            failed: seedResult.failed,
+            reason: "probabilistic_seed_failed",
+          });
+        } else {
+          seeded = true;
+        }
       }
 
       if (seeded) {
@@ -280,7 +314,9 @@ export default function PerfectCatFinderPage() {
       }
     } catch (err) {
       console.error("Failed to load matchup", err);
-      setError(err instanceof Error ? err.message : "Failed to load matchup");
+      const message = err instanceof Error ? err.message : "Failed to load matchup";
+      setError(message);
+      track("perfect_cat_matchup_load_failed", { message });
     } finally {
       setLoading(false);
     }

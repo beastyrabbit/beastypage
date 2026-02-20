@@ -98,6 +98,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [isSpriteMapperReady, setIsSpriteMapperReady] = useState(false);
   const [spriteMapperError, setSpriteMapperError] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<TreeOrientation>("vertical");
   const [currentMainId, setCurrentMainId] = useState<string | null>(null);
   const [isEditingRelations, setIsEditingRelations] = useState(false);
@@ -161,6 +162,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
   const generateTreeFromCouple = useCallback(
     async (input: FoundingCoupleInput, method: "random" | "history" = "random") => {
       setIsGenerating(true);
+      setGenerationError(null);
       try {
         // Use Web Worker for non-blocking generation
         const serialized = await generateTreeWorker(
@@ -173,6 +175,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         track("ancestry_tree_created", { method });
       } catch (error) {
         console.error("Failed to generate tree:", error);
+        const message = error instanceof Error ? error.message : "Failed to generate tree";
+        setGenerationError(message);
+        track("ancestry_tree_generation_failed", { method, message });
       } finally {
         setIsGenerating(false);
       }
@@ -463,6 +468,11 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
     setIsEditingRelations(isEditing);
   }, []);
 
+  const handleChartError = useCallback((message: string) => {
+    setGenerationError(message);
+    track("ancestry_tree_add_relative_failed", { message });
+  }, []);
+
   // Handle edit relations button click - toggles add-relative mode on graph
   const handleEditRelations = useCallback(() => {
     if (isEditingRelations) {
@@ -471,6 +481,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
       familyChartRef.current?.stopAddRelative();
     } else {
       // Start editing
+      setGenerationError(null);
       setIsEditingRelations(true);
       familyChartRef.current?.startAddRelative();
     }
@@ -668,6 +679,11 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
   if (viewMode === "config" || !tree) {
     return (
       <div className="w-full">
+        {generationError ? (
+          <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            {generationError}
+          </div>
+        ) : null}
         {spriteMapperError ? (
           <div className="flex flex-col items-center justify-center gap-4 py-20">
             <div className="text-red-400 text-lg font-medium">Failed to load sprite data</div>
@@ -1034,6 +1050,12 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         </div>
       </div>
 
+      {generationError ? (
+        <div className="mx-4 mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {generationError}
+        </div>
+      ) : null}
+
       {/* Tree Visualization */}
       <div className="flex-1 glass-card m-4 overflow-hidden">
         <FamilyChartTree
@@ -1043,6 +1065,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
           orientation={orientation}
           onSelectCat={handleCatClick}
           onAddRelative={handleAddRelativeFromGraph}
+          onAddRelativeError={handleChartError}
           onMainIdChange={handleMainIdChange}
           onEditModeChanged={handleEditModeChanged}
         />
