@@ -136,6 +136,17 @@ type PerfectCatInspectedProps = {
   from: "matchup" | "leaderboard";
 };
 
+type PerfectCatSeedFailedProps = {
+  requested: number;
+  generated: number;
+  failed: number;
+  reason: "no_cats_generated" | "probabilistic_seed_failed";
+};
+
+type PerfectCatMatchupLoadFailedProps = {
+  message: string;
+};
+
 // Palette Tools
 type PaletteCreatorExportedProps = {
   format: string;
@@ -172,6 +183,11 @@ type AncestryTreeCreatedProps = {
   method: "random" | "history";
 };
 
+type AncestryTreeGenerationFailedProps = {
+  method: "random" | "history";
+  message: string;
+};
+
 type AncestryParentsSelectedProps = {
   source: string;
 };
@@ -188,6 +204,10 @@ type AncestryCatEditedProps = {
 type AncestryTreeSavedProps = {
   has_name: boolean;
   has_creator: boolean;
+};
+
+type AncestryTreeAddRelativeFailedProps = {
+  message: string;
 };
 
 // Streamer Tools
@@ -287,6 +307,8 @@ type AnalyticsEventMap = {
   perfect_cat_copied: Record<string, never>;
   perfect_cat_downloaded: Record<string, never>;
   perfect_cat_opened_in_builder: Record<string, never>;
+  perfect_cat_seed_failed: PerfectCatSeedFailedProps;
+  perfect_cat_matchup_load_failed: PerfectCatMatchupLoadFailedProps;
 
   // Palette Tools
   palette_creator_image_uploaded: Record<string, never>;
@@ -305,11 +327,13 @@ type AnalyticsEventMap = {
 
   // Ancestry Tree
   ancestry_tree_created: AncestryTreeCreatedProps;
+  ancestry_tree_generation_failed: AncestryTreeGenerationFailedProps;
   ancestry_parents_selected: AncestryParentsSelectedProps;
   ancestry_offspring_generated: AncestryOffspringGeneratedProps;
   ancestry_cat_edited: AncestryCatEditedProps;
   ancestry_tree_saved: AncestryTreeSavedProps;
   ancestry_tree_exported: Record<string, never>;
+  ancestry_tree_add_relative_failed: AncestryTreeAddRelativeFailedProps;
 
   // Streamer Tools
   stream_session_created: StreamSessionCreatedProps;

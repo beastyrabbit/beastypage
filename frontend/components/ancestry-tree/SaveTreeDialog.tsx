@@ -27,8 +27,13 @@ export function SaveTreeDialog({
   onSave,
   onClose,
 }: SaveTreeDialogProps) {
-  const [name, setName] = useState(currentName);
-  const [creatorName, setCreatorName] = useState(currentCreator ?? "");
+  // Capture initial values once on mount; dialog is opened/closed by mounting.
+  const initialValuesRef = useRef({
+    name: currentName,
+    creatorName: currentCreator ?? "",
+  });
+  const [name, setName] = useState(initialValuesRef.current.name);
+  const [creatorName, setCreatorName] = useState(initialValuesRef.current.creatorName);
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -119,7 +124,7 @@ export function SaveTreeDialog({
   }, [getTreeUrl]);
 
   const handleOpenInNewTab = useCallback(() => {
-    window.open(getTreeUrl(), "_blank");
+    window.open(getTreeUrl(), "_blank", "noopener,noreferrer");
   }, [getTreeUrl]);
 
   // Success state
@@ -127,12 +132,23 @@ export function SaveTreeDialog({
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-        onClick={onClose}
+        role="button"
+        tabIndex={0}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) onClose();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            onClose();
+          }
+          if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+            event.preventDefault();
+            onClose();
+          }
+        }}
       >
-        <div
-          className="glass-card relative w-full max-w-md p-6"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="glass-card relative w-full max-w-md p-6">
           <button
             type="button"
             onClick={onClose}
@@ -152,7 +168,7 @@ export function SaveTreeDialog({
 
             {/* URL Display */}
             <div className="bg-white/5 rounded-lg p-3 text-left">
-              <label className="block text-xs text-muted-foreground mb-1">Share URL</label>
+              <p className="block text-xs text-muted-foreground mb-1">Share URL</p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 text-sm text-amber-400 truncate">
                   {getTreeUrl()}
@@ -200,12 +216,23 @@ export function SaveTreeDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      onClick={onClose}
+      role="button"
+      tabIndex={0}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+        if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+          event.preventDefault();
+          onClose();
+        }
+      }}
     >
-      <div
-        className="glass-card relative w-full max-w-md p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="glass-card relative w-full max-w-md p-6">
         <button
           type="button"
           onClick={onClose}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useId } from "react";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
 
@@ -25,14 +26,18 @@ export function PaletteControls({
   onExtract,
   onReset,
 }: PaletteControlsProps) {
+  const colorCountId = useId();
+  const filterToggleId = useId();
+
   return (
     <div className="glass-card flex flex-wrap items-center gap-4 p-4 sm:gap-6 sm:p-6">
       {/* Color count slider */}
       <div className="flex flex-col gap-2">
-        <label className="text-xs font-medium text-muted-foreground">
+        <label htmlFor={colorCountId} className="text-xs font-medium text-muted-foreground">
           Colors: {colorCount}
         </label>
         <input
+          id={colorCountId}
           type="range"
           min={3}
           max={12}
@@ -45,8 +50,9 @@ export function PaletteControls({
 
       {/* Filter toggle */}
       <div className="flex items-center gap-3">
-        <label className="relative inline-flex cursor-pointer items-center">
+        <label htmlFor={filterToggleId} className="relative inline-flex cursor-pointer items-center gap-3">
           <input
+            id={filterToggleId}
             type="checkbox"
             checked={filterBlackWhite}
             onChange={(e) => onFilterToggle(e.target.checked)}
@@ -54,8 +60,8 @@ export function PaletteControls({
             disabled={isProcessing}
           />
           <div className="peer h-6 w-11 rounded-full bg-border/50 after:absolute after:start-[2px] after:top-[2px] after:size-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-focus:outline-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50" />
+          <span className="text-sm text-muted-foreground">Filter black/white</span>
         </label>
-        <span className="text-sm text-muted-foreground">Filter black/white</span>
       </div>
 
       {/* Spacer */}

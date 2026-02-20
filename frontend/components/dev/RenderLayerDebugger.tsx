@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import pixelmatch from 'pixelmatch';
 
 import { decodeImageFromDataUrl, renderCatV3 } from '@/lib/cat-v3/api';
@@ -70,10 +70,11 @@ export function RenderLayerDebugger() {
     scars: { enabled: false, count: 2 },
     tortie: { enabled: false, count: 2 },
   });
+  const payloadInputId = useId();
 
   const recomposedRef = useRef<HTMLCanvasElement>(null);
 
-  const activeLayerCount = useMemo(() => layers.filter((layer) => layer.enabled).length, [layers]);
+  const activeLayerCount = layers.filter((layer) => layer.enabled).length;
 
   const normaliseCanvas = useCallback((source: HTMLCanvasElement | OffscreenCanvas): HTMLCanvasElement => {
     if (source instanceof HTMLCanvasElement) {
@@ -306,7 +307,9 @@ useEffect(() => {
       console.error(err);
       if (err instanceof Error && err.name === 'SyntaxError') {
         setError('Invalid JSON payload');
+        return;
       }
+      setError(err instanceof Error ? err.message : String(err));
     }
   }, [payloadText, runComparison]);
 
@@ -321,7 +324,7 @@ useEffect(() => {
 
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3">
-          <label className="flex items-center justify-between text-sm font-medium text-neutral-200">
+          <label htmlFor={payloadInputId} className="flex items-center justify-between text-sm font-medium text-neutral-200">
             Payload
             <div className="space-x-2">
               <button
@@ -351,6 +354,7 @@ useEffect(() => {
             </div>
           </label>
           <textarea
+            id={payloadInputId}
             className="h-64 w-full rounded-lg border border-slate-700 bg-slate-900 p-3 font-mono text-sm text-neutral-100 focus:border-emerald-500 focus:outline-none"
             spellCheck={false}
             value={payloadText}
@@ -529,7 +533,7 @@ useEffect(() => {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {layers.map((layer, index) => (
               <div
-                key={`${layer.id}-${index}`}
+                key={layer.id}
                 className={`rounded-lg border p-3 transition-colors ${layer.enabled ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-slate-700 bg-slate-900/60'}`}
               >
                 <div className="flex items-start justify-between gap-2">

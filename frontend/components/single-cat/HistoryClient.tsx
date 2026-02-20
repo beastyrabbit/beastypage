@@ -344,9 +344,21 @@ export function HistoryClient() {
       {focusedPreview && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
+          role="button"
+          tabIndex={0}
           onClick={(event) => {
             if (event.target !== event.currentTarget) return;
             setFocusedPreview(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              setFocusedPreview(null);
+            }
+            if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+              event.preventDefault();
+              setFocusedPreview(null);
+            }
           }}
         >
           <div className="relative w-full max-w-4xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">

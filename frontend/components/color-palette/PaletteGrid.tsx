@@ -108,7 +108,7 @@ export function PaletteGrid({
 
           return (
             <button
-              key={index}
+              key={`${color.hex}-${color.position.x}-${color.position.y}`}
               onClick={() => onColorSelect(index)}
               onMouseEnter={() => onColorHover(index, color.rgb)}
               onMouseLeave={() => onColorHover(null)}
@@ -179,7 +179,7 @@ export function PaletteGrid({
 
             return (
               <div
-                key={rowIndex}
+                key={`${colors[rowIndex]?.hex ?? "row"}-brightness`}
                 className={`grid gap-1 p-1 -m-1 rounded-lg transition-all duration-200 ${
                   isRowSelected
                     ? "bg-primary/10"
@@ -196,11 +196,11 @@ export function PaletteGrid({
                     : "none",
                 }}
               >
-                {row.map((cell, colIndex) => {
+                {row.map((cell) => {
                   const cellRgb = hexToRgb(cell.hex);
                   return (
                   <button
-                    key={colIndex}
+                    key={`${cell.hex}-${cell.factor}`}
                     onClick={() => copyToClipboard(cell.hex)}
                     onMouseEnter={() => onColorHover(rowIndex, cellRgb)}
                     onMouseLeave={() => onColorHover(null)}
@@ -227,8 +227,8 @@ export function PaletteGrid({
             gridTemplateColumns: `repeat(${brightnessFactors.length}, 1fr)`,
           }}
         >
-          {brightnessFactors.map((factor, index) => (
-            <span key={index} className="text-center">
+          {brightnessFactors.map((factor) => (
+            <span key={`factor-${factor}`} className="text-center">
               {factor}x
             </span>
           ))}
@@ -248,7 +248,7 @@ export function PaletteGrid({
 
             return (
               <div
-                key={rowIndex}
+                key={`${colors[rowIndex]?.hex ?? "row"}-hue`}
                 className={`grid gap-1 p-1 -m-1 rounded-lg transition-all duration-200 ${
                   isRowSelected
                     ? "bg-primary/10"
@@ -265,11 +265,11 @@ export function PaletteGrid({
                     : "none",
                 }}
               >
-                {row.map((cell, colIndex) => {
+                {row.map((cell) => {
                   const cellRgb = hexToRgb(cell.hex);
                   return (
                   <button
-                    key={colIndex}
+                    key={`${cell.hex}-${cell.shift}`}
                     onClick={() => copyToClipboard(cell.hex)}
                     onMouseEnter={() => onColorHover(rowIndex, cellRgb)}
                     onMouseLeave={() => onColorHover(null)}
@@ -296,8 +296,8 @@ export function PaletteGrid({
             gridTemplateColumns: `repeat(${hueShifts.length}, 1fr)`,
           }}
         >
-          {hueShifts.map((shift, index) => (
-            <span key={index} className="text-center">
+          {hueShifts.map((shift) => (
+            <span key={`shift-${shift}`} className="text-center">
               {shift >= 0 ? "+" : ""}{shift}°
             </span>
           ))}

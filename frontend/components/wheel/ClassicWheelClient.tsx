@@ -102,7 +102,7 @@ export function ClassicWheelClient() {
 
   const totalSpins = stats?.totalSpins ?? 0;
 
-  const wheelItems = useMemo(() => DEFAULT_ITEMS, []);
+  const wheelItems = DEFAULT_ITEMS;
 
   const clearTimers = useCallback(() => {
     rafIdsRef.current.forEach((id) => cancelAnimationFrame(id));

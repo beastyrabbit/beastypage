@@ -228,9 +228,21 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
       {focusedPreview && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
+          role="button"
+          tabIndex={0}
           onClick={(event) => {
             if (event.target !== event.currentTarget) return;
             closePreview();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              closePreview();
+            }
+            if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+              event.preventDefault();
+              closePreview();
+            }
           }}
         >
           <div className="relative w-full max-w-4xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">

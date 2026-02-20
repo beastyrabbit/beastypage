@@ -355,8 +355,20 @@ export function VariantBar<T>({
       {manageOpen && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70"
+          role="button"
+          tabIndex={0}
           onClick={(e) => {
             if (e.target === e.currentTarget) setManageOpen(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setManageOpen(false);
+            }
+            if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+              e.preventDefault();
+              setManageOpen(false);
+            }
           }}
         >
           <div

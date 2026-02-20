@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { ViewerClient } from "@/components/single-cat/ViewerClient";
+
+export const metadata: Metadata = {
+  title: "Cat Viewer",
+  description: "View and share generated cat profiles and variants.",
+};
 
 type ViewSlugPageProps = {
   params: Promise<{ slug: string }>;
