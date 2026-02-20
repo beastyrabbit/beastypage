@@ -20,9 +20,9 @@ interface PaletteSingleSelectProps {
 function ColorSwatch({ colors }: { colors: Array<[number, number, number]> }) {
   return (
     <div className="flex gap-0.5">
-      {colors.map((rgb, i) => (
+      {colors.map((rgb) => (
         <div
-          key={i}
+          key={`${rgb[0]}-${rgb[1]}-${rgb[2]}`}
           className="size-3 rounded-sm"
           style={{ backgroundColor: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})` }}
         />

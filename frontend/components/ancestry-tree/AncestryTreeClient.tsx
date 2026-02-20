@@ -830,10 +830,11 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm text-muted-foreground">Male Ratio</label>
+                      <label htmlFor="maleRatio" className="text-sm text-muted-foreground">Male Ratio</label>
                       <span className="text-sm font-medium tabular-nums">{Math.round(config.genderRatio * 100)}%</span>
                     </div>
                     <input
+                      id="maleRatio"
                       type="range"
                       min={0}
                       max={100}
@@ -879,10 +880,11 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm text-muted-foreground">Partner Chance</label>
+                      <label htmlFor="partnerChance" className="text-sm text-muted-foreground">Partner Chance</label>
                       <span className="text-sm font-medium tabular-nums">{Math.round((config.partnerChance ?? 1) * 100)}%</span>
                     </div>
                     <input
+                      id="partnerChance"
                       type="range"
                       min={0}
                       max={100}

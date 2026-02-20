@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Test Pages",
+  description: "Internal test pages for renderer and UI quality checks.",
+};
 
 export default function TestsLanding() {
   return (

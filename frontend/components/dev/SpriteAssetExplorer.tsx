@@ -1,7 +1,7 @@
 'use client';
-/* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import Image from "next/image";
 
 import spriteSheetLoader from '@/lib/single-cat/spriteSheetLoader';
 import { ensureSpriteMapper } from '@/lib/cat-v3/randomGenerator';
@@ -164,6 +164,7 @@ export function SpriteAssetExplorer() {
   const [loadingKey, setLoadingKey] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const loadTokenRef = useRef(0);
+  const filterInputId = useId();
   const exclusiveTotal = EXCLUSIVE_FILES.length;
 
   const exclusiveGroups = useMemo<ExclusiveGroup[]>(() => {
@@ -292,7 +293,7 @@ export function SpriteAssetExplorer() {
       <section className="grid gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4 md:grid-cols-4">
         <div className="md:col-span-1 space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-neutral-400">Category</label>
+            <p className="block text-xs font-semibold uppercase tracking-wide text-neutral-400">Category</p>
             <div className="mt-2 flex flex-col gap-2 text-sm text-neutral-100">
               {CATEGORIES.map((entry) => (
                 <button
@@ -312,8 +313,9 @@ export function SpriteAssetExplorer() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-neutral-400">Filter</label>
+            <label htmlFor={filterInputId} className="block text-xs font-semibold uppercase tracking-wide text-neutral-400">Filter</label>
             <input
+              id={filterInputId}
               type="search"
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
@@ -375,9 +377,12 @@ export function SpriteAssetExplorer() {
                 <div className="text-xs text-neutral-400">#{preview.spriteNumber}</div>
                 <div className="mt-2 h-20 w-20 rounded-md border border-slate-800 bg-slate-900/80">
                   {preview.dataUrl ? (
-                    <img
+                    <Image
                       src={preview.dataUrl}
                       alt={`${selectedKey} sprite ${preview.spriteNumber}`}
+                      width={80}
+                      height={80}
+                      unoptimized
                       className="h-20 w-20"
                       style={{ imageRendering: 'pixelated' }}
                     />

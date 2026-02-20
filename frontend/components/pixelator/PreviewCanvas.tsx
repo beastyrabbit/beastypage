@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useId, useRef, useState } from "react";
+import Image from "next/image";
 
 interface ImageDimensions {
   w: number;
@@ -56,11 +57,13 @@ export function PreviewCanvas({
             </div>
           </div>
         )}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           ref={imgRef}
           src={displayUrl}
           alt={showOriginal ? "Original image" : "Processed result"}
+          width={1024}
+          height={1024}
+          unoptimized
           className="max-h-[500px] w-auto object-contain"
           style={{ imageRendering: "pixelated" }}
           onLoad={handleImgLoad}

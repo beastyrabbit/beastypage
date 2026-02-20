@@ -74,11 +74,8 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     chartDataRef.current = chartData;
   }, [chartData]);
 
-  // Find root cat ID
-  const rootId = useMemo(() => {
-    // The founding mother is typically the "root" for full graph view
-    return tree.foundingMotherId;
-  }, [tree.foundingMotherId]);
+  // The founding mother is typically the "root" for full graph view.
+  const rootId = tree.foundingMotherId;
 
   // Helper function to safely get the main datum
   const safeGetMainDatum = (): ReturnType<ReturnType<typeof f3.createChart>["getMainDatum"]> | null => {

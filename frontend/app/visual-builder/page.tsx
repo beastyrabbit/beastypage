@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import { VisualBuilderClient, DEFAULT_PARAMS, type VisualBuilderInitialPayload } from "@/components/visual-builder/VisualBuilderClient";
 import { VisualBuilderLoader } from "@/components/visual-builder/VisualBuilderLoader";
 import { decodeCatShare } from "@/lib/catShare";
+
+export const metadata: Metadata = {
+  title: "Visual Cat Builder",
+  description: "Customize and share ClanGen-style cat sprites in the visual builder.",
+};
 
 type PageProps = {
   searchParams?: Promise<{

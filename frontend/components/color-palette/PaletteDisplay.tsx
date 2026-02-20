@@ -50,7 +50,7 @@ export function PaletteDisplay({
       <div className="grid grid-cols-2 gap-3">
         {colors.map((color, index) => (
           <ColorSwatch
-            key={index}
+            key={`${color.hex}-${color.position.x}-${color.position.y}`}
             color={color}
             index={index}
             isSelected={selectedIndex === index}

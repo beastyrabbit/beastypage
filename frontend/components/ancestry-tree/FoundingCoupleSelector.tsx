@@ -156,12 +156,23 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      onClick={onClose}
+      role="button"
+      tabIndex={0}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+        if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+          event.preventDefault();
+          onClose();
+        }
+      }}
     >
-      <div
-        className="glass-card relative max-h-[90vh] w-full max-w-3xl overflow-hidden flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="glass-card relative max-h-[90vh] w-full max-w-3xl overflow-hidden flex flex-col">
         <div className="flex items-center justify-between border-b border-white/10 p-4">
           <h2 className="text-xl font-bold">Select Founding Couple</h2>
           <button

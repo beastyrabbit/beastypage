@@ -77,9 +77,9 @@ export function ColorVariations({ color }: ColorVariationsProps) {
             Brightness
           </div>
           <div className="flex flex-wrap gap-2">
-            {brightnessVariations.map((variation, index) => (
+            {brightnessVariations.map((variation) => (
               <button
-                key={index}
+                key={`brightness-${variation.label}`}
                 onClick={() => copyToClipboard(variation.hex)}
                 className="group flex flex-col items-center gap-1.5 rounded-lg p-2 transition-all hover:bg-primary/10"
                 title={`Click to copy ${variation.hex}`}
@@ -110,9 +110,9 @@ export function ColorVariations({ color }: ColorVariationsProps) {
             Hue Shift
           </div>
           <div className="flex flex-wrap gap-2">
-            {hueVariations.map((variation, index) => (
+            {hueVariations.map((variation) => (
               <button
-                key={index}
+                key={`hue-${variation.label}`}
                 onClick={() => copyToClipboard(variation.hex)}
                 className="group flex flex-col items-center gap-1.5 rounded-lg p-2 transition-all hover:bg-primary/10"
                 title={`Click to copy ${variation.hex}`}

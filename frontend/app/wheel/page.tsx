@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import { ClassicWheelClient } from "@/components/wheel/ClassicWheelClient";
+
+export const metadata: Metadata = {
+  title: "Prize Wheel",
+  description: "Spin the BeastyRabbit prize wheel and track outcomes.",
+};
 
 export default function WheelPage() {
   return (

@@ -44,6 +44,7 @@ export function PipelineStepCard({
 
   const def = OPERATIONS.find((o) => o.type === step.algorithm);
   const previousSteps = allSteps.slice(0, index);
+  const idPrefix = `pipeline-step-${step.id}`;
 
   // Input source options
   const inputOptions = [
@@ -89,8 +90,9 @@ export function PipelineStepCard({
           {step.label}
         </span>
 
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <label htmlFor={`${idPrefix}-enabled`} className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <input
+            id={`${idPrefix}-enabled`}
             type="checkbox"
             checked={step.enabled}
             onChange={(e) => onUpdate(step.id, { enabled: e.target.checked })}
@@ -113,10 +115,11 @@ export function PipelineStepCard({
         <div className="flex flex-col gap-3 border-t border-border/50 px-3 pb-3 pt-3">
           {/* Input source */}
           <div className="flex items-center gap-2">
-            <label className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+            <label htmlFor={`${idPrefix}-input-source`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
               Input
             </label>
             <select
+              id={`${idPrefix}-input-source`}
               value={step.inputSource}
               onChange={(e) => onUpdate(step.id, { inputSource: e.target.value })}
               className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
@@ -132,12 +135,13 @@ export function PipelineStepCard({
           {/* Algorithm params */}
           {def?.params.map((param) => (
             <div key={param.key} className="flex items-center gap-2">
-              <label className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+              <label htmlFor={`${idPrefix}-param-${param.key}`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
                 {param.label}
               </label>
               {param.type === "number" ? (
                 <div className="flex flex-1 items-center gap-2">
                   <input
+                    id={`${idPrefix}-param-${param.key}`}
                     type="range"
                     min={param.min}
                     max={param.max}
@@ -159,6 +163,7 @@ export function PipelineStepCard({
                 </div>
               ) : (
                 <input
+                  id={`${idPrefix}-param-${param.key}`}
                   type="checkbox"
                   checked={Boolean(step.params[param.key] ?? param.default)}
                   onChange={(e) =>
@@ -178,10 +183,11 @@ export function PipelineStepCard({
           {/* Blend settings */}
           <div className="flex flex-col gap-2 border-t border-border/30 pt-2">
             <div className="flex items-center gap-2">
-              <label className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+              <label htmlFor={`${idPrefix}-blend-enabled`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
                 Blend
               </label>
               <select
+                id={`${idPrefix}-blend-enabled`}
                 value={step.blendWith ? "enabled" : "none"}
                 onChange={(e) => {
                   if (e.target.value === "none") {
@@ -206,10 +212,11 @@ export function PipelineStepCard({
             {step.blendWith && (
               <>
                 <div className="flex items-center gap-2">
-                  <label className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                  <label htmlFor={`${idPrefix}-blend-source`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
                     Source
                   </label>
                   <select
+                    id={`${idPrefix}-blend-source`}
                     value={step.blendWith.stepId}
                     onChange={(e) =>
                       onUpdate(step.id, {
@@ -226,10 +233,11 @@ export function PipelineStepCard({
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                  <label htmlFor={`${idPrefix}-blend-mode`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
                     Mode
                   </label>
                   <select
+                    id={`${idPrefix}-blend-mode`}
                     value={step.blendWith.mode}
                     onChange={(e) =>
                       onUpdate(step.id, {
@@ -249,10 +257,11 @@ export function PipelineStepCard({
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                  <label htmlFor={`${idPrefix}-blend-opacity`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
                     Opacity
                   </label>
                   <input
+                    id={`${idPrefix}-blend-opacity`}
                     type="range"
                     min={0}
                     max={1}
