@@ -159,5 +159,7 @@ export function isExperimentalColor(colorName: string): boolean {
   return ADDITIONAL_PALETTES.some((palette) => upper in palette.colors);
 }
 
-// Re-export types
+// Re-export types and utilities
 export type { PaletteCategory, PaletteColorDef, FullPaletteColorDef, PaletteId, PaletteMode };
+export type { PatternDefinition, PatternStripe } from './types';
+export { patternToCssBackground } from './pattern-css';

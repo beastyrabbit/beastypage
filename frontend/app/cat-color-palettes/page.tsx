@@ -7,7 +7,7 @@ import CheckedIcon from '@/components/ui/checked-icon';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PageHero } from '@/components/common/PageHero';
-import { ADDITIONAL_PALETTES, type PaletteCategory } from '@/lib/palettes';
+import { ADDITIONAL_PALETTES, patternToCssBackground, type PaletteCategory, type PatternDefinition } from '@/lib/palettes';
 import {
   rgbToHex,
   rgbToHsl,
@@ -65,10 +65,12 @@ function formatColor(
 
 function PaletteDownload({ palette }: { palette: PaletteCategory }) {
   const handleExport = useCallback(() => {
-    const colors = Object.entries(palette.colors).map(([name, def]) => ({
-      rgb: { r: def.multiply[0], g: def.multiply[1], b: def.multiply[2] },
-      name: name.replace(/_/g, ' '),
-    }));
+    const colors = Object.entries(palette.colors)
+      .filter(([, def]) => def.multiply)
+      .map(([name, def]) => ({
+        rgb: { r: def.multiply![0], g: def.multiply![1], b: def.multiply![2] },
+        name: name.replace(/_/g, ' '),
+      }));
 
     if (colors.length === 0) {
       toast.error('No colors to export');
@@ -107,11 +109,13 @@ function ColorCard({
   name,
   rgb,
   screen,
+  pattern,
   colorFormat,
 }: {
   name: string;
   rgb: [number, number, number];
   screen?: [number, number, number, number];
+  pattern?: PatternDefinition;
   colorFormat: ColorFormat;
 }) {
   const [copied, setCopied] = useState(false);
@@ -132,19 +136,23 @@ function ColorCard({
   const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
   const textColor = luminance > 0.5 ? 'text-black/80' : 'text-white/90';
 
+  const bgStyle: React.CSSProperties = pattern
+    ? patternToCssBackground(pattern)
+    : { backgroundColor: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})` };
+
   return (
     <button
       onClick={copyToClipboard}
       className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-lg border border-border/30 transition hover:scale-105 hover:shadow-lg"
-      style={{ backgroundColor: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})` }}
-      title={`${name}\n${clipboard}\nClick to copy`}
+      style={bgStyle}
+      title={`${name}\n${pattern ? `${pattern.type} pattern` : clipboard}\nClick to copy`}
     >
       <div className={`text-center ${textColor}`}>
         <div className="text-[10px] font-bold uppercase tracking-wide opacity-80 group-hover:opacity-100">
           {name.replace(/_/g, ' ')}
         </div>
         <div className="mt-0.5 text-[9px] font-mono opacity-60 group-hover:opacity-90">
-          {display}
+          {pattern ? pattern.type : display}
         </div>
       </div>
       {copied && (
@@ -161,6 +169,16 @@ function ColorCard({
             }}
             title="Has screen overlay"
           />
+        </div>
+      )}
+      {pattern && (
+        <div className="absolute top-1 left-1">
+          <div
+            className="rounded-sm bg-black/40 px-1 py-0.5 text-[7px] font-bold uppercase text-white/80"
+            title={`${pattern.type} pattern`}
+          >
+            {pattern.type.charAt(0)}
+          </div>
         </div>
       )}
     </button>
@@ -200,8 +218,9 @@ function PaletteSection({
             <ColorCard
               key={name}
               name={name}
-              rgb={def.multiply}
+              rgb={def.multiply ?? def.pattern?.background ?? [128, 128, 128]}
               screen={def.screen}
+              pattern={def.pattern}
               colorFormat={colorFormat}
             />
           ))}
@@ -259,7 +278,8 @@ export default function CatColorPalettesPage() {
         <div className="mt-8 rounded-lg border border-border/30 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
           <p>
             These colors are applied using multiply blend mode on WHITE base sprites. Colors with a
-            small dot indicator also have a screen overlay for added depth.
+            small dot indicator also have a screen overlay for added depth. Pattern swatches (marked
+            with a letter badge) use repeating tile patterns instead of flat colors.
           </p>
         </div>
       </div>

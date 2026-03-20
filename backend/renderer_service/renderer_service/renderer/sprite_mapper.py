@@ -18,6 +18,7 @@ class ExperimentalColourDefinition:
     multiply: Optional[List[float]] = None
     screen: Optional[List[float]] = None
     overlay: Optional[List[float]] = None
+    pattern: Optional[dict] = None
 
 
 def _dedupe(seq: Iterable[str]) -> List[str]:
@@ -195,6 +196,7 @@ class SpriteMapper:
                         multiply=color_def.get("multiply"),
                         screen=color_def.get("screen"),
                         overlay=color_def.get("overlay"),
+                        pattern=color_def.get("pattern"),
                     )
 
                 self.experimental_categories[palette_id] = category_colors

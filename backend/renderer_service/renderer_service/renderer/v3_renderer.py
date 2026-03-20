@@ -6,22 +6,79 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 from PIL import Image, ImageOps
 
-from .image_ops import add, fill_with_colour, multiply, overlay, screen, apply_mask, apply_missing_scar, tint_image, sanitize_transparency, alpha_over
+from .image_ops import (
+    add,
+    fill_with_colour,
+    multiply,
+    screen,
+    apply_mask,
+    apply_missing_scar,
+    tint_image,
+    sanitize_transparency,
+    alpha_over,
+)
+from .patterns import PatternDefinition, generate_pattern_tile
 from .repository import SpriteRepository
 from .sprite_mapper import SpriteMapper
 from ..models import LayerIdentifier
 
 SCARS_PRIMARY = {
-    "ONE", "TWO", "THREE", "TAILSCAR", "SNOUT", "CHEEK", "SIDE", "THROAT", "TAILBASE",
-    "BELLY", "LEGBITE", "NECKBITE", "FACE", "MANLEG", "BRIGHTHEART", "MANTAIL", "BRIDGE",
-    "RIGHTBLIND", "LEFTBLIND", "BOTHBLIND", "BEAKCHEEK", "BEAKLOWER", "CATBITE", "RATBITE",
-    "QUILLCHUNK", "QUILLSCRATCH", "HINDLEG", "BACK", "QUILLSIDE", "SCRATCHSIDE", "BEAKSIDE",
-    "CATBITETWO", "FOUR", "BURNPAWS", "BURNTAIL", "BURNBELLY", "BURNRUMP", "FROSTFACE",
-    "SNAKE", "SNAKETWO", "TOETRAP", "TOE", "FROSTTAIL", "FROSTSOCK", "FROSTMITT",
+    "ONE",
+    "TWO",
+    "THREE",
+    "TAILSCAR",
+    "SNOUT",
+    "CHEEK",
+    "SIDE",
+    "THROAT",
+    "TAILBASE",
+    "BELLY",
+    "LEGBITE",
+    "NECKBITE",
+    "FACE",
+    "MANLEG",
+    "BRIGHTHEART",
+    "MANTAIL",
+    "BRIDGE",
+    "RIGHTBLIND",
+    "LEFTBLIND",
+    "BOTHBLIND",
+    "BEAKCHEEK",
+    "BEAKLOWER",
+    "CATBITE",
+    "RATBITE",
+    "QUILLCHUNK",
+    "QUILLSCRATCH",
+    "HINDLEG",
+    "BACK",
+    "QUILLSIDE",
+    "SCRATCHSIDE",
+    "BEAKSIDE",
+    "CATBITETWO",
+    "FOUR",
+    "BURNPAWS",
+    "BURNTAIL",
+    "BURNBELLY",
+    "BURNRUMP",
+    "FROSTFACE",
+    "SNAKE",
+    "SNAKETWO",
+    "TOETRAP",
+    "TOE",
+    "FROSTTAIL",
+    "FROSTSOCK",
+    "FROSTMITT",
 }
 
 SCARS_SECONDARY = {
-    "LEFTEAR", "RIGHTEAR", "NOTAIL", "HALFTAIL", "NOPAW", "NOLEFTEAR", "NORIGHTEAR", "NOEAR"
+    "LEFTEAR",
+    "RIGHTEAR",
+    "NOTAIL",
+    "HALFTAIL",
+    "NOPAW",
+    "NOLEFTEAR",
+    "NORIGHTEAR",
+    "NOEAR",
 }
 
 
@@ -138,10 +195,18 @@ class CatRendererV3:
                 for layer in params["tortie"]:
                     if not layer:
                         continue
-                    draw(layer.get("pattern"), layer.get("colour") or "GINGER", layer.get("mask"))
+                    draw(
+                        layer.get("pattern"),
+                        layer.get("colour") or "GINGER",
+                        layer.get("mask"),
+                    )
             elif params.get("tortiePattern") and params.get("tortiePattern") != "none":
                 draw(pelt_name, colour)
-                draw(params.get("tortiePattern"), params.get("tortieColour") or "GINGER", params.get("tortieMask"))
+                draw(
+                    params.get("tortiePattern"),
+                    params.get("tortieColour") or "GINGER",
+                    params.get("tortieMask"),
+                )
             else:
                 draw(pelt_name, colour)
         else:
@@ -159,12 +224,14 @@ class CatRendererV3:
     def _build_pelt_layer(self, pattern, colour, sprite_number):
         if not pattern:
             return None
-        raw_colour = (colour or "WHITE")
+        raw_colour = colour or "WHITE"
         definition = self.mapper.get_experimental_definition(raw_colour)
         base_colour = definition.base_colour if definition else raw_colour
 
         sprite_name = self.mapper.build_sprite_name("pelt", pattern, base_colour)
-        if (not sprite_name or not self.repo.has_sprite(sprite_name)) and base_colour.upper() != "WHITE":
+        if (
+            not sprite_name or not self.repo.has_sprite(sprite_name)
+        ) and base_colour.upper() != "WHITE":
             sprite_name = self.mapper.build_sprite_name("pelt", pattern, "WHITE")
 
         if not sprite_name or not self.repo.has_sprite(sprite_name):
@@ -191,7 +258,9 @@ class CatRendererV3:
         alpha = arr[..., 3:4]
 
         def parse(values):
-            colour = np.array([values[0], values[1], values[2]], dtype=np.float32) / 255.0
+            colour = (
+                np.array([values[0], values[1], values[2]], dtype=np.float32) / 255.0
+            )
             if len(values) >= 4:
                 raw_alpha = values[3]
                 blend_alpha = raw_alpha / 255.0 if raw_alpha > 1 else raw_alpha
@@ -215,9 +284,19 @@ class CatRendererV3:
                 blend_rgb = rgb
             return (1.0 - blend_alpha) * rgb + blend_alpha * blend_rgb
 
-        if definition.multiply:
+        if definition.pattern:
+            # Per-pixel pattern multiply: generate a tiled pattern and use it
+            # as the multiply color instead of a flat uniform color
+            h, w = rgb.shape[:2]
+            pat_def = PatternDefinition.from_dict(definition.pattern)
+            pattern_rgb = generate_pattern_tile(
+                pat_def, w, h
+            )  # (h, w, 3) float32 [0,1]
+            rgb = rgb * pattern_rgb
+        elif definition.multiply:
             colour, blend_alpha = parse(definition.multiply)
             rgb = blend(rgb, colour, blend_alpha, "multiply")
+
         if definition.screen:
             colour, blend_alpha = parse(definition.screen)
             rgb = blend(rgb, colour, blend_alpha, "screen")
@@ -238,11 +317,15 @@ class CatRendererV3:
         overlays = []
         diagnostics = []
         if tint:
-            overlay = fill_with_colour(canvas.size, tuple(int(c) for c in tint[:3]) + (255,), canvas)
+            overlay = fill_with_colour(
+                canvas.size, tuple(int(c) for c in tint[:3]) + (255,), canvas
+            )
             overlays.append((overlay, "multiply"))
             diagnostics.append("tint-multiply")
         if dilute:
-            overlay = fill_with_colour(canvas.size, tuple(int(c) for c in dilute[:3]) + (255,), canvas)
+            overlay = fill_with_colour(
+                canvas.size, tuple(int(c) for c in dilute[:3]) + (255,), canvas
+            )
             overlays.append((overlay, "add"))
             diagnostics.append("tint-dilute")
 
@@ -456,7 +539,9 @@ class CatRendererV3:
     def _stage_accessories(self, params: Dict, canvas: Image.Image):
         accessories_raw: List[str] = []
         if isinstance(params.get("accessories"), list):
-            accessories_raw.extend(str(a) for a in params["accessories"] if a and a != "none")
+            accessories_raw.extend(
+                str(a) for a in params["accessories"] if a and a != "none"
+            )
         if params.get("accessory") and params.get("accessory") != "none":
             accessories_raw.append(str(params.get("accessory")))
         valid_accessories = [acc for acc in accessories_raw if acc]
@@ -469,7 +554,9 @@ class CatRendererV3:
             sprite_name = self._resolve_accessory(str(accessory))
             if not sprite_name or not self.repo.has_sprite(sprite_name):
                 continue
-            overlay = alpha_over(overlay, self.repo.get_sprite(sprite_name, sprite_number))
+            overlay = alpha_over(
+                overlay, self.repo.get_sprite(sprite_name, sprite_number)
+            )
             diagnostics.append(sprite_name)
         if not diagnostics:
             return None, [], "alpha", LayerIdentifier.accessories
@@ -482,7 +569,6 @@ class CatRendererV3:
 
         raw = name.strip()
         upper = raw.upper()
-        lower = raw.lower()
         options = [
             raw,
             upper,
