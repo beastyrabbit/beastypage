@@ -5,11 +5,14 @@
  * frontend can show a visual preview without rendering through the backend.
  */
 
+import type { CSSProperties } from 'react';
+
 import type { PatternDefinition } from './types';
 
 type CSSPatternStyle = {
   background: string;
   backgroundSize?: string;
+  backgroundPosition?: string;
 };
 
 function rgb(c: [number, number, number]): string {
@@ -173,6 +176,7 @@ function buffaloCss(p: PatternDefinition): CSSPatternStyle {
 
 function checkerboardCss(p: PatternDefinition): CSSPatternStyle {
   const ts = p.tileSize;
+  const half = ts / 2;
   const fg = rgb(p.foreground ?? [0, 0, 0]);
 
   return {
@@ -182,6 +186,7 @@ function checkerboardCss(p: PatternDefinition): CSSPatternStyle {
       solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${ts}px ${ts}px`,
+    backgroundPosition: `0 0, ${half}px ${half}px, 0 0`,
   };
 }
 
@@ -263,7 +268,7 @@ const CSS_GENERATORS: Record<PatternDefinition['type'], (p: PatternDefinition) =
   flag: flagCss,
 };
 
-export function patternToCssBackground(pattern: PatternDefinition): React.CSSProperties {
+export function patternToCssBackground(pattern: PatternDefinition): CSSProperties {
   const generator = CSS_GENERATORS[pattern.type];
   if (!generator) {
     console.warn(`[pattern-css] No CSS generator for pattern type "${pattern.type}", falling back to flat color`);
@@ -273,5 +278,6 @@ export function patternToCssBackground(pattern: PatternDefinition): React.CSSPro
   return {
     background: style.background,
     backgroundSize: style.backgroundSize,
+    backgroundPosition: style.backgroundPosition,
   };
 }
