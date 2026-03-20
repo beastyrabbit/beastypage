@@ -127,10 +127,11 @@ function ColorCard({
   const { display, clipboard } = formatColor(rgb, colorFormat);
 
   const copyToClipboard = async () => {
+    const value = pattern ? name : clipboard;
     try {
-      await navigator.clipboard.writeText(clipboard);
+      await navigator.clipboard.writeText(value);
       setCopied(true);
-      toast.success(`Copied ${clipboard}`);
+      toast.success(`Copied ${value}`);
       setTimeout(() => setCopied(false), 1500);
     } catch (error) {
       console.error('Clipboard copy failed:', error);

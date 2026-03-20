@@ -6,11 +6,15 @@ in the experimental tint pipeline.
 
 from __future__ import annotations
 
+import logging
+import math
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Literal, Optional, Tuple
 
 import numpy as np
+
+logger = logging.getLogger("renderer.patterns")
 
 PatternType = Literal[
     "tartan",
@@ -64,6 +68,13 @@ class PatternDefinition:
             raise ValueError(f"tileSize must be a positive int, got: {tile_size!r}")
         if tile_size > 256:
             raise ValueError(f"tileSize {tile_size} exceeds maximum of 256")
+
+        if ptype in ("chevron", "diagonal") and tile_size != SPRITE_SIZE:
+            logger.warning(
+                "tileSize=%d ignored for '%s' pattern; use 'spacing' to control density",
+                tile_size,
+                ptype,
+            )
 
         stripes = tuple(
             PatternStripe(
@@ -331,9 +342,13 @@ def _generate_flag(defn: PatternDefinition) -> np.ndarray:
 
     # Distribute stripe heights proportionally
     total_weight = sum(s.width for s in defn.stripes)
+    n_stripes = len(defn.stripes)
     y = 0
-    for stripe in defn.stripes:
-        h = max(round(ts * stripe.width / total_weight), 1)
+    for i, stripe in enumerate(defn.stripes):
+        if i == n_stripes - 1:
+            h = ts - y  # absorb rounding remainder into last stripe
+        else:
+            h = max(round(ts * stripe.width / total_weight), 1)
         end = min(y + h, ts)
         tile[y:end, :] = _c(stripe.color)
         y = end
