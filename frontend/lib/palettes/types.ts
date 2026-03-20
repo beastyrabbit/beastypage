@@ -57,7 +57,14 @@ export type PaletteId =
   | 'peach-sorbet'
   | 'greyscale'
   | 'cold-steel'
-  | 'ink-wash';
+  | 'ink-wash'
+  // Textile-inspired palettes
+  | 'royal-stewart'
+  | 'black-watch'
+  | 'country-tweed'
+  | 'savile-row'
+  | 'bavarian-tracht'
+  | 'oktoberfest';
 
 /**
  * PaletteMode is 'off' (classic/original colours) or a specific palette ID

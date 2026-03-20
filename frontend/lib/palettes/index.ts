@@ -26,6 +26,9 @@ import { fmaPalette } from './fma';
 // Pure/monochromatic palettes
 import { PURE_PALETTES } from './pure';
 
+// Textile-inspired palettes
+import { TEXTILE_PALETTES } from './textile';
+
 /**
  * All additional palettes in display order
  */
@@ -48,6 +51,8 @@ export const ADDITIONAL_PALETTES: PaletteCategory[] = [
   fmaPalette,
   // Pure/monochromatic palettes
   ...PURE_PALETTES,
+  // Textile-inspired palettes
+  ...TEXTILE_PALETTES,
 ];
 
 /**

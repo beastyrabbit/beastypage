@@ -1,0 +1,27 @@
+{
+  "id": "savile-row",
+  "label": "Savile Row",
+  "description": "English tailoring — pinstripe charcoals, bespoke navies, chalk whites and silk lining",
+  "colors": {
+    "SV_JETBLACK": { "multiply": [10, 10, 12] },
+    "SV_CHARCOALSUIT": { "multiply": [32, 32, 36] },
+    "SV_CITYSLATE": { "multiply": [52, 52, 58] },
+    "SV_PINSTRIPE": { "multiply": [72, 72, 78] },
+    "SV_FLANNELGREY": { "multiply": [98, 98, 102] },
+    "SV_DOVEGREY": { "multiply": [145, 145, 148] },
+    "SV_CHALKSTRIPE": { "multiply": [195, 195, 198] },
+    "SV_MIDNIGHTNAVY": { "multiply": [12, 15, 38] },
+    "SV_OXFORDBLUE": { "multiply": [22, 28, 62] },
+    "SV_BESPOKEBLUE": { "multiply": [32, 42, 88] },
+    "SV_REGENTBLUE": { "multiply": [45, 58, 118] },
+    "SV_SILKNAVY": { "multiply": [58, 72, 142] },
+    "SV_BURGUNYLINING": { "multiply": [120, 22, 35] },
+    "SV_CLARETWINE": { "multiply": [145, 32, 48] },
+    "SV_SILKRED": { "multiply": [172, 45, 58] },
+    "SV_GOLDBUTTON": { "multiply": [195, 165, 52] },
+    "SV_BRASSPIN": { "multiply": [215, 185, 72] },
+    "SV_IVORYSHIRT": { "multiply": [238, 235, 228] },
+    "SV_LINENWHITE": { "multiply": [232, 228, 218] },
+    "SV_CAMELCOAT": { "multiply": [178, 148, 108] }
+  }
+}
