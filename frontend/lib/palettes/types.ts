@@ -54,7 +54,10 @@ export type PaletteId =
   | 'coral-reef'
   | 'tropical-lagoon'
   | 'midnight-wine'
-  | 'peach-sorbet';
+  | 'peach-sorbet'
+  | 'greyscale'
+  | 'cold-steel'
+  | 'ink-wash';
 
 /**
  * PaletteMode is 'off' (classic/original colours) or a specific palette ID

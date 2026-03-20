@@ -1,0 +1,27 @@
+{
+  "id": "ink-wash",
+  "label": "Ink Wash",
+  "description": "Sumi-e grey — warm sepia-black ink diluted across rice paper to pale tea stain",
+  "colors": {
+    "IW_SUMI": { "multiply": [12, 10, 8] },
+    "IW_BOKUJU": { "multiply": [22, 18, 15] },
+    "IW_NOTAN": { "multiply": [35, 30, 25] },
+    "IW_FUDESAKI": { "multiply": [48, 42, 36] },
+    "IW_TSUKETATAMI": { "multiply": [62, 55, 48] },
+    "IW_KAKEJIKU": { "multiply": [78, 70, 62] },
+    "IW_SUIBOKU": { "multiply": [95, 86, 78] },
+    "IW_HABOKU": { "multiply": [112, 104, 95] },
+    "IW_TARASHIKOMI": { "multiply": [130, 122, 112] },
+    "IW_NIJIMI": { "multiply": [148, 140, 130] },
+    "IW_USUINK": { "multiply": [164, 158, 148] },
+    "IW_MIZUGOROMO": { "multiply": [180, 174, 165] },
+    "IW_SENMEN": { "multiply": [194, 188, 180] },
+    "IW_WASHI": { "multiply": [206, 202, 194] },
+    "IW_SHOJI": { "multiply": [216, 212, 205] },
+    "IW_KOZO": { "multiply": [224, 220, 214] },
+    "IW_GAMPI": { "multiply": [230, 226, 222] },
+    "IW_MITSUMATA": { "multiply": [234, 232, 228] },
+    "IW_TORINOKO": { "multiply": [237, 235, 232] },
+    "IW_HOSHO": { "multiply": [240, 238, 235] }
+  }
+}

@@ -24,6 +24,9 @@ import { coralReefPalette } from './coral-reef';
 import { tropicalLagoonPalette } from './tropical-lagoon';
 import { midnightWinePalette } from './midnight-wine';
 import { peachSorbetPalette } from './peach-sorbet';
+import { greyscalePalette } from './greyscale';
+import { coldSteelPalette } from './cold-steel';
+import { inkWashPalette } from './ink-wash';
 
 export const PURE_PALETTES: PaletteCategory[] = [
   oceanDepthsPalette,
@@ -46,4 +49,7 @@ export const PURE_PALETTES: PaletteCategory[] = [
   tropicalLagoonPalette,
   midnightWinePalette,
   peachSorbetPalette,
+  greyscalePalette,
+  coldSteelPalette,
+  inkWashPalette,
 ];
