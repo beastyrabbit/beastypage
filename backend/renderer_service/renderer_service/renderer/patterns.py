@@ -6,7 +6,6 @@ in the experimental tint pipeline.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Literal, Optional, Tuple
@@ -50,6 +49,22 @@ class PatternDefinition:
 
     @staticmethod
     def from_dict(d: dict) -> PatternDefinition:
+        if "type" not in d:
+            raise ValueError(f"Pattern definition missing 'type': {d!r}")
+
+        ptype = d["type"]
+        if ptype not in _GENERATORS:
+            raise ValueError(
+                f"Unknown pattern type '{ptype}'. "
+                f"Valid: {', '.join(sorted(_GENERATORS))}"
+            )
+
+        tile_size = d.get("tileSize", 8)
+        if not isinstance(tile_size, int) or tile_size < 1:
+            raise ValueError(f"tileSize must be a positive int, got: {tile_size!r}")
+        if tile_size > 256:
+            raise ValueError(f"tileSize {tile_size} exceeds maximum of 256")
+
         stripes = tuple(
             PatternStripe(
                 color=tuple(s["color"]),  # type: ignore[arg-type]
@@ -62,8 +77,8 @@ class PatternDefinition:
         fg_raw = d.get("foreground")
         fg = tuple(fg_raw) if fg_raw else None  # type: ignore[arg-type]
         return PatternDefinition(
-            type=d["type"],
-            tile_size=d.get("tileSize", 8),
+            type=ptype,
+            tile_size=tile_size,
             background=bg,
             foreground=fg,
             stripes=stripes,
@@ -129,33 +144,23 @@ def _generate_houndstooth(defn: PatternDefinition) -> np.ndarray:
     ts = defn.tile_size
     c1, c2 = _c(defn.background), _fg(defn)
     half = max(ts // 2, 2)
-    mask = np.zeros((ts, ts), dtype=bool)
+    step = max(half // 4, 1)
 
-    for y in range(ts):
-        for x in range(ts):
-            # Map to position within the 2x2 super-cell
-            cy, cx = y % half, x % half
-            qy, qx = y // half, x // half
-            quadrant = (qy % 2) * 2 + (qx % 2)  # 0=TL, 1=TR, 2=BL, 3=BR
+    yy, xx = np.mgrid[:ts, :ts]
 
-            # Staircase: pixel is "dark" if its column (stepped) <= its row
-            # Using integer division to create the stair steps
-            step = max(half // 4, 1)
-            stair_x = (cx // step) * step
-            is_dark = stair_x <= cy
+    # Position within each half-cell
+    cy = yy % half
+    cx = xx % half
 
-            if quadrant == 0:
-                # Top-left: dark staircase
-                mask[y, x] = is_dark
-            elif quadrant == 3:
-                # Bottom-right: dark staircase (same)
-                mask[y, x] = is_dark
-            elif quadrant == 1:
-                # Top-right: inverted (light staircase = dark background)
-                mask[y, x] = not is_dark
-            else:
-                # Bottom-left: inverted
-                mask[y, x] = not is_dark
+    # Quadrant index: 0=TL, 1=TR, 2=BL, 3=BR
+    quadrant = (yy // half % 2) * 2 + (xx // half % 2)
+
+    # Staircase: pixel is "dark" when its stepped column <= its row
+    is_dark = (cx // step) * step <= cy
+
+    # TL (0) and BR (3) use the staircase directly; TR (1) and BL (2) invert it
+    is_inverted = (quadrant == 1) | (quadrant == 2)
+    mask = np.where(is_inverted, ~is_dark, is_dark)
 
     return np.where(mask[..., None], c2, c1)
 
@@ -164,13 +169,8 @@ def _generate_pinstripe(defn: PatternDefinition) -> np.ndarray:
     """Thin vertical lines on solid background."""
     ts = defn.tile_size
     tile = np.full((ts, ts, 3), _c(defn.background), dtype=np.float32)
-    fg = _fg(defn)
     spacing = max(defn.spacing, 2)
-
-    col = 0
-    while col < ts:
-        tile[:, col] = fg
-        col += spacing
+    tile[:, ::spacing] = _fg(defn)
     return tile
 
 
@@ -182,75 +182,57 @@ def _generate_chevron(defn: PatternDefinition) -> np.ndarray:
     """
     size = SPRITE_SIZE
     bg, fg = _c(defn.background), _fg(defn)
-    tile = np.full((size, size, 3), bg, dtype=np.float32)
     stripe_w = max(defn.spacing, 2)
+    half = size // 2
 
-    for y in range(size):
-        for x in range(size):
-            half = size // 2
-            if x < half:
-                diag = (y + x) % stripe_w
-            else:
-                diag = (y + (size - 1 - x)) % stripe_w
-            if diag < stripe_w // 2:
-                tile[y, x] = fg
+    yy, xx = np.mgrid[:size, :size]
+    # Mirror x around center to form V-shape
+    mirrored_x = np.where(xx < half, xx, size - 1 - xx)
+    mask = (yy + mirrored_x) % stripe_w < stripe_w // 2
+
+    tile = np.full((size, size, 3), bg, dtype=np.float32)
+    tile[mask] = fg
     return tile
 
 
 def _generate_polkadot(defn: PatternDefinition) -> np.ndarray:
-    """Circles on solid background."""
+    """Circles on solid background with anti-aliased edges."""
     ts = defn.tile_size
     bg, fg = _c(defn.background), _fg(defn)
-    tile = np.full((ts, ts, 3), bg, dtype=np.float32)
-
-    # Dot centered in tile, radius ~ 1/3 of tile size
-    cx, cy = ts / 2.0, ts / 2.0
     radius = ts / 3.0
 
-    for y in range(ts):
-        for x in range(ts):
-            dist = math.sqrt((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2)
-            if dist <= radius:
-                # Slight anti-alias at edge
-                if dist > radius - 0.8:
-                    t = (radius - dist) / 0.8
-                    tile[y, x] = (1 - t) * bg + t * fg
-                else:
-                    tile[y, x] = fg
-    return tile
+    yy, xx = np.mgrid[:ts, :ts]
+    dist = np.sqrt((xx + 0.5 - ts / 2.0) ** 2 + (yy + 0.5 - ts / 2.0) ** 2)
+
+    # Anti-alias blend factor: 1.0 inside, smooth falloff in the last 0.8px
+    t = np.clip((radius - dist) / 0.8, 0.0, 1.0)
+
+    tile = (1 - t)[..., None] * bg + t[..., None] * fg
+    return tile.astype(np.float32)
 
 
 def _generate_argyle(defn: PatternDefinition) -> np.ndarray:
     """Diamond lattice with thin diagonal lines."""
     ts = defn.tile_size
     bg, fg = _c(defn.background), _fg(defn)
-    tile = np.full((ts, ts, 3), bg, dtype=np.float32)
-
     cx, cy = ts / 2.0, ts / 2.0
-    for y in range(ts):
-        for x in range(ts):
-            # Diamond: |x - cx| / cx + |y - cy| / cy <= 1
-            dx = abs(x + 0.5 - cx) / cx
-            dy = abs(y + 0.5 - cy) / cy
-            if dx + dy <= 1.0:
-                tile[y, x] = fg
 
-    # Thin diagonal lines (from stripes if provided, else subtle)
+    yy, xx = np.mgrid[:ts, :ts]
+    # Diamond mask: |x - cx| / cx + |y - cy| / cy <= 1
+    diamond = (np.abs(xx + 0.5 - cx) / cx + np.abs(yy + 0.5 - cy) / cy) <= 1.0
+    tile = np.where(diamond[..., None], fg, bg)
+
+    # Thin diagonal lines blended at 50%
+    line_mask = ((xx + yy) % ts == 0) | ((xx - yy) % ts == 0)
     if defn.stripes:
         for stripe in defn.stripes:
             sc = _c(stripe.color)
-            for y in range(ts):
-                for x in range(ts):
-                    if (x + y) % ts == 0 or (x - y) % ts == 0:
-                        tile[y, x] = 0.5 * tile[y, x] + 0.5 * sc
+            tile[line_mask] = 0.5 * tile[line_mask] + 0.5 * sc
     else:
         line_color = 0.5 * bg + 0.5 * fg
-        for y in range(ts):
-            for x in range(ts):
-                if (x + y) % ts == 0 or (x - y) % ts == 0:
-                    tile[y, x] = line_color
+        tile[line_mask] = line_color
 
-    return np.clip(tile, 0.0, 1.0)
+    return np.clip(tile, 0.0, 1.0).astype(np.float32)
 
 
 def _generate_buffalo(defn: PatternDefinition) -> np.ndarray:
@@ -275,14 +257,9 @@ def _generate_checkerboard(defn: PatternDefinition) -> np.ndarray:
     c1, c2 = _c(defn.background), _fg(defn)
     half = max(ts // 2, 1)
 
-    tile = np.empty((ts, ts, 3), dtype=np.float32)
-    for y in range(ts):
-        for x in range(ts):
-            if ((y // half) + (x // half)) % 2 == 0:
-                tile[y, x] = c1
-            else:
-                tile[y, x] = c2
-    return tile
+    yy, xx = np.mgrid[:ts, :ts]
+    mask = ((yy // half) + (xx // half)) % 2 == 0
+    return np.where(mask[..., None], c1, c2).astype(np.float32)
 
 
 def _generate_windowpane(defn: PatternDefinition) -> np.ndarray:
@@ -306,13 +283,13 @@ def _generate_diagonal(defn: PatternDefinition) -> np.ndarray:
     """
     size = SPRITE_SIZE
     bg, fg = _c(defn.background), _fg(defn)
-    tile = np.full((size, size, 3), bg, dtype=np.float32)
     stripe_w = max(defn.spacing, 2)
 
-    for y in range(size):
-        for x in range(size):
-            if (x + y) % (stripe_w * 2) < stripe_w:
-                tile[y, x] = fg
+    yy, xx = np.mgrid[:size, :size]
+    mask = (xx + yy) % (stripe_w * 2) < stripe_w
+
+    tile = np.full((size, size, 3), bg, dtype=np.float32)
+    tile[mask] = fg
     return tile
 
 
@@ -322,19 +299,18 @@ def _generate_basketweave(defn: PatternDefinition) -> np.ndarray:
     c1, c2 = _c(defn.background), _fg(defn)
     half = max(ts // 2, 1)
 
-    tile = np.empty((ts, ts, 3), dtype=np.float32)
-    for y in range(ts):
-        for x in range(ts):
-            by, bx = y // half, x // half
-            if (by + bx) % 2 == 0:
-                # Horizontal block — slight gradient left-to-right
-                t = (x % half) / max(half - 1, 1) * 0.15
-                tile[y, x] = (1 - t) * c1 + t * c2
-            else:
-                # Vertical block — slight gradient top-to-bottom
-                t = (y % half) / max(half - 1, 1) * 0.15
-                tile[y, x] = (1 - t) * c2 + t * c1
-    return np.clip(tile, 0.0, 1.0)
+    yy, xx = np.mgrid[:ts, :ts]
+    is_horiz = ((yy // half) + (xx // half)) % 2 == 0
+
+    # Gradient factor: 0..0.15 across each half-cell
+    t_horiz = ((xx % half) / max(half - 1, 1) * 0.15)[..., None]
+    t_vert = ((yy % half) / max(half - 1, 1) * 0.15)[..., None]
+
+    horiz_block = (1 - t_horiz) * c1 + t_horiz * c2
+    vert_block = (1 - t_vert) * c2 + t_vert * c1
+
+    tile = np.where(is_horiz[..., None], horiz_block, vert_block)
+    return np.clip(tile, 0.0, 1.0).astype(np.float32)
 
 
 def _generate_flag(defn: PatternDefinition) -> np.ndarray:

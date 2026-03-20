@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -21,6 +22,8 @@ from .patterns import PatternDefinition, generate_pattern_tile
 from .repository import SpriteRepository
 from .sprite_mapper import SpriteMapper
 from ..models import LayerIdentifier
+
+logger = logging.getLogger("renderer.v3")
 
 SCARS_PRIMARY = {
     "ONE",
@@ -285,14 +288,17 @@ class CatRendererV3:
             return (1.0 - blend_alpha) * rgb + blend_alpha * blend_rgb
 
         if definition.pattern:
-            # Per-pixel pattern multiply: generate a tiled pattern and use it
-            # as the multiply color instead of a flat uniform color
-            h, w = rgb.shape[:2]
-            pat_def = PatternDefinition.from_dict(definition.pattern)
-            pattern_rgb = generate_pattern_tile(
-                pat_def, w, h
-            )  # (h, w, 3) float32 [0,1]
-            rgb = rgb * pattern_rgb
+            try:
+                h, w = rgb.shape[:2]
+                pat_def = PatternDefinition.from_dict(definition.pattern)
+                pattern_rgb = generate_pattern_tile(pat_def, w, h)
+                rgb = rgb * pattern_rgb
+            except Exception:
+                logger.error(
+                    "Pattern generation failed, skipping multiply. pattern=%r",
+                    definition.pattern,
+                    exc_info=True,
+                )
         elif definition.multiply:
             colour, blend_alpha = parse(definition.multiply)
             rgb = blend(rgb, colour, blend_alpha, "multiply")

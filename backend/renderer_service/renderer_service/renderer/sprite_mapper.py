@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 from .repository import SpriteRepository
+
+logger = logging.getLogger("renderer.sprite_mapper")
 
 
 class MissingAccessorySprite(RuntimeError):
@@ -201,8 +204,14 @@ class SpriteMapper:
 
                 self.experimental_categories[palette_id] = category_colors
 
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Warning: Failed to load palette {palette_file}: {e}")
+            except (
+                json.JSONDecodeError,
+                IOError,
+                KeyError,
+                TypeError,
+                ValueError,
+            ) as e:
+                logger.error("Failed to load palette %s: %s", palette_file, e)
 
         return result
 

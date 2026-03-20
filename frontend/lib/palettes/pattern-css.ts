@@ -20,6 +20,12 @@ function rgba(c: [number, number, number], a: number): string {
   return `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
 }
 
+/** Solid color as a linear-gradient (used as the bottom layer in multi-layer backgrounds). */
+function solidLayer(c: [number, number, number]): string {
+  const color = rgb(c);
+  return `linear-gradient(${color}, ${color})`;
+}
+
 function tartanCss(p: PatternDefinition): CSSPatternStyle {
   const ts = p.tileSize;
   const layers: string[] = [];
@@ -37,7 +43,7 @@ function tartanCss(p: PatternDefinition): CSSPatternStyle {
     );
   }
 
-  layers.push(`linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`);
+  layers.push(solidLayer(p.background));
 
   return {
     background: layers.join(', '),
@@ -54,7 +60,7 @@ function ginghamCss(p: PatternDefinition): CSSPatternStyle {
     background: [
       `repeating-linear-gradient(0deg, ${c} 0px, ${c} ${ts / 2}px, transparent ${ts / 2}px, transparent ${ts}px)`,
       `repeating-linear-gradient(90deg, ${c} 0px, ${c} ${ts / 2}px, transparent ${ts / 2}px, transparent ${ts}px)`,
-      `linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`,
+      solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${ts}px ${ts}px`,
   };
@@ -99,7 +105,7 @@ function pinstripeCss(p: PatternDefinition): CSSPatternStyle {
   return {
     background: [
       `repeating-linear-gradient(90deg, ${fg} 0px, ${fg} 1px, transparent 1px, transparent ${spacing}px)`,
-      `linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`,
+      solidLayer(p.background),
     ].join(', '),
   };
 }
@@ -114,7 +120,7 @@ function chevronCss(p: PatternDefinition): CSSPatternStyle {
       `linear-gradient(225deg, ${fg} 25%, transparent 25%)`,
       `linear-gradient(315deg, ${fg} 25%, transparent 25%)`,
       `linear-gradient(45deg, ${fg} 25%, transparent 25%)`,
-      `linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`,
+      solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${s * 2}px ${s * 2}px`,
   };
@@ -128,7 +134,7 @@ function polkadotCss(p: PatternDefinition): CSSPatternStyle {
   return {
     background: [
       `radial-gradient(circle ${r}px, ${fg} 100%, transparent 100%)`,
-      `linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`,
+      solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${ts}px ${ts}px`,
   };
@@ -144,7 +150,7 @@ function argyleCss(p: PatternDefinition): CSSPatternStyle {
       `repeating-linear-gradient(135deg, ${line} 0px, ${line} 1px, transparent 1px, transparent ${ts}px)`,
       `repeating-linear-gradient(45deg, ${line} 0px, ${line} 1px, transparent 1px, transparent ${ts}px)`,
       `linear-gradient(45deg, ${fg} 25%, transparent 25%, transparent 75%, ${fg} 75%)`,
-      `linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`,
+      solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${ts}px ${ts}px`,
   };
@@ -159,7 +165,7 @@ function buffaloCss(p: PatternDefinition): CSSPatternStyle {
     background: [
       `repeating-linear-gradient(0deg, ${c} 0px, ${c} ${ts / 2}px, transparent ${ts / 2}px, transparent ${ts}px)`,
       `repeating-linear-gradient(90deg, ${c} 0px, ${c} ${ts / 2}px, transparent ${ts / 2}px, transparent ${ts}px)`,
-      `linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`,
+      solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${ts}px ${ts}px`,
   };
@@ -167,14 +173,13 @@ function buffaloCss(p: PatternDefinition): CSSPatternStyle {
 
 function checkerboardCss(p: PatternDefinition): CSSPatternStyle {
   const ts = p.tileSize;
-  const half = ts / 2;
   const fg = rgb(p.foreground ?? [0, 0, 0]);
 
   return {
     background: [
       `linear-gradient(45deg, ${fg} 25%, transparent 25%, transparent 75%, ${fg} 75%)`,
       `linear-gradient(45deg, ${fg} 25%, transparent 25%, transparent 75%, ${fg} 75%)`,
-      `linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`,
+      solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${ts}px ${ts}px`,
   };
@@ -188,7 +193,7 @@ function windowpaneCss(p: PatternDefinition): CSSPatternStyle {
     background: [
       `repeating-linear-gradient(0deg, ${fg} 0px, ${fg} 1px, transparent 1px, transparent ${ts}px)`,
       `repeating-linear-gradient(90deg, ${fg} 0px, ${fg} 1px, transparent 1px, transparent ${ts}px)`,
-      `linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`,
+      solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${ts}px ${ts}px`,
   };
@@ -201,7 +206,7 @@ function diagonalCss(p: PatternDefinition): CSSPatternStyle {
   return {
     background: [
       `repeating-linear-gradient(135deg, ${fg} 0px, ${fg} ${s}px, transparent ${s}px, transparent ${s * 2}px)`,
-      `linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`,
+      solidLayer(p.background),
     ].join(', '),
   };
 }
@@ -215,7 +220,7 @@ function basketweaveCss(p: PatternDefinition): CSSPatternStyle {
     background: [
       `repeating-linear-gradient(0deg, ${fg} 0px, ${fg} ${half}px, transparent ${half}px, transparent ${ts}px)`,
       `repeating-linear-gradient(90deg, transparent 0px, transparent ${half}px, ${fg} ${half}px, ${fg} ${ts}px)`,
-      `linear-gradient(${rgb(p.background)}, ${rgb(p.background)})`,
+      solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${ts}px ${ts}px`,
   };
@@ -261,6 +266,7 @@ const CSS_GENERATORS: Record<PatternDefinition['type'], (p: PatternDefinition) =
 export function patternToCssBackground(pattern: PatternDefinition): React.CSSProperties {
   const generator = CSS_GENERATORS[pattern.type];
   if (!generator) {
+    console.warn(`[pattern-css] No CSS generator for pattern type "${pattern.type}", falling back to flat color`);
     return { backgroundColor: rgb(pattern.background) };
   }
   const style = generator(pattern);

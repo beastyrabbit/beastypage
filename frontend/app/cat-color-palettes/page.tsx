@@ -73,7 +73,12 @@ function PaletteDownload({ palette }: { palette: PaletteCategory }) {
       }));
 
     if (colors.length === 0) {
-      toast.error('No colors to export');
+      const hasPatterns = Object.values(palette.colors).some((def) => def.pattern);
+      toast.error(
+        hasPatterns
+          ? 'Pattern palettes cannot be exported as ACO (flat color format)'
+          : 'No colors to export'
+      );
       return;
     }
 
