@@ -7,7 +7,6 @@ in the experimental tint pipeline.
 from __future__ import annotations
 
 import logging
-import math
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Literal, Optional, Tuple
