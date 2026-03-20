@@ -1,0 +1,55 @@
+import type { PaletteCategory } from '../types';
+
+export const houndstoothPatternsPalette: PaletteCategory = {
+  id: 'houndstooth-patterns',
+  label: 'Houndstooth Patterns',
+  description:
+    'Classic dogtooth checks at 3 scales — fine (tight weave), medium, and bold (oversized)',
+  colors: {
+    HP_CLASSIC_FINE: {
+      pattern: { type: 'houndstooth', tileSize: 6, background: [235, 235, 230], foreground: [15, 15, 15] },
+    },
+    HP_CLASSIC_MED: {
+      pattern: { type: 'houndstooth', tileSize: 12, background: [235, 235, 230], foreground: [15, 15, 15] },
+    },
+    HP_CLASSIC_BOLD: {
+      pattern: { type: 'houndstooth', tileSize: 20, background: [235, 235, 230], foreground: [15, 15, 15] },
+    },
+    HP_BROWN_FINE: {
+      pattern: { type: 'houndstooth', tileSize: 6, background: [225, 215, 195], foreground: [75, 45, 20] },
+    },
+    HP_BROWN_MED: {
+      pattern: { type: 'houndstooth', tileSize: 12, background: [225, 215, 195], foreground: [75, 45, 20] },
+    },
+    HP_BROWN_BOLD: {
+      pattern: { type: 'houndstooth', tileSize: 20, background: [225, 215, 195], foreground: [75, 45, 20] },
+    },
+    HP_RED_FINE: {
+      pattern: { type: 'houndstooth', tileSize: 6, background: [240, 230, 225], foreground: [160, 25, 25] },
+    },
+    HP_RED_MED: {
+      pattern: { type: 'houndstooth', tileSize: 12, background: [240, 230, 225], foreground: [160, 25, 25] },
+    },
+    HP_RED_BOLD: {
+      pattern: { type: 'houndstooth', tileSize: 20, background: [240, 230, 225], foreground: [160, 25, 25] },
+    },
+    HP_NAVY_FINE: {
+      pattern: { type: 'houndstooth', tileSize: 6, background: [230, 232, 240], foreground: [18, 22, 65] },
+    },
+    HP_NAVY_MED: {
+      pattern: { type: 'houndstooth', tileSize: 12, background: [230, 232, 240], foreground: [18, 22, 65] },
+    },
+    HP_NAVY_BOLD: {
+      pattern: { type: 'houndstooth', tileSize: 20, background: [230, 232, 240], foreground: [18, 22, 65] },
+    },
+    HP_GREY_FINE: {
+      pattern: { type: 'houndstooth', tileSize: 6, background: [230, 230, 230], foreground: [80, 80, 85] },
+    },
+    HP_GREY_MED: {
+      pattern: { type: 'houndstooth', tileSize: 12, background: [230, 230, 230], foreground: [80, 80, 85] },
+    },
+    HP_GREY_BOLD: {
+      pattern: { type: 'houndstooth', tileSize: 20, background: [230, 230, 230], foreground: [80, 80, 85] },
+    },
+  },
+};

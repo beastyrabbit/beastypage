@@ -3,11 +3,28 @@
  *
  * All experimental colors are applied on WHITE base sprites using multiply/screen blend modes.
  * The baseColour is always WHITE so it's not stored in individual definitions.
+ * Colors with a `pattern` field use per-pixel pattern tiles instead of flat multiply.
  */
 
+export interface PatternStripe {
+  color: [number, number, number];
+  width: number;
+  offset: number;
+}
+
+export interface PatternDefinition {
+  type: 'tartan' | 'gingham' | 'houndstooth' | 'pinstripe' | 'chevron' | 'polkadot' | 'argyle' | 'buffalo' | 'checkerboard' | 'windowpane' | 'diagonal' | 'basketweave' | 'flag';
+  tileSize: number;
+  background: [number, number, number];
+  foreground?: [number, number, number];
+  stripes?: PatternStripe[];
+  spacing?: number;
+}
+
 export interface PaletteColorDef {
-  multiply: [number, number, number];
+  multiply?: [number, number, number];
   screen?: [number, number, number, number];
+  pattern?: PatternDefinition;
 }
 
 /**
@@ -15,8 +32,9 @@ export interface PaletteColorDef {
  */
 export interface FullPaletteColorDef {
   baseColour: 'WHITE';
-  multiply: [number, number, number];
+  multiply?: [number, number, number];
   screen?: [number, number, number, number];
+  pattern?: PatternDefinition;
 }
 
 export type PaletteId =
@@ -54,7 +72,31 @@ export type PaletteId =
   | 'coral-reef'
   | 'tropical-lagoon'
   | 'midnight-wine'
-  | 'peach-sorbet';
+  | 'peach-sorbet'
+  | 'greyscale'
+  | 'cold-steel'
+  | 'ink-wash'
+  // Textile-inspired palettes
+  | 'royal-stewart'
+  | 'black-watch'
+  | 'country-tweed'
+  | 'savile-row'
+  | 'bavarian-tracht'
+  | 'oktoberfest'
+  // Pattern palettes
+  | 'tartan-patterns'
+  | 'gingham-patterns'
+  | 'houndstooth-patterns'
+  | 'pinstripe-patterns'
+  | 'chevron-patterns'
+  | 'polkadot-patterns'
+  | 'argyle-patterns'
+  | 'buffalo-patterns'
+  | 'checkerboard-patterns'
+  | 'windowpane-patterns'
+  | 'diagonal-patterns'
+  | 'basketweave-patterns'
+  | 'flag-patterns';
 
 /**
  * PaletteMode is 'off' (classic/original colours) or a specific palette ID

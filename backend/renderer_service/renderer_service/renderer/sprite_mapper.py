@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 from .repository import SpriteRepository
+
+logger = logging.getLogger("renderer.sprite_mapper")
 
 
 class MissingAccessorySprite(RuntimeError):
@@ -18,6 +21,7 @@ class ExperimentalColourDefinition:
     multiply: Optional[List[float]] = None
     screen: Optional[List[float]] = None
     overlay: Optional[List[float]] = None
+    pattern: Optional[dict] = None
 
 
 def _dedupe(seq: Iterable[str]) -> List[str]:
@@ -195,12 +199,19 @@ class SpriteMapper:
                         multiply=color_def.get("multiply"),
                         screen=color_def.get("screen"),
                         overlay=color_def.get("overlay"),
+                        pattern=color_def.get("pattern"),
                     )
 
                 self.experimental_categories[palette_id] = category_colors
 
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Warning: Failed to load palette {palette_file}: {e}")
+            except (
+                json.JSONDecodeError,
+                IOError,
+                KeyError,
+                TypeError,
+                ValueError,
+            ) as e:
+                logger.error("Failed to load palette %s: %s", palette_file, e)
 
         return result
 

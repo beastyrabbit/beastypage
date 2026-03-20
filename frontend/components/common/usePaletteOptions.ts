@@ -19,7 +19,7 @@ export function usePaletteOptions(): PaletteOption[] {
       // Get first 4 colors for preview
       const previewColors = colorEntries
         .slice(0, 4)
-        .map(([, def]) => def.multiply);
+        .map(([, def]) => def.multiply ?? def.pattern?.background ?? ([128, 128, 128] as [number, number, number]));
 
       return {
         id: palette.id,

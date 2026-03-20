@@ -1,0 +1,27 @@
+{
+  "id": "oktoberfest",
+  "label": "Oktoberfest",
+  "description": "German festive — golden Masskrug amber, pretzel brown, Festzelt greens and Radler sunshine",
+  "colors": {
+    "OK_DUNKELWEIZEN": { "multiply": [42, 25, 10] },
+    "OK_DOPPELBOCK": { "multiply": [68, 35, 12] },
+    "OK_MARZEN": { "multiply": [95, 52, 15] },
+    "OK_BERNSTEIN": { "multiply": [148, 88, 22] },
+    "OK_GOLDENBIER": { "multiply": [195, 148, 35] },
+    "OK_RADLERGOLD": { "multiply": [225, 188, 55] },
+    "OK_BREZEL": { "multiply": [155, 105, 52] },
+    "OK_KRUSTE": { "multiply": [182, 132, 72] },
+    "OK_SENFGELB": { "multiply": [210, 178, 42] },
+    "OK_HENDLBRAUN": { "multiply": [128, 82, 38] },
+    "OK_FESTZELTGRUEN": { "multiply": [28, 82, 35] },
+    "OK_HOPFENGRUEN": { "multiply": [45, 112, 48] },
+    "OK_WIESENGRUEN": { "multiply": [65, 142, 62] },
+    "OK_RAUTENBLAU": { "multiply": [32, 78, 162] },
+    "OK_WEISSWURST": { "multiply": [232, 225, 210] },
+    "OK_MASSKRUG": { "multiply": [218, 208, 185] },
+    "OK_LEBKUCHEN": { "multiply": [108, 62, 28] },
+    "OK_ZIMT": { "multiply": [158, 95, 42] },
+    "OK_KARUSELLROT": { "multiply": [195, 35, 38] },
+    "OK_HERZROT": { "multiply": [218, 48, 52] }
+  }
+}

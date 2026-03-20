@@ -1,0 +1,22 @@
+{
+  "id": "buffalo-patterns",
+  "label": "Buffalo Check Patterns",
+  "description": "Bold two-color lumber checks at 3 scales — fine, medium, and bold",
+  "colors": {
+    "BF_REDBLACK_FINE":  { "pattern": { "type": "buffalo", "tileSize": 6,  "background": [190, 25, 25],  "foreground": [15, 15, 15] } },
+    "BF_REDBLACK_MED":   { "pattern": { "type": "buffalo", "tileSize": 12, "background": [190, 25, 25],  "foreground": [15, 15, 15] } },
+    "BF_REDBLACK_BOLD":  { "pattern": { "type": "buffalo", "tileSize": 20, "background": [190, 25, 25],  "foreground": [15, 15, 15] } },
+    "BF_WHITEBLACK_FINE":{ "pattern": { "type": "buffalo", "tileSize": 6,  "background": [240, 240, 240], "foreground": [15, 15, 15] } },
+    "BF_WHITEBLACK_MED": { "pattern": { "type": "buffalo", "tileSize": 12, "background": [240, 240, 240], "foreground": [15, 15, 15] } },
+    "BF_WHITEBLACK_BOLD":{ "pattern": { "type": "buffalo", "tileSize": 20, "background": [240, 240, 240], "foreground": [15, 15, 15] } },
+    "BF_GREENBLACK_FINE":{ "pattern": { "type": "buffalo", "tileSize": 6,  "background": [30, 100, 40],  "foreground": [12, 12, 14] } },
+    "BF_GREENBLACK_MED": { "pattern": { "type": "buffalo", "tileSize": 12, "background": [30, 100, 40],  "foreground": [12, 12, 14] } },
+    "BF_GREENBLACK_BOLD":{ "pattern": { "type": "buffalo", "tileSize": 20, "background": [30, 100, 40],  "foreground": [12, 12, 14] } },
+    "BF_BLUEBLACK_FINE": { "pattern": { "type": "buffalo", "tileSize": 6,  "background": [30, 55, 150],  "foreground": [12, 12, 14] } },
+    "BF_BLUEBLACK_MED":  { "pattern": { "type": "buffalo", "tileSize": 12, "background": [30, 55, 150],  "foreground": [12, 12, 14] } },
+    "BF_BLUEBLACK_BOLD": { "pattern": { "type": "buffalo", "tileSize": 20, "background": [30, 55, 150],  "foreground": [12, 12, 14] } },
+    "BF_ORANGE_FINE":    { "pattern": { "type": "buffalo", "tileSize": 6,  "background": [220, 120, 20], "foreground": [15, 15, 15] } },
+    "BF_ORANGE_MED":     { "pattern": { "type": "buffalo", "tileSize": 12, "background": [220, 120, 20], "foreground": [15, 15, 15] } },
+    "BF_ORANGE_BOLD":    { "pattern": { "type": "buffalo", "tileSize": 20, "background": [220, 120, 20], "foreground": [15, 15, 15] } }
+  }
+}

@@ -1,0 +1,110 @@
+import type { PaletteCategory } from '../types';
+
+export const flagPatternsPalette: PaletteCategory = {
+  id: 'flag-patterns',
+  label: 'Flag Patterns',
+  description:
+    'National and pride flag stripes rendered as repeating horizontal bands',
+  colors: {
+    FL_FRANCE: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 35, 149], stripes: [
+          { color: [0, 35, 149], width: 1, offset: 0 },
+          { color: [240, 240, 240], width: 1, offset: 0 },
+          { color: [237, 41, 57], width: 1, offset: 0 },
+        ] },
+    },
+    FL_GERMANY: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 0, 0], stripes: [
+          { color: [0, 0, 0], width: 1, offset: 0 },
+          { color: [221, 0, 0], width: 1, offset: 0 },
+          { color: [255, 206, 0], width: 1, offset: 0 },
+        ] },
+    },
+    FL_USA: {
+      pattern: { type: 'flag', tileSize: 50, background: [191, 10, 48], stripes: [
+          { color: [191, 10, 48], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [191, 10, 48], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [191, 10, 48], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 40, 104], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [191, 10, 48], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [191, 10, 48], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [191, 10, 48], width: 1, offset: 0 },
+        ] },
+    },
+    FL_UKRAINE: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 87, 183], stripes: [
+          { color: [0, 87, 183], width: 1, offset: 0 },
+          { color: [255, 215, 0], width: 1, offset: 0 },
+        ] },
+    },
+    FL_JAPAN: {
+      pattern: { type: 'polkadot', tileSize: 50, background: [240, 240, 240], foreground: [188, 0, 45] },
+    },
+    FL_PRIDE: {
+      pattern: { type: 'flag', tileSize: 50, background: [228, 3, 3], stripes: [
+          { color: [228, 3, 3], width: 1, offset: 0 },
+          { color: [255, 140, 0], width: 1, offset: 0 },
+          { color: [255, 237, 0], width: 1, offset: 0 },
+          { color: [0, 128, 38], width: 1, offset: 0 },
+          { color: [36, 64, 142], width: 1, offset: 0 },
+          { color: [115, 41, 130], width: 1, offset: 0 },
+        ] },
+    },
+    FL_TRANS: {
+      pattern: { type: 'flag', tileSize: 50, background: [91, 206, 250], stripes: [
+          { color: [91, 206, 250], width: 1, offset: 0 },
+          { color: [245, 169, 184], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [245, 169, 184], width: 1, offset: 0 },
+          { color: [91, 206, 250], width: 1, offset: 0 },
+        ] },
+    },
+    FL_BI: {
+      pattern: { type: 'flag', tileSize: 50, background: [214, 2, 112], stripes: [
+          { color: [214, 2, 112], width: 2, offset: 0 },
+          { color: [155, 79, 150], width: 1, offset: 0 },
+          { color: [0, 56, 168], width: 2, offset: 0 },
+        ] },
+    },
+    FL_NONBINARY: {
+      pattern: { type: 'flag', tileSize: 50, background: [252, 244, 52], stripes: [
+          { color: [252, 244, 52], width: 1, offset: 0 },
+          { color: [252, 252, 252], width: 1, offset: 0 },
+          { color: [156, 89, 209], width: 1, offset: 0 },
+          { color: [44, 44, 44], width: 1, offset: 0 },
+        ] },
+    },
+    FL_LESBIAN: {
+      pattern: { type: 'flag', tileSize: 50, background: [213, 45, 0], stripes: [
+          { color: [213, 45, 0], width: 1, offset: 0 },
+          { color: [239, 118, 39], width: 1, offset: 0 },
+          { color: [255, 154, 86], width: 1, offset: 0 },
+          { color: [255, 255, 255], width: 1, offset: 0 },
+          { color: [209, 98, 164], width: 1, offset: 0 },
+          { color: [181, 86, 144], width: 1, offset: 0 },
+          { color: [163, 2, 98], width: 1, offset: 0 },
+        ] },
+    },
+    FL_ASEXUAL: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 0, 0], stripes: [
+          { color: [0, 0, 0], width: 1, offset: 0 },
+          { color: [163, 163, 163], width: 1, offset: 0 },
+          { color: [255, 255, 255], width: 1, offset: 0 },
+          { color: [128, 0, 128], width: 1, offset: 0 },
+        ] },
+    },
+    FL_PAN: {
+      pattern: { type: 'flag', tileSize: 50, background: [255, 33, 140], stripes: [
+          { color: [255, 33, 140], width: 1, offset: 0 },
+          { color: [255, 216, 0], width: 1, offset: 0 },
+          { color: [33, 177, 255], width: 1, offset: 0 },
+        ] },
+    },
+  },
+};
