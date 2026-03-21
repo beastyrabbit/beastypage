@@ -556,18 +556,16 @@ function kikkoCss(p: PatternDefinition): CSSPatternStyle {
 }
 
 function sayagataCss(p: PatternDefinition): CSSPatternStyle {
-  const ts = p.tileSize;
-  const fg = rgb(p.foreground ?? [255, 255, 255]);
-  const sw = Math.max(0.8, ts / 10);
-  const u = ts / 4;
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${ts}" height="${ts}">` +
-    `<rect width="${ts}" height="${ts}" fill="${rgb(p.background)}"/>` +
-    `<line x1="${u}" y1="0" x2="${u}" y2="${2 * u}" stroke="${fg}" stroke-width="${sw}"/>` +
-    `<line x1="${u}" y1="${2 * u}" x2="${3 * u}" y2="${2 * u}" stroke="${fg}" stroke-width="${sw}"/>` +
-    `<line x1="${3 * u}" y1="${2 * u}" x2="${3 * u}" y2="${ts}" stroke="${fg}" stroke-width="${sw}"/>` +
-    `</svg>`;
-  return { background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, backgroundSize: `${ts}px ${ts}px` };
+  const fgStr = rgb(p.foreground ?? [255, 255, 255]);
+  const bgStr = rgb(p.background);
+  // Hero Patterns 'aztec' (MIT license) — matches backend
+  return {
+    background: buildSvgUrl('0 0 32 64',
+      `<rect width="32" height="64" fill="${bgStr}"/>`,
+      `<path d="M0 28h20V16h-4v8H4V4h28v28h-4V8H8v12h4v-8h12v20H0v-4zm12 8h20v4H16v24H0v-4h12V36zm16 12h-4v12h8v4H20V44h12v12h-4v-8zM0 36h8v20H0v-4h4V40H0v-4z" fill="${fgStr}" fill-rule="evenodd"/>`,
+    ),
+    backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
+  };
 }
 
 function chineseLatticeCss(p: PatternDefinition): CSSPatternStyle {
@@ -675,10 +673,10 @@ function kolamCss(p: PatternDefinition): CSSPatternStyle {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${ts}" height="${ts}">` +
     `<rect width="${ts}" height="${ts}" fill="${rgb(p.background)}"/>` +
-    `<path d="M 0,${h} A ${q},${q} 0 0 1 ${q},0" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
-    `<path d="M ${h},0 A ${q},${q} 0 0 1 ${ts},${h}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
-    `<path d="M ${ts},${h} A ${q},${q} 0 0 1 ${h},${ts}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
-    `<path d="M ${h},${ts} A ${q},${q} 0 0 1 0,${h}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
+    `<path d="M 0,${h} A ${h},${h} 0 0 1 ${h},0" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
+    `<path d="M ${h},0 A ${h},${h} 0 0 1 ${ts},${h}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
+    `<path d="M ${ts},${h} A ${h},${h} 0 0 1 ${h},${ts}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
+    `<path d="M ${h},${ts} A ${h},${h} 0 0 1 0,${h}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
     `<circle cx="${h}" cy="${h}" r="${ts * 0.06}" fill="${fgStr}"/>` +
     `</svg>`;
   return { background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, backgroundSize: `${ts}px ${ts}px` };

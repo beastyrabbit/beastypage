@@ -82,7 +82,10 @@ function inferGroup(id: PaletteId): PaletteGroup {
   if (ORNATE_IDS.has(id)) return 'ornate';
   if (HERITAGE_IDS.has(id)) return 'heritage';
   if (FLAG_IDS.has(id)) return 'flags';
-  return 'solid'; // fallback
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(`[palettes] palette "${id}" has no group assignment — defaulting to 'solid'`);
+  }
+  return 'solid';
 }
 
 /**
