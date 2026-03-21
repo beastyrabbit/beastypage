@@ -682,6 +682,10 @@ function kolamCss(p: PatternDefinition): CSSPatternStyle {
     `<path d="M ${ts},${h} A ${h},${h} 0 0 1 ${h},${ts}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
     `<path d="M ${h},${ts} A ${h},${h} 0 0 1 0,${h}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
     `<circle cx="${h}" cy="${h}" r="${ts * 0.06}" fill="${fgStr}"/>` +
+    `<circle cx="0" cy="0" r="${ts * 0.08}" fill="${fgStr}"/>` +
+    `<circle cx="${ts}" cy="0" r="${ts * 0.08}" fill="${fgStr}"/>` +
+    `<circle cx="0" cy="${ts}" r="${ts * 0.08}" fill="${fgStr}"/>` +
+    `<circle cx="${ts}" cy="${ts}" r="${ts * 0.08}" fill="${fgStr}"/>` +
     `</svg>`;
   return { background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, backgroundSize: `${ts}px ${ts}px` };
 }

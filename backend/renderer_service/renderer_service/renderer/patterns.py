@@ -159,11 +159,15 @@ def _svg_to_array(svg_str: str, width: int, height: int) -> np.ndarray:
     import cairosvg
     from PIL import Image
 
-    png = cairosvg.svg2png(
-        bytestring=svg_str.encode("utf-8"),
-        output_width=width,
-        output_height=height,
-    )
+    try:
+        png = cairosvg.svg2png(
+            bytestring=svg_str.encode("utf-8"),
+            output_width=width,
+            output_height=height,
+        )
+    except Exception:
+        logger.exception("cairosvg rasterisation failed; returning grey tile")
+        return np.full((height, width, 3), 0.5, dtype=np.float32)
     img = Image.open(io.BytesIO(png)).convert("RGB")
     return np.asarray(img, dtype=np.float32) / 255.0
 
