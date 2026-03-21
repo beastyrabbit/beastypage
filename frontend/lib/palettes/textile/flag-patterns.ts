@@ -6,6 +6,20 @@ export const flagPatternsPalette: PaletteCategory = {
   description:
     'National and pride flag stripes rendered as repeating horizontal bands',
   colors: {
+    // ── Europe ──────────────────────────────────────────────
+
+    // England — St George's Cross (red/white/red bands)
+    FL_ENGLAND: {
+      pattern: { type: 'flag', tileSize: 50, background: [255, 255, 255], stripes: [
+          { color: [255, 255, 255], width: 2, offset: 0 },
+          { color: [206, 17, 38], width: 1, offset: 0 },
+          { color: [255, 255, 255], width: 2, offset: 0 },
+        ] },
+    },
+    // United Kingdom — Union Jack
+    FL_UK: {
+      pattern: { type: 'flag_uk', tileSize: 50, background: [1, 33, 105] },
+    },
     FL_FRANCE: {
       pattern: { type: 'flag', tileSize: 50, background: [0, 35, 149], stripes: [
           { color: [0, 35, 149], width: 1, offset: 0 },
@@ -20,6 +34,280 @@ export const flagPatternsPalette: PaletteCategory = {
           { color: [255, 206, 0], width: 1, offset: 0 },
         ] },
     },
+    FL_ITALY: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 146, 70], stripes: [
+          { color: [0, 146, 70], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [206, 43, 55], width: 1, offset: 0 },
+        ] },
+    },
+    FL_IRELAND: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 155, 72], stripes: [
+          { color: [0, 155, 72], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [255, 136, 62], width: 1, offset: 0 },
+        ] },
+    },
+    FL_SPAIN: {
+      pattern: { type: 'flag', tileSize: 50, background: [198, 11, 30], stripes: [
+          { color: [198, 11, 30], width: 1, offset: 0 },
+          { color: [255, 196, 0], width: 2, offset: 0 },
+          { color: [198, 11, 30], width: 1, offset: 0 },
+        ] },
+    },
+    FL_PORTUGAL: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 102, 0], stripes: [
+          { color: [0, 102, 0], width: 2, offset: 0 },
+          { color: [255, 0, 0], width: 3, offset: 0 },
+        ] },
+    },
+    FL_NETHERLANDS: {
+      pattern: { type: 'flag', tileSize: 50, background: [174, 28, 40], stripes: [
+          { color: [174, 28, 40], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [33, 70, 139], width: 1, offset: 0 },
+        ] },
+    },
+    FL_BELGIUM: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 0, 0], stripes: [
+          { color: [0, 0, 0], width: 1, offset: 0 },
+          { color: [255, 215, 0], width: 1, offset: 0 },
+          { color: [239, 51, 64], width: 1, offset: 0 },
+        ] },
+    },
+    FL_LUXEMBOURG: {
+      pattern: { type: 'flag', tileSize: 50, background: [237, 41, 57], stripes: [
+          { color: [237, 41, 57], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 161, 222], width: 1, offset: 0 },
+        ] },
+    },
+    FL_AUSTRIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [237, 41, 57], stripes: [
+          { color: [237, 41, 57], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [237, 41, 57], width: 1, offset: 0 },
+        ] },
+    },
+    FL_HUNGARY: {
+      pattern: { type: 'flag', tileSize: 50, background: [206, 41, 57], stripes: [
+          { color: [206, 41, 57], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [67, 111, 77], width: 1, offset: 0 },
+        ] },
+    },
+    FL_POLAND: {
+      pattern: { type: 'flag', tileSize: 50, background: [245, 245, 245], stripes: [
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [220, 20, 60], width: 1, offset: 0 },
+        ] },
+    },
+    FL_ROMANIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 43, 127], stripes: [
+          { color: [0, 43, 127], width: 1, offset: 0 },
+          { color: [252, 209, 22], width: 1, offset: 0 },
+          { color: [206, 17, 38], width: 1, offset: 0 },
+        ] },
+    },
+    FL_BULGARIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [245, 245, 245], stripes: [
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 150, 110], width: 1, offset: 0 },
+          { color: [214, 38, 18], width: 1, offset: 0 },
+        ] },
+    },
+    FL_GREECE: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 87, 183], stripes: [
+          { color: [0, 87, 183], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 87, 183], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 87, 183], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 87, 183], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 87, 183], width: 1, offset: 0 },
+        ] },
+    },
+    FL_UKRAINE: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 87, 183], stripes: [
+          { color: [0, 87, 183], width: 1, offset: 0 },
+          { color: [255, 215, 0], width: 1, offset: 0 },
+        ] },
+    },
+    FL_RUSSIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [245, 245, 245], stripes: [
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 57, 166], width: 1, offset: 0 },
+          { color: [213, 43, 30], width: 1, offset: 0 },
+        ] },
+    },
+    FL_CZECH: {
+      pattern: { type: 'flag', tileSize: 50, background: [245, 245, 245], stripes: [
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [17, 69, 126], width: 1, offset: 0 },
+          { color: [215, 20, 26], width: 1, offset: 0 },
+        ] },
+    },
+    FL_LITHUANIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [253, 185, 19], stripes: [
+          { color: [253, 185, 19], width: 1, offset: 0 },
+          { color: [0, 106, 68], width: 1, offset: 0 },
+          { color: [193, 39, 45], width: 1, offset: 0 },
+        ] },
+    },
+    FL_LATVIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [155, 36, 35], stripes: [
+          { color: [155, 36, 35], width: 2, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [155, 36, 35], width: 2, offset: 0 },
+        ] },
+    },
+    FL_ESTONIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 114, 206], stripes: [
+          { color: [0, 114, 206], width: 1, offset: 0 },
+          { color: [0, 0, 0], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+        ] },
+    },
+    FL_CROATIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [255, 0, 0], stripes: [
+          { color: [255, 0, 0], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 55, 145], width: 1, offset: 0 },
+        ] },
+    },
+    // Switzerland — red with white cross
+    FL_SWITZERLAND: {
+      pattern: { type: 'flag_switzerland', tileSize: 50, background: [255, 0, 0] },
+    },
+    // Turkey — red with white crescent and star
+    FL_TURKEY: {
+      pattern: { type: 'flag_turkey', tileSize: 50, background: [227, 10, 23] },
+    },
+    // Israel — white with blue stripes and Star of David
+    FL_ISRAEL: {
+      pattern: { type: 'flag_israel', tileSize: 50, background: [0, 56, 184] },
+    },
+
+    // ── Scandinavia (cross flags approximated as stripe bands) ──
+
+    // Denmark — Dannebrog: red with white cross band
+    FL_DENMARK: {
+      pattern: { type: 'flag', tileSize: 50, background: [198, 12, 48], stripes: [
+          { color: [198, 12, 48], width: 3, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [198, 12, 48], width: 4, offset: 0 },
+        ] },
+    },
+    // Sweden — blue with gold cross band
+    FL_SWEDEN: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 106, 167], stripes: [
+          { color: [0, 106, 167], width: 2, offset: 0 },
+          { color: [254, 204, 2], width: 1, offset: 0 },
+          { color: [0, 106, 167], width: 2, offset: 0 },
+        ] },
+    },
+    // Norway — red with blue/white cross
+    FL_NORWAY: {
+      pattern: { type: 'flag', tileSize: 50, background: [186, 12, 47], stripes: [
+          { color: [186, 12, 47], width: 3, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 32, 91], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [186, 12, 47], width: 4, offset: 0 },
+        ] },
+    },
+    // Finland — white with blue cross band
+    FL_FINLAND: {
+      pattern: { type: 'flag', tileSize: 50, background: [245, 245, 245], stripes: [
+          { color: [245, 245, 245], width: 2, offset: 0 },
+          { color: [0, 47, 108], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 2, offset: 0 },
+        ] },
+    },
+    // Iceland — blue with red/white cross
+    FL_ICELAND: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 56, 151], stripes: [
+          { color: [0, 56, 151], width: 3, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [215, 40, 40], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 56, 151], width: 4, offset: 0 },
+        ] },
+    },
+
+    // ── Additional Europe ──────────────────────────────────
+    // Scotland — St Andrew's Saltire
+    FL_SCOTLAND: {
+      pattern: { type: 'flag_scotland', tileSize: 50, background: [0, 101, 189] },
+    },
+
+    // ── Americas ────────────────────────────────────────────
+    // Mexico — green/white/red (coat of arms too complex for 50px)
+    FL_MEXICO: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 104, 71], stripes: [
+          { color: [0, 104, 71], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [206, 17, 38], width: 1, offset: 0 },
+        ] },
+    },
+    // Jamaica — diagonal gold cross
+    FL_JAMAICA: {
+      pattern: { type: 'flag_jamaica', tileSize: 50, background: [0, 153, 0] },
+    },
+    // Argentina — blue/white/blue
+    FL_ARGENTINA: {
+      pattern: { type: 'flag', tileSize: 50, background: [116, 172, 223], stripes: [
+          { color: [116, 172, 223], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [116, 172, 223], width: 1, offset: 0 },
+        ] },
+    },
+    // Colombia — yellow/blue/red
+    FL_COLOMBIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [252, 209, 22], stripes: [
+          { color: [252, 209, 22], width: 2, offset: 0 },
+          { color: [0, 56, 147], width: 1, offset: 0 },
+          { color: [206, 17, 38], width: 1, offset: 0 },
+        ] },
+    },
+    // Chile — white/red with blue canton
+    FL_CHILE: {
+      pattern: { type: 'flag', tileSize: 50, background: [245, 245, 245], stripes: [
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [213, 0, 0], width: 1, offset: 0 },
+        ] },
+    },
+    // Cuba — blue/white stripes
+    FL_CUBA: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 42, 113], stripes: [
+          { color: [0, 42, 113], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 42, 113], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 42, 113], width: 1, offset: 0 },
+        ] },
+    },
+    // Peru — red/white/red
+    FL_PERU: {
+      pattern: { type: 'flag', tileSize: 50, background: [216, 7, 1], stripes: [
+          { color: [216, 7, 1], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [216, 7, 1], width: 1, offset: 0 },
+        ] },
+    },
+    // Brazil — green/yellow (diamond + globe too complex, stripe approx)
+    FL_BRAZIL: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 156, 59], stripes: [
+          { color: [0, 156, 59], width: 2, offset: 0 },
+          { color: [255, 223, 0], width: 2, offset: 0 },
+          { color: [0, 39, 118], width: 1, offset: 0 },
+          { color: [255, 223, 0], width: 2, offset: 0 },
+          { color: [0, 156, 59], width: 2, offset: 0 },
+        ] },
+    },
+
     FL_USA: {
       pattern: { type: 'flag', tileSize: 50, background: [191, 10, 48], stripes: [
           { color: [191, 10, 48], width: 1, offset: 0 },
@@ -37,15 +325,195 @@ export const flagPatternsPalette: PaletteCategory = {
           { color: [191, 10, 48], width: 1, offset: 0 },
         ] },
     },
-    FL_UKRAINE: {
-      pattern: { type: 'flag', tileSize: 50, background: [0, 87, 183], stripes: [
-          { color: [0, 87, 183], width: 1, offset: 0 },
-          { color: [255, 215, 0], width: 1, offset: 0 },
-        ] },
+    // Canada — red/white/red with maple leaf
+    FL_CANADA: {
+      pattern: { type: 'flag_canada', tileSize: 50, background: [255, 0, 0] },
     },
+
+    // ── Asia ────────────────────────────────────────────────
+
+    // Japan — hinomaru (red circle on white, using polkadot)
     FL_JAPAN: {
       pattern: { type: 'polkadot', tileSize: 50, background: [240, 240, 240], foreground: [188, 0, 45] },
     },
+    FL_THAILAND: {
+      pattern: { type: 'flag', tileSize: 50, background: [165, 25, 49], stripes: [
+          { color: [165, 25, 49], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [45, 25, 100], width: 2, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [165, 25, 49], width: 1, offset: 0 },
+        ] },
+    },
+    FL_INDONESIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [206, 17, 38], stripes: [
+          { color: [206, 17, 38], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+        ] },
+    },
+    FL_INDIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [255, 153, 51], stripes: [
+          { color: [255, 153, 51], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [19, 136, 8], width: 1, offset: 0 },
+        ] },
+    },
+    // Bangladesh — green with red circle (polkadot)
+    FL_BANGLADESH: {
+      pattern: { type: 'polkadot', tileSize: 50, background: [0, 106, 78], foreground: [244, 42, 65] },
+    },
+    // China — five yellow stars on red
+    FL_CHINA: {
+      pattern: { type: 'flag_china', tileSize: 50, background: [238, 28, 37] },
+    },
+    // Vietnam — yellow star on red
+    FL_VIETNAM: {
+      pattern: { type: 'flag', tileSize: 50, background: [218, 37, 29], stripes: [
+          { color: [218, 37, 29], width: 1, offset: 0 },
+        ] },
+    },
+    // Pakistan — green with white band
+    FL_PAKISTAN: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 64, 26], stripes: [
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 64, 26], width: 3, offset: 0 },
+        ] },
+    },
+    // Philippines — blue/red with white triangle
+    FL_PHILIPPINES: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 56, 168], stripes: [
+          { color: [0, 56, 168], width: 1, offset: 0 },
+          { color: [206, 17, 38], width: 1, offset: 0 },
+        ] },
+    },
+    // Malaysia — red/white stripes with blue canton
+    FL_MALAYSIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [204, 0, 0], stripes: [
+          { color: [204, 0, 0], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [204, 0, 0], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [204, 0, 0], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 0, 102], width: 2, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [204, 0, 0], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [204, 0, 0], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [204, 0, 0], width: 1, offset: 0 },
+        ] },
+    },
+    // South Korea — approximated as blue/white/red bands
+    FL_SOUTH_KOREA: {
+      pattern: { type: 'flag', tileSize: 50, background: [245, 245, 245], stripes: [
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 52, 120], width: 1, offset: 0 },
+          { color: [205, 46, 58], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+        ] },
+    },
+
+    // ── Oceania ─────────────────────────────────────────────
+    // Australia — Union Jack + Southern Cross
+    FL_AUSTRALIA: {
+      pattern: { type: 'flag_australia', tileSize: 50, background: [0, 0, 139] },
+    },
+    // New Zealand — blue/red/white (simplified)
+    FL_NEW_ZEALAND: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 36, 125], stripes: [
+          { color: [0, 36, 125], width: 1, offset: 0 },
+        ] },
+    },
+
+    // ── Africa / Middle East ─────────────────────────────────
+    // Morocco — red with green star (stripe approx)
+    FL_MOROCCO: {
+      pattern: { type: 'flag', tileSize: 50, background: [193, 39, 45], stripes: [
+          { color: [193, 39, 45], width: 1, offset: 0 },
+        ] },
+    },
+    // Egypt — red/white/black
+    FL_EGYPT: {
+      pattern: { type: 'flag', tileSize: 50, background: [206, 17, 38], stripes: [
+          { color: [206, 17, 38], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 0, 0], width: 1, offset: 0 },
+        ] },
+    },
+    // UAE — green/white/black with red bar
+    FL_UAE: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 112, 60], stripes: [
+          { color: [0, 112, 60], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 0, 0], width: 1, offset: 0 },
+        ] },
+    },
+    // Iran — green/white/red
+    FL_IRAN: {
+      pattern: { type: 'flag', tileSize: 50, background: [35, 159, 64], stripes: [
+          { color: [35, 159, 64], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [218, 0, 0], width: 1, offset: 0 },
+        ] },
+    },
+    // Saudi Arabia — green (simplified, no text/sword at 50px)
+    FL_SAUDI: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 100, 0], stripes: [
+          { color: [0, 100, 0], width: 1, offset: 0 },
+        ] },
+    },
+
+    FL_NIGERIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 135, 68], stripes: [
+          { color: [0, 135, 68], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 135, 68], width: 1, offset: 0 },
+        ] },
+    },
+    FL_GHANA: {
+      pattern: { type: 'flag', tileSize: 50, background: [206, 17, 38], stripes: [
+          { color: [206, 17, 38], width: 1, offset: 0 },
+          { color: [252, 209, 22], width: 1, offset: 0 },
+          { color: [0, 107, 63], width: 1, offset: 0 },
+        ] },
+    },
+    FL_ETHIOPIA: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 155, 58], stripes: [
+          { color: [0, 155, 58], width: 1, offset: 0 },
+          { color: [252, 209, 22], width: 1, offset: 0 },
+          { color: [218, 18, 26], width: 1, offset: 0 },
+        ] },
+    },
+    FL_IVORY_COAST: {
+      pattern: { type: 'flag', tileSize: 50, background: [245, 131, 24], stripes: [
+          { color: [245, 131, 24], width: 1, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 155, 72], width: 1, offset: 0 },
+        ] },
+    },
+    FL_KENYA: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 0, 0], stripes: [
+          { color: [0, 0, 0], width: 3, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [187, 0, 0], width: 3, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 98, 51], width: 3, offset: 0 },
+        ] },
+    },
+    FL_SOUTH_AFRICA: {
+      pattern: { type: 'flag', tileSize: 50, background: [0, 0, 0], stripes: [
+          { color: [228, 28, 44], width: 2, offset: 0 },
+          { color: [245, 245, 245], width: 1, offset: 0 },
+          { color: [0, 119, 73], width: 2, offset: 0 },
+          { color: [255, 184, 28], width: 1, offset: 0 },
+          { color: [0, 0, 0], width: 2, offset: 0 },
+          { color: [0, 20, 137], width: 2, offset: 0 },
+        ] },
+    },
+
+    // ── Pride flags ─────────────────────────────────────────
+
     FL_PRIDE: {
       pattern: { type: 'flag', tileSize: 50, background: [228, 3, 3], stripes: [
           { color: [228, 3, 3], width: 1, offset: 0 },

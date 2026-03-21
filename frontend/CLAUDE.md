@@ -47,7 +47,7 @@ frontend/
 ```bash
 # Use Bun for all package management
 bun install              # Install dependencies
-bun run dev              # Start dev server (port 3100)
+bun run dev              # Start dev server (port via portless)
 bun run build            # Production build
 bun run lint             # ESLint check
 bun run typecheck        # TypeScript check
@@ -114,7 +114,7 @@ bun test --watch         # Watch mode
 
 ## Ports
 
-Dev server runs on port 3100, renderer service on 8001, image processing on 8002 (registered in `/home/beasty/projects/.ports`).
+Ports are managed by portless — check dev server output or `/home/beasty/projects/.ports` for registered defaults.
 
 ## Important Files
 

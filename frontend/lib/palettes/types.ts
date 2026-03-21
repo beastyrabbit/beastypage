@@ -13,7 +13,20 @@ export interface PatternStripe {
 }
 
 export interface PatternDefinition {
-  type: 'tartan' | 'gingham' | 'houndstooth' | 'pinstripe' | 'chevron' | 'polkadot' | 'argyle' | 'buffalo' | 'checkerboard' | 'windowpane' | 'diagonal' | 'basketweave' | 'flag';
+  type:
+    | 'tartan' | 'gingham' | 'houndstooth' | 'pinstripe' | 'chevron'
+    | 'polkadot' | 'argyle' | 'buffalo' | 'checkerboard' | 'windowpane'
+    | 'diagonal' | 'basketweave' | 'flag'
+    // SVG emblem flags
+    | 'flag_canada' | 'flag_switzerland' | 'flag_uk' | 'flag_turkey' | 'flag_israel'
+    | 'flag_scotland' | 'flag_jamaica' | 'flag_china' | 'flag_australia'
+    // Phase 1: World patterns
+    | 'seigaiha' | 'asanoha' | 'shippo' | 'islamic_star' | 'fleur_de_lis'
+    | 'paisley' | 'greek_key' | 'art_deco_fan' | 'uroko' | 'eight_point_star'
+    // Phase 2: East Asian + African + Indian
+    | 'kikko' | 'sayagata' | 'chinese_lattice' | 'chinese_coin' | 'ruyi_cloud'
+    | 'dancheong' | 'batik_kawung' | 'batik_parang' | 'karakusa' | 'kolam'
+    | 'kente' | 'mudcloth' | 'adinkra' | 'shweshwe';
   tileSize: number;
   background: [number, number, number];
   foreground?: [number, number, number];
@@ -30,11 +43,8 @@ export interface PaletteColorDef {
 /**
  * Full color definition with baseColour for spriteMapper compatibility
  */
-export interface FullPaletteColorDef {
+export interface FullPaletteColorDef extends PaletteColorDef {
   baseColour: 'WHITE';
-  multiply?: [number, number, number];
-  screen?: [number, number, number, number];
-  pattern?: PatternDefinition;
 }
 
 export type PaletteId =
@@ -96,17 +106,32 @@ export type PaletteId =
   | 'windowpane-patterns'
   | 'diagonal-patterns'
   | 'basketweave-patterns'
-  | 'flag-patterns';
+  | 'flag-patterns'
+  | 'scottish-clans'
+  | 'japanese-patterns'
+  | 'middle-eastern-rugs'
+  // Phase 1: New cultural palettes
+  | 'european-ornate'
+  | 'art-deco-patterns'
+  | 'indian-patterns'
+  // Phase 2: Cultural palettes
+  | 'chinese-patterns'
+  | 'african-patterns'
+  | 'indonesian-patterns'
+  | 'korean-patterns';
 
 /**
  * PaletteMode is 'off' (classic/original colours) or a specific palette ID
  */
 export type PaletteMode = 'off' | PaletteId;
 
+export type PaletteGroup = 'solid' | 'anime' | 'textile' | 'ornate' | 'heritage' | 'flags';
+
 export interface PaletteCategory {
   id: PaletteId;
   label: string;
   description?: string;
+  group?: PaletteGroup;
   colors: Record<string, PaletteColorDef>;
 }
 
