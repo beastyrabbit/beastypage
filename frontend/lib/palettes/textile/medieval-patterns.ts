@@ -4,7 +4,7 @@ export const medievalPatternsPalette: PaletteCategory = {
   id: 'medieval-patterns',
   label: 'Medieval Patterns',
   description:
-    'Medieval and Gothic motifs — chainmail rings, trefoil stars, Celtic weaves, damask florals, and quatrefoil crosses',
+    'Medieval and Gothic motifs — chainmail rings, four-point stars, Celtic weaves, damask florals, and quatrefoil crosses',
   colors: {
     // Chainmail — silver on dark iron
     MV_CHAINMAIL_FINE: {
@@ -16,7 +16,7 @@ export const medievalPatternsPalette: PaletteCategory = {
     MV_CHAINMAIL_BOLD: {
       pattern: { type: 'chainmail', tileSize: 22, background: [28, 28, 32], foreground: [155, 160, 168] },
     },
-    // Gothic trefoil — gold on royal purple
+    // Four-point star — gold on royal purple
     MV_TREFOIL_FINE: {
       pattern: { type: 'four_point_star_motif', tileSize: 8, background: [52, 18, 72], foreground: [210, 175, 55] },
     },
