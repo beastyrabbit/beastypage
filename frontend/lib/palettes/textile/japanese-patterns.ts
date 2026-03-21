@@ -176,5 +176,35 @@ export const japanesePatternsPalette: PaletteCategory = {
     JP_KARAKUSA_BOLD: {
       pattern: { type: 'karakusa', tileSize: 28, background: [42, 68, 38], foreground: [225, 220, 200] },
     },
+    // Same komon — shark skin tiny dots (grey / charcoal)
+    JP_SAME_FINE: {
+      pattern: { type: 'same_komon', tileSize: 6, background: [42, 42, 48], foreground: [165, 168, 175] },
+    },
+    JP_SAME_MED: {
+      pattern: { type: 'same_komon', tileSize: 12, background: [42, 42, 48], foreground: [165, 168, 175] },
+    },
+    JP_SAME_BOLD: {
+      pattern: { type: 'same_komon', tileSize: 20, background: [42, 42, 48], foreground: [165, 168, 175] },
+    },
+    // Tachiwaki — rising steam wavy lines (plum / gold)
+    JP_TACHIWAKI_FINE: {
+      pattern: { type: 'tachiwaki', tileSize: 10, background: [68, 22, 52], foreground: [215, 185, 105] },
+    },
+    JP_TACHIWAKI_MED: {
+      pattern: { type: 'tachiwaki', tileSize: 18, background: [68, 22, 52], foreground: [215, 185, 105] },
+    },
+    JP_TACHIWAKI_BOLD: {
+      pattern: { type: 'tachiwaki', tileSize: 28, background: [68, 22, 52], foreground: [215, 185, 105] },
+    },
+    // Bishamon kikko — interlocking hexagonal lattice (ivory / indigo)
+    JP_BISHAMON_FINE: {
+      pattern: { type: 'bishamon_kikko', tileSize: 12, background: [22, 28, 62], foreground: [215, 212, 200] },
+    },
+    JP_BISHAMON_MED: {
+      pattern: { type: 'bishamon_kikko', tileSize: 20, background: [22, 28, 62], foreground: [215, 212, 200] },
+    },
+    JP_BISHAMON_BOLD: {
+      pattern: { type: 'bishamon_kikko', tileSize: 32, background: [22, 28, 62], foreground: [215, 212, 200] },
+    },
   },
 };

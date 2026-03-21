@@ -1,0 +1,60 @@
+import type { PaletteCategory } from '../types';
+
+export const americanPatternsPalette: PaletteCategory = {
+  id: 'american-patterns',
+  label: 'American Patterns',
+  description:
+    'American textile traditions — Southwest Native stepped diamonds, herringbone tweed, and military camouflage',
+  colors: {
+    // Native step — turquoise on terracotta (Southwest pottery)
+    US_STEP_TURQ_FINE: {
+      pattern: { type: 'native_step', tileSize: 8, background: [155, 68, 35], foreground: [52, 158, 148] },
+    },
+    US_STEP_TURQ_MED: {
+      pattern: { type: 'native_step', tileSize: 14, background: [155, 68, 35], foreground: [52, 158, 148] },
+    },
+    US_STEP_TURQ_BOLD: {
+      pattern: { type: 'native_step', tileSize: 22, background: [155, 68, 35], foreground: [52, 158, 148] },
+    },
+    // Native step — cream on charcoal (Navajo blanket)
+    US_STEP_NAVAJO_FINE: {
+      pattern: { type: 'native_step', tileSize: 8, background: [42, 38, 35], foreground: [225, 215, 190] },
+    },
+    US_STEP_NAVAJO_MED: {
+      pattern: { type: 'native_step', tileSize: 14, background: [42, 38, 35], foreground: [225, 215, 190] },
+    },
+    US_STEP_NAVAJO_BOLD: {
+      pattern: { type: 'native_step', tileSize: 22, background: [42, 38, 35], foreground: [225, 215, 190] },
+    },
+    // Herringbone — cream on dark brown (tweed)
+    US_HERRING_FINE: {
+      pattern: { type: 'herringbone', tileSize: 6, background: [52, 38, 28], foreground: [195, 182, 160] },
+    },
+    US_HERRING_MED: {
+      pattern: { type: 'herringbone', tileSize: 12, background: [52, 38, 28], foreground: [195, 182, 160] },
+    },
+    US_HERRING_BOLD: {
+      pattern: { type: 'herringbone', tileSize: 20, background: [52, 38, 28], foreground: [195, 182, 160] },
+    },
+    // Camouflage — olive on dark green (military woodland)
+    US_CAMO_FINE: {
+      pattern: { type: 'camouflage', tileSize: 8, background: [35, 52, 28], foreground: [105, 118, 62] },
+    },
+    US_CAMO_MED: {
+      pattern: { type: 'camouflage', tileSize: 14, background: [35, 52, 28], foreground: [105, 118, 62] },
+    },
+    US_CAMO_BOLD: {
+      pattern: { type: 'camouflage', tileSize: 22, background: [35, 52, 28], foreground: [105, 118, 62] },
+    },
+    // Camouflage — sand on tan (desert)
+    US_CAMO_DESERT_FINE: {
+      pattern: { type: 'camouflage', tileSize: 8, background: [178, 155, 118], foreground: [135, 110, 72] },
+    },
+    US_CAMO_DESERT_MED: {
+      pattern: { type: 'camouflage', tileSize: 14, background: [178, 155, 118], foreground: [135, 110, 72] },
+    },
+    US_CAMO_DESERT_BOLD: {
+      pattern: { type: 'camouflage', tileSize: 22, background: [178, 155, 118], foreground: [135, 110, 72] },
+    },
+  },
+};

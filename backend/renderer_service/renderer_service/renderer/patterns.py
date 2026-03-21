@@ -66,6 +66,23 @@ PatternType = Literal[
     "mudcloth",
     "adinkra",
     "shweshwe",
+    # Phase 2b: Missing Japanese + famous + medieval + continental
+    "same_komon",
+    "kanoko",
+    "hishi",
+    "tachiwaki",
+    "bishamon_kikko",
+    "quatrefoil",
+    "herringbone",
+    "trellis",
+    "damask",
+    "camouflage",
+    "chainmail",
+    "four_point_star_motif",
+    "celtic_knot",
+    "nordic_snowflake",
+    "nordic_diamond",
+    "native_step",
 ]
 
 SPRITE_SIZE = 50
@@ -774,6 +791,369 @@ def _generate_mudcloth(defn: PatternDefinition) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Phase 2b — numpy patterns (Japanese + famous + medieval + continental)
+# ---------------------------------------------------------------------------
+
+
+def _generate_same_komon(defn: PatternDefinition) -> np.ndarray:
+    """Tiny offset semicircle dots (Japanese shark skin / same komon)."""
+    ts = defn.tile_size
+    c1, c2 = _c(defn.background), _fg(defn)
+    yy, xx = np.mgrid[:ts, :ts]
+
+    spacing = max(ts // 4, 2)
+    half = spacing // 2
+
+    # Row of tiny dots, offset every other row
+    row = yy // spacing
+    cy = (yy % spacing).astype(np.float32)
+    cx = ((xx + (row % 2) * half) % spacing).astype(np.float32)
+
+    # Small circle at center of each cell
+    dist = np.sqrt((cx - half) ** 2 + (cy - half) ** 2)
+    mask = dist < half * 0.6
+
+    return np.where(mask[..., None], c2, c1)
+
+
+def _generate_kanoko(defn: PatternDefinition) -> np.ndarray:
+    """Fawn spot tie-dye dots (Japanese kanoko shibori)."""
+    ts = defn.tile_size
+    c1, c2 = _c(defn.background), _fg(defn)
+    yy, xx = np.mgrid[:ts, :ts]
+
+    # Staggered dot grid — offset every other row
+    spacing = max(ts // 3, 2)
+    half = spacing // 2
+    row = yy // spacing
+
+    cy = (yy % spacing).astype(np.float32) - half
+    cx = ((xx + (row % 2) * half) % spacing).astype(np.float32) - half
+
+    dist = np.sqrt(cx**2 + cy**2)
+    # Ring shape (donut) — characteristic of shibori
+    ring = (dist > half * 0.25) & (dist < half * 0.7)
+
+    return np.where(ring[..., None], c2, c1)
+
+
+def _generate_hishi(defn: PatternDefinition) -> np.ndarray:
+    """Diamond / rhombus shapes (Japanese hishi)."""
+    ts = defn.tile_size
+    c1, c2 = _c(defn.background), _fg(defn)
+    center = ts / 2.0
+    yy, xx = np.mgrid[:ts, :ts]
+
+    # Diamond outline — |x-cx|/a + |y-cy|/b == 1
+    dx = np.abs(xx + 0.5 - center) / center
+    dy = np.abs(yy + 0.5 - center) / center
+    dist = dx + dy
+
+    # Double diamond outline
+    outline = (np.abs(dist - 0.6) < 0.08) | (np.abs(dist - 0.85) < 0.06)
+
+    return np.where(outline[..., None], c2, c1)
+
+
+def _generate_nordic_snowflake(defn: PatternDefinition) -> np.ndarray:
+    """Pixel-art 8-point star (Scandinavian knit snowflake)."""
+    ts = defn.tile_size
+    c1, c2 = _c(defn.background), _fg(defn)
+    center = ts / 2.0
+    yy, xx = np.mgrid[:ts, :ts]
+
+    dx = np.abs(xx + 0.5 - center)
+    dy = np.abs(yy + 0.5 - center)
+
+    # Cross arms
+    arm_w = ts * 0.08
+    cross = ((dx < arm_w) | (dy < arm_w)) & (dx + dy < center * 0.9)
+
+    # Diagonal arms
+    diag_w = ts * 0.06
+    diag = (np.abs(dx - dy) < diag_w) & (dx + dy < center * 0.85)
+
+    # Small dots at arm tips
+    dots = (
+        (dx + dy > center * 0.6)
+        & (dx + dy < center * 0.75)
+        & ((dx < arm_w * 2) | (dy < arm_w * 2))
+    )
+
+    mask = cross | diag | dots
+    return np.where(mask[..., None], c2, c1)
+
+
+def _generate_nordic_diamond(defn: PatternDefinition) -> np.ndarray:
+    """Rows of diamond lozenges (Scandinavian knit pattern)."""
+    ts = defn.tile_size
+    c1, c2 = _c(defn.background), _fg(defn)
+    center = ts / 2.0
+    yy, xx = np.mgrid[:ts, :ts]
+
+    dx = np.abs(xx + 0.5 - center)
+    dy = np.abs(yy + 0.5 - center)
+
+    # Diamond outline
+    dist = dx / center + dy / center
+    outline = np.abs(dist - 0.7) < 0.1
+
+    # Small cross at center
+    arm = ts * 0.06
+    cross = (dx < arm) & (dy < arm)
+
+    mask = outline | cross
+    return np.where(mask[..., None], c2, c1)
+
+
+def _generate_native_step(defn: PatternDefinition) -> np.ndarray:
+    """Staircase-edged diamonds (Southwest US / Native American step pattern)."""
+    ts = defn.tile_size
+    c1, c2 = _c(defn.background), _fg(defn)
+    center = ts / 2.0
+    step_size = max(ts // 6, 1)
+
+    yy, xx = np.mgrid[:ts, :ts]
+    dx = np.abs(xx + 0.5 - center)
+    dy = np.abs(yy + 0.5 - center)
+
+    # Stepped diamond: quantize the distance
+    sdx = (dx // step_size) * step_size
+    sdy = (dy // step_size) * step_size
+    mask = (sdx + sdy) <= center * 0.7
+
+    return np.where(mask[..., None], c2, c1)
+
+
+def _generate_camouflage(defn: PatternDefinition) -> np.ndarray:
+    """Organic blob pattern (military camouflage)."""
+    ts = defn.tile_size
+    c1, c2 = _c(defn.background), _fg(defn)
+    # Use a deterministic pseudo-random pattern based on coordinates
+    yy, xx = np.mgrid[:ts, :ts]
+
+    # Tile-size-commensurate frequencies for seamless tiling
+    f1 = 2 * np.pi / ts
+    f2 = 2 * np.pi * 2 / ts
+    f3 = 2 * np.pi * 3 / ts
+    v1 = np.sin(xx * f1) + np.sin(yy * f2)
+    v2 = np.sin((xx + yy) * f1) + np.cos((xx - yy) * f2)
+    v3 = np.sin(xx * f3 + 1) + np.cos(yy * f2 + 2)
+
+    combined = v1 + v2 * 0.7 + v3 * 0.5
+    mask = combined > 0.5
+
+    return np.where(mask[..., None], c2, c1)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2b — SVG patterns (Japanese + famous + medieval)
+# ---------------------------------------------------------------------------
+
+
+def _generate_tachiwaki(defn: PatternDefinition) -> np.ndarray:
+    """Rising steam / wavy vertical lines (Japanese tachiwaki)."""
+    ts = defn.tile_size
+    bg_s = _svg_rgb(defn.background)
+    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
+    sw = max(1, ts / 8)
+    q = ts / 4
+
+    # Two wavy vertical lines using cubic bezier
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{ts}" height="{ts}">'
+        f'<rect width="{ts}" height="{ts}" fill="{bg_s}"/>'
+        f'<path d="M {q},0 C {q + q * 0.6},{ts * 0.25} {q - q * 0.6},'
+        f'{ts * 0.75} {q},{ts}" fill="none" stroke="{fg_s}"'
+        f' stroke-width="{sw}"/>'
+        f'<path d="M {3 * q},0 C {3 * q + q * 0.6},{ts * 0.25}'
+        f' {3 * q - q * 0.6},{ts * 0.75} {3 * q},{ts}"'
+        f' fill="none" stroke="{fg_s}" stroke-width="{sw}"/>'
+        "</svg>"
+    )
+    return _svg_to_array(svg, ts, ts)
+
+
+def _generate_bishamon_kikko(defn: PatternDefinition) -> np.ndarray:
+    """Interlocking triple hexagons (Japanese bishamon kikko).
+
+    Based on Hero Patterns 'happy-intersection' (MIT license).
+    """
+    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
+    bg_s = _svg_rgb(defn.background)
+
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 88">'
+        f'<rect width="88" height="88" fill="{bg_s}"/>'
+        f'<path d="M29.42 29.41c.36-.36.58-.85.58-1.4V0h-4v26H0v4h28c.55'
+        " 0 1.05-.22 1.41-.58h.01zm0 29.18c.36.36.58.86.58 1.4V88h-4V62"
+        "H0v-4h28c.56 0 1.05.22 1.41.58zm29.16 0c-.36.36-.58.85-.58 1.4"
+        "V88h4V62h26v-4H60c-.55 0-1.05.22-1.41.58zm0-29.18c-.36-.36-.58"
+        "-.86-.58-1.4V0h4v26h26v4H60c-.56 0-1.05-.22-1.41-.58zM26 30H0"
+        "v-2h26V2h2v28zm36 0h26v-2H62V2h-2v28zM26 58H0v2h26v26h2V58zm36"
+        f' 0h26v2H62v26h-2V58z" fill="{fg_s}" fill-rule="evenodd"/>'
+        "</svg>"
+    )
+    return _svg_to_array(svg, defn.tile_size, defn.tile_size)
+
+
+def _generate_quatrefoil(defn: PatternDefinition) -> np.ndarray:
+    """Four overlapping circles forming 4-lobed shape (Gothic quatrefoil).
+
+    Based on Hero Patterns 'tic-tac-toe' (MIT license).
+    """
+    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
+    bg_s = _svg_rgb(defn.background)
+
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+        f'<rect width="64" height="64" fill="{bg_s}"/>'
+        f'<path d="M8 16c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8'
+        " 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6"
+        " 6 2.686 6 6 6zm33.414-6l5.95-5.95L45.95.636 40 6.586 34.05"
+        ".636 32.636 2.05 38.586 8l-5.95 5.95 1.414 1.414L40 9.414l5.95"
+        " 5.95 1.414-1.414L41.414 8zM40 48c4.418 0 8-3.582 8-8s-3.582"
+        "-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s"
+        "-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zM9.414 40l5.95-5.95"
+        "-1.414-1.414L8 38.586l-5.95-5.95L.636 34.05 6.586 40l-5.95"
+        f' 5.95 1.414 1.414L8 41.414l5.95 5.95 1.414-1.414L9.414 40z"'
+        f' fill="{fg_s}" fill-rule="evenodd"/>'
+        "</svg>"
+    )
+    return _svg_to_array(svg, defn.tile_size, defn.tile_size)
+
+
+def _generate_herringbone(defn: PatternDefinition) -> np.ndarray:
+    """Angled rectangular bricks in zigzag rows (herringbone).
+
+    Based on Hero Patterns 'charlie-brown' (MIT license).
+    """
+    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
+    bg_s = _svg_rgb(defn.background)
+
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 12">'
+        f'<rect width="20" height="12" fill="{bg_s}"/>'
+        f'<path d="M9.8 12L0 2.2V.8l10 10 10-10v1.4L10.2 12h-.4zm-4'
+        " 0L0 6.2V4.8L7.2 12H5.8zm8.4 0L20 6.2V4.8L12.8 12h1.4zM9.8"
+        f' 0l.2.2.2-.2h-.4zm-4 0L10 4.2 14.2 0h-1.4L10 2.8 7.2 0H5.8z"'
+        f' fill="{fg_s}" fill-rule="evenodd"/>'
+        "</svg>"
+    )
+    return _svg_to_array(svg, defn.tile_size, defn.tile_size)
+
+
+def _generate_trellis(defn: PatternDefinition) -> np.ndarray:
+    """Diamond lattice grid (trellis / garden lattice).
+
+    Based on Hero Patterns 'diagonal-stripes' (MIT license).
+    """
+    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
+    bg_s = _svg_rgb(defn.background)
+
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">'
+        f'<rect width="40" height="40" fill="{bg_s}"/>'
+        f'<path d="M0 40L40 0H20L0 20zM40 40V20L20 40z"'
+        f' fill="{fg_s}" fill-rule="evenodd"/>'
+        "</svg>"
+    )
+    return _svg_to_array(svg, defn.tile_size, defn.tile_size)
+
+
+def _generate_damask(defn: PatternDefinition) -> np.ndarray:
+    """Simplified floral diamond motif (Syrian damask).
+
+    Based on Hero Patterns 'morphing-diamonds' (MIT license).
+    """
+    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
+    bg_s = _svg_rgb(defn.background)
+
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60">'
+        f'<rect width="60" height="60" fill="{bg_s}"/>'
+        f'<path d="M54.627 0l.829.828-1.414 1.415L51.799 0h2.828zM5.373'
+        " 0l-.829.828 1.414 1.415L8.201 0H5.373zM48.97 0l3.657 3.657"
+        "-1.414 1.414L46.143 0h2.828zM11.03 0L7.373 3.657 8.787 5.07"
+        " 13.857 0H11.03zm32.284 0L49.8 6.485 48.384 7.9 40.484 0h2.83"
+        "zM16.686 0L10.2 6.485 11.616 7.9 19.516 0h-2.83zM22.344 0L13"
+        " 9.314l1.414 1.414L22.344 2.8V0h2.828L28 2.828V0h4v2.828L34.828"
+        " 0h2.83L30 7.657l-7.657-7.657L30 7.657 37.657 0H34.83L30"
+        " 4.828V0h-4v4.828L22.344 0h-2.83L30 10.486l-7.657-7.657L30"
+        f' 10.486z" fill="{fg_s}" fill-rule="evenodd"/>'
+        "</svg>"
+    )
+    return _svg_to_array(svg, defn.tile_size, defn.tile_size)
+
+
+def _generate_chainmail(defn: PatternDefinition) -> np.ndarray:
+    """Interlocking rings (medieval chainmail).
+
+    Based on Hero Patterns 'connections' (MIT license).
+    """
+    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
+    bg_s = _svg_rgb(defn.background)
+
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">'
+        f'<rect width="36" height="36" fill="{bg_s}"/>'
+        f'<path d="M36 0H0v36h36V0zM15.126 2H2v13.126c.367.094.714.24'
+        " 1.032.428L15.554 3.032c-.188-.318-.334-.665-.428-1.032zM18"
+        " 4.874V18H4.874c-.094-.367-.24-.714-.428-1.032L16.968 4.446c"
+        ".318.188.665.334 1.032.428zM22.874 2c-.094.367-.24.714-.428"
+        " 1.032l12.522 12.522c.188-.318.334-.665.428-1.032H22.874zM18"
+        " 31.126V18h13.126c.094.367.24.714.428 1.032L19.032 31.554c"
+        "-.318-.188-.665-.334-1.032-.428zM4.874 34H18V20.874c-.367-.094"
+        "-.714-.24-1.032-.428L4.446 32.968c.188.318.334.665.428 1.032z"
+        "M31.126 34H18V20.874c.367-.094.714-.24 1.032-.428l12.522"
+        " 12.522c-.188.318-.334.665-.428 1.032zM34 15.126V2H20.874c"
+        "-.094.367-.24.714-.428 1.032l12.522 12.522c.318-.188.665-.334"
+        " 1.032-.428zM2 20.874V34h13.126c.094-.367.24-.714.428-1.032"
+        "L3.032 20.446c-.318.188-.665.334-1.032.428z"
+        f'" fill="{fg_s}" fill-rule="evenodd"/>'
+        "</svg>"
+    )
+    return _svg_to_array(svg, defn.tile_size, defn.tile_size)
+
+
+def _generate_four_point_star_motif(defn: PatternDefinition) -> np.ndarray:
+    """Four-point compass star motif (Gothic architecture).
+
+    Based on Hero Patterns 'four-point-stars' (MIT license).
+    """
+    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
+    bg_s = _svg_rgb(defn.background)
+
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+        f'<rect width="24" height="24" fill="{bg_s}"/>'
+        f'<path d="M8 4l4 2-4 2-2 4-2-4-4-2 4-2 2-4 2 4z"'
+        f' fill="{fg_s}"/>'
+        "</svg>"
+    )
+    return _svg_to_array(svg, defn.tile_size, defn.tile_size)
+
+
+def _generate_celtic_knot(defn: PatternDefinition) -> np.ndarray:
+    """Interlocking chevron band pattern (Celtic-inspired).
+
+    Based on Hero Patterns 'curtain' (MIT license).
+    """
+    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
+    bg_s = _svg_rgb(defn.background)
+
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44 12">'
+        f'<rect width="44" height="12" fill="{bg_s}"/>'
+        f'<path d="M20 12v-2L0 0v10l4 2h16zm18 0l4-2V0L22 10v2h16zM20'
+        f' 0v8L4 0h16zm18 0L22 8V0h16z" fill="{fg_s}"'
+        ' fill-rule="evenodd"/>'
+        "</svg>"
+    )
+    return _svg_to_array(svg, defn.tile_size, defn.tile_size)
+
+
 # Phase 2 — SVG patterns (rendered via cairosvg)
 # ---------------------------------------------------------------------------
 
@@ -955,37 +1335,40 @@ def _generate_karakusa(defn: PatternDefinition) -> np.ndarray:
 
 
 def _generate_kolam(defn: PatternDefinition) -> np.ndarray:
-    """Lines weaving around dot grid (South Indian kolam)."""
-    ts = defn.tile_size
-    bg_s = _svg_rgb(defn.background)
-    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
-    sw = max(1, ts / 8)
-    h = ts / 2
-    r = ts * 0.08  # dot radius
+    """Lines weaving around dot grid (South Indian kolam).
 
-    # Woven loops around dots using larger arcs
+    Based on Hero Patterns 'jupiter' (MIT license) — dots connected by arcs.
+    """
+    fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
+    bg_s = _svg_rgb(defn.background)
+
     svg = (
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{ts}" height="{ts}">'
-        f'<rect width="{ts}" height="{ts}" fill="{bg_s}"/>'
-        # Four arcs connecting edge midpoints via corners
-        f'<path d="M 0,{h} Q 0,0 {h},0" '
-        f'fill="none" stroke="{fg_s}" stroke-width="{sw}"/>'
-        f'<path d="M {h},0 Q {ts},0 {ts},{h}" '
-        f'fill="none" stroke="{fg_s}" stroke-width="{sw}"/>'
-        f'<path d="M {ts},{h} Q {ts},{ts} {h},{ts}" '
-        f'fill="none" stroke="{fg_s}" stroke-width="{sw}"/>'
-        f'<path d="M {h},{ts} Q 0,{ts} 0,{h}" '
-        f'fill="none" stroke="{fg_s}" stroke-width="{sw}"/>'
-        # Center dot
-        f'<circle cx="{h}" cy="{h}" r="{r}" fill="{fg_s}"/>'
-        # Corner dots (quarter visible, so larger)
-        f'<circle cx="0" cy="0" r="{r}" fill="{fg_s}"/>'
-        f'<circle cx="{ts}" cy="0" r="{r}" fill="{fg_s}"/>'
-        f'<circle cx="0" cy="{ts}" r="{r}" fill="{fg_s}"/>'
-        f'<circle cx="{ts}" cy="{ts}" r="{r}" fill="{fg_s}"/>'
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">'
+        f'<rect width="52" height="52" fill="{bg_s}"/>'
+        f'<path d="M0 17.83V0h17.83a3 3 0 0 1-5.66 2H5.9A5 5 0 0 1'
+        " 2 5.9v6.27a3 3 0 0 1-2 5.66zm0 18.34a3 3 0 0 1 2 5.66v6.27"
+        "A5 5 0 0 1 5.9 52h6.27a3 3 0 0 1 5.66 0H0V36.17zM36.17 52a3"
+        " 3 0 0 1 5.66 0h6.27a5 5 0 0 1 3.9-3.9v-6.27a3 3 0 0 1"
+        " 0-5.66V52H36.17zM0 31.93v-9.78a5 5 0 0 1 3.8.72l4.43-4.43"
+        "a3 3 0 1 1 1.42 1.41L5.2 24.28a5 5 0 0 1 0 5.52l4.44 4.43a3"
+        " 3 0 1 1-1.42 1.42L3.8 31.2a5 5 0 0 1-3.8.72zm52-14.1a3 3"
+        " 0 0 1 0-5.66V5.9A5 5 0 0 1 48.1 2h-6.27a3 3 0 0 1-5.66"
+        "-2H52v17.83zm0 14.1a4.97 4.97 0 0 1-1.72-.72l-4.43 4.44a3"
+        " 3 0 1 1-1.41-1.42l4.43-4.43a5 5 0 0 1 0-5.52l-4.43-4.43"
+        "a3 3 0 1 1 1.41-1.41l4.43 4.43c.53-.35 1.12-.6 1.72-.72v9.78"
+        "zM22.15 0h9.78a5 5 0 0 1-.72 3.8l4.44 4.43a3 3 0 1 1-1.42"
+        " 1.42L29.8 5.2a5 5 0 0 1-5.52 0l-4.43 4.44a3 3 0 1 1-1.41"
+        "-1.42l4.43-4.43a5 5 0 0 1-.72-3.8zm0 52c.13-.6.37-1.19.72"
+        "-1.72l-4.43-4.43a3 3 0 1 1 1.41-1.41l4.43 4.43a5 5 0 0 1"
+        " 5.52 0l4.43-4.43a3 3 0 1 1 1.42 1.41l-4.44 4.43c.36.53.6"
+        " 1.12.72 1.72h-9.78zm9.75-24a5 5 0 0 1-3.9 3.9v6.27a3 3 0"
+        " 1 1-2 0V31.9a5 5 0 0 1-3.9-3.9h-6.27a3 3 0 1 1 0-2h6.27"
+        "a5 5 0 0 1 3.9-3.9v-6.27a3 3 0 1 1 2 0v6.27a5 5 0 0 1 3.9"
+        f' 3.9h6.27a3 3 0 1 1 0 2H31.9z" fill="{fg_s}"'
+        ' fill-rule="evenodd"/>'
         "</svg>"
     )
-    return _svg_to_array(svg, ts, ts)
+    return _svg_to_array(svg, defn.tile_size, defn.tile_size)
 
 
 def _generate_adinkra(defn: PatternDefinition) -> np.ndarray:
@@ -1257,27 +1640,28 @@ def _generate_fleur_de_lis(defn: PatternDefinition) -> np.ndarray:
 
 
 def _generate_paisley(defn: PatternDefinition) -> np.ndarray:
-    """Spiral boteh/paisley motif (Indian/Persian).
-
-    Uses a classic inward-spiraling teardrop construction.
-    """
-    ts = defn.tile_size
-    bg_s = _svg_rgb(defn.background)
+    """Filled teardrop boteh/paisley motif (Indian/Persian)."""
     fg_s = _svg_rgb(defn.foreground or (255, 255, 255))
-    sw = max(0.8, ts / 10)
+    bg_s = _svg_rgb(defn.background)
 
-    # Spiral paisley in 50x50 viewBox — curves inward with a dot
+    # Filled teardrop shape with curled tip and inner cutout
     svg = (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">'
-        f'<rect width="50" height="50" fill="{bg_s}"/>'
-        f'<path d="M25 5 C35 5,45 15,45 28 C45 38,38 45,28 45'
-        " C20 45,14 40,14 33 C14 26,20 22,25 22"
-        ' C30 22,34 26,34 30 C34 34,31 36,28 36 C25 36,23 34,23 31"'
-        f' fill="none" stroke="{fg_s}" stroke-width="{sw}"/>'
-        f'<circle cx="30" cy="15" r="3" fill="{fg_s}"/>'
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 56">'
+        f'<rect width="50" height="56" fill="{bg_s}"/>'
+        # Filled teardrop body
+        f'<path d="M25 4 C16 4,8 14,8 27 C8 40,16 50,25 50'
+        f' C34 50,42 40,42 27 C42 14,34 4,25 4Z" fill="{fg_s}"/>'
+        # Inner cutout (same shape smaller) to make it outlined/hollow
+        f'<path d="M25 10 C19 10,14 18,14 27 C14 36,19 44,25 44'
+        f' C31 44,36 36,36 27 C36 18,31 10,25 10Z" fill="{bg_s}"/>'
+        # Curled tip at top
+        f'<path d="M25 4 C28 4,32 7,32 11 C32 15,28 15,25 13"'
+        f' fill="{fg_s}"/>'
+        # Inner dot
+        f'<circle cx="25" cy="30" r="4" fill="{fg_s}"/>'
         "</svg>"
     )
-    return _svg_to_array(svg, ts, ts)
+    return _svg_to_array(svg, defn.tile_size, defn.tile_size)
 
 
 # ---------------------------------------------------------------------------
@@ -1333,6 +1717,23 @@ _GENERATORS = {
     "mudcloth": _generate_mudcloth,
     "adinkra": _generate_adinkra,
     "shweshwe": _generate_shweshwe,
+    # Phase 2b: Japanese + famous + medieval + continental
+    "same_komon": _generate_same_komon,
+    "kanoko": _generate_kanoko,
+    "hishi": _generate_hishi,
+    "tachiwaki": _generate_tachiwaki,
+    "bishamon_kikko": _generate_bishamon_kikko,
+    "quatrefoil": _generate_quatrefoil,
+    "herringbone": _generate_herringbone,
+    "trellis": _generate_trellis,
+    "damask": _generate_damask,
+    "camouflage": _generate_camouflage,
+    "chainmail": _generate_chainmail,
+    "four_point_star_motif": _generate_four_point_star_motif,
+    "celtic_knot": _generate_celtic_knot,
+    "nordic_snowflake": _generate_nordic_snowflake,
+    "nordic_diamond": _generate_nordic_diamond,
+    "native_step": _generate_native_step,
 }
 
 
