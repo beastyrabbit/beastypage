@@ -18,13 +18,13 @@ export const medievalPatternsPalette: PaletteCategory = {
     },
     // Gothic trefoil — gold on royal purple
     MV_TREFOIL_FINE: {
-      pattern: { type: 'gothic_trefoil', tileSize: 8, background: [52, 18, 72], foreground: [210, 175, 55] },
+      pattern: { type: 'four_point_star_motif', tileSize: 8, background: [52, 18, 72], foreground: [210, 175, 55] },
     },
     MV_TREFOIL_MED: {
-      pattern: { type: 'gothic_trefoil', tileSize: 14, background: [52, 18, 72], foreground: [210, 175, 55] },
+      pattern: { type: 'four_point_star_motif', tileSize: 14, background: [52, 18, 72], foreground: [210, 175, 55] },
     },
     MV_TREFOIL_BOLD: {
-      pattern: { type: 'gothic_trefoil', tileSize: 22, background: [52, 18, 72], foreground: [210, 175, 55] },
+      pattern: { type: 'four_point_star_motif', tileSize: 22, background: [52, 18, 72], foreground: [210, 175, 55] },
     },
     // Celtic knot — gold on dark green (Irish manuscript)
     MV_CELTIC_FINE: {

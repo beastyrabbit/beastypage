@@ -30,7 +30,7 @@ export interface PatternDefinition {
     // Phase 2b: Japanese + famous + medieval + continental
     | 'same_komon' | 'kanoko' | 'hishi' | 'tachiwaki' | 'bishamon_kikko'
     | 'quatrefoil' | 'herringbone' | 'trellis' | 'damask' | 'camouflage'
-    | 'chainmail' | 'gothic_trefoil' | 'celtic_knot'
+    | 'chainmail' | 'four_point_star_motif' | 'celtic_knot'
     | 'nordic_snowflake' | 'nordic_diamond' | 'native_step';
   tileSize: number;
   background: [number, number, number];

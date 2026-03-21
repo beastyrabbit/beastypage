@@ -78,7 +78,7 @@ PatternType = Literal[
     "damask",
     "camouflage",
     "chainmail",
-    "gothic_trefoil",
+    "four_point_star_motif",
     "celtic_knot",
     "nordic_snowflake",
     "nordic_diamond",
@@ -933,10 +933,13 @@ def _generate_camouflage(defn: PatternDefinition) -> np.ndarray:
     # Use a deterministic pseudo-random pattern based on coordinates
     yy, xx = np.mgrid[:ts, :ts]
 
-    # Layered sine waves creating organic blobs
-    v1 = np.sin(xx * 0.8) + np.sin(yy * 0.6)
-    v2 = np.sin((xx + yy) * 0.5) + np.cos((xx - yy) * 0.4)
-    v3 = np.sin(xx * 1.2 + 1) + np.cos(yy * 0.9 + 2)
+    # Tile-size-commensurate frequencies for seamless tiling
+    f1 = 2 * np.pi / ts
+    f2 = 2 * np.pi * 2 / ts
+    f3 = 2 * np.pi * 3 / ts
+    v1 = np.sin(xx * f1) + np.sin(yy * f2)
+    v2 = np.sin((xx + yy) * f1) + np.cos((xx - yy) * f2)
+    v3 = np.sin(xx * f3 + 1) + np.cos(yy * f2 + 2)
 
     combined = v1 + v2 * 0.7 + v3 * 0.5
     mask = combined > 0.5
@@ -1114,8 +1117,8 @@ def _generate_chainmail(defn: PatternDefinition) -> np.ndarray:
     return _svg_to_array(svg, defn.tile_size, defn.tile_size)
 
 
-def _generate_gothic_trefoil(defn: PatternDefinition) -> np.ndarray:
-    """Three-lobed trefoil motif (Gothic architecture).
+def _generate_four_point_star_motif(defn: PatternDefinition) -> np.ndarray:
+    """Four-point compass star motif (Gothic architecture).
 
     Based on Hero Patterns 'four-point-stars' (MIT license).
     """
@@ -1726,7 +1729,7 @@ _GENERATORS = {
     "damask": _generate_damask,
     "camouflage": _generate_camouflage,
     "chainmail": _generate_chainmail,
-    "gothic_trefoil": _generate_gothic_trefoil,
+    "four_point_star_motif": _generate_four_point_star_motif,
     "celtic_knot": _generate_celtic_knot,
     "nordic_snowflake": _generate_nordic_snowflake,
     "nordic_diamond": _generate_nordic_diamond,

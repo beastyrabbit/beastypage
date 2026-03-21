@@ -740,10 +740,11 @@ function sameKomonCss(p: PatternDefinition): CSSPatternStyle {
   return {
     background: [
       `radial-gradient(circle ${s * 0.3}px, ${fg} 100%, transparent 100%)`,
+      `radial-gradient(circle ${s * 0.3}px, ${fg} 100%, transparent 100%)`,
       solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${s}px ${s}px`,
-    backgroundPosition: `0 0, ${s / 2}px ${s / 2}px`,
+    backgroundPosition: `0 0, ${s / 2}px ${s / 2}px, 0 0`,
   };
 }
 
@@ -755,9 +756,11 @@ function kanokoCss(p: PatternDefinition): CSSPatternStyle {
   return {
     background: [
       `radial-gradient(circle ${r}px, transparent ${r * 0.4}px, ${fg} ${r * 0.4}px, ${fg} ${r}px, transparent ${r}px)`,
+      `radial-gradient(circle ${r}px, transparent ${r * 0.4}px, ${fg} ${r * 0.4}px, ${fg} ${r}px, transparent ${r}px)`,
       solidLayer(p.background),
     ].join(', '),
     backgroundSize: `${s}px ${s}px`,
+    backgroundPosition: `0 0, ${s / 2}px ${s / 2}px, 0 0`,
   };
 }
 
@@ -843,7 +846,7 @@ function damaskCss(p: PatternDefinition): CSSPatternStyle {
   return {
     background: buildSvgUrl('0 0 60 60',
       `<rect width="60" height="60" fill="${bgStr}"/>`,
-      `<path d="M54.627 0l.829.828-1.414 1.415L51.799 0h2.828zM5.373 0l-.829.828 1.414 1.415L8.201 0H5.373z" fill="${fgStr}" fill-opacity=".5" fill-rule="evenodd"/>`,
+      `<path d="M54.627 0l.829.828-1.414 1.415L51.799 0h2.828zM5.373 0l-.829.828 1.414 1.415L8.201 0H5.373zM48.97 0l3.657 3.657-1.414 1.414L46.143 0h2.828zM11.03 0L7.373 3.657 8.787 5.07 13.857 0H11.03zm32.284 0L49.8 6.485 48.384 7.9 40.484 0h2.83zM16.686 0L10.2 6.485 11.616 7.9 19.516 0h-2.83zM22.344 0L13 9.314l1.414 1.414L22.344 2.8V0h2.828L28 2.828V0h4v2.828L34.828 0h2.83L30 7.657l-7.657-7.657L30 7.657 37.657 0H34.83L30 4.828V0h-4v4.828L22.344 0h-2.83L30 10.486l-7.657-7.657L30 10.486z" fill="${fgStr}" fill-rule="evenodd"/>`,
     ),
     backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
   };
@@ -868,13 +871,13 @@ function chainmailCss(p: PatternDefinition): CSSPatternStyle {
   return {
     background: buildSvgUrl('0 0 36 36',
       `<rect width="36" height="36" fill="${bgStr}"/>`,
-      `<path d="M36 0H0v36h36V0zM15.126 2H2v13.126c.367.094.714.24 1.032.428L15.554 3.032c-.188-.318-.334-.665-.428-1.032zM18 4.874V18H4.874c-.094-.367-.24-.714-.428-1.032L16.968 4.446c.318.188.665.334 1.032.428z" fill="${fgStr}" fill-rule="evenodd"/>`,
+      `<path d="M36 0H0v36h36V0zM15.126 2H2v13.126c.367.094.714.24 1.032.428L15.554 3.032c-.188-.318-.334-.665-.428-1.032zM18 4.874V18H4.874c-.094-.367-.24-.714-.428-1.032L16.968 4.446c.318.188.665.334 1.032.428zM22.874 2c-.094.367-.24.714-.428 1.032l12.522 12.522c.188-.318.334-.665.428-1.032H22.874zM18 31.126V18h13.126c.094.367.24.714.428 1.032L19.032 31.554c-.318-.188-.665-.334-1.032-.428zM4.874 34H18V20.874c-.367-.094-.714-.24-1.032-.428L4.446 32.968c.188.318.334.665.428 1.032zM31.126 34H18V20.874c.367-.094.714-.24 1.032-.428l12.522 12.522c-.188.318-.334.665-.428 1.032zM34 15.126V2H20.874c-.094.367-.24.714-.428 1.032l12.522 12.522c.318-.188.665-.334 1.032-.428zM2 20.874V34h13.126c.094-.367.24-.714.428-1.032L3.032 20.446c-.318.188-.665.334-1.032.428z" fill="${fgStr}" fill-rule="evenodd"/>`,
     ),
     backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
   };
 }
 
-function gothicTrefoilCss(p: PatternDefinition): CSSPatternStyle {
+function fourPointStarMotifCss(p: PatternDefinition): CSSPatternStyle {
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
   const bgStr = rgb(p.background);
   return {
@@ -1024,7 +1027,7 @@ const CSS_GENERATORS: Record<PatternDefinition['type'], (p: PatternDefinition) =
   damask: damaskCss,
   camouflage: camouflageCss,
   chainmail: chainmailCss,
-  gothic_trefoil: gothicTrefoilCss,
+  four_point_star_motif: fourPointStarMotifCss,
   celtic_knot: celticKnotCss,
   nordic_snowflake: nordicSnowflakeCss,
   nordic_diamond: nordicDiamondCss,
