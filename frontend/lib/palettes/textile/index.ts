@@ -33,6 +33,10 @@ import { chinesePatternsPalette } from './chinese-patterns';
 import { africanPatternsPalette } from './african-patterns';
 import { indonesianPatternsPalette } from './indonesian-patterns';
 import { koreanPatternsPalette } from './korean-patterns';
+import { scandinavianPatternsPalette } from './scandinavian-patterns';
+import { medievalPatternsPalette } from './medieval-patterns';
+import { americanPatternsPalette } from './american-patterns';
+import { famousPatternsPalette } from './famous-patterns';
 
 export const TEXTILE_PALETTES: PaletteCategory[] = [
   royalStewartPalette,
@@ -64,4 +68,8 @@ export const TEXTILE_PALETTES: PaletteCategory[] = [
   africanPatternsPalette,
   indonesianPatternsPalette,
   koreanPatternsPalette,
+  scandinavianPatternsPalette,
+  medievalPatternsPalette,
+  americanPatternsPalette,
+  famousPatternsPalette,
 ];

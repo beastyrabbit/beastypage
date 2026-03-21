@@ -65,12 +65,13 @@ const TEXTILE_IDS = new Set<PaletteId>([
 ]);
 
 const ORNATE_IDS = new Set<PaletteId>([
-  'european-ornate', 'art-deco-patterns',
+  'european-ornate', 'art-deco-patterns', 'medieval-patterns', 'famous-patterns',
 ]);
 
 const HERITAGE_IDS = new Set<PaletteId>([
   'scottish-clans', 'japanese-patterns', 'middle-eastern-rugs', 'indian-patterns',
   'chinese-patterns', 'african-patterns', 'indonesian-patterns', 'korean-patterns',
+  'scandinavian-patterns', 'american-patterns',
 ]);
 
 const FLAG_IDS = new Set<PaletteId>(['flag-patterns']);

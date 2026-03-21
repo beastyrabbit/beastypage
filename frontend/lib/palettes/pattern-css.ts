@@ -413,21 +413,16 @@ function fleurDeLisCss(p: PatternDefinition): CSSPatternStyle {
 function paisleyCss(p: PatternDefinition): CSSPatternStyle {
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
   const bgStr = rgb(p.background);
-  const sw = Math.max(0.8, p.tileSize / 10);
 
-  // Spiral boteh paisley in 50x50 viewBox
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50">` +
-    `<rect width="50" height="50" fill="${bgStr}"/>` +
-    `<path d="M25 5 C35 5,45 15,45 28 C45 38,38 45,28 45` +
-    ` C20 45,14 40,14 33 C14 26,20 22,25 22` +
-    ` C30 22,34 26,34 30 C34 34,31 36,28 36 C25 36,23 34,23 31"` +
-    ` fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
-    `<circle cx="30" cy="15" r="3" fill="${fgStr}"/>` +
-    `</svg>`;
-
+  // Filled teardrop boteh with inner cutout and curled tip
   return {
-    background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`,
+    background: flagSvgUrl('0 0 50 56',
+      `<rect width="50" height="56" fill="${bgStr}"/>`,
+      `<path d="M25 4 C16 4,8 14,8 27 C8 40,16 50,25 50 C34 50,42 40,42 27 C42 14,34 4,25 4Z" fill="${fgStr}"/>` +
+      `<path d="M25 10 C19 10,14 18,14 27 C14 36,19 44,25 44 C31 44,36 36,36 27 C36 18,31 10,25 10Z" fill="${bgStr}"/>` +
+      `<path d="M25 4 C28 4,32 7,32 11 C32 15,28 15,25 13" fill="${fgStr}"/>` +
+      `<circle cx="25" cy="30" r="4" fill="${fgStr}"/>`,
+    ),
     backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
   };
 }
@@ -670,24 +665,16 @@ function karakusaCss(p: PatternDefinition): CSSPatternStyle {
 }
 
 function kolamCss(p: PatternDefinition): CSSPatternStyle {
-  const ts = p.tileSize;
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
-  const h = ts / 2;
-  const sw = Math.max(0.5, ts / 12);
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${ts}" height="${ts}">` +
-    `<rect width="${ts}" height="${ts}" fill="${rgb(p.background)}"/>` +
-    `<path d="M 0,${h} A ${h},${h} 0 0 1 ${h},0" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
-    `<path d="M ${h},0 A ${h},${h} 0 0 1 ${ts},${h}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
-    `<path d="M ${ts},${h} A ${h},${h} 0 0 1 ${h},${ts}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
-    `<path d="M ${h},${ts} A ${h},${h} 0 0 1 0,${h}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
-    `<circle cx="${h}" cy="${h}" r="${ts * 0.06}" fill="${fgStr}"/>` +
-    `<circle cx="0" cy="0" r="${ts * 0.08}" fill="${fgStr}"/>` +
-    `<circle cx="${ts}" cy="0" r="${ts * 0.08}" fill="${fgStr}"/>` +
-    `<circle cx="0" cy="${ts}" r="${ts * 0.08}" fill="${fgStr}"/>` +
-    `<circle cx="${ts}" cy="${ts}" r="${ts * 0.08}" fill="${fgStr}"/>` +
-    `</svg>`;
-  return { background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, backgroundSize: `${ts}px ${ts}px` };
+  const bgStr = rgb(p.background);
+  // Hero Patterns 'jupiter' (MIT) — dots connected by arcs
+  return {
+    background: buildSvgUrl('0 0 52 52',
+      `<rect width="52" height="52" fill="${bgStr}"/>`,
+      `<path d="M0 17.83V0h17.83a3 3 0 0 1-5.66 2H5.9A5 5 0 0 1 2 5.9v6.27a3 3 0 0 1-2 5.66zm0 18.34a3 3 0 0 1 2 5.66v6.27A5 5 0 0 1 5.9 52h6.27a3 3 0 0 1 5.66 0H0V36.17zM36.17 52a3 3 0 0 1 5.66 0h6.27a5 5 0 0 1 3.9-3.9v-6.27a3 3 0 0 1 0-5.66V52H36.17zM0 31.93v-9.78a5 5 0 0 1 3.8.72l4.43-4.43a3 3 0 1 1 1.42 1.41L5.2 24.28a5 5 0 0 1 0 5.52l4.44 4.43a3 3 0 1 1-1.42 1.42L3.8 31.2a5 5 0 0 1-3.8.72zm52-14.1a3 3 0 0 1 0-5.66V5.9A5 5 0 0 1 48.1 2h-6.27a3 3 0 0 1-5.66-2H52v17.83zm0 14.1a4.97 4.97 0 0 1-1.72-.72l-4.43 4.44a3 3 0 1 1-1.41-1.42l4.43-4.43a5 5 0 0 1 0-5.52l-4.43-4.43a3 3 0 1 1 1.41-1.41l4.43 4.43c.53-.35 1.12-.6 1.72-.72v9.78zM22.15 0h9.78a5 5 0 0 1-.72 3.8l4.44 4.43a3 3 0 1 1-1.42 1.42L29.8 5.2a5 5 0 0 1-5.52 0l-4.43 4.44a3 3 0 1 1-1.41-1.42l4.43-4.43a5 5 0 0 1-.72-3.8zm0 52c.13-.6.37-1.19.72-1.72l-4.43-4.43a3 3 0 1 1 1.41-1.41l4.43 4.43a5 5 0 0 1 5.52 0l4.43-4.43a3 3 0 1 1 1.42 1.41l-4.44 4.43c.36.53.6 1.12.72 1.72h-9.78zm9.75-24a5 5 0 0 1-3.9 3.9v6.27a3 3 0 1 1-2 0V31.9a5 5 0 0 1-3.9-3.9h-6.27a3 3 0 1 1 0-2h6.27a5 5 0 0 1 3.9-3.9v-6.27a3 3 0 1 1 2 0v6.27a5 5 0 0 1 3.9 3.9h6.27a3 3 0 1 1 0 2H31.9z" fill="${fgStr}" fill-rule="evenodd"/>`,
+    ),
+    backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
+  };
 }
 
 function kenteCss(p: PatternDefinition): CSSPatternStyle {
@@ -740,6 +727,219 @@ function shweshweCss(p: PatternDefinition): CSSPatternStyle {
     ].join(', '),
     backgroundSize: `${s}px ${s}px`,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2b: Japanese + famous + medieval + continental CSS generators
+// ---------------------------------------------------------------------------
+
+function sameKomonCss(p: PatternDefinition): CSSPatternStyle {
+  const ts = p.tileSize;
+  const fg = rgb(p.foreground ?? [255, 255, 255]);
+  const s = Math.max(ts / 4, 2);
+  return {
+    background: [
+      `radial-gradient(circle ${s * 0.3}px, ${fg} 100%, transparent 100%)`,
+      solidLayer(p.background),
+    ].join(', '),
+    backgroundSize: `${s}px ${s}px`,
+    backgroundPosition: `0 0, ${s / 2}px ${s / 2}px`,
+  };
+}
+
+function kanokoCss(p: PatternDefinition): CSSPatternStyle {
+  const ts = p.tileSize;
+  const fg = rgba(p.foreground ?? [255, 255, 255], 0.6);
+  const s = Math.max(ts / 3, 2);
+  const r = s * 0.35;
+  return {
+    background: [
+      `radial-gradient(circle ${r}px, transparent ${r * 0.4}px, ${fg} ${r * 0.4}px, ${fg} ${r}px, transparent ${r}px)`,
+      solidLayer(p.background),
+    ].join(', '),
+    backgroundSize: `${s}px ${s}px`,
+  };
+}
+
+function hishiCss(p: PatternDefinition): CSSPatternStyle {
+  const ts = p.tileSize;
+  const fg = rgb(p.foreground ?? [255, 255, 255]);
+  return {
+    background: [
+      `linear-gradient(45deg, ${fg} 12%, transparent 12%, transparent 88%, ${fg} 88%)`,
+      `linear-gradient(135deg, ${fg} 12%, transparent 12%, transparent 88%, ${fg} 88%)`,
+      solidLayer(p.background),
+    ].join(', '),
+    backgroundSize: `${ts}px ${ts}px`,
+  };
+}
+
+function tachiwakiCss(p: PatternDefinition): CSSPatternStyle {
+  const ts = p.tileSize;
+  const fgStr = rgb(p.foreground ?? [255, 255, 255]);
+  const bgStr = rgb(p.background);
+  const sw = Math.max(1, ts / 8);
+  const q = ts / 4;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${ts}" height="${ts}">` +
+    `<rect width="${ts}" height="${ts}" fill="${bgStr}"/>` +
+    `<path d="M ${q},0 C ${q + q * 0.6},${ts * 0.25} ${q - q * 0.6},${ts * 0.75} ${q},${ts}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
+    `<path d="M ${3 * q},0 C ${3 * q + q * 0.6},${ts * 0.25} ${3 * q - q * 0.6},${ts * 0.75} ${3 * q},${ts}" fill="none" stroke="${fgStr}" stroke-width="${sw}"/>` +
+    `</svg>`;
+  return { background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, backgroundSize: `${ts}px ${ts}px` };
+}
+
+function bishamonKikkoCss(p: PatternDefinition): CSSPatternStyle {
+  const fgStr = rgb(p.foreground ?? [255, 255, 255]);
+  const bgStr = rgb(p.background);
+  return {
+    background: flagSvgUrl('0 0 88 88',
+      `<rect width="88" height="88" fill="${bgStr}"/>`,
+      `<path d="M29.42 29.41c.36-.36.58-.85.58-1.4V0h-4v26H0v4h28c.55 0 1.05-.22 1.41-.58h.01zm0 29.18c.36.36.58.86.58 1.4V88h-4V62H0v-4h28c.56 0 1.05.22 1.41.58zm29.16 0c-.36.36-.58.85-.58 1.4V88h4V62h26v-4H60c-.55 0-1.05.22-1.41.58zm0-29.18c-.36-.36-.58-.86-.58-1.4V0h4v26h26v4H60c-.56 0-1.05-.22-1.41-.58zM26 30H0v-2h26V2h2v28zm36 0h26v-2H62V2h-2v28zM26 58H0v2h26v26h2V58zm36 0h26v2H62v26h-2V58z" fill="${fgStr}" fill-rule="evenodd"/>`,
+    ),
+    backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
+  };
+}
+
+function quatrefoilCss(p: PatternDefinition): CSSPatternStyle {
+  const fgStr = rgb(p.foreground ?? [255, 255, 255]);
+  const bgStr = rgb(p.background);
+  return {
+    background: flagSvgUrl('0 0 64 64',
+      `<rect width="64" height="64" fill="${bgStr}"/>`,
+      `<path d="M8 16c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zm33.414-6l5.95-5.95L45.95.636 40 6.586 34.05.636 32.636 2.05 38.586 8l-5.95 5.95 1.414 1.414L40 9.414l5.95 5.95 1.414-1.414L41.414 8zM40 48c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zM9.414 40l5.95-5.95-1.414-1.414L8 38.586l-5.95-5.95L.636 34.05 6.586 40l-5.95 5.95 1.414 1.414L8 41.414l5.95 5.95 1.414-1.414L9.414 40z" fill="${fgStr}" fill-rule="evenodd"/>`,
+    ),
+    backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
+  };
+}
+
+function herringboneCss(p: PatternDefinition): CSSPatternStyle {
+  const fgStr = rgb(p.foreground ?? [255, 255, 255]);
+  const bgStr = rgb(p.background);
+  return {
+    background: flagSvgUrl('0 0 20 12',
+      `<rect width="20" height="12" fill="${bgStr}"/>`,
+      `<path d="M9.8 12L0 2.2V.8l10 10 10-10v1.4L10.2 12h-.4zm-4 0L0 6.2V4.8L7.2 12H5.8zm8.4 0L20 6.2V4.8L12.8 12h1.4zM9.8 0l.2.2.2-.2h-.4zm-4 0L10 4.2 14.2 0h-1.4L10 2.8 7.2 0H5.8z" fill="${fgStr}" fill-rule="evenodd"/>`,
+    ),
+    backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
+  };
+}
+
+function trellisCss(p: PatternDefinition): CSSPatternStyle {
+  const fgStr = rgb(p.foreground ?? [255, 255, 255]);
+  const bgStr = rgb(p.background);
+  return {
+    background: flagSvgUrl('0 0 40 40',
+      `<rect width="40" height="40" fill="${bgStr}"/>`,
+      `<path d="M0 40L40 0H20L0 20zM40 40V20L20 40z" fill="${fgStr}" fill-rule="evenodd"/>`,
+    ),
+    backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
+  };
+}
+
+function damaskCss(p: PatternDefinition): CSSPatternStyle {
+  const fgStr = rgb(p.foreground ?? [255, 255, 255]);
+  const bgStr = rgb(p.background);
+  return {
+    background: flagSvgUrl('0 0 60 60',
+      `<rect width="60" height="60" fill="${bgStr}"/>`,
+      `<path d="M54.627 0l.829.828-1.414 1.415L51.799 0h2.828zM5.373 0l-.829.828 1.414 1.415L8.201 0H5.373z" fill="${fgStr}" fill-opacity=".5" fill-rule="evenodd"/>`,
+    ),
+    backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
+  };
+}
+
+function camouflageCss(p: PatternDefinition): CSSPatternStyle {
+  const ts = p.tileSize;
+  const fg = rgba(p.foreground ?? [255, 255, 255], 0.5);
+  return {
+    background: [
+      `radial-gradient(ellipse ${ts * 0.4}px ${ts * 0.3}px at 30% 40%, ${fg} 100%, transparent 100%)`,
+      `radial-gradient(ellipse ${ts * 0.3}px ${ts * 0.4}px at 70% 60%, ${fg} 100%, transparent 100%)`,
+      solidLayer(p.background),
+    ].join(', '),
+    backgroundSize: `${ts}px ${ts}px`,
+  };
+}
+
+function chainmailCss(p: PatternDefinition): CSSPatternStyle {
+  const fgStr = rgb(p.foreground ?? [255, 255, 255]);
+  const bgStr = rgb(p.background);
+  return {
+    background: flagSvgUrl('0 0 36 36',
+      `<rect width="36" height="36" fill="${bgStr}"/>`,
+      `<path d="M36 0H0v36h36V0zM15.126 2H2v13.126c.367.094.714.24 1.032.428L15.554 3.032c-.188-.318-.334-.665-.428-1.032zM18 4.874V18H4.874c-.094-.367-.24-.714-.428-1.032L16.968 4.446c.318.188.665.334 1.032.428z" fill="${fgStr}" fill-rule="evenodd"/>`,
+    ),
+    backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
+  };
+}
+
+function gothicTrefoilCss(p: PatternDefinition): CSSPatternStyle {
+  const fgStr = rgb(p.foreground ?? [255, 255, 255]);
+  const bgStr = rgb(p.background);
+  return {
+    background: flagSvgUrl('0 0 24 24',
+      `<rect width="24" height="24" fill="${bgStr}"/>`,
+      `<path d="M8 4l4 2-4 2-2 4-2-4-4-2 4-2 2-4 2 4z" fill="${fgStr}"/>`,
+    ),
+    backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
+  };
+}
+
+function celticKnotCss(p: PatternDefinition): CSSPatternStyle {
+  const fgStr = rgb(p.foreground ?? [255, 255, 255]);
+  const bgStr = rgb(p.background);
+  return {
+    background: flagSvgUrl('0 0 44 12',
+      `<rect width="44" height="12" fill="${bgStr}"/>`,
+      `<path d="M20 12v-2L0 0v10l4 2h16zm18 0l4-2V0L22 10v2h16zM20 0v8L4 0h16zm18 0L22 8V0h16z" fill="${fgStr}" fill-rule="evenodd"/>`,
+    ),
+    backgroundSize: `${p.tileSize}px ${p.tileSize}px`,
+  };
+}
+
+function nordicSnowflakeCss(p: PatternDefinition): CSSPatternStyle {
+  const ts = p.tileSize;
+  const fg = rgb(p.foreground ?? [255, 255, 255]);
+  const c = ts / 2;
+  const a = ts * 0.08;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${ts}" height="${ts}">` +
+    `<rect width="${ts}" height="${ts}" fill="${rgb(p.background)}"/>` +
+    `<line x1="${c}" y1="0" x2="${c}" y2="${ts}" stroke="${fg}" stroke-width="${2 * a}"/>` +
+    `<line x1="0" y1="${c}" x2="${ts}" y2="${c}" stroke="${fg}" stroke-width="${2 * a}"/>` +
+    `<line x1="0" y1="0" x2="${ts}" y2="${ts}" stroke="${fg}" stroke-width="${a}"/>` +
+    `<line x1="${ts}" y1="0" x2="0" y2="${ts}" stroke="${fg}" stroke-width="${a}"/>` +
+    `</svg>`;
+  return { background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, backgroundSize: `${ts}px ${ts}px` };
+}
+
+function nordicDiamondCss(p: PatternDefinition): CSSPatternStyle {
+  const ts = p.tileSize;
+  const fg = rgb(p.foreground ?? [255, 255, 255]);
+  return {
+    background: [
+      `linear-gradient(45deg, ${fg} 15%, transparent 15%, transparent 85%, ${fg} 85%)`,
+      `linear-gradient(135deg, ${fg} 15%, transparent 15%, transparent 85%, ${fg} 85%)`,
+      solidLayer(p.background),
+    ].join(', '),
+    backgroundSize: `${ts}px ${ts}px`,
+  };
+}
+
+function nativeStepCss(p: PatternDefinition): CSSPatternStyle {
+  const ts = p.tileSize;
+  const fg = rgb(p.foreground ?? [255, 255, 255]);
+  const c = ts / 2;
+  const s = Math.max(ts / 6, 1);
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${ts}" height="${ts}">` +
+    `<rect width="${ts}" height="${ts}" fill="${rgb(p.background)}"/>` +
+    `<rect x="${c - 2 * s}" y="${c - 2 * s}" width="${4 * s}" height="${4 * s}" fill="${fg}"/>` +
+    `<rect x="${c - s}" y="${c - 3 * s}" width="${2 * s}" height="${6 * s}" fill="${fg}"/>` +
+    `<rect x="${c - 3 * s}" y="${c - s}" width="${6 * s}" height="${2 * s}" fill="${fg}"/>` +
+    `</svg>`;
+  return { background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, backgroundSize: `${ts}px ${ts}px` };
 }
 
 function flagCss(p: PatternDefinition): CSSPatternStyle {
@@ -812,6 +1012,23 @@ const CSS_GENERATORS: Record<PatternDefinition['type'], (p: PatternDefinition) =
   mudcloth: mudclothCss,
   adinkra: adinkraCss,
   shweshwe: shweshweCss,
+  // Phase 2b: Japanese + famous + medieval + continental
+  same_komon: sameKomonCss,
+  kanoko: kanokoCss,
+  hishi: hishiCss,
+  tachiwaki: tachiwakiCss,
+  bishamon_kikko: bishamonKikkoCss,
+  quatrefoil: quatrefoilCss,
+  herringbone: herringboneCss,
+  trellis: trellisCss,
+  damask: damaskCss,
+  camouflage: camouflageCss,
+  chainmail: chainmailCss,
+  gothic_trefoil: gothicTrefoilCss,
+  celtic_knot: celticKnotCss,
+  nordic_snowflake: nordicSnowflakeCss,
+  nordic_diamond: nordicDiamondCss,
+  native_step: nativeStepCss,
 };
 
 export function patternToCssBackground(pattern: PatternDefinition): CSSProperties {

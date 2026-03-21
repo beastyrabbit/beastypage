@@ -26,7 +26,12 @@ export interface PatternDefinition {
     // Phase 2: East Asian + African + Indian
     | 'kikko' | 'sayagata' | 'chinese_lattice' | 'chinese_coin' | 'ruyi_cloud'
     | 'dancheong' | 'batik_kawung' | 'batik_parang' | 'karakusa' | 'kolam'
-    | 'kente' | 'mudcloth' | 'adinkra' | 'shweshwe';
+    | 'kente' | 'mudcloth' | 'adinkra' | 'shweshwe'
+    // Phase 2b: Japanese + famous + medieval + continental
+    | 'same_komon' | 'kanoko' | 'hishi' | 'tachiwaki' | 'bishamon_kikko'
+    | 'quatrefoil' | 'herringbone' | 'trellis' | 'damask' | 'camouflage'
+    | 'chainmail' | 'gothic_trefoil' | 'celtic_knot'
+    | 'nordic_snowflake' | 'nordic_diamond' | 'native_step';
   tileSize: number;
   background: [number, number, number];
   foreground?: [number, number, number];
@@ -118,7 +123,12 @@ export type PaletteId =
   | 'chinese-patterns'
   | 'african-patterns'
   | 'indonesian-patterns'
-  | 'korean-patterns';
+  | 'korean-patterns'
+  // Phase 2b: New palettes
+  | 'scandinavian-patterns'
+  | 'medieval-patterns'
+  | 'american-patterns'
+  | 'famous-patterns';
 
 /**
  * PaletteMode is 'off' (classic/original colours) or a specific palette ID
