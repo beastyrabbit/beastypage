@@ -7,6 +7,7 @@ in the experimental tint pipeline.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Literal, Optional, Tuple
@@ -421,9 +422,10 @@ def _generate_flag(defn: PatternDefinition) -> np.ndarray:
 
 
 def _flag_svg(viewbox: str, *paths: str) -> str:
-    """Build a flag SVG string with viewBox scaling."""
+    """Build an SVG string with viewBox scaling (stretched to fill tile)."""
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{viewbox}">'
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{viewbox}"'
+        f' preserveAspectRatio="none">'
         + "".join(paths)
         + "</svg>"
     )
@@ -1199,8 +1201,6 @@ def _generate_art_deco_fan(defn: PatternDefinition) -> np.ndarray:
         f'<g clip-path="url(#c)">'
         f'<rect width="{ts}" height="{ts}" fill="{bg_s}"/>'
     )
-
-    import math
 
     # Fans from bottom-center and offset positions
     fan_positions = [
