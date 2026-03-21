@@ -875,8 +875,10 @@ def _generate_nordic_snowflake(defn: PatternDefinition) -> np.ndarray:
     diag = (np.abs(dx - dy) < diag_w) & (dx + dy < center * 0.85)
 
     # Small dots at arm tips
-    dots = (dx + dy > center * 0.6) & (dx + dy < center * 0.75) & (
-        (dx < arm_w * 2) | (dy < arm_w * 2)
+    dots = (
+        (dx + dy > center * 0.6)
+        & (dx + dy < center * 0.75)
+        & ((dx < arm_w * 2) | (dy < arm_w * 2))
     )
 
     mask = cross | diag | dots

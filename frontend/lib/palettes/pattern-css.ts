@@ -416,7 +416,7 @@ function paisleyCss(p: PatternDefinition): CSSPatternStyle {
 
   // Filled teardrop boteh with inner cutout and curled tip
   return {
-    background: flagSvgUrl('0 0 50 56',
+    background: buildSvgUrl('0 0 50 56',
       `<rect width="50" height="56" fill="${bgStr}"/>`,
       `<path d="M25 4 C16 4,8 14,8 27 C8 40,16 50,25 50 C34 50,42 40,42 27 C42 14,34 4,25 4Z" fill="${fgStr}"/>` +
       `<path d="M25 10 C19 10,14 18,14 27 C14 36,19 44,25 44 C31 44,36 36,36 27 C36 18,31 10,25 10Z" fill="${bgStr}"/>` +
@@ -793,7 +793,7 @@ function bishamonKikkoCss(p: PatternDefinition): CSSPatternStyle {
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
   const bgStr = rgb(p.background);
   return {
-    background: flagSvgUrl('0 0 88 88',
+    background: buildSvgUrl('0 0 88 88',
       `<rect width="88" height="88" fill="${bgStr}"/>`,
       `<path d="M29.42 29.41c.36-.36.58-.85.58-1.4V0h-4v26H0v4h28c.55 0 1.05-.22 1.41-.58h.01zm0 29.18c.36.36.58.86.58 1.4V88h-4V62H0v-4h28c.56 0 1.05.22 1.41.58zm29.16 0c-.36.36-.58.85-.58 1.4V88h4V62h26v-4H60c-.55 0-1.05.22-1.41.58zm0-29.18c-.36-.36-.58-.86-.58-1.4V0h4v26h26v4H60c-.56 0-1.05-.22-1.41-.58zM26 30H0v-2h26V2h2v28zm36 0h26v-2H62V2h-2v28zM26 58H0v2h26v26h2V58zm36 0h26v2H62v26h-2V58z" fill="${fgStr}" fill-rule="evenodd"/>`,
     ),
@@ -805,7 +805,7 @@ function quatrefoilCss(p: PatternDefinition): CSSPatternStyle {
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
   const bgStr = rgb(p.background);
   return {
-    background: flagSvgUrl('0 0 64 64',
+    background: buildSvgUrl('0 0 64 64',
       `<rect width="64" height="64" fill="${bgStr}"/>`,
       `<path d="M8 16c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zm33.414-6l5.95-5.95L45.95.636 40 6.586 34.05.636 32.636 2.05 38.586 8l-5.95 5.95 1.414 1.414L40 9.414l5.95 5.95 1.414-1.414L41.414 8zM40 48c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zM9.414 40l5.95-5.95-1.414-1.414L8 38.586l-5.95-5.95L.636 34.05 6.586 40l-5.95 5.95 1.414 1.414L8 41.414l5.95 5.95 1.414-1.414L9.414 40z" fill="${fgStr}" fill-rule="evenodd"/>`,
     ),
@@ -817,7 +817,7 @@ function herringboneCss(p: PatternDefinition): CSSPatternStyle {
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
   const bgStr = rgb(p.background);
   return {
-    background: flagSvgUrl('0 0 20 12',
+    background: buildSvgUrl('0 0 20 12',
       `<rect width="20" height="12" fill="${bgStr}"/>`,
       `<path d="M9.8 12L0 2.2V.8l10 10 10-10v1.4L10.2 12h-.4zm-4 0L0 6.2V4.8L7.2 12H5.8zm8.4 0L20 6.2V4.8L12.8 12h1.4zM9.8 0l.2.2.2-.2h-.4zm-4 0L10 4.2 14.2 0h-1.4L10 2.8 7.2 0H5.8z" fill="${fgStr}" fill-rule="evenodd"/>`,
     ),
@@ -829,7 +829,7 @@ function trellisCss(p: PatternDefinition): CSSPatternStyle {
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
   const bgStr = rgb(p.background);
   return {
-    background: flagSvgUrl('0 0 40 40',
+    background: buildSvgUrl('0 0 40 40',
       `<rect width="40" height="40" fill="${bgStr}"/>`,
       `<path d="M0 40L40 0H20L0 20zM40 40V20L20 40z" fill="${fgStr}" fill-rule="evenodd"/>`,
     ),
@@ -841,7 +841,7 @@ function damaskCss(p: PatternDefinition): CSSPatternStyle {
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
   const bgStr = rgb(p.background);
   return {
-    background: flagSvgUrl('0 0 60 60',
+    background: buildSvgUrl('0 0 60 60',
       `<rect width="60" height="60" fill="${bgStr}"/>`,
       `<path d="M54.627 0l.829.828-1.414 1.415L51.799 0h2.828zM5.373 0l-.829.828 1.414 1.415L8.201 0H5.373z" fill="${fgStr}" fill-opacity=".5" fill-rule="evenodd"/>`,
     ),
@@ -866,7 +866,7 @@ function chainmailCss(p: PatternDefinition): CSSPatternStyle {
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
   const bgStr = rgb(p.background);
   return {
-    background: flagSvgUrl('0 0 36 36',
+    background: buildSvgUrl('0 0 36 36',
       `<rect width="36" height="36" fill="${bgStr}"/>`,
       `<path d="M36 0H0v36h36V0zM15.126 2H2v13.126c.367.094.714.24 1.032.428L15.554 3.032c-.188-.318-.334-.665-.428-1.032zM18 4.874V18H4.874c-.094-.367-.24-.714-.428-1.032L16.968 4.446c.318.188.665.334 1.032.428z" fill="${fgStr}" fill-rule="evenodd"/>`,
     ),
@@ -878,7 +878,7 @@ function gothicTrefoilCss(p: PatternDefinition): CSSPatternStyle {
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
   const bgStr = rgb(p.background);
   return {
-    background: flagSvgUrl('0 0 24 24',
+    background: buildSvgUrl('0 0 24 24',
       `<rect width="24" height="24" fill="${bgStr}"/>`,
       `<path d="M8 4l4 2-4 2-2 4-2-4-4-2 4-2 2-4 2 4z" fill="${fgStr}"/>`,
     ),
@@ -890,7 +890,7 @@ function celticKnotCss(p: PatternDefinition): CSSPatternStyle {
   const fgStr = rgb(p.foreground ?? [255, 255, 255]);
   const bgStr = rgb(p.background);
   return {
-    background: flagSvgUrl('0 0 44 12',
+    background: buildSvgUrl('0 0 44 12',
       `<rect width="44" height="12" fill="${bgStr}"/>`,
       `<path d="M20 12v-2L0 0v10l4 2h16zm18 0l4-2V0L22 10v2h16zM20 0v8L4 0h16zm18 0L22 8V0h16z" fill="${fgStr}" fill-rule="evenodd"/>`,
     ),
