@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpng16-16 \
     zlib1g \
     libfreetype6 \
+    libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user

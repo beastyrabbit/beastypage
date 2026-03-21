@@ -7,7 +7,7 @@ import CheckedIcon from '@/components/ui/checked-icon';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { PageHero } from '@/components/common/PageHero';
-import { ADDITIONAL_PALETTES, patternToCssBackground, type PaletteCategory, type PatternDefinition } from '@/lib/palettes';
+import { ADDITIONAL_PALETTES, patternToCssBackground, type PaletteCategory, type PatternDefinition, type PaletteGroup } from '@/lib/palettes';
 import {
   rgbToHex,
   rgbToHsl,
@@ -21,6 +21,17 @@ import { generateACO } from '@/lib/color-extraction/palette-formats';
 const COLOR_FORMATS = ['hex', 'rgb', 'hsl', 'hsv', 'cmyk', 'oklch'] as const;
 
 type ColorFormat = (typeof COLOR_FORMATS)[number];
+
+const PALETTE_GROUP_LABELS: Record<PaletteGroup, string> = {
+  solid: 'Solid Colors',
+  anime: 'Anime & Film',
+  textile: 'Textile',
+  ornate: 'Ornate',
+  heritage: 'World Heritage',
+  flags: 'Flags',
+};
+
+const PALETTE_GROUPS: PaletteGroup[] = ['solid', 'anime', 'textile', 'ornate', 'heritage', 'flags'];
 
 function formatColor(
   rgb: [number, number, number],
@@ -238,10 +249,19 @@ function PaletteSection({
 
 export default function CatColorPalettesPage() {
   const [colorFormat, setColorFormat] = useState<ColorFormat>('hex');
+  const [activeGroup, setActiveGroup] = useState<PaletteGroup | 'all'>('all');
+
+  const filteredPalettes = useMemo(
+    () =>
+      activeGroup === 'all'
+        ? ADDITIONAL_PALETTES
+        : ADDITIONAL_PALETTES.filter((p) => p.group === activeGroup),
+    [activeGroup]
+  );
 
   const totalColors = useMemo(
-    () => ADDITIONAL_PALETTES.reduce((sum, p) => sum + Object.keys(p.colors).length, 0),
-    []
+    () => filteredPalettes.reduce((sum, p) => sum + Object.keys(p.colors).length, 0),
+    [filteredPalettes]
   );
 
   return (
@@ -250,32 +270,71 @@ export default function CatColorPalettesPage() {
         <PageHero
           eyebrow="Artist Tools"
           title="Cat Color Palettes"
-          description={`Browse ${ADDITIONAL_PALETTES.length} experimental color palettes with ${totalColors} unique colors for cat generation. Click any color to copy its ${colorFormat.toUpperCase()} value.`}
+          description={`Browse ${filteredPalettes.length} experimental color palettes with ${totalColors} unique colors for cat generation. Click any color to copy its ${colorFormat.toUpperCase()} value.`}
         />
 
-        {/* Format selector + palette sections */}
+        {/* Format selector + group filter + palette sections */}
         <div className="space-y-4">
-          <div className="glass-card flex items-center gap-3 px-6 py-3">
-            <span className="text-xs font-medium text-muted-foreground">Color format</span>
-            <div className="inline-flex items-center gap-1 rounded-full border border-border/30 bg-muted/30 p-1">
-              {COLOR_FORMATS.map((fmt) => (
+          <div className="glass-card flex flex-col gap-3 px-6 py-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-medium text-muted-foreground">Color format</span>
+              <div className="inline-flex items-center gap-1 rounded-full border border-border/30 bg-muted/30 p-1">
+                {COLOR_FORMATS.map((fmt) => (
+                  <button
+                    key={fmt}
+                    type="button"
+                    className={cn(
+                      'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition',
+                      colorFormat === fmt
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                    onClick={() => setColorFormat(fmt)}
+                  >
+                    {fmt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Category filter bar */}
+          <div className="glass-card overflow-x-auto px-6 py-3">
+            <div className="flex items-center gap-3">
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">Category</span>
+              <div className="inline-flex items-center gap-1 rounded-full border border-border/30 bg-muted/30 p-1">
                 <button
-                  key={fmt}
                   type="button"
                   className={cn(
-                    'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition',
-                    colorFormat === fmt
+                    'rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition whitespace-nowrap',
+                    activeGroup === 'all'
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
-                  onClick={() => setColorFormat(fmt)}
+                  onClick={() => setActiveGroup('all')}
                 >
-                  {fmt}
+                  All
                 </button>
-              ))}
+                {PALETTE_GROUPS.map((group) => (
+                  <button
+                    key={group}
+                    type="button"
+                    className={cn(
+                      'rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition whitespace-nowrap',
+                      activeGroup === group
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                    onClick={() => setActiveGroup(group)}
+                  >
+                    {PALETTE_GROUP_LABELS[group]}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          {ADDITIONAL_PALETTES.map((palette) => (
+
+          {filteredPalettes.map((palette) => (
             <PaletteSection key={palette.id} palette={palette} colorFormat={colorFormat} />
           ))}
         </div>

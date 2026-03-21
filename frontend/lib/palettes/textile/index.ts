@@ -23,6 +23,16 @@ import { windowpanePatternsPalette } from './windowpane-patterns';
 import { diagonalPatternsPalette } from './diagonal-patterns';
 import { basketweavePatternsPalette } from './basketweave-patterns';
 import { flagPatternsPalette } from './flag-patterns';
+import { scottishClansPalette } from './scottish-clans';
+import { japanesePatternsPalette } from './japanese-patterns';
+import { middleEasternRugsPalette } from './middle-eastern-rugs';
+import { europeanOrnatePalette } from './european-ornate';
+import { artDecoPatternsPalette } from './art-deco-patterns';
+import { indianPatternsPalette } from './indian-patterns';
+import { chinesePatternsPalette } from './chinese-patterns';
+import { africanPatternsPalette } from './african-patterns';
+import { indonesianPatternsPalette } from './indonesian-patterns';
+import { koreanPatternsPalette } from './korean-patterns';
 
 export const TEXTILE_PALETTES: PaletteCategory[] = [
   royalStewartPalette,
@@ -44,4 +54,14 @@ export const TEXTILE_PALETTES: PaletteCategory[] = [
   diagonalPatternsPalette,
   basketweavePatternsPalette,
   flagPatternsPalette,
+  scottishClansPalette,
+  japanesePatternsPalette,
+  middleEasternRugsPalette,
+  europeanOrnatePalette,
+  artDecoPatternsPalette,
+  indianPatternsPalette,
+  chinesePatternsPalette,
+  africanPatternsPalette,
+  indonesianPatternsPalette,
+  koreanPatternsPalette,
 ];

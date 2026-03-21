@@ -51,5 +51,15 @@ export const checkerboardPatternsPalette: PaletteCategory = {
     CB_PINK_BOLD: {
       pattern: { type: 'checkerboard', tileSize: 18, background: [220, 90, 130], foreground: [250, 235, 240] },
     },
+    // Missing texture — the iconic magenta/black checkerboard from Source engine games
+    CB_MISSING_FINE: {
+      pattern: { type: 'checkerboard', tileSize: 4, background: [0, 0, 0], foreground: [255, 0, 255] },
+    },
+    CB_MISSING_MED: {
+      pattern: { type: 'checkerboard', tileSize: 10, background: [0, 0, 0], foreground: [255, 0, 255] },
+    },
+    CB_MISSING_BOLD: {
+      pattern: { type: 'checkerboard', tileSize: 18, background: [0, 0, 0], foreground: [255, 0, 255] },
+    },
   },
 };

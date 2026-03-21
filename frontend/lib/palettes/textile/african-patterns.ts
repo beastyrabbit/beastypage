@@ -1,0 +1,70 @@
+import type { PaletteCategory } from '../types';
+
+export const africanPatternsPalette: PaletteCategory = {
+  id: 'african-patterns',
+  label: 'African Patterns',
+  description:
+    'West and South African textiles — Ghanaian kente, Malian mudcloth, adinkra stamps, and shweshwe prints',
+  colors: {
+    // Kente — gold and black (Ashanti royal cloth)
+    AF_KENTE_GOLD_FINE: {
+      pattern: { type: 'kente', tileSize: 6, background: [210, 175, 55], foreground: [25, 20, 15] },
+    },
+    AF_KENTE_GOLD_MED: {
+      pattern: { type: 'kente', tileSize: 12, background: [210, 175, 55], foreground: [25, 20, 15] },
+    },
+    AF_KENTE_GOLD_BOLD: {
+      pattern: { type: 'kente', tileSize: 20, background: [210, 175, 55], foreground: [25, 20, 15] },
+    },
+    // Kente — green and red (pan-African)
+    AF_KENTE_PAN_FINE: {
+      pattern: { type: 'kente', tileSize: 6, background: [0, 105, 55], foreground: [195, 25, 25] },
+    },
+    AF_KENTE_PAN_MED: {
+      pattern: { type: 'kente', tileSize: 12, background: [0, 105, 55], foreground: [195, 25, 25] },
+    },
+    AF_KENTE_PAN_BOLD: {
+      pattern: { type: 'kente', tileSize: 20, background: [0, 105, 55], foreground: [195, 25, 25] },
+    },
+    // Mudcloth — dark on ochre (Malian bogolanfini)
+    AF_MUDCLOTH_FINE: {
+      pattern: { type: 'mudcloth', tileSize: 8, background: [185, 145, 75], foreground: [35, 25, 15] },
+    },
+    AF_MUDCLOTH_MED: {
+      pattern: { type: 'mudcloth', tileSize: 14, background: [185, 145, 75], foreground: [35, 25, 15] },
+    },
+    AF_MUDCLOTH_BOLD: {
+      pattern: { type: 'mudcloth', tileSize: 22, background: [185, 145, 75], foreground: [35, 25, 15] },
+    },
+    // Adinkra — charcoal stamps on cream (Akan symbols)
+    AF_ADINKRA_FINE: {
+      pattern: { type: 'adinkra', tileSize: 10, background: [235, 228, 210], foreground: [42, 38, 32] },
+    },
+    AF_ADINKRA_MED: {
+      pattern: { type: 'adinkra', tileSize: 18, background: [235, 228, 210], foreground: [42, 38, 32] },
+    },
+    AF_ADINKRA_BOLD: {
+      pattern: { type: 'adinkra', tileSize: 28, background: [235, 228, 210], foreground: [42, 38, 32] },
+    },
+    // Shweshwe — white on indigo (South African three-cats)
+    AF_SHWESHWE_INDIGO_FINE: {
+      pattern: { type: 'shweshwe', tileSize: 6, background: [22, 32, 82], foreground: [220, 218, 225] },
+    },
+    AF_SHWESHWE_INDIGO_MED: {
+      pattern: { type: 'shweshwe', tileSize: 12, background: [22, 32, 82], foreground: [220, 218, 225] },
+    },
+    AF_SHWESHWE_INDIGO_BOLD: {
+      pattern: { type: 'shweshwe', tileSize: 20, background: [22, 32, 82], foreground: [220, 218, 225] },
+    },
+    // Shweshwe — white on turkey red
+    AF_SHWESHWE_RED_FINE: {
+      pattern: { type: 'shweshwe', tileSize: 6, background: [155, 28, 28], foreground: [235, 228, 218] },
+    },
+    AF_SHWESHWE_RED_MED: {
+      pattern: { type: 'shweshwe', tileSize: 12, background: [155, 28, 28], foreground: [235, 228, 218] },
+    },
+    AF_SHWESHWE_RED_BOLD: {
+      pattern: { type: 'shweshwe', tileSize: 20, background: [155, 28, 28], foreground: [235, 228, 218] },
+    },
+  },
+};

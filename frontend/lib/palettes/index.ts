@@ -2,7 +2,7 @@
  * Palette aggregator - single source of truth for all experimental color palettes
  */
 
-import type { PaletteCategory, PaletteColorDef, FullPaletteColorDef, PaletteId, PaletteMode } from './types';
+import type { PaletteCategory, PaletteColorDef, FullPaletteColorDef, PaletteId, PaletteMode, PaletteGroup } from './types';
 import { toFullColorDef } from './types';
 
 // Base palettes
@@ -30,7 +30,66 @@ import { PURE_PALETTES } from './pure';
 import { TEXTILE_PALETTES } from './textile';
 
 /**
- * All additional palettes in display order
+ * Assign a group to a palette without modifying the original definition.
+ */
+function withGroup(palette: PaletteCategory, group: PaletteGroup): PaletteCategory {
+  return { ...palette, group };
+}
+
+/**
+ * Group assignments — centralized so individual palette files don't need a `group` field.
+ */
+const SOLID_IDS = new Set<PaletteId>([
+  'mood', 'bold', 'darker', 'blackout',
+  // All pure/monochromatic palettes are also solid
+  'ocean-depths', 'midnight-velvet', 'arctic-waters', 'emerald-forest',
+  'jade-mist', 'electric-grass', 'golden-hour', 'ember-glow',
+  'crimson-flame', 'rose-garden', 'neon-blossom', 'royal-amethyst',
+  'twilight-haze', 'espresso-bean', 'desert-sand', 'storm-cloud',
+  'coral-reef', 'tropical-lagoon', 'midnight-wine', 'peach-sorbet',
+  'greyscale', 'cold-steel', 'ink-wash',
+]);
+
+const ANIME_IDS = new Set<PaletteId>([
+  'mononoke', 'howl', 'demonslayer', 'titanic', 'deathnote',
+  'slime', 'ghostintheshell', 'mushishi', 'chisweethome', 'fma',
+]);
+
+const TEXTILE_IDS = new Set<PaletteId>([
+  'royal-stewart', 'black-watch', 'country-tweed', 'savile-row',
+  'bavarian-tracht', 'oktoberfest',
+  'tartan-patterns', 'gingham-patterns', 'houndstooth-patterns',
+  'pinstripe-patterns', 'chevron-patterns', 'polkadot-patterns',
+  'argyle-patterns', 'buffalo-patterns', 'checkerboard-patterns',
+  'windowpane-patterns', 'diagonal-patterns', 'basketweave-patterns',
+]);
+
+const ORNATE_IDS = new Set<PaletteId>([
+  'european-ornate', 'art-deco-patterns',
+]);
+
+const HERITAGE_IDS = new Set<PaletteId>([
+  'scottish-clans', 'japanese-patterns', 'middle-eastern-rugs', 'indian-patterns',
+  'chinese-patterns', 'african-patterns', 'indonesian-patterns', 'korean-patterns',
+]);
+
+const FLAG_IDS = new Set<PaletteId>(['flag-patterns']);
+
+function inferGroup(id: PaletteId): PaletteGroup {
+  if (SOLID_IDS.has(id)) return 'solid';
+  if (ANIME_IDS.has(id)) return 'anime';
+  if (TEXTILE_IDS.has(id)) return 'textile';
+  if (ORNATE_IDS.has(id)) return 'ornate';
+  if (HERITAGE_IDS.has(id)) return 'heritage';
+  if (FLAG_IDS.has(id)) return 'flags';
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(`[palettes] palette "${id}" has no group assignment — defaulting to 'solid'`);
+  }
+  return 'solid';
+}
+
+/**
+ * All additional palettes in display order, with groups assigned.
  */
 export const ADDITIONAL_PALETTES: PaletteCategory[] = [
   // Original palettes
@@ -53,7 +112,7 @@ export const ADDITIONAL_PALETTES: PaletteCategory[] = [
   ...PURE_PALETTES,
   // Textile-inspired palettes
   ...TEXTILE_PALETTES,
-];
+].map((p) => withGroup(p, inferGroup(p.id)));
 
 /**
  * Map of palette ID to palette category for quick lookups
@@ -159,7 +218,14 @@ export function isExperimentalColor(colorName: string): boolean {
   return ADDITIONAL_PALETTES.some((palette) => upper in palette.colors);
 }
 
+/**
+ * Get palettes filtered by group
+ */
+export function getPalettesByGroup(group: PaletteGroup): PaletteCategory[] {
+  return ADDITIONAL_PALETTES.filter((p) => p.group === group);
+}
+
 // Re-export types and utilities
-export type { PaletteCategory, PaletteColorDef, FullPaletteColorDef, PaletteId, PaletteMode };
+export type { PaletteCategory, PaletteColorDef, FullPaletteColorDef, PaletteId, PaletteMode, PaletteGroup };
 export type { PatternDefinition, PatternStripe } from './types';
 export { patternToCssBackground } from './pattern-css';

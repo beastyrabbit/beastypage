@@ -89,7 +89,7 @@ await page.screenshot({ path: 'my-screenshot.png' });
 
 ## Ports
 
-Frontend dev server runs on port 3100, renderer service on 8001, image processing on 8002 (registered in `/home/beasty/projects/.ports`).
+Ports are managed by portless — check dev server output or `/home/beasty/projects/.ports` for registered defaults.
 
 ## Project Structure
 
