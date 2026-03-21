@@ -1136,7 +1136,7 @@ def _generate_four_point_star_motif(defn: PatternDefinition) -> np.ndarray:
 
 
 def _generate_celtic_knot(defn: PatternDefinition) -> np.ndarray:
-    """Angular crossing bands with over-under weave (Irish celtic knot).
+    """Interlocking chevron band pattern (Celtic-inspired).
 
     Based on Hero Patterns 'curtain' (MIT license).
     """

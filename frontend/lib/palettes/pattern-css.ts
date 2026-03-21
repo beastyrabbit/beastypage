@@ -906,13 +906,14 @@ function nordicSnowflakeCss(p: PatternDefinition): CSSPatternStyle {
   const fg = rgb(p.foreground ?? [255, 255, 255]);
   const c = ts / 2;
   const a = ts * 0.08;
+  const r = c * 0.85; // arm length, contained within tile
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${ts}" height="${ts}">` +
     `<rect width="${ts}" height="${ts}" fill="${rgb(p.background)}"/>` +
-    `<line x1="${c}" y1="0" x2="${c}" y2="${ts}" stroke="${fg}" stroke-width="${2 * a}"/>` +
-    `<line x1="0" y1="${c}" x2="${ts}" y2="${c}" stroke="${fg}" stroke-width="${2 * a}"/>` +
-    `<line x1="0" y1="0" x2="${ts}" y2="${ts}" stroke="${fg}" stroke-width="${a}"/>` +
-    `<line x1="${ts}" y1="0" x2="0" y2="${ts}" stroke="${fg}" stroke-width="${a}"/>` +
+    `<line x1="${c}" y1="${c - r}" x2="${c}" y2="${c + r}" stroke="${fg}" stroke-width="${2 * a}"/>` +
+    `<line x1="${c - r}" y1="${c}" x2="${c + r}" y2="${c}" stroke="${fg}" stroke-width="${2 * a}"/>` +
+    `<line x1="${c - r * 0.7}" y1="${c - r * 0.7}" x2="${c + r * 0.7}" y2="${c + r * 0.7}" stroke="${fg}" stroke-width="${a}"/>` +
+    `<line x1="${c + r * 0.7}" y1="${c - r * 0.7}" x2="${c - r * 0.7}" y2="${c + r * 0.7}" stroke="${fg}" stroke-width="${a}"/>` +
     `</svg>`;
   return { background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, backgroundSize: `${ts}px ${ts}px` };
 }
@@ -935,12 +936,11 @@ function nativeStepCss(p: PatternDefinition): CSSPatternStyle {
   const fg = rgb(p.foreground ?? [255, 255, 255]);
   const c = ts / 2;
   const s = Math.max(ts / 6, 1);
+  // Stepped diamond: polygon with staircase edges matching backend
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${ts}" height="${ts}">` +
     `<rect width="${ts}" height="${ts}" fill="${rgb(p.background)}"/>` +
-    `<rect x="${c - 2 * s}" y="${c - 2 * s}" width="${4 * s}" height="${4 * s}" fill="${fg}"/>` +
-    `<rect x="${c - s}" y="${c - 3 * s}" width="${2 * s}" height="${6 * s}" fill="${fg}"/>` +
-    `<rect x="${c - 3 * s}" y="${c - s}" width="${6 * s}" height="${2 * s}" fill="${fg}"/>` +
+    `<polygon points="${c},${c - 3 * s} ${c + s},${c - 2 * s} ${c + 2 * s},${c - s} ${c + 3 * s},${c} ${c + 2 * s},${c + s} ${c + s},${c + 2 * s} ${c},${c + 3 * s} ${c - s},${c + 2 * s} ${c - 2 * s},${c + s} ${c - 3 * s},${c} ${c - 2 * s},${c - s} ${c - s},${c - 2 * s}" fill="${fg}"/>` +
     `</svg>`;
   return { background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, backgroundSize: `${ts}px ${ts}px` };
 }
