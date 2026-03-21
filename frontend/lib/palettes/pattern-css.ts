@@ -578,8 +578,13 @@ function chineseLatticeCss(p: PatternDefinition): CSSPatternStyle {
     `<rect width="${ts}" height="${ts}" fill="${rgb(p.background)}"/>` +
     `<g fill="none" stroke="${fgStr}" stroke-width="${sw}">` +
     `<polygon points="${u},0 ${3 * u},0 ${2.5 * u},${2 * u} ${1.5 * u},${1.5 * u}"/>` +
+    `<polygon points="${3 * u},0 ${ts},0 ${ts},${1.5 * u} ${3.5 * u},${2 * u}"/>` +
+    `<polygon points="0,0 ${u},0 ${1.5 * u},${1.5 * u} 0,${2 * u}"/>` +
     `<polygon points="0,${2 * u} ${1.5 * u},${1.5 * u} ${2.5 * u},${2 * u} ${2 * u},${3.5 * u} 0,${3 * u}"/>` +
+    `<polygon points="${2.5 * u},${2 * u} ${3.5 * u},${2 * u} ${ts},${1.5 * u} ${ts},${3.5 * u} ${3 * u},${3.5 * u}"/>` +
+    `<polygon points="0,${3 * u} ${2 * u},${3.5 * u} ${1.5 * u},${ts} 0,${ts}"/>` +
     `<polygon points="${2 * u},${3.5 * u} ${3 * u},${3.5 * u} ${3.5 * u},${ts} ${1.5 * u},${ts}"/>` +
+    `<polygon points="${3 * u},${3.5 * u} ${ts},${3.5 * u} ${ts},${ts} ${3.5 * u},${ts}"/>` +
     `</g></svg>`;
   return { background: `url("data:image/svg+xml,${encodeURIComponent(svg)}")`, backgroundSize: `${ts}px ${ts}px` };
 }
