@@ -425,9 +425,7 @@ def _flag_svg(viewbox: str, *paths: str) -> str:
     """Build an SVG string with viewBox scaling (stretched to fill tile)."""
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{viewbox}"'
-        f' preserveAspectRatio="none">'
-        + "".join(paths)
-        + "</svg>"
+        f' preserveAspectRatio="none">' + "".join(paths) + "</svg>"
     )
 
 
@@ -1153,7 +1151,7 @@ def _generate_islamic_star(defn: PatternDefinition) -> np.ndarray:
         " 14.785 5.738 18 12.73v-7.434c-3.545-4.262-8.426-7.374-14"
         "-8.69V14h-5.993C52.271 14 46 7.734 46 0h-4zM0 34.82c3.213"
         "-6.992 9.984-12.008 18-12.73V18h2.001C29.94 18 38 9.941 38"
-        f' 0h-4c0 7.732-6.275 14-14.007 14H14v4.696c-5.574 1.316-10.455'
+        f" 0h-4c0 7.732-6.275 14-14.007 14H14v4.696c-5.574 1.316-10.455"
         f' 4.428-14 8.69v7.433z" fill="{fg_s}" fill-rule="evenodd"/>'
         "</svg>"
     )
@@ -1178,7 +1176,7 @@ def _generate_greek_key(defn: PatternDefinition) -> np.ndarray:
         "-54 92v-18H50v18h18zm-20-18H28V82H10v38h20v20h38v-18H48v-20zm0-2"
         "V82H30v18h18zm-20 22H10v18h18v-18zm54 0v18h38v-20h20V82h-18v20h-20"
         "v20H82zm18-20H82v18h18v-18zm2-2h18V82h-18v18zm20 40v-18h18v18h-18z"
-        f'M30 0h-2v8H8v20H0v2h8v40h42V50h20V8H30V0zm20 48h18V30H50v18zm18'
+        f"M30 0h-2v8H8v20H0v2h8v40h42V50h20V8H30V0zm20 48h18V30H50v18zm18"
         "-20H48v20H28v20H10V30h20V10h38v18zM30 50h18v18H30V50zm-2-40H10v18"
         f'h18V10z" fill="{fg_s}" fill-rule="evenodd"/>'
         "</svg>"
@@ -1246,7 +1244,7 @@ def _generate_fleur_de_lis(defn: PatternDefinition) -> np.ndarray:
         f'<rect width="24" height="24" fill="{bg_s}"/>'
         f'<path fill="{fg_s}" d="M12 2S9 4 9 7 11 12 11 16H10S10 14 9 12'
         "C7 8 3 10 3 13S5 16 5 16C5 13 8.5 13 8.5 16H7V18H10.5L9 20S10 21"
-        ' 11 20L12 22L13 20C14 21 15 20 15 20L13.5 18H17V16H15.5C15.5 13'
+        " 11 20L12 22L13 20C14 21 15 20 15 20L13.5 18H17V16H15.5C15.5 13"
         " 19 13 19 16C19 16 21 16 21 13S17 8 15 12C14 14 14 16 14 16H13"
         'C13 12 15 10 15 7S12 2 12 2Z"/>'
         "</svg>"
