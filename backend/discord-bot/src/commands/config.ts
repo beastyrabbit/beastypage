@@ -47,7 +47,7 @@ async function handleView(
     console.error("Error fetching config:", error);
     await interaction.editReply({
       content: "Failed to fetch config. Please try again later.",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to send error reply:", e));
   }
 }
 
@@ -106,7 +106,7 @@ async function handleSet(
     console.error("Error updating config:", error);
     await interaction.editReply({
       content: "Failed to update config. Please try again later.",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to send error reply:", e));
   }
 }
 
@@ -129,7 +129,7 @@ async function handlePaletteAdd(
     console.error("Error adding palette:", error);
     await interaction.editReply({
       content: "Failed to add palette. Please try again later.",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to send error reply:", e));
   }
 }
 
@@ -152,7 +152,7 @@ async function handlePaletteRemove(
     console.error("Error removing palette:", error);
     await interaction.editReply({
       content: "Failed to remove palette. Please try again later.",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to send error reply:", e));
   }
 }
 
@@ -173,7 +173,7 @@ async function handleReset(
     console.error("Error resetting config:", error);
     await interaction.editReply({
       content: "Failed to reset config. Please try again later.",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to send error reply:", e));
   }
 }
 
@@ -184,24 +184,31 @@ export async function handleConfigAutocomplete(
     const sub = interaction.options.getSubcommand();
     const focused = interaction.options.getFocused(true);
 
-    if (focused.name !== "palette") return;
+    if (focused.name !== "palette") {
+      await interaction.respond([]);
+      return;
+    }
 
     const input = focused.value.toLowerCase();
 
     if (sub === "palette-add") {
-      const paletteCatalog = await getPaletteCatalog();
-      // Show all palettes, filtered by input
-      const filtered = paletteCatalog
-        .filter(
-          (p) =>
-            p.id.toLowerCase().includes(input) ||
-            p.label.toLowerCase().includes(input)
-        )
-        .slice(0, 25);
+      try {
+        const paletteCatalog = await getPaletteCatalog();
+        // Show all palettes, filtered by input
+        const filtered = paletteCatalog
+          .filter(
+            (p) =>
+              p.id.toLowerCase().includes(input) ||
+              p.label.toLowerCase().includes(input)
+          )
+          .slice(0, 25);
 
-      await interaction.respond(
-        filtered.map((p) => ({ name: p.label, value: p.id }))
-      );
+        await interaction.respond(
+          filtered.map((p) => ({ name: p.label, value: p.id }))
+        );
+      } catch {
+        await interaction.respond([]);
+      }
     } else if (sub === "palette-remove") {
       // Show only the user's active palettes
       try {
@@ -229,5 +236,8 @@ export async function handleConfigAutocomplete(
     }
   } catch (error) {
     console.error("Config autocomplete error:", error);
+    try {
+      await interaction.respond([]);
+    } catch { /* interaction may already be responded to */ }
   }
 }

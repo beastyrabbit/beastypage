@@ -290,11 +290,7 @@ export async function generateRandomParamsV3(options: RandomGenerationOptions = 
     isTortie: false,
   };
 
-  if (roll(RANDOM_CONFIG.probabilities.isTortie)) {
-    params.isTortie = true;
-  } else {
-    params.isTortie = false;
-  }
+  params.isTortie = roll(RANDOM_CONFIG.probabilities.isTortie);
 
   if (roll(RANDOM_CONFIG.probabilities.heterochromia)) {
     const heteroPool = ['', ...eyeColours];

@@ -10,11 +10,11 @@ export function WelcomeStep({ onNext, hasInitialCode }: WizardStepProps) {
         🐱
       </div>
 
-      <div className="max-w-lg space-y-4">
+      <section className="max-w-lg space-y-4 rounded-2xl border border-border/40 bg-card/60 p-6 backdrop-blur">
         <h2 className="text-2xl font-bold text-foreground sm:text-3xl">
           Configure Your Cat Settings
         </h2>
-        <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
+        <p className="text-base leading-relaxed text-muted-foreground">
           You&apos;ve purchased a Single Cat Plus gacha &mdash; nice! This
           wizard will walk you through each generation setting step-by-step so
           you can customise exactly how your cat looks.
@@ -23,7 +23,7 @@ export function WelcomeStep({ onNext, hasInitialCode }: WizardStepProps) {
           At the end you&apos;ll get a settings code to copy and submit with your
           order. You can always come back and tweak it later.
         </p>
-      </div>
+      </section>
 
       {hasInitialCode && (
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-sm text-emerald-300">

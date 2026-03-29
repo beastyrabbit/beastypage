@@ -109,8 +109,8 @@ function AfterlifeComparison({ settings }: { settings: WizardStepProps["settings
           return next;
         });
       }
-    } catch {
-      // leave nulls
+    } catch (err) {
+      console.error("[AfterlifeComparison] generation failed:", err);
     }
     setIsGenerating(false);
   }, [generator, isGenerating, settings]);
@@ -173,17 +173,17 @@ export function AfterlifeStep(props: WizardStepProps) {
   return (
     <div className="space-y-6">
       {/* Explanation */}
-      <div className="space-y-2">
-        <h2 className="text-xl font-bold text-foreground sm:text-2xl">
+      <section className="space-y-2 rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
+        <h2 className="text-2xl font-bold text-foreground sm:text-3xl">
           Afterlife Effects
         </h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-base leading-relaxed text-muted-foreground">
           In Warriors lore, cats can join <strong>StarClan</strong> (a starry
           spirit) or the <strong>Dark Forest</strong> (a shadowy ghost). These
           are rare visual effects that change the overall appearance of your
           cat.
         </p>
-      </div>
+      </section>
 
       {/* Visual comparison — dedicated inline render */}
       <section className="rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">

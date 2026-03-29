@@ -86,7 +86,7 @@ export function ExampleCatGrid({ settings }: ExampleCatGridProps) {
       }
     } catch (err) {
       console.error("[ExampleCatGrid] generation failed", err);
-      setError("Failed to generate cats. Is the renderer running?");
+      setError("Failed to generate preview cats. Try refreshing the page.");
     } finally {
       setIsGenerating(false);
     }

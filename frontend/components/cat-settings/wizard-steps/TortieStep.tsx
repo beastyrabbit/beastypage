@@ -65,8 +65,8 @@ function TortieComparison({ settings }: { settings: WizardStepProps["settings"] 
           return next;
         });
       }
-    } catch {
-      // leave nulls
+    } catch (err) {
+      console.error("[TortieComparison] generation failed:", err);
     }
     setIsGenerating(false);
   }, [generator, isGenerating, settings]);
@@ -129,17 +129,17 @@ export function TortieStep(props: WizardStepProps) {
   return (
     <div className="space-y-6">
       {/* Explanation */}
-      <div className="space-y-2">
-        <h2 className="text-xl font-bold text-foreground sm:text-2xl">
+      <section className="space-y-2 rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
+        <h2 className="text-2xl font-bold text-foreground sm:text-3xl">
           Tortie Layers
         </h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-base leading-relaxed text-muted-foreground">
           Tortie layers add additional coat colours stacked on top of the base.
           More layers = more complex multi-coloured cats. A cat with 0 tortie
           layers is a solid-coat cat; 4 layers creates rich, multi-coloured
           patterns.
         </p>
-      </div>
+      </section>
 
       {/* Demo comparison — same cat with progressive layers */}
       <section className="rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">

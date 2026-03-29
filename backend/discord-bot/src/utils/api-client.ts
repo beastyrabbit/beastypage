@@ -206,6 +206,7 @@ export async function getPaletteCatalog(): Promise<PaletteCatalogEntry[]> {
     return data;
   } catch (error) {
     if (paletteCatalogCache?.data.length) {
+      console.warn("[api-client] palette catalog fetch failed, serving stale cache:", error);
       return paletteCatalogCache.data;
     }
     throw error;

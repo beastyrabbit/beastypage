@@ -11,19 +11,38 @@ export function PalettesStep(props: WizardStepProps) {
   const paletteCount = settings.extendedModes.length;
   const showWarning = paletteCount > 5;
 
+  const nav = (
+    <div className="flex justify-between">
+      <button
+        type="button"
+        onClick={onBack}
+        className="rounded-lg border border-border/50 bg-background/70 px-6 py-2.5 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+      >
+        &larr; Back
+      </button>
+      <button
+        type="button"
+        onClick={onNext}
+        className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-6 py-2.5 text-sm font-medium text-amber-200 transition hover:bg-amber-500/20"
+      >
+        Next: Summary &rarr;
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Explanation */}
-      <div className="space-y-2">
-        <h2 className="text-xl font-bold text-foreground sm:text-2xl">
+      <section className="space-y-2 rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
+        <h2 className="text-2xl font-bold text-foreground sm:text-3xl">
           Colour Palettes
         </h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-base leading-relaxed text-muted-foreground">
           Colour palettes define the pool of colours for your cat. We
           recommend <strong>3 palettes</strong> (most people pick 3). Each
           palette adds its set of colours to the random selection pool.
         </p>
-      </div>
+      </section>
 
       {showWarning && (
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-3 text-sm text-amber-200">
@@ -53,22 +72,7 @@ export function PalettesStep(props: WizardStepProps) {
       </section>
 
       {/* Navigation — top (above the long palette list) */}
-      <div className="flex justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-lg border border-border/50 bg-background/70 px-6 py-2.5 text-sm font-medium text-muted-foreground transition hover:text-foreground"
-        >
-          &larr; Back
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-6 py-2.5 text-sm font-medium text-amber-200 transition hover:bg-amber-500/20"
-        >
-          Next: Summary &rarr;
-        </button>
-      </div>
+      {nav}
 
       {/* Palette picker */}
       <section className="rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
@@ -82,22 +86,7 @@ export function PalettesStep(props: WizardStepProps) {
       </section>
 
       {/* Navigation */}
-      <div className="flex justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-lg border border-border/50 bg-background/70 px-6 py-2.5 text-sm font-medium text-muted-foreground transition hover:text-foreground"
-        >
-          &larr; Back
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-6 py-2.5 text-sm font-medium text-amber-200 transition hover:bg-amber-500/20"
-        >
-          Next: Summary &rarr;
-        </button>
-      </div>
+      {nav}
     </div>
   );
 }

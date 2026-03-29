@@ -441,7 +441,9 @@ export async function generateRandomParamsServer(
     isTortie: false,
     darkForest: isDarkForest,
     darkMode: isDarkForest,
-    dead: overrides.starclan === true ? true : undefined,
+    dead: overrides.starclan === true ? true :
+          overrides.starclan === false ? false :
+          undefined,
   };
 
   // Heterochromia
@@ -454,7 +456,7 @@ export async function generateRandomParamsServer(
   // Tortie — per-invocation override > user config range > random chance
   const tortieMin = overrides.tortiesMin ?? 0;
   const tortieMax = overrides.tortiesMax ?? 4;
-  const tortieCount = overrides.torties ?? undefined;
+  const tortieCount = overrides.torties;
   if (tortieCount === 0) {
     params.isTortie = false;
   } else if (tortieCount !== undefined) {

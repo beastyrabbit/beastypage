@@ -83,8 +83,8 @@ export function CatSettingsClient({
       await navigator.clipboard.writeText(liveCode);
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 1500);
-    } catch {
-      // Fallback: select text
+    } catch (err) {
+      console.warn("[CatSettings] clipboard copy failed:", err);
     }
   }, [liveCode]);
 
@@ -95,8 +95,8 @@ export function CatSettingsClient({
       await navigator.clipboard.writeText(url);
       setCopyUrlFeedback(true);
       setTimeout(() => setCopyUrlFeedback(false), 1500);
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.warn("[CatSettings] clipboard URL copy failed:", err);
     }
   }, [liveCode]);
 

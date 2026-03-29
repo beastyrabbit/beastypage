@@ -1285,8 +1285,8 @@ function SettingsCodeSection({
       await navigator.clipboard.writeText(liveCode);
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 1500);
-    } catch {
-      /* noop */
+    } catch (err) {
+      console.warn("[SingleCatPlus] clipboard copy failed:", err);
     }
   }, [liveCode]);
 

@@ -18,8 +18,8 @@ export function SummaryStep(props: WizardStepProps) {
       await navigator.clipboard.writeText(liveCode);
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 1500);
-    } catch {
-      /* fallback silently */
+    } catch (err) {
+      console.warn("[SummaryStep] clipboard copy failed:", err);
     }
   }, [liveCode]);
 
@@ -29,8 +29,8 @@ export function SummaryStep(props: WizardStepProps) {
       await navigator.clipboard.writeText(url);
       setCopyUrlFeedback(true);
       setTimeout(() => setCopyUrlFeedback(false), 1500);
-    } catch {
-      /* fallback silently */
+    } catch (err) {
+      console.warn("[SummaryStep] clipboard URL copy failed:", err);
     }
   }, [liveCode]);
 

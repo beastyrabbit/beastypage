@@ -156,16 +156,16 @@ export function AccessoriesStep(props: WizardStepProps) {
   return (
     <div className="space-y-6">
       {/* Explanation */}
-      <div className="space-y-2">
-        <h2 className="text-xl font-bold text-foreground sm:text-2xl">
+      <section className="space-y-2 rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
+        <h2 className="text-2xl font-bold text-foreground sm:text-3xl">
           Accessories
         </h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-base leading-relaxed text-muted-foreground">
           Accessories are items your cat wears &mdash; plants, collars,
           feathers, and more. There are <strong>{poolRef.current.length || "360"}+</strong> options
           that get randomly selected. You control how many your cat can wear.
         </p>
-      </div>
+      </section>
 
       {/* Controls */}
       <section className="rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">

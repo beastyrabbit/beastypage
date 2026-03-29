@@ -151,14 +151,14 @@ export function ScarsStep(props: WizardStepProps) {
   return (
     <div className="space-y-6">
       {/* Explanation */}
-      <div className="space-y-2">
-        <h2 className="text-xl font-bold text-foreground sm:text-2xl">Scars</h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+      <section className="space-y-2 rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
+        <h2 className="text-2xl font-bold text-foreground sm:text-3xl">Scars</h2>
+        <p className="text-base leading-relaxed text-muted-foreground">
           Scars tell your cat&apos;s story &mdash; <strong>{poolRef.current.length || 53}</strong> scars
           across battle, missing parts, and environmental categories. You
           control how many scars each cat can have.
         </p>
-      </div>
+      </section>
 
       {/* Controls */}
       <section className="rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
