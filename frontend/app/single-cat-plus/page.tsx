@@ -5,6 +5,8 @@ import { SingleCatPlusClient, type AfterlifeOption } from "@/components/single-c
 import type { SingleCatSettings } from "@/utils/singleCatVariants";
 import { parseSingleCatPayload } from "@/utils/singleCatVariants";
 import { getServerConvexUrl } from "@/lib/convexUrl";
+import { decodePortableSettings } from "@/lib/portable-settings";
+import type { SingleCatPortableSettings } from "@/lib/portable-settings";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -95,6 +97,13 @@ export default async function SingleCatPlusPage({ searchParams }: SingleCatPlusP
     initialVariantLoadError = loaded.error;
   }
 
+  // Portable settings code (?code=word-word-word-word-word-word)
+  const codeParam = firstSearchParam(resolvedSearchParams.code)?.trim() ?? null;
+  let initialCodeSettings: SingleCatPortableSettings | null = null;
+  if (codeParam) {
+    initialCodeSettings = decodePortableSettings(codeParam);
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
@@ -113,6 +122,7 @@ export default async function SingleCatPlusPage({ searchParams }: SingleCatPlusP
         variantSlug={variantSlug}
         initialVariantSettings={initialVariantSettings}
         initialVariantLoadError={initialVariantLoadError}
+        initialCodeSettings={initialCodeSettings}
       />
     </main>
   );

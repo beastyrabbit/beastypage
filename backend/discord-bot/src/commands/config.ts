@@ -2,49 +2,12 @@ import {
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
 } from "discord.js";
-import { getUserConfig, updateUserConfig } from "../utils/api-client.js";
+import {
+  getPaletteCatalog,
+  getUserConfig,
+  updateUserConfig,
+} from "../utils/api-client.js";
 import { buildConfigEmbed } from "../utils/embed-builder.js";
-
-/** All 34 palette IDs with human-readable labels for autocomplete */
-const ALL_PALETTES: { id: string; label: string }[] = [
-  // Base
-  { id: "mood", label: "Mood" },
-  { id: "bold", label: "Bold" },
-  { id: "darker", label: "Darker" },
-  { id: "blackout", label: "Blackout" },
-  // Anime
-  { id: "mononoke", label: "Princess Mononoke" },
-  { id: "howl", label: "Howl's Moving Castle" },
-  { id: "demonslayer", label: "Demon Slayer" },
-  { id: "titanic", label: "Titanic" },
-  { id: "deathnote", label: "Death Note" },
-  { id: "slime", label: "That Time I Got Reincarnated as a Slime" },
-  { id: "ghostintheshell", label: "Ghost in the Shell" },
-  { id: "mushishi", label: "Mushishi" },
-  { id: "chisweethome", label: "Chi's Sweet Home" },
-  { id: "fma", label: "Fullmetal Alchemist" },
-  // Pure
-  { id: "ocean-depths", label: "Ocean Depths" },
-  { id: "midnight-velvet", label: "Midnight Velvet" },
-  { id: "arctic-waters", label: "Arctic Waters" },
-  { id: "emerald-forest", label: "Emerald Forest" },
-  { id: "jade-mist", label: "Jade Mist" },
-  { id: "electric-grass", label: "Electric Grass" },
-  { id: "golden-hour", label: "Golden Hour" },
-  { id: "ember-glow", label: "Ember Glow" },
-  { id: "crimson-flame", label: "Crimson Flame" },
-  { id: "rose-garden", label: "Rose Garden" },
-  { id: "neon-blossom", label: "Neon Blossom" },
-  { id: "royal-amethyst", label: "Royal Amethyst" },
-  { id: "twilight-haze", label: "Twilight Haze" },
-  { id: "espresso-bean", label: "Espresso Bean" },
-  { id: "desert-sand", label: "Desert Sand" },
-  { id: "storm-cloud", label: "Storm Cloud" },
-  { id: "coral-reef", label: "Coral Reef" },
-  { id: "tropical-lagoon", label: "Tropical Lagoon" },
-  { id: "midnight-wine", label: "Midnight Wine" },
-  { id: "peach-sorbet", label: "Peach Sorbet" },
-];
 
 export async function handleConfigCommand(
   interaction: ChatInputCommandInteraction
@@ -226,8 +189,9 @@ export async function handleConfigAutocomplete(
     const input = focused.value.toLowerCase();
 
     if (sub === "palette-add") {
+      const paletteCatalog = await getPaletteCatalog();
       // Show all palettes, filtered by input
-      const filtered = ALL_PALETTES
+      const filtered = paletteCatalog
         .filter(
           (p) =>
             p.id.toLowerCase().includes(input) ||
@@ -242,9 +206,10 @@ export async function handleConfigAutocomplete(
       // Show only the user's active palettes
       try {
         const cfg = await getUserConfig(interaction.user.id);
+        const paletteCatalog = await getPaletteCatalog();
         const active = cfg.palettes
           .map((id) => {
-            const match = ALL_PALETTES.find((p) => p.id === id);
+            const match = paletteCatalog.find((p) => p.id === id);
             return match ?? { id, label: id };
           })
           .filter(

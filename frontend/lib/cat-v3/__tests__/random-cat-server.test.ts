@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateRandomParamsServer } from '../random-cat-server';
+import { getColorNamesForPalette } from '@/lib/palettes';
 
 // Valid sprite pool from random-config.json
 const VALID_SPRITES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
@@ -100,5 +101,40 @@ describe('generateRandomParamsServer', () => {
     expect(params.tortieMask).toBeDefined();
     expect(params.tortiePattern).toBeDefined();
     expect(params.tortieColour).toBeDefined();
+  });
+
+  it('uses new pattern palette colours when palette overrides are provided', async () => {
+    const allowed = new Set(getColorNamesForPalette('chevron-patterns'));
+    expect(allowed.size).toBeGreaterThan(0);
+
+    for (let i = 0; i < 10; i += 1) {
+      const params = await generateRandomParamsServer({
+        palettes: ['chevron-patterns'],
+        torties: 2,
+      });
+
+      expect(allowed.has(params.colour)).toBe(true);
+      for (const layer of params.tortie ?? []) {
+        if (layer?.colour) {
+          expect(allowed.has(layer.colour)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('does not fall back to classic colours when multiple pattern palettes are selected', async () => {
+    const allowed = new Set([
+      ...getColorNamesForPalette('chevron-patterns'),
+      ...getColorNamesForPalette('houndstooth-patterns'),
+    ]);
+    expect(allowed.size).toBeGreaterThan(0);
+
+    for (let i = 0; i < 10; i += 1) {
+      const params = await generateRandomParamsServer({
+        palettes: ['chevron-patterns', 'houndstooth-patterns'],
+      });
+      expect(allowed.has(params.colour)).toBe(true);
+      expect(VALID_COLOURS).not.toContain(params.colour);
+    }
   });
 });

@@ -60,6 +60,21 @@ export interface UserConfig {
   palettes: string[];
 }
 
+export interface PaletteCatalogEntry {
+  id: string;
+  label: string;
+  description?: string;
+}
+
+const PALETTE_CACHE_TTL_MS = 5 * 60_000;
+
+let paletteCatalogCache:
+  | {
+      expiresAt: number;
+      data: PaletteCatalogEntry[];
+    }
+  | null = null;
+
 async function fetchWithTimeout(
   url: string,
   init: RequestInit
@@ -148,5 +163,51 @@ export async function updateUserConfig(
   if (!res.ok) {
     const text = await readErrorBody(res);
     throw new Error(`user-config PATCH error ${res.status}: ${text}`);
+  }
+}
+
+export async function getPaletteCatalog(): Promise<PaletteCatalogEntry[]> {
+  const now = Date.now();
+  if (paletteCatalogCache && paletteCatalogCache.expiresAt > now) {
+    return paletteCatalogCache.data;
+  }
+
+  const url = `${config.frontendApiUrl}/api/palettes`;
+  try {
+    const res = await fetchWithTimeout(url, { method: "GET" });
+    if (!res.ok) {
+      const text = await readErrorBody(res);
+      throw new Error(`palette catalog GET error ${res.status}: ${text}`);
+    }
+
+    const payload = (await res.json()) as unknown;
+    if (!Array.isArray(payload)) {
+      throw new Error("palette catalog response was not an array");
+    }
+
+    const data = payload
+      .map((entry): PaletteCatalogEntry | null => {
+        if (!entry || typeof entry !== "object") return null;
+        const row = entry as Record<string, unknown>;
+        if (typeof row.id !== "string") return null;
+
+        return {
+          id: row.id,
+          label: typeof row.label === "string" && row.label.trim() ? row.label : row.id,
+          description: typeof row.description === "string" ? row.description : undefined,
+        };
+      })
+      .filter((entry): entry is PaletteCatalogEntry => entry !== null);
+
+    paletteCatalogCache = {
+      data,
+      expiresAt: now + PALETTE_CACHE_TTL_MS,
+    };
+    return data;
+  } catch (error) {
+    if (paletteCatalogCache?.data.length) {
+      return paletteCatalogCache.data;
+    }
+    throw error;
   }
 }

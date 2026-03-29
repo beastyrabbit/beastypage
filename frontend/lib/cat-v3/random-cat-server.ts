@@ -259,6 +259,49 @@ function ensureArray<T>(value: T | T[] | undefined): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
+function buildColourPools(
+  baseColours: readonly string[],
+  paletteIds?: readonly string[],
+): string[][] {
+  const palettePools: string[][] = [];
+  const seen = new Set<string>();
+
+  for (const paletteId of paletteIds ?? []) {
+    const normalized = String(paletteId).trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+
+    const colours = getColorNamesForPalette(normalized as PaletteId);
+    if (colours.length > 0) {
+      palettePools.push(colours);
+    }
+  }
+
+  if (palettePools.length > 0) {
+    return palettePools;
+  }
+
+  return baseColours.length > 0 ? [Array.from(baseColours)] : [];
+}
+
+function flattenPools(pools: readonly string[][]): string[] {
+  const combined = new Set<string>();
+  for (const pool of pools) {
+    for (const colour of pool) {
+      combined.add(colour);
+    }
+  }
+  return Array.from(combined);
+}
+
+function pickColourFromPools(pools: readonly string[][]): string {
+  const availablePools = pools.filter((pool) => pool.length > 0);
+  if (!availablePools.length) {
+    throw new Error('Attempted to pick from an empty colour pool');
+  }
+  return pickOne(pickOne([...availablePools]));
+}
+
 function resolveCountsMode(
   category: CountCategory,
   override?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>,
@@ -369,18 +412,12 @@ export async function generateRandomParamsServer(
 
   const pelts = data.peltNames.filter((p) => p !== 'Tortie' && p !== 'Calico');
 
-  // Resolve colour pool — include palette colours when specified
-  let colourPool: readonly string[] = data.colours;
-  if (overrides.palettes && overrides.palettes.length > 0) {
-    const paletteColours = new Set<string>();
-    for (const pid of overrides.palettes) {
-      for (const name of getColorNamesForPalette(pid as PaletteId)) {
-        paletteColours.add(name);
-      }
-    }
-    // When palettes are active, pick from palette colours only
-    if (paletteColours.size > 0) colourPool = Array.from(paletteColours);
+  const colourPools = buildColourPools(data.colours, overrides.palettes);
+  const colourPool = flattenPools(colourPools);
+  if (!colourPool.length) {
+    throw new Error('Colour pool is empty');
   }
+  const pickColour = () => pickColourFromPools(colourPools);
 
   // Afterlife: respect overrides, otherwise 10% chance
   const isDarkForest =
@@ -393,7 +430,7 @@ export async function generateRandomParamsServer(
     peltName: overrides.pelt && pelts.includes(overrides.pelt) ? overrides.pelt : pickOne(pelts),
     colour: overrides.colour && (data.colours.includes(overrides.colour) || colourPool.includes(overrides.colour))
       ? overrides.colour
-      : pickOne(colourPool),
+      : pickColour(),
     tint: pickOne(data.tints),
     skinColour: pickOne(data.skinColours),
     eyeColour: overrides.eyeColour && data.eyeColours.includes(overrides.eyeColour)
@@ -443,7 +480,7 @@ export async function generateRandomParamsServer(
       tortiePatterns.push({
         mask,
         pattern: pickOne(pelts),
-        colour: pickOne(colourPool),
+        colour: pickColour(),
       });
       if (uniqueMasks && !availableMasks.length) break;
     }
@@ -456,7 +493,7 @@ export async function generateRandomParamsServer(
         tortiePatterns.push({
           mask: fallback,
           pattern: pickOne(pelts),
-          colour: pickOne(colourPool),
+          colour: pickColour(),
         });
       }
     }

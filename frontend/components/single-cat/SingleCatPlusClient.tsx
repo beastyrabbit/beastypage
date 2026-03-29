@@ -65,7 +65,20 @@ import { VariantBar } from "../common/VariantBar";
 // @ts-ignore -- legacy JS module without types.
 import { encodeCatShare, createCatShare } from "@/lib/catShare";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
+import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import type { PaletteId } from "@/lib/palettes";
+import {
+  MAX_LAYER_VALUE,
+  clampLayerValue,
+  computeLayerCount,
+  resolveAfterlife,
+  AFTERLIFE_OPTIONS,
+} from "@/utils/catSettingsHelpers";
+import {
+  decodePortableSettings,
+  encodePortableSettings,
+} from "@/lib/portable-settings";
+import type { SingleCatPortableSettings } from "@/lib/portable-settings";
 
 export type { AfterlifeOption } from "../../utils/singleCatVariants";
 
@@ -129,7 +142,6 @@ type FetchPriority = "high" | "low" | "auto";
 const MAX_LAYER_VARIATIONS = 12;
 const MAX_SPINNY_VARIATIONS = Number.MAX_SAFE_INTEGER;
 const MAX_SPINNY_LAYER_VARIATIONS = Number.MAX_SAFE_INTEGER;
-const MAX_LAYER_VALUE = 4;
 const DEFAULT_SPRITE_NUMBER = 8;
 const PLACEHOLDER_COLOUR = "GINGER";
 const GLOBAL_PRESETS: Array<keyof TimingPresetSet> = ["slow", "normal", "fast"];
@@ -507,14 +519,7 @@ const PARAM_SEQUENCE: ParamDefinition[] = [
   { id: "sprite", label: "Sprite" },
 ];
 
-const AFTERLIFE_OPTIONS: { label: string; value: AfterlifeOption; description?: string }[] = [
-  { label: "Off", value: "off" },
-  { label: "Dark Forest 10%", value: "dark10" },
-  { label: "StarClan 10%", value: "star10" },
-  { label: "Both 10%", value: "both10" },
-  { label: "Always Dark Forest", value: "darkForce" },
-  { label: "Always StarClan", value: "starForce" },
-];
+// AFTERLIFE_OPTIONS imported from @/utils/catSettingsHelpers
 
 function wait(ms: number) {
   return new Promise<void>((resolve) => {
@@ -985,144 +990,10 @@ function getParameterValueForDisplay(paramId: ParamId, params: Partial<CatParams
   }
 }
 
-function clampLayerValue(value: number): number {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(MAX_LAYER_VALUE, Math.round(value)));
-}
+// clampLayerValue, computeLayerCount imported from @/utils/catSettingsHelpers
+// LayerRangeSelector imported from @/components/common/LayerRangeSelector
 
-function computeLayerCount(range: LayerRange) {
-  const min = clampLayerValue(Math.min(range.min, range.max));
-  const max = clampLayerValue(Math.max(range.min, range.max));
-  if (min === max) {
-    return min;
-  }
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-interface LayerRangeSliderProps {
-  label: string;
-  value: LayerRange;
-  onChange: (next: LayerRange) => void;
-}
-
-interface LayerRangeSelectorRowProps {
-  label: string;
-  type: "min" | "max";
-  selectedValue: number;
-  options: number[];
-  minValue: number;
-  onSelect: (next: number) => void;
-}
-
-function LayerRangeSelectorRow({
-  label,
-  type,
-  selectedValue,
-  options,
-  minValue,
-  onSelect,
-}: LayerRangeSelectorRowProps) {
-  return (
-    <div className="flex items-center gap-2" role="radiogroup" aria-label={`${label} ${type}`}>
-      <span className="w-10 text-[10px] uppercase tracking-wide text-muted-foreground/70">
-        {type === "min" ? "Min" : "Max"}
-      </span>
-      <div className="flex flex-1 items-center gap-1 rounded-full border border-border/60 bg-background/70 p-1">
-        {options.map((option) => {
-          const isActive = selectedValue === option;
-          const isDisabled = type === "max" && option < minValue;
-          return (
-            <button
-              key={`${label}-${type}-${option}`}
-              type="button"
-              role="radio"
-              aria-checked={isActive}
-              disabled={isDisabled}
-              onClick={() => onSelect(option)}
-              className={cn(
-                "h-8 flex-1 rounded-md text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                isDisabled && "cursor-not-allowed opacity-40",
-                !isActive && !isDisabled && "bg-background text-muted-foreground hover:bg-primary/10",
-                isActive && "bg-primary text-primary-foreground shadow-inner"
-              )}
-            >
-              {option}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function LayerRangeSelector({ label, value, onChange }: LayerRangeSliderProps) {
-  const summary = value.min === value.max ? `${value.min}` : `${value.min} – ${value.max}`;
-  const options = useMemo(() => Array.from({ length: MAX_LAYER_VALUE + 1 }, (_, index) => index), []);
-
-  const handleMinSelect = (nextMin: number) => {
-    const clampedMin = clampLayerValue(nextMin);
-    const clampedMax = clampLayerValue(value.max);
-    const adjustedMax = Math.max(clampedMin, clampedMax);
-    onChange({ min: clampedMin, max: adjustedMax });
-  };
-
-  const handleMaxSelect = (nextMax: number) => {
-    const clampedMax = clampLayerValue(nextMax);
-    const clampedMin = clampLayerValue(value.min);
-    if (clampedMax < clampedMin) {
-      onChange({ min: clampedMax, max: clampedMax });
-    } else {
-      onChange({ min: clampedMin, max: clampedMax });
-    }
-  };
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground/80">
-        <span>{label}</span>
-        <span className="font-mono text-muted-foreground/70">{summary}</span>
-      </div>
-      <LayerRangeSelectorRow
-        label={label}
-        type="min"
-        selectedValue={clampLayerValue(value.min)}
-        options={options}
-        minValue={value.min}
-        onSelect={handleMinSelect}
-      />
-      <LayerRangeSelectorRow
-        label={label}
-        type="max"
-        selectedValue={clampLayerValue(value.max)}
-        options={options}
-        minValue={value.min}
-        onSelect={handleMaxSelect}
-      />
-    </div>
-  );
-}
-
-function resolveAfterlife(option: AfterlifeOption) {
-  switch (option) {
-    case "off":
-      return { darkForest: false, dead: false };
-    case "dark10":
-      return { darkForest: Math.random() < 0.1, dead: false };
-    case "star10":
-      return { darkForest: false, dead: Math.random() < 0.1 };
-    case "both10":
-      return {
-        darkForest: Math.random() < 0.1,
-        dead: Math.random() < 0.1,
-      };
-    case "darkForce":
-      return { darkForest: true, dead: false };
-    case "starForce":
-      return { darkForest: false, dead: true };
-    default:
-      return { darkForest: false, dead: false };
-  }
-}
+// resolveAfterlife imported from @/utils/catSettingsHelpers
 
 function randomFrom<T>(list: T[]): T {
   return list[Math.floor(Math.random() * list.length)];
@@ -1369,6 +1240,133 @@ function sampleValues(
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// Settings Code section (inline sub-component for the aside)
+// ---------------------------------------------------------------------------
+
+interface SettingsCodeSectionProps {
+  accessoryRange: LayerRange;
+  scarRange: LayerRange;
+  tortieRange: LayerRange;
+  afterlifeMode: AfterlifeOption;
+  includeBaseColours: boolean;
+  extendedModes: Set<ExtendedMode>;
+  onApply: (portable: SingleCatPortableSettings) => void;
+}
+
+function SettingsCodeSection({
+  accessoryRange,
+  scarRange,
+  tortieRange,
+  afterlifeMode,
+  includeBaseColours,
+  extendedModes,
+  onApply,
+}: SettingsCodeSectionProps) {
+  const [codeInput, setCodeInput] = useState("");
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState(false);
+
+  const liveCode = useMemo(
+    () =>
+      encodePortableSettings({
+        accessoryRange,
+        scarRange,
+        tortieRange,
+        afterlifeMode,
+        includeBaseColours,
+        extendedModes: Array.from(extendedModes),
+      }),
+    [accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes],
+  );
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(liveCode);
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 1500);
+    } catch {
+      /* noop */
+    }
+  }, [liveCode]);
+
+  const handleApply = useCallback(() => {
+    const trimmed = codeInput.trim();
+    if (!trimmed) {
+      setCodeError("Enter a settings code");
+      return;
+    }
+    const decoded = decodePortableSettings(trimmed);
+    if (!decoded) {
+      setCodeError("Invalid code");
+      return;
+    }
+    setCodeError(null);
+    setCodeInput("");
+    onApply(decoded);
+  }, [codeInput, onApply]);
+
+  return (
+    <div className="space-y-3">
+      <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground/80">
+        Settings Code
+      </p>
+      {/* Live code */}
+      <div className="flex items-center gap-2">
+        <code className="flex-1 truncate rounded-lg border border-primary/20 bg-background/60 px-3 py-1.5 font-mono text-xs tracking-wide text-foreground">
+          {liveCode}
+        </code>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className={cn(
+            "shrink-0 rounded-md border px-2 py-1.5 text-[10px] font-medium transition",
+            copyFeedback
+              ? "border-emerald-500/40 text-emerald-400"
+              : "border-border/50 text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {copyFeedback ? "Copied!" : "Copy"}
+        </button>
+      </div>
+      {/* Paste + Apply */}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={codeInput}
+          onChange={(e) => {
+            setCodeInput(e.target.value);
+            if (codeError) setCodeError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleApply();
+          }}
+          placeholder="Paste a code..."
+          className="min-w-0 flex-1 rounded-lg border border-border/40 bg-background/60 px-2.5 py-1.5 font-mono text-xs outline-none placeholder:text-muted-foreground/40 focus:border-primary/40"
+        />
+        <button
+          type="button"
+          onClick={handleApply}
+          className="shrink-0 rounded-md border border-border/50 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground transition hover:text-foreground"
+        >
+          Apply
+        </button>
+      </div>
+      {codeError && <p className="text-[10px] text-red-400">{codeError}</p>}
+      <Link
+        href="/single-cat-plus/settings"
+        className="inline-flex items-center gap-1 text-[10px] text-primary/70 transition hover:text-primary"
+      >
+        Open Settings Configurator &rarr;
+      </Link>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 type SingleCatPlusClientProps = {
   defaultMode?: "flashy" | "calm";
   defaultAccessoryRange?: LayerRange;
@@ -1378,6 +1376,7 @@ type SingleCatPlusClientProps = {
   variantSlug?: string;
   initialVariantSettings?: SingleCatSettings | null;
   initialVariantLoadError?: string | null;
+  initialCodeSettings?: SingleCatPortableSettings | null;
 };
 
 export function SingleCatPlusClient({
@@ -1389,6 +1388,7 @@ export function SingleCatPlusClient({
   variantSlug,
   initialVariantSettings = null,
   initialVariantLoadError = null,
+  initialCodeSettings = null,
 }: SingleCatPlusClientProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
@@ -1405,28 +1405,43 @@ export function SingleCatPlusClient({
   const [error, setError] = useState<string | null>(null);
 
   const initialSettings = useMemo<SingleCatSettings>(() => {
+    let base: SingleCatSettings;
     if (initialVariantSettings) {
-      return initialVariantSettings;
+      base = initialVariantSettings;
+    } else {
+      base = {
+        ...DEFAULT_SINGLE_CAT_SETTINGS,
+        mode: defaultMode,
+        accessoryRange: { ...defaultAccessoryRange },
+        scarRange: { ...defaultScarRange },
+        tortieRange: { ...defaultTortieRange },
+        afterlifeMode: defaultAfterlife,
+        timing: {
+          ...DEFAULT_TIMING_CONFIG,
+          delays: { ...DEFAULT_TIMING_CONFIG.delays },
+          subsetLimits: { ...(DEFAULT_TIMING_CONFIG.subsetLimits ?? {}) },
+          pauseDelays: DEFAULT_TIMING_CONFIG.pauseDelays
+            ? {
+                flashyMs: DEFAULT_TIMING_CONFIG.pauseDelays.flashyMs,
+                calmMs: DEFAULT_TIMING_CONFIG.pauseDelays.calmMs,
+              }
+            : undefined,
+        },
+      };
     }
-    return {
-      ...DEFAULT_SINGLE_CAT_SETTINGS,
-      mode: defaultMode,
-      accessoryRange: { ...defaultAccessoryRange },
-      scarRange: { ...defaultScarRange },
-      tortieRange: { ...defaultTortieRange },
-      afterlifeMode: defaultAfterlife,
-      timing: {
-        ...DEFAULT_TIMING_CONFIG,
-        delays: { ...DEFAULT_TIMING_CONFIG.delays },
-        subsetLimits: { ...(DEFAULT_TIMING_CONFIG.subsetLimits ?? {}) },
-        pauseDelays: DEFAULT_TIMING_CONFIG.pauseDelays
-          ? {
-              flashyMs: DEFAULT_TIMING_CONFIG.pauseDelays.flashyMs,
-              calmMs: DEFAULT_TIMING_CONFIG.pauseDelays.calmMs,
-            }
-          : undefined,
-      },
-    };
+    // Portable code overrides portable fields only (never timing/mode/speed)
+    if (initialCodeSettings) {
+      base = {
+        ...base,
+        accessoryRange: { ...initialCodeSettings.accessoryRange },
+        scarRange: { ...initialCodeSettings.scarRange },
+        tortieRange: { ...initialCodeSettings.tortieRange },
+        afterlifeMode: initialCodeSettings.afterlifeMode,
+        includeBaseColours: initialCodeSettings.includeBaseColours,
+        extendedModes: [...initialCodeSettings.extendedModes],
+      };
+    }
+    return base;
   }, [
     defaultAccessoryRange,
     defaultAfterlife,
@@ -1434,6 +1449,7 @@ export function SingleCatPlusClient({
     defaultScarRange,
     defaultTortieRange,
     initialVariantSettings,
+    initialCodeSettings,
   ]);
 
   const [mode, setMode] = useState<"flashy" | "calm">(initialSettings.mode);
@@ -3868,6 +3884,24 @@ export function SingleCatPlusClient({
                   onClassicChange={setIncludeBaseColours}
                 />
               </div>
+
+              {/* Settings Code */}
+              <SettingsCodeSection
+                accessoryRange={accessoryRange}
+                scarRange={scarRange}
+                tortieRange={tortieRange}
+                afterlifeMode={afterlifeMode}
+                includeBaseColours={includeBaseColours}
+                extendedModes={extendedModes}
+                onApply={(portable) => {
+                  setAccessoryRange(portable.accessoryRange);
+                  setScarRange(portable.scarRange);
+                  setTortieRange(portable.tortieRange);
+                  setAfterlifeMode(portable.afterlifeMode);
+                  setIncludeBaseColours(portable.includeBaseColours);
+                  setExtendedModes(new Set(portable.extendedModes));
+                }}
+              />
             </div>
           </aside>
         </div>

@@ -1,4 +1,5 @@
 import { DEFAULT_TIMING_CONFIG, type SpinTimingConfig, type ParamTimingKey, isParamTimingKey } from "./spinTiming";
+import type { PaletteId } from "@/lib/palettes/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -6,22 +7,8 @@ import { DEFAULT_TIMING_CONFIG, type SpinTimingConfig, type ParamTimingKey, isPa
 
 export type AfterlifeOption = "off" | "dark10" | "star10" | "both10" | "darkForce" | "starForce";
 
-export type ExtendedMode =
-  | "base"
-  | "mood"
-  | "bold"
-  | "darker"
-  | "blackout"
-  | "mononoke"
-  | "howl"
-  | "demonslayer"
-  | "titanic"
-  | "deathnote"
-  | "slime"
-  | "ghostintheshell"
-  | "mushishi"
-  | "chisweethome"
-  | "fma";
+/** "base" means classic ClanGen colours; any PaletteId selects an extended palette. */
+export type ExtendedMode = "base" | PaletteId;
 
 export interface LayerRange {
   min: number;
@@ -67,10 +54,35 @@ export const DEFAULT_SINGLE_CAT_SETTINGS: SingleCatSettings = {
 // Validation helpers
 // ---------------------------------------------------------------------------
 
+/** Every valid ExtendedMode value.  Keep in sync with PaletteId in lib/palettes/types.ts. */
 const EXTENDED_MODE_VALUES: Set<string> = new Set([
-  "base", "mood", "bold", "darker", "blackout", "mononoke", "howl",
-  "demonslayer", "titanic", "deathnote", "slime", "ghostintheshell",
-  "mushishi", "chisweethome", "fma",
+  "base",
+  // Original 14
+  "mood", "bold", "darker", "blackout",
+  "mononoke", "howl", "demonslayer", "titanic", "deathnote",
+  "slime", "ghostintheshell", "mushishi", "chisweethome", "fma",
+  // Pure/monochromatic
+  "ocean-depths", "midnight-velvet", "arctic-waters", "emerald-forest",
+  "jade-mist", "electric-grass", "golden-hour", "ember-glow",
+  "crimson-flame", "rose-garden", "neon-blossom", "royal-amethyst",
+  "twilight-haze", "espresso-bean", "desert-sand", "storm-cloud",
+  "coral-reef", "tropical-lagoon", "midnight-wine", "peach-sorbet",
+  "greyscale", "cold-steel", "ink-wash",
+  // Textile
+  "royal-stewart", "black-watch", "country-tweed", "savile-row",
+  "bavarian-tracht", "oktoberfest",
+  // Pattern
+  "tartan-patterns", "gingham-patterns", "houndstooth-patterns",
+  "pinstripe-patterns", "chevron-patterns", "polkadot-patterns",
+  "argyle-patterns", "buffalo-patterns", "checkerboard-patterns",
+  "windowpane-patterns", "diagonal-patterns", "basketweave-patterns",
+  "flag-patterns", "scottish-clans", "japanese-patterns", "middle-eastern-rugs",
+  // Cultural Phase 1
+  "european-ornate", "art-deco-patterns", "indian-patterns",
+  // Cultural Phase 2
+  "chinese-patterns", "african-patterns", "indonesian-patterns", "korean-patterns",
+  // Cultural Phase 2b
+  "scandinavian-patterns", "medieval-patterns", "american-patterns", "famous-patterns",
 ]);
 
 const AFTERLIFE_VALUES: Set<string> = new Set(["off", "dark10", "star10", "both10", "darkForce", "starForce"]);
