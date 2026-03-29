@@ -34,6 +34,7 @@ interface SpriteMapperApi {
   loaded: boolean;
   init(): Promise<boolean>;
   getColourOptions(mode?: unknown, includeBase?: boolean): string[];
+  getExperimentalColoursByMode(mode?: unknown): string[];
   getColours(): string[];
   getPeltNames(): string[];
   getTints(): string[];
@@ -148,6 +149,69 @@ function ensureArray<T>(value: T | T[] | undefined): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
+function normalizeExperimentalModes(mode: RandomGenerationOptions['experimentalColourMode']): string[] {
+  const normalized = new Set<string>();
+
+  const visit = (value: string | string[] | undefined): void => {
+    if (value === undefined) return;
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+
+    const entry = String(value).trim().toLowerCase();
+    if (!entry || entry === 'off') return;
+    normalized.add(entry);
+  };
+
+  visit(mode);
+  return Array.from(normalized);
+}
+
+function buildColourPools(
+  spriteMapper: SpriteMapperApi,
+  experimentalMode: RandomGenerationOptions['experimentalColourMode'],
+  includeBaseColours: boolean,
+): string[][] {
+  const pools: string[][] = [];
+  const baseColours = spriteMapper.getColours();
+
+  if (includeBaseColours && baseColours.length > 0) {
+    pools.push(baseColours);
+  }
+
+  for (const mode of normalizeExperimentalModes(experimentalMode)) {
+    const colours = spriteMapper.getExperimentalColoursByMode(mode);
+    if (colours.length > 0) {
+      pools.push(colours);
+    }
+  }
+
+  if (pools.length > 0) {
+    return pools;
+  }
+
+  return baseColours.length > 0 ? [baseColours] : [];
+}
+
+function flattenPools(pools: readonly string[][]): string[] {
+  const combined = new Set<string>();
+  for (const pool of pools) {
+    for (const colour of pool) {
+      combined.add(colour);
+    }
+  }
+  return Array.from(combined);
+}
+
+function pickColourFromPools(pools: readonly string[][]): string {
+  const availablePools = pools.filter((pool) => pool.length > 0);
+  if (!availablePools.length) {
+    throw new Error('Attempted to pick from an empty colour pool');
+  }
+  return pickOne(pickOne([...availablePools]));
+}
+
 function hasOverride(
   category: CountCategory,
   override?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>
@@ -194,15 +258,16 @@ export async function generateRandomParamsV3(options: RandomGenerationOptions = 
   const spriteNumber = pickOne(spritePool);
 
   const experimentalMode = options.experimentalColourMode ?? 'off';
-  const baseColours = spriteMapper.getColourOptions(experimentalMode);
-  let colours = baseColours;
-  if (options.includeBaseColours === false) {
-    const baseSet = new Set(spriteMapper.getColours().map((value: string) => value.toUpperCase()));
-    const filtered = baseColours.filter((value: string) => !baseSet.has(value.toUpperCase()));
-    if (filtered.length > 0) {
-      colours = filtered;
-    }
+  const colourPools = buildColourPools(
+    spriteMapper,
+    experimentalMode,
+    options.includeBaseColours !== false,
+  );
+  const colours = flattenPools(colourPools);
+  if (!colours.length) {
+    throw new Error('Colour pool is empty; check palette configuration');
   }
+  const pickColour = () => pickColourFromPools(colourPools);
 
   const pelts = spriteMapper.getPeltNames().filter((p: string) => p !== 'Tortie' && p !== 'Calico');
   const tints = spriteMapper.getTints();
@@ -216,7 +281,7 @@ export async function generateRandomParamsV3(options: RandomGenerationOptions = 
   const params: CatParams = {
     spriteNumber,
     peltName: pickOne(pelts),
-    colour: pickOne(colours),
+    colour: pickColour(),
     tint: pickOne(tints),
     skinColour: pickOne(skinColours),
     eyeColour: pickOne(eyeColours),
@@ -225,11 +290,7 @@ export async function generateRandomParamsV3(options: RandomGenerationOptions = 
     isTortie: false,
   };
 
-  if (roll(RANDOM_CONFIG.probabilities.isTortie)) {
-    params.isTortie = true;
-  } else {
-    params.isTortie = false;
-  }
+  params.isTortie = roll(RANDOM_CONFIG.probabilities.isTortie);
 
   if (roll(RANDOM_CONFIG.probabilities.heterochromia)) {
     const heteroPool = ['', ...eyeColours];
@@ -259,7 +320,7 @@ export async function generateRandomParamsV3(options: RandomGenerationOptions = 
       tortiePatterns.push({
         mask,
         pattern: pickOne(pelts),
-        colour: pickOne(colours),
+        colour: pickColour(),
       });
       if (uniqueMasks && !availableMasks.length) {
         break;
@@ -272,7 +333,7 @@ export async function generateRandomParamsV3(options: RandomGenerationOptions = 
         tortiePatterns.push({
           mask: fallbackMask,
           pattern: pickOne(pelts),
-          colour: pickOne(colours),
+          colour: pickColour(),
         });
       }
     }

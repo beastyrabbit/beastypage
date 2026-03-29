@@ -2,49 +2,12 @@ import {
   type AutocompleteInteraction,
   type ChatInputCommandInteraction,
 } from "discord.js";
-import { getUserConfig, updateUserConfig } from "../utils/api-client.js";
+import {
+  getPaletteCatalog,
+  getUserConfig,
+  updateUserConfig,
+} from "../utils/api-client.js";
 import { buildConfigEmbed } from "../utils/embed-builder.js";
-
-/** All 34 palette IDs with human-readable labels for autocomplete */
-const ALL_PALETTES: { id: string; label: string }[] = [
-  // Base
-  { id: "mood", label: "Mood" },
-  { id: "bold", label: "Bold" },
-  { id: "darker", label: "Darker" },
-  { id: "blackout", label: "Blackout" },
-  // Anime
-  { id: "mononoke", label: "Princess Mononoke" },
-  { id: "howl", label: "Howl's Moving Castle" },
-  { id: "demonslayer", label: "Demon Slayer" },
-  { id: "titanic", label: "Titanic" },
-  { id: "deathnote", label: "Death Note" },
-  { id: "slime", label: "That Time I Got Reincarnated as a Slime" },
-  { id: "ghostintheshell", label: "Ghost in the Shell" },
-  { id: "mushishi", label: "Mushishi" },
-  { id: "chisweethome", label: "Chi's Sweet Home" },
-  { id: "fma", label: "Fullmetal Alchemist" },
-  // Pure
-  { id: "ocean-depths", label: "Ocean Depths" },
-  { id: "midnight-velvet", label: "Midnight Velvet" },
-  { id: "arctic-waters", label: "Arctic Waters" },
-  { id: "emerald-forest", label: "Emerald Forest" },
-  { id: "jade-mist", label: "Jade Mist" },
-  { id: "electric-grass", label: "Electric Grass" },
-  { id: "golden-hour", label: "Golden Hour" },
-  { id: "ember-glow", label: "Ember Glow" },
-  { id: "crimson-flame", label: "Crimson Flame" },
-  { id: "rose-garden", label: "Rose Garden" },
-  { id: "neon-blossom", label: "Neon Blossom" },
-  { id: "royal-amethyst", label: "Royal Amethyst" },
-  { id: "twilight-haze", label: "Twilight Haze" },
-  { id: "espresso-bean", label: "Espresso Bean" },
-  { id: "desert-sand", label: "Desert Sand" },
-  { id: "storm-cloud", label: "Storm Cloud" },
-  { id: "coral-reef", label: "Coral Reef" },
-  { id: "tropical-lagoon", label: "Tropical Lagoon" },
-  { id: "midnight-wine", label: "Midnight Wine" },
-  { id: "peach-sorbet", label: "Peach Sorbet" },
-];
 
 export async function handleConfigCommand(
   interaction: ChatInputCommandInteraction
@@ -84,7 +47,7 @@ async function handleView(
     console.error("Error fetching config:", error);
     await interaction.editReply({
       content: "Failed to fetch config. Please try again later.",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to send error reply:", e));
   }
 }
 
@@ -143,7 +106,7 @@ async function handleSet(
     console.error("Error updating config:", error);
     await interaction.editReply({
       content: "Failed to update config. Please try again later.",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to send error reply:", e));
   }
 }
 
@@ -166,7 +129,7 @@ async function handlePaletteAdd(
     console.error("Error adding palette:", error);
     await interaction.editReply({
       content: "Failed to add palette. Please try again later.",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to send error reply:", e));
   }
 }
 
@@ -189,7 +152,7 @@ async function handlePaletteRemove(
     console.error("Error removing palette:", error);
     await interaction.editReply({
       content: "Failed to remove palette. Please try again later.",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to send error reply:", e));
   }
 }
 
@@ -210,7 +173,7 @@ async function handleReset(
     console.error("Error resetting config:", error);
     await interaction.editReply({
       content: "Failed to reset config. Please try again later.",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to send error reply:", e));
   }
 }
 
@@ -221,30 +184,39 @@ export async function handleConfigAutocomplete(
     const sub = interaction.options.getSubcommand();
     const focused = interaction.options.getFocused(true);
 
-    if (focused.name !== "palette") return;
+    if (focused.name !== "palette") {
+      await interaction.respond([]);
+      return;
+    }
 
     const input = focused.value.toLowerCase();
 
     if (sub === "palette-add") {
-      // Show all palettes, filtered by input
-      const filtered = ALL_PALETTES
-        .filter(
-          (p) =>
-            p.id.toLowerCase().includes(input) ||
-            p.label.toLowerCase().includes(input)
-        )
-        .slice(0, 25);
+      try {
+        const paletteCatalog = await getPaletteCatalog();
+        // Show all palettes, filtered by input
+        const filtered = paletteCatalog
+          .filter(
+            (p) =>
+              p.id.toLowerCase().includes(input) ||
+              p.label.toLowerCase().includes(input)
+          )
+          .slice(0, 25);
 
-      await interaction.respond(
-        filtered.map((p) => ({ name: p.label, value: p.id }))
-      );
+        await interaction.respond(
+          filtered.map((p) => ({ name: p.label, value: p.id }))
+        );
+      } catch {
+        await interaction.respond([]);
+      }
     } else if (sub === "palette-remove") {
       // Show only the user's active palettes
       try {
         const cfg = await getUserConfig(interaction.user.id);
+        const paletteCatalog = await getPaletteCatalog();
         const active = cfg.palettes
           .map((id) => {
-            const match = ALL_PALETTES.find((p) => p.id === id);
+            const match = paletteCatalog.find((p) => p.id === id);
             return match ?? { id, label: id };
           })
           .filter(
@@ -264,5 +236,8 @@ export async function handleConfigAutocomplete(
     }
   } catch (error) {
     console.error("Config autocomplete error:", error);
+    try {
+      await interaction.respond([]);
+    } catch { /* interaction may already be responded to */ }
   }
 }

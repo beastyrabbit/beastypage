@@ -107,6 +107,14 @@ export const TOOL_REGISTRY: ToolWidgetMeta[] = [
     "category": "gacha"
   },
   {
+    "id": "cat-settings",
+    "title": "Cat Settings",
+    "description": "Configure and share cat generation presets with a 6-word code.",
+    "icon": "⚙️",
+    "href": "/single-cat-plus/settings",
+    "category": "gacha"
+  },
+  {
     "id": "single-cat-plus",
     "title": "Single Cat Plus",
     "description": "Generate, spin, and export pixel cats with layered accessories and tortie coats.",

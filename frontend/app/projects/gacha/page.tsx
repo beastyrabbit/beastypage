@@ -33,6 +33,13 @@ const TOOLS: ToolCard[] = [
     href: "/single-cat-plus",
   },
   {
+    title: "Cat Settings",
+    icon: "⚙️",
+    description:
+      "Configure and share cat generation presets with a 6-word code.",
+    href: "/single-cat-plus/settings",
+  },
+  {
     title: "CatGen History",
     icon: "🗂️",
     description:
@@ -45,20 +52,6 @@ const TOOLS: ToolCard[] = [
     description:
       "Weighted wheel with animated reveals and celebratory effects.",
     href: "/wheel",
-  },
-  {
-    title: "Single Cat Generator",
-    icon: "✨",
-    description:
-      "Airport flip-board chaos with rapid spins before the final reveal.",
-    href: "/single-cat-plus?mode=flashy&accessories=1-1&scars=1-1&torties=1-1&afterlife=off",
-  },
-  {
-    title: "Single Cat (Less Spin)",
-    icon: "🎯",
-    description:
-      "Calm typewriter-style reveal where traits appear one by one.",
-    href: "/single-cat-plus?mode=calm",
   },
   {
     title: "Adoption Generator",
