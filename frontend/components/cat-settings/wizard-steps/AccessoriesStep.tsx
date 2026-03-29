@@ -182,7 +182,7 @@ export function AccessoriesStep(props: WizardStepProps) {
           onChange={setAccessoryRange}
           compact
         />
-        <ForceInitialRollInfo range={settings.accessoryRange} layerName="accessory" />
+        <ForceInitialRollInfo range={settings.accessoryRange} layerName="accessory" exactLayerCounts={settings.exactLayerCounts} />
       </section>
 
       {/* Accessory gallery — below the selector */}

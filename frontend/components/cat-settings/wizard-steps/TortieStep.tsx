@@ -162,7 +162,7 @@ export function TortieStep(props: WizardStepProps) {
           onChange={setTortieRange}
           compact
         />
-        <ForceInitialRollInfo range={settings.tortieRange} layerName="tortie layer" />
+        <ForceInitialRollInfo range={settings.tortieRange} layerName="tortie layer" exactLayerCounts={settings.exactLayerCounts} />
       </section>
 
       {/* Live preview */}

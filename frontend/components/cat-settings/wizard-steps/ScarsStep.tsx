@@ -175,7 +175,7 @@ export function ScarsStep(props: WizardStepProps) {
           onChange={setScarRange}
           compact
         />
-        <ForceInitialRollInfo range={settings.scarRange} layerName="scar" />
+        <ForceInitialRollInfo range={settings.scarRange} layerName="scar" exactLayerCounts={settings.exactLayerCounts} />
       </section>
 
       {/* Scar gallery — below the selector */}

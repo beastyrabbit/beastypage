@@ -10,6 +10,7 @@ import type { LayerRange } from "@/utils/singleCatVariants";
 interface ForceInitialRollInfoProps {
   range: LayerRange;
   layerName: string;
+  exactLayerCounts: boolean;
 }
 
 type ForceState = "disabled" | "on" | "off";
@@ -24,13 +25,12 @@ function pluralize(name: string): string {
 }
 
 /**
- * Force initial roll defaults to ON only when min=0 AND max ≤ 2,
- * OFF for all other ranges, and disabled when min=0 & max=0.
+ * Derive badge state from both the range and the global exactLayerCounts toggle.
+ * Disabled when range produces nothing; ON only when exactLayerCounts is true.
  */
-function deriveForceState(range: LayerRange): ForceState {
+function deriveForceState(range: LayerRange, exactLayerCounts: boolean): ForceState {
   if (range.min === 0 && range.max === 0) return "disabled";
-  if (range.min === 0 && range.max <= 2) return "on";
-  return "off";
+  return exactLayerCounts ? "on" : "off";
 }
 
 const INACTIVE_BADGE = "border-border/40 bg-muted/20 text-muted-foreground/50";
@@ -63,8 +63,8 @@ function getMessage(state: ForceState, layerName: string, range: LayerRange): st
 // Component
 // ---------------------------------------------------------------------------
 
-export function ForceInitialRollInfo({ range, layerName }: ForceInitialRollInfoProps) {
-  const state = deriveForceState(range);
+export function ForceInitialRollInfo({ range, layerName, exactLayerCounts }: ForceInitialRollInfoProps) {
+  const state = deriveForceState(range, exactLayerCounts);
   const plural = pluralize(layerName);
 
   return (
