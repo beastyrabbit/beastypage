@@ -8,7 +8,8 @@
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { CatParams, TortieLayer, RandomGenerationOptions } from './types';
+import type { CatParams, RandomGenerationOptions } from './types';
+import { materializeStringSlots, materializeTortieSlots } from './slotMaterializer';
 import { getColorNamesForPalette, type PaletteId } from '@/lib/palettes';
 import config from './random-config.json';
 
@@ -353,13 +354,6 @@ function determineSlotCount(
   return Math.max(0, Math.trunc(defaults?.[category] ?? 1));
 }
 
-function drawUnique<T>(available: T[]): T | null {
-  if (!available.length) return null;
-  const idx = Math.floor(Math.random() * available.length);
-  const [item] = available.splice(idx, 1);
-  return item ?? null;
-}
-
 // ---------------------------------------------------------------------------
 // Discord-specific overrides
 // ---------------------------------------------------------------------------
@@ -402,6 +396,7 @@ export async function generateRandomParamsServer(
   options: RandomGenerationOptions = {},
 ): Promise<CatParams> {
   const data = await loadSpriteData();
+  const exactLayerCounts = options.exactLayerCounts === true;
 
   const spritePool = ensureArray(RANDOM_CONFIG.spritePool.include);
   if (!spritePool.length) throw new Error('Sprite pool is empty');
@@ -470,41 +465,42 @@ export async function generateRandomParamsServer(
     const tortieConfig = RANDOM_CONFIG.counts.tortie;
     const masks = data.tortieMasks;
     const uniqueMasks = tortieConfig.unique !== false;
-    const availableMasks: string[] = [...masks];
     const layerProb = RANDOM_CONFIG.probabilities.tortieLayer ?? RANDOM_CONFIG.probabilities.isTortie ?? 0.5;
-    const tortiePatterns: TortieLayer[] = [];
+    const tortieResult = materializeTortieSlots({
+      slotCount,
+      masks,
+      pelts,
+      pickColour,
+      uniqueMasks,
+      exactCount: exactLayerCounts,
+      shouldFillSlot: (slotIndex) => slotIndex === 0 || roll(layerProb),
+    });
 
-    for (let slot = 0; slot < slotCount; slot++) {
-      const shouldAdd = slot === 0 || roll(layerProb);
-      if (!shouldAdd) continue;
-      const mask = uniqueMasks ? drawUnique(availableMasks) : pickOne(availableMasks);
-      if (!mask) break;
-      tortiePatterns.push({
-        mask,
-        pattern: pickOne(pelts),
-        colour: pickColour(),
+    if (tortieResult.selectedValues.length > 0) {
+      params.tortie = tortieResult.selectedValues;
+      params.tortieMask = tortieResult.selectedValues[0].mask;
+      params.tortieColour = tortieResult.selectedValues[0].colour;
+      params.tortiePattern = tortieResult.selectedValues[0].pattern;
+    } else if (exactLayerCounts || slotCount === 0) {
+      params.isTortie = false;
+    } else {
+      const fallback = materializeTortieSlots({
+        slotCount: 1,
+        masks,
+        pelts,
+        pickColour,
+        uniqueMasks,
+        exactCount: true,
+        shouldFillSlot: () => true,
       });
-      if (uniqueMasks && !availableMasks.length) break;
-    }
-
-    if (tortiePatterns.length === 0) {
-      const fallback = uniqueMasks
-        ? drawUnique(availableMasks.length ? availableMasks : [...masks] as string[])
-        : pickOne(masks);
-      if (fallback) {
-        tortiePatterns.push({
-          mask: fallback,
-          pattern: pickOne(pelts),
-          colour: pickColour(),
-        });
+      if (fallback.selectedValues.length > 0) {
+        params.tortie = fallback.selectedValues;
+        params.tortieMask = fallback.selectedValues[0].mask;
+        params.tortieColour = fallback.selectedValues[0].colour;
+        params.tortiePattern = fallback.selectedValues[0].pattern;
+      } else {
+        params.isTortie = false;
       }
-    }
-
-    if (tortiePatterns.length > 0) {
-      params.tortie = tortiePatterns;
-      params.tortieMask = tortiePatterns[0].mask;
-      params.tortieColour = tortiePatterns[0].colour;
-      params.tortiePattern = tortiePatterns[0].pattern;
     }
   }
 
@@ -536,19 +532,18 @@ export async function generateRandomParamsServer(
   if (accSlots > 0 && data.accessories.length > 0) {
     const accConfig = RANDOM_CONFIG.counts.accessories;
     const uniqueAcc = accConfig.unique !== false;
-    const available: string[] = [...data.accessories];
     const accProb = RANDOM_CONFIG.probabilities.accessorySlot ?? RANDOM_CONFIG.probabilities.accessory ?? 0.5;
-    const selected: string[] = [];
-    for (let slot = 0; slot < accSlots; slot++) {
-      if (!roll(accProb)) continue;
-      const choice = uniqueAcc ? drawUnique(available) : pickOne(available);
-      if (!choice) break;
-      selected.push(choice);
-      if (uniqueAcc && !available.length) break;
-    }
-    if (selected.length > 0) {
-      params.accessories = selected;
-      params.accessory = selected[0];
+    const accResult = materializeStringSlots({
+      slotCount: accSlots,
+      availableChoices: data.accessories,
+      unique: uniqueAcc,
+      exactCount: exactLayerCounts,
+      placeholder: 'none',
+      shouldFillSlot: () => roll(accProb),
+    });
+    if (accResult.selectedValues.length > 0) {
+      params.accessories = accResult.selectedValues;
+      params.accessory = accResult.selectedValues[0];
     }
   }
 
@@ -559,19 +554,18 @@ export async function generateRandomParamsServer(
   if (scarSlots > 0 && data.scars.length > 0) {
     const scarsConfig = RANDOM_CONFIG.counts.scars;
     const uniqueScars = scarsConfig.unique !== false;
-    const available: string[] = [...data.scars];
     const scarProb = RANDOM_CONFIG.probabilities.scarSlot ?? RANDOM_CONFIG.probabilities.scar ?? 0.5;
-    const selected: string[] = [];
-    for (let slot = 0; slot < scarSlots; slot++) {
-      if (!roll(scarProb)) continue;
-      const choice = uniqueScars ? drawUnique(available) : pickOne(available);
-      if (!choice) break;
-      selected.push(choice);
-      if (uniqueScars && !available.length) break;
-    }
-    if (selected.length > 0) {
-      params.scars = selected;
-      params.scar = selected[0];
+    const scarResult = materializeStringSlots({
+      slotCount: scarSlots,
+      availableChoices: data.scars,
+      unique: uniqueScars,
+      exactCount: exactLayerCounts,
+      placeholder: 'none',
+      shouldFillSlot: () => roll(scarProb),
+    });
+    if (scarResult.selectedValues.length > 0) {
+      params.scars = scarResult.selectedValues;
+      params.scar = scarResult.selectedValues[0];
     }
   }
 

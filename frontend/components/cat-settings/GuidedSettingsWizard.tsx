@@ -26,6 +26,7 @@ const DEFAULTS: SingleCatPortableSettings = {
   accessoryRange: { ...DEFAULT_SINGLE_CAT_SETTINGS.accessoryRange },
   scarRange: { ...DEFAULT_SINGLE_CAT_SETTINGS.scarRange },
   tortieRange: { ...DEFAULT_SINGLE_CAT_SETTINGS.tortieRange },
+  exactLayerCounts: DEFAULT_SINGLE_CAT_SETTINGS.exactLayerCounts,
   afterlifeMode: DEFAULT_SINGLE_CAT_SETTINGS.afterlifeMode,
   includeBaseColours: DEFAULT_SINGLE_CAT_SETTINGS.includeBaseColours,
   extendedModes: [...DEFAULT_SINGLE_CAT_SETTINGS.extendedModes],
@@ -64,6 +65,7 @@ export function GuidedSettingsWizard({
   const [accessoryRange, setAccessoryRange] = useState<LayerRange>(init.accessoryRange);
   const [scarRange, setScarRange] = useState<LayerRange>(init.scarRange);
   const [tortieRange, setTortieRange] = useState<LayerRange>(init.tortieRange);
+  const [exactLayerCounts] = useState(init.exactLayerCounts);
   const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(init.afterlifeMode);
   const [includeBaseColours, setIncludeBaseColours] = useState(init.includeBaseColours);
   const [extendedModes, setExtendedModes] = useState<ExtendedMode[]>(init.extendedModes);
@@ -77,11 +79,12 @@ export function GuidedSettingsWizard({
       accessoryRange,
       scarRange,
       tortieRange,
+      exactLayerCounts,
       afterlifeMode,
       includeBaseColours,
       extendedModes,
     }),
-    [accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes],
+    [accessoryRange, scarRange, tortieRange, exactLayerCounts, afterlifeMode, includeBaseColours, extendedModes],
   );
 
   const liveCode = useMemo(

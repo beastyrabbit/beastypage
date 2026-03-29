@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
+import { LayerCountModeSelector } from "@/components/common/LayerCountModeSelector";
 import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
 import {
   encodePortableSettings,
@@ -24,6 +25,7 @@ const DEFAULTS: SingleCatPortableSettings = {
   accessoryRange: { ...DEFAULT_SINGLE_CAT_SETTINGS.accessoryRange },
   scarRange: { ...DEFAULT_SINGLE_CAT_SETTINGS.scarRange },
   tortieRange: { ...DEFAULT_SINGLE_CAT_SETTINGS.tortieRange },
+  exactLayerCounts: DEFAULT_SINGLE_CAT_SETTINGS.exactLayerCounts,
   afterlifeMode: DEFAULT_SINGLE_CAT_SETTINGS.afterlifeMode,
   includeBaseColours: DEFAULT_SINGLE_CAT_SETTINGS.includeBaseColours,
   extendedModes: [...DEFAULT_SINGLE_CAT_SETTINGS.extendedModes],
@@ -49,6 +51,7 @@ export function CatSettingsClient({
   const [accessoryRange, setAccessoryRange] = useState<LayerRange>(init.accessoryRange);
   const [scarRange, setScarRange] = useState<LayerRange>(init.scarRange);
   const [tortieRange, setTortieRange] = useState<LayerRange>(init.tortieRange);
+  const [exactLayerCounts, setExactLayerCounts] = useState(init.exactLayerCounts);
   const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(init.afterlifeMode);
   const [includeBaseColours, setIncludeBaseColours] = useState(init.includeBaseColours);
   const [extendedModes, setExtendedModes] = useState<ExtendedMode[]>(init.extendedModes);
@@ -65,11 +68,12 @@ export function CatSettingsClient({
       accessoryRange,
       scarRange,
       tortieRange,
+      exactLayerCounts,
       afterlifeMode,
       includeBaseColours,
       extendedModes,
     }),
-    [accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes],
+    [accessoryRange, scarRange, tortieRange, exactLayerCounts, afterlifeMode, includeBaseColours, extendedModes],
   );
 
   const liveCode = useMemo(
@@ -116,6 +120,7 @@ export function CatSettingsClient({
     setAccessoryRange(decoded.accessoryRange);
     setScarRange(decoded.scarRange);
     setTortieRange(decoded.tortieRange);
+    setExactLayerCounts(decoded.exactLayerCounts);
     setAfterlifeMode(decoded.afterlifeMode);
     setIncludeBaseColours(decoded.includeBaseColours);
     setExtendedModes(decoded.extendedModes);
@@ -228,6 +233,7 @@ export function CatSettingsClient({
           <LayerRangeSelector label="Accessories" value={accessoryRange} onChange={setAccessoryRange} compact />
           <LayerRangeSelector label="Scars" value={scarRange} onChange={setScarRange} compact />
           <LayerRangeSelector label="Tortie Layers" value={tortieRange} onChange={setTortieRange} compact />
+          <LayerCountModeSelector value={exactLayerCounts} onChange={setExactLayerCounts} compact />
         </div>
 
         <div className="my-5 border-t border-border/30" />

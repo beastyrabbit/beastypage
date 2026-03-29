@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { WizardExampleCats } from "../WizardExampleCats";
+import { ForceInitialRollInfo } from "./ForceInitialRollInfo";
 import type { WizardStepProps } from "./types";
 import type { ExtendedMode } from "@/utils/singleCatVariants";
 
@@ -38,6 +39,7 @@ function TortieComparison({ settings }: { settings: WizardStepProps["settings"] 
         accessoryCount: 0,
         scarCount: 0,
         tortieCount: 4,
+        exactLayerCounts: settings.exactLayerCounts,
         experimentalColourMode,
         includeBaseColours: settings.includeBaseColours,
       });
@@ -160,6 +162,7 @@ export function TortieStep(props: WizardStepProps) {
           onChange={setTortieRange}
           compact
         />
+        <ForceInitialRollInfo range={settings.tortieRange} layerName="tortie layer" exactLayerCounts={settings.exactLayerCounts} />
       </section>
 
       {/* Live preview */}

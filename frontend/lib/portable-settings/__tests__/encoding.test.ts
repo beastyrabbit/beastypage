@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "vitest";
 import {
   encodePortableSettings,
   decodePortableSettings,
@@ -21,6 +21,7 @@ function makeSettings(
     accessoryRange: { min: 1, max: 4 },
     scarRange: { min: 1, max: 1 },
     tortieRange: { min: 1, max: 4 },
+    exactLayerCounts: true,
     afterlifeMode: "dark10",
     includeBaseColours: true,
     extendedModes: [],
@@ -35,6 +36,7 @@ function assertRoundTrip(settings: SingleCatPortableSettings) {
   expect(decoded!.accessoryRange).toEqual(settings.accessoryRange);
   expect(decoded!.scarRange).toEqual(settings.scarRange);
   expect(decoded!.tortieRange).toEqual(settings.tortieRange);
+  expect(decoded!.exactLayerCounts).toBe(settings.exactLayerCounts);
   expect(decoded!.afterlifeMode).toBe(settings.afterlifeMode);
   expect(decoded!.includeBaseColours).toBe(settings.includeBaseColours);
   expect([...decoded!.extendedModes].sort()).toEqual(
@@ -49,6 +51,14 @@ function assertRoundTrip(settings: SingleCatPortableSettings) {
 describe("encodePortableSettings / decodePortableSettings", () => {
   it("round-trips default settings", () => {
     assertRoundTrip(makeSettings());
+  });
+
+  it("round-trips exactLayerCounts = true", () => {
+    assertRoundTrip(makeSettings({ exactLayerCounts: true }));
+  });
+
+  it("round-trips exactLayerCounts = false", () => {
+    assertRoundTrip(makeSettings({ exactLayerCounts: false }));
   });
 
   it("round-trips with no palettes and base off", () => {
@@ -174,6 +184,12 @@ describe("encodePortableSettings / decodePortableSettings", () => {
     const a = encodePortableSettings(makeSettings({ afterlifeMode: "off" }));
     const b = encodePortableSettings(makeSettings({ afterlifeMode: "starForce" }));
     expect(a).not.toBe(b);
+  });
+
+  it("decodes pre-change codes as exactLayerCounts = true", () => {
+    const decoded = decodePortableSettings("alkaloids-which-that-that-that-that");
+    expect(decoded).not.toBeNull();
+    expect(decoded!.exactLayerCounts).toBe(true);
   });
 });
 
@@ -319,6 +335,7 @@ describe("extractPortableSettings / applyPortableSettings", () => {
       accessoryRange: { min: 0, max: 0 },
       scarRange: { min: 4, max: 4 },
       tortieRange: { min: 2, max: 3 },
+      exactLayerCounts: false,
       afterlifeMode: "starForce",
       includeBaseColours: false,
       extendedModes: ["howl"],
@@ -326,6 +343,7 @@ describe("extractPortableSettings / applyPortableSettings", () => {
     const result = applyPortableSettings(full, portable);
 
     expect(result.accessoryRange).toEqual({ min: 0, max: 0 });
+    expect(result.exactLayerCounts).toBe(false);
     expect(result.afterlifeMode).toBe("starForce");
     expect(result.extendedModes).toEqual(["howl"]);
     expect(result.mode).toBe("calm");

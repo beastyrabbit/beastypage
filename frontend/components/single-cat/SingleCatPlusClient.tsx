@@ -60,6 +60,7 @@ import {
   type LayerRange,
 } from "../../utils/singleCatVariants";
 import { VariantBar } from "../common/VariantBar";
+import { LayerCountModeSelector } from "../common/LayerCountModeSelector";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
 // @ts-ignore -- legacy JS module without types.
@@ -1248,6 +1249,7 @@ interface SettingsCodeSectionProps {
   accessoryRange: LayerRange;
   scarRange: LayerRange;
   tortieRange: LayerRange;
+  exactLayerCounts: boolean;
   afterlifeMode: AfterlifeOption;
   includeBaseColours: boolean;
   extendedModes: Set<ExtendedMode>;
@@ -1258,6 +1260,7 @@ function SettingsCodeSection({
   accessoryRange,
   scarRange,
   tortieRange,
+  exactLayerCounts,
   afterlifeMode,
   includeBaseColours,
   extendedModes,
@@ -1273,11 +1276,12 @@ function SettingsCodeSection({
         accessoryRange,
         scarRange,
         tortieRange,
+        exactLayerCounts,
         afterlifeMode,
         includeBaseColours,
         extendedModes: Array.from(extendedModes),
       }),
-    [accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes],
+    [accessoryRange, scarRange, tortieRange, exactLayerCounts, afterlifeMode, includeBaseColours, extendedModes],
   );
 
   const handleCopy = useCallback(async () => {
@@ -1436,6 +1440,7 @@ export function SingleCatPlusClient({
         accessoryRange: { ...initialCodeSettings.accessoryRange },
         scarRange: { ...initialCodeSettings.scarRange },
         tortieRange: { ...initialCodeSettings.tortieRange },
+        exactLayerCounts: initialCodeSettings.exactLayerCounts,
         afterlifeMode: initialCodeSettings.afterlifeMode,
         includeBaseColours: initialCodeSettings.includeBaseColours,
         extendedModes: [...initialCodeSettings.extendedModes],
@@ -1456,6 +1461,7 @@ export function SingleCatPlusClient({
   const [accessoryRange, setAccessoryRange] = useState<LayerRange>(initialSettings.accessoryRange);
   const [scarRange, setScarRange] = useState<LayerRange>(initialSettings.scarRange);
   const [tortieRange, setTortieRange] = useState<LayerRange>(initialSettings.tortieRange);
+  const [exactLayerCounts, setExactLayerCounts] = useState(initialSettings.exactLayerCounts);
   const [timingConfig, setTimingConfig] = useState<SpinTimingConfig>(initialSettings.timing);
 
   // Page variant management
@@ -1600,12 +1606,13 @@ export function SingleCatPlusClient({
     accessoryRange,
     scarRange,
     tortieRange,
+    exactLayerCounts,
     afterlifeMode,
     extendedModes: [...extendedModes].sort(),
     includeBaseColours,
     catName: catNameDraft,
     creatorName: creatorNameDraft,
-  }), [mode, timingConfig, speedMultiplier, accessoryRange, scarRange, tortieRange, afterlifeMode, extendedModes, includeBaseColours, catNameDraft, creatorNameDraft]);
+  }), [mode, timingConfig, speedMultiplier, accessoryRange, scarRange, tortieRange, exactLayerCounts, afterlifeMode, extendedModes, includeBaseColours, catNameDraft, creatorNameDraft]);
 
   const applyVariantConfig = useCallback((settings: SingleCatSettings) => {
     setMode(settings.mode);
@@ -1614,6 +1621,7 @@ export function SingleCatPlusClient({
     setAccessoryRange(settings.accessoryRange);
     setScarRange(settings.scarRange);
     setTortieRange(settings.tortieRange);
+    setExactLayerCounts(settings.exactLayerCounts ?? true);
     setAfterlifeMode(settings.afterlifeMode);
     setExtendedModes(new Set(settings.extendedModes));
     setIncludeBaseColours(settings.includeBaseColours);
@@ -1626,15 +1634,17 @@ export function SingleCatPlusClient({
     return !singleCatSettingsEqual(snapshotConfig, variants.activeVariant.settings);
   }, [snapshotConfig, variants.activeVariant]);
 
-  // Apply active variant settings after hydration from localStorage (skip when URL slug takes priority)
+  // Apply active variant settings after hydration from localStorage
+  // (skip when URL slug or portable code settings take priority)
   const variantRestoredRef = useRef(false);
   useEffect(() => {
     if (variantRestoredRef.current) return;
     if (variantSlug) return;
+    if (initialCodeSettings) return;
     if (!variants.activeVariant) return;
     variantRestoredRef.current = true;
     applyVariantConfig(variants.activeVariant.settings);
-  }, [variantSlug, variants.activeVariant, applyVariantConfig]);
+  }, [variantSlug, initialCodeSettings, variants.activeVariant, applyVariantConfig]);
 
   // Warn before unload when dirty
   useEffect(() => {
@@ -1812,6 +1822,15 @@ export function SingleCatPlusClient({
       showToast("Settings loaded from URL");
     }
   }, [initialVariantLoadError, initialVariantSettings, showToast, variantSlug]);
+
+  // Notify when portable code settings were applied from URL
+  const codeToastShownRef = useRef(false);
+  useEffect(() => {
+    if (!initialCodeSettings) return;
+    if (codeToastShownRef.current) return;
+    codeToastShownRef.current = true;
+    showToast("Settings applied from code");
+  }, [initialCodeSettings, showToast]);
 
   const settleRoller = useCallback(
     async (
@@ -2692,6 +2711,7 @@ export function SingleCatPlusClient({
         accessoryCount,
         scarCount,
         tortieCount,
+        exactLayerCounts,
         experimentalColourMode: experimentalMode,
         whitePatchColourMode: "default",
         includeBaseColours,
@@ -2706,65 +2726,24 @@ export function SingleCatPlusClient({
         params.colour = PLACEHOLDER_COLOUR;
       }
 
-      // Re-run per-slot logic to mirror legacy behaviour.
-      const accessoriesAll = invokeMapperArray(mapper, mapper.getAccessories).filter(
-        (entry: string) => entry && entry !== "none"
-      );
-      const scarsAll = invokeMapperArray(mapper, mapper.getScars).filter(
-        (entry: string) => entry && entry !== "none"
-      );
-      const tortieMasksAll = invokeMapperArray(mapper, mapper.getTortieMasks);
-      const tortiePeltsAll = invokeMapperArray(mapper, mapper.getPeltNames);
-      const coloursAll = parameterOptionsRef.current?.colour ?? invokeMapperArray(mapper, mapper.getColours);
-
-      const accessorySlots: string[] = [];
-      for (let i = 0; i < accessoryCount; i += 1) {
-        const include = Math.random() <= 0.5;
-        if (include && accessoriesAll.length > 0) {
-          accessorySlots.push(randomFrom(accessoriesAll));
-        } else {
-          accessorySlots.push("none");
-        }
-      }
-      params.accessories = accessorySlots.filter((entry) => entry && entry !== "none");
-      params.accessory = params.accessories[0] ?? undefined;
-
-      const scarSlots: string[] = [];
-      for (let i = 0; i < scarCount; i += 1) {
-        const include = Math.random() <= 0.5;
-        if (include && scarsAll.length > 0) {
-          scarSlots.push(randomFrom(scarsAll));
-        } else {
-          scarSlots.push("none");
-        }
-      }
-      params.scars = scarSlots.filter((entry) => entry && entry !== "none");
-      params.scar = params.scars[0] ?? undefined;
-
-      const tortieSlots: (TortieSlot | null)[] = [];
-      for (let i = 0; i < tortieCount; i += 1) {
-        const include = Math.random() <= 0.5;
-        if (include && tortieMasksAll.length > 0) {
-          const mask = randomFrom(tortieMasksAll);
-          const pattern = randomFrom(tortiePeltsAll);
-          const colour = coloursAll.length > 0 ? randomFrom(coloursAll) : "GINGER";
-          tortieSlots.push({ mask, pattern, colour });
-        } else {
-          tortieSlots.push(null);
-        }
-      }
+      const accessorySlots =
+        randomResult.slotSelections?.accessories ??
+        (params.accessories ?? []).filter((entry): entry is string => typeof entry === "string");
+      const scarSlots =
+        randomResult.slotSelections?.scars ??
+        (params.scars ?? []).filter((entry): entry is string => typeof entry === "string");
+      const tortieSlots: (TortieSlot | null)[] =
+        randomResult.slotSelections?.tortie?.map((slot) =>
+          slot?.mask && slot?.pattern && slot?.colour
+            ? { mask: slot.mask, pattern: slot.pattern, colour: slot.colour }
+            : null
+        ) ??
+        (params.tortie ?? []).map((slot) =>
+          slot?.mask && slot?.pattern && slot?.colour
+            ? { mask: slot.mask, pattern: slot.pattern, colour: slot.colour }
+            : null
+        );
       const tortieLayers = tortieSlots.filter(Boolean) as TortieSlot[];
-      params.tortie = tortieLayers;
-      params.isTortie = tortieLayers.length > 0;
-      if (tortieLayers.length > 0) {
-        params.tortieMask = tortieLayers[0].mask;
-        params.tortiePattern = tortieLayers[0].pattern;
-        params.tortieColour = tortieLayers[0].colour;
-      } else {
-        params.tortieMask = undefined;
-        params.tortiePattern = undefined;
-        params.tortieColour = undefined;
-      }
 
       resetLayerRows(accessorySlots, scarSlots, tortieSlots);
 
@@ -2774,13 +2753,13 @@ export function SingleCatPlusClient({
       params.dead = enableDead;
 
       const countsResult: GenerationCounts = {
-        accessories: accessoryCount,
-        scars: scarCount,
-        tortie: tortieCount,
+        accessories: accessorySlots.length,
+        scars: scarSlots.length,
+        tortie: tortieSlots.length,
       };
 
       setRollSummary(
-        `Rolled → Accessories: ${accessoryCount} • Scars: ${scarCount} • Tortie layers: ${tortieCount}`
+        `Rolled → Accessories: ${countsResult.accessories} • Scars: ${countsResult.scars} • Tortie layers: ${countsResult.tortie}`
       );
       setHasTint(Boolean(enableDarkForest || enableDead));
       setSpriteGalleryOpen(false);
@@ -3095,6 +3074,7 @@ export function SingleCatPlusClient({
         torties: countsResult.tortie > 0,
         afterlife: afterlifeMode !== "off",
         speed: speedMultiplierRef.current,
+        layer_count_mode: exactLayerCounts ? "exact" : "chance",
       });
       window.setTimeout(() => {
         if (generationIdRef.current === token) {
@@ -3212,6 +3192,7 @@ export function SingleCatPlusClient({
     createMapper,
     resetMetaDrafts,
     getDelayWithMultiplier,
+    exactLayerCounts,
     timingConfig.allowFastFlips,
     timingConfig.delays,
     subsetLimits,
@@ -3844,6 +3825,7 @@ export function SingleCatPlusClient({
                 <LayerRangeSelector label="Accessories" value={accessoryRange} onChange={setAccessoryRange} />
                 <LayerRangeSelector label="Scars" value={scarRange} onChange={setScarRange} />
                 <LayerRangeSelector label="Tortie Layers" value={tortieRange} onChange={setTortieRange} />
+                <LayerCountModeSelector value={exactLayerCounts} onChange={setExactLayerCounts} />
               </div>
 
               <div className="space-y-3">
@@ -3890,6 +3872,7 @@ export function SingleCatPlusClient({
                 accessoryRange={accessoryRange}
                 scarRange={scarRange}
                 tortieRange={tortieRange}
+                exactLayerCounts={exactLayerCounts}
                 afterlifeMode={afterlifeMode}
                 includeBaseColours={includeBaseColours}
                 extendedModes={extendedModes}
@@ -3897,6 +3880,7 @@ export function SingleCatPlusClient({
                   setAccessoryRange(portable.accessoryRange);
                   setScarRange(portable.scarRange);
                   setTortieRange(portable.tortieRange);
+                  setExactLayerCounts(portable.exactLayerCounts);
                   setAfterlifeMode(portable.afterlifeMode);
                   setIncludeBaseColours(portable.includeBaseColours);
                   setExtendedModes(new Set(portable.extendedModes));

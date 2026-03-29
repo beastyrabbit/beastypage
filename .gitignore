@@ -61,3 +61,14 @@ test-*.sh
 
 # Playwright MCP
 .playwright-mcp/
+
+# AI tool directories
+.crush/
+.goose/
+.junie/
+
+# Convex generated files
+convex/_generated/
+
+# Skills lock
+skills-lock.json

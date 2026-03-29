@@ -39,6 +39,7 @@ export interface RandomGenerationOptions {
   ignoreForbiddenSprites?: boolean;
   experimentalColourMode?: string | string[];
   includeBaseColours?: boolean;
+  exactLayerCounts?: boolean;
   countsMode?:
     | 'weighted'
     | 'uniform'
@@ -49,6 +50,17 @@ export interface RandomGenerationOptions {
   accessoryCount?: number;
   scarCount?: number;
   tortieCount?: number;
+}
+
+export interface SlotSelections {
+  accessories: string[];
+  scars: string[];
+  tortie: (TortieLayer | null)[];
+}
+
+export interface RandomGenerationResult {
+  params: CatParams;
+  slotSelections: SlotSelections;
 }
 
 export interface CatRenderParams {

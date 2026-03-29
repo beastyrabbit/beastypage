@@ -12,6 +12,7 @@ type SingleCatGeneratedProps = {
   torties: boolean;
   afterlife: boolean;
   speed: number;
+  layer_count_mode: "exact" | "chance";
 };
 
 type SingleCatModeChangedProps = {

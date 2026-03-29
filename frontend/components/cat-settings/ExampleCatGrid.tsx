@@ -61,6 +61,7 @@ export function ExampleCatGrid({ settings }: ExampleCatGridProps) {
           accessoryCount,
           scarCount,
           tortieCount,
+          exactLayerCounts: settings.exactLayerCounts,
           experimentalColourMode,
           includeBaseColours: settings.includeBaseColours,
         });

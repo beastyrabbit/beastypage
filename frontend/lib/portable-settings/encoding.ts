@@ -67,24 +67,25 @@ function decodeRange(index: number): LayerRange {
 }
 
 // ---------------------------------------------------------------------------
-// Palette mask helpers — two-half split for 75-bit bitmask
+// Palette mask helpers — two-half split for 74-bit palette space
 //
 // Palette bitmask starts at bit 21 of the 96-bit value.
 // It straddles the lower/upper boundary (bit 48):
 //   paletteLow  = bits 21-47 -> 27 bits (palette positions 0-26)
-//   paletteHigh = bits 48-95 -> 48 bits (palette positions 27-74)
+//   paletteHigh = bits 48-94 -> 47 bits (palette positions 27-73)
+//   reservedBit = bit 95     -> 1 bit   (exactLayerCounts mode)
 //
 // Uses 2**i (safe up to i=52) instead of 1<<i (32-bit truncation).
 // ---------------------------------------------------------------------------
 
-/** Encode palette selections into [low27, high48] pair. */
+/** Encode palette selections into [low27, high47] pair. */
 function encodePaletteMask(
   modes: readonly ExtendedMode[],
 ): [number, number] {
   let low = 0;
   let high = 0;
   const modeSet = new Set(modes);
-  const len = Math.min(PORTABLE_PALETTE_REGISTRY.length, 75);
+  const len = Math.min(PORTABLE_PALETTE_REGISTRY.length, 74);
 
   for (let i = 0; i < Math.min(len, 27); i++) {
     if (modeSet.has(PORTABLE_PALETTE_REGISTRY[i])) low += 2 ** i;
@@ -95,10 +96,10 @@ function encodePaletteMask(
   return [low, high];
 }
 
-/** Decode [low27, high48] pair back to palette selections. */
+/** Decode [low27, high47] pair back to palette selections. */
 function decodePaletteMask(low: number, high: number): ExtendedMode[] {
   const modes: ExtendedMode[] = [];
-  const len = Math.min(PORTABLE_PALETTE_REGISTRY.length, 75);
+  const len = Math.min(PORTABLE_PALETTE_REGISTRY.length, 74);
 
   for (let i = 0; i < Math.min(len, 27); i++) {
     if (Math.floor(low / (2 ** i)) % 2 === 1) {
@@ -126,7 +127,9 @@ function decodePaletteMask(low: number, high: number): ExtendedMode[] {
 //   bits 12-15  tortie range          (4)
 //   bits 16-19  afterlife             (4)
 //   bit  20     includeBase           (1)
-//   bits 21-95  palette bitmask       (75) one bit per palette
+//   bits 21-94  palette bitmask       (74) one bit per palette
+//   bit  95     reserved mode bit     (1) 1 => exactLayerCounts = false
+  //                                     (inverted so legacy codes with 0 default to true)
 //   ─────────────────────────────────────
 //   total                             96 bits
 //
@@ -136,8 +139,9 @@ function decodePaletteMask(low: number, high: number): ExtendedMode[] {
 //   upper (words 3-5, 48 bits): bits 48-95  (max ~2.8x10^14 < 2^53)
 //
 // Palette bitmask straddles the boundary:
-//   paletteLow  = bits 21-47 (27 bits, in lower half)
-//   paletteHigh = bits 48-95 (48 bits, = upper half)
+//   paletteLow   = bits 21-47 (27 bits, in lower half)
+//   paletteHigh  = bits 48-94 (47 bits, in upper half)
+//   reservedBit  = bit 95
 // =========================================================================
 
 const W = 65536; // 2^16
@@ -159,6 +163,7 @@ function pack(
   const tortieIdx = encodeRange(settings.tortieRange) & 0xf;
   const afterlifeIdx = (AFTERLIFE_INDEX.get(settings.afterlifeMode) ?? 0) & 0xf;
   const baseBit = settings.includeBaseColours ? 1 : 0;
+  const reservedModeBit = settings.exactLayerCounts ? 0 : 1;
 
   const [paletteLow, paletteHigh] = encodePaletteMask(settings.extendedModes);
 
@@ -172,8 +177,8 @@ function pack(
     baseBit * POW20 +
     paletteLow * POW21;
 
-  // Upper half: bits 48-95 (paletteHigh)
-  const upper = paletteHigh;
+  // Upper half: bits 48-95 (paletteHigh + reserved mode bit)
+  const upper = paletteHigh + reservedModeBit * (2 ** 47);
 
   // Split into 6 x 16-bit words via division + modulo
   return [
@@ -213,12 +218,14 @@ function unpack(
   const includeBase = Math.floor(lower / POW20) % 2 === 1;
 
   const paletteLow = Math.floor(lower / POW21); // bits 21-47 = 27 bits
-  const paletteHigh = upper;                     // bits 48-95 = 48 bits
+  const reservedModeBit = Math.floor(upper / (2 ** 47)) % 2;
+  const paletteHigh = upper % (2 ** 47);        // bits 48-94 = 47 bits
 
   return {
     accessoryRange: decodeRange(accIdx),
     scarRange: decodeRange(scarIdx),
     tortieRange: decodeRange(tortieIdx),
+    exactLayerCounts: reservedModeBit === 0,
     afterlifeMode: AFTERLIFE_TABLE[afterlifeIdx],
     includeBaseColours: includeBase,
     extendedModes: decodePaletteMask(paletteLow, paletteHigh),
