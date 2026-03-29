@@ -10,7 +10,11 @@ const outputDir = path.resolve(
 );
 
 function stableStringify(value: unknown): string {
-  return JSON.stringify(value, Object.keys(value as Record<string, unknown>).sort());
+  return JSON.stringify(value, (_, v) =>
+    v !== null && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort())
+      : v,
+  );
 }
 
 async function readJsonIfPresent(filePath: string) {

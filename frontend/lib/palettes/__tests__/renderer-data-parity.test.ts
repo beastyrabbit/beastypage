@@ -29,7 +29,13 @@ describe("renderer palette data parity", () => {
         colors: palette.colors,
       };
 
-      if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      const sortedStringify = (v: unknown) =>
+        JSON.stringify(v, (_, val) =>
+          val !== null && typeof val === "object" && !Array.isArray(val)
+            ? Object.fromEntries(Object.entries(val as Record<string, unknown>).sort())
+            : val,
+        );
+      if (sortedStringify(actual) !== sortedStringify(expected)) {
         mismatches.push(`${palette.id} (content mismatch)`);
       }
     }
