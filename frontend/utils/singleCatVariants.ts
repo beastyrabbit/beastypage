@@ -24,6 +24,7 @@ export interface SingleCatSettings {
   accessoryRange: LayerRange;
   scarRange: LayerRange;
   tortieRange: LayerRange;
+  exactLayerCounts: boolean;
   afterlifeMode: AfterlifeOption;
   extendedModes: ExtendedMode[];
   includeBaseColours: boolean;
@@ -40,10 +41,11 @@ export const DEFAULT_SINGLE_CAT_SETTINGS: SingleCatSettings = {
   mode: "flashy",
   timing: DEFAULT_TIMING_CONFIG,
   speedMultiplier: 1.0,
-  accessoryRange: { min: 1, max: 4 },
-  scarRange: { min: 1, max: 1 },
-  tortieRange: { min: 1, max: 4 },
-  afterlifeMode: "dark10",
+  accessoryRange: { min: 0, max: 2 },
+  scarRange: { min: 0, max: 2 },
+  tortieRange: { min: 0, max: 2 },
+  exactLayerCounts: true,
+  afterlifeMode: "off",
   extendedModes: [],
   includeBaseColours: true,
   catName: "",
@@ -195,6 +197,7 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
       accessoryRange: isValidRange(data.accessoryRange) ? data.accessoryRange as LayerRange : DEFAULT_SINGLE_CAT_SETTINGS.accessoryRange,
       scarRange: isValidRange(data.scarRange) ? data.scarRange as LayerRange : DEFAULT_SINGLE_CAT_SETTINGS.scarRange,
       tortieRange: isValidRange(data.tortieRange) ? data.tortieRange as LayerRange : DEFAULT_SINGLE_CAT_SETTINGS.tortieRange,
+      exactLayerCounts: typeof data.exactLayerCounts === "boolean" ? data.exactLayerCounts : true,
       afterlifeMode: isAfterlifeOption(data.afterlifeMode) ? data.afterlifeMode : DEFAULT_SINGLE_CAT_SETTINGS.afterlifeMode,
       extendedModes: Array.isArray(modes) ? [...new Set((modes as string[]).filter((m): m is ExtendedMode => EXTENDED_MODE_VALUES.has(m)))].sort() : [],
       includeBaseColours: typeof data.includeBaseColours === "boolean" ? data.includeBaseColours : true,
@@ -215,6 +218,7 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
 export function singleCatSettingsEqual(a: SingleCatSettings, b: SingleCatSettings): boolean {
   const normalize = (s: SingleCatSettings) => ({
     ...s,
+    exactLayerCounts: s.exactLayerCounts ?? true,
     extendedModes: [...s.extendedModes].sort(),
   });
   return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));

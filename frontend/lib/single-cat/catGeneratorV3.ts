@@ -5,6 +5,7 @@ import {
 } from '@/lib/cat-v3/api';
 import {
   generateRandomParamsV3,
+  generateRandomParamsV3Detailed,
   type RandomGenerationOptions,
 } from '@/lib/cat-v3/randomGenerator';
 import type {
@@ -167,9 +168,36 @@ export class CatGeneratorV3 {
   }
 
   async generateRandomCat(options: Record<string, unknown> = {}) {
-    const params = await this.generateRandomParams(options as LegacyRandomParamsOptions);
+    const {
+      accessoryCount,
+      scarCount,
+      tortieCount,
+      slotOverrides,
+      ...rest
+    } = options as LegacyRandomParamsOptions;
+
+    const overrides: Partial<Record<SlotOverrideKey, number>> = {
+      ...(slotOverrides ?? {}),
+    };
+
+    if (typeof accessoryCount === 'number' && Number.isFinite(accessoryCount)) {
+      overrides.accessories = Math.max(0, Math.trunc(accessoryCount));
+    }
+    if (typeof scarCount === 'number' && Number.isFinite(scarCount)) {
+      overrides.scars = Math.max(0, Math.trunc(scarCount));
+    }
+    if (typeof tortieCount === 'number' && Number.isFinite(tortieCount)) {
+      overrides.tortie = Math.max(0, Math.trunc(tortieCount));
+    }
+
+    const mapped: RandomGenerationOptions = {
+      ...rest,
+      slotOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
+    };
+
+    const { params, slotSelections } = await generateRandomParamsV3Detailed(mapped);
     const result = await this.generateCat(params);
-    return { params, canvas: result.canvas };
+    return { params, canvas: result.canvas, slotSelections };
   }
 
   buildCatURL(params: CatParams) {

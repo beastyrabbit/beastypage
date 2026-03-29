@@ -78,6 +78,58 @@ describe('generateRandomParamsServer', () => {
     expect(params.isTortie).toBe(false);
   });
 
+  it('fills exact accessory slot counts when exactLayerCounts is true', async () => {
+    const params = await generateRandomParamsServer(
+      { accessories: 4, scars: 0, torties: 0 },
+      { exactLayerCounts: true },
+    );
+    expect(params.accessories).toHaveLength(4);
+  });
+
+  it('fills exact scar slot counts when exactLayerCounts is true', async () => {
+    const params = await generateRandomParamsServer(
+      { accessories: 0, scars: 4, torties: 0 },
+      { exactLayerCounts: true },
+    );
+    expect(params.scars).toHaveLength(4);
+  });
+
+  it('fills exact tortie slot counts when exactLayerCounts is true', async () => {
+    const params = await generateRandomParamsServer(
+      { accessories: 0, scars: 0, torties: 4 },
+      { exactLayerCounts: true },
+    );
+    expect(params.isTortie).toBe(true);
+    expect(params.tortie).toHaveLength(4);
+  });
+
+  it('forces no tortie when exactLayerCounts is true and torties is 0', async () => {
+    const params = await generateRandomParamsServer(
+      { accessories: 0, scars: 0, torties: 0 },
+      { exactLayerCounts: true },
+    );
+    expect(params.isTortie).toBe(false);
+    expect(params.tortie).toBeUndefined();
+  });
+
+  it('keeps placeholder-capable sparse legacy behavior when exactLayerCounts is false', async () => {
+    const seenSparse = new Set<string>();
+
+    for (let i = 0; i < 25; i += 1) {
+      const params = await generateRandomParamsServer(
+        { accessories: 4, scars: 4, torties: 4 },
+        { exactLayerCounts: false },
+      );
+      seenSparse.add([
+        params.accessories?.length ?? 0,
+        params.scars?.length ?? 0,
+        params.tortie?.length ?? 0,
+      ].join(':'));
+    }
+
+    expect(Array.from(seenSparse).some((entry) => entry !== '4:4:4')).toBe(true);
+  });
+
   it('ignores invalid sprite override', async () => {
     const params = await generateRandomParamsServer({ sprite: 999 });
     // Should fall back to random from valid pool

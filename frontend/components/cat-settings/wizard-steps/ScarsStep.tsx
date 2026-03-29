@@ -5,6 +5,7 @@ import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import { useSpriteMapperOptions, useCatGenerator } from "@/components/cat-builder/hooks";
 import { formatName } from "@/components/cat-builder/utils";
 import { WizardExampleCats } from "../WizardExampleCats";
+import { ForceInitialRollInfo } from "./ForceInitialRollInfo";
 import type { WizardStepProps } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -174,6 +175,7 @@ export function ScarsStep(props: WizardStepProps) {
           onChange={setScarRange}
           compact
         />
+        <ForceInitialRollInfo range={settings.scarRange} layerName="scar" />
       </section>
 
       {/* Scar gallery — below the selector */}

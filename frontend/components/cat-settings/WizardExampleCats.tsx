@@ -88,6 +88,7 @@ export function WizardExampleCats({
           accessoryCount,
           scarCount,
           tortieCount,
+          exactLayerCounts: settings.exactLayerCounts,
           experimentalColourMode,
           includeBaseColours: settings.includeBaseColours,
         });

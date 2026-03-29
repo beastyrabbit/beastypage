@@ -5,6 +5,7 @@ import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import { useSpriteMapperOptions, useCatGenerator } from "@/components/cat-builder/hooks";
 import { formatName } from "@/components/cat-builder/utils";
 import { WizardExampleCats } from "../WizardExampleCats";
+import { ForceInitialRollInfo } from "./ForceInitialRollInfo";
 import type { WizardStepProps } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -181,6 +182,7 @@ export function AccessoriesStep(props: WizardStepProps) {
           onChange={setAccessoryRange}
           compact
         />
+        <ForceInitialRollInfo range={settings.accessoryRange} layerName="accessory" />
       </section>
 
       {/* Accessory gallery — below the selector */}

@@ -87,6 +87,7 @@ function AfterlifeComparison({ settings }: { settings: WizardStepProps["settings
         accessoryCount: 0,
         scarCount: 0,
         tortieCount: 0,
+        exactLayerCounts: settings.exactLayerCounts,
         experimentalColourMode,
         includeBaseColours: settings.includeBaseColours,
       });

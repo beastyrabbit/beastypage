@@ -12,7 +12,8 @@ import type { ExtendedMode } from "@/utils/singleCatVariants";
  * `includeBaseColours` boolean, which has its own dedicated bit.
  *
  * Current capacity: 75 bit positions (96 total bits − 21 fixed).
- * Used: 70 / 75.  Spare: 5 slots for future palettes.
+ * Used: 70 / 75 palette positions, plus 1 reserved mode bit.
+ * Spare: 4 palette slots + 1 reserved mode bit.
  */
 export const PORTABLE_PALETTE_REGISTRY: readonly ExtendedMode[] = [
   // ── Core: Solid (positions 0–3) ──

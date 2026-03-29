@@ -11,6 +11,7 @@ export interface SingleCatPortableSettings {
   accessoryRange: LayerRange;
   scarRange: LayerRange;
   tortieRange: LayerRange;
+  exactLayerCounts: boolean;
   afterlifeMode: AfterlifeOption;
   includeBaseColours: boolean;
   extendedModes: ExtendedMode[];
