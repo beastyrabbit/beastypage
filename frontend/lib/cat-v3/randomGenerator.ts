@@ -299,11 +299,11 @@ export async function generateRandomParamsV3Detailed(
   const tortieConfig = RANDOM_CONFIG.counts.tortie;
   const tortieSlotCount = determineSlotCount('tortie', tortieConfig, RANDOM_CONFIG.defaultSlots, options);
   const usesExplicitTortieCount = hasExplicitSlotControl('tortie', options);
-  params.isTortie = exactLayerCounts
-    ? tortieSlotCount > 0
-    : usesExplicitTortieCount
-      ? tortieSlotCount > 0
-      : roll(RANDOM_CONFIG.probabilities.isTortie);
+  if (exactLayerCounts || usesExplicitTortieCount) {
+    params.isTortie = tortieSlotCount > 0;
+  } else {
+    params.isTortie = roll(RANDOM_CONFIG.probabilities.isTortie);
+  }
 
   if (roll(RANDOM_CONFIG.probabilities.heterochromia)) {
     const heteroPool = ['', ...eyeColours];
@@ -314,11 +314,9 @@ export async function generateRandomParamsV3Detailed(
   }
 
   if (params.isTortie) {
-    const slotCount = exactLayerCounts
+    const slotCount = (exactLayerCounts || usesExplicitTortieCount)
       ? tortieSlotCount
-      : usesExplicitTortieCount
-        ? tortieSlotCount
-        : Math.max(1, tortieSlotCount);
+      : Math.max(1, tortieSlotCount);
     const masks = spriteMapper.getTortieMasks();
     const uniqueMasks = tortieConfig.unique !== false;
     const layerProbability = RANDOM_CONFIG.probabilities.tortieLayer ?? RANDOM_CONFIG.probabilities.isTortie ?? 0.5;
@@ -402,8 +400,6 @@ export async function generateRandomParamsV3Detailed(
       exactCount: exactLayerCounts,
       placeholder: 'none',
       shouldFillSlot: () => roll(accessoryProbability),
-      mapChoice: (choice) => choice,
-      mapValueToSlot: (value) => value,
     });
     slotSelections.accessories = accessoryResult.slotSelections as string[];
     if (accessoryResult.selectedValues.length > 0) {
@@ -424,8 +420,6 @@ export async function generateRandomParamsV3Detailed(
       exactCount: exactLayerCounts,
       placeholder: 'none',
       shouldFillSlot: () => roll(scarProbability),
-      mapChoice: (choice) => choice,
-      mapValueToSlot: (value) => value,
     });
     slotSelections.scars = scarResult.slotSelections as string[];
     if (scarResult.selectedValues.length > 0) {

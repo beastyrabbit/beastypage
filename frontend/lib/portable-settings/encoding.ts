@@ -67,17 +67,18 @@ function decodeRange(index: number): LayerRange {
 }
 
 // ---------------------------------------------------------------------------
-// Palette mask helpers — two-half split for 75-bit payload space
+// Palette mask helpers — two-half split for 74-bit palette space
 //
 // Palette bitmask starts at bit 21 of the 96-bit value.
 // It straddles the lower/upper boundary (bit 48):
 //   paletteLow  = bits 21-47 -> 27 bits (palette positions 0-26)
-//   paletteHigh = bits 48-95 -> 48 bits (palette positions 27-73 + 1 reserved mode bit)
+//   paletteHigh = bits 48-94 -> 47 bits (palette positions 27-73)
+//   reservedBit = bit 95     -> 1 bit   (exactLayerCounts mode)
 //
 // Uses 2**i (safe up to i=52) instead of 1<<i (32-bit truncation).
 // ---------------------------------------------------------------------------
 
-/** Encode palette selections into [low27, high48] pair. */
+/** Encode palette selections into [low27, high47] pair. */
 function encodePaletteMask(
   modes: readonly ExtendedMode[],
 ): [number, number] {
@@ -95,7 +96,7 @@ function encodePaletteMask(
   return [low, high];
 }
 
-/** Decode [low27, high48] pair back to palette selections. */
+/** Decode [low27, high47] pair back to palette selections. */
 function decodePaletteMask(low: number, high: number): ExtendedMode[] {
   const modes: ExtendedMode[] = [];
   const len = Math.min(PORTABLE_PALETTE_REGISTRY.length, 74);
@@ -128,6 +129,7 @@ function decodePaletteMask(low: number, high: number): ExtendedMode[] {
 //   bit  20     includeBase           (1)
 //   bits 21-94  palette bitmask       (74) one bit per palette
 //   bit  95     reserved mode bit     (1) 1 => exactLayerCounts = false
+  //                                     (inverted so legacy codes with 0 default to true)
 //   ─────────────────────────────────────
 //   total                             96 bits
 //

@@ -39,6 +39,35 @@ function clonePlain<T extends Record<string, unknown>>(input: T): Record<string,
   }
 }
 
+function sanitizeSlotCount(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.trunc(value));
+  }
+  return undefined;
+}
+
+function mapLegacyOptions(options: LegacyRandomParamsOptions): RandomGenerationOptions {
+  const { accessoryCount, scarCount, tortieCount, slotOverrides, ...rest } = options;
+
+  const overrides: Partial<Record<SlotOverrideKey, number>> = {
+    ...(slotOverrides ?? {}),
+  };
+
+  const accCount = sanitizeSlotCount(accessoryCount);
+  if (accCount !== undefined) overrides.accessories = accCount;
+
+  const scarCountSanitized = sanitizeSlotCount(scarCount);
+  if (scarCountSanitized !== undefined) overrides.scars = scarCountSanitized;
+
+  const tortieCountSanitized = sanitizeSlotCount(tortieCount);
+  if (tortieCountSanitized !== undefined) overrides.tortie = tortieCountSanitized;
+
+  return {
+    ...rest,
+    slotOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
+  };
+}
+
 function coerceSpriteNumber(value: unknown, fallback = 0): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -137,64 +166,11 @@ export class CatGeneratorV3 {
   }
 
   async generateRandomParams(options: LegacyRandomParamsOptions = {}) {
-    const {
-      accessoryCount,
-      scarCount,
-      tortieCount,
-      slotOverrides,
-      ...rest
-    } = options;
-
-    const overrides: Partial<Record<SlotOverrideKey, number>> = {
-      ...(slotOverrides ?? {}),
-    };
-
-    if (typeof accessoryCount === 'number' && Number.isFinite(accessoryCount)) {
-      overrides.accessories = Math.max(0, Math.trunc(accessoryCount));
-    }
-    if (typeof scarCount === 'number' && Number.isFinite(scarCount)) {
-      overrides.scars = Math.max(0, Math.trunc(scarCount));
-    }
-    if (typeof tortieCount === 'number' && Number.isFinite(tortieCount)) {
-      overrides.tortie = Math.max(0, Math.trunc(tortieCount));
-    }
-
-    const mapped: RandomGenerationOptions = {
-      ...rest,
-      slotOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
-    };
-
-    return generateRandomParamsV3(mapped);
+    return generateRandomParamsV3(mapLegacyOptions(options));
   }
 
   async generateRandomCat(options: Record<string, unknown> = {}) {
-    const {
-      accessoryCount,
-      scarCount,
-      tortieCount,
-      slotOverrides,
-      ...rest
-    } = options as LegacyRandomParamsOptions;
-
-    const overrides: Partial<Record<SlotOverrideKey, number>> = {
-      ...(slotOverrides ?? {}),
-    };
-
-    if (typeof accessoryCount === 'number' && Number.isFinite(accessoryCount)) {
-      overrides.accessories = Math.max(0, Math.trunc(accessoryCount));
-    }
-    if (typeof scarCount === 'number' && Number.isFinite(scarCount)) {
-      overrides.scars = Math.max(0, Math.trunc(scarCount));
-    }
-    if (typeof tortieCount === 'number' && Number.isFinite(tortieCount)) {
-      overrides.tortie = Math.max(0, Math.trunc(tortieCount));
-    }
-
-    const mapped: RandomGenerationOptions = {
-      ...rest,
-      slotOverrides: Object.keys(overrides).length > 0 ? overrides : undefined,
-    };
-
+    const mapped = mapLegacyOptions(options as LegacyRandomParamsOptions);
     const { params, slotSelections } = await generateRandomParamsV3Detailed(mapped);
     const result = await this.generateCat(params);
     return { params, canvas: result.canvas, slotSelections };

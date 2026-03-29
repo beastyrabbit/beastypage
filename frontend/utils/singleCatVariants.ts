@@ -218,7 +218,6 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
 export function singleCatSettingsEqual(a: SingleCatSettings, b: SingleCatSettings): boolean {
   const normalize = (s: SingleCatSettings) => ({
     ...s,
-    exactLayerCounts: s.exactLayerCounts ?? true,
     extendedModes: [...s.extendedModes].sort(),
   });
   return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));

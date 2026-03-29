@@ -396,6 +396,7 @@ export async function generateRandomParamsServer(
   options: RandomGenerationOptions = {},
 ): Promise<CatParams> {
   const data = await loadSpriteData();
+  const exactLayerCounts = options.exactLayerCounts === true;
 
   const spritePool = ensureArray(RANDOM_CONFIG.spritePool.include);
   if (!spritePool.length) throw new Error('Sprite pool is empty');
@@ -471,7 +472,7 @@ export async function generateRandomParamsServer(
       pelts,
       pickColour,
       uniqueMasks,
-      exactCount: options.exactLayerCounts === true,
+      exactCount: exactLayerCounts,
       shouldFillSlot: (slotIndex) => slotIndex === 0 || roll(layerProb),
     });
 
@@ -480,7 +481,7 @@ export async function generateRandomParamsServer(
       params.tortieMask = tortieResult.selectedValues[0].mask;
       params.tortieColour = tortieResult.selectedValues[0].colour;
       params.tortiePattern = tortieResult.selectedValues[0].pattern;
-    } else if (options.exactLayerCounts === true || slotCount === 0) {
+    } else if (exactLayerCounts || slotCount === 0) {
       params.isTortie = false;
     } else {
       const fallback = materializeTortieSlots({
@@ -536,11 +537,9 @@ export async function generateRandomParamsServer(
       slotCount: accSlots,
       availableChoices: data.accessories,
       unique: uniqueAcc,
-      exactCount: options.exactLayerCounts === true,
+      exactCount: exactLayerCounts,
       placeholder: 'none',
       shouldFillSlot: () => roll(accProb),
-      mapChoice: (choice) => choice,
-      mapValueToSlot: (value) => value,
     });
     if (accResult.selectedValues.length > 0) {
       params.accessories = accResult.selectedValues;
@@ -560,11 +559,9 @@ export async function generateRandomParamsServer(
       slotCount: scarSlots,
       availableChoices: data.scars,
       unique: uniqueScars,
-      exactCount: options.exactLayerCounts === true,
+      exactCount: exactLayerCounts,
       placeholder: 'none',
       shouldFillSlot: () => roll(scarProb),
-      mapChoice: (choice) => choice,
-      mapValueToSlot: (value) => value,
     });
     if (scarResult.selectedValues.length > 0) {
       params.scars = scarResult.selectedValues;

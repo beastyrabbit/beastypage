@@ -33,10 +33,12 @@ function deriveForceState(range: LayerRange): ForceState {
   return "off";
 }
 
+const INACTIVE_BADGE = "border-border/40 bg-muted/20 text-muted-foreground/50";
+
 const BADGE_STYLES: Record<ForceState, string> = {
-  disabled: "border-border/40 bg-muted/20 text-muted-foreground/50",
+  disabled: INACTIVE_BADGE,
   on: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-  off: "border-border/40 bg-muted/20 text-muted-foreground/50",
+  off: INACTIVE_BADGE,
 };
 
 const BADGE_LABELS: Record<ForceState, string> = {

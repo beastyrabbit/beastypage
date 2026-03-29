@@ -12,8 +12,10 @@ interface BaseSlotOptions<TChoice, TValue, TSlot> {
   exactCount: boolean;
   placeholder: TSlot;
   shouldFillSlot(slotIndex: number, selectedCount: number): boolean;
-  mapChoice(choice: TChoice): TValue;
-  mapValueToSlot(value: TValue): TSlot;
+  /** Transform a drawn choice into the stored value. Defaults to identity. */
+  mapChoice?(choice: TChoice): TValue;
+  /** Transform a stored value into the slot representation. Defaults to identity. */
+  mapValueToSlot?(value: TValue): TSlot;
 }
 
 interface TortieSlotOptions {
@@ -53,12 +55,16 @@ export function materializeStringSlots<TChoice, TValue = TChoice>({
   exactCount,
   placeholder,
   shouldFillSlot,
-  mapChoice,
-  mapValueToSlot,
+  mapChoice: mapChoiceFn,
+  mapValueToSlot: mapValueToSlotFn,
 }: BaseSlotOptions<TChoice, TValue, TValue | TChoice | string>): MaterializedSlotsResult<TValue, TValue | TChoice | string> {
+  const identity = <T>(x: T): T => x;
+  const mapChoice = mapChoiceFn ?? (identity as (choice: TChoice) => TValue);
+  const mapValueToSlot = mapValueToSlotFn ?? (identity as (value: TValue) => TValue | TChoice | string);
+
   const selectedValues: TValue[] = [];
   const slotSelections: Array<TValue | TChoice | string> = [];
-  const available = unique ? [...availableChoices] : [...availableChoices];
+  const available = [...availableChoices];
 
   if (slotCount <= 0 || available.length === 0) {
     return { selectedValues, slotSelections };
@@ -93,7 +99,7 @@ export function materializeTortieSlots({
 }: TortieSlotOptions): MaterializedSlotsResult<TortieLayer, TortieLayer | null> {
   const selectedValues: TortieLayer[] = [];
   const slotSelections: Array<TortieLayer | null> = [];
-  const availableMasks = uniqueMasks ? [...masks] : [...masks];
+  const availableMasks = [...masks];
 
   if (slotCount <= 0 || masks.length === 0 || pelts.length === 0) {
     return { selectedValues, slotSelections };
