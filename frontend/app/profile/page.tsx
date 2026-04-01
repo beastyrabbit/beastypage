@@ -275,11 +275,6 @@ export default function ProfilePage() {
 // Variants section
 // ---------------------------------------------------------------------------
 
-const TOOL_LABELS: Record<string, string> = {
-  singleCatPlus: "Single Cat Plus",
-  pixelator: "Pixelator",
-};
-
 type VariantDoc = {
   variantId: string;
   toolKey: string;
@@ -288,15 +283,10 @@ type VariantDoc = {
   createdAt: number;
 };
 
-const TOOL_STORAGE_KEYS: Record<string, string> = {
-  singleCatPlus: "singleCatPlus.variants",
-  pixelator: "pixelator-variants",
-};
-
-const TOOL_API_PATHS: Record<string, string> = {
-  singleCatPlus: "/api/single-cat-settings",
-  pixelator: "/api/pixelator-settings",
-};
+const VARIANT_TOOLS = {
+  singleCatPlus: { label: "Single Cat Plus", storageKey: "singleCatPlus.variants", apiPath: "/api/single-cat-settings" },
+  pixelator: { label: "Pixelator", storageKey: "pixelator-variants", apiPath: "/api/pixelator-settings" },
+} as const;
 
 function VariantsSection({
   variants,
@@ -340,8 +330,8 @@ function VariantsSection({
     setImporting(true);
     let totalImported = 0;
     try {
-      for (const [toolKey, storageKey] of Object.entries(TOOL_STORAGE_KEYS)) {
-        const raw = localStorage.getItem(storageKey);
+      for (const [toolKey, tool] of Object.entries(VARIANT_TOOLS)) {
+        const raw = localStorage.getItem(tool.storageKey);
         if (!raw) continue;
         try {
           const parsed = JSON.parse(raw);
@@ -359,7 +349,7 @@ function VariantsSection({
             })),
           });
           totalImported += result.imported;
-          if (result.imported > 0) localStorage.removeItem(storageKey);
+          if (result.imported > 0) localStorage.removeItem(tool.storageKey);
         } catch (err) {
           console.error(`[import] failed for ${toolKey}:`, err);
         }
@@ -432,7 +422,8 @@ function VariantsSection({
       toast.error("Enter a slug");
       return;
     }
-    const apiPath = TOOL_API_PATHS[slugToolKey];
+    const tool = VARIANT_TOOLS[slugToolKey as keyof typeof VARIANT_TOOLS];
+    const apiPath = tool?.apiPath;
     if (!apiPath) {
       toast.error("Unknown tool");
       return;
@@ -514,8 +505,8 @@ function VariantsSection({
           onChange={(e) => setSlugToolKey(e.target.value)}
           className="rounded-lg border border-border/50 bg-background px-2 py-1.5 text-xs text-foreground"
         >
-          {Object.entries(TOOL_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
+          {Object.entries(VARIANT_TOOLS).map(([key, t]) => (
+            <option key={key} value={key}>{t.label}</option>
           ))}
         </select>
         <input
@@ -532,7 +523,7 @@ function VariantsSection({
         </button>
       </div>
       <div className="space-y-2">
-          {Object.entries(TOOL_LABELS).map(([toolKey, label]) => {
+          {Object.entries(VARIANT_TOOLS).map(([toolKey, toolConfig]) => {
             const toolVariants = grouped.get(toolKey) ?? [];
             const expanded = expandedTools.has(toolKey);
             return (
@@ -546,7 +537,7 @@ function VariantsSection({
                   )}
                 >
                   <span>
-                    {label}{" "}
+                    {toolConfig.label}{" "}
                     <span className="text-muted-foreground">({toolVariants.length})</span>
                   </span>
                   {expanded ? (

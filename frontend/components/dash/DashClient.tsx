@@ -45,7 +45,7 @@ export function DashClient({
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const [opening, setOpening] = useState(false);
   const initialLoadToastRef = useRef(false);
-  const loadedFromConvex = useRef(false);
+  const [loadedFromConvex, setLoadedFromConvex] = useState(false);
 
   useEffect(() => {
     if (initialLoadToastRef.current) return;
@@ -62,14 +62,14 @@ export function DashClient({
 
   // Load settings from Convex once available
   useEffect(() => {
-    if (loadedFromConvex.current || initialSlug) return;
+    if (loadedFromConvex || initialSlug) return;
     if (!convexVariants) return;
     const saved = convexVariants.find((v) => v.variantId === DASH_VARIANT_ID);
     if (saved) {
       setSettings(parseDashPayload(saved.settings));
     }
-    loadedFromConvex.current = true;
-  }, [convexVariants, initialSlug]);
+    setLoadedFromConvex(true);
+  }, [convexVariants, initialSlug, loadedFromConvex]);
 
   // Save settings to Convex on change (debounced)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,7 +79,7 @@ export function DashClient({
       isFirstRender.current = false;
       return;
     }
-    if (!isAuthenticated || !loadedFromConvex.current) return;
+    if (!isAuthenticated || !loadedFromConvex) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       void upsertVariant({
@@ -88,20 +88,23 @@ export function DashClient({
         name: "Dashboard",
         settings: settings as unknown as Record<string, unknown>,
         isActive: true,
-      }).catch((err) => console.error("[Dash] save failed:", err));
+      }).catch((err) => {
+        console.error("[Dash] save failed:", err);
+        toast.error("Failed to save dashboard");
+      });
     }, 1000);
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [settings, isAuthenticated, upsertVariant]);
+  }, [settings, isAuthenticated, upsertVariant, loadedFromConvex]);
 
   // Auto-enter edit mode when there are no widgets and no slug pending
   useEffect(() => {
-    if (!initialSlug && settings.widgets.length === 0 && loadedFromConvex.current) {
+    if (!initialSlug && settings.widgets.length === 0 && loadedFromConvex) {
       queueMicrotask(() => setEditing(true));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSlug, loadedFromConvex.current]);
+  }, [initialSlug, loadedFromConvex]);
 
   // Resolve widget IDs to tool metadata
   const resolvedWidgets = useMemo(

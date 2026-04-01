@@ -128,6 +128,15 @@ export const deleteAccount = mutation({
       throw new Error("User not found");
     }
 
+    // Cascade delete user_variants
+    const variants = await ctx.db
+      .query("user_variants")
+      .withIndex("byUserTool", (q) => q.eq("userId", user._id))
+      .collect();
+    for (const variant of variants) {
+      await ctx.db.delete(variant._id);
+    }
+
     await ctx.db.delete(user._id);
   },
 });

@@ -50,6 +50,19 @@ export const upsert = mutation({
     const userId = await requireUserId(ctx);
     const now = Date.now();
 
+    // If setting this variant as active, deactivate others for this tool
+    if (args.isActive) {
+      const others = await ctx.db
+        .query("user_variants")
+        .withIndex("byUserTool", (q) => q.eq("userId", userId).eq("toolKey", args.toolKey))
+        .collect();
+      for (const other of others) {
+        if (other.isActive && other.variantId !== args.variantId) {
+          await ctx.db.patch(other._id, { isActive: false });
+        }
+      }
+    }
+
     const existing = await ctx.db
       .query("user_variants")
       .withIndex("byUserVariant", (q) =>
@@ -66,19 +79,6 @@ export const upsert = mutation({
         updatedAt: now,
       });
       return existing._id;
-    }
-
-    // If setting this variant as active, deactivate others for this tool
-    if (args.isActive) {
-      const others = await ctx.db
-        .query("user_variants")
-        .withIndex("byUserTool", (q) => q.eq("userId", userId).eq("toolKey", args.toolKey))
-        .collect();
-      for (const other of others) {
-        if (other.isActive) {
-          await ctx.db.patch(other._id, { isActive: false });
-        }
-      }
     }
 
     return ctx.db.insert("user_variants", {
@@ -164,6 +164,7 @@ export const importBatch = mutation({
   handler: async (ctx, { toolKey, variants }) => {
     const userId = await requireUserId(ctx);
     let imported = 0;
+    let activeSet = false;
 
     for (const v of variants) {
       const existing = await ctx.db
@@ -174,6 +175,10 @@ export const importBatch = mutation({
         .unique();
       if (existing) continue;
 
+      // Enforce at most one active variant per tool
+      const isActive = v.isActive && !activeSet;
+      if (isActive) activeSet = true;
+
       await ctx.db.insert("user_variants", {
         userId,
         toolKey,
@@ -181,7 +186,7 @@ export const importBatch = mutation({
         name: v.name,
         ...(v.slug !== undefined ? { slug: v.slug } : {}),
         settings: v.settings,
-        isActive: v.isActive,
+        isActive,
         createdAt: v.createdAt,
         updatedAt: v.updatedAt,
       });

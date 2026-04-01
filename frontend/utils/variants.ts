@@ -60,8 +60,8 @@ function clearVariantStore(storageKey: string): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.removeItem(storageKey);
-  } catch {
-    // ignore
+  } catch (error) {
+    console.warn(`[variants] Failed to clear localStorage key "${storageKey}":`, error);
   }
 }
 
@@ -176,6 +176,7 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
       clearVariantStore(storageKey);
     }).catch((err) => {
       console.error("[useVariants] auto-import failed:", err);
+      importedRef.current = false; // allow retry on next mount
     });
   }, [useConvex, toolKey, convexVariants, storageKey, importBatchMut]);
 
@@ -218,13 +219,13 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
     };
 
     if (useConvex && toolKey) {
-      void upsertVariant({
+      upsertVariant({
         toolKey,
         variantId: variant.id,
         name,
         settings: settings as Record<string, unknown>,
         isActive: true,
-      });
+      }).catch((err) => console.error("[useVariants] create sync failed:", err));
     }
 
     setLocalStore((prev) => ({
@@ -235,20 +236,20 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
   }, [useConvex, toolKey, upsertVariant]);
 
   const saveToActive = useCallback((settings: T) => {
+    if (useConvex && toolKey) {
+      const active = store.variants.find((v) => v.id === store.activeId);
+      if (active) {
+        upsertVariant({
+          toolKey,
+          variantId: active.id,
+          name: active.name,
+          settings: settings as Record<string, unknown>,
+          isActive: true,
+        }).catch((err) => console.error("[useVariants] save sync failed:", err));
+      }
+    }
     setLocalStore((prev) => {
       if (!prev.activeId) return prev;
-      if (useConvex && toolKey) {
-        const active = prev.variants.find((v) => v.id === prev.activeId);
-        if (active) {
-          void upsertVariant({
-            toolKey,
-            variantId: active.id,
-            name: active.name,
-            settings: settings as Record<string, unknown>,
-            isActive: true,
-          });
-        }
-      }
       return {
         ...prev,
         variants: prev.variants.map((v) =>
@@ -258,11 +259,11 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
         ),
       };
     });
-  }, [useConvex, toolKey, upsertVariant]);
+  }, [useConvex, toolKey, upsertVariant, store.variants, store.activeId]);
 
   const deleteVariant = useCallback((id: string) => {
     if (useConvex) {
-      void removeVariant({ variantId: id });
+      removeVariant({ variantId: id }).catch((err) => console.error("[useVariants] delete sync failed:", err));
     }
     setLocalStore((prev) => ({
       activeId: prev.activeId === id ? null : prev.activeId,
@@ -272,7 +273,7 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
 
   const renameVariant = useCallback((id: string, name: string) => {
     if (useConvex) {
-      void renameVariantMut({ variantId: id, name });
+      renameVariantMut({ variantId: id, name }).catch((err) => console.error("[useVariants] rename sync failed:", err));
     }
     setLocalStore((prev) => ({
       ...prev,
@@ -284,7 +285,7 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
 
   const setActive = useCallback((id: string | null) => {
     if (useConvex && toolKey) {
-      void setActiveMut({ toolKey, variantId: id ?? undefined });
+      setActiveMut({ toolKey, variantId: id ?? undefined }).catch((err) => console.error("[useVariants] setActive sync failed:", err));
     }
     setLocalStore((prev) => ({ ...prev, activeId: id }));
   }, [useConvex, toolKey, setActiveMut]);
@@ -293,14 +294,14 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
     if (useConvex && toolKey) {
       const variant = store.variants.find((v) => v.id === id);
       if (variant) {
-        void upsertVariant({
+        upsertVariant({
           toolKey,
           variantId: id,
           name: variant.name,
           slug,
           settings: variant.settings as Record<string, unknown>,
           isActive: variant.id === store.activeId,
-        });
+        }).catch((err) => console.error("[useVariants] slug sync failed:", err));
       }
     }
     setLocalStore((prev) => ({
