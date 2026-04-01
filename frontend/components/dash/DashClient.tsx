@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { toast } from "sonner";
-import { useVariants } from "@/utils/variants";
-import { VariantBar } from "@/components/common/VariantBar";
+import { useConvexAuth } from "convex/react";
 import { TOOL_MAP } from "@/lib/dash/registry.generated";
 import { APP_VERSION } from "@/lib/dash/version";
 import { DEFAULT_DASH_SETTINGS, parseDashPayload, dashSettingsEqual } from "@/utils/dashVariants";
@@ -25,8 +24,7 @@ export function DashClient({
   initialLoadError = null,
 }: DashClientProps = {}) {
 
-  const variants = useVariants<DashSettings>({ storageKey: "dash.variants", toolKey: "dash" });
-  const { activeVariant, setVariantSlug, saveToActive } = variants;
+  const { isAuthenticated } = useConvexAuth();
 
   // Local working copy of settings
   const [settings, setSettings] = useState<DashSettings>(() => (
@@ -51,24 +49,13 @@ export function DashClient({
     }
   }, [initialLoadError, initialSettings, initialSlug]);
 
-  // Sync settings from active variant
+  // Auto-enter edit mode when there are no widgets and no slug pending
   useEffect(() => {
-    if (activeVariant && !initialSlug) {
-      queueMicrotask(() => {
-        setSettings(parseDashPayload(activeVariant.settings));
-        setEditing(false);
-      });
-    }
-  }, [activeVariant, initialSlug]);
-
-  // Auto-enter edit mode when there are no widgets and no variant or slug pending
-  useEffect(() => {
-    if (!activeVariant && !initialSlug && settings.widgets.length === 0) {
+    if (!initialSlug && settings.widgets.length === 0) {
       queueMicrotask(() => setEditing(true));
     }
-    // Only trigger on variant/slug changes, not on every settings mutation
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeVariant, initialSlug]);
+  }, [initialSlug]);
 
   // Resolve widget IDs to tool metadata
   const resolvedWidgets = useMemo(
@@ -84,15 +71,9 @@ export function DashClient({
     settings.lastSeenVersion !== null &&
     settings.lastSeenVersion !== APP_VERSION;
 
-  // Re-parse active variant settings once (memoized) to avoid repeated work during dirty checks
   const baseSettings = useMemo(
-    () => {
-      if (initialSlug && initialSettings) {
-        return parseDashPayload(initialSettings);
-      }
-      return activeVariant ? parseDashPayload(activeVariant.settings) : DEFAULT_DASH_SETTINGS;
-    },
-    [activeVariant, initialSettings, initialSlug],
+    () => initialSlug && initialSettings ? parseDashPayload(initialSettings) : DEFAULT_DASH_SETTINGS,
+    [initialSettings, initialSlug],
   );
   const isDirty = !dashSettingsEqual(settings, baseSettings);
 
@@ -115,10 +96,6 @@ export function DashClient({
     setSettings((prev) => ({ ...prev, widgets: widgetIds }));
   }, []);
 
-  const handleApplyConfig = useCallback((config: DashSettings) => {
-    setSettings(parseDashPayload(config));
-  }, []);
-
   const handleReleaseNotesClose = useCallback((latestTag: string | null) => {
     setReleaseNotesOpen(false);
     if (latestTag) {
@@ -126,41 +103,14 @@ export function DashClient({
     }
   }, []);
 
-  const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
-    toast[type](message);
-  }, []);
-
-  const copyText = useCallback(async (text: string, successMessage: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(successMessage);
-    } catch (err) {
-      console.error("[DashClient] copyText failed", err);
-      toast.error("Failed to copy");
-    }
-  }, []);
-
   const handleOpen = useCallback(async () => {
-    // Fast path: clean variant with slug
-    if (activeVariant?.slug && !isDirty) {
-      window.open(`/dash?slug=${encodeURIComponent(activeVariant.slug)}`, "_blank");
-      return;
-    }
-
-    // Dirty or no slug: save locally first, then sync to DB
     setOpening(true);
     try {
-      if (activeVariant && isDirty) {
-        saveToActive(settings);
-      }
       const response = await fetch("/api/dash-settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({
-          config: settings,
-          ...(activeVariant?.slug ? { slug: activeVariant.slug } : {}),
-        }),
+        body: JSON.stringify({ config: settings }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null) as { error?: string } | null;
@@ -169,9 +119,6 @@ export function DashClient({
       const json = (await response.json()) as { slug?: string };
       const slug = json.slug?.trim();
       if (!slug) throw new Error("No slug returned");
-      if (activeVariant && !activeVariant.slug) {
-        setVariantSlug(activeVariant.id, slug);
-      }
       window.open(`/dash?slug=${encodeURIComponent(slug)}`, "_blank");
     } catch (error) {
       console.error("[DashClient] handleOpen", error);
@@ -179,25 +126,25 @@ export function DashClient({
     } finally {
       setOpening(false);
     }
-  }, [activeVariant, isDirty, settings, saveToActive, setVariantSlug]);
+  }, [settings]);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
+        <p className="text-sm text-muted-foreground">Sign in to access your dashboard.</p>
+      </div>
+    );
+  }
 
   return (
     <>
-      <VariantBar
-        variants={variants}
-        snapshotConfig={settings}
-        applyConfig={handleApplyConfig}
-        isDirty={isDirty}
-        showToast={showToast}
-      />
-
       <DashHero
         version={APP_VERSION}
         hasNewVersion={hasNewVersion}
         onOpenReleaseNotes={() => setReleaseNotesOpen(true)}
         editing={editing}
         onToggleEditing={() => setEditing((e) => !e)}
-        hasVariant={!!activeVariant}
+        hasVariant={false}
         opening={opening}
         onOpen={handleOpen}
       />

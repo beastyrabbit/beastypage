@@ -288,7 +288,6 @@ export default function ProfilePage() {
 const TOOL_LABELS: Record<string, string> = {
   singleCatPlus: "Single Cat Plus",
   paletteGenerator: "Palette Generator",
-  dash: "Dash",
   pixelator: "Pixelator",
 };
 
@@ -303,14 +302,12 @@ type VariantDoc = {
 const TOOL_STORAGE_KEYS: Record<string, string> = {
   singleCatPlus: "singleCatPlus.variants",
   paletteGenerator: "paletteGenerator.variants",
-  dash: "dash.variants",
   pixelator: "pixelator-variants",
 };
 
 const TOOL_API_PATHS: Record<string, string> = {
   singleCatPlus: "/api/single-cat-settings",
   paletteGenerator: "/api/palette-generator-settings",
-  dash: "/api/dash-settings",
   pixelator: "/api/pixelator-settings",
 };
 
