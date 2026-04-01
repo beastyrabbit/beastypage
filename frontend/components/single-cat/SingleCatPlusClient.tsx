@@ -49,6 +49,7 @@ import {
   stepCountsToMetrics,
 } from "../../utils/spinTiming";
 import { useVariants } from "../../utils/variants";
+import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import {
   DEFAULT_SINGLE_CAT_SETTINGS,
   parseSingleCatPayload,
@@ -1556,8 +1557,9 @@ export function SingleCatPlusClient({
   const [toast, setToast] = useState<string | null>(null);
   const [rollerExpanded, setRollerExpanded] = useState(false);
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
+  const defaultCreatorName = useDefaultCreatorName();
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
-  const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName);
+  const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName || defaultCreatorName);
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaDirty, setMetaDirty] = useState(false);
 
@@ -1579,9 +1581,9 @@ export function SingleCatPlusClient({
 
   const resetMetaDrafts = useCallback((catName?: string | null, creatorName?: string | null) => {
     setCatNameDraft(catName ?? "");
-    setCreatorNameDraft(creatorName ?? "");
+    setCreatorNameDraft(creatorName || defaultCreatorName);
     setMetaDirty(false);
-  }, []);
+  }, [defaultCreatorName]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);

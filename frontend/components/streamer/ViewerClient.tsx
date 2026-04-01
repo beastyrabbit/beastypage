@@ -14,6 +14,7 @@ import { cloneParams, createStreamSteps, getDefaultStreamParams } from "@/lib/st
 import type { StreamerParams, StreamStep } from "@/lib/streamer/steps";
 import { cn } from "@/lib/utils";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
+import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import OptionPreview from "@/components/streamer/OptionPreview";
 import { ensureSpriteDataLoaded } from "@/lib/streamer/steps";
 
@@ -90,8 +91,9 @@ type ViewerClientProps = {
 };
 
 export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
+  const defaultCreatorName = useDefaultCreatorName();
   const [viewerSession, setViewerSession] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState("");
+  const [displayName, setDisplayName] = useState(defaultCreatorName);
   const [nameError, setNameError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
