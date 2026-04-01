@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  createShooConvexAuth,
   createShooAuth,
   decodeIdentityClaims,
   type ShooAuthClient,
@@ -10,21 +9,11 @@ import {
 
 const SHOO_OPTIONS = { callbackPath: "/auth/callback", requestPii: true } as const;
 
-let _auth: ReturnType<typeof createShooConvexAuth> | null = null;
 let _client: ShooAuthClient | null = null;
 
-function getAuth() {
-  if (!_auth) {
-    _auth = createShooConvexAuth(SHOO_OPTIONS);
-  }
-  return _auth;
-}
-
 /**
- * Return a shared ShooAuthClient for direct operations
- * (callback handling, reading identity, clearing tokens).
- * Separate from the Convex auth adapter returned by getAuth(),
- * which creates its own internal client. Both share localStorage.
+ * Return the shared ShooAuthClient singleton.
+ * Used for callback handling, reading identity, and clearing tokens.
  */
 export function getShooClient(): ShooAuthClient {
   if (!_client) {
@@ -34,11 +23,53 @@ export function getShooClient(): ShooAuthClient {
 }
 
 /**
- * useAuth adapter for ConvexProviderWithAuth.
- * Returns a static stub during SSR (where the Shoo client cannot run)
- * and delegates to the real Shoo auth on the client.
+ * Custom useAuth adapter for ConvexProviderWithAuth.
+ *
+ * Unlike createShooConvexAuth's built-in useAuth, this does NOT redirect
+ * the browser when the token expires. Instead, it returns the token as long
+ * as the identity exists in localStorage. Convex will reject expired tokens
+ * server-side, but the user stays on the page. Re-authentication happens
+ * explicitly via the sign-in button.
  */
 export function useAuth() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const ran = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || ran.current) return;
+    ran.current = true;
+    const client = getShooClient();
+    // Handle OAuth callback if we're returning from Shoo
+    client.handleCallback().finally(() => {
+      const identity = client.getIdentity();
+      setIsAuthenticated(identity.userId !== null && !!identity.token);
+      setIsLoading(false);
+    });
+  }, []);
+
+  const fetchAccessToken = useCallback(
+    async (_args: { forceRefreshToken: boolean }) => {
+      if (typeof window === "undefined") return null;
+      try {
+        const client = getShooClient();
+        const identity = client.getIdentity();
+        if (!identity.token || identity.userId === null) {
+          setIsAuthenticated(false);
+          return null;
+        }
+        // Always return the token — let Convex validate expiry server-side.
+        // This prevents disruptive browser redirects on token expiry.
+        setIsAuthenticated(true);
+        return identity.token;
+      } catch {
+        setIsAuthenticated(false);
+        return null;
+      }
+    },
+    [],
+  );
+
   if (typeof window === "undefined") {
     return {
       isLoading: true as const,
@@ -47,14 +78,16 @@ export function useAuth() {
         null as string | null,
     };
   }
-  return getAuth().useAuth();
+
+  return { isLoading, isAuthenticated, fetchAccessToken };
 }
 
 /** Sign in via Shoo, clearing any existing identity first to force a fresh flow. */
 export function useSignIn() {
   return useCallback(() => {
-    getShooClient().clearIdentity();
-    void getAuth().signIn();
+    const client = getShooClient();
+    client.clearIdentity();
+    void client.startSignIn();
   }, []);
 }
 
@@ -69,7 +102,6 @@ export function useProfilePic(): string | undefined {
     try {
       token = getShooClient().getIdentity().token;
     } catch {
-      // Corrupted localStorage — treat as no token
       token = undefined;
     }
   }
@@ -79,7 +111,6 @@ export function useProfilePic(): string | undefined {
       const claims = decodeIdentityClaims(token);
       return claims?.picture ?? undefined;
     } catch {
-      // Malformed JWT — don't crash the component tree
       return undefined;
     }
   }, [token]);
@@ -88,6 +119,8 @@ export function useProfilePic(): string | undefined {
 /** Sign out via Shoo */
 export function useSignOut() {
   return useCallback(() => {
-    getAuth().signOut();
+    const client = getShooClient();
+    client.clearIdentity();
+    window.location.reload();
   }, []);
 }
