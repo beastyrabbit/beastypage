@@ -326,11 +326,9 @@ export default defineSchema({
 
   users: defineTable({
     tokenIdentifier: v.string(),
-    displayName: v.optional(v.string()),
+    username: v.optional(v.string()),
     showProfilePic: v.boolean(),
-    profilePicUrl: v.optional(v.string()),
-    email: v.optional(v.string()),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   }).index("byTokenIdentifier", ["tokenIdentifier"])
 });

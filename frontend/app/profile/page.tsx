@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
-import { Loader2, Save, User } from "lucide-react";
+import { Loader2, Save, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
-import { useSignIn } from "@/lib/shooAuth";
+import { useSignIn, useSignOut, useProfilePic } from "@/lib/shooAuth";
 import { PageHero } from "@/components/common/PageHero";
 import { cn } from "@/lib/utils";
 
@@ -13,9 +13,12 @@ export default function ProfilePage() {
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const viewer = useQuery(api.users.viewer);
   const updateProfile = useMutation(api.users.updateProfile);
+  const deleteAccount = useMutation(api.users.deleteAccount);
   const handleSignIn = useSignIn();
+  const handleSignOut = useSignOut();
+  const profilePic = useProfilePic();
 
-  const [displayName, setDisplayName] = useState("");
+  const [username, setUsername] = useState("");
   const [showProfilePic, setShowProfilePic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -23,7 +26,7 @@ export default function ProfilePage() {
   // Seed form fields from viewer data
   useEffect(() => {
     if (viewer && !initialized) {
-      setDisplayName(viewer.displayName ?? "");
+      setUsername(viewer.username ?? "");
       setShowProfilePic(viewer.showProfilePic ?? true);
       setInitialized(true);
     }
@@ -33,15 +36,26 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!isAuthenticated) {
       setInitialized(false);
-      setDisplayName("");
+      setUsername("");
       setShowProfilePic(true);
     }
   }, [isAuthenticated]);
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
+    try {
+      await deleteAccount();
+      toast.success("Account deleted");
+      handleSignOut();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete account");
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateProfile({ displayName, showProfilePic });
+      await updateProfile({ username: username || undefined, showProfilePic });
       toast.success("Profile updated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
@@ -77,7 +91,7 @@ export default function ProfilePage() {
               "transition hover:bg-foreground hover:text-background"
             )}
           >
-            Sign in with Google
+            Sign in
           </button>
         </div>
       </main>
@@ -85,13 +99,13 @@ export default function ProfilePage() {
   }
 
   const isLoading = viewer === undefined;
+  const initial = viewer?.username?.[0]?.toUpperCase();
 
   return (
     <main className="mx-auto max-w-4xl space-y-8 px-6 py-12">
       <PageHero
         eyebrow="Profile"
-        title="Your Profile"
-        description="Manage your display name and profile picture settings."
+        title={viewer?.username ? `Hello ${viewer.username}` : "Hii You?"}
       />
 
       {isLoading || !viewer ? (
@@ -99,9 +113,10 @@ export default function ProfilePage() {
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
+        <>
         <section className="rounded-2xl border border-border/40 bg-background/80 p-6 backdrop-blur">
           <div className="space-y-6">
-            {/* Profile Picture Preview */}
+            {/* Avatar + Username Preview */}
             <div className="flex items-center gap-4">
               <div
                 className={cn(
@@ -109,50 +124,49 @@ export default function ProfilePage() {
                   "border border-border/50 bg-primary/15"
                 )}
               >
-                {showProfilePic && viewer.profilePicUrl ? (
+                {showProfilePic && profilePic ? (
                   <img
-                    src={viewer.profilePicUrl}
+                    src={profilePic}
                     alt="Profile"
                     className="size-full rounded-full object-cover"
                     referrerPolicy="no-referrer"
                   />
+                ) : initial ? (
+                  <span className="text-xl font-bold text-primary">{initial}</span>
                 ) : (
                   <User className="size-8 text-primary" />
                 )}
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  {viewer.displayName ?? "Anonymous"}
+                  {viewer.username ?? "No username set"}
                 </p>
-                {viewer.email && (
-                  <p className="text-xs text-muted-foreground">{viewer.email}</p>
-                )}
               </div>
             </div>
 
-            {/* Display Name */}
+            {/* Username */}
             <div className="space-y-2">
               <label
-                htmlFor="displayName"
+                htmlFor="username"
                 className="block text-sm font-medium text-foreground"
               >
-                Display Name
+                Username
               </label>
               <input
-                id="displayName"
+                id="username"
                 type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                maxLength={50}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                maxLength={30}
                 className={cn(
                   "w-full rounded-lg border border-border/50 bg-background px-3 py-2",
                   "text-sm text-foreground placeholder:text-muted-foreground",
                   "focus:outline-none focus:ring-2 focus:ring-primary/50"
                 )}
-                placeholder="Enter your display name"
+                placeholder="Choose a username"
               />
               <p className="text-xs text-muted-foreground">
-                {displayName.length}/50 characters
+                Letters, numbers, hyphens, and underscores only. {username.length}/30
               </p>
             </div>
 
@@ -163,7 +177,7 @@ export default function ProfilePage() {
                   Show Profile Picture
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  When enabled, your Google profile picture will be visible.
+                  When disabled, a generic icon will be shown instead.
                 </p>
               </div>
               <button
@@ -208,6 +222,30 @@ export default function ProfilePage() {
             </div>
           </div>
         </section>
+
+        {/* Danger Zone */}
+        <section className="rounded-2xl border border-red-500/30 bg-background/80 p-6 backdrop-blur">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-red-400">Delete Account</p>
+              <p className="text-xs text-muted-foreground">
+                Permanently delete your account and all associated data.
+              </p>
+            </div>
+            <button
+              onClick={handleDelete}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg border border-red-500/50 px-4 py-2",
+                "text-sm font-medium text-red-400 transition-colors",
+                "hover:bg-red-500/10"
+              )}
+            >
+              <Trash2 className="size-4" />
+              Delete
+            </button>
+          </div>
+        </section>
+        </>
       )}
     </main>
   );

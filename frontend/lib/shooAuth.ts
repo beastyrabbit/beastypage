@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback } from "react";
-
-// We lazily initialize the auth instance because @shoojs/react calls
-// deriveRedirectUri at module scope, which crashes in Node/SSR.
-// We guard with typeof window so the module is only imported in browsers.
+import { useCallback, useMemo } from "react";
+import {
+  createShooConvexAuth,
+  createShooAuth,
+  decodeIdentityClaims,
+  type ShooAuthClient,
+} from "@shoojs/react";
 
 type ConvexUseAuth = () => {
   isLoading: boolean;
@@ -18,15 +20,28 @@ type ShooAuth = {
   signOut: () => void;
 };
 
+const SHOO_OPTIONS = { callbackPath: "/auth/callback", requestPii: true } as const;
+
 let _auth: ShooAuth | null = null;
+let _client: ShooAuthClient | null = null;
 
 function getAuth(): ShooAuth {
   if (!_auth) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { createShooConvexAuth } = require("@shoojs/react") as typeof import("@shoojs/react");
-    _auth = createShooConvexAuth({ callbackPath: "/auth/callback" });
+    _auth = createShooConvexAuth(SHOO_OPTIONS);
   }
   return _auth;
+}
+
+/**
+ * Return the shared ShooAuthClient singleton.
+ * Used by the callback page to exchange the auth code and redirect,
+ * ensuring a single client instance across the app.
+ */
+export function getShooClient(): ShooAuthClient {
+  if (!_client) {
+    _client = createShooAuth(SHOO_OPTIONS);
+  }
+  return _client;
 }
 
 /**
@@ -47,8 +62,25 @@ export function useAuth() {
 /** Sign in via Shoo */
 export function useSignIn() {
   return useCallback(() => {
-    getAuth().signIn({ requestPii: true });
+    getShooClient().clearIdentity();
+    void getAuth().signIn();
   }, []);
+}
+
+/**
+ * Read the profile picture URL from the Shoo JWT claims (client-side only).
+ * Requires requestPii: true and user consent on the Shoo consent screen.
+ */
+export function useProfilePic(): string | undefined {
+  const token =
+    typeof window !== "undefined"
+      ? getShooClient().getIdentity().token
+      : undefined;
+  return useMemo(() => {
+    if (!token) return undefined;
+    const claims = decodeIdentityClaims(token);
+    return claims?.picture ?? undefined;
+  }, [token]);
 }
 
 /** Sign out via Shoo */

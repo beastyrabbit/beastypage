@@ -2,9 +2,9 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import { useConvexAuth, useMutation } from "convex/react";
-import { Loader2, LogIn, User, LogOut } from "lucide-react";
-import { useSignIn, useSignOut } from "@/lib/shooAuth";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { Loader2, LogIn, LogOut, Settings, User } from "lucide-react";
+import { useSignIn, useSignOut, useProfilePic } from "@/lib/shooAuth";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,8 @@ export function UserAuthButton() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const getOrCreateUser = useMutation(api.users.getOrCreateUser);
+  const viewer = useQuery(api.users.viewer);
+  const profilePic = useProfilePic();
   const hasCreatedRef = useRef(false);
   const handleSignIn = useSignIn();
   const handleSignOut = useSignOut();
@@ -21,8 +23,8 @@ export function UserAuthButton() {
   useEffect(() => {
     if (isAuthenticated && !hasCreatedRef.current) {
       hasCreatedRef.current = true;
-      getOrCreateUser().catch(() => {
-        // Silently ignore -- user doc may already exist or identity may not be ready yet
+      getOrCreateUser().catch((err) => {
+        console.warn("[UserAuthButton] getOrCreateUser failed:", err);
         hasCreatedRef.current = false;
       });
     }
@@ -79,18 +81,37 @@ export function UserAuthButton() {
     );
   }
 
+  const showPic = viewer?.showProfilePic !== false;
+  const picUrl = showPic ? profilePic : undefined;
+  const initial = viewer?.username?.[0]?.toUpperCase();
+
   return (
     <div ref={dropdownRef} className="relative">
       <button
         onClick={() => setDropdownOpen((prev) => !prev)}
         className={cn(
           "flex size-8 items-center justify-center rounded-full",
-          "border border-border/50 bg-primary/15 text-primary",
-          "transition hover:bg-primary/25"
+          "border border-border/50 overflow-hidden",
+          "transition hover:ring-2 hover:ring-primary/30"
         )}
         aria-label="User menu"
       >
-        <User className="size-4" />
+        {picUrl ? (
+          <img
+            src={picUrl}
+            alt=""
+            className="size-full rounded-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="flex size-full items-center justify-center bg-primary/15 text-primary">
+            {initial ? (
+              <span className="text-xs font-bold">{initial}</span>
+            ) : (
+              <User className="size-4" />
+            )}
+          </div>
+        )}
       </button>
 
       {dropdownOpen && (
@@ -109,7 +130,7 @@ export function UserAuthButton() {
               "text-sm text-foreground transition hover:bg-foreground/10"
             )}
           >
-            <User className="size-3.5" />
+            <Settings className="size-3.5" />
             Profile
           </Link>
           <button

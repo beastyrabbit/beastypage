@@ -129,3 +129,11 @@ Ports are managed by portless — check dev server output or `/home/beasty/proje
 - **SSRF protection**: Any API route that fetches user-provided URLs must validate against private IPs — see `app/api/discord/palette/route.ts` for the blocklist pattern (IPv4 + IPv6 with bracket stripping)
 - **Convex HTTP client in API routes**: Use `ConvexHttpClient` with `getServerConvexUrl()` — see `app/api/discord/random-cat/route.ts` or `app/api/cat-share/route.ts`
 - **Standalone Docker path resolution**: `process.cwd()` may not point to the Next.js dir in standalone builds — use `NEXT_PUBLIC_DIR` env var as fallback
+
+<!-- convex-ai-start -->
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
+<!-- convex-ai-end -->
