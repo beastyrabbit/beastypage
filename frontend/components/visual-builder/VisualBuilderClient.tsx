@@ -193,8 +193,17 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   const [lockedShareSlug, setLockedShareSlug] = useState<string | null>(null);
   const defaultCreatorName = useDefaultCreatorName();
   const [catName, setCatName] = useState("");
-  const [creatorName, setCreatorName] = useState(defaultCreatorName);
+  const [creatorName, setCreatorName] = useState("");
   const [randomizing, setRandomizing] = useState(false);
+
+  // Auto-fill creator name when username loads and field is still empty
+  const creatorFilledRef = useRef(false);
+  useEffect(() => {
+    if (defaultCreatorName && !creatorFilledRef.current && !creatorName) {
+      setCreatorName(defaultCreatorName);
+      creatorFilledRef.current = true;
+    }
+  }, [defaultCreatorName, creatorName]);
   const [shareBusy, setShareBusy] = useState(false);
   const [expandedLayer, setExpandedLayer] = useState<number | null>(null);
   const [expandedMarking, setExpandedMarking] = useState<"white" | "points" | "vitiligo" | "tint" | null>(null);
@@ -213,7 +222,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     setLockedShareSlug(null);
     setShareInfo(null);
     setCatName("");
-    setCreatorName("");
+    setCreatorName(defaultCreatorName);
     if (typeof window !== "undefined") {
       const currentUrl = new URL(window.location.href);
       currentUrl.searchParams.delete("slug");
@@ -1826,7 +1835,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     setExperimentalColourMode("off");
     setTortiePaletteMode("off");
     setCatName("");
-    setCreatorName("");
+    setCreatorName(defaultCreatorName);
     setExpandedLayer(null);
     setExpandedTortieSub({});
     setExpandedMarking(null);

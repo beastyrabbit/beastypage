@@ -85,10 +85,19 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
   const [meta, setMeta] = useState<{ catName?: string | null; creatorName?: string | null; created?: number | null }>({});
   const defaultCreatorName = useDefaultCreatorName();
   const [catNameDraft, setCatNameDraft] = useState("");
-  const [creatorNameDraft, setCreatorNameDraft] = useState(defaultCreatorName);
+  const [creatorNameDraft, setCreatorNameDraft] = useState("");
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaSaved, setMetaSaved] = useState(false);
   const updateMeta = useMutation(api.mapper.updateMeta);
+
+  // Auto-fill creator name when username loads and field is still empty
+  const creatorFilledRef = useRef(false);
+  useEffect(() => {
+    if (defaultCreatorName && !creatorFilledRef.current && !creatorNameDraft) {
+      setCreatorNameDraft(defaultCreatorName);
+      creatorFilledRef.current = true;
+    }
+  }, [defaultCreatorName, creatorNameDraft]);
 
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const catDataRecord = mapperRecord?.cat_data ?? undefined;
@@ -163,10 +172,10 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
     } else if (!mapperRecord && !slug) {
       if (!metaSaved) {
         setCatNameDraft("");
-        setCreatorNameDraft("");
+        setCreatorNameDraft(defaultCreatorName);
       }
     }
-  }, [mapperRecord, metaSaved, slug]);
+  }, [mapperRecord, metaSaved, slug, defaultCreatorName]);
 
   useEffect(() => {
     if (slug) return;
@@ -314,7 +323,7 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
         created: result?.created ?? mapperRecord?.created ?? null,
       });
       setCatNameDraft(resolvedName ?? "");
-      setCreatorNameDraft(resolvedCreator ?? "");
+      setCreatorNameDraft(resolvedCreator || defaultCreatorName);
       setMetaSaved(true);
       window.alert("Saved to history!");
     } catch (err) {

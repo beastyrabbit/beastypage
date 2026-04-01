@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Vote } from "lucide-react";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
@@ -93,12 +93,21 @@ type ViewerClientProps = {
 export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   const defaultCreatorName = useDefaultCreatorName();
   const [viewerSession, setViewerSession] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState(defaultCreatorName);
+  const [displayName, setDisplayName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [mapperReady, setMapperReady] = useState(false);
   const { generator, ready: generatorReady } = useCatGenerator();
+
+  // Auto-fill display name when username loads and field is still empty
+  const nameFilledRef = useRef(false);
+  useEffect(() => {
+    if (defaultCreatorName && !nameFilledRef.current && !displayName) {
+      setDisplayName(defaultCreatorName);
+      nameFilledRef.current = true;
+    }
+  }, [defaultCreatorName, displayName]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

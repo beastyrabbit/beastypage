@@ -1560,9 +1560,18 @@ export function SingleCatPlusClient({
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
   const defaultCreatorName = useDefaultCreatorName();
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
-  const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName || defaultCreatorName);
+  const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName);
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaDirty, setMetaDirty] = useState(false);
+
+  // Auto-fill creator name when username loads and field is still empty
+  const creatorFilledRef = useRef(false);
+  useEffect(() => {
+    if (defaultCreatorName && !creatorFilledRef.current && !creatorNameDraft) {
+      setCreatorNameDraft(defaultCreatorName);
+      creatorFilledRef.current = true;
+    }
+  }, [defaultCreatorName, creatorNameDraft]);
 
   const rollerValueClass = useMemo(() => {
     if (!rollerActiveValue) {
@@ -1629,8 +1638,8 @@ export function SingleCatPlusClient({
     setExtendedModes(new Set(settings.extendedModes));
     setIncludeBaseColours(settings.includeBaseColours);
     setCatNameDraft(settings.catName);
-    setCreatorNameDraft(settings.creatorName);
-  }, []);
+    setCreatorNameDraft(settings.creatorName || defaultCreatorName);
+  }, [defaultCreatorName]);
 
   const variantDirty = useMemo(() => {
     if (!variants.activeVariant) return false;
