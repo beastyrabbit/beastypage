@@ -5,7 +5,7 @@ import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { ChevronDown, ChevronRight, Download, Loader2, Save, Trash2, Upload, User } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
-import { useSignIn, useSignOut, useProfilePic } from "@/lib/shooAuth";
+import { signIn, signOut } from "@/lib/shooAuth";
 import { setAccountDeleting } from "@/components/auth/UserAuthButton";
 import { PageHero } from "@/components/common/PageHero";
 import { cn } from "@/lib/utils";
@@ -18,9 +18,6 @@ export default function ProfilePage() {
   const allVariants = useQuery(api.userVariants.listAll, isAuthenticated ? {} : "skip");
   const removeVariant = useMutation(api.userVariants.remove);
   const importBatchMut = useMutation(api.userVariants.importBatch);
-  const handleSignIn = useSignIn();
-  const handleSignOut = useSignOut();
-  const profilePic = useProfilePic();
 
   const [username, setUsername] = useState("");
   const [showProfilePic, setShowProfilePic] = useState(true);
@@ -57,7 +54,7 @@ export default function ProfilePage() {
       toast.error(err instanceof Error ? err.message : "Failed to delete account");
       return;
     }
-    handleSignOut();
+    signOut();
   };
 
   const handleSave = async () => {
@@ -92,7 +89,7 @@ export default function ProfilePage() {
         />
         <div className="flex justify-center">
           <button
-            onClick={handleSignIn}
+            onClick={() => signIn()}
             className={cn(
               "inline-flex items-center gap-2 rounded-lg border border-border/50",
               "px-5 py-2.5 text-sm font-semibold text-muted-foreground",
@@ -132,14 +129,7 @@ export default function ProfilePage() {
                   "border border-border/50 bg-primary/15"
                 )}
               >
-                {showProfilePic && profilePic ? (
-                  <img
-                    src={profilePic}
-                    alt="Profile"
-                    className="size-full rounded-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : initial ? (
+                {initial ? (
                   <span className="text-xl font-bold text-primary">{initial}</span>
                 ) : (
                   <User className="size-8 text-primary" />
