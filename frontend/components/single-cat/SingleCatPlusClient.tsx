@@ -1468,6 +1468,7 @@ export function SingleCatPlusClient({
   // Page variant management
   const variants = useVariants<SingleCatSettings>({
     storageKey: "singleCatPlus.variants",
+    toolKey: "singleCatPlus",
     migrate: migrateSingleCatTiming,
   });
   const [timingModalOpen, setTimingModalOpen] = useState(false);

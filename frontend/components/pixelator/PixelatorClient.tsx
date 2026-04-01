@@ -93,6 +93,7 @@ export function PixelatorClient() {
   // ---- Variant system ----
   const variants = useVariants<PixelatorSettings>({
     storageKey: "pixelator-variants",
+    toolKey: "pixelator",
   });
 
   const snapshotConfig = useMemo<PixelatorSettings>(

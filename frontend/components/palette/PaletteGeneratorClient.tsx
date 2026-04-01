@@ -65,6 +65,7 @@ export function PaletteGeneratorClient() {
   // -------------------------------------------------------------------------
   const variants = useVariants<PaletteGeneratorSettings>({
     storageKey: "paletteGenerator.variants",
+    toolKey: "paletteGenerator",
   });
 
   // Persist collection to standalone localStorage only when no variant is active.

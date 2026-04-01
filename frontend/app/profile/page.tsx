@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
-import { Loader2, Save, Trash2, User } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Save, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { useSignIn, useSignOut, useProfilePic } from "@/lib/shooAuth";
@@ -15,6 +15,8 @@ export default function ProfilePage() {
   const viewer = useQuery(api.users.viewer);
   const updateProfile = useMutation(api.users.updateProfile);
   const deleteAccount = useMutation(api.users.deleteAccount);
+  const allVariants = useQuery(api.userVariants.listAll);
+  const removeVariant = useMutation(api.userVariants.remove);
   const handleSignIn = useSignIn();
   const handleSignOut = useSignOut();
   const profilePic = useProfilePic();
@@ -23,6 +25,7 @@ export default function ProfilePage() {
   const [showProfilePic, setShowProfilePic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
 
   // Seed form fields from viewer data
   useEffect(() => {
@@ -227,6 +230,27 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        {/* Saved Variants */}
+        <VariantsSection
+          variants={allVariants ?? []}
+          expandedTools={expandedTools}
+          onToggleTool={(tool) =>
+            setExpandedTools((prev) => {
+              const next = new Set(prev);
+              next.has(tool) ? next.delete(tool) : next.add(tool);
+              return next;
+            })
+          }
+          onDeleteVariant={async (variantId) => {
+            try {
+              await removeVariant({ variantId });
+              toast.success("Variant deleted");
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Failed to delete");
+            }
+          }}
+        />
+
         {/* Danger Zone */}
         <section className="rounded-2xl border border-red-500/30 bg-background/80 p-6 backdrop-blur">
           <div className="flex items-center justify-between">
@@ -252,5 +276,106 @@ export default function ProfilePage() {
         </>
       )}
     </main>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Variants section
+// ---------------------------------------------------------------------------
+
+const TOOL_LABELS: Record<string, string> = {
+  singleCatPlus: "Single Cat Plus",
+  paletteGenerator: "Palette Generator",
+  dash: "Dash",
+  pixelator: "Pixelator",
+};
+
+type VariantDoc = {
+  variantId: string;
+  toolKey: string;
+  name: string;
+  isActive: boolean;
+  createdAt: number;
+};
+
+function VariantsSection({
+  variants,
+  expandedTools,
+  onToggleTool,
+  onDeleteVariant,
+}: {
+  variants: VariantDoc[];
+  expandedTools: Set<string>;
+  onToggleTool: (tool: string) => void;
+  onDeleteVariant: (variantId: string) => Promise<void>;
+}) {
+  // Group by toolKey
+  const grouped = new Map<string, VariantDoc[]>();
+  for (const v of variants) {
+    const list = grouped.get(v.toolKey) ?? [];
+    list.push(v);
+    grouped.set(v.toolKey, list);
+  }
+
+  return (
+    <section className="rounded-2xl border border-border/40 bg-background/80 p-6 backdrop-blur">
+      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Saved Variants
+      </h3>
+      {grouped.size === 0 ? (
+        <p className="text-sm text-muted-foreground">No variants saved yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {[...grouped.entries()].map(([toolKey, toolVariants]) => {
+            const expanded = expandedTools.has(toolKey);
+            return (
+              <div key={toolKey} className="rounded-lg border border-border/30">
+                <button
+                  onClick={() => onToggleTool(toolKey)}
+                  className={cn(
+                    "flex w-full items-center justify-between px-4 py-2.5",
+                    "text-sm font-medium text-foreground transition hover:bg-foreground/5",
+                    expanded ? "rounded-t-lg" : "rounded-lg"
+                  )}
+                >
+                  <span>
+                    {TOOL_LABELS[toolKey] ?? toolKey}{" "}
+                    <span className="text-muted-foreground">({toolVariants.length})</span>
+                  </span>
+                  {expanded ? (
+                    <ChevronDown className="size-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  )}
+                </button>
+                {expanded && (
+                  <div className="border-t border-border/20 px-4 py-2 space-y-1">
+                    {toolVariants.map((v) => (
+                      <div
+                        key={v.variantId}
+                        className="flex items-center justify-between py-1"
+                      >
+                        <span className="text-sm text-foreground">
+                          {v.name}
+                          {v.isActive && (
+                            <span className="ml-2 text-xs text-primary">(active)</span>
+                          )}
+                        </span>
+                        <button
+                          onClick={() => void onDeleteVariant(v.variantId)}
+                          className="text-xs text-muted-foreground hover:text-red-400 transition"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }

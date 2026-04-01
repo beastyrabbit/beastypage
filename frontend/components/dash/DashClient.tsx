@@ -25,7 +25,7 @@ export function DashClient({
   initialLoadError = null,
 }: DashClientProps = {}) {
 
-  const variants = useVariants<DashSettings>({ storageKey: "dash.variants" });
+  const variants = useVariants<DashSettings>({ storageKey: "dash.variants", toolKey: "dash" });
   const { activeVariant, setVariantSlug, saveToActive } = variants;
 
   // Local working copy of settings
