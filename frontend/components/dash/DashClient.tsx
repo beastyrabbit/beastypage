@@ -26,10 +26,17 @@ export function DashClient({
 
   const { isAuthenticated } = useConvexAuth();
 
-  // Local working copy of settings
-  const [settings, setSettings] = useState<DashSettings>(() => (
-    initialSettings ? parseDashPayload(initialSettings) : { ...DEFAULT_DASH_SETTINGS }
-  ));
+  // Local working copy of settings — persisted to localStorage
+  const [settings, setSettings] = useState<DashSettings>(() => {
+    if (initialSettings) return parseDashPayload(initialSettings);
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("dash.settings");
+        if (saved) return parseDashPayload(JSON.parse(saved));
+      } catch { /* ignore */ }
+    }
+    return { ...DEFAULT_DASH_SETTINGS };
+  });
   const [editing, setEditing] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
@@ -48,6 +55,18 @@ export function DashClient({
       toast.success("Dashboard loaded");
     }
   }, [initialLoadError, initialSettings, initialSlug]);
+
+  // Persist settings to localStorage on change
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem("dash.settings", JSON.stringify(settings));
+    } catch { /* ignore */ }
+  }, [settings]);
 
   // Auto-enter edit mode when there are no widgets and no slug pending
   useEffect(() => {
