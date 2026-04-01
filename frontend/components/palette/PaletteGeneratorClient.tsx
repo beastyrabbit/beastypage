@@ -196,9 +196,6 @@ export function PaletteGeneratorClient() {
         applyConfig={applyConfig}
         isDirty={isDirty}
         showToast={showToast}
-        copyText={copyText}
-        apiPath="/api/palette-generator-settings"
-        parsePayload={parsePaletteGeneratorPayload}
       />
 
       <GeneratorControls

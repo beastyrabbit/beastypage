@@ -189,9 +189,6 @@ export function DashClient({
         applyConfig={handleApplyConfig}
         isDirty={isDirty}
         showToast={showToast}
-        copyText={copyText}
-        apiPath="/api/dash-settings"
-        parsePayload={parseDashPayload}
       />
 
       <DashHero

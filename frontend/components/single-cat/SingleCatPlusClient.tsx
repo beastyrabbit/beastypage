@@ -3477,9 +3477,6 @@ export function SingleCatPlusClient({
         applyConfig={applyVariantConfig}
         isDirty={variantDirty}
         showToast={showToast}
-        copyText={copyText}
-        apiPath="/api/single-cat-settings"
-        parsePayload={parseSingleCatPayload}
       />
       <div className="glass-card px-6 py-8">
         <div className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,420px)] xl:items-start">

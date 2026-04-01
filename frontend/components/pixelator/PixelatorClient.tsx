@@ -330,9 +330,6 @@ export function PixelatorClient() {
         applyConfig={applyConfig}
         isDirty={isDirty}
         showToast={(msg) => toast(msg)}
-        copyText={copyText}
-        apiPath="/api/pixelator-settings"
-        parsePayload={parsePixelatorPayload}
       />
 
       {!state.imageDataUrl ? (

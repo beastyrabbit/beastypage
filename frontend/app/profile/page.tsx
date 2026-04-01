@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
-import { ChevronDown, ChevronRight, Loader2, Save, Trash2, User } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Loader2, Save, Trash2, Upload, User } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { useSignIn, useSignOut, useProfilePic } from "@/lib/shooAuth";
@@ -17,6 +17,7 @@ export default function ProfilePage() {
   const deleteAccount = useMutation(api.users.deleteAccount);
   const allVariants = useQuery(api.userVariants.listAll, isAuthenticated ? {} : "skip");
   const removeVariant = useMutation(api.userVariants.remove);
+  const importBatchMut = useMutation(api.userVariants.importBatch);
   const handleSignIn = useSignIn();
   const handleSignOut = useSignOut();
   const profilePic = useProfilePic();
@@ -249,6 +250,7 @@ export default function ProfilePage() {
               toast.error(err instanceof Error ? err.message : "Failed to delete");
             }
           }}
+          onImportBatch={importBatchMut}
         />
 
         {/* Danger Zone */}
@@ -298,17 +300,39 @@ type VariantDoc = {
   createdAt: number;
 };
 
+const TOOL_STORAGE_KEYS: Record<string, string> = {
+  singleCatPlus: "singleCatPlus.variants",
+  paletteGenerator: "paletteGenerator.variants",
+  dash: "dash.variants",
+  pixelator: "pixelator-variants",
+};
+
 function VariantsSection({
   variants,
   expandedTools,
   onToggleTool,
   onDeleteVariant,
+  onImportBatch,
 }: {
   variants: VariantDoc[];
   expandedTools: Set<string>;
   onToggleTool: (tool: string) => void;
   onDeleteVariant: (variantId: string) => Promise<void>;
+  onImportBatch: (args: {
+    toolKey: string;
+    variants: {
+      variantId: string;
+      name: string;
+      slug?: string;
+      settings: Record<string, unknown>;
+      isActive: boolean;
+      createdAt: number;
+      updatedAt: number;
+    }[];
+  }) => Promise<{ imported: number; total: number }>;
 }) {
+  const [importing, setImporting] = useState(false);
+
   // Group by toolKey
   const grouped = new Map<string, VariantDoc[]>();
   for (const v of variants) {
@@ -317,11 +341,85 @@ function VariantsSection({
     grouped.set(v.toolKey, list);
   }
 
+  const handleImportFromBrowser = async () => {
+    setImporting(true);
+    let totalImported = 0;
+    try {
+      for (const [toolKey, storageKey] of Object.entries(TOOL_STORAGE_KEYS)) {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) continue;
+        try {
+          const parsed = JSON.parse(raw);
+          if (!parsed || !Array.isArray(parsed.variants) || parsed.variants.length === 0) continue;
+          const result = await onImportBatch({
+            toolKey,
+            variants: parsed.variants.map((v: { id: string; name: string; slug?: string; settings: unknown; createdAt: number; updatedAt: number }) => ({
+              variantId: v.id,
+              name: v.name,
+              slug: v.slug,
+              settings: v.settings as Record<string, unknown>,
+              isActive: v.id === parsed.activeId,
+              createdAt: v.createdAt,
+              updatedAt: v.updatedAt,
+            })),
+          });
+          totalImported += result.imported;
+          if (result.imported > 0) localStorage.removeItem(storageKey);
+        } catch (err) {
+          console.error(`[import] failed for ${toolKey}:`, err);
+        }
+      }
+      toast.success(totalImported > 0 ? `Imported ${totalImported} variant(s)` : "No new variants found in browser storage");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExportAll = () => {
+    const data = JSON.stringify(variants, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "beastypage-variants.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Variants exported");
+  };
+
   return (
     <section className="rounded-2xl border border-border/40 bg-background/80 p-6 backdrop-blur">
-      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        Saved Variants
-      </h3>
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Saved Variants
+        </h3>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleImportFromBrowser}
+            disabled={importing}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5",
+              "text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background",
+              "disabled:opacity-50"
+            )}
+          >
+            {importing ? <Loader2 className="size-3 animate-spin" /> : <Upload className="size-3" />}
+            Import from browser
+          </button>
+          {variants.length > 0 && (
+            <button
+              onClick={handleExportAll}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5",
+                "text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
+              )}
+            >
+              <Download className="size-3" />
+              Export all
+            </button>
+          )}
+        </div>
+      </div>
       {grouped.size === 0 ? (
         <p className="text-sm text-muted-foreground">No variants saved yet.</p>
       ) : (
