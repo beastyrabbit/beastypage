@@ -24,8 +24,6 @@ export function VariantBar<T>({
   const { isAuthenticated } = useConvexAuth();
   const { store, activeVariant, createVariant, saveToActive, deleteVariant, renameVariant, setActive } = variants;
 
-  if (!isAuthenticated) return null;
-
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [manageOpen, setManageOpen] = useState(false);
@@ -125,6 +123,8 @@ export function VariantBar<T>({
     setConfirmDeleteId(null);
     showToast("Variant deleted");
   }, [confirmDeleteId, deleteVariant, showToast]);
+
+  if (!isAuthenticated) return null;
 
   const buttonClass =
     "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-50";
