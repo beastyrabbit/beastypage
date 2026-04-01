@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 
 import { DiscordInviteButton } from "@/components/common/DiscordInviteButton";
+import { UserAuthButton } from "@/components/auth/UserAuthButton";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/components/site-nav-config";
 
@@ -45,7 +46,10 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
-        <DiscordInviteButton />
+        <div className="flex items-center gap-3">
+          <UserAuthButton />
+          <DiscordInviteButton />
+        </div>
       </div>
     </header>
   );

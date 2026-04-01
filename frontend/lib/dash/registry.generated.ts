@@ -27,6 +27,14 @@ export const TOOL_REGISTRY: ToolWidgetMeta[] = [
     "category": "artist"
   },
   {
+    "id": "cat-settings",
+    "title": "Cat Settings",
+    "description": "Configure and share cat generation presets with a 6-word code.",
+    "icon": "⚙️",
+    "href": "/single-cat-plus/settings",
+    "category": "gacha"
+  },
+  {
     "id": "catdex",
     "title": "Catdex",
     "description": "Browse, search, and filter every cat in a Pokedex-style archive.",
@@ -104,14 +112,6 @@ export const TOOL_REGISTRY: ToolWidgetMeta[] = [
     "description": "Airport flip-board chaos with rapid spins before the final reveal.",
     "icon": "✨",
     "href": "/single-cat-plus?mode=flashy&accessories=1-1&scars=1-1&torties=1-1&afterlife=off",
-    "category": "gacha"
-  },
-  {
-    "id": "cat-settings",
-    "title": "Cat Settings",
-    "description": "Configure and share cat generation presets with a 6-word code.",
-    "icon": "⚙️",
-    "href": "/single-cat-plus/settings",
     "category": "gacha"
   },
   {
