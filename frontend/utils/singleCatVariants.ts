@@ -214,12 +214,12 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
 // Comparison
 // ---------------------------------------------------------------------------
 
-/** JSON comparison that normalizes extendedModes order before comparing. */
+/** JSON comparison that normalizes extendedModes order and ignores metadata fields (catName, creatorName). */
 export function singleCatSettingsEqual(a: SingleCatSettings, b: SingleCatSettings): boolean {
-  const normalize = (s: SingleCatSettings) => ({
-    ...s,
-    extendedModes: [...s.extendedModes].sort(),
-  });
+  const normalize = (s: SingleCatSettings) => {
+    const { catName: _cn, creatorName: _cr, ...rest } = s;
+    return { ...rest, extendedModes: [...s.extendedModes].sort() };
+  };
   return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
 }
 
