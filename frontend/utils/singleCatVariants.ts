@@ -214,13 +214,17 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
 // Comparison
 // ---------------------------------------------------------------------------
 
-/** JSON comparison that normalizes extendedModes order and ignores metadata fields (catName, creatorName). */
-export function singleCatSettingsEqual(a: SingleCatSettings, b: SingleCatSettings): boolean {
+/** JSON comparison that normalizes both sides through parseSingleCatPayload and ignores metadata fields. */
+export function singleCatSettingsEqual(a: SingleCatSettings, b: unknown): boolean {
   const normalize = (s: SingleCatSettings) => {
     const { catName: _cn, creatorName: _cr, ...rest } = s;
     return { ...rest, extendedModes: [...s.extendedModes].sort() };
   };
-  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
+  const parsedA = normalize(parseSingleCatPayload(a));
+  const parsedB = normalize(parseSingleCatPayload(b));
+  // Sort keys for consistent comparison (Convex may return different key order)
+  return JSON.stringify(parsedA, Object.keys(parsedA).sort()) ===
+    JSON.stringify(parsedB, Object.keys(parsedB).sort());
 }
 
 // ---------------------------------------------------------------------------
