@@ -4,14 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import { PageHero } from "@/components/common/PageHero";
-import { VariantBar } from "@/components/common/VariantBar";
-import { useVariants } from "@/utils/variants";
-import {
-  parsePaletteGeneratorPayload,
-  paletteGeneratorSettingsEqual,
-  DEFAULT_PALETTE_GENERATOR_SETTINGS,
-  type PaletteGeneratorSettings,
-} from "@/utils/paletteGeneratorVariants";
+import { DEFAULT_PALETTE_GENERATOR_SETTINGS } from "@/utils/paletteGeneratorVariants";
 import { type DisplayFormat, type GeneratedPalette } from "@/lib/palette-generator/types";
 import { fetchPaletteFromAPI } from "@/lib/palette-generator/api";
 import SparklesIcon from "@/components/ui/sparkles-icon";
@@ -60,60 +53,16 @@ export function PaletteGeneratorClient() {
     setCollection(loadCollection());
   }, []);
 
-  // -------------------------------------------------------------------------
-  // Variant system
-  // -------------------------------------------------------------------------
-  const variants = useVariants<PaletteGeneratorSettings>({
-    storageKey: "paletteGenerator.variants",
-    toolKey: "paletteGenerator",
-  });
-
-  // Persist collection to standalone localStorage only when no variant is active.
-  // When a variant is active, collection is included in snapshotConfig and saved
-  // through VariantBar's save action (which calls variants.save(snapshotConfig)).
+  // Persist collection to localStorage
   useEffect(() => {
     if (!collectionInitialized.current) return;
-    if (variants.activeVariant) return;
     try {
       localStorage.setItem(COLLECTION_KEY, JSON.stringify(collection));
     } catch (error) {
       console.error("[PaletteGenerator] Failed to persist palette collection", error);
       toast.error("Could not save collection locally. Consider exporting before leaving.");
     }
-  }, [collection, variants.activeVariant]);
-
-  const snapshotConfig = useMemo(
-    (): PaletteGeneratorSettings => ({
-      v: 1,
-      paletteSize,
-      displayFormat,
-      collection,
-    }),
-    [paletteSize, displayFormat, collection],
-  );
-
-  const applyConfig = useCallback((s: PaletteGeneratorSettings) => {
-    const safe = parsePaletteGeneratorPayload(s);
-    setPaletteSize(safe.paletteSize);
-    setDisplayFormat(safe.displayFormat);
-    setCollection(safe.collection);
-  }, []);
-
-  const isDirty = useMemo(() => {
-    if (!variants.activeVariant) return false;
-    const parsed = parsePaletteGeneratorPayload(variants.activeVariant.settings);
-    return !paletteGeneratorSettingsEqual(snapshotConfig, parsed);
-  }, [snapshotConfig, variants.activeVariant]);
-
-  // Apply variant on first load
-  const appliedInitial = useRef(false);
-  useEffect(() => {
-    if (appliedInitial.current) return;
-    if (variants.activeVariant) {
-      appliedInitial.current = true;
-      applyConfig(variants.activeVariant.settings);
-    }
-  }, [variants.activeVariant, applyConfig]);
+  }, [collection]);
 
   // -------------------------------------------------------------------------
   // Toast / clipboard helpers
@@ -188,14 +137,6 @@ export function PaletteGeneratorClient() {
         eyebrow="Artist Tools"
         title="Palette Generator"
         description="Generate harmonious color palettes instantly. Pick a harmony mode to generate, adjust size, and build your collection."
-      />
-
-      <VariantBar<PaletteGeneratorSettings>
-        variants={variants}
-        snapshotConfig={snapshotConfig}
-        applyConfig={applyConfig}
-        isDirty={isDirty}
-        showToast={showToast}
       />
 
       <GeneratorControls
