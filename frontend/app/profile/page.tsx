@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { ChevronDown, ChevronRight, Download, Loader2, Save, Trash2, Upload, User } from "lucide-react";
 import { toast } from "sonner";
@@ -307,6 +307,13 @@ const TOOL_STORAGE_KEYS: Record<string, string> = {
   pixelator: "pixelator-variants",
 };
 
+const TOOL_API_PATHS: Record<string, string> = {
+  singleCatPlus: "/api/single-cat-settings",
+  paletteGenerator: "/api/palette-generator-settings",
+  dash: "/api/dash-settings",
+  pixelator: "/api/pixelator-settings",
+};
+
 function VariantsSection({
   variants,
   expandedTools,
@@ -332,6 +339,10 @@ function VariantsSection({
   }) => Promise<{ imported: number; total: number }>;
 }) {
   const [importing, setImporting] = useState(false);
+  const [slugImporting, setSlugImporting] = useState(false);
+  const [slugValue, setSlugValue] = useState("");
+  const [slugToolKey, setSlugToolKey] = useState("singleCatPlus");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Group by toolKey
   const grouped = new Map<string, VariantDoc[]>();
@@ -387,38 +398,154 @@ function VariantsSection({
     toast.success("Variants exported");
   };
 
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text) as VariantDoc[];
+      if (!Array.isArray(data) || data.length === 0) {
+        toast.error("No variants found in file");
+        return;
+      }
+      // Group by toolKey and import each batch
+      const byTool = new Map<string, VariantDoc[]>();
+      for (const v of data) {
+        if (!v.toolKey || !v.variantId) continue;
+        const list = byTool.get(v.toolKey) ?? [];
+        list.push(v);
+        byTool.set(v.toolKey, list);
+      }
+      let totalImported = 0;
+      for (const [toolKey, toolVariants] of byTool) {
+        const result = await onImportBatch({
+          toolKey,
+          variants: toolVariants.map((v) => ({
+            variantId: v.variantId,
+            name: v.name,
+            settings: (v as unknown as { settings: Record<string, unknown> }).settings ?? {},
+            isActive: v.isActive,
+            createdAt: v.createdAt,
+            updatedAt: Date.now(),
+          })),
+        });
+        totalImported += result.imported;
+      }
+      toast.success(totalImported > 0 ? `Imported ${totalImported} variant(s)` : "No new variants found");
+    } catch (err) {
+      console.error("[importFile]", err);
+      toast.error("Failed to import file");
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleImportSlug = async () => {
+    const slug = slugValue.trim();
+    if (!slug) {
+      toast.error("Enter a slug");
+      return;
+    }
+    const apiPath = TOOL_API_PATHS[slugToolKey];
+    if (!apiPath) {
+      toast.error("Unknown tool");
+      return;
+    }
+    setSlugImporting(true);
+    try {
+      const res = await fetch(`${apiPath}?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
+      if (!res.ok) {
+        toast.error(res.status === 404 ? "Slug not found" : "Failed to load");
+        return;
+      }
+      const json = (await res.json()) as { config?: unknown; slug?: string };
+      if (!json.config) {
+        toast.error("Invalid config");
+        return;
+      }
+      const now = Date.now();
+      const result = await onImportBatch({
+        toolKey: slugToolKey,
+        variants: [{
+          variantId: crypto.randomUUID(),
+          name: `Import ${slug.slice(0, 8)}`,
+          slug,
+          settings: json.config as Record<string, unknown>,
+          isActive: false,
+          createdAt: now,
+          updatedAt: now,
+        }],
+      });
+      if (result.imported > 0) {
+        toast.success("Variant imported from slug");
+        setSlugValue("");
+      } else {
+        toast.success("Variant already exists");
+      }
+    } catch (err) {
+      console.error("[importSlug]", err);
+      toast.error("Import failed");
+    } finally {
+      setSlugImporting(false);
+    }
+  };
+
+  const btnClass = cn(
+    "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5",
+    "text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background",
+    "disabled:opacity-50"
+  );
+
   return (
     <section className="rounded-2xl border border-border/40 bg-background/80 p-6 backdrop-blur">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Saved Variants
-        </h3>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleImportFromBrowser}
-            disabled={importing}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5",
-              "text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background",
-              "disabled:opacity-50"
-            )}
-          >
-            {importing ? <Loader2 className="size-3 animate-spin" /> : <Upload className="size-3" />}
-            Import from browser
+      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Saved Variants
+      </h3>
+
+      {/* Import / Export row */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <button onClick={handleImportFromBrowser} disabled={importing} className={btnClass}>
+          {importing ? <Loader2 className="size-3 animate-spin" /> : <Upload className="size-3" />}
+          From browser
+        </button>
+        <button onClick={() => fileInputRef.current?.click()} disabled={importing} className={btnClass}>
+          <Upload className="size-3" />
+          From file
+        </button>
+        <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImportFile} />
+        {variants.length > 0 && (
+          <button onClick={handleExportAll} className={btnClass}>
+            <Download className="size-3" />
+            Export all
           </button>
-          {variants.length > 0 && (
-            <button
-              onClick={handleExportAll}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5",
-                "text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-              )}
-            >
-              <Download className="size-3" />
-              Export all
-            </button>
-          )}
-        </div>
+        )}
+      </div>
+
+      {/* Slug import */}
+      <div className="mb-4 flex items-center gap-2">
+        <select
+          value={slugToolKey}
+          onChange={(e) => setSlugToolKey(e.target.value)}
+          className="rounded-lg border border-border/50 bg-background px-2 py-1.5 text-xs text-foreground"
+        >
+          {Object.entries(TOOL_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
+        <input
+          type="text"
+          value={slugValue}
+          onChange={(e) => setSlugValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void handleImportSlug(); }}
+          placeholder="Paste slug to import"
+          className="flex-1 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+        />
+        <button onClick={() => void handleImportSlug()} disabled={slugImporting} className={btnClass}>
+          {slugImporting ? <Loader2 className="size-3 animate-spin" /> : <Upload className="size-3" />}
+          Import slug
+        </button>
       </div>
       {grouped.size === 0 ? (
         <p className="text-sm text-muted-foreground">No variants saved yet.</p>
