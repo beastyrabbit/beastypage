@@ -322,5 +322,15 @@ export default defineSchema({
     updatedAt: v.number()
   })
     .index("bySlug", ["slug"])
-    .index("byCreated", ["createdAt"])
+    .index("byCreated", ["createdAt"]),
+
+  users: defineTable({
+    tokenIdentifier: v.string(),
+    username: v.optional(v.string()),
+    showProfilePic: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("byTokenIdentifier", ["tokenIdentifier"])
+    .index("byUsername", ["username"])
 });

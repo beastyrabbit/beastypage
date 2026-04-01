@@ -67,6 +67,9 @@ test-*.sh
 .goose/
 .junie/
 
+# Planning artifacts
+plans/
+
 # Convex generated files
 convex/_generated/
 
