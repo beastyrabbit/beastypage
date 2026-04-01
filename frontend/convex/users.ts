@@ -89,11 +89,21 @@ export const updateProfile = mutation({
       throw new Error("User not found. Please sign in again.");
     }
 
+    let validatedUsername: string | undefined;
+    if (args.username !== undefined) {
+      validatedUsername = validateUsername(args.username);
+      const existing = await ctx.db
+        .query("users")
+        .withIndex("byUsername", (q) => q.eq("username", validatedUsername!))
+        .unique();
+      if (existing && existing._id !== user._id) {
+        throw new Error("Username is already taken");
+      }
+    }
+
     await ctx.db.patch(user._id, {
       updatedAt: Date.now(),
-      ...(args.username !== undefined && {
-        username: validateUsername(args.username),
-      }),
+      ...(validatedUsername !== undefined && { username: validatedUsername }),
       ...(args.showProfilePic !== undefined && {
         showProfilePic: args.showProfilePic,
       }),

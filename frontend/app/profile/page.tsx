@@ -6,6 +6,7 @@ import { Loader2, Save, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { useSignIn, useSignOut, useProfilePic } from "@/lib/shooAuth";
+import { setAccountDeleting } from "@/components/auth/UserAuthButton";
 import { PageHero } from "@/components/common/PageHero";
 import { cn } from "@/lib/utils";
 
@@ -43,21 +44,22 @@ export default function ProfilePage() {
 
   const handleDelete = async () => {
     if (!window.confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
+    setAccountDeleting(true);
     try {
       await deleteAccount();
       toast.success("Account deleted");
     } catch (err) {
+      setAccountDeleting(false);
       toast.error(err instanceof Error ? err.message : "Failed to delete account");
       return;
     }
-    // Sign out after successful deletion to prevent getOrCreateUser from re-creating the doc
     handleSignOut();
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateProfile({ username: username || undefined, showProfilePic });
+      await updateProfile({ username: username.trim() || undefined, showProfilePic });
       toast.success("Profile updated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");

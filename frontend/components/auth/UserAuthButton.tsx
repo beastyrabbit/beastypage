@@ -8,6 +8,15 @@ import { useSignIn, useSignOut, useProfilePic } from "@/lib/shooAuth";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 
+/**
+ * Module-level flag to suppress getOrCreateUser after account deletion.
+ * Set by the profile page before calling deleteAccount, cleared on sign-out.
+ */
+let _accountDeleting = false;
+export function setAccountDeleting(v: boolean) {
+  _accountDeleting = v;
+}
+
 export function UserAuthButton() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -16,13 +25,12 @@ export function UserAuthButton() {
   const viewer = useQuery(api.users.viewer);
   const profilePic = useProfilePic();
   const hasCreatedRef = useRef(false);
-  const deletingRef = useRef(false);
   const handleSignIn = useSignIn();
   const handleSignOut = useSignOut();
 
-  // Ensure user doc exists in Convex after login (also refreshes profile pic)
+  // Ensure user doc exists in Convex after login
   useEffect(() => {
-    if (isAuthenticated && !hasCreatedRef.current && !deletingRef.current) {
+    if (isAuthenticated && !hasCreatedRef.current && !_accountDeleting) {
       hasCreatedRef.current = true;
       getOrCreateUser().catch((err) => {
         console.error("[UserAuthButton] getOrCreateUser failed:", err);
@@ -31,7 +39,7 @@ export function UserAuthButton() {
     }
     if (!isAuthenticated) {
       hasCreatedRef.current = false;
-      deletingRef.current = false;
+      _accountDeleting = false;
     }
   }, [isAuthenticated, getOrCreateUser]);
 

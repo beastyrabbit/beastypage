@@ -330,5 +330,7 @@ export default defineSchema({
     showProfilePic: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("byTokenIdentifier", ["tokenIdentifier"])
+  })
+    .index("byTokenIdentifier", ["tokenIdentifier"])
+    .index("byUsername", ["username"])
 });
