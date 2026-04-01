@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useRef } from "react";
+import { useConvexAuth } from "convex/react";
 import { Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UseVariantsReturn } from "@/utils/variants";
@@ -29,7 +30,11 @@ export function VariantBar<T>({
   parsePayload,
   shareBaseUrl,
 }: VariantBarProps<T>) {
+  const { isAuthenticated } = useConvexAuth();
   const { store, activeVariant, createVariant, saveToActive, deleteVariant, renameVariant, setActive, setVariantSlug } = variants;
+
+  // Only show variant bar for authenticated users
+  if (!isAuthenticated) return null;
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
