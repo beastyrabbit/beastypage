@@ -16,45 +16,42 @@ export function UserAuthButton() {
   const viewer = useQuery(api.users.viewer);
   const profilePic = useProfilePic();
   const hasCreatedRef = useRef(false);
+  const deletingRef = useRef(false);
   const handleSignIn = useSignIn();
   const handleSignOut = useSignOut();
 
-  // Ensure user doc exists in Convex after login
+  // Ensure user doc exists in Convex after login (also refreshes profile pic)
   useEffect(() => {
-    if (isAuthenticated && !hasCreatedRef.current) {
+    if (isAuthenticated && !hasCreatedRef.current && !deletingRef.current) {
       hasCreatedRef.current = true;
       getOrCreateUser().catch((err) => {
-        console.warn("[UserAuthButton] getOrCreateUser failed:", err);
+        console.error("[UserAuthButton] getOrCreateUser failed:", err);
         hasCreatedRef.current = false;
       });
     }
     if (!isAuthenticated) {
       hasCreatedRef.current = false;
+      deletingRef.current = false;
     }
   }, [isAuthenticated, getOrCreateUser]);
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click or Escape
   useEffect(() => {
+    if (!dropdownOpen) return;
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
       }
     }
-    if (dropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [dropdownOpen]);
-
-  // Close dropdown on Escape
-  useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
       if (e.key === "Escape") setDropdownOpen(false);
     }
-    if (dropdownOpen) {
-      document.addEventListener("keydown", handleEscape);
-      return () => document.removeEventListener("keydown", handleEscape);
-    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, [dropdownOpen]);
 
   if (isLoading) {
@@ -81,7 +78,7 @@ export function UserAuthButton() {
     );
   }
 
-  const showPic = viewer?.showProfilePic !== false;
+  const showPic = viewer?.showProfilePic === true;
   const picUrl = showPic ? profilePic : undefined;
   const initial = viewer?.username?.[0]?.toUpperCase();
 

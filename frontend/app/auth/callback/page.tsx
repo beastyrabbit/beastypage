@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 
-// The Shoo callback must be fully client-side because @shoojs/react
-// evaluates deriveRedirectUri at module scope, which requires a browser.
+// The Shoo callback must be fully client-side because @shoojs/auth
+// is browser-only and accesses window.location during initialization.
 const ShooCallbackClient = dynamic(
   () => import("@/components/auth/ShooCallbackClient"),
   {

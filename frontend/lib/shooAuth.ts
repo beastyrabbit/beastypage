@@ -8,24 +8,12 @@ import {
   type ShooAuthClient,
 } from "@shoojs/react";
 
-type ConvexUseAuth = () => {
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  fetchAccessToken: (args: { forceRefreshToken: boolean }) => Promise<string | null>;
-};
-
-type ShooAuth = {
-  useAuth: ConvexUseAuth;
-  signIn: (opts?: { requestPii?: boolean }) => void;
-  signOut: () => void;
-};
-
 const SHOO_OPTIONS = { callbackPath: "/auth/callback", requestPii: true } as const;
 
-let _auth: ShooAuth | null = null;
+let _auth: ReturnType<typeof createShooConvexAuth> | null = null;
 let _client: ShooAuthClient | null = null;
 
-function getAuth(): ShooAuth {
+function getAuth() {
   if (!_auth) {
     _auth = createShooConvexAuth(SHOO_OPTIONS);
   }
@@ -33,9 +21,10 @@ function getAuth(): ShooAuth {
 }
 
 /**
- * Return the shared ShooAuthClient singleton.
- * Used by the callback page to exchange the auth code and redirect,
- * ensuring a single client instance across the app.
+ * Return a shared ShooAuthClient for direct operations
+ * (callback handling, reading identity, clearing tokens).
+ * Separate from the Convex auth adapter returned by getAuth(),
+ * which creates its own internal client. Both share localStorage.
  */
 export function getShooClient(): ShooAuthClient {
   if (!_client) {
@@ -46,6 +35,8 @@ export function getShooClient(): ShooAuthClient {
 
 /**
  * useAuth adapter for ConvexProviderWithAuth.
+ * Returns a static stub during SSR (where the Shoo client cannot run)
+ * and delegates to the real Shoo auth on the client.
  */
 export function useAuth() {
   if (typeof window === "undefined") {
@@ -59,7 +50,7 @@ export function useAuth() {
   return getAuth().useAuth();
 }
 
-/** Sign in via Shoo */
+/** Sign in via Shoo, clearing any existing identity first to force a fresh flow. */
 export function useSignIn() {
   return useCallback(() => {
     getShooClient().clearIdentity();
@@ -70,16 +61,27 @@ export function useSignIn() {
 /**
  * Read the profile picture URL from the Shoo JWT claims (client-side only).
  * Requires requestPii: true and user consent on the Shoo consent screen.
+ * Returns undefined when no token is available or the user declined PII consent.
  */
 export function useProfilePic(): string | undefined {
-  const token =
-    typeof window !== "undefined"
-      ? getShooClient().getIdentity().token
-      : undefined;
+  let token: string | undefined;
+  if (typeof window !== "undefined") {
+    try {
+      token = getShooClient().getIdentity().token;
+    } catch {
+      // Corrupted localStorage — treat as no token
+      token = undefined;
+    }
+  }
   return useMemo(() => {
     if (!token) return undefined;
-    const claims = decodeIdentityClaims(token);
-    return claims?.picture ?? undefined;
+    try {
+      const claims = decodeIdentityClaims(token);
+      return claims?.picture ?? undefined;
+    } catch {
+      // Malformed JWT — don't crash the component tree
+      return undefined;
+    }
   }, [token]);
 }
 

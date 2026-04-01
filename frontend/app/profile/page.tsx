@@ -46,10 +46,12 @@ export default function ProfilePage() {
     try {
       await deleteAccount();
       toast.success("Account deleted");
-      handleSignOut();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete account");
+      return;
     }
+    // Sign out after successful deletion to prevent getOrCreateUser from re-creating the doc
+    handleSignOut();
   };
 
   const handleSave = async () => {
