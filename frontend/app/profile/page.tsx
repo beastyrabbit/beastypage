@@ -15,7 +15,7 @@ export default function ProfilePage() {
   const viewer = useQuery(api.users.viewer);
   const updateProfile = useMutation(api.users.updateProfile);
   const deleteAccount = useMutation(api.users.deleteAccount);
-  const allVariants = useQuery(api.userVariants.listAll);
+  const allVariants = useQuery(api.userVariants.listAll, isAuthenticated ? {} : "skip");
   const removeVariant = useMutation(api.userVariants.remove);
   const handleSignIn = useSignIn();
   const handleSignOut = useSignOut();
