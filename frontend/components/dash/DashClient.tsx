@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { toast } from "sonner";
-import { useConvexAuth } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { TOOL_MAP } from "@/lib/dash/registry.generated";
 import { APP_VERSION } from "@/lib/dash/version";
 import { DEFAULT_DASH_SETTINGS, parseDashPayload, dashSettingsEqual } from "@/utils/dashVariants";
@@ -11,6 +12,8 @@ import { DashHero } from "./DashHero";
 import { WidgetGrid } from "./WidgetGrid";
 import { AddWidgetModal } from "./AddWidgetModal";
 import { ReleaseNotesModal } from "./ReleaseNotesModal";
+
+const DASH_VARIANT_ID = "dash-settings";
 
 type DashClientProps = {
   initialSlug?: string | null;
@@ -26,22 +29,23 @@ export function DashClient({
 
   const { isAuthenticated } = useConvexAuth();
 
-  // Local working copy of settings — persisted to localStorage
-  const [settings, setSettings] = useState<DashSettings>(() => {
-    if (initialSettings) return parseDashPayload(initialSettings);
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("dash.settings");
-        if (saved) return parseDashPayload(JSON.parse(saved));
-      } catch { /* ignore */ }
-    }
-    return { ...DEFAULT_DASH_SETTINGS };
-  });
+  // Load settings from Convex
+  const convexVariants = useQuery(
+    api.userVariants.list,
+    isAuthenticated ? { toolKey: "dash" } : "skip"
+  );
+  const upsertVariant = useMutation(api.userVariants.upsert);
+
+  // Local working copy of settings
+  const [settings, setSettings] = useState<DashSettings>(() => (
+    initialSettings ? parseDashPayload(initialSettings) : { ...DEFAULT_DASH_SETTINGS }
+  ));
   const [editing, setEditing] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const [opening, setOpening] = useState(false);
   const initialLoadToastRef = useRef(false);
+  const loadedFromConvex = useRef(false);
 
   useEffect(() => {
     if (initialLoadToastRef.current) return;
@@ -56,25 +60,48 @@ export function DashClient({
     }
   }, [initialLoadError, initialSettings, initialSlug]);
 
-  // Persist settings to localStorage on change
+  // Load settings from Convex once available
+  useEffect(() => {
+    if (loadedFromConvex.current || initialSlug) return;
+    if (!convexVariants) return;
+    const saved = convexVariants.find((v) => v.variantId === DASH_VARIANT_ID);
+    if (saved) {
+      setSettings(parseDashPayload(saved.settings));
+    }
+    loadedFromConvex.current = true;
+  }, [convexVariants, initialSlug]);
+
+  // Save settings to Convex on change (debounced)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
-    try {
-      localStorage.setItem("dash.settings", JSON.stringify(settings));
-    } catch { /* ignore */ }
-  }, [settings]);
+    if (!isAuthenticated || !loadedFromConvex.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void upsertVariant({
+        toolKey: "dash",
+        variantId: DASH_VARIANT_ID,
+        name: "Dashboard",
+        settings: settings as unknown as Record<string, unknown>,
+        isActive: true,
+      }).catch((err) => console.error("[Dash] save failed:", err));
+    }, 1000);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [settings, isAuthenticated, upsertVariant]);
 
   // Auto-enter edit mode when there are no widgets and no slug pending
   useEffect(() => {
-    if (!initialSlug && settings.widgets.length === 0) {
+    if (!initialSlug && settings.widgets.length === 0 && loadedFromConvex.current) {
       queueMicrotask(() => setEditing(true));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSlug]);
+  }, [initialSlug, loadedFromConvex.current]);
 
   // Resolve widget IDs to tool metadata
   const resolvedWidgets = useMemo(
@@ -90,13 +117,6 @@ export function DashClient({
     settings.lastSeenVersion !== null &&
     settings.lastSeenVersion !== APP_VERSION;
 
-  const baseSettings = useMemo(
-    () => initialSlug && initialSettings ? parseDashPayload(initialSettings) : DEFAULT_DASH_SETTINGS,
-    [initialSettings, initialSlug],
-  );
-  const isDirty = !dashSettingsEqual(settings, baseSettings);
-
-  // Widget actions
   const handleAddWidget = useCallback((id: string) => {
     setSettings((prev) => {
       if (prev.widgets.includes(id)) return prev;
