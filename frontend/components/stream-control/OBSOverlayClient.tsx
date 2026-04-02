@@ -586,9 +586,9 @@ function SpinPhase({
 
           <div className="space-y-0.5">
             {/* Revealed params */}
-            {revealedParams.map((p) => (
+            {revealedParams.map((p, i) => (
               <div
-                key={p.id}
+                key={`${p.id}-${i}`}
                 className="flex items-center justify-between rounded-md bg-amber-500/5 px-3 py-1.5"
               >
                 <span className="text-sm font-medium text-white/40">{p.label}</span>
