@@ -3617,164 +3617,200 @@ export function OBSSpinClient({
     (def) => !def.requiresTortie || isTortie
   );
 
+  // All layer groups combined for the layer panel
+  const hasLayers = layerRows.accessories.length > 0 || layerRows.scars.length > 0 || layerRows.torties.length > 0;
+
   return (
     <div className="relative" style={{ width: "1280px", height: "1080px" }}>
       <style>{`
-        @keyframes obs-glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(245,158,11,0.1); }
-          50% { box-shadow: 0 0 40px rgba(245,158,11,0.25); }
-        }
         @keyframes obs-dot-pulse {
           0%, 100% { opacity: 0.4; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
         }
-        /* Override split-flap library — high contrast readable amber */
+        /* Split-flap overrides — clean dark tiles, white text */
         .obs-flap [data-kind="digit"] {
-          color: #fff !important;
-          background: #111 !important;
-          border: 1px solid rgba(255,255,255,0.08) !important;
-          border-radius: 3px !important;
+          color: #e4e4e7 !important;
+          background: #18181b !important;
+          border: 1px solid #27272a !important;
+          border-radius: 4px !important;
           margin-right: 2px !important;
           font-family: 'Geist Mono', ui-monospace, monospace !important;
           font-weight: 700 !important;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.6) !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
         }
         .obs-flap-active [data-kind="digit"] {
-          color: #fcd34d !important;
-          background: #1a1400 !important;
-          border-color: rgba(245, 158, 11, 0.3) !important;
-          text-shadow: 0 0 8px rgba(252, 211, 77, 0.4);
+          color: #fbbf24 !important;
+          background: #1c1a0a !important;
+          border-color: #44400a !important;
         }
         .obs-flap-done [data-kind="digit"] {
-          color: #d4d4d8 !important;
-          background: #0a0a0a !important;
-          border-color: rgba(255,255,255,0.04) !important;
-          box-shadow: none !important;
+          color: #a1a1aa !important;
+          background: #111113 !important;
+          border-color: #1e1e22 !important;
         }
       `}</style>
 
-      {/* ═══ Cat canvas — absolute center-left, always in the same spot ═══ */}
-      <div
-        className="absolute flex items-center justify-center"
-        style={{ left: "0px", top: "60px", width: "740px", height: "740px" }}
-      >
-        <canvas
-          ref={canvasRef}
-          width={DISPLAY_SIZE}
-          height={DISPLAY_SIZE}
-          className="drop-shadow-[0_0_60px_rgba(245,158,11,0.15)]"
-          style={{
-            width: "680px",
-            height: "680px",
-            imageRendering: "pixelated",
-          }}
-        />
+      {/* ═══ LEFT COLUMN: Cat (top) + Layers (bottom) ═══ */}
+      <div className="absolute left-0 top-0 flex flex-col" style={{ width: "750px", height: "1080px" }}>
+        {/* Cat canvas — hero, as big as possible */}
+        <div className="flex flex-1 items-center justify-center">
+          <canvas
+            ref={canvasRef}
+            width={DISPLAY_SIZE}
+            height={DISPLAY_SIZE}
+            className="drop-shadow-[0_0_50px_rgba(245,158,11,0.12)]"
+            style={{ width: "720px", height: "720px", imageRendering: "pixelated" }}
+          />
+        </div>
+
+        {/* Layer details */}
+        {hasLayers && (
+          <div
+            style={{
+              background: "rgba(0,0,0,0.85)",
+              borderTop: "1px solid #27272a",
+              padding: "16px 24px",
+            }}
+          >
+            <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.3em] text-zinc-500">
+              Layers
+            </div>
+            <div className="flex gap-8">
+              {(["accessories", "scars", "torties"] as const).map((group) => {
+                const rows = layerRows[group];
+                if (rows.length === 0) return null;
+                return (
+                  <div key={group} className="min-w-[160px]">
+                    <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
+                      {group === "torties" ? "Tortie" : group.charAt(0).toUpperCase() + group.slice(1)}
+                    </div>
+                    {rows.map((row, i) => (
+                      <div
+                        key={`${group}-${i}`}
+                        className="flex items-center justify-between border-l-2 py-1.5 pl-3"
+                        style={{
+                          borderColor: row.status === "active" ? "#f59e0b" : row.status === "revealed" ? "#27272a" : "transparent",
+                        }}
+                      >
+                        <span className={cn(
+                          "text-sm",
+                          row.status === "active" ? "font-semibold text-amber-400" :
+                          row.status === "revealed" ? "text-zinc-400" : "text-zinc-700"
+                        )}>
+                          {row.label}
+                        </span>
+                        <span className={cn(
+                          "ml-4 font-mono text-sm font-bold",
+                          row.status === "active" ? "text-white" :
+                          row.status === "revealed" ? "text-zinc-300" : "text-zinc-800"
+                        )}>
+                          {row.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ═══ Right panel — fixed board, always visible ═══ */}
+      {/* ═══ RIGHT COLUMN: Roller + Param board ═══ */}
       <div
         className="absolute flex flex-col"
-        style={{
-          right: "0px",
-          top: "40px",
-          width: "520px",
-          height: "1000px",
-        }}
+        style={{ left: "750px", top: "0px", width: "530px", height: "1080px" }}
       >
-        {/* Active roller — what's currently spinning */}
+        {/* Roller — current spinning param */}
         <div
-          className="mb-4 rounded-l-xl"
           style={{
-            minHeight: "72px",
-            background: "linear-gradient(135deg, rgba(12,10,2,0.95), rgba(8,6,0,0.9))",
-            borderLeft: rollerLabel ? "3px solid rgba(245,158,11,0.6)" : "3px solid rgba(245,158,11,0.08)",
-            padding: "14px 20px",
+            height: "100px",
+            background: "rgba(0,0,0,0.88)",
+            borderBottom: "1px solid #27272a",
+            borderLeft: "1px solid #27272a",
+            padding: "20px 28px",
           }}
         >
           {rollerLabel ? (
             <>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <div
-                  className="size-2.5 rounded-full bg-amber-500"
+                  className="size-2 rounded-full bg-amber-500"
                   style={{ animation: "obs-dot-pulse 1s ease-in-out infinite" }}
                 />
-                <span className="text-[11px] font-bold uppercase tracking-[0.4em] text-amber-500/60">
+                <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-500/60">
                   {rollerLabel}
                 </span>
               </div>
               {rollerActiveValue && (
-                <div className="mt-1 font-mono text-3xl font-bold text-white">
+                <div className="mt-2 truncate font-mono text-3xl font-bold text-white">
                   {rollerActiveValue}
                 </div>
               )}
             </>
           ) : (
-            <div className="text-[11px] font-bold uppercase tracking-[0.4em] text-white/8">
-              Waiting…
-            </div>
+            <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
+              Ready
+            </span>
           )}
         </div>
 
-        {/* Fixed board — all slots always rendered */}
+        {/* Param board — all slots, always visible */}
         <div
-          className="flex-1 rounded-l-xl"
+          className="flex-1 overflow-hidden"
           style={{
-            background: "linear-gradient(180deg, rgba(6,5,0,0.92) 0%, rgba(10,8,2,0.88) 100%)",
-            borderLeft: "2px solid rgba(245,158,11,0.1)",
-            padding: "8px 0",
-            animation: paramRows.length > 0 ? "obs-glow 3s ease-in-out infinite" : "none",
+            background: "rgba(0,0,0,0.85)",
+            borderLeft: "1px solid #27272a",
+            padding: "12px 0",
           }}
         >
           {boardSlots.map((def) => {
             const row = revealedMap.get(def.id);
             const isActive = row?.status === "active";
             const isRevealed = row?.status === "revealed";
-            const isEmpty = !row;
 
             return (
               <div
                 key={def.id}
-                className="flex items-center gap-3 transition-colors duration-300"
+                className="flex items-center transition-all duration-200"
                 style={{
-                  padding: "5px 20px",
-                  borderLeft: isActive ? "3px solid rgba(245,158,11,0.7)" : "3px solid transparent",
-                  background: isActive ? "rgba(245,158,11,0.04)" : "transparent",
+                  padding: "8px 24px",
+                  borderLeft: isActive ? "3px solid #f59e0b" : "3px solid transparent",
+                  background: isActive ? "rgba(245,158,11,0.05)" : "transparent",
                 }}
               >
-                {/* Label — fixed width */}
                 <span
                   className={cn(
-                    "w-[120px] shrink-0 text-sm font-bold uppercase tracking-wide transition-colors duration-300",
+                    "w-[130px] shrink-0 text-sm font-bold uppercase tracking-wide",
                     isActive ? "text-amber-400" :
                     isRevealed ? "text-zinc-400" :
-                    "text-white/8"
+                    "text-zinc-800"
                   )}
                 >
                   {def.label}
                 </span>
 
-                {/* Value — flap display or empty placeholder */}
                 <div className="flex-1">
                   {row ? (
                     <FlapDisplay
                       className={cn("obs-flap M", isActive ? "obs-flap-active" : isRevealed ? "obs-flap-done" : "")}
                       chars={flapChars}
-                      length={Math.max(row.value.length, 12)}
+                      length={Math.max(row.value.length, 14)}
                       value={row.value.toUpperCase()}
                       timing={80}
                       padMode="end"
                     />
                   ) : (
-                    <div className="flex gap-[2px]">
-                      {Array.from({ length: 12 }).map((_, i) => (
+                    <div className="flex gap-[3px]">
+                      {Array.from({ length: 14 }).map((_, i) => (
                         <div
                           key={i}
-                          className="rounded-sm"
                           style={{
-                            width: "14px",
-                            height: "22px",
-                            background: "rgba(245,158,11,0.02)",
-                            border: "1px solid rgba(245,158,11,0.03)",
+                            width: "16px",
+                            height: "26px",
+                            background: "#0e0e10",
+                            border: "1px solid #1a1a1e",
+                            borderRadius: "3px",
                           }}
                         />
                       ))}
@@ -3787,74 +3823,12 @@ export function OBSSpinClient({
         </div>
       </div>
 
-      {/* ═══ Bottom-left: Layer details (accessories, scars, torties) ═══ */}
-      {(layerRows.accessories.length > 0 || layerRows.scars.length > 0 || layerRows.torties.length > 0) && (
-        <div
-          className="absolute rounded-tr-xl"
-          style={{
-            left: "0px",
-            bottom: "20px",
-            width: "700px",
-            background: "linear-gradient(180deg, rgba(6,5,0,0.92) 0%, rgba(10,8,2,0.88) 100%)",
-            borderTop: "2px solid rgba(245,158,11,0.1)",
-            borderRight: "2px solid rgba(245,158,11,0.06)",
-            padding: "10px 0",
-          }}
-        >
-          <div className="mb-2 px-5">
-            <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-amber-500/40">
-              Layer Details
-            </span>
-          </div>
-          <div className="flex gap-6 px-5">
-            {(["accessories", "scars", "torties"] as const).map((group) => {
-              const rows = layerRows[group];
-              if (rows.length === 0) return null;
-              return (
-                <div key={group} className="flex-1">
-                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                    {group === "torties" ? "Tortie Layers" : group.charAt(0).toUpperCase() + group.slice(1)}
-                  </div>
-                  {rows.map((row, i) => (
-                    <div
-                      key={`${group}-${i}`}
-                      className="flex items-center justify-between py-1"
-                      style={{
-                        borderLeft: row.status === "active" ? "2px solid rgba(245,158,11,0.6)" : "2px solid transparent",
-                        paddingLeft: "8px",
-                      }}
-                    >
-                      <span className={cn(
-                        "text-xs",
-                        row.status === "active" ? "text-amber-400 font-semibold" :
-                        row.status === "revealed" ? "text-zinc-500" :
-                        "text-white/10"
-                      )}>
-                        {row.label}
-                      </span>
-                      <span className={cn(
-                        "font-mono text-xs font-bold",
-                        row.status === "active" ? "text-white" :
-                        row.status === "revealed" ? "text-zinc-400" :
-                        "text-white/8"
-                      )}>
-                        {row.value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Loading state */}
+      {/* Loading */}
       {initializing && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="flex items-center gap-3 rounded-xl bg-black/90 px-6 py-4">
+          <div className="flex items-center gap-3 bg-black/90 px-6 py-4 rounded-lg">
             <Loader2 className="size-5 animate-spin text-amber-500" />
-            <span className="text-sm font-medium text-amber-500/60">Loading…</span>
+            <span className="text-sm text-zinc-400">Loading…</span>
           </div>
         </div>
       )}
