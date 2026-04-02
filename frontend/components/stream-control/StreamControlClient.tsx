@@ -335,8 +335,23 @@ export function StreamControlClient() {
               {obsUrl ? (
                 <iframe
                   src={obsUrl}
-                  className="h-full w-full"
+                  className="absolute left-0 top-0 origin-top-left"
+                  style={{
+                    width: "1920px",
+                    height: "1080px",
+                    transform: "scale(var(--preview-scale, 0.3))",
+                  }}
                   title="OBS Overlay Preview"
+                  ref={(el) => {
+                    if (!el) return;
+                    const container = el.parentElement;
+                    if (!container) return;
+                    const observer = new ResizeObserver(([entry]) => {
+                      const scale = entry.contentRect.width / 1920;
+                      container.style.setProperty("--preview-scale", String(scale));
+                    });
+                    observer.observe(container);
+                  }}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
