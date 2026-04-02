@@ -6,12 +6,15 @@ import {
   Copy,
   Eye,
   Loader2,
+  Minus,
   Play,
+  Plus,
   Radio,
   RotateCcw,
   Square,
   Timer,
   Tv,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
@@ -401,6 +404,40 @@ export function StreamControlClient() {
                   className="w-10 bg-transparent text-center text-sm text-foreground focus:outline-none"
                 />
                 <span className="text-xs text-muted-foreground">sec</span>
+              </div>
+
+              {/* Speed */}
+              <div className="flex items-center gap-1 rounded-lg border border-border/50 px-1.5 py-1">
+                <Zap className="size-3.5 text-muted-foreground" />
+                <button
+                  onClick={() =>
+                    updateSettings({
+                      speedMultiplier: Math.max(
+                        0.25,
+                        (settings.speedMultiplier ?? 1) - 0.25
+                      ),
+                    })
+                  }
+                  className="rounded p-1 text-muted-foreground transition hover:bg-foreground hover:text-background"
+                >
+                  <Minus className="size-3" />
+                </button>
+                <span className="w-8 text-center text-xs font-semibold text-foreground">
+                  {(settings.speedMultiplier ?? 1).toFixed(2).replace(/\.?0+$/, "")}x
+                </span>
+                <button
+                  onClick={() =>
+                    updateSettings({
+                      speedMultiplier: Math.min(
+                        4,
+                        (settings.speedMultiplier ?? 1) + 0.25
+                      ),
+                    })
+                  }
+                  className="rounded p-1 text-muted-foreground transition hover:bg-foreground hover:text-background"
+                >
+                  <Plus className="size-3" />
+                </button>
               </div>
 
               {/* Lobby */}

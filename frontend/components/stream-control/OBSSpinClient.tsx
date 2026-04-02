@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { useQuery } from "convex/react";
+import { FlapDisplay, Presets } from "react-split-flap-effect";
 import { api } from "@/convex/_generated/api";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import type { BatchRenderResponse, CatParams } from "@/lib/cat-v3/types";
@@ -3597,42 +3598,6 @@ export function OBSSpinClient({
   return (
     <div className="flex h-full">
       <style>{`
-        @keyframes flapIn {
-          0% { transform: rotateX(90deg); opacity: 0; }
-          50% { transform: rotateX(-8deg); opacity: 1; }
-          100% { transform: rotateX(0deg); opacity: 1; }
-        }
-        .flap-char {
-          display: inline-block;
-          background: #1a1400;
-          border: 1px solid rgba(245, 158, 11, 0.15);
-          border-radius: 3px;
-          padding: 2px 5px;
-          margin: 0 1px;
-          font-family: ui-monospace, monospace;
-          font-weight: 700;
-          font-size: 18px;
-          line-height: 1.2;
-          min-width: 16px;
-          text-align: center;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
-        }
-        .flap-revealed .flap-char {
-          color: #fbbf24;
-          animation: flapIn 0.2s ease-out both;
-        }
-        .flap-active .flap-char {
-          color: #fcd34d;
-          text-shadow: 0 0 8px rgba(252, 211, 77, 0.4);
-        }
-        .flap-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 6px 16px;
-          border-bottom: 1px solid rgba(245, 158, 11, 0.06);
-        }
-        .flap-row:last-child { border-bottom: none; }
         .flap-board {
           background: #0d0b00;
           border: 2px solid rgba(245, 158, 11, 0.2);
@@ -3640,6 +3605,16 @@ export function OBSSpinClient({
           padding: 12px 8px;
           box-shadow: 0 0 60px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
         }
+        .flap-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 8px 16px;
+          border-bottom: 1px solid rgba(245, 158, 11, 0.06);
+        }
+        .flap-row:last-child { border-bottom: none; }
+        /* Style the split-flap library chars */
+        .flap-board .split-flap-display { gap: 2px; }
       `}</style>
 
       {/* Left: Cat canvas */}
@@ -3657,17 +3632,18 @@ export function OBSSpinClient({
       <div className="flex flex-1 flex-col justify-center px-6">
         {/* Active roller — what's currently spinning */}
         {rollerLabel && (
-          <div className="mb-3 px-4">
+          <div className="mb-3 rounded-lg bg-black/80 px-4 py-3">
             <div className="text-[11px] font-bold uppercase tracking-[0.4em] text-amber-500/50">
               {rollerLabel}
             </div>
             {rollerActiveValue && (
-              <div className="mt-1 flex flex-wrap">
-                {rollerActiveValue.split("").map((ch, i) => (
-                  <span key={i} className="flap-char flap-active" style={{ animationDelay: `${i * 25}ms` }}>
-                    {ch}
-                  </span>
-                ))}
+              <div className="mt-2">
+                <FlapDisplay
+                  chars={Presets.ALPHANUM + " .-()_/•–"}
+                  length={Math.max(rollerActiveValue.length, 12)}
+                  value={rollerActiveValue.toUpperCase()}
+                  padMode="end"
+                />
               </div>
             )}
           </div>
@@ -3679,22 +3655,17 @@ export function OBSSpinClient({
             {paramRows.map((row, i) => (
               <div key={`${row.id}-${i}`} className="flap-row">
                 <span className={cn(
-                  "text-sm font-semibold uppercase tracking-wider",
+                  "w-[120px] shrink-0 text-sm font-semibold uppercase tracking-wider",
                   row.status === "revealed" ? "text-amber-600/60" : "text-amber-400"
                 )}>
                   {row.label}
                 </span>
-                <span className={row.status === "revealed" ? "flap-revealed" : "flap-active"}>
-                  {row.value.split("").map((ch, ci) => (
-                    <span
-                      key={`${ci}-${ch}`}
-                      className="flap-char"
-                      style={row.status === "revealed" ? { animationDelay: `${ci * 30}ms` } : undefined}
-                    >
-                      {ch}
-                    </span>
-                  ))}
-                </span>
+                <FlapDisplay
+                  chars={Presets.ALPHANUM + " .-()_/•–"}
+                  length={Math.max(row.value.length, 10)}
+                  value={row.value.toUpperCase()}
+                  padMode="end"
+                />
               </div>
             ))}
           </div>
