@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
-import { ChevronDown, ChevronRight, Download, Loader2, Save, Trash2, Upload, User } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Download, Eye, EyeOff, Loader2, RefreshCw, Save, Trash2, Upload, User } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { signIn, signOut } from "@/lib/shooAuth";
@@ -15,6 +15,7 @@ export default function ProfilePage() {
   const viewer = useQuery(api.users.viewer);
   const updateProfile = useMutation(api.users.updateProfile);
   const deleteAccount = useMutation(api.users.deleteAccount);
+  const regenerateApiKey = useMutation(api.users.regenerateApiKey);
   const allVariants = useQuery(api.userVariants.listAll, isAuthenticated ? {} : "skip");
   const removeVariant = useMutation(api.userVariants.remove);
   const importBatchMut = useMutation(api.userVariants.importBatch);
@@ -221,6 +222,20 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        {/* API Key */}
+        <ApiKeySection
+          apiKey={viewer.apiKey ?? null}
+          onRegenerate={async () => {
+            if (!window.confirm("Regenerate your API key? Any existing OBS overlays using the old key will stop working.")) return;
+            try {
+              await regenerateApiKey();
+              toast.success("API key regenerated");
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Failed to regenerate");
+            }
+          }}
+        />
+
         {/* Saved Variants */}
         <VariantsSection
           variants={allVariants ?? []}
@@ -268,6 +283,102 @@ export default function ProfilePage() {
         </>
       )}
     </main>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// API Key section
+// ---------------------------------------------------------------------------
+
+function ApiKeySection({
+  apiKey,
+  onRegenerate,
+}: {
+  apiKey: string | null;
+  onRegenerate: () => Promise<void>;
+}) {
+  const [revealed, setRevealed] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+
+  const masked = apiKey
+    ? `${"•".repeat(apiKey.length - 8)}${apiKey.slice(-8)}`
+    : "—";
+
+  const handleCopy = async () => {
+    if (!apiKey) return;
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      toast.success("API key copied");
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    try {
+      await onRegenerate();
+    } finally {
+      setRegenerating(false);
+      setRevealed(false);
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border border-border/40 bg-background/80 p-6 backdrop-blur">
+      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        API Key
+      </h3>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Use this key in your OBS browser source URL to connect your stream overlay.
+      </p>
+      <div className="flex items-center gap-2">
+        <div
+          className={cn(
+            "flex-1 rounded-lg border border-border/50 bg-background px-3 py-2",
+            "font-mono text-sm text-foreground select-all"
+          )}
+        >
+          {revealed ? apiKey ?? "—" : masked}
+        </div>
+        <button
+          onClick={() => setRevealed((prev) => !prev)}
+          className={cn(
+            "rounded-lg border border-border/50 p-2 text-muted-foreground",
+            "transition hover:bg-foreground hover:text-background"
+          )}
+          title={revealed ? "Hide" : "Reveal"}
+        >
+          {revealed ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        </button>
+        <button
+          onClick={handleCopy}
+          disabled={!apiKey}
+          className={cn(
+            "rounded-lg border border-border/50 p-2 text-muted-foreground",
+            "transition hover:bg-foreground hover:text-background disabled:opacity-50"
+          )}
+          title="Copy"
+        >
+          <Copy className="size-4" />
+        </button>
+        <button
+          onClick={handleRegenerate}
+          disabled={regenerating}
+          className={cn(
+            "rounded-lg border border-border/50 p-2 text-muted-foreground",
+            "transition hover:bg-foreground hover:text-background disabled:opacity-50"
+          )}
+          title="Regenerate"
+        >
+          {regenerating ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <RefreshCw className="size-4" />
+          )}
+        </button>
+      </div>
+    </section>
   );
 }
 
