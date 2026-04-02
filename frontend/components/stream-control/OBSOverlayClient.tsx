@@ -8,15 +8,18 @@ import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builde
 import { ADDITIONAL_PALETTES } from "@/lib/palettes";
 import type { PaletteCategory } from "@/lib/palettes";
 import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
-import type { CatGeneratorApi, BuilderOptions } from "@/components/cat-builder/types";
+import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import type { CatParams } from "@/lib/cat-v3/types";
+import {
+  runProgressiveSpin,
+  type ParameterOptions,
+} from "@/utils/spinEngine";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type OverlayPhase = "idle" | "lobby" | "countdown" | "spinning" | "result";
-type ParamId = (typeof PARAM_SEQUENCE)[number]["id"];
 
 interface FlyingCat {
   id: string;
@@ -35,24 +38,6 @@ interface RevealedParam {
 }
 
 // ---------------------------------------------------------------------------
-// Param sequence — same order as SingleCatPlusClient
-// ---------------------------------------------------------------------------
-
-const PARAM_SEQUENCE = [
-  { id: "colour", label: "Colour", field: "colour", optional: false },
-  { id: "pelt", label: "Pelt", field: "peltName", optional: false },
-  { id: "eyeColour", label: "Eyes", field: "eyeColour", optional: false },
-  { id: "eyeColour2", label: "Heterochromia", field: "eyeColour2", optional: true },
-  { id: "tortie", label: "Tortie", field: "isTortie", optional: true },
-  { id: "tint", label: "Tint", field: "tint", optional: true },
-  { id: "skinColour", label: "Skin", field: "skinColour", optional: false },
-  { id: "whitePatches", label: "White Patches", field: "whitePatches", optional: true },
-  { id: "points", label: "Points", field: "points", optional: true },
-  { id: "vitiligo", label: "Vitiligo", field: "vitiligo", optional: true },
-  { id: "sprite", label: "Sprite", field: "spriteNumber", optional: false },
-] as const;
-
-// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -63,28 +48,6 @@ const MAX_FLYING_CATS = 3;
 const FLYING_CAT_FRAMES = 5;
 const FRAME_CYCLE_MS = 150;
 const PALETTE_CYCLE_MS = 4_000;
-const VARIATION_COUNT = 6; // how many variations to pre-render per param
-const FLIP_FAST_MS = 80; // fast cycle frame duration
-const FLIP_SLOW_MS = 200; // deceleration frame duration
-const PARAM_PAUSE_MS = 300; // pause between parameters
-
-// ---------------------------------------------------------------------------
-// Utility: clone params
-// ---------------------------------------------------------------------------
-
-function cloneParams(params: Partial<CatParams>): Partial<CatParams> {
-  return JSON.parse(JSON.stringify(params));
-}
-
-function applyParam(params: Partial<CatParams>, field: string, value: unknown) {
-  (params as Record<string, unknown>)[field] = value;
-}
-
-function formatValue(value: unknown): string {
-  if (value === undefined || value === null || value === "" || value === "none") return "None";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  return String(value).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 // ---------------------------------------------------------------------------
 // OBSOverlayClient
@@ -175,102 +138,81 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
   }, [phase, countdownValue]);
 
   // =====================================================================
-  // PROGRESSIVE SPIN — the same approach as SingleCatPlusClient
+  // PROGRESSIVE SPIN — uses the shared spinEngine (same as SingleCatPlusClient)
   // =====================================================================
+
+  // Build ParameterOptions from the mapper's BuilderOptions
+  const parameterOptions = useMemo((): ParameterOptions | null => {
+    if (!mapperOptions) return null;
+    return {
+      sprite: mapperOptions.sprites ?? [],
+      pelt: mapperOptions.pelts ?? [],
+      colour: mapperOptions.pelts ?? [], // colours come from pelts in the mapper
+      tortie: [true, false],
+      tortieMask: mapperOptions.tortieMasks ?? [],
+      tortiePattern: mapperOptions.pelts ?? [],
+      tortieColour: mapperOptions.pelts ?? [],
+      tint: mapperOptions.tints ?? [],
+      eyeColour: mapperOptions.eyeColours ?? [],
+      eyeColour2: ["none", ...(mapperOptions.eyeColours ?? [])],
+      skinColour: mapperOptions.skinColours ?? [],
+      whitePatches: ["none", ...(mapperOptions.whitePatches ?? [])],
+      points: ["none", ...(mapperOptions.points ?? [])],
+      whitePatchesTint: ["none", ...(mapperOptions.whiteTints ?? [])],
+      vitiligo: ["none", ...(mapperOptions.vitiligo ?? [])],
+      accessory: [
+        "none",
+        ...(mapperOptions.plantAccessories ?? []),
+        ...(mapperOptions.wildAccessories ?? []),
+        ...(mapperOptions.collarAccessories ?? []),
+      ],
+      scar: [
+        "none",
+        ...(mapperOptions.scarBattle ?? []),
+        ...(mapperOptions.scarMissing ?? []),
+        ...(mapperOptions.scarEnvironmental ?? []),
+      ],
+      shading: [true, false],
+      reverse: [true, false],
+    };
+  }, [mapperOptions]);
+
   useEffect(() => {
     if (phase !== "spinning" || !currentParams || !generator) return;
 
     const token = ++spinTokenRef.current;
-    const cancelled = () => spinTokenRef.current !== token;
 
-    (async () => {
-      const finalParams = currentParams as Partial<CatParams>;
-
-      // Start with placeholder params — simple default cat
-      const progressive: Partial<CatParams> = {
-        spriteNumber: 8,
-        peltName: "SingleColour",
-        colour: "WHITE",
-        shading: finalParams.shading ?? false,
-        reverse: finalParams.reverse ?? false,
-        isTortie: false,
-        accessories: [],
-        scars: [],
-        tortie: [],
-        darkForest: finalParams.darkForest ?? false,
-        darkMode: finalParams.darkMode ?? false,
-        dead: finalParams.dead ?? false,
-      };
-
-      // Render the placeholder
-      await renderAndSetCat(generator, progressive);
-      if (cancelled()) return;
-
-      // Go through each parameter, one by one
-      for (const def of PARAM_SEQUENCE) {
-        if (cancelled()) return;
-
-        const finalValue = (finalParams as Record<string, unknown>)[def.field];
-        if (finalValue === undefined || finalValue === null) {
-          if (def.optional) continue;
-        }
-
-        setActiveParam({ label: def.label, value: "..." });
-
-        // Get possible variation values from the mapper
-        const variations = getVariations(def.id, finalValue, mapperOptions);
-
-        if (variations.length > 1) {
-          // === FLIP ANIMATION ===
-          // Fast cycle through variations (2 full passes)
-          for (let pass = 0; pass < 2; pass++) {
-            for (const v of variations) {
-              if (cancelled()) return;
-              const preview = cloneParams(progressive);
-              applyParam(preview, def.field, v.raw);
-              setActiveParam({ label: def.label, value: v.display });
-              await renderAndSetCat(generator, preview);
-              await wait(FLIP_FAST_MS);
-            }
+    runProgressiveSpin(
+      generator,
+      currentParams as Partial<CatParams>,
+      parameterOptions,
+      {
+        onParamStart: (paramId, label) => {
+          setActiveParam({ label, value: "..." });
+        },
+        onFrame: (canvas, paramLabel, valueDisplay, _isFinal) => {
+          setCatImageUrl(canvas.toDataURL("image/png"));
+          setActiveParam({ label: paramLabel, value: valueDisplay });
+        },
+        onParamRevealed: (paramId, label, value) => {
+          setRevealedParams((prev) => [
+            ...prev,
+            { id: paramId, label, value },
+          ]);
+          setActiveParam(null);
+        },
+        onComplete: (finalCanvas) => {
+          if (finalCanvas) {
+            setCatImageUrl(finalCanvas.toDataURL("image/png"));
           }
-
-          // Deceleration: 4 random picks with increasing delay
-          for (let i = 0; i < 4; i++) {
-            if (cancelled()) return;
-            const v = variations[Math.floor(Math.random() * variations.length)];
-            const preview = cloneParams(progressive);
-            applyParam(preview, def.field, v.raw);
-            setActiveParam({ label: def.label, value: v.display });
-            await renderAndSetCat(generator, preview);
-            await wait(FLIP_SLOW_MS + i * 60);
-          }
-        }
-
-        // Land on the final value
-        if (cancelled()) return;
-        applyParam(progressive, def.field, finalValue);
-        const displayValue = formatValue(finalValue);
-        setActiveParam({ label: def.label, value: displayValue });
-        await renderAndSetCat(generator, progressive);
-
-        // Lock it in
-        setRevealedParams((prev) => [
-          ...prev,
-          { id: def.id, label: def.label, value: displayValue },
-        ]);
-        setActiveParam(null);
-
-        await wait(PARAM_PAUSE_MS);
+          setPhase("result");
+        },
+        isCancelled: () => spinTokenRef.current !== token,
       }
-
-      // Final render with all params
-      if (cancelled()) return;
-      await renderAndSetCat(generator, finalParams);
-      setPhase("result");
-    })();
+    );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentParams, generator, mapperOptions]);
+  }, [phase, currentParams, generator, parameterOptions]);
 
   // Resolve palette data for lobby
   const sessionPalettes = useMemo(() => {
@@ -325,96 +267,8 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
     </div>
   );
 
-  // Helper: render cat and update the image URL
-  async function renderAndSetCat(
-    gen: CatGeneratorApi,
-    params: Partial<CatParams>
-  ) {
-    try {
-      const result = await gen.generateCat(params);
-      if (result.imageDataUrl) {
-        setCatImageUrl(result.imageDataUrl);
-      } else if (result.canvas) {
-        const canvas = result.canvas as HTMLCanvasElement;
-        setCatImageUrl(canvas.toDataURL("image/png"));
-      }
-    } catch (err) {
-      console.error("[OBS] render failed:", err);
-    }
-  }
 }
 
-// ---------------------------------------------------------------------------
-// Get variation options for a parameter from the mapper
-// ---------------------------------------------------------------------------
-
-function getVariations(
-  paramId: string,
-  finalValue: unknown,
-  options: BuilderOptions | null
-): { raw: unknown; display: string }[] {
-  if (!options) return [{ raw: finalValue, display: formatValue(finalValue) }];
-
-  let pool: unknown[] = [];
-
-  switch (paramId) {
-    case "colour":
-      // Use pelt colours if available
-      pool = (options as unknown as Record<string, unknown[]>).pelts ?? [];
-      break;
-    case "pelt":
-      pool = options.pelts ?? [];
-      break;
-    case "eyeColour":
-    case "eyeColour2":
-      pool = options.eyeColours ?? [];
-      break;
-    case "tint":
-      pool = options.tints ?? [];
-      break;
-    case "skinColour":
-      pool = options.skinColours ?? [];
-      break;
-    case "whitePatches":
-      pool = options.whitePatches ?? [];
-      break;
-    case "points":
-      pool = (options as unknown as Record<string, unknown[]>).points ?? [];
-      break;
-    case "vitiligo":
-      pool = (options as unknown as Record<string, unknown[]>).vitiligo ?? [];
-      break;
-    case "sprite":
-      pool = options.sprites?.map(String) ?? [];
-      break;
-    case "tortie":
-      return [
-        { raw: false, display: "No" },
-        { raw: true, display: "Yes" },
-      ];
-    default:
-      return [{ raw: finalValue, display: formatValue(finalValue) }];
-  }
-
-  if (pool.length === 0) return [{ raw: finalValue, display: formatValue(finalValue) }];
-
-  // Sample up to VARIATION_COUNT from the pool, always ending with the final value
-  const finalStr = String(finalValue);
-  const nonFinal = pool.filter((v) => String(v) !== finalStr);
-  const sampled: { raw: unknown; display: string }[] = [];
-  const step = Math.max(1, Math.floor(nonFinal.length / (VARIATION_COUNT - 1)));
-
-  for (let i = 0; i < nonFinal.length && sampled.length < VARIATION_COUNT - 1; i += step) {
-    sampled.push({ raw: nonFinal[i], display: formatValue(nonFinal[i]) });
-  }
-
-  sampled.push({ raw: finalValue, display: formatValue(finalValue) });
-  return sampled;
-}
-
-function wait(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
 
 // ---------------------------------------------------------------------------
 // Phase: Lobby (pre-spin)
