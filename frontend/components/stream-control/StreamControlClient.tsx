@@ -41,6 +41,12 @@ import { useCatGenerator } from "@/components/cat-builder/hooks";
 // StreamControlClient
 // ---------------------------------------------------------------------------
 
+const LOBBY_MODE_DEFAULTS = {
+  "fruit-ninja": { cats: 5, move: 1, swap: 1 },
+  "matrix": { cats: 8, move: 1, swap: 1 },
+  "dvd": { cats: 3, move: 1, swap: 1 },
+} as const;
+
 export function StreamControlClient() {
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const viewer = useQuery(api.users.viewer);
@@ -528,12 +534,22 @@ export function StreamControlClient() {
         <div className="flex flex-wrap items-center gap-3">
           {/* Mode */}
           <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1">
-            {(["fruit-ninja", "matrix", "dvd"] as const).map((m) => (
+            {(["fruit-ninja", "matrix", "dvd"] as const).map((m) => {
+              const defaults = LOBBY_MODE_DEFAULTS[m];
+              return (
               <button
                 key={m}
                 onClick={() => {
                   setLobbyMode(m);
-                  syncLobbySettings({ lobbyMode: m });
+                  setLobbyCatCount(defaults.cats);
+                  setLobbyMoveSpeed(defaults.move);
+                  setLobbySwapSpeed(defaults.swap);
+                  syncLobbySettings({
+                    lobbyMode: m,
+                    lobbyCatCount: defaults.cats,
+                    lobbyMoveSpeed: defaults.move,
+                    lobbySwapSpeed: defaults.swap,
+                  });
                 }}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition",
@@ -544,7 +560,8 @@ export function StreamControlClient() {
               >
                 {m === "dvd" ? "DVD Bounce" : m === "matrix" ? "Matrix" : "Fruit Ninja"}
               </button>
-            ))}
+              );
+            })}
           </div>
 
           {/* Cat count */}
@@ -579,6 +596,19 @@ export function StreamControlClient() {
             format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
             onChange={(v) => { setLobbySwapSpeed(v); syncLobbySettings({ lobbySwapSpeed: v }); }}
           />
+
+          {/* Clear cats */}
+          <button
+            onClick={() => syncLobbySettings({ lobbyClearSeq: Date.now() })}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-3 py-1.5",
+              "text-xs font-medium text-muted-foreground transition",
+              "hover:bg-foreground hover:text-background"
+            )}
+          >
+            <RotateCcw className="size-3" />
+            Reset
+          </button>
         </div>
       </section>
 

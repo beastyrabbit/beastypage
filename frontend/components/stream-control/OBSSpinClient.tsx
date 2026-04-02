@@ -3711,6 +3711,7 @@ export function OBSSpinClient({
           lobbyCatCount: (sessionSettings as Record<string, unknown> | undefined)?.lobbyCatCount as number ?? 4,
           lobbyMoveSpeed: (sessionSettings as Record<string, unknown> | undefined)?.lobbyMoveSpeed as number ?? 1.0,
           lobbySwapSpeed: (sessionSettings as Record<string, unknown> | undefined)?.lobbySwapSpeed as number ?? 1.0,
+          lobbyClearSeq: (sessionSettings as Record<string, unknown> | undefined)?.lobbyClearSeq as number ?? 0,
         }}
         generator={generatorRef.current}
       />
@@ -3970,6 +3971,7 @@ function OBSLobby({
     lobbyCatCount?: number;
     lobbyMoveSpeed?: number;
     lobbySwapSpeed?: number;
+    lobbyClearSeq?: number;
   };
   generator: CatGeneratorApi | null;
 }) {
@@ -4051,9 +4053,10 @@ function OBSLobby({
       setFlyingCats((prev) => {
         const alive = prev.filter((c) => Date.now() - c.startTime < c.duration);
         if (alive.length >= maxCats) return alive;
+        // Random duration 10-30s for natural fade, scaled by moveSpeed
         const baseDuration = lobbyMode === "dvd"
           ? 999999
-          : (3500 + Math.random() * 2000) / moveSpeed;
+          : (10000 + Math.random() * 20000) / moveSpeed;
         return [...alive, {
           id: catIdRef.current++,
           frames,
@@ -4067,18 +4070,28 @@ function OBSLobby({
     };
 
     spawn();
-    const spawnInterval = Math.max(800, 3000 / moveSpeed);
-    const timer = setInterval(spawn, spawnInterval);
+    // Spawn fast enough to maintain maxCats active — check every 500ms
+    const timer = setInterval(spawn, 500);
     return () => { cancelled = true; clearInterval(timer); };
   }, [generator, settings]);
 
-  // Cleanup
+  // Cleanup expired cats
   useEffect(() => {
     const timer = setInterval(() => {
       setFlyingCats((prev) => prev.filter((c) => Date.now() - c.startTime < c.duration + 500));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Clear all cats when reset button is pressed
+  const clearSeqRef = useRef(settings.lobbyClearSeq ?? 0);
+  useEffect(() => {
+    const seq = settings.lobbyClearSeq ?? 0;
+    if (seq > clearSeqRef.current) {
+      clearSeqRef.current = seq;
+      setFlyingCats([]);
+    }
+  }, [settings.lobbyClearSeq]);
 
   const chips = [
     { label: "Afterlife", value: afterlifeLabel },
