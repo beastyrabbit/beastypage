@@ -3651,10 +3651,11 @@ export function OBSSpinClient({
         }
       `}</style>
 
-      {/* ═══ LEFT COLUMN: Cat (top) + Layers (bottom) ═══ */}
-      <div className="absolute left-0 top-0 flex flex-col" style={{ width: "750px", height: "1080px" }}>
-        {/* Cat canvas — hero, as big as possible */}
-        <div className="flex flex-1 items-center justify-center">
+      {/* ═══ Cat canvas — absolute, never moves ═══ */}
+      <div
+        className="absolute flex items-center justify-center"
+        style={{ left: "0px", top: "0px", width: "750px", height: "780px" }}
+      >
           <canvas
             ref={canvasRef}
             width={DISPLAY_SIZE}
@@ -3675,60 +3676,64 @@ export function OBSSpinClient({
               ].join(" "),
             }}
           />
-        </div>
-
-        {/* Layer details */}
-        {hasLayers && (
-          <div
-            style={{
-              background: "rgba(0,0,0,0.85)",
-              borderTop: "1px solid #27272a",
-              padding: "16px 24px",
-            }}
-          >
-            <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.3em] text-zinc-500">
-              Layers
-            </div>
-            <div className="flex gap-8">
-              {(["accessories", "scars", "torties"] as const).map((group) => {
-                const rows = layerRows[group];
-                if (rows.length === 0) return null;
-                return (
-                  <div key={group} className="min-w-[160px]">
-                    <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
-                      {group === "torties" ? "Tortie" : group.charAt(0).toUpperCase() + group.slice(1)}
-                    </div>
-                    {rows.map((row, i) => (
-                      <div
-                        key={`${group}-${i}`}
-                        className="flex items-center justify-between border-l-2 py-1.5 pl-3"
-                        style={{
-                          borderColor: row.status === "active" ? "#f59e0b" : row.status === "revealed" ? "#27272a" : "transparent",
-                        }}
-                      >
-                        <span className={cn(
-                          "text-sm",
-                          row.status === "active" ? "font-semibold text-amber-400" :
-                          row.status === "revealed" ? "text-zinc-400" : "text-zinc-700"
-                        )}>
-                          {row.label}
-                        </span>
-                        <span className={cn(
-                          "ml-4 font-mono text-sm font-bold",
-                          row.status === "active" ? "text-white" :
-                          row.status === "revealed" ? "text-zinc-300" : "text-zinc-800"
-                        )}>
-                          {row.value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* ═══ LAYER DETAILS — absolute bottom-left, never affects cat ═══ */}
+      {hasLayers && (
+        <div
+          className="absolute overflow-hidden"
+          style={{
+            left: "0px",
+            bottom: "0px",
+            width: "750px",
+            maxHeight: "280px",
+            background: "rgba(0,0,0,0.85)",
+            borderTop: "1px solid #27272a",
+            padding: "14px 24px",
+          }}
+        >
+          <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.3em] text-zinc-500">
+            Layers
+          </div>
+          <div className="flex gap-6">
+            {(["accessories", "scars", "torties"] as const).map((group) => {
+              const rows = layerRows[group];
+              if (rows.length === 0) return null;
+              return (
+                <div key={group} className="min-w-[140px] max-w-[220px]">
+                  <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
+                    {group === "torties" ? "Tortie" : group.charAt(0).toUpperCase() + group.slice(1)}
+                  </div>
+                  {rows.map((row, i) => (
+                    <div
+                      key={`${group}-${i}`}
+                      className="flex items-center gap-3 border-l-2 py-1 pl-3"
+                      style={{
+                        borderColor: row.status === "active" ? "#f59e0b" : row.status === "revealed" ? "#27272a" : "transparent",
+                      }}
+                    >
+                      <span className={cn(
+                        "shrink-0 text-xs",
+                        row.status === "active" ? "font-semibold text-amber-400" :
+                        row.status === "revealed" ? "text-zinc-400" : "text-zinc-700"
+                      )}>
+                        {row.label}
+                      </span>
+                      <span className={cn(
+                        "truncate font-mono text-xs font-bold",
+                        row.status === "active" ? "text-white" :
+                        row.status === "revealed" ? "text-zinc-300" : "text-zinc-800"
+                      )}>
+                        {row.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ═══ RIGHT COLUMN: Roller + Param board ═══ */}
       <div
