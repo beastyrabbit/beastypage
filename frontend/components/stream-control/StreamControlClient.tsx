@@ -95,7 +95,7 @@ export function StreamControlClient() {
         const merged = { ...prev, ...next };
         clearTimeout(syncTimer.current);
         syncTimer.current = setTimeout(() => {
-          updateSettingsMut({ settings: merged }).catch(console.error);
+          if (session) updateSettingsMut({ settings: merged }).catch(() => {});
         }, 500);
         return merged;
       });
