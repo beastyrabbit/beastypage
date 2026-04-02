@@ -3626,26 +3626,27 @@ export function OBSSpinClient({
           0%, 100% { opacity: 0.4; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
         }
-        /* Override split-flap library styling for premium amber look */
+        /* Override split-flap library — high contrast readable amber */
         .obs-flap [data-kind="digit"] {
-          color: #fbbf24 !important;
-          background: linear-gradient(180deg, #1a1508 0%, #0f0d04 100%) !important;
-          border: 1px solid rgba(245, 158, 11, 0.12) !important;
-          border-radius: 4px !important;
+          color: #fff !important;
+          background: #111 !important;
+          border: 1px solid rgba(255,255,255,0.08) !important;
+          border-radius: 3px !important;
           margin-right: 2px !important;
           font-family: 'Geist Mono', ui-monospace, monospace !important;
-          font-weight: 600 !important;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 1px 0 rgba(245,158,11,0.05) !important;
+          font-weight: 700 !important;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.6) !important;
         }
         .obs-flap-active [data-kind="digit"] {
           color: #fcd34d !important;
-          border-color: rgba(245, 158, 11, 0.25) !important;
-          text-shadow: 0 0 10px rgba(252, 211, 77, 0.3);
+          background: #1a1400 !important;
+          border-color: rgba(245, 158, 11, 0.3) !important;
+          text-shadow: 0 0 8px rgba(252, 211, 77, 0.4);
         }
-        .obs-flap-dim [data-kind="digit"] {
-          color: rgba(245, 158, 11, 0.35) !important;
-          background: linear-gradient(180deg, #110f04 0%, #0a0903 100%) !important;
-          border-color: rgba(245, 158, 11, 0.06) !important;
+        .obs-flap-done [data-kind="digit"] {
+          color: #d4d4d8 !important;
+          background: #0a0a0a !important;
+          border-color: rgba(255,255,255,0.04) !important;
           box-shadow: none !important;
         }
       `}</style>
@@ -3700,14 +3701,8 @@ export function OBSSpinClient({
                 </span>
               </div>
               {rollerActiveValue && (
-                <div className="mt-2">
-                  <FlapDisplay
-                    className="obs-flap obs-flap-active M"
-                    chars={flapChars}
-                    length={Math.max(rollerActiveValue.length, 14)}
-                    value={rollerActiveValue.toUpperCase()}
-                    padMode="end"
-                  />
+                <div className="mt-1 font-mono text-3xl font-bold text-white">
+                  {rollerActiveValue}
                 </div>
               )}
             </>
@@ -3747,10 +3742,10 @@ export function OBSSpinClient({
                 {/* Label — fixed width */}
                 <span
                   className={cn(
-                    "w-[110px] shrink-0 text-[13px] font-semibold uppercase tracking-wide transition-colors duration-300",
+                    "w-[120px] shrink-0 text-sm font-bold uppercase tracking-wide transition-colors duration-300",
                     isActive ? "text-amber-400" :
-                    isRevealed ? "text-amber-600/50" :
-                    "text-white/6"
+                    isRevealed ? "text-zinc-400" :
+                    "text-white/8"
                   )}
                 >
                   {def.label}
@@ -3760,10 +3755,11 @@ export function OBSSpinClient({
                 <div className="flex-1">
                   {row ? (
                     <FlapDisplay
-                      className={cn("obs-flap M", isActive ? "obs-flap-active" : isRevealed ? "obs-flap-dim" : "")}
+                      className={cn("obs-flap M", isActive ? "obs-flap-active" : isRevealed ? "obs-flap-done" : "")}
                       chars={flapChars}
                       length={Math.max(row.value.length, 12)}
                       value={row.value.toUpperCase()}
+                      timing={80}
                       padMode="end"
                     />
                   ) : (
