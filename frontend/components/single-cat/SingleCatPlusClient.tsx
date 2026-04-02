@@ -2771,6 +2771,7 @@ export function SingleCatPlusClient({
         if (generationIdRef.current !== token) return;
 
         const baseParams = catResult.params;
+        baseParams.spriteNumber = 9; // always use longhair adult for count previews
         const slots = catResult.slotSelections;
 
         // Pre-render a frame for each possible count (0 to max), building up
