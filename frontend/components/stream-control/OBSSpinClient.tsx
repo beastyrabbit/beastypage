@@ -4200,7 +4200,7 @@ function FlyingCatSprite({ cat, mode = "fruit-ninja", swapSpeed = 1, moveSpeed =
       const t = Math.min(elapsed / cat.duration, 1);
 
       // Frame cycling — speed controlled by swapSpeed
-      const swapInterval = Math.max(40, 120 / swapSpeed);
+      const swapInterval = Math.max(200, 2000 / swapSpeed);
       if (cat.frames.length > 1 && now - lastSwap > swapInterval) {
         frameRef.current = (frameRef.current + 1) % cat.frames.length;
         if (imgRef.current) imgRef.current.src = cat.frames[frameRef.current];
