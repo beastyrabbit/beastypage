@@ -1,13 +1,8 @@
-"use client";
-
-import { ConvexProvider } from "convex/react";
-import convex from "@/lib/convexClient";
-
 /**
  * Minimal layout for the OBS overlay page.
- * - No site header/footer
- * - Bare ConvexProvider (no auth — overlay authenticates via API key in URL)
- * - Transparent background for OBS browser source
+ * CSS custom properties for streamer customization via OBS Custom CSS.
+ * The root layout's ConvexProviderWithAuth handles the Convex connection;
+ * getSessionByApiKey is a public query that doesn't require auth.
  */
 export default function OBSOverlayLayout({
   children,
@@ -15,16 +10,14 @@ export default function OBSOverlayLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ConvexProvider client={convex}>
-      <div
-        className="fixed inset-0 z-[9999]"
-        style={{
-          "--cam-zone-width": "33.33%",
-          "--accent-color": "#f59e0b",
-        } as React.CSSProperties}
-      >
-        {children}
-      </div>
-    </ConvexProvider>
+    <div
+      className="fixed inset-0 z-[9999]"
+      style={{
+        "--cam-zone-width": "33.33%",
+        "--accent-color": "#f59e0b",
+      } as React.CSSProperties}
+    >
+      {children}
+    </div>
   );
 }

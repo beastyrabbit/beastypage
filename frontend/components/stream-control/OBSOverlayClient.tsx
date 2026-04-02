@@ -4,10 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
-import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
+import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { ADDITIONAL_PALETTES } from "@/lib/palettes";
 import type { PaletteCategory } from "@/lib/palettes";
 import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
+import type { CatGeneratorApi } from "@/components/cat-builder/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -17,12 +18,12 @@ type OverlayPhase = "idle" | "lobby" | "countdown" | "spinning" | "result";
 
 interface FlyingCat {
   id: string;
-  imageDataUrl: string;
-  startX: number; // vw units
+  frames: string[]; // multiple renders to cycle through (simulates spinning)
+  startX: number;
   startTime: number;
-  duration: number; // ms
-  peakY: number; // vh units (how high the arc peaks)
-  rotation: number; // degrees
+  duration: number;
+  peakY: number;
+  rotation: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -31,10 +32,15 @@ interface FlyingCat {
 
 const RESULT_HOLD_MS = 10_000;
 const FADE_MS = 500;
-const CAT_FLIGHT_DURATION_MS = 3_500;
-const CAT_SPAWN_INTERVAL_MS = 3_000;
+const LOBBY_FADE_MS = 400;
+const CAT_FLIGHT_DURATION_MS = 4_500;
+const CAT_SPAWN_INTERVAL_MS = 3_500;
 const MAX_FLYING_CATS = 3;
+const FLYING_CAT_FRAMES = 5; // how many random cats to pre-render per flying cat
+const FRAME_CYCLE_MS = 150; // how fast frames cycle on a flying cat
 const PALETTE_CYCLE_MS = 4_000;
+const SPIN_FRAME_COUNT = 6; // number of variation frames during spin
+const SPIN_CYCLE_MS = 120; // frame cycle speed during spin
 
 // ---------------------------------------------------------------------------
 // OBSOverlayClient
@@ -48,6 +54,8 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
   const [currentParams, setCurrentParams] = useState<Record<string, unknown> | null>(null);
   const [revealedParams, setRevealedParams] = useState<string[]>([]);
   const [catImageUrl, setCatImageUrl] = useState<string | null>(null);
+  const [spinFrames, setSpinFrames] = useState<string[]>([]);
+  const [spinFrameIndex, setSpinFrameIndex] = useState(0);
   const [fading, setFading] = useState(false);
 
   const { generator } = useCatGenerator();
@@ -56,13 +64,10 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
   useEffect(() => {
     document.documentElement.style.background = "transparent";
     document.body.style.background = "transparent";
-
-    // Hide the site header and footer, but keep the content container visible
     const header = document.querySelector("header");
     const footer = document.querySelector("footer");
     if (header instanceof HTMLElement) header.style.display = "none";
     if (footer instanceof HTMLElement) footer.style.display = "none";
-
     return () => {
       document.documentElement.style.background = "";
       document.body.style.background = "";
@@ -83,13 +88,13 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
         setFading(false);
         setPhase("lobby");
         break;
-
       case "spin": {
         const params = cmd.params as Record<string, unknown>;
         setCurrentParams(params);
         setRevealedParams([]);
         setCatImageUrl(null);
-
+        setSpinFrames([]);
+        setSpinFrameIndex(0);
         if (cmd.countdownSeconds && cmd.countdownSeconds > 0) {
           setCountdownValue(cmd.countdownSeconds);
           setPhase("countdown");
@@ -98,7 +103,6 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
         }
         break;
       }
-
       case "clear":
         setFading(true);
         setTimeout(() => {
@@ -106,9 +110,9 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
           setFading(false);
           setCurrentParams(null);
           setCatImageUrl(null);
+          setSpinFrames([]);
         }, FADE_MS);
         break;
-
       case "test":
         setPhase("lobby");
         break;
@@ -126,30 +130,64 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
     return () => clearTimeout(timer);
   }, [phase, countdownValue]);
 
-  // Spinning → result transition (simulate parameter reveal)
+  // Pre-render spin variation frames when spinning starts
+  useEffect(() => {
+    if (phase !== "spinning" || !generator?.generateRandomCat) return;
+    let cancelled = false;
+
+    (async () => {
+      const frames: string[] = [];
+      for (let i = 0; i < SPIN_FRAME_COUNT; i++) {
+        if (cancelled) return;
+        try {
+          const result = await generator.generateRandomCat!();
+          const canvas = result.canvas;
+          if (canvas instanceof HTMLCanvasElement) {
+            frames.push(canvas.toDataURL("image/png"));
+          }
+        } catch {
+          // skip failed frame
+        }
+      }
+      if (!cancelled) setSpinFrames(frames);
+    })();
+
+    return () => { cancelled = true; };
+  }, [phase, generator]);
+
+  // Cycle through spin frames
+  useEffect(() => {
+    if (phase !== "spinning" || spinFrames.length === 0) return;
+    const timer = setInterval(() => {
+      setSpinFrameIndex((prev) => (prev + 1) % spinFrames.length);
+    }, SPIN_CYCLE_MS);
+    return () => clearInterval(timer);
+  }, [phase, spinFrames.length]);
+
+  // Spinning → result transition (sequential parameter reveal)
   useEffect(() => {
     if (phase !== "spinning" || !currentParams) return;
-
-    const paramKeys = PARAM_ORDER.filter((k) => currentParams[k] !== undefined && currentParams[k] !== null);
+    const paramKeys = PARAM_ORDER.filter(
+      (k) => currentParams[k] !== undefined && currentParams[k] !== null
+    );
     let i = 0;
 
     const revealNext = () => {
       if (i >= paramKeys.length) {
-        // All revealed — render final cat
         renderFinalCat();
         return;
       }
       setRevealedParams((prev) => [...prev, paramKeys[i]]);
       i++;
-      setTimeout(revealNext, 300 + Math.random() * 200);
+      setTimeout(revealNext, 400 + Math.random() * 300);
     };
 
-    const timeout = setTimeout(revealNext, 500);
+    const timeout = setTimeout(revealNext, 800);
     return () => clearTimeout(timeout);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, currentParams]);
 
-  // Render the final cat image
+  // Render the final cat
   const renderFinalCat = useCallback(async () => {
     if (!generator || !currentParams) return;
     try {
@@ -164,27 +202,16 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
       console.error("[OBS] Failed to render cat:", err);
     }
     setPhase("result");
-
-    // Auto-fade after hold time
-    setTimeout(() => {
-      setFading(true);
-      setTimeout(() => {
-        setPhase("idle");
-        setFading(false);
-        setCurrentParams(null);
-        setCatImageUrl(null);
-      }, FADE_MS);
-    }, RESULT_HOLD_MS);
+    // Result stays visible until the streamer sends a new command
+    // (lobby, clear, or another spin). No auto-fade.
   }, [generator, currentParams]);
 
-  // Resolve palette data for lobby display
+  // Resolve palette data for lobby
   const sessionPalettes = useMemo(() => {
     if (!session?.settings) return [];
-    const settings = session.settings as { extendedModes?: string[] };
-    if (!settings.extendedModes) return [];
-    return ADDITIONAL_PALETTES.filter((p) =>
-      settings.extendedModes!.includes(p.id)
-    );
+    const s = session.settings as { extendedModes?: string[] };
+    if (!s.extendedModes) return [];
+    return ADDITIONAL_PALETTES.filter((p) => s.extendedModes!.includes(p.id));
   }, [session?.settings]);
 
   const settings = session?.settings as {
@@ -194,10 +221,12 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
     tortieRange?: { min: number; max: number };
     afterlifeMode?: string;
     includeBaseColours?: boolean;
-    extendedModes?: string[];
   } | null;
 
   if (phase === "idle") return null;
+
+  const currentSpinFrame =
+    spinFrames.length > 0 ? spinFrames[spinFrameIndex] : null;
 
   return (
     <div
@@ -220,15 +249,14 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
           />
         )}
 
-        {phase === "countdown" && (
-          <CountdownPhase value={countdownValue} />
-        )}
+        {phase === "countdown" && <CountdownPhase value={countdownValue} />}
 
         {(phase === "spinning" || phase === "result") && (
           <SpinPhase
             params={currentParams}
             revealedParams={revealedParams}
             catImageUrl={catImageUrl}
+            spinFrame={currentSpinFrame}
             isResult={phase === "result"}
           />
         )}
@@ -255,7 +283,7 @@ function LobbyPhase({
     includeBaseColours?: boolean;
   } | null;
   palettes: PaletteCategory[];
-  generator: ReturnType<typeof useCatGenerator>["generator"];
+  generator: CatGeneratorApi | null;
 }) {
   const [paletteIndex, setPaletteIndex] = useState(0);
   const [flyingCats, setFlyingCats] = useState<FlyingCat[]>([]);
@@ -270,29 +298,34 @@ function LobbyPhase({
     return () => clearInterval(timer);
   }, [palettes.length]);
 
-  // Spawn flying cats
+  // Spawn flying cats — each with multiple frames to cycle through
   useEffect(() => {
     if (!generator?.generateRandomCat) return;
+    let cancelled = false;
 
     const spawnCat = async () => {
+      if (cancelled) return;
       try {
-        const result = await generator.generateRandomCat!();
-        let imageDataUrl: string;
-        if (result.canvas instanceof HTMLCanvasElement) {
-          imageDataUrl = result.canvas.toDataURL("image/png");
-        } else {
-          return; // OffscreenCanvas
+        // Generate multiple frames so the cat "spins" during flight
+        const frames: string[] = [];
+        for (let f = 0; f < FLYING_CAT_FRAMES; f++) {
+          if (cancelled) return;
+          const result = await generator.generateRandomCat!();
+          if (result.canvas instanceof HTMLCanvasElement) {
+            frames.push(result.canvas.toDataURL("image/png"));
+          }
         }
+        if (cancelled || frames.length === 0) return;
 
         const id = `cat-${catIdCounter.current++}`;
         const newCat: FlyingCat = {
           id,
-          imageDataUrl,
-          startX: 10 + Math.random() * 50, // 10-60vw
+          frames,
+          startX: 5 + Math.random() * 50,
           startTime: Date.now(),
-          duration: CAT_FLIGHT_DURATION_MS + Math.random() * 1000,
-          peakY: 8 + Math.random() * 15, // 8-23vh peak height
-          rotation: -15 + Math.random() * 30,
+          duration: CAT_FLIGHT_DURATION_MS + Math.random() * 1500,
+          peakY: 10 + Math.random() * 18,
+          rotation: -20 + Math.random() * 40,
         };
 
         setFlyingCats((prev) => {
@@ -309,7 +342,10 @@ function LobbyPhase({
 
     spawnCat();
     const timer = setInterval(spawnCat, CAT_SPAWN_INTERVAL_MS);
-    return () => clearInterval(timer);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [generator]);
 
   // Clean up expired cats
@@ -324,25 +360,37 @@ function LobbyPhase({
 
   const currentPalette = palettes[paletteIndex];
   const afterlifeLabel =
-    AFTERLIFE_OPTIONS.find((o) => o.value === settings?.afterlifeMode)?.label ?? "Off";
-
+    AFTERLIFE_OPTIONS.find((o) => o.value === settings?.afterlifeMode)?.label ??
+    "Off";
   const rangeStr = (r?: { min: number; max: number }) =>
-    r ? `${r.min}–${r.max}` : "—";
+    r ? `${r.min}–${r.max}` : "0–2";
 
   return (
     <div className="flex h-full flex-col">
       {/* Top 2/3: Settings overview */}
-      <div className="flex flex-1 items-center justify-center" style={{ height: "66.67%" }}>
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 rounded-2xl border border-white/10 bg-black/60 px-10 py-8 backdrop-blur-md shadow-2xl max-w-[70%]">
-          <h2 className="mb-6 text-center text-2xl font-bold text-white tracking-wide">
+      <div
+        className="flex flex-1 items-center justify-center"
+        style={{ height: "66.67%" }}
+      >
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 rounded-2xl border border-amber-500/20 bg-black/80 px-12 py-10 shadow-[0_0_60px_rgba(245,158,11,0.1)] max-w-[75%]">
+          <h2 className="mb-8 text-center text-3xl font-bold text-white tracking-wide">
             Settings Overview
           </h2>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-lg">
+          <div className="grid grid-cols-2 gap-x-10 gap-y-4 text-xl">
             <SettingRow label="Mode" value={settings?.mode ?? "flashy"} />
             <SettingRow label="Afterlife" value={afterlifeLabel} />
-            <SettingRow label="Accessories" value={rangeStr(settings?.accessoryRange)} />
-            <SettingRow label="Scars" value={rangeStr(settings?.scarRange)} />
-            <SettingRow label="Torties" value={rangeStr(settings?.tortieRange)} />
+            <SettingRow
+              label="Accessories"
+              value={rangeStr(settings?.accessoryRange)}
+            />
+            <SettingRow
+              label="Scars"
+              value={rangeStr(settings?.scarRange)}
+            />
+            <SettingRow
+              label="Torties"
+              value={rangeStr(settings?.tortieRange)}
+            />
             <SettingRow
               label="Base colours"
               value={settings?.includeBaseColours !== false ? "Yes" : "No"}
@@ -351,28 +399,31 @@ function LobbyPhase({
 
           {/* Palette carousel */}
           {currentPalette && (
-            <div className="mt-6 animate-in fade-in duration-500">
-              <p className="mb-2 text-center text-sm font-semibold text-white/70">
+            <div
+              key={currentPalette.id}
+              className="mt-8 animate-in fade-in duration-500"
+            >
+              <p className="mb-3 text-center text-base font-semibold text-amber-400/80">
                 {currentPalette.label}
                 {palettes.length > 1 && (
-                  <span className="ml-2 text-white/40">
+                  <span className="ml-2 text-amber-400/40">
                     ({paletteIndex + 1}/{palettes.length})
                   </span>
                 )}
               </p>
-              <div className="flex flex-wrap justify-center gap-1">
+              <div className="flex flex-wrap justify-center gap-1.5">
                 {Object.entries(currentPalette.colors)
-                  .slice(0, 20)
+                  .slice(0, 24)
                   .map(([name, def]) => {
                     const rgb = def.multiply ?? [128, 128, 128];
                     return (
                       <div
                         key={name}
-                        className="size-6 rounded-sm border border-white/10"
+                        className="size-7 rounded border border-white/15 shadow-sm"
                         style={{
                           backgroundColor: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`,
                         }}
-                        title={name}
+                        title={name.replace(/_/g, " ")}
                       />
                     );
                   })}
@@ -395,39 +446,55 @@ function LobbyPhase({
 function SettingRow({ label, value }: { label: string; value: string }) {
   return (
     <>
-      <span className="text-right text-white/50">{label}</span>
-      <span className="font-semibold capitalize text-white">{value}</span>
+      <span className="text-right text-white/40 font-medium">{label}</span>
+      <span className="font-bold capitalize text-white">{value}</span>
     </>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Flying cat (fruit-ninja arc)
+// Flying cat — fruit-ninja arc with frame cycling
 // ---------------------------------------------------------------------------
 
 function FlyingCatSprite({ cat }: { cat: FlyingCat }) {
   const ref = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const frameRef = useRef(0);
 
   useEffect(() => {
     let raf: number;
+    let lastFrameSwap = 0;
+
     const animate = () => {
       if (!ref.current) return;
-      const elapsed = Date.now() - cat.startTime;
+      const now = Date.now();
+      const elapsed = now - cat.startTime;
       const progress = Math.min(elapsed / cat.duration, 1);
       if (progress >= 1) return;
 
+      // Parabolic arc
       const y = -4 * cat.peakY * progress * (progress - 1);
-      const xDrift = progress * 10;
+      const xDrift = progress * 12;
+      // Fade in/out
       const opacity =
-        progress < 0.15
-          ? progress / 0.15
-          : progress > 0.85
-            ? (1 - progress) / 0.15
+        progress < 0.12
+          ? progress / 0.12
+          : progress > 0.88
+            ? (1 - progress) / 0.12
             : 1;
 
       ref.current.style.left = `${cat.startX + xDrift}%`;
-      ref.current.style.transform = `translateY(${-y}vh) rotate(${cat.rotation * progress}deg)`;
+      ref.current.style.transform = `translateY(${-y}vh) rotate(${cat.rotation * progress}deg) scale(${0.8 + progress * 0.4})`;
       ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
+
+      // Cycle frames to simulate spinning
+      if (cat.frames.length > 1 && now - lastFrameSwap > FRAME_CYCLE_MS) {
+        frameRef.current = (frameRef.current + 1) % cat.frames.length;
+        if (imgRef.current) {
+          imgRef.current.src = cat.frames[frameRef.current];
+        }
+        lastFrameSwap = now;
+      }
 
       raf = requestAnimationFrame(animate);
     };
@@ -439,9 +506,10 @@ function FlyingCatSprite({ cat }: { cat: FlyingCat }) {
     <div ref={ref} className="absolute bottom-0" style={{ opacity: 0 }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={cat.imageDataUrl}
+        ref={imgRef}
+        src={cat.frames[0]}
         alt=""
-        className="size-16 object-contain drop-shadow-lg"
+        className="h-24 w-auto drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
         style={{ imageRendering: "pixelated" }}
       />
     </div>
@@ -457,7 +525,8 @@ function CountdownPhase({ value }: { value: number }) {
     <div className="flex h-full items-center justify-center">
       <div
         key={value}
-        className="animate-in zoom-in-50 fade-in duration-500 text-[20vw] font-black text-white drop-shadow-[0_0_40px_rgba(245,158,11,0.5)]"
+        className="animate-in zoom-in-50 fade-in duration-500 text-[20vw] font-black text-white drop-shadow-[0_0_60px_rgba(245,158,11,0.6)]"
+        style={{ textShadow: "0 0 80px rgba(245,158,11,0.4)" }}
       >
         {value}
       </div>
@@ -513,11 +582,13 @@ function SpinPhase({
   params,
   revealedParams,
   catImageUrl,
+  spinFrame,
   isResult,
 }: {
   params: Record<string, unknown> | null;
   revealedParams: string[];
   catImageUrl: string | null;
+  spinFrame: string | null;
   isResult: boolean;
 }) {
   if (!params) return null;
@@ -527,63 +598,72 @@ function SpinPhase({
   );
   const revealed = new Set(revealedParams);
 
+  // Show: final cat if result, spinning frame if available, or placeholder
+  const displayImage = catImageUrl ?? spinFrame;
+
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-      {/* Cat canvas area */}
+    <div className="flex h-full gap-4 p-6">
+      {/* Cat canvas — BIG, dominates the space */}
       <div className="flex flex-1 items-center justify-center">
-        {catImageUrl ? (
-          <div className="animate-in zoom-in-75 fade-in duration-700">
+        {displayImage ? (
+          <div
+            className={cn(
+              isResult
+                ? "animate-in zoom-in-75 fade-in duration-700"
+                : "transition-opacity duration-100"
+            )}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={catImageUrl}
-              alt="Generated cat"
-              className="max-h-[45vh] w-auto drop-shadow-[0_0_30px_rgba(245,158,11,0.3)]"
+              src={displayImage}
+              alt="Cat"
+              className="h-[55vh] w-auto drop-shadow-[0_0_40px_rgba(245,158,11,0.35)]"
               style={{ imageRendering: "pixelated" }}
             />
           </div>
         ) : (
-          <div className="size-32 animate-pulse rounded-xl bg-white/5" />
+          <div className="flex size-[40vh] items-center justify-center rounded-2xl bg-white/5">
+            <div className="size-16 animate-spin rounded-full border-4 border-amber-500/30 border-t-amber-500" />
+          </div>
         )}
       </div>
 
       {/* Split-flap result table */}
-      <div className="w-full max-w-lg rounded-xl border border-white/10 bg-black/70 p-4 backdrop-blur-md">
-        <div className="space-y-1">
-          {visibleParams.map((key) => {
-            const isRevealed = revealed.has(key) || isResult;
-            const rawValue = params[key];
-            const displayValue =
-              typeof rawValue === "boolean"
-                ? rawValue
-                  ? "Yes"
-                  : "No"
-                : String(rawValue ?? "—");
+      <div className="flex w-[40%] max-w-md flex-col justify-center">
+        <div className="rounded-xl border border-amber-500/15 bg-black/85 p-5 shadow-[0_0_40px_rgba(0,0,0,0.5)] backdrop-blur-md">
+          <div className="space-y-0.5">
+            {visibleParams.map((key) => {
+              const isRevealed = revealed.has(key) || isResult;
+              const rawValue = params[key];
+              const displayValue =
+                typeof rawValue === "boolean"
+                  ? rawValue
+                    ? "Yes"
+                    : "No"
+                  : String(rawValue ?? "—");
 
-            return (
-              <div
-                key={key}
-                className="flex items-center justify-between rounded-md px-3 py-1.5"
-              >
-                <span className="text-sm font-medium text-white/50">
-                  {PARAM_LABELS[key] ?? key}
-                </span>
-                <span
+              return (
+                <div
+                  key={key}
                   className={cn(
-                    "font-mono text-sm font-bold transition-all duration-300",
-                    isRevealed
-                      ? "text-amber-400"
-                      : "text-white/20 blur-sm"
+                    "flex items-center justify-between rounded-md px-3 py-1.5 transition-colors duration-300",
+                    isRevealed ? "bg-amber-500/5" : ""
                   )}
                 >
-                  {isRevealed ? (
-                    <SplitFlapText text={displayValue} />
-                  ) : (
-                    <CyclingText />
-                  )}
-                </span>
-              </div>
-            );
-          })}
+                  <span className="text-sm font-medium text-white/40">
+                    {PARAM_LABELS[key] ?? key}
+                  </span>
+                  <div className="overflow-hidden" style={{ perspective: "200px" }}>
+                    {isRevealed ? (
+                      <SplitFlapText text={displayValue} />
+                    ) : (
+                      <CyclingText />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -591,21 +671,39 @@ function SpinPhase({
 }
 
 // ---------------------------------------------------------------------------
-// Split-flap text animation
+// Split-flap text — each character flips down like an airport departure board
 // ---------------------------------------------------------------------------
 
 function SplitFlapText({ text }: { text: string }) {
   return (
-    <span className="inline-flex">
+    <span className="inline-flex gap-px">
       {text.split("").map((char, i) => (
         <span
           key={`${i}-${char}`}
-          className="inline-block animate-in fade-in slide-in-from-top-2 duration-200"
-          style={{ animationDelay: `${i * 30}ms` }}
+          className="inline-block rounded-sm bg-amber-500/10 px-[3px] py-[1px] font-mono text-sm font-bold text-amber-400"
+          style={{
+            animation: `splitFlap 0.25s ease-out ${i * 40}ms both`,
+          }}
         >
           {char}
         </span>
       ))}
+      <style>{`
+        @keyframes splitFlap {
+          0% {
+            transform: rotateX(90deg);
+            opacity: 0;
+          }
+          60% {
+            transform: rotateX(-10deg);
+            opacity: 1;
+          }
+          100% {
+            transform: rotateX(0deg);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </span>
   );
 }
@@ -617,13 +715,24 @@ function CyclingText() {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     const timer = setInterval(() => {
       setText(
-        Array.from({ length: 3 + Math.floor(Math.random() * 4) }, () =>
+        Array.from({ length: 3 + Math.floor(Math.random() * 5) }, () =>
           chars[Math.floor(Math.random() * chars.length)]
         ).join("")
       );
-    }, 80);
+    }, 70);
     return () => clearInterval(timer);
   }, []);
 
-  return <span className="inline-block w-20 text-right">{text}</span>;
+  return (
+    <span className="inline-flex gap-px">
+      {text.split("").map((char, i) => (
+        <span
+          key={i}
+          className="inline-block rounded-sm bg-white/5 px-[3px] py-[1px] font-mono text-sm font-bold text-white/15"
+        >
+          {char}
+        </span>
+      ))}
+    </span>
+  );
 }
