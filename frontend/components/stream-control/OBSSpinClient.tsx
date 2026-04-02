@@ -4060,11 +4060,11 @@ function OBSLobby({
         return [...alive, {
           id: catIdRef.current++,
           frames,
-          x: 5 + Math.random() * 70,
+          x: Math.random() * 85,
           startTime: Date.now(),
           duration: baseDuration,
-          peakY: 200 + Math.random() * 400,
-          rotation: -25 + Math.random() * 50,
+          peakY: 250 + Math.random() * 500,
+          rotation: -60 + Math.random() * 120,
         }];
       });
     };
@@ -4248,7 +4248,7 @@ function FlyingCatSprite({ cat, mode = "fruit-ninja", swapSpeed = 1, moveSpeed =
         // Fruit ninja — arc from bottom
         if (t >= 1) return;
         const y = -4 * cat.peakY * t * (t - 1);
-        const xDrift = t * 15;
+        const xDrift = t * 30 * (cat.rotation > 0 ? 1 : -1);
         const opacity = t < 0.1 ? t / 0.1 : t > 0.9 ? (1 - t) / 0.1 : 1;
         ref.current.style.left = `${cat.x + xDrift}%`;
         ref.current.style.transform = `translateY(${-y}px) rotate(${cat.rotation * t}deg) scale(${0.7 + t * 0.5})`;
