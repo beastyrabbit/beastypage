@@ -9,11 +9,8 @@ import { ADDITIONAL_PALETTES } from "@/lib/palettes";
 import type { PaletteCategory } from "@/lib/palettes";
 import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
-import type { CatParams } from "@/lib/cat-v3/types";
-import {
-  runProgressiveSpin,
-  type ParameterOptions,
-} from "@/utils/spinEngine";
+import { OBSSpinClient } from "./OBSSpinClient";
+import type { SingleCatSettings } from "@/utils/singleCatVariants";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -208,6 +205,11 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
           setPhase("result");
         },
         isCancelled: () => spinTokenRef.current !== token,
+      },
+      {
+        timingConfig: (session?.settings as Record<string, unknown>)?.timing as import("@/utils/spinTiming").SpinTimingConfig | undefined,
+        speedMultiplier: (session?.settings as Record<string, unknown>)?.speedMultiplier as number | undefined,
+        mode: ((session?.settings as Record<string, unknown>)?.mode as "flashy" | "calm") ?? "flashy",
       }
     );
 

@@ -9,6 +9,16 @@
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import type { CatParams } from "@/lib/cat-v3/types";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
+import {
+  ABSOLUTE_MIN_STEP_MS,
+  MIN_SAFE_STEP_MS,
+  DEFAULT_TIMING_CONFIG,
+  clampDelay,
+  getDelayForKey,
+  isParamTimingKey,
+  type SpinTimingConfig,
+  type ParamTimingKey,
+} from "./spinTiming";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -594,14 +604,35 @@ export interface SpinCallbacks {
 }
 
 export interface SpinOptions {
-  /** Base delay per flip step in ms (default 80). */
-  baseStepMs?: number;
-  /** Pause between parameters in ms (default 300). */
-  paramPauseMs?: number;
-  /** Max variation options to sample per param (default 8). */
+  /** Timing config from the settings (per-param delays, allowFastFlips). */
+  timingConfig?: SpinTimingConfig;
+  /** Speed multiplier (default 1.0). Divides the per-param delay. */
+  speedMultiplier?: number;
+  /** Mode affects the pause between params. */
+  mode?: "flashy" | "calm";
+  /** Max variation options to sample per param (default MAX_SPINNY_VARIATIONS). */
   variationLimit?: number;
   /** Skip params listed here (instant reveal). */
   instantParams?: ParamId[];
+}
+
+const MIN_FRAME_DURATION = 45;
+const PRE_SPIN_DELAY = 120;
+const PARAM_REVEAL_PAUSE = 500;
+
+/** Compute per-step durations for a flip sequence — same as SingleCatPlusClient. */
+function computeStepDurations(
+  sequence: { delay: number }[],
+  baseDelay: number,
+  allowFast: boolean,
+  minimum: number = MIN_FRAME_DURATION
+): number[] {
+  if (sequence.length === 0) return [];
+  const safeBase = clampDelay(baseDelay, allowFast);
+  return sequence.map((step) => {
+    const scaled = safeBase * Math.max(step.delay, 1);
+    return Math.max(scaled, allowFast ? ABSOLUTE_MIN_STEP_MS : Math.max(MIN_SAFE_STEP_MS, minimum));
+  });
 }
 
 /**
@@ -622,10 +653,27 @@ export async function runProgressiveSpin(
   callbacks: SpinCallbacks,
   options?: SpinOptions
 ): Promise<void> {
-  const baseStepMs = options?.baseStepMs ?? 80;
-  const paramPauseMs = options?.paramPauseMs ?? 300;
-  const variationLimit = options?.variationLimit ?? 8;
+  const timingConfig = options?.timingConfig ?? DEFAULT_TIMING_CONFIG;
+  const speedMultiplier = options?.speedMultiplier ?? 1.0;
+  const mode = options?.mode ?? "flashy";
+  const variationLimit = options?.variationLimit ?? MAX_SPINNY_VARIATIONS;
   const instantParamsSet = new Set(options?.instantParams ?? INSTANT_PARAMS);
+
+  /** Get the configured delay for a param, divided by speed multiplier. */
+  function getDelay(paramId: ParamId): number {
+    if (!isParamTimingKey(paramId)) return MIN_SAFE_STEP_MS;
+    const baseDelay = getDelayForKey(timingConfig, paramId);
+    return Math.max(MIN_SAFE_STEP_MS, baseDelay / speedMultiplier);
+  }
+
+  /** Pause between params — uses the timing config's pause settings. */
+  function getParamPause(): number {
+    const pauses = timingConfig.pauseDelays;
+    if (pauses) {
+      return Math.max(PARAM_REVEAL_PAUSE, (mode === "calm" ? pauses.calmMs : pauses.flashyMs) / speedMultiplier);
+    }
+    return Math.max(PARAM_REVEAL_PAUSE, 520 / speedMultiplier);
+  }
 
   // Start with placeholder progressive params
   const progressive: Partial<CatParams> = {
@@ -683,17 +731,27 @@ export async function runProgressiveSpin(
 
       const sequence = buildFlipSequence(frames);
 
-      // Execute flip sequence
-      for (const step of sequence) {
+      // Execute flip sequence with proper per-step timing
+      const configuredDelay = getDelay(definition.id);
+      for (let idx = 0; idx < sequence.length; idx++) {
+        const step = sequence[idx];
         if (callbacks.isCancelled()) return;
+
+        // Compute duration for this step — same as SingleCatPlusClient
+        const stepDurations = computeStepDurations(
+          sequence.slice(idx),
+          configuredDelay,
+          timingConfig.allowFastFlips
+        );
+        const stepDuration = stepDurations[0] ?? configuredDelay;
+
         callbacks.onFrame(
           step.frame.canvas,
           definition.label,
           step.frame.option.display,
           step.isFinal
         );
-        const stepDuration = baseStepMs * step.delay;
-        await spinWait(stepDuration);
+        await spinWait(Math.max(stepDuration, 30));
       }
 
       // Apply the final value
@@ -716,7 +774,7 @@ export async function runProgressiveSpin(
 
     if (callbacks.isCancelled()) return;
     callbacks.onParamRevealed(definition.id, definition.label, displayValue);
-    await spinWait(paramPauseMs);
+    await spinWait(getParamPause());
   }
 
   // Final render with all params
