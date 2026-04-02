@@ -3679,10 +3679,10 @@ export function OBSSpinClient({
           />
       </div>
 
-      {/* ═══ LAYER DETAILS — full width bottom bar ═══ */}
+      {/* ═══ LAYER DETAILS — full width bottom bar, above right panel ═══ */}
       {hasLayers && (
         <div
-          className="absolute overflow-hidden"
+          className="absolute z-10 overflow-hidden"
           style={{
             left: "0px",
             bottom: "0px",
