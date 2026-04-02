@@ -32,6 +32,13 @@ const TOOLS: ToolCard[] = [
       "Generate pixel cats, extract color palettes, and customize your experience — all from Discord slash commands.",
     href: "/projects/tools/discord-bot",
   },
+  {
+    title: "Single Cat Stream",
+    icon: "🎬",
+    description:
+      "OBS overlay for live cat gacha spins — control settings from a dashboard, spin cats on stream with animated reveals.",
+    href: "/single-cat-stream",
+  },
 ];
 
 export default function ToolsCategory() {
