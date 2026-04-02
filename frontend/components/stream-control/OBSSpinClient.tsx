@@ -3592,11 +3592,57 @@ export function OBSSpinClient({
   }, [session?.currentCommand, generationDisabled, generateCatPlus]);
 
   // =======================================================================
-  // OBS: Render — canvas + param table, no settings UI
+  // OBS: Render — canvas + airport split-flap board
   // =======================================================================
   return (
     <div className="flex h-full">
-      {/* Left: Cat canvas — same canvasRef that generateCatPlus draws to */}
+      <style>{`
+        @keyframes flapIn {
+          0% { transform: rotateX(90deg); opacity: 0; }
+          50% { transform: rotateX(-8deg); opacity: 1; }
+          100% { transform: rotateX(0deg); opacity: 1; }
+        }
+        .flap-char {
+          display: inline-block;
+          background: #1a1400;
+          border: 1px solid rgba(245, 158, 11, 0.15);
+          border-radius: 3px;
+          padding: 2px 5px;
+          margin: 0 1px;
+          font-family: ui-monospace, monospace;
+          font-weight: 700;
+          font-size: 18px;
+          line-height: 1.2;
+          min-width: 16px;
+          text-align: center;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+        .flap-revealed .flap-char {
+          color: #fbbf24;
+          animation: flapIn 0.2s ease-out both;
+        }
+        .flap-active .flap-char {
+          color: #fcd34d;
+          text-shadow: 0 0 8px rgba(252, 211, 77, 0.4);
+        }
+        .flap-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 6px 16px;
+          border-bottom: 1px solid rgba(245, 158, 11, 0.06);
+        }
+        .flap-row:last-child { border-bottom: none; }
+        .flap-board {
+          background: #0d0b00;
+          border: 2px solid rgba(245, 158, 11, 0.2);
+          border-radius: 12px;
+          padding: 12px 8px;
+          box-shadow: 0 0 60px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
+        }
+      `}</style>
+
+      {/* Left: Cat canvas */}
       <div className="flex items-center justify-center" style={{ width: "720px" }}>
         <canvas
           ref={canvasRef}
@@ -3607,58 +3653,50 @@ export function OBSSpinClient({
         />
       </div>
 
-      {/* Right: Roller + param rows */}
+      {/* Right: Airport split-flap departure board */}
       <div className="flex flex-1 flex-col justify-center px-6">
-        {/* Active roller label */}
+        {/* Active roller — what's currently spinning */}
         {rollerLabel && (
-          <div className="mb-4 rounded-xl border border-amber-500/20 bg-black/85 px-5 py-3 backdrop-blur-md">
-            <div className="text-xs font-bold uppercase tracking-[0.3em] text-amber-400/60">
+          <div className="mb-3 px-4">
+            <div className="text-[11px] font-bold uppercase tracking-[0.4em] text-amber-500/50">
               {rollerLabel}
             </div>
             {rollerActiveValue && (
-              <div className="mt-1 font-mono text-2xl font-bold text-amber-400">
-                {rollerActiveValue}
+              <div className="mt-1 flex flex-wrap">
+                {rollerActiveValue.split("").map((ch, i) => (
+                  <span key={i} className="flap-char flap-active" style={{ animationDelay: `${i * 25}ms` }}>
+                    {ch}
+                  </span>
+                ))}
               </div>
             )}
           </div>
         )}
 
-        {/* Param rows table */}
+        {/* Split-flap board */}
         {paramRows.length > 0 && (
-          <div className="rounded-xl border border-amber-500/15 bg-black/85 p-5 shadow-[0_0_40px_rgba(0,0,0,0.5)] backdrop-blur-md">
-            <div className="mb-3 flex items-center gap-3">
-              <div className="h-px flex-1 bg-gradient-to-r from-amber-500/30 to-transparent" />
-              <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-400/50">
-                Parameters
-              </span>
-              <div className="h-px flex-1 bg-gradient-to-l from-amber-500/30 to-transparent" />
-            </div>
-            <div className="space-y-1">
-              {paramRows.map((row, i) => (
-                <div
-                  key={`${row.id}-${i}`}
-                  className={cn(
-                    "flex items-center justify-between rounded-lg px-4 py-2.5",
-                    row.status === "revealed"
-                      ? "bg-amber-500/5"
-                      : "border border-amber-500/20 bg-amber-500/10"
-                  )}
-                >
-                  <span className={cn(
-                    "text-base font-medium",
-                    row.status === "revealed" ? "text-white/40" : "text-amber-400"
-                  )}>
-                    {row.label}
-                  </span>
-                  <span className={cn(
-                    "font-mono text-base font-bold",
-                    row.status === "revealed" ? "text-amber-400" : "text-amber-300"
-                  )}>
-                    {row.value}
-                  </span>
-                </div>
-              ))}
-            </div>
+          <div className="flap-board">
+            {paramRows.map((row, i) => (
+              <div key={`${row.id}-${i}`} className="flap-row">
+                <span className={cn(
+                  "text-sm font-semibold uppercase tracking-wider",
+                  row.status === "revealed" ? "text-amber-600/60" : "text-amber-400"
+                )}>
+                  {row.label}
+                </span>
+                <span className={row.status === "revealed" ? "flap-revealed" : "flap-active"}>
+                  {row.value.split("").map((ch, ci) => (
+                    <span
+                      key={`${ci}-${ch}`}
+                      className="flap-char"
+                      style={row.status === "revealed" ? { animationDelay: `${ci * 30}ms` } : undefined}
+                    >
+                      {ch}
+                    </span>
+                  ))}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 
