@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { FlapDisplay, Presets } from "react-split-flap-effect";
+import "react-split-flap-effect/extras/themes.css";
 import { api } from "@/convex/_generated/api";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import type { BatchRenderResponse, CatParams } from "@/lib/cat-v3/types";
@@ -3562,8 +3563,11 @@ export function OBSSpinClient({
   // OBS: Hide header/footer, transparent background
   // =======================================================================
   useEffect(() => {
-    document.documentElement.style.background = "transparent";
-    document.body.style.background = "transparent";
+    // Green chroma key for dev preview — OBS uses transparent
+    const isOBS = typeof window !== "undefined" && "obsstudio" in window;
+    const bg = isOBS ? "transparent" : "#00ff00";
+    document.documentElement.style.background = bg;
+    document.body.style.background = bg;
     const header = document.querySelector("header");
     const footer = document.querySelector("footer");
     if (header instanceof HTMLElement) header.style.display = "none";
@@ -3622,6 +3626,28 @@ export function OBSSpinClient({
           0%, 100% { opacity: 0.4; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
         }
+        /* Override split-flap library styling for premium amber look */
+        .obs-flap [data-kind="digit"] {
+          color: #fbbf24 !important;
+          background: linear-gradient(180deg, #1a1508 0%, #0f0d04 100%) !important;
+          border: 1px solid rgba(245, 158, 11, 0.12) !important;
+          border-radius: 4px !important;
+          margin-right: 2px !important;
+          font-family: 'Geist Mono', ui-monospace, monospace !important;
+          font-weight: 600 !important;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 1px 0 rgba(245,158,11,0.05) !important;
+        }
+        .obs-flap-active [data-kind="digit"] {
+          color: #fcd34d !important;
+          border-color: rgba(245, 158, 11, 0.25) !important;
+          text-shadow: 0 0 10px rgba(252, 211, 77, 0.3);
+        }
+        .obs-flap-dim [data-kind="digit"] {
+          color: rgba(245, 158, 11, 0.35) !important;
+          background: linear-gradient(180deg, #110f04 0%, #0a0903 100%) !important;
+          border-color: rgba(245, 158, 11, 0.06) !important;
+          box-shadow: none !important;
+        }
       `}</style>
 
       {/* ═══ Cat canvas — absolute center-left, always in the same spot ═══ */}
@@ -3676,6 +3702,7 @@ export function OBSSpinClient({
               {rollerActiveValue && (
                 <div className="mt-2">
                   <FlapDisplay
+                    className="obs-flap obs-flap-active M"
                     chars={flapChars}
                     length={Math.max(rollerActiveValue.length, 14)}
                     value={rollerActiveValue.toUpperCase()}
@@ -3733,6 +3760,7 @@ export function OBSSpinClient({
                 <div className="flex-1">
                   {row ? (
                     <FlapDisplay
+                      className={cn("obs-flap M", isActive ? "obs-flap-active" : isRevealed ? "obs-flap-dim" : "")}
                       chars={flapChars}
                       length={Math.max(row.value.length, 12)}
                       value={row.value.toUpperCase()}
