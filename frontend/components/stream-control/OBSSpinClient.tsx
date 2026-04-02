@@ -90,7 +90,7 @@ interface ParamRow {
   id: ParamId;
   label: string;
   value: string;
-  status: "active" | "revealed";
+  status: "pending" | "active" | "revealed";
 }
 
 interface SpriteVariation {
@@ -1487,6 +1487,8 @@ export function OBSSpinClient({
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [hasTint, setHasTint] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [flashParamId, setFlashParamId] = useState<ParamId | null>(null);
+  const [flashLayerKey, setFlashLayerKey] = useState<string | null>(null);
   const [rollerExpanded, setRollerExpanded] = useState(false);
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
   const defaultCreatorName = sessionSettings?.creatorName ?? "";
@@ -1847,6 +1849,43 @@ export function OBSSpinClient({
     );
   }, []);
 
+  // Prefill the param board with all slots in "pending" state
+  const layerParamIdSet = useMemo(
+    () => new Set(["accessory", "scar", "tortie", "tortieMask", "tortiePattern", "tortieColour"]),
+    []
+  );
+  const initBoardRows = useCallback(() => {
+    setParamRows(
+      PARAM_SEQUENCE
+        .filter((def) => !layerParamIdSet.has(def.id))
+        .map((def) => ({ id: def.id, label: def.label, value: "???", status: "pending" as const }))
+    );
+  }, [layerParamIdSet]);
+
+  // Prefill layer rows with MAX counts from range settings
+  const initMaxLayerRows = useCallback(() => {
+    setLayerRows({
+      accessories: Array.from({ length: accessoryRange.max }, (_, i) => ({
+        label: `Accessory ${i + 1}`, value: "???", status: "idle" as const,
+      })),
+      scars: Array.from({ length: scarRange.max }, (_, i) => ({
+        label: `Scar ${i + 1}`, value: "???", status: "idle" as const,
+      })),
+      torties: Array.from({ length: tortieRange.max }, (_, i) => ({
+        label: `Tortie ${i + 1}`, value: "???", status: "idle" as const,
+      })),
+    });
+  }, [accessoryRange.max, scarRange.max, tortieRange.max]);
+
+  // Trim layer rows to actual counts after count reveal
+  const trimLayerRows = useCallback((accCount: number, scarCount: number, tortieCount: number) => {
+    setLayerRows((prev) => ({
+      accessories: prev.accessories.slice(0, accCount),
+      scars: prev.scars.slice(0, scarCount),
+      torties: prev.torties.slice(0, tortieCount),
+    }));
+  }, []);
+
   const drawPlaceholder = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1979,8 +2018,13 @@ export function OBSSpinClient({
         const spinState = readSpinState();
         setRollerLabel(`Accessory ${i + 1}`);
 
+        // Flash the layer row before rolling
+        setFlashLayerKey(`accessories-${i}`);
+        await wait(350);
+        setFlashLayerKey(null);
+
         if (spinState.spinny) {
-          updateLayerRow("accessories", i, { status: "active", value: "—" });
+          updateLayerRow("accessories", i, { status: "active", value: "---" });
 
           const variationOptions = buildLayerOptionStrings(allAccessories, target, true, {
             spinny: true,
@@ -2160,8 +2204,13 @@ export function OBSSpinClient({
         const spinState = readSpinState();
         setRollerLabel(`Scar ${i + 1}`);
 
+        // Flash the layer row before rolling
+        setFlashLayerKey(`scars-${i}`);
+        await wait(350);
+        setFlashLayerKey(null);
+
         if (spinState.spinny) {
-          updateLayerRow("scars", i, { status: "active", value: "—" });
+          updateLayerRow("scars", i, { status: "active", value: "---" });
 
           const variationOptions = buildLayerOptionStrings(allScars, target, true, {
             spinny: true,
@@ -2341,6 +2390,11 @@ export function OBSSpinClient({
         if (generationIdRef.current !== currentToken) return;
         const target = targetSlots[i];
         const spinState = readSpinState();
+
+        // Flash the layer row before rolling
+        setFlashLayerKey(`torties-${i}`);
+        await wait(350);
+        setFlashLayerKey(null);
 
         if (!target) {
           updateLayerRow("torties", i, { value: "None", status: "revealed" });
@@ -2652,9 +2706,9 @@ export function OBSSpinClient({
       if (!generator.generateRandomCat) return;
 
       const groups = [
+        { label: "Tortie Layers", key: "tortieMask" as const, ...layers.torties },
         { label: "Accessories", key: "accessory" as const, ...layers.accessories },
         { label: "Scars", key: "scar" as const, ...layers.scars },
-        { label: "Tortie Layers", key: "tortieMask" as const, ...layers.torties },
       ];
 
       for (const group of groups) {
@@ -2803,7 +2857,7 @@ export function OBSSpinClient({
     setError(null);
     setShareLink(null);
     setSpriteVariations([]);
-    setParamRows([]);
+    initBoardRows();
     setRollerLabel(null);
     setRollerActiveValue(null);
     setRollerHighlight(false);
@@ -2877,7 +2931,7 @@ export function OBSSpinClient({
         );
       const tortieLayers = tortieSlots.filter(Boolean) as TortieSlot[];
 
-      resetLayerRows(accessorySlots, scarSlots, tortieSlots);
+      initMaxLayerRows();
 
       const { darkForest: enableDarkForest, dead: enableDead } = resolveAfterlife(afterlifeMode);
       params.darkForest = enableDarkForest;
@@ -2929,16 +2983,16 @@ export function OBSSpinClient({
       };
 
       const rollerOptions = parameterOptionsRef.current;
-      setParamRows([]);
+      initBoardRows();
 
       // Count reveal phase — spin the accessory/scar/tortie counts before params
       if (exactLayerCounts) {
         await revealLayerCounts(
           generator,
           {
-            accessories: { range: accessoryRange, count: accessoryCount },
-            scars: { range: scarRange, count: scarCount },
-            torties: { range: tortieRange, count: tortieCount },
+            accessories: { range: accessoryRange, count: accessorySlots.length },
+            scars: { range: scarRange, count: scarSlots.length },
+            torties: { range: tortieRange, count: tortieLayers.length },
           },
           {
             experimentalColourMode: experimentalMode,
@@ -2948,6 +3002,9 @@ export function OBSSpinClient({
         );
         if (generationIdRef.current !== token) return;
       }
+
+      // Count reveal done — show real layer counts in the bottom table
+      resetLayerRows(accessorySlots, scarSlots, tortieSlots);
 
       for (const definition of PARAM_SEQUENCE) {
         if (definition.id === "tortieMask" || definition.id === "tortiePattern" || definition.id === "tortieColour") {
@@ -2963,17 +3020,31 @@ export function OBSSpinClient({
         const rawTargetValue = getParameterRawValue(definition.id, params);
         const displayValue = getParameterValueForDisplay(definition.id, params);
         setActiveParamId(definition.id);
+
+        // Flash the row before activating it
+        setFlashParamId(definition.id);
+        await wait(350);
+        setFlashParamId(null);
+
+        // Update existing pending row to active (instead of appending)
         let rowIndex = -1;
         setParamRows((prev) => {
-          const nextIndex = prev.length;
-          rowIndex = nextIndex;
+          const idx = prev.findIndex((row) => row.id === definition.id);
+          if (idx !== -1) {
+            rowIndex = idx;
+            return prev.map((row, i) =>
+              i === idx ? { ...row, value: "---", status: "active" as const } : row
+            );
+          }
+          // Fallback: append if not found (shouldn't happen with prefill)
+          rowIndex = prev.length;
           return [
             ...prev,
             {
               id: definition.id,
               label: definition.label,
-              value: "—",
-              status: "active",
+              value: "---",
+              status: "active" as const,
             },
           ];
         });
@@ -3335,6 +3406,9 @@ export function OBSSpinClient({
     spinScarSlots,
     spinTortieSlots,
     revealLayerCounts,
+    initBoardRows,
+    initMaxLayerRows,
+    trimLayerRows,
     playFlip,
     clearMirror,
     drawPlaceholder,
@@ -3831,9 +3905,8 @@ export function OBSSpinClient({
   // The fixed board slots — exclude accessory/scar (they have their own panel)
   // Show tortie sub-params only if tortie was revealed as "Yes"
   // Exclude all layer params — they have their own bottom panel
-  const layerParamIds = new Set(["accessory", "scar", "tortie", "tortieMask", "tortiePattern", "tortieColour"]);
   const boardSlots = PARAM_SEQUENCE.filter(
-    (def) => !layerParamIds.has(def.id)
+    (def) => !layerParamIdSet.has(def.id)
   );
 
   // All layer groups combined for the layer panel
@@ -4041,17 +4114,30 @@ export function OBSSpinClient({
           font-family: 'Geist Mono', ui-monospace, monospace !important;
           font-weight: 700 !important;
           box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+          text-shadow: 0 1px 2px rgba(0,0,0,0.8), 0 0 4px rgba(0,0,0,0.5) !important;
         }
         .obs-flap-active [data-kind="digit"] {
           color: #fbbf24 !important;
           background: #1c1a0a !important;
           border-color: #44400a !important;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(251,191,36,0.3) !important;
         }
         .obs-flap-done [data-kind="digit"] {
           color: #a1a1aa !important;
           background: #111113 !important;
           border-color: #1e1e22 !important;
         }
+        .obs-flap-pending [data-kind="digit"] {
+          color: #3f3f46 !important;
+          background: #0f0f10 !important;
+          border-color: #1a1a1e !important;
+        }
+        @keyframes obs-row-flash {
+          0% { background: transparent; }
+          40% { background: rgba(245, 158, 11, 0.15); box-shadow: inset 0 0 20px rgba(245, 158, 11, 0.08); }
+          100% { background: transparent; }
+        }
+        .obs-row-flash { animation: obs-row-flash 350ms ease-out; }
       `}</style>
 
       {/* ═══ Cat canvas — absolute, never moves ═══ */}
@@ -4071,60 +4157,71 @@ export function OBSSpinClient({
           />
       </div>
 
-      {/* ═══ LAYER DETAILS — full width bottom bar ═══ */}
-      {hasLayers && (
-        <div
-          className="absolute z-10 overflow-hidden"
-          style={{
-            left: "20px",
-            bottom: "20px",
-            right: "20px",
-            background: "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 50%, rgba(10,10,10,0.92) 100%)",
-            borderRadius: "16px",
-            border: "2px solid rgba(245, 158, 11, 0.2)",
-            boxShadow: "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
-            padding: "14px 32px",
-          }}
-        >
-          <div className="flex">
-            {(["accessories", "scars", "torties"] as const).map((group) => {
-              const rows = layerRows[group];
-              if (rows.length === 0) return null;
-              return (
-                <div key={group} style={{ width: "400px" }}>
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-                    {group === "torties" ? "Tortie Layers" : group.charAt(0).toUpperCase() + group.slice(1)}
-                  </div>
-                  {rows.map((row, i) => (
-                    <div
-                      key={`${group}-${i}`}
-                      className="flex items-center border-l-2 py-1.5 pl-3"
-                      style={{
-                        borderColor: row.status === "active" ? "#f59e0b" : row.status === "revealed" ? "#3f3f46" : "transparent",
-                      }}
-                    >
-                      <span className={cn(
-                        "w-[90px] shrink-0 text-sm",
-                        row.status === "active" ? "font-semibold text-amber-400" :
-                        row.status === "revealed" ? "text-zinc-300" : "text-zinc-600"
-                      )}>
-                        {row.label}
-                      </span>
-                      <span className={cn(
-                        "truncate font-mono text-sm font-bold",
-                        row.status === "active" ? "text-white" :
-                        row.status === "revealed" ? "text-white" : "text-zinc-600"
-                      )}>
-                        {row.value}
-                      </span>
-                    </div>
-                  ))}
+      {/* ═══ LAYER DETAILS — full width bottom bar, always visible at fixed size ═══ */}
+      <div
+        className="absolute z-10 overflow-hidden"
+        style={{
+          left: "20px",
+          bottom: "20px",
+          right: "20px",
+          height: "180px",
+          background: "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 50%, rgba(10,10,10,0.92) 100%)",
+          borderRadius: "16px",
+          border: "2px solid rgba(245, 158, 11, 0.2)",
+          boxShadow: "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+          padding: "14px 0",
+        }}
+      >
+        <div className="flex h-full">
+          {([
+            { group: "torties" as const, label: "Tortie Layers", width: "50%" },
+            { group: "accessories" as const, label: "Accessories", width: "25%" },
+            { group: "scars" as const, label: "Scars", width: "25%" },
+          ]).map(({ group, label, width }) => {
+            const rows = layerRows[group];
+            return (
+              <div key={group} className="flex flex-col overflow-hidden px-5" style={{ width, flexShrink: 0 }}>
+                <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400">
+                  {label}
                 </div>
-              );
-            })}
-          </div>
+                <div className="flex-1 overflow-hidden">
+                  {rows.map((row, i) => {
+                    const layerKey = `${group}-${i}`;
+                    const isFlashing = flashLayerKey === layerKey;
+                    return (
+                      <div
+                        key={layerKey}
+                        className={cn(
+                          "flex items-center border-l-2 py-1 pl-3",
+                          isFlashing && "obs-row-flash"
+                        )}
+                        style={{
+                          borderColor: row.status === "active" ? "#f59e0b" : row.status === "revealed" ? "#3f3f46" : "rgba(113,113,122,0.3)",
+                        }}
+                      >
+                        <span className={cn(
+                          "w-[80px] shrink-0 text-sm",
+                          row.status === "active" ? "font-semibold text-amber-400" :
+                          row.status === "revealed" ? "text-zinc-300" : "text-zinc-600"
+                        )}>
+                          {row.label}
+                        </span>
+                        <span className={cn(
+                          "truncate font-mono text-sm font-bold",
+                          row.status === "active" ? "text-white" :
+                          row.status === "revealed" ? "text-white" : "text-zinc-600"
+                        )}>
+                          {row.value}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      )}
+      </div>
 
       {/* ═══ RIGHT COLUMN: Roller + Param board — always leaves room for bottom bar ═══ */}
       <div
@@ -4181,7 +4278,9 @@ export function OBSSpinClient({
             const row = revealedMap.get(def.id);
             const isActive = row?.status === "active";
             const isRevealed = row?.status === "revealed";
+            const isPending = row?.status === "pending";
             const isNone = isRevealed && row?.value?.toLowerCase() === "none";
+            const isFlashing = flashParamId === def.id;
             const valueLen = row?.value?.length ?? 0;
             // Use S size for long values (>12 chars), M for normal
             const sizeClass = valueLen > 12 ? "S" : "M";
@@ -4189,23 +4288,42 @@ export function OBSSpinClient({
             // Hide "None" rows after reveal (fade out)
             if (isNone) return null;
 
-            // Don't show empty slots
+            // Don't show empty slots (only when not prefilled)
             if (!row) return null;
+
+            const flapClass = isPending
+              ? "obs-flap-pending"
+              : isActive
+                ? "obs-flap-active"
+                : "obs-flap-done";
+
+            const flapValue = isPending
+              ? "???".padEnd(3).toUpperCase()
+              : isActive
+                ? "?".repeat(row.value.length)
+                : row.value.toUpperCase();
 
             return (
               <div
                 key={def.id}
-                className="flex items-center transition-all duration-200"
+                className={cn(
+                  "flex items-center transition-all duration-200",
+                  isFlashing && "obs-row-flash"
+                )}
                 style={{
                   padding: "8px 24px",
-                  borderLeft: isActive ? "3px solid #f59e0b" : "3px solid transparent",
+                  borderLeft: isActive
+                    ? "3px solid #f59e0b"
+                    : isPending
+                      ? "3px solid rgba(113,113,122,0.3)"
+                      : "3px solid transparent",
                   background: isActive ? "rgba(245,158,11,0.05)" : "transparent",
                 }}
               >
                 <span
                   className={cn(
                     "w-[130px] shrink-0 text-sm font-bold uppercase tracking-wide",
-                    isActive ? "text-amber-400" : "text-zinc-400"
+                    isActive ? "text-amber-400" : isPending ? "text-zinc-600" : "text-zinc-400"
                   )}
                 >
                   {def.label}
@@ -4213,10 +4331,10 @@ export function OBSSpinClient({
 
                 <div className="flex-1 overflow-hidden">
                   <FlapDisplay
-                    className={cn("obs-flap", sizeClass, isActive ? "obs-flap-active" : "obs-flap-done")}
+                    className={cn("obs-flap", sizeClass, flapClass)}
                     chars={flapChars}
-                    length={row.value.length}
-                    value={isActive ? "?".repeat(row.value.length) : row.value.toUpperCase()}
+                    length={isPending ? 3 : row.value.length}
+                    value={flapValue}
                     timing={80}
                     padMode="end"
                   />
