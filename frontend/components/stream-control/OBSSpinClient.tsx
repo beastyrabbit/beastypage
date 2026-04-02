@@ -3787,6 +3787,68 @@ export function OBSSpinClient({
         </div>
       </div>
 
+      {/* ═══ Bottom-left: Layer details (accessories, scars, torties) ═══ */}
+      {(layerRows.accessories.length > 0 || layerRows.scars.length > 0 || layerRows.torties.length > 0) && (
+        <div
+          className="absolute rounded-tr-xl"
+          style={{
+            left: "0px",
+            bottom: "20px",
+            width: "700px",
+            background: "linear-gradient(180deg, rgba(6,5,0,0.92) 0%, rgba(10,8,2,0.88) 100%)",
+            borderTop: "2px solid rgba(245,158,11,0.1)",
+            borderRight: "2px solid rgba(245,158,11,0.06)",
+            padding: "10px 0",
+          }}
+        >
+          <div className="mb-2 px-5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-amber-500/40">
+              Layer Details
+            </span>
+          </div>
+          <div className="flex gap-6 px-5">
+            {(["accessories", "scars", "torties"] as const).map((group) => {
+              const rows = layerRows[group];
+              if (rows.length === 0) return null;
+              return (
+                <div key={group} className="flex-1">
+                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                    {group === "torties" ? "Tortie Layers" : group.charAt(0).toUpperCase() + group.slice(1)}
+                  </div>
+                  {rows.map((row, i) => (
+                    <div
+                      key={`${group}-${i}`}
+                      className="flex items-center justify-between py-1"
+                      style={{
+                        borderLeft: row.status === "active" ? "2px solid rgba(245,158,11,0.6)" : "2px solid transparent",
+                        paddingLeft: "8px",
+                      }}
+                    >
+                      <span className={cn(
+                        "text-xs",
+                        row.status === "active" ? "text-amber-400 font-semibold" :
+                        row.status === "revealed" ? "text-zinc-500" :
+                        "text-white/10"
+                      )}>
+                        {row.label}
+                      </span>
+                      <span className={cn(
+                        "font-mono text-xs font-bold",
+                        row.status === "active" ? "text-white" :
+                        row.status === "revealed" ? "text-zinc-400" :
+                        "text-white/8"
+                      )}>
+                        {row.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Loading state */}
       {initializing && (
         <div className="absolute inset-0 flex items-center justify-center">
