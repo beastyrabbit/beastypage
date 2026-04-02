@@ -3610,11 +3610,14 @@ export function OBSSpinClient({
     return map;
   }, [paramRows]);
 
-  // The fixed board slots — always rendered, filled or empty
+  // The fixed board slots — exclude accessory/scar (they have their own panel)
   // Show tortie sub-params only if tortie was revealed as "Yes"
   const isTortie = paramRows.some((r) => r.id === "tortie" && r.value.toLowerCase() === "yes");
   const boardSlots = PARAM_SEQUENCE.filter(
-    (def) => !def.requiresTortie || isTortie
+    (def) =>
+      def.id !== "accessory" &&
+      def.id !== "scar" &&
+      (!def.requiresTortie || isTortie)
   );
 
   // All layer groups combined for the layer panel
@@ -3678,49 +3681,45 @@ export function OBSSpinClient({
           />
       </div>
 
-      {/* ═══ LAYER DETAILS — absolute bottom-left, never affects cat ═══ */}
+      {/* ═══ LAYER DETAILS — full width bottom bar ═══ */}
       {hasLayers && (
         <div
           className="absolute overflow-hidden"
           style={{
             left: "0px",
             bottom: "0px",
-            width: "750px",
-            maxHeight: "280px",
+            width: "1280px",
             background: "rgba(0,0,0,0.85)",
             borderTop: "1px solid #27272a",
-            padding: "14px 24px",
+            padding: "14px 32px",
           }}
         >
-          <div className="mb-3 text-[11px] font-bold uppercase tracking-[0.3em] text-zinc-500">
-            Layers
-          </div>
-          <div className="flex gap-6">
+          <div className="flex">
             {(["accessories", "scars", "torties"] as const).map((group) => {
               const rows = layerRows[group];
               if (rows.length === 0) return null;
               return (
-                <div key={group} className="min-w-[140px] max-w-[220px]">
-                  <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
-                    {group === "torties" ? "Tortie" : group.charAt(0).toUpperCase() + group.slice(1)}
+                <div key={group} style={{ width: "400px" }}>
+                  <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-600">
+                    {group === "torties" ? "Tortie Layers" : group.charAt(0).toUpperCase() + group.slice(1)}
                   </div>
                   {rows.map((row, i) => (
                     <div
                       key={`${group}-${i}`}
-                      className="flex items-center gap-3 border-l-2 py-1 pl-3"
+                      className="flex items-center border-l-2 py-1 pl-3"
                       style={{
                         borderColor: row.status === "active" ? "#f59e0b" : row.status === "revealed" ? "#27272a" : "transparent",
                       }}
                     >
                       <span className={cn(
-                        "shrink-0 text-xs",
+                        "w-[80px] shrink-0 text-sm",
                         row.status === "active" ? "font-semibold text-amber-400" :
                         row.status === "revealed" ? "text-zinc-400" : "text-zinc-700"
                       )}>
                         {row.label}
                       </span>
                       <span className={cn(
-                        "truncate font-mono text-xs font-bold",
+                        "truncate font-mono text-sm font-bold",
                         row.status === "active" ? "text-white" :
                         row.status === "revealed" ? "text-zinc-300" : "text-zinc-800"
                       )}>
