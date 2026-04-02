@@ -4,21 +4,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
-import { useCatGenerator } from "@/components/cat-builder/hooks";
+import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
 import { ADDITIONAL_PALETTES } from "@/lib/palettes";
 import type { PaletteCategory } from "@/lib/palettes";
 import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
-import type { CatGeneratorApi } from "@/components/cat-builder/types";
+import type { CatGeneratorApi, BuilderOptions } from "@/components/cat-builder/types";
+import type { CatParams } from "@/lib/cat-v3/types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type OverlayPhase = "idle" | "lobby" | "countdown" | "spinning" | "result";
+type ParamId = (typeof PARAM_SEQUENCE)[number]["id"];
 
 interface FlyingCat {
   id: string;
-  frames: string[]; // multiple renders to cycle through (simulates spinning)
+  frames: string[];
   startX: number;
   startTime: number;
   duration: number;
@@ -26,21 +28,63 @@ interface FlyingCat {
   rotation: number;
 }
 
+interface RevealedParam {
+  id: string;
+  label: string;
+  value: string;
+}
+
+// ---------------------------------------------------------------------------
+// Param sequence — same order as SingleCatPlusClient
+// ---------------------------------------------------------------------------
+
+const PARAM_SEQUENCE = [
+  { id: "colour", label: "Colour", field: "colour", optional: false },
+  { id: "pelt", label: "Pelt", field: "peltName", optional: false },
+  { id: "eyeColour", label: "Eyes", field: "eyeColour", optional: false },
+  { id: "eyeColour2", label: "Heterochromia", field: "eyeColour2", optional: true },
+  { id: "tortie", label: "Tortie", field: "isTortie", optional: true },
+  { id: "tint", label: "Tint", field: "tint", optional: true },
+  { id: "skinColour", label: "Skin", field: "skinColour", optional: false },
+  { id: "whitePatches", label: "White Patches", field: "whitePatches", optional: true },
+  { id: "points", label: "Points", field: "points", optional: true },
+  { id: "vitiligo", label: "Vitiligo", field: "vitiligo", optional: true },
+  { id: "sprite", label: "Sprite", field: "spriteNumber", optional: false },
+] as const;
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const RESULT_HOLD_MS = 10_000;
 const FADE_MS = 500;
-const LOBBY_FADE_MS = 400;
 const CAT_FLIGHT_DURATION_MS = 4_500;
 const CAT_SPAWN_INTERVAL_MS = 3_500;
 const MAX_FLYING_CATS = 3;
-const FLYING_CAT_FRAMES = 5; // how many random cats to pre-render per flying cat
-const FRAME_CYCLE_MS = 150; // how fast frames cycle on a flying cat
+const FLYING_CAT_FRAMES = 5;
+const FRAME_CYCLE_MS = 150;
 const PALETTE_CYCLE_MS = 4_000;
-const SPIN_FRAME_COUNT = 6; // number of variation frames during spin
-const SPIN_CYCLE_MS = 120; // frame cycle speed during spin
+const VARIATION_COUNT = 6; // how many variations to pre-render per param
+const FLIP_FAST_MS = 80; // fast cycle frame duration
+const FLIP_SLOW_MS = 200; // deceleration frame duration
+const PARAM_PAUSE_MS = 300; // pause between parameters
+
+// ---------------------------------------------------------------------------
+// Utility: clone params
+// ---------------------------------------------------------------------------
+
+function cloneParams(params: Partial<CatParams>): Partial<CatParams> {
+  return JSON.parse(JSON.stringify(params));
+}
+
+function applyParam(params: Partial<CatParams>, field: string, value: unknown) {
+  (params as Record<string, unknown>)[field] = value;
+}
+
+function formatValue(value: unknown): string {
+  if (value === undefined || value === null || value === "" || value === "none") return "None";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 // ---------------------------------------------------------------------------
 // OBSOverlayClient
@@ -52,13 +96,14 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
   const [phase, setPhase] = useState<OverlayPhase>("idle");
   const [countdownValue, setCountdownValue] = useState(3);
   const [currentParams, setCurrentParams] = useState<Record<string, unknown> | null>(null);
-  const [revealedParams, setRevealedParams] = useState<string[]>([]);
+  const [revealedParams, setRevealedParams] = useState<RevealedParam[]>([]);
+  const [activeParam, setActiveParam] = useState<{ label: string; value: string } | null>(null);
   const [catImageUrl, setCatImageUrl] = useState<string | null>(null);
-  const [spinFrames, setSpinFrames] = useState<string[]>([]);
-  const [spinFrameIndex, setSpinFrameIndex] = useState(0);
   const [fading, setFading] = useState(false);
+  const spinTokenRef = useRef(0);
 
   const { generator } = useCatGenerator();
+  const { options: mapperOptions } = useSpriteMapperOptions();
 
   // Make background transparent for OBS and hide root layout chrome
   useEffect(() => {
@@ -92,9 +137,8 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
         const params = cmd.params as Record<string, unknown>;
         setCurrentParams(params);
         setRevealedParams([]);
+        setActiveParam(null);
         setCatImageUrl(null);
-        setSpinFrames([]);
-        setSpinFrameIndex(0);
         if (cmd.countdownSeconds && cmd.countdownSeconds > 0) {
           setCountdownValue(cmd.countdownSeconds);
           setPhase("countdown");
@@ -104,13 +148,13 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
         break;
       }
       case "clear":
+        spinTokenRef.current++;
         setFading(true);
         setTimeout(() => {
           setPhase("idle");
           setFading(false);
           setCurrentParams(null);
           setCatImageUrl(null);
-          setSpinFrames([]);
         }, FADE_MS);
         break;
       case "test":
@@ -130,81 +174,103 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
     return () => clearTimeout(timer);
   }, [phase, countdownValue]);
 
-  // Pre-render spin variation frames when spinning starts
+  // =====================================================================
+  // PROGRESSIVE SPIN — the same approach as SingleCatPlusClient
+  // =====================================================================
   useEffect(() => {
-    if (phase !== "spinning" || !generator?.generateRandomCat) return;
-    let cancelled = false;
+    if (phase !== "spinning" || !currentParams || !generator) return;
+
+    const token = ++spinTokenRef.current;
+    const cancelled = () => spinTokenRef.current !== token;
 
     (async () => {
-      const frames: string[] = [];
-      for (let i = 0; i < SPIN_FRAME_COUNT; i++) {
-        if (cancelled) return;
-        try {
-          const result = await generator.generateRandomCat!();
-          const canvas = result.canvas;
-          if (canvas instanceof HTMLCanvasElement) {
-            frames.push(canvas.toDataURL("image/png"));
-          }
-        } catch {
-          // skip failed frame
+      const finalParams = currentParams as Partial<CatParams>;
+
+      // Start with placeholder params — simple default cat
+      const progressive: Partial<CatParams> = {
+        spriteNumber: 8,
+        peltName: "SingleColour",
+        colour: "WHITE",
+        shading: finalParams.shading ?? false,
+        reverse: finalParams.reverse ?? false,
+        isTortie: false,
+        accessories: [],
+        scars: [],
+        tortie: [],
+        darkForest: finalParams.darkForest ?? false,
+        darkMode: finalParams.darkMode ?? false,
+        dead: finalParams.dead ?? false,
+      };
+
+      // Render the placeholder
+      await renderAndSetCat(generator, progressive);
+      if (cancelled()) return;
+
+      // Go through each parameter, one by one
+      for (const def of PARAM_SEQUENCE) {
+        if (cancelled()) return;
+
+        const finalValue = (finalParams as Record<string, unknown>)[def.field];
+        if (finalValue === undefined || finalValue === null) {
+          if (def.optional) continue;
         }
+
+        setActiveParam({ label: def.label, value: "..." });
+
+        // Get possible variation values from the mapper
+        const variations = getVariations(def.id, finalValue, mapperOptions);
+
+        if (variations.length > 1) {
+          // === FLIP ANIMATION ===
+          // Fast cycle through variations (2 full passes)
+          for (let pass = 0; pass < 2; pass++) {
+            for (const v of variations) {
+              if (cancelled()) return;
+              const preview = cloneParams(progressive);
+              applyParam(preview, def.field, v.raw);
+              setActiveParam({ label: def.label, value: v.display });
+              await renderAndSetCat(generator, preview);
+              await wait(FLIP_FAST_MS);
+            }
+          }
+
+          // Deceleration: 4 random picks with increasing delay
+          for (let i = 0; i < 4; i++) {
+            if (cancelled()) return;
+            const v = variations[Math.floor(Math.random() * variations.length)];
+            const preview = cloneParams(progressive);
+            applyParam(preview, def.field, v.raw);
+            setActiveParam({ label: def.label, value: v.display });
+            await renderAndSetCat(generator, preview);
+            await wait(FLIP_SLOW_MS + i * 60);
+          }
+        }
+
+        // Land on the final value
+        if (cancelled()) return;
+        applyParam(progressive, def.field, finalValue);
+        const displayValue = formatValue(finalValue);
+        setActiveParam({ label: def.label, value: displayValue });
+        await renderAndSetCat(generator, progressive);
+
+        // Lock it in
+        setRevealedParams((prev) => [
+          ...prev,
+          { id: def.id, label: def.label, value: displayValue },
+        ]);
+        setActiveParam(null);
+
+        await wait(PARAM_PAUSE_MS);
       }
-      if (!cancelled) setSpinFrames(frames);
+
+      // Final render with all params
+      if (cancelled()) return;
+      await renderAndSetCat(generator, finalParams);
+      setPhase("result");
     })();
 
-    return () => { cancelled = true; };
-  }, [phase, generator]);
-
-  // Cycle through spin frames
-  useEffect(() => {
-    if (phase !== "spinning" || spinFrames.length === 0) return;
-    const timer = setInterval(() => {
-      setSpinFrameIndex((prev) => (prev + 1) % spinFrames.length);
-    }, SPIN_CYCLE_MS);
-    return () => clearInterval(timer);
-  }, [phase, spinFrames.length]);
-
-  // Spinning → result transition (sequential parameter reveal)
-  useEffect(() => {
-    if (phase !== "spinning" || !currentParams) return;
-    const paramKeys = PARAM_ORDER.filter(
-      (k) => currentParams[k] !== undefined && currentParams[k] !== null
-    );
-    let i = 0;
-
-    const revealNext = () => {
-      if (i >= paramKeys.length) {
-        renderFinalCat();
-        return;
-      }
-      setRevealedParams((prev) => [...prev, paramKeys[i]]);
-      i++;
-      setTimeout(revealNext, 400 + Math.random() * 300);
-    };
-
-    const timeout = setTimeout(revealNext, 800);
-    return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentParams]);
-
-  // Render the final cat
-  const renderFinalCat = useCallback(async () => {
-    if (!generator || !currentParams) return;
-    try {
-      const result = await generator.generateCat(currentParams);
-      if (result.imageDataUrl) {
-        setCatImageUrl(result.imageDataUrl);
-      } else if (result.canvas) {
-        const canvas = result.canvas as HTMLCanvasElement;
-        setCatImageUrl(canvas.toDataURL("image/png"));
-      }
-    } catch (err) {
-      console.error("[OBS] Failed to render cat:", err);
-    }
-    setPhase("result");
-    // Result stays visible until the streamer sends a new command
-    // (lobby, clear, or another spin). No auto-fade.
-  }, [generator, currentParams]);
+  }, [phase, currentParams, generator, mapperOptions]);
 
   // Resolve palette data for lobby
   const sessionPalettes = useMemo(() => {
@@ -225,9 +291,6 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
 
   if (phase === "idle") return null;
 
-  const currentSpinFrame =
-    spinFrames.length > 0 ? spinFrames[spinFrameIndex] : null;
-
   return (
     <div
       className={cn(
@@ -236,7 +299,6 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
       )}
       style={{ transitionDuration: `${FADE_MS}ms` }}
     >
-      {/* Content area — left 2/3 */}
       <div
         className="absolute top-0 bottom-0 left-0"
         style={{ right: "var(--cam-zone-width, 33.33%)" }}
@@ -253,16 +315,105 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
 
         {(phase === "spinning" || phase === "result") && (
           <SpinPhase
-            params={currentParams}
-            revealedParams={revealedParams}
             catImageUrl={catImageUrl}
-            spinFrame={currentSpinFrame}
+            revealedParams={revealedParams}
+            activeParam={activeParam}
             isResult={phase === "result"}
           />
         )}
       </div>
     </div>
   );
+
+  // Helper: render cat and update the image URL
+  async function renderAndSetCat(
+    gen: CatGeneratorApi,
+    params: Partial<CatParams>
+  ) {
+    try {
+      const result = await gen.generateCat(params);
+      if (result.imageDataUrl) {
+        setCatImageUrl(result.imageDataUrl);
+      } else if (result.canvas) {
+        const canvas = result.canvas as HTMLCanvasElement;
+        setCatImageUrl(canvas.toDataURL("image/png"));
+      }
+    } catch (err) {
+      console.error("[OBS] render failed:", err);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Get variation options for a parameter from the mapper
+// ---------------------------------------------------------------------------
+
+function getVariations(
+  paramId: string,
+  finalValue: unknown,
+  options: BuilderOptions | null
+): { raw: unknown; display: string }[] {
+  if (!options) return [{ raw: finalValue, display: formatValue(finalValue) }];
+
+  let pool: unknown[] = [];
+
+  switch (paramId) {
+    case "colour":
+      // Use pelt colours if available
+      pool = (options as unknown as Record<string, unknown[]>).pelts ?? [];
+      break;
+    case "pelt":
+      pool = options.pelts ?? [];
+      break;
+    case "eyeColour":
+    case "eyeColour2":
+      pool = options.eyeColours ?? [];
+      break;
+    case "tint":
+      pool = options.tints ?? [];
+      break;
+    case "skinColour":
+      pool = options.skinColours ?? [];
+      break;
+    case "whitePatches":
+      pool = options.whitePatches ?? [];
+      break;
+    case "points":
+      pool = (options as unknown as Record<string, unknown[]>).points ?? [];
+      break;
+    case "vitiligo":
+      pool = (options as unknown as Record<string, unknown[]>).vitiligo ?? [];
+      break;
+    case "sprite":
+      pool = options.sprites?.map(String) ?? [];
+      break;
+    case "tortie":
+      return [
+        { raw: false, display: "No" },
+        { raw: true, display: "Yes" },
+      ];
+    default:
+      return [{ raw: finalValue, display: formatValue(finalValue) }];
+  }
+
+  if (pool.length === 0) return [{ raw: finalValue, display: formatValue(finalValue) }];
+
+  // Sample up to VARIATION_COUNT from the pool, always ending with the final value
+  const finalStr = String(finalValue);
+  const nonFinal = pool.filter((v) => String(v) !== finalStr);
+  const sampled: { raw: unknown; display: string }[] = [];
+  const step = Math.max(1, Math.floor(nonFinal.length / (VARIATION_COUNT - 1)));
+
+  for (let i = 0; i < nonFinal.length && sampled.length < VARIATION_COUNT - 1; i += step) {
+    sampled.push({ raw: nonFinal[i], display: formatValue(nonFinal[i]) });
+  }
+
+  sampled.push({ raw: finalValue, display: formatValue(finalValue) });
+  return sampled;
+}
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 // ---------------------------------------------------------------------------
@@ -289,7 +440,6 @@ function LobbyPhase({
   const [flyingCats, setFlyingCats] = useState<FlyingCat[]>([]);
   const catIdCounter = useRef(0);
 
-  // Cycle palettes
   useEffect(() => {
     if (palettes.length <= 1) return;
     const timer = setInterval(() => {
@@ -298,7 +448,7 @@ function LobbyPhase({
     return () => clearInterval(timer);
   }, [palettes.length]);
 
-  // Spawn flying cats — each with multiple frames to cycle through
+  // Spawn flying cats with multiple frames
   useEffect(() => {
     if (!generator?.generateRandomCat) return;
     let cancelled = false;
@@ -306,7 +456,6 @@ function LobbyPhase({
     const spawnCat = async () => {
       if (cancelled) return;
       try {
-        // Generate multiple frames so the cat "spins" during flight
         const frames: string[] = [];
         for (let f = 0; f < FLYING_CAT_FRAMES; f++) {
           if (cancelled) return;
@@ -317,38 +466,32 @@ function LobbyPhase({
         }
         if (cancelled || frames.length === 0) return;
 
-        const id = `cat-${catIdCounter.current++}`;
-        const newCat: FlyingCat = {
-          id,
-          frames,
-          startX: 5 + Math.random() * 50,
-          startTime: Date.now(),
-          duration: CAT_FLIGHT_DURATION_MS + Math.random() * 1500,
-          peakY: 10 + Math.random() * 18,
-          rotation: -20 + Math.random() * 40,
-        };
-
         setFlyingCats((prev) => {
-          const alive = prev.filter(
-            (c) => Date.now() - c.startTime < c.duration
-          );
+          const alive = prev.filter((c) => Date.now() - c.startTime < c.duration);
           if (alive.length >= MAX_FLYING_CATS) return alive;
-          return [...alive, newCat];
+          return [
+            ...alive,
+            {
+              id: `cat-${catIdCounter.current++}`,
+              frames,
+              startX: 5 + Math.random() * 50,
+              startTime: Date.now(),
+              duration: CAT_FLIGHT_DURATION_MS + Math.random() * 1500,
+              peakY: 10 + Math.random() * 18,
+              rotation: -20 + Math.random() * 40,
+            },
+          ];
         });
       } catch (err) {
-        console.error("[OBS] Failed to generate flying cat:", err);
+        console.error("[OBS] Flying cat failed:", err);
       }
     };
 
     spawnCat();
     const timer = setInterval(spawnCat, CAT_SPAWN_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
+    return () => { cancelled = true; clearInterval(timer); };
   }, [generator]);
 
-  // Clean up expired cats
   useEffect(() => {
     const cleanup = setInterval(() => {
       setFlyingCats((prev) =>
@@ -360,80 +503,106 @@ function LobbyPhase({
 
   const currentPalette = palettes[paletteIndex];
   const afterlifeLabel =
-    AFTERLIFE_OPTIONS.find((o) => o.value === settings?.afterlifeMode)?.label ??
-    "Off";
+    AFTERLIFE_OPTIONS.find((o) => o.value === settings?.afterlifeMode)?.label ?? "Off";
   const rangeStr = (r?: { min: number; max: number }) =>
     r ? `${r.min}–${r.max}` : "0–2";
 
+  const settingChips = [
+    { label: "Mode", value: settings?.mode ?? "flashy" },
+    { label: "Afterlife", value: afterlifeLabel },
+    { label: "Accessories", value: rangeStr(settings?.accessoryRange) },
+    { label: "Scars", value: rangeStr(settings?.scarRange) },
+    { label: "Torties", value: rangeStr(settings?.tortieRange) },
+    { label: "Base", value: settings?.includeBaseColours !== false ? "On" : "Off" },
+  ];
+
   return (
     <div className="flex h-full flex-col">
-      {/* Top 2/3: Settings overview */}
-      <div
-        className="flex flex-1 items-center justify-center"
-        style={{ height: "66.67%" }}
-      >
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 rounded-2xl border border-amber-500/20 bg-black/80 px-12 py-10 shadow-[0_0_60px_rgba(245,158,11,0.1)] max-w-[75%]">
-          <h2 className="mb-8 text-center text-3xl font-bold text-white tracking-wide">
-            Settings Overview
-          </h2>
-          <div className="grid grid-cols-2 gap-x-10 gap-y-4 text-xl">
-            <SettingRow label="Mode" value={settings?.mode ?? "flashy"} />
-            <SettingRow label="Afterlife" value={afterlifeLabel} />
-            <SettingRow
-              label="Accessories"
-              value={rangeStr(settings?.accessoryRange)}
-            />
-            <SettingRow
-              label="Scars"
-              value={rangeStr(settings?.scarRange)}
-            />
-            <SettingRow
-              label="Torties"
-              value={rangeStr(settings?.tortieRange)}
-            />
-            <SettingRow
-              label="Base colours"
-              value={settings?.includeBaseColours !== false ? "Yes" : "No"}
-            />
-          </div>
+      <style>{`
+        @keyframes lobby-glow { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
+        @keyframes lobby-chip-in { 0% { opacity: 0; transform: translateY(12px) scale(0.9); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes lobby-swatch-pop { 0% { opacity: 0; transform: scale(0.5); } 60% { transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes lobby-pulse-ring { 0% { transform: scale(0.98); opacity: 0.5; } 50% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.98); opacity: 0.5; } }
+      `}</style>
 
-          {/* Palette carousel */}
-          {currentPalette && (
-            <div
-              key={currentPalette.id}
-              className="mt-8 animate-in fade-in duration-500"
-            >
-              <p className="mb-3 text-center text-base font-semibold text-amber-400/80">
-                {currentPalette.label}
-                {palettes.length > 1 && (
-                  <span className="ml-2 text-amber-400/40">
-                    ({paletteIndex + 1}/{palettes.length})
+      <div className="relative flex items-center justify-center" style={{ height: "66.67%" }}>
+        {/* Ambient glow */}
+        <div
+          className="pointer-events-none absolute rounded-full blur-[100px]"
+          style={{
+            width: "60%", height: "50%",
+            background: "radial-gradient(circle, rgba(245,158,11,0.15) 0%, transparent 70%)",
+            animation: "lobby-glow 4s ease-in-out infinite",
+          }}
+        />
+
+        <div className="relative z-10 w-[85%] max-w-[640px]">
+          {/* Pulsing border */}
+          <div
+            className="absolute -inset-[2px] rounded-2xl"
+            style={{
+              background: "linear-gradient(135deg, rgba(245,158,11,0.4), rgba(217,119,6,0.1), rgba(245,158,11,0.3))",
+              animation: "lobby-pulse-ring 3s ease-in-out infinite",
+            }}
+          />
+
+          <div className="relative rounded-2xl bg-black/85 px-8 py-7 backdrop-blur-xl">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
+              <span className="text-xs font-bold uppercase tracking-[0.35em] text-amber-400/70">
+                Spin Settings
+              </span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
+              {settingChips.map((chip, i) => (
+                <div
+                  key={chip.label}
+                  className="flex flex-col items-center rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3"
+                  style={{ animation: `lobby-chip-in 0.5s ease-out ${i * 80}ms both` }}
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-white/30">
+                    {chip.label}
                   </span>
-                )}
-              </p>
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {Object.entries(currentPalette.colors)
-                  .slice(0, 24)
-                  .map(([name, def]) => {
+                  <span className="mt-1 text-lg font-bold capitalize text-white">
+                    {chip.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {currentPalette && (
+              <div key={currentPalette.id} className="mt-5 border-t border-white/5 pt-5">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-sm font-bold text-amber-400/90">{currentPalette.label}</span>
+                  {palettes.length > 1 && (
+                    <span className="text-[10px] font-medium tabular-nums text-white/25">
+                      {paletteIndex + 1} / {palettes.length}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {Object.entries(currentPalette.colors).slice(0, 28).map(([name, def], i) => {
                     const rgb = def.multiply ?? [128, 128, 128];
                     return (
                       <div
                         key={name}
-                        className="size-7 rounded border border-white/15 shadow-sm"
+                        className="size-6 rounded-[4px] border border-white/10 shadow-sm shadow-black/30"
                         style={{
                           backgroundColor: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`,
+                          animation: `lobby-swatch-pop 0.3s ease-out ${i * 20}ms both`,
                         }}
-                        title={name.replace(/_/g, " ")}
                       />
                     );
                   })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Bottom 1/3: Fruit-ninja cat zone */}
       <div className="relative overflow-hidden" style={{ height: "33.33%" }}>
         {flyingCats.map((cat) => (
           <FlyingCatSprite key={cat.id} cat={cat} />
@@ -443,17 +612,8 @@ function LobbyPhase({
   );
 }
 
-function SettingRow({ label, value }: { label: string; value: string }) {
-  return (
-    <>
-      <span className="text-right text-white/40 font-medium">{label}</span>
-      <span className="font-bold capitalize text-white">{value}</span>
-    </>
-  );
-}
-
 // ---------------------------------------------------------------------------
-// Flying cat — fruit-ninja arc with frame cycling
+// Flying cat (fruit-ninja arc with frame cycling)
 // ---------------------------------------------------------------------------
 
 function FlyingCatSprite({ cat }: { cat: FlyingCat }) {
@@ -464,7 +624,6 @@ function FlyingCatSprite({ cat }: { cat: FlyingCat }) {
   useEffect(() => {
     let raf: number;
     let lastFrameSwap = 0;
-
     const animate = () => {
       if (!ref.current) return;
       const now = Date.now();
@@ -472,27 +631,17 @@ function FlyingCatSprite({ cat }: { cat: FlyingCat }) {
       const progress = Math.min(elapsed / cat.duration, 1);
       if (progress >= 1) return;
 
-      // Parabolic arc
       const y = -4 * cat.peakY * progress * (progress - 1);
       const xDrift = progress * 12;
-      // Fade in/out
-      const opacity =
-        progress < 0.12
-          ? progress / 0.12
-          : progress > 0.88
-            ? (1 - progress) / 0.12
-            : 1;
+      const opacity = progress < 0.12 ? progress / 0.12 : progress > 0.88 ? (1 - progress) / 0.12 : 1;
 
       ref.current.style.left = `${cat.startX + xDrift}%`;
       ref.current.style.transform = `translateY(${-y}vh) rotate(${cat.rotation * progress}deg) scale(${0.8 + progress * 0.4})`;
       ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
 
-      // Cycle frames to simulate spinning
       if (cat.frames.length > 1 && now - lastFrameSwap > FRAME_CYCLE_MS) {
         frameRef.current = (frameRef.current + 1) % cat.frames.length;
-        if (imgRef.current) {
-          imgRef.current.src = cat.frames[frameRef.current];
-        }
+        if (imgRef.current) imgRef.current.src = cat.frames[frameRef.current];
         lastFrameSwap = now;
       }
 
@@ -535,87 +684,29 @@ function CountdownPhase({ value }: { value: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Phase: Spinning / Result
+// Phase: Spinning / Result — progressive reveal with live cat updates
 // ---------------------------------------------------------------------------
 
-const PARAM_ORDER = [
-  "spriteNumber",
-  "peltName",
-  "colour",
-  "eyeColour",
-  "eyeColour2",
-  "tint",
-  "skinColour",
-  "whitePatches",
-  "points",
-  "whitePatchesTint",
-  "vitiligo",
-  "isTortie",
-  "tortieMask",
-  "tortiePattern",
-  "tortieColour",
-  "shading",
-  "reverse",
-] as const;
-
-const PARAM_LABELS: Record<string, string> = {
-  spriteNumber: "Sprite",
-  peltName: "Pelt",
-  colour: "Colour",
-  eyeColour: "Eyes",
-  eyeColour2: "Heterochromia",
-  tint: "Tint",
-  skinColour: "Skin",
-  whitePatches: "White Patches",
-  points: "Points",
-  whitePatchesTint: "White Tint",
-  vitiligo: "Vitiligo",
-  isTortie: "Tortie",
-  tortieMask: "Tortie Mask",
-  tortiePattern: "Tortie Pattern",
-  tortieColour: "Tortie Colour",
-  shading: "Shading",
-  reverse: "Reverse",
-};
-
 function SpinPhase({
-  params,
-  revealedParams,
   catImageUrl,
-  spinFrame,
+  revealedParams,
+  activeParam,
   isResult,
 }: {
-  params: Record<string, unknown> | null;
-  revealedParams: string[];
   catImageUrl: string | null;
-  spinFrame: string | null;
+  revealedParams: RevealedParam[];
+  activeParam: { label: string; value: string } | null;
   isResult: boolean;
 }) {
-  if (!params) return null;
-
-  const visibleParams = PARAM_ORDER.filter(
-    (k) => params[k] !== undefined && params[k] !== null
-  );
-  const revealed = new Set(revealedParams);
-
-  // Show: final cat if result, spinning frame if available, or placeholder
-  const displayImage = catImageUrl ?? spinFrame;
-
   return (
     <div className="flex h-full gap-4 p-6">
-      {/* Cat canvas — BIG, dominates the space */}
+      {/* Cat canvas — BIG, dominates */}
       <div className="flex flex-1 items-center justify-center">
-        {displayImage ? (
-          <div
-            className={cn(
-              isResult
-                ? "animate-in zoom-in-75 fade-in duration-700"
-                : "transition-opacity duration-100"
-            )}
-          >
+        {catImageUrl ? (
+          <div className={isResult ? "animate-in zoom-in-75 fade-in duration-700" : ""}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={displayImage}
+              src={catImageUrl}
               alt="Cat"
               className="h-[55vh] w-auto drop-shadow-[0_0_40px_rgba(245,158,11,0.35)]"
               style={{ imageRendering: "pixelated" }}
@@ -631,38 +722,44 @@ function SpinPhase({
       {/* Split-flap result table */}
       <div className="flex w-[40%] max-w-md flex-col justify-center">
         <div className="rounded-xl border border-amber-500/15 bg-black/85 p-5 shadow-[0_0_40px_rgba(0,0,0,0.5)] backdrop-blur-md">
-          <div className="space-y-0.5">
-            {visibleParams.map((key) => {
-              const isRevealed = revealed.has(key) || isResult;
-              const rawValue = params[key];
-              const displayValue =
-                typeof rawValue === "boolean"
-                  ? rawValue
-                    ? "Yes"
-                    : "No"
-                  : String(rawValue ?? "—");
+          <style>{`
+            @keyframes splitFlap {
+              0% { transform: rotateX(90deg); opacity: 0; }
+              60% { transform: rotateX(-10deg); opacity: 1; }
+              100% { transform: rotateX(0deg); opacity: 1; }
+            }
+          `}</style>
 
-              return (
-                <div
-                  key={key}
-                  className={cn(
-                    "flex items-center justify-between rounded-md px-3 py-1.5 transition-colors duration-300",
-                    isRevealed ? "bg-amber-500/5" : ""
-                  )}
-                >
-                  <span className="text-sm font-medium text-white/40">
-                    {PARAM_LABELS[key] ?? key}
-                  </span>
-                  <div className="overflow-hidden" style={{ perspective: "200px" }}>
-                    {isRevealed ? (
-                      <SplitFlapText text={displayValue} />
-                    ) : (
-                      <CyclingText />
-                    )}
-                  </div>
+          <div className="space-y-0.5">
+            {/* Revealed params */}
+            {revealedParams.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between rounded-md bg-amber-500/5 px-3 py-1.5"
+              >
+                <span className="text-sm font-medium text-white/40">{p.label}</span>
+                <SplitFlapText text={p.value} />
+              </div>
+            ))}
+
+            {/* Currently active param (being revealed) */}
+            {activeParam && (
+              <div className="flex items-center justify-between rounded-md bg-amber-500/10 px-3 py-1.5 border border-amber-500/20">
+                <span className="text-sm font-bold text-amber-400">{activeParam.label}</span>
+                <span className="font-mono text-sm font-bold text-amber-300">
+                  {activeParam.value}
+                </span>
+              </div>
+            )}
+
+            {/* Unrevealed placeholder rows */}
+            {!isResult &&
+              Array.from({ length: Math.max(0, 6 - revealedParams.length - (activeParam ? 1 : 0)) }).map((_, i) => (
+                <div key={`placeholder-${i}`} className="flex items-center justify-between rounded-md px-3 py-1.5">
+                  <span className="text-sm text-white/10">???</span>
+                  <CyclingText />
                 </div>
-              );
-            })}
+              ))}
           </div>
         </div>
       </div>
@@ -671,7 +768,7 @@ function SpinPhase({
 }
 
 // ---------------------------------------------------------------------------
-// Split-flap text — each character flips down like an airport departure board
+// Split-flap text — each character flips down
 // ---------------------------------------------------------------------------
 
 function SplitFlapText({ text }: { text: string }) {
@@ -681,44 +778,23 @@ function SplitFlapText({ text }: { text: string }) {
         <span
           key={`${i}-${char}`}
           className="inline-block rounded-sm bg-amber-500/10 px-[3px] py-[1px] font-mono text-sm font-bold text-amber-400"
-          style={{
-            animation: `splitFlap 0.25s ease-out ${i * 40}ms both`,
-          }}
+          style={{ animation: `splitFlap 0.25s ease-out ${i * 40}ms both` }}
         >
           {char}
         </span>
       ))}
-      <style>{`
-        @keyframes splitFlap {
-          0% {
-            transform: rotateX(90deg);
-            opacity: 0;
-          }
-          60% {
-            transform: rotateX(-10deg);
-            opacity: 1;
-          }
-          100% {
-            transform: rotateX(0deg);
-            opacity: 1;
-          }
-        }
-      `}</style>
     </span>
   );
 }
 
 function CyclingText() {
   const [text, setText] = useState("???");
-
   useEffect(() => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     const timer = setInterval(() => {
-      setText(
-        Array.from({ length: 3 + Math.floor(Math.random() * 5) }, () =>
-          chars[Math.floor(Math.random() * chars.length)]
-        ).join("")
-      );
+      setText(Array.from({ length: 3 + Math.floor(Math.random() * 5) }, () =>
+        chars[Math.floor(Math.random() * chars.length)]
+      ).join(""));
     }, 70);
     return () => clearInterval(timer);
   }, []);
@@ -726,10 +802,7 @@ function CyclingText() {
   return (
     <span className="inline-flex gap-px">
       {text.split("").map((char, i) => (
-        <span
-          key={i}
-          className="inline-block rounded-sm bg-white/5 px-[3px] py-[1px] font-mono text-sm font-bold text-white/15"
-        >
+        <span key={i} className="inline-block rounded-sm bg-white/5 px-[3px] py-[1px] font-mono text-sm font-bold text-white/15">
           {char}
         </span>
       ))}
