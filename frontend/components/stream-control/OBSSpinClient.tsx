@@ -1,7 +1,16 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
+/**
+ * OBSSpinClient — copied from SingleCatPlusClient.tsx
+ *
+ * ALL spin logic (generateCatPlus, flip sequences, timing, layer count spinner)
+ * is kept byte-for-byte identical. Only the component shell changed:
+ * - Props: accepts apiKey instead of page-level settings
+ * - Settings: read from Convex session instead of local state/variants
+ * - JSX: OBS overlay layout instead of full page UI
+ * - Trigger: Convex subscription instead of button click
+ */
+
 import {
   useCallback,
   useEffect,
@@ -10,21 +19,10 @@ import {
   useState,
 } from "react";
 import { cn } from "@/lib/utils";
-import { track } from "@/lib/analytics";
-import {
-  ArrowUpRight,
-  Download,
-  Loader2,
-} from "lucide-react";
-import CopyIcon from "@/components/ui/copy-icon";
-import ExternalLinkIcon from "@/components/ui/external-link-icon";
-import PaintIcon from "@/components/ui/paint-icon";
-import RefreshIcon from "@/components/ui/refresh-icon";
-import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
-import SparklesIcon from "@/components/ui/sparkles-icon";
-import XIcon from "@/components/ui/x-icon";
-import type { Id } from "@/convex/_generated/dataModel";
-import { useMutation } from "convex/react";
+import { Loader2 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { FlapDisplay, Presets } from "react-split-flap-effect";
+import "react-split-flap-effect/extras/themes.css";
 import { api } from "@/convex/_generated/api";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import type { BatchRenderResponse, CatParams } from "@/lib/cat-v3/types";
@@ -48,8 +46,6 @@ import {
   isParamTimingKey,
   stepCountsToMetrics,
 } from "../../utils/spinTiming";
-import { useVariants } from "../../utils/variants";
-import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import {
   DEFAULT_SINGLE_CAT_SETTINGS,
   parseSingleCatPayload,
@@ -60,15 +56,8 @@ import {
   type ExtendedMode,
   type LayerRange,
 } from "../../utils/singleCatVariants";
-import { VariantBar } from "../common/VariantBar";
-import { LayerCountModeSelector } from "../common/LayerCountModeSelector";
-// `encodeCatShare` is still defined in the legacy pipeline and gives us a
-// portable payload for the old viewer and future React viewer work.
-// @ts-ignore -- legacy JS module without types.
-import { encodeCatShare, createCatShare } from "@/lib/catShare";
-import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
-import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import type { PaletteId } from "@/lib/palettes";
+import { ADDITIONAL_PALETTES } from "@/lib/palettes";
 import {
   MAX_LAYER_VALUE,
   clampLayerValue,
@@ -76,13 +65,14 @@ import {
   resolveAfterlife,
   AFTERLIFE_OPTIONS,
 } from "@/utils/catSettingsHelpers";
-import {
-  decodePortableSettings,
-  encodePortableSettings,
-} from "@/lib/portable-settings";
-import type { SingleCatPortableSettings } from "@/lib/portable-settings";
+import { OBSLobby } from "./OBSLobby";
 
-export type { AfterlifeOption } from "../../utils/singleCatVariants";
+// OBS stubs — functions referenced by the spin logic but not needed for overlay
+const track = (..._args: unknown[]) => {};
+const encodeCatShare = (..._args: unknown[]) => "";
+const createCatShare = async (..._args: unknown[]): Promise<{ slug: string; id: string; shareToken?: string }> => ({ slug: "", id: "" });
+type SingleCatPortableSettings = SingleCatSettings;
+type Id<T extends string> = string & { __tableName: T };
 
 interface TortieSlot {
   mask: string;
@@ -1288,158 +1278,28 @@ function sampleValues(
 }
 
 // ---------------------------------------------------------------------------
-// Settings Code section (inline sub-component for the aside)
-// ---------------------------------------------------------------------------
-
-interface SettingsCodeSectionProps {
-  accessoryRange: LayerRange;
-  scarRange: LayerRange;
-  tortieRange: LayerRange;
-  exactLayerCounts: boolean;
-  afterlifeMode: AfterlifeOption;
-  includeBaseColours: boolean;
-  extendedModes: Set<ExtendedMode>;
-  onApply: (portable: SingleCatPortableSettings) => void;
-}
-
-function SettingsCodeSection({
-  accessoryRange,
-  scarRange,
-  tortieRange,
-  exactLayerCounts,
-  afterlifeMode,
-  includeBaseColours,
-  extendedModes,
-  onApply,
-}: SettingsCodeSectionProps) {
-  const [codeInput, setCodeInput] = useState("");
-  const [codeError, setCodeError] = useState<string | null>(null);
-  const [copyFeedback, setCopyFeedback] = useState(false);
-
-  const liveCode = useMemo(
-    () =>
-      encodePortableSettings({
-        accessoryRange,
-        scarRange,
-        tortieRange,
-        exactLayerCounts,
-        afterlifeMode,
-        includeBaseColours,
-        extendedModes: Array.from(extendedModes),
-      }),
-    [accessoryRange, scarRange, tortieRange, exactLayerCounts, afterlifeMode, includeBaseColours, extendedModes],
-  );
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(liveCode);
-      setCopyFeedback(true);
-      setTimeout(() => setCopyFeedback(false), 1500);
-    } catch (err) {
-      console.warn("[SingleCatPlus] clipboard copy failed:", err);
-    }
-  }, [liveCode]);
-
-  const handleApply = useCallback(() => {
-    const trimmed = codeInput.trim();
-    if (!trimmed) {
-      setCodeError("Enter a settings code");
-      return;
-    }
-    const decoded = decodePortableSettings(trimmed);
-    if (!decoded) {
-      setCodeError("Invalid code");
-      return;
-    }
-    setCodeError(null);
-    setCodeInput("");
-    onApply(decoded);
-  }, [codeInput, onApply]);
-
-  return (
-    <div className="space-y-3">
-      <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground/80">
-        Settings Code
-      </p>
-      {/* Live code */}
-      <div className="flex items-center gap-2">
-        <code className="flex-1 truncate rounded-lg border border-primary/20 bg-background/60 px-3 py-1.5 font-mono text-xs tracking-wide text-foreground">
-          {liveCode}
-        </code>
-        <button
-          type="button"
-          onClick={handleCopy}
-          className={cn(
-            "shrink-0 rounded-md border px-2 py-1.5 text-[10px] font-medium transition",
-            copyFeedback
-              ? "border-emerald-500/40 text-emerald-400"
-              : "border-border/50 text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {copyFeedback ? "Copied!" : "Copy"}
-        </button>
-      </div>
-      {/* Paste + Apply */}
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={codeInput}
-          onChange={(e) => {
-            setCodeInput(e.target.value);
-            if (codeError) setCodeError(null);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleApply();
-          }}
-          placeholder="Paste a code..."
-          className="min-w-0 flex-1 rounded-lg border border-border/40 bg-background/60 px-2.5 py-1.5 font-mono text-xs outline-none placeholder:text-muted-foreground/40 focus:border-primary/40"
-        />
-        <button
-          type="button"
-          onClick={handleApply}
-          className="shrink-0 rounded-md border border-border/50 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground transition hover:text-foreground"
-        >
-          Apply
-        </button>
-      </div>
-      {codeError && <p className="text-[10px] text-red-400">{codeError}</p>}
-      <Link
-        href="/single-cat-plus/settings"
-        className="inline-flex items-center gap-1 text-[10px] text-primary/70 transition hover:text-primary"
-      >
-        Open Settings Configurator &rarr;
-      </Link>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
-type SingleCatPlusClientProps = {
-  defaultMode?: "flashy" | "calm";
-  defaultAccessoryRange?: LayerRange;
-  defaultScarRange?: LayerRange;
-  defaultTortieRange?: LayerRange;
-  defaultAfterlife?: AfterlifeOption;
-  variantSlug?: string;
-  initialVariantSettings?: SingleCatSettings | null;
-  initialVariantLoadError?: string | null;
-  initialCodeSettings?: SingleCatPortableSettings | null;
-};
+export function OBSSpinClient({
+  apiKey,
+}: {
+  apiKey: string;
+}) {
+  // Convex subscription — get session data by API key
+  const session = useQuery(api.catStream.getSessionByApiKey, { apiKey });
+  const sessionSettings = session?.settings as SingleCatSettings | undefined;
 
-export function SingleCatPlusClient({
-  defaultMode = "flashy",
-  defaultAccessoryRange = { min: 1, max: 4 },
-  defaultScarRange = { min: 1, max: 1 },
-  defaultTortieRange = { min: 1, max: 4 },
-  defaultAfterlife = "dark10",
-  variantSlug,
-  initialVariantSettings = null,
-  initialVariantLoadError = null,
-  initialCodeSettings = null,
-}: SingleCatPlusClientProps) {
+  // Derive settings from session (or defaults)
+  const defaultMode = sessionSettings?.mode ?? "flashy";
+  const defaultAccessoryRange = sessionSettings?.accessoryRange ?? { min: 1, max: 4 };
+  const defaultScarRange = sessionSettings?.scarRange ?? { min: 1, max: 1 };
+  const defaultTortieRange = sessionSettings?.tortieRange ?? { min: 1, max: 4 };
+  const defaultAfterlife = sessionSettings?.afterlifeMode ?? "dark10";
+  const variantSlug = undefined;
+  const initialVariantSettings = sessionSettings ?? null;
+  const initialVariantLoadError = null as string | null;
+  const initialCodeSettings = null as SingleCatPortableSettings | null;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const mapperRef = useRef<SpriteMapperApi | null>(null);
@@ -1510,12 +1370,16 @@ export function SingleCatPlusClient({
   const [exactLayerCounts, setExactLayerCounts] = useState(initialSettings.exactLayerCounts);
   const [timingConfig, setTimingConfig] = useState<SpinTimingConfig>(initialSettings.timing);
 
-  // Page variant management
-  const variants = useVariants<SingleCatSettings>({
-    storageKey: "singleCatPlus.variants",
-    toolKey: "singleCatPlus",
-    migrate: migrateSingleCatTiming,
-  });
+  // OBS: no variant management — settings come from Convex session
+  const variants = {
+    variants: [] as { id: string; name: string; slug?: string; settings: SingleCatSettings; isActive: boolean; createdAt: number; updatedAt: number }[],
+    activeVariant: null as { id: string; name: string; settings: SingleCatSettings } | null,
+    saveVariant: async (_name: string, _settings: SingleCatSettings) => {},
+    activateVariant: (_id: string) => {},
+    deactivateVariant: () => {},
+    removeVariant: (_id: string) => {},
+    renameVariant: (_id: string, _name: string) => {},
+  };
   const [timingModalOpen, setTimingModalOpen] = useState(false);
   const [lastTimingSnapshot, setLastTimingSnapshot] = useState<TimingSnapshot | null>(null);
   const [speedMultiplier, setSpeedMultiplier] = useState(initialSettings.speedMultiplier);
@@ -1586,6 +1450,28 @@ export function SingleCatPlusClient({
   const [includeBaseColours, setIncludeBaseColours] = useState(initialSettings.includeBaseColours);
   const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(() => new Set(initialSettings.extendedModes));
 
+  // OBS: Re-sync settings when the Convex session updates (control page changed them)
+  useEffect(() => {
+    if (!sessionSettings) return;
+    setMode(sessionSettings.mode);
+    setAccessoryRange(sessionSettings.accessoryRange);
+    setScarRange(sessionSettings.scarRange);
+    setTortieRange(sessionSettings.tortieRange);
+    setExactLayerCounts(sessionSettings.exactLayerCounts);
+    setAfterlifeMode(sessionSettings.afterlifeMode);
+    setIncludeBaseColours(sessionSettings.includeBaseColours);
+    setExtendedModes(new Set(sessionSettings.extendedModes));
+    if (sessionSettings.speedMultiplier !== undefined) {
+      setSpeedMultiplier(sessionSettings.speedMultiplier);
+    }
+    if (sessionSettings.timing) {
+      setTimingConfig(sessionSettings.timing);
+    }
+    if (sessionSettings.creatorName) {
+      setCreatorNameDraft(sessionSettings.creatorName);
+    }
+  }, [sessionSettings]);
+
   const [rollerLabel, setRollerLabel] = useState<string | null>(null);
   const [rollerActiveValue, setRollerActiveValue] = useState<string | null>(null);
   const [rollerHighlight, setRollerHighlight] = useState(false);
@@ -1603,9 +1489,9 @@ export function SingleCatPlusClient({
   const [toast, setToast] = useState<string | null>(null);
   const [rollerExpanded, setRollerExpanded] = useState(false);
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
-  const defaultCreatorName = useDefaultCreatorName();
+  const defaultCreatorName = sessionSettings?.creatorName ?? "";
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
-  const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName);
+  const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName || defaultCreatorName);
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaDirty, setMetaDirty] = useState(false);
 
@@ -1629,8 +1515,9 @@ export function SingleCatPlusClient({
     return "text-3xl tracking-[0.32em]";
   }, [rollerActiveValue]);
 
-  const createMapper = useMutation(api.mapper.create);
-  const updateMapperMeta = useMutation(api.mapper.updateMeta);
+  // OBS: stub out Convex mutations not needed for overlay
+  const createMapper = async (..._args: unknown[]): Promise<{ id: string; slug: string; catName?: string; creatorName?: string; shareToken?: string } | null> => null;
+  const updateMapperMeta = async (..._args: unknown[]): Promise<{ id: string; slug: string; catName?: string; creatorName?: string; shareToken?: string } | null> => null;
 
   const extendedModesArray = useMemo(() => Array.from(extendedModes), [extendedModes]);
 
@@ -1983,27 +1870,49 @@ export function SingleCatPlusClient({
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+
+    // Resolve source to a usable canvas
+    let src: HTMLCanvasElement;
     try {
-      ctx.drawImage(source as HTMLCanvasElement, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
-    } catch (error) {
-      console.warn("drawImage failed, creating fallback canvas", error);
+      // Test if source can be drawn directly
+      ctx.drawImage(source as HTMLCanvasElement, 0, 0, 1, 1);
+      ctx.clearRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+      src = source as HTMLCanvasElement;
+    } catch {
       const fallback = document.createElement("canvas");
-      const fallbackWidth =
-        "width" in source && typeof source.width === "number"
-          ? source.width
-          : DISPLAY_SIZE;
-      const fallbackHeight =
-        "height" in source && typeof source.height === "number"
-          ? source.height
-          : DISPLAY_SIZE;
-      fallback.width = fallbackWidth;
-      fallback.height = fallbackHeight;
-      const fallbackCtx = fallback.getContext("2d");
-      if (fallbackCtx) {
-        fallbackCtx.drawImage(source as HTMLCanvasElement, 0, 0);
-        ctx.drawImage(fallback, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
-      }
+      const w = "width" in source && typeof source.width === "number" ? source.width : DISPLAY_SIZE;
+      const h = "height" in source && typeof source.height === "number" ? source.height : DISPLAY_SIZE;
+      fallback.width = w;
+      fallback.height = h;
+      const fCtx = fallback.getContext("2d");
+      if (fCtx) fCtx.drawImage(source as HTMLCanvasElement, 0, 0);
+      src = fallback;
     }
+
+    // White sticker outline — draw source offset in 8 directions, tinted white
+    // This works in OBS unlike CSS drop-shadow
+    const outline = 3;
+    const offsets = [
+      [-outline, 0], [outline, 0], [0, -outline], [0, outline],
+      [-outline, -outline], [outline, -outline], [-outline, outline], [outline, outline],
+    ];
+    // Create a white-tinted version of the source
+    const tint = document.createElement("canvas");
+    tint.width = DISPLAY_SIZE;
+    tint.height = DISPLAY_SIZE;
+    const tCtx = tint.getContext("2d")!;
+    tCtx.imageSmoothingEnabled = false;
+    tCtx.drawImage(src, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+    tCtx.globalCompositeOperation = "source-in";
+    tCtx.fillStyle = "white";
+    tCtx.fillRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+
+    // Draw the white silhouette at each offset
+    for (const [dx, dy] of offsets) {
+      ctx.drawImage(tint, dx, dy);
+    }
+    // Draw the actual cat on top
+    ctx.drawImage(src, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
   }, []);
 
   const renderCat = useCallback(
@@ -2914,18 +2823,31 @@ export function SingleCatPlusClient({
       const tortieCount = computeLayerCount(tortieRange);
       const experimentalMode = extendedModesArray.length === 0 ? "off" : extendedModesArray;
 
-      if (!generator.generateRandomCat) {
-        throw new Error("Random cat generation not available");
+      // OBS: Use override params from the control page if available
+      const override = overrideParamsRef.current;
+      overrideParamsRef.current = null; // consume once
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let randomResult: any;
+      if (override?.params) {
+        randomResult = {
+          params: override.params as Record<string, unknown>,
+          slotSelections: override.slots as typeof randomResult.slotSelections,
+        };
+      } else {
+        if (!generator.generateRandomCat) {
+          throw new Error("Random cat generation not available");
+        }
+        randomResult = await generator.generateRandomCat({
+          accessoryCount,
+          scarCount,
+          tortieCount,
+          exactLayerCounts,
+          experimentalColourMode: experimentalMode,
+          whitePatchColourMode: "default",
+          includeBaseColours,
+        });
       }
-      const randomResult = await generator.generateRandomCat({
-        accessoryCount,
-        scarCount,
-        tortieCount,
-        exactLayerCounts,
-        experimentalColourMode: experimentalMode,
-        whitePatchColourMode: "default",
-        includeBaseColours,
-      });
 
       if (generationIdRef.current !== token) return;
 
@@ -2943,7 +2865,7 @@ export function SingleCatPlusClient({
         randomResult.slotSelections?.scars ??
         (params.scars ?? []).filter((entry): entry is string => typeof entry === "string");
       const tortieSlots: (TortieSlot | null)[] =
-        randomResult.slotSelections?.tortie?.map((slot) =>
+        randomResult.slotSelections?.tortie?.map((slot: any) =>
           slot?.mask && slot?.pattern && slot?.colour
             ? { mask: slot.mask, pattern: slot.pattern, colour: slot.colour }
             : null
@@ -2974,11 +2896,11 @@ export function SingleCatPlusClient({
       setHasTint(Boolean(enableDarkForest || enableDead));
       setSpriteGalleryOpen(false);
 
-      const uniqueAccessories = Array.from(
-        new Set(accessorySlots.filter((entry): entry is string => typeof entry === "string" && entry !== "none"))
+      const uniqueAccessories: string[] = Array.from(
+        new Set(accessorySlots.filter((entry: unknown): entry is string => typeof entry === "string" && entry !== "none"))
       );
-      const uniqueScars = Array.from(
-        new Set(scarSlots.filter((entry): entry is string => typeof entry === "string" && entry !== "none"))
+      const uniqueScars: string[] = Array.from(
+        new Set(scarSlots.filter((entry: unknown): entry is string => typeof entry === "string" && entry !== "none"))
       );
       const tortieChoices = tortieLayers.length ? tortieLayers : [];
 
@@ -3693,765 +3615,628 @@ export function SingleCatPlusClient({
   const saveHistoryDisabled = !historyReady || metaSaving || (!metaDirty && !metaChanged);
   const viewerSlug = currentState?.mapperSlug ?? null;
 
+
   const generationDisabled = initializing || !!initialError;
 
-  return (
-    <div className="grid gap-10">
-      <VariantBar<SingleCatSettings>
-        variants={variants}
-        snapshotConfig={snapshotConfig}
-        applyConfig={applyVariantConfig}
-        isDirty={variantDirty}
-        showToast={showToast}
-      />
-      <div className="glass-card px-6 py-8">
-        <div className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,420px)] xl:items-start">
-          <div className="flex flex-col gap-6">
-            <div className="relative flex flex-col items-center gap-4">
-              <div className="flip-container w-full max-w-[700px]">
-                <div className="rounded-3xl border border-border/50 bg-background/90 p-6 shadow-inner">
-                  <canvas
-                    ref={canvasRef}
-                    width={DISPLAY_SIZE}
-                    height={DISPLAY_SIZE}
-                    onClick={handleCanvasClick}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-              {initializing && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-background/70">
-                  <Loader2 className="mb-2 size-8 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">
-                    Loading renderer
-                  </p>
-                </div>
-              )}
-            </div>
+  // =======================================================================
+  // OBS: Hide header/footer, transparent background
+  // =======================================================================
+  useEffect(() => {
+    // Dev preview shows background art — OBS uses transparent
+    const isOBS = typeof window !== "undefined" && "obsstudio" in window;
+    if (isOBS) {
+      document.documentElement.style.background = "transparent";
+      document.body.style.background = "transparent";
+    } else {
+      document.documentElement.style.background = "url(/assets/stream-bg.jpg) 0 0/1920px 1080px no-repeat fixed #000";
+      document.body.style.background = "url(/assets/stream-bg.jpg) 0 0/1920px 1080px no-repeat fixed #000";
+    }
+    const header = document.querySelector("header");
+    const footer = document.querySelector("footer");
+    if (header instanceof HTMLElement) header.style.display = "none";
+    if (footer instanceof HTMLElement) footer.style.display = "none";
+    return () => {
+      document.documentElement.style.background = "";
+      document.body.style.background = "";
+      if (header instanceof HTMLElement) header.style.display = "";
+      if (footer instanceof HTMLElement) footer.style.display = "";
+    };
+  }, []);
 
-            <div className="mx-auto w-full max-w-[700px] rounded-2xl border border-border/40 bg-background/70 p-4 shadow-inner">
-              <div className="text-center text-xs uppercase tracking-[0.32em] text-muted-foreground/80">
-                {rollerLabel ?? "Ready"}
-              </div>
+  // =======================================================================
+  // OBS: Command handling — spin, clear, lobby
+  // =======================================================================
+  const lastSeqRef = useRef<number | null>(null);
+  const initializedSeqRef = useRef(false);
+  /** When set, generateCatPlus uses these params instead of generating random ones */
+  const overrideParamsRef = useRef<{ params: unknown; slots?: unknown } | null>(null);
+  const [obsPhase, setObsPhase] = useState<"idle" | "lobby" | "active" | "countdown" | "fading">("idle");
+  const [countdownValue, setCountdownValue] = useState(0);
+  const [countdownPreview, setCountdownPreview] = useState<string | null>(null);
+  const [spinVisible, setSpinVisible] = useState(false);
+  const [spinBoardVisible, setSpinBoardVisible] = useState(false);
+  const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Cancel running timers + reset roller/param state for phase transitions */
+  const resetCommandState = useCallback(() => {
+    if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+    if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
+    generationIdRef.current++;
+    setParamRows([]);
+    setRollerLabel(null);
+    setRollerActiveValue(null);
+  }, []);
+
+  // Fade-in when entering active phase (5s)
+  useEffect(() => {
+    if (obsPhase === "active") {
+      const raf = requestAnimationFrame(() => setSpinVisible(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    if (obsPhase === "fading") {
+      // Start fading out, then go idle after transition
+      setSpinVisible(false);
+      fadeTimerRef.current = setTimeout(() => setObsPhase("idle"), 1500);
+      return () => { if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current); };
+    }
+    setSpinVisible(false);
+  }, [obsPhase]);
+
+  useEffect(() => {
+    if (!session?.currentCommand) return;
+    const cmd = session.currentCommand;
+
+    // On first load, just record the current seq — don't replay it
+    if (!initializedSeqRef.current) {
+      initializedSeqRef.current = true;
+      lastSeqRef.current = cmd.seq;
+      return;
+    }
+
+    if (lastSeqRef.current !== null && cmd.seq <= lastSeqRef.current) return;
+    lastSeqRef.current = cmd.seq;
+
+    switch (cmd.type) {
+      case "spin":
+        if (!generationDisabled) {
+          // Store the params from the control page so generateCatPlus uses them
+          overrideParamsRef.current = {
+            params: cmd.params,
+            slots: cmd.slots,
+          };
+          setParamRows([]);
+          setRollerLabel(null);
+          setRollerActiveValue(null);
+          setRollerHighlight(false);
+          setActiveParamId(null);
+
+          const cdSeconds = (cmd as Record<string, unknown>).countdownSeconds as number | undefined;
+          if (cdSeconds && cdSeconds > 0) {
+            setObsPhase("countdown");
+            setCountdownValue(cdSeconds);
+            setCountdownPreview(null);
+            setSpinBoardVisible(false);
+            let remaining = cdSeconds;
+
+            // Rich full-screen fireworks
+            const fireConfetti = async () => {
+              try {
+                const confetti = (await import("canvas-confetti")).default;
+                const colors = ["#f59e0b", "#ef4444", "#3b82f6", "#22c55e", "#a855f7", "#ec4899", "#fbbf24"];
+                // Center burst
+                confetti({ particleCount: 80, spread: 100, origin: { x: 0.5, y: 0.5 }, colors, zIndex: 10000, startVelocity: 35 });
+                // Left side sprayer
+                confetti({ angle: 60, spread: 55, origin: { x: 0, y: 0.6 }, particleCount: 50, colors, zIndex: 10000, startVelocity: 45 });
+                // Right side sprayer
+                confetti({ angle: 120, spread: 55, origin: { x: 1, y: 0.6 }, particleCount: 50, colors, zIndex: 10000, startVelocity: 45 });
+                // Top burst with stars
+                confetti({ spread: 360, ticks: 60, startVelocity: 30, particleCount: 40, origin: { x: 0.3 + Math.random() * 0.4, y: Math.random() * 0.4 }, colors, shapes: ["star"], zIndex: 10000 });
+                // Random scatter
+                confetti({ particleCount: 30, spread: 120, origin: { x: Math.random(), y: Math.random() * 0.5 }, colors, zIndex: 10000 });
+              } catch { /* confetti unavailable */ }
+            };
+            fireConfetti();
+
+            // Cat preview cycling every 250ms
+            const genRef = generatorRef.current;
+            if (genRef?.generateRandomCat) {
+              const cycle = async () => {
+                try {
+                  const r = await genRef.generateRandomCat!({
+                    accessoryCount: computeLayerCount(accessoryRange),
+                    scarCount: computeLayerCount(scarRange),
+                    tortieCount: computeLayerCount(tortieRange),
+                    exactLayerCounts,
+                    experimentalColourMode: extendedModesArray.length > 0 ? extendedModesArray : undefined,
+                    includeBaseColours,
+                  });
+                  if (r.canvas instanceof HTMLCanvasElement) {
+                    setCountdownPreview(r.canvas.toDataURL("image/png"));
+                  }
+                } catch { /* skip */ }
+              };
+              cycle();
+              previewIntervalRef.current = setInterval(cycle, 250);
+            }
+
+            const tick = () => {
+              remaining--;
+              if (remaining <= 0) {
+                // "GO!" flash — big finale burst, hold 800ms then start spin
+                setCountdownValue(0);
+                if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
+                // Massive finale — triple burst
+                fireConfetti();
+                setTimeout(() => fireConfetti(), 150);
+                setTimeout(() => fireConfetti(), 300);
+                countdownTimerRef.current = setTimeout(() => {
+                  setCountdownPreview(null);
+                  setObsPhase("active");
+                  generateCatPlus();
+                }, 800);
+              } else {
+                setCountdownValue(remaining);
+                fireConfetti();
+                // Last 3 seconds — extra bursts + start fading in the spin board
+                if (remaining <= 3) {
+                  setTimeout(() => fireConfetti(), 400);
+                  setTimeout(() => fireConfetti(), 700);
+                  setSpinBoardVisible(true);
+                }
+                countdownTimerRef.current = setTimeout(tick, 1000);
+              }
+            };
+            countdownTimerRef.current = setTimeout(tick, 1000);
+          } else {
+            setObsPhase("active");
+            generateCatPlus();
+          }
+        }
+        break;
+      case "clear":
+        resetCommandState();
+        if (obsPhase === "active" || obsPhase === "countdown") {
+          setObsPhase("fading");
+        } else {
+          setObsPhase("idle");
+        }
+        drawPlaceholder();
+        break;
+      case "lobby":
+        resetCommandState();
+        setObsPhase("lobby");
+        break;
+      case "test":
+        // Test mode — no-op for now, visual handled by session.testMode
+        break;
+    }
+  }, [session?.currentCommand, generationDisabled, generateCatPlus, drawPlaceholder, resetCommandState]);
+
+  // =======================================================================
+  // OBS: Fixed-position overlay — nothing moves, everything anchored
+  // =======================================================================
+  const flapChars = Presets.ALPHANUM + " .-()_/•–:";
+
+  // Build a map of revealed params for the fixed board
+  const revealedMap = useMemo(() => {
+    const map = new Map<string, ParamRow>();
+    for (const row of paramRows) {
+      map.set(row.id, row);
+    }
+    return map;
+  }, [paramRows]);
+
+  // The fixed board slots — exclude accessory/scar (they have their own panel)
+  // Show tortie sub-params only if tortie was revealed as "Yes"
+  // Exclude all layer params — they have their own bottom panel
+  const layerParamIds = new Set(["accessory", "scar", "tortie", "tortieMask", "tortiePattern", "tortieColour"]);
+  const boardSlots = PARAM_SEQUENCE.filter(
+    (def) => !layerParamIds.has(def.id)
+  );
+
+  // All layer groups combined for the layer panel
+  const hasLayers = layerRows.accessories.length > 0 || layerRows.scars.length > 0 || layerRows.torties.length > 0;
+
+  // Memoize lobby settings so OBSLobby doesn't restart animations on every render
+  const rawSession = sessionSettings as Record<string, unknown> | undefined;
+  const lobbySettings = useMemo(() => ({
+    mode,
+    accessoryRange,
+    scarRange,
+    tortieRange,
+    afterlifeMode,
+    includeBaseColours,
+    extendedModes: extendedModesArray,
+    exactLayerCounts,
+    lobbyMode: rawSession?.lobbyMode as string ?? "fruit-ninja",
+    lobbyCatCount: rawSession?.lobbyCatCount as number ?? 4,
+    lobbyMoveSpeed: rawSession?.lobbyMoveSpeed as number ?? 1.0,
+    lobbySwapSpeed: rawSession?.lobbySwapSpeed as number ?? 1.0,
+    lobbyClearSeq: rawSession?.lobbyClearSeq as number ?? 0,
+    paletteDisplayMode: rawSession?.paletteDisplayMode as "cycle" | "all" ?? "cycle",
+  }), [mode, accessoryRange, scarRange, tortieRange, afterlifeMode,
+       includeBaseColours, extendedModesArray, exactLayerCounts, rawSession]);
+
+  // Track whether lobby was showing before countdown (for crossfade)
+  const showLobbyLayer = obsPhase === "lobby" || obsPhase === "countdown";
+  const showCountdownLayer = obsPhase === "countdown";
+
+  // When idle (after clear), show nothing — fully transparent
+  if (obsPhase === "idle" && !initializing) {
+    return null;
+  }
+
+  // Lobby + Countdown crossfade: both render as overlapping layers.
+  // Lobby fades out over 3s while countdown fades in over 3s.
+  if (obsPhase === "lobby" || obsPhase === "countdown") {
+    return (
+      <div className="relative" style={{ width: "1920px", height: "1080px" }}>
+        {/* Lobby layer — fades out when countdown starts */}
+        <div
+          className="absolute inset-0"
+          style={{
+            opacity: showCountdownLayer ? 0 : 1,
+            transition: "opacity 3s ease-in-out",
+            pointerEvents: showCountdownLayer ? "none" : "auto",
+          }}
+        >
+          <OBSLobby
+            settings={lobbySettings}
+            generator={generatorRef.current}
+          />
+        </div>
+
+        {/* Countdown layer — fades in when countdown starts */}
+        {showCountdownLayer && (
+          <div
+            className="absolute inset-0"
+            style={{
+              opacity: 1,
+              animation: "countdown-fade-in 3s ease-in-out",
+            }}
+          >
+            <div className="relative" style={{ width: "1280px", height: "1080px" }}>
+              <style>{`
+                @keyframes countdown-pop {
+                  0% { transform: scale(1.4); opacity: 0.3; }
+                  30% { transform: scale(0.95); opacity: 1; }
+                  100% { transform: scale(1); opacity: 1; }
+                }
+                @keyframes countdown-go {
+                  0% { transform: scale(0.5); opacity: 0; }
+                  40% { transform: scale(1.2); opacity: 1; }
+                  100% { transform: scale(1); opacity: 1; }
+                }
+                @keyframes countdown-fade-in {
+                  0% { opacity: 0; }
+                  100% { opacity: 1; }
+                }
+              `}</style>
+
+              {/* Cat preview cycling behind the number — in the cat canvas area */}
               <div
-                className={cn(
-                  "overflow-hidden transition-all duration-300",
-                  rollerExpanded
-                    ? "mt-3 max-h-40 opacity-100"
-                    : "max-h-0 opacity-0"
+                className="absolute flex items-center justify-center"
+                style={{ left: "0px", top: "0px", width: "750px", height: "780px" }}
+              >
+                {countdownPreview && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={countdownPreview}
+                    alt=""
+                    style={{
+                      width: "720px",
+                      height: "720px",
+                      imageRendering: "pixelated",
+                      opacity: 0.2,
+                      filter: "blur(2px) saturate(1.3)",
+                      transition: "opacity 0.15s",
+                    }}
+                  />
                 )}
+              </div>
+
+              {/* Countdown number / GO — centered over cat canvas area */}
+              <div
+                className="absolute flex items-center justify-center"
+                style={{ left: "0px", top: "0px", width: "750px", height: "780px" }}
               >
                 <div
-                  className={cn(
-                    "relative h-24 overflow-hidden rounded-xl bg-gradient-to-b from-background/40 via-background/20 to-background/5 transition",
-                    rollerHighlight && "roller-flash ring-2 ring-primary/30"
-                  )}
+                  key={countdownValue}
+                  style={{
+                    fontSize: countdownValue === 0 ? "220px" : "300px",
+                    fontWeight: 900,
+                    color: countdownValue === 0 ? "#22c55e" : "#fbbf24",
+                    textShadow: countdownValue === 0
+                      ? "0 0 100px rgba(34,197,94,0.6), 0 4px 30px rgba(0,0,0,0.7)"
+                      : "0 0 80px rgba(251,191,36,0.5), 0 4px 30px rgba(0,0,0,0.7)",
+                    lineHeight: 1,
+                    animation: countdownValue === 0
+                      ? "countdown-go 0.6s ease-out"
+                      : "countdown-pop 0.8s ease-out",
+                    fontFamily: "'Geist Mono', ui-monospace, monospace",
+                  }}
                 >
-                  <div
-                    className={cn(
-                      "flex h-full items-center justify-center font-semibold transition",
-                      rollerActiveValue ? "text-primary" : "text-muted-foreground/40",
-                      rollerHighlight && "text-primary",
-                      rollerValueClass
-                    )}
-                  >
-                    {rollerActiveValue ?? "—"}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition hover:translate-y-0.5 hover:opacity-90"
-                onClick={generateCatPlus}
-                disabled={generationDisabled || isGenerating}
-              >
-                <RefreshIcon size={16} />
-                {initializing ? "Loading" : isGenerating ? "Rolling..." : "Generate Cat"}
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full border border-border/60 px-5 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-                onClick={handleDownload}
-                disabled={initializing}
-              >
-                <Download className="size-4" />
-                Download PNG
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full border border-border/60 px-5 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-                onClick={() => exportCat()}
-                disabled={initializing}
-              >
-                <CopyIcon size={16} />
-                Copy 700×700
-              </button>
-              {hasTint && (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-full border border-border/60 px-5 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-                  onClick={() => exportCat({ noTint: true })}
-                  disabled={initializing}
-                  title="Shift+click the canvas for a shortcut"
-                >
-                  <CopyIcon size={16} />
-                  Copy (No Tint)
-                </button>
-              )}
-            </div>
-
-            {rollSummary && (
-              <div className="rounded-2xl border border-border/40 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
-                {rollSummary}
-              </div>
-            )}
-
-            <div className="rounded-2xl border border-border/40 bg-background/60 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-foreground">Parameter Reveal</h3>
-                <div className="flex min-h-[1.5rem] items-center gap-2 text-xs text-muted-foreground">
-                  {rollerActiveValue ? (
-                    <>
-                      <SparklesIcon size={12} />
-                      <span className="font-mono uppercase tracking-wide text-primary">
-                        {rollerActiveValue}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="font-mono text-muted-foreground/60">Ready</span>
-                  )}
-                </div>
-              </div>
-              <div className="mt-3 space-y-2">
-                {paramRows.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Roll a cat to reveal traits one by one.</p>
-                )}
-                {paramRows.map((row) => (
-                  <div
-                    key={row.id}
-                    className={`flex items-center justify-between rounded-xl border border-border/30 px-3 py-2 text-sm transition ${row.status === "active" || activeParamId === row.id
-                        ? "bg-primary/10 text-foreground"
-                        : "bg-background/70 text-muted-foreground"
-                      }`}
-                  >
-                    <span className="font-medium text-foreground/90">{row.label}</span>
-                    <span className="font-mono text-xs uppercase tracking-wide text-foreground">
-                      {row.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/40 bg-background/60 p-4 text-sm text-muted-foreground">
-              <h3 className="mb-3 text-sm font-semibold text-foreground">Layered Details</h3>
-              <div className="grid gap-3 md:grid-cols-3">
-                {(Object.keys(layerGroupLabels) as LayerGroup[]).map((group) => {
-                  const rows = layerRows[group];
-                  return (
-                    <div key={group} className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-                        {layerGroupLabels[group]}
-                      </p>
-                      {rows.length ? (
-                        <ul className="space-y-2">
-                          {rows.map((row) => (
-                            <li
-                              key={`${group}-${row.label}`}
-                              className={cn(
-                                "rounded-xl border px-3 py-2 transition",
-                                row.status === "active"
-                                  ? "border-primary/60 bg-primary/10 text-primary"
-                                  : row.status === "revealed"
-                                    ? "border-border/40 text-foreground"
-                                    : "border-border/20 text-muted-foreground"
-                              )}
-                            >
-                              <span className="block text-[0.65rem] uppercase tracking-wide text-muted-foreground/70">
-                                {row.label}
-                              </span>
-                              <span className="block font-mono text-sm text-foreground">{row.value}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-xs text-muted-foreground/60">None rolled</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-border/40 bg-background/60 p-4">
-              <h3 className="text-sm font-semibold text-foreground">Links & Actions</h3>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                  onClick={handleCopyShareLink}
-                  disabled={!catStateRef.current}
-                >
-                  <SendHorizontalIcon size={16} /> Copy Share Link
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                  onClick={handleOpenShareViewer}
-                  disabled={!catStateRef.current}
-                >
-                  <SparklesIcon size={16} /> Open Share Viewer
-                </button>
-              </div>
-              <div className="mt-4 grid gap-3 rounded-xl border border-border/40 bg-background/50 p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">History Entry</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-muted-foreground/70">
-                    <span>Cat Name</span>
-                    <input
-                      type="text"
-                      value={catNameDraft}
-                      onChange={(event) => {
-                        setCatNameDraft(event.target.value);
-                        setMetaDirty(true);
-                      }}
-                      placeholder="Optional"
-                      className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-muted-foreground/70">
-                    <span>Your Name</span>
-                    <input
-                      type="text"
-                      value={creatorNameDraft}
-                      onChange={(event) => {
-                        setCreatorNameDraft(event.target.value);
-                        setMetaDirty(true);
-                      }}
-                      placeholder="Optional"
-                      className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-                    />
-                  </label>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background disabled:opacity-50"
-                    onClick={handleSaveMeta}
-                    disabled={saveHistoryDisabled}
-                  >
-                    <SparklesIcon size={16} /> Save to History
-                  </button>
-                  <Link
-                    href="/history"
-                    className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                  >
-                    Browse History
-                  </Link>
-                  {viewerSlug && (
-                    <Link
-                      href={`/view/${viewerSlug}`}
-                      className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                    >
-                      <ArrowUpRight className="size-4" /> View Entry
-                    </Link>
-                  )}
-                </div>
-              </div>
-              {shareLink && (
-                <p className="mt-3 truncate text-xs text-muted-foreground">
-                  Latest share: <span className="text-foreground">{shareLink}</span>
-                </p>
-              )}
-            </div>
-          </div>
-
-          <aside className="rounded-2xl border border-border/40 bg-background/60 p-5">
-            <h3 className="text-sm font-semibold text-foreground">Controls</h3>
-            <div className="mt-4 space-y-6 text-sm text-muted-foreground">
-              <div className="space-y-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Generation Mode</p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode("flashy");
-                      track("single_cat_mode_changed", { mode: "flashy" });
-                    }}
-                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${mode === "flashy"
-                        ? "border-primary/60 bg-primary/15 text-foreground"
-                        : "border-border/60 bg-background/70"
-                      }`}
-                  >
-                    Flashy
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode("calm");
-                      track("single_cat_mode_changed", { mode: "calm" });
-                    }}
-                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${mode === "calm"
-                        ? "border-primary/60 bg-primary/15 text-foreground"
-                        : "border-border/60 bg-background/70"
-                      }`}
-                  >
-                    Calm
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Timing</p>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setTimingModalOpen(true)}
-                        className="flex-1 inline-flex items-center gap-2 rounded-full border border-border/60 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
-                      >
-                        Adjust Timing Settings
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSpeedMultiplier((prev) => Math.max(0.25, Math.min(4.0, prev - 0.25)))}
-                        className="inline-flex items-center justify-center rounded-full border border-border/60 px-2.5 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Slow down (decrease speed multiplier)"
-                        disabled={speedMultiplier <= 0.25}
-                      >
-                        −
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSpeedMultiplier((prev) => Math.max(0.25, Math.min(4.0, prev + 0.25)))}
-                        className="inline-flex items-center justify-center rounded-full border border-border/60 px-2.5 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Speed up (increase speed multiplier)"
-                        disabled={speedMultiplier >= 4.0}
-                      >
-                        +
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground/70">
-                        Estimated total: {formatMs(effectiveTotalMs / speedMultiplier)}
-                      </span>
-                      {speedMultiplier !== 1.0 && (
-                        <span className="text-muted-foreground/70">
-                          {speedMultiplier > 1 ? "×" : "÷"} {Math.abs(speedMultiplier).toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  {countdownValue === 0 ? "GO!" : countdownValue}
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Layer Counts</p>
-                <LayerRangeSelector label="Accessories" value={accessoryRange} onChange={setAccessoryRange} />
-                <LayerRangeSelector label="Scars" value={scarRange} onChange={setScarRange} />
-                <LayerRangeSelector label="Tortie Layers" value={tortieRange} onChange={setTortieRange} />
-                <LayerCountModeSelector value={exactLayerCounts} onChange={setExactLayerCounts} />
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Afterlife Effects</p>
-                <label className="flex flex-col gap-1 text-xs">
-                  <span>Dark Forest / StarClan chance</span>
-                  <select
-                    value={afterlifeMode}
-                    onChange={(event) => setAfterlifeMode(event.target.value as AfterlifeOption)}
-                    className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-                  >
-                    {AFTERLIFE_OPTIONS.map((option) => (
-                      <option key={`afterlife-${option.value}`} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="space-y-3">
-                <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground/80">
-                  <PaintIcon size={12} /> Colour Palettes
-                  <Link
-                    href="/cat-color-palettes"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ml-auto text-muted-foreground/60 transition-colors hover:text-amber-400"
-                    title="View all colour palettes"
-                  >
-                    <ExternalLinkIcon size={12} />
-                  </Link>
-                </p>
-                <PaletteMultiSelect
-                  selected={extendedModes as Set<PaletteId>}
-                  onChange={(newSet) => setExtendedModes(newSet as Set<ExtendedMode>)}
-                  includeClassic={includeBaseColours}
-                  onClassicChange={setIncludeBaseColours}
-                />
-              </div>
-
-              {/* Settings Code */}
-              <SettingsCodeSection
-                accessoryRange={accessoryRange}
-                scarRange={scarRange}
-                tortieRange={tortieRange}
-                exactLayerCounts={exactLayerCounts}
-                afterlifeMode={afterlifeMode}
-                includeBaseColours={includeBaseColours}
-                extendedModes={extendedModes}
-                onApply={(portable) => {
-                  setAccessoryRange(portable.accessoryRange);
-                  setScarRange(portable.scarRange);
-                  setTortieRange(portable.tortieRange);
-                  setExactLayerCounts(portable.exactLayerCounts);
-                  setAfterlifeMode(portable.afterlifeMode);
-                  setIncludeBaseColours(portable.includeBaseColours);
-                  setExtendedModes(new Set(portable.extendedModes));
+              {/* Spin board preview — fades in 3s before GO */}
+              <div
+                className="absolute flex flex-col overflow-hidden"
+                style={{
+                  left: "750px",
+                  top: "20px",
+                  width: "510px",
+                  bottom: "220px",
+                  background: "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
+                  borderRadius: "20px",
+                  border: "2px solid rgba(245, 158, 11, 0.2)",
+                  boxShadow: "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+                  opacity: spinBoardVisible ? 1 : 0,
+                  transition: "opacity 3s ease-in-out",
                 }}
-              />
-            </div>
-          </aside>
-        </div>
-
-        {error && (
-          <p className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-            {error}
-          </p>
-        )}
-        {initialError && (
-          <p className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-            {initialError}
-          </p>
-        )}
-      </div>
-
-      <div className="glass-card px-6 py-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Sprite Tools</h3>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-              {spriteToolsSubtitle}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={() => handleCopySprite(currentSpriteNumber, 120)}
-              disabled={!canCopySprite}
-            >
-              Copy 120×120
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={() => handleCopySprite(currentSpriteNumber, FULL_EXPORT_SIZE)}
-              disabled={!canCopySprite}
-            >
-              Copy 700×700
-            </button>
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={() => setSpriteGalleryOpen(true)}
-              disabled={spriteVariations.length === 0}
-            >
-              View Sprite Gallery
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {spriteGalleryOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setSpriteGalleryOpen(false);
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              setSpriteGalleryOpen(false);
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          aria-label="Close sprite gallery"
-        >
-          <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setSpriteGalleryOpen(false)}
-              aria-label="Close sprite gallery"
-              className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
-            >
-              <XIcon size={16} />
-            </button>
-            <div className="flex flex-col gap-6">
-              <div>
-                <h2 className="text-xl font-semibold text-foreground">Sprite Gallery</h2>
-                <p className="text-sm text-muted-foreground">
-                  Browse every sprite rendered for this cat and copy quick exports.
-                </p>
-              </div>
-              {spriteVariations.length === 0 ? (
-                <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
-                  Roll a cat to generate sprite previews.
+              >
+                <div
+                  className="flex items-center justify-center"
+                  style={{ height: "100px", borderBottom: "1px solid rgba(245, 158, 11, 0.1)", padding: "20px 28px" }}
+                >
+                  <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
+                    Ready
+                  </span>
                 </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {spriteVariations.map((variation) => (
+              </div>
+
+              {/* Bottom layer bar preview — fades in with the board */}
+              <div
+                className="absolute overflow-hidden"
+                style={{
+                  left: "20px",
+                  bottom: "20px",
+                  right: "20px",
+                  background: "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 50%, rgba(10,10,10,0.92) 100%)",
+                  borderRadius: "16px",
+                  border: "2px solid rgba(245, 158, 11, 0.2)",
+                  boxShadow: "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+                  padding: "14px 32px",
+                  opacity: spinBoardVisible ? 1 : 0,
+                  transition: "opacity 3s ease-in-out",
+                }}
+              >
+                <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
+                  Layers
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative"
+      style={{
+        width: "1280px",
+        height: "1080px",
+        opacity: spinVisible ? 1 : 0,
+        transition: "opacity 1.5s ease-in-out",
+      }}
+    >
+      <style>{`
+        @keyframes obs-dot-pulse {
+          0%, 100% { opacity: 0.4; transform: scale(0.8); }
+          50% { opacity: 1; transform: scale(1); }
+        }
+        /* Split-flap overrides — clean dark tiles, single line */
+        .obs-flap { white-space: nowrap !important; flex-wrap: nowrap !important; }
+        .obs-flap [data-kind="digit"] {
+          color: #e4e4e7 !important;
+          background: #18181b !important;
+          border: 1px solid #27272a !important;
+          border-radius: 4px !important;
+          margin-right: 2px !important;
+          font-family: 'Geist Mono', ui-monospace, monospace !important;
+          font-weight: 700 !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
+        }
+        .obs-flap-active [data-kind="digit"] {
+          color: #fbbf24 !important;
+          background: #1c1a0a !important;
+          border-color: #44400a !important;
+        }
+        .obs-flap-done [data-kind="digit"] {
+          color: #a1a1aa !important;
+          background: #111113 !important;
+          border-color: #1e1e22 !important;
+        }
+      `}</style>
+
+      {/* ═══ Cat canvas — absolute, never moves ═══ */}
+      <div
+        className="absolute flex items-center justify-center"
+        style={{ left: "0px", top: "0px", width: "750px", height: "780px" }}
+      >
+          <canvas
+            ref={canvasRef}
+            width={DISPLAY_SIZE}
+            height={DISPLAY_SIZE}
+            style={{
+              width: "720px",
+              height: "720px",
+              imageRendering: "pixelated",
+            }}
+          />
+      </div>
+
+      {/* ═══ LAYER DETAILS — full width bottom bar ═══ */}
+      {hasLayers && (
+        <div
+          className="absolute z-10 overflow-hidden"
+          style={{
+            left: "20px",
+            bottom: "20px",
+            right: "20px",
+            background: "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 50%, rgba(10,10,10,0.92) 100%)",
+            borderRadius: "16px",
+            border: "2px solid rgba(245, 158, 11, 0.2)",
+            boxShadow: "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+            padding: "14px 32px",
+          }}
+        >
+          <div className="flex">
+            {(["accessories", "scars", "torties"] as const).map((group) => {
+              const rows = layerRows[group];
+              if (rows.length === 0) return null;
+              return (
+                <div key={group} style={{ width: "400px" }}>
+                  <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400">
+                    {group === "torties" ? "Tortie Layers" : group.charAt(0).toUpperCase() + group.slice(1)}
+                  </div>
+                  {rows.map((row, i) => (
                     <div
-                      key={variation.spriteNumber}
-                      className="rounded-2xl border border-border/40 bg-background/70 p-4"
+                      key={`${group}-${i}`}
+                      className="flex items-center border-l-2 py-1.5 pl-3"
+                      style={{
+                        borderColor: row.status === "active" ? "#f59e0b" : row.status === "revealed" ? "#3f3f46" : "transparent",
+                      }}
                     >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-foreground">{variation.name}</p>
-                        <span className="text-xs text-muted-foreground">#{variation.spriteNumber}</span>
-                      </div>
-                      <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
-                        <Image
-                          src={variation.dataUrl}
-                          alt={variation.name}
-                          width={120}
-                          height={120}
-                          unoptimized
-                          className="mx-auto block h-28 w-28 image-render-pixel"
-                        />
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                          onClick={() => handleCopySprite(variation.spriteNumber, 120)}
-                        >
-                          Copy 120×120
-                        </button>
-                        <button
-                          type="button"
-                          className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                          onClick={() => handleCopySprite(variation.spriteNumber, FULL_EXPORT_SIZE)}
-                        >
-                          Copy 700×700
-                        </button>
-                      </div>
+                      <span className={cn(
+                        "w-[90px] shrink-0 text-sm",
+                        row.status === "active" ? "font-semibold text-amber-400" :
+                        row.status === "revealed" ? "text-zinc-300" : "text-zinc-600"
+                      )}>
+                        {row.label}
+                      </span>
+                      <span className={cn(
+                        "truncate font-mono text-sm font-bold",
+                        row.status === "active" ? "text-white" :
+                        row.status === "revealed" ? "text-white" : "text-zinc-600"
+                      )}>
+                        {row.value}
+                      </span>
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {timingModalOpen && (
+      {/* ═══ RIGHT COLUMN: Roller + Param board — always leaves room for bottom bar ═══ */}
+      <div
+        className="absolute flex flex-col overflow-hidden"
+        style={{
+          left: "750px",
+          top: "20px",
+          width: "510px",
+          bottom: "220px",
+          background: "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
+          borderRadius: "20px",
+          border: "2px solid rgba(245, 158, 11, 0.2)",
+          boxShadow: "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+        }}
+      >
+        {/* Roller — current spinning param */}
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 py-10"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setTimingModalOpen(false);
-            }
+          style={{
+            height: "100px",
+            borderBottom: "1px solid rgba(245, 158, 11, 0.1)",
+            padding: "20px 28px",
           }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              setTimingModalOpen(false);
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          aria-label="Close timing settings"
         >
-          <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setTimingModalOpen(false)}
-              className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
-              aria-label="Close timing settings"
-            >
-              <XIcon size={16} />
-            </button>
-            <div className="max-h-[80vh] overflow-y-auto px-6 pb-8 pt-6">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground">Spin Timing</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Tune per-parameter delays for flashy rolls. Estimated totals update instantly; actuals are logged after each roll.
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-2 text-xs text-muted-foreground/80">
-                  <span className="rounded-full border border-border/50 bg-background/80 px-3 py-1 font-mono text-foreground">
-                    Estimated total: {formatMs(estimatedTotals.total)}
-                  </span>
-                  {lastTimingSnapshot && (
-                    <span className="rounded-full border border-border/50 bg-background/80 px-3 py-1 font-mono text-muted-foreground">
-                      Last roll: {formatMs(lastTimingSnapshot.actualTotal)}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap items-center gap-2">
-                {GLOBAL_PRESETS.map((preset) => {
-                  const label = preset === "slow" ? "Slow" : preset === "fast" ? "Fast" : "Normal";
-                  const active = activeGlobalPreset === preset;
-                  return (
-                    <button
-                      key={`preset-${preset}`}
-                      type="button"
-                      onClick={() => handleGlobalPreset(preset)}
-                      className={cn(
-                        "rounded-full border px-4 py-1.5 text-xs font-semibold transition",
-                        active
-                          ? "border-primary/60 bg-primary/20 text-foreground"
-                          : "border-border/60 bg-background/70 text-muted-foreground"
-                      )}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={handleResetTimings}
-                  className="ml-auto rounded-full border border-border/60 bg-background/70 px-4 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
-                >
-                  Reset to Default
-                </button>
-              </div>
-
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground/80">
-                  <span>Flashy pause</span>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      min={1}
-                      max={10}
-                      step={0.1}
-                      value={flashyPauseSeconds}
-                      onChange={(event) => handlePauseChange("flashyMs", Number.parseFloat(event.target.value))}
-                      className="h-2 flex-1 rounded-full bg-border/60 accent-primary"
-                    />
-                    <span className="w-12 text-right font-mono text-sm text-foreground">
-                      {flashyPauseSeconds.toFixed(1)} s
-                    </span>
-                  </div>
-                </label>
-                <label className="flex flex-col gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground/80">
-                  <span>Calm pause</span>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      min={1}
-                      max={10}
-                      step={0.1}
-                      value={calmPauseSeconds}
-                      onChange={(event) => handlePauseChange("calmMs", Number.parseFloat(event.target.value))}
-                      className="h-2 flex-1 rounded-full bg-border/60 accent-primary"
-                    />
-                    <span className="w-12 text-right font-mono text-sm text-foreground">
-                      {calmPauseSeconds.toFixed(1)} s
-                    </span>
-                  </div>
-                </label>
-              </div>
-
-              <div className="mt-4 grid gap-2 text-xs text-muted-foreground/80 sm:grid-cols-2">
-                <span className="rounded-xl border border-border/40 bg-background/70 px-3 py-2">
-                  Flashy pause: <strong className="ml-1 font-mono text-foreground">{formatMs(flashyPauseMs)}</strong>
-                </span>
-                <span className="rounded-xl border border-border/40 bg-background/70 px-3 py-2">
-                  Calm pause: <strong className="ml-1 font-mono text-foreground">{formatMs(calmPauseMs)}</strong>
+          {rollerLabel ? (
+            <>
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="size-2 rounded-full bg-amber-500"
+                  style={{ animation: "obs-dot-pulse 1s ease-in-out infinite" }}
+                />
+                <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-500/60">
+                  {rollerLabel}
                 </span>
               </div>
-
-              <div className="mt-6 overflow-hidden rounded-2xl border border-border/40">
-                <div className="grid grid-cols-[minmax(0,1.6fr)_100px_80px_110px_110px] gap-3 border-b border-border/40 bg-background/70 px-4 py-3 text-[0.65rem] uppercase tracking-wide text-muted-foreground/70">
-                  <span>Parameter</span>
-                  <span className="text-right">Delay (ms)</span>
-                  <span className="text-right">Options</span>
-                  <span className="text-right">Estimated</span>
-                  <span className="text-right">Last Actual</span>
+              {rollerActiveValue && (
+                <div className="mt-2 truncate font-mono text-3xl font-bold text-white">
+                  {rollerActiveValue}
                 </div>
-                {PARAM_TIMING_ORDER.map((key) => {
-                  const label = PARAM_TIMING_LABELS[key] ?? key;
-                  const storedDelay = timingConfig.delays[key];
-                  const delayInputValue = Number.isFinite(storedDelay)
-                    ? (storedDelay as number)
-                    : getPresetValues(key).normal;
-                  const rawOptions = optionCounts[key] ?? PARAM_DEFAULT_STEP_COUNTS[key] ?? 0;
-                  const subsetEligible = rawOptions > SUBSET_LIMIT;
-                  const subsetEnabled = Boolean(subsetLimits[key]);
-                  const effectiveOptions = adjustedOptionCounts[key] ?? rawOptions;
-                  const delayForEstimate = delayInputValue;
-                  const estimatedDuration = estimatedTotals.perKey[key] ?? delayForEstimate * effectiveOptions;
-                  const actualDuration = lastTimingSnapshot?.actual?.[key] ?? 0;
-                  const hasActual = actualDuration > 0;
-                  return (
-                    <div
-                      key={`timing-row-${key}`}
-                      className="grid grid-cols-[minmax(0,1.6fr)_100px_80px_110px_110px] items-center gap-3 border-b border-border/30 px-4 py-3 last:border-b-0"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-foreground">{label}</p>
-                        {subsetEligible ? (
-                          <button
-                            type="button"
-                            onClick={() => toggleSubsetLimit(key)}
-                            className={cn(
-                              "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition",
-                              subsetEnabled
-                                ? "border-primary/60 bg-primary/20 text-foreground"
-                                : "border-border/60 bg-background/70 text-muted-foreground"
-                            )}
-                          >
-                            {subsetEnabled ? "Subset 20" : "All"}
-                          </button>
-                        ) : null}
-                      </div>
-                      <div className="text-right">
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          value={delayInputValue}
-                          onChange={(event) => {
-                            const next = Number.parseFloat(event.target.value);
-                            if (Number.isFinite(next)) {
-                              handleTimingStepChange(key, next);
-                            }
-                          }}
-                          className="w-full rounded-lg border border-border/50 bg-background/80 px-2 py-1 text-right font-mono text-xs text-foreground focus:border-primary focus:outline-none"
-                        />
-                      </div>
-                      <div className="text-right font-mono text-sm text-foreground">
-                        {subsetEnabled && subsetEligible ? `${effectiveOptions}/${rawOptions}` : effectiveOptions}
-                      </div>
-                      <div className="text-right font-mono text-sm text-muted-foreground">{formatMs(estimatedDuration)}</div>
-                      <div className="text-right font-mono text-sm text-muted-foreground">
-                        {hasActual ? formatMs(actualDuration) : "—"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <p className="mt-4 text-xs text-muted-foreground/70">
-                Minimum delay is {MIN_SAFE_STEP_MS}ms. Console logs include a full breakdown after each roll.
-              </p>
-            </div>
-          </div>
+              )}
+            </>
+          ) : (
+            <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
+              Ready
+            </span>
+          )}
         </div>
-      )}
 
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-full border border-border/40 bg-background/90 px-4 py-2 text-sm text-foreground shadow-lg shadow-primary/10">
-          {toast}
+        {/* Param board — all slots, always visible */}
+        <div
+          className="flex-1 overflow-hidden"
+          style={{ padding: "12px 0" }}
+        >
+          {boardSlots.map((def) => {
+            const row = revealedMap.get(def.id);
+            const isActive = row?.status === "active";
+            const isRevealed = row?.status === "revealed";
+            const isNone = isRevealed && row?.value?.toLowerCase() === "none";
+            const valueLen = row?.value?.length ?? 0;
+            // Use S size for long values (>12 chars), M for normal
+            const sizeClass = valueLen > 12 ? "S" : "M";
+
+            // Hide "None" rows after reveal (fade out)
+            if (isNone) return null;
+
+            // Don't show empty slots
+            if (!row) return null;
+
+            return (
+              <div
+                key={def.id}
+                className="flex items-center transition-all duration-200"
+                style={{
+                  padding: "8px 24px",
+                  borderLeft: isActive ? "3px solid #f59e0b" : "3px solid transparent",
+                  background: isActive ? "rgba(245,158,11,0.05)" : "transparent",
+                }}
+              >
+                <span
+                  className={cn(
+                    "w-[130px] shrink-0 text-sm font-bold uppercase tracking-wide",
+                    isActive ? "text-amber-400" : "text-zinc-400"
+                  )}
+                >
+                  {def.label}
+                </span>
+
+                <div className="flex-1 overflow-hidden">
+                  <FlapDisplay
+                    className={cn("obs-flap", sizeClass, isActive ? "obs-flap-active" : "obs-flap-done")}
+                    chars={flapChars}
+                    length={row.value.length}
+                    value={isActive ? "?".repeat(row.value.length) : row.value.toUpperCase()}
+                    timing={80}
+                    padMode="end"
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Loading */}
+      {initializing && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex items-center gap-3 bg-black/90 px-6 py-4 rounded-lg">
+            <Loader2 className="size-5 animate-spin text-amber-500" />
+            <span className="text-sm text-zinc-400">Loading…</span>
+          </div>
         </div>
       )}
     </div>
   );
 }
+

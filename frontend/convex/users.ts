@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server.js";
+import { query, mutation, internalQuery } from "./_generated/server.js";
 import { v } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server.js";
 
@@ -58,11 +58,22 @@ export const getOrCreateUser = mutation({
     }
 
     const existing = await getUserByToken(ctx, identity.tokenIdentifier);
-    if (existing) return existing;
+    if (existing) {
+      // Backfill apiKey for users created before the field existed
+      if (!existing.apiKey) {
+        await ctx.db.patch(existing._id, {
+          apiKey: crypto.randomUUID(),
+          updatedAt: Date.now(),
+        });
+        return await ctx.db.get(existing._id);
+      }
+      return existing;
+    }
 
     const id = await ctx.db.insert("users", {
       tokenIdentifier: identity.tokenIdentifier,
       showProfilePic: true,
+      apiKey: crypto.randomUUID(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -109,6 +120,44 @@ export const updateProfile = mutation({
       }),
     });
     return await ctx.db.get(user._id);
+  },
+});
+
+/**
+ * Regenerate the authenticated user's API key.
+ */
+export const regenerateApiKey = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await getUserByToken(ctx, identity.tokenIdentifier);
+    if (!user) {
+      throw new Error("User not found. Please sign in again.");
+    }
+
+    const newKey = crypto.randomUUID();
+    await ctx.db.patch(user._id, {
+      apiKey: newKey,
+      updatedAt: Date.now(),
+    });
+    return newKey;
+  },
+});
+
+/**
+ * Look up a user by API key. Internal only — used by the stream session backend.
+ */
+export const getUserByApiKey = internalQuery({
+  args: { apiKey: v.string() },
+  handler: async (ctx, args) => {
+    return ctx.db
+      .query("users")
+      .withIndex("byApiKey", (q) => q.eq("apiKey", args.apiKey))
+      .unique();
   },
 });
 

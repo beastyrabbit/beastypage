@@ -328,11 +328,37 @@ export default defineSchema({
     tokenIdentifier: v.string(),
     username: v.optional(v.string()),
     showProfilePic: v.boolean(),
+    apiKey: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("byTokenIdentifier", ["tokenIdentifier"])
-    .index("byUsername", ["username"]),
+    .index("byUsername", ["username"])
+    .index("byApiKey", ["apiKey"]),
+
+  cat_stream_sessions: defineTable({
+    userId: v.id("users"),
+    status: v.union(v.literal("active"), v.literal("idle")),
+    settings: v.any(),
+    currentCommand: v.optional(v.object({
+      type: v.union(
+        v.literal("spin"),
+        v.literal("countdown"),
+        v.literal("clear"),
+        v.literal("test"),
+        v.literal("lobby"),
+      ),
+      seq: v.number(),
+      params: v.optional(v.any()),
+      slots: v.optional(v.any()),
+      countdownSeconds: v.optional(v.number()),
+      timestamp: v.number(),
+    })),
+    testMode: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("byUserId", ["userId"]),
 
   user_variants: defineTable({
     userId: v.id("users"),
