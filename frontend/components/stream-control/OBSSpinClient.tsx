@@ -3952,6 +3952,8 @@ interface FlyingCat {
   duration: number;
   peakY: number;
   rotation: number;
+  size: number; // 1.0 to 2.0
+  mode: "fruit-ninja" | "matrix" | "dvd"; // locked at spawn time
 }
 
 function OBSLobby({
@@ -4060,11 +4062,13 @@ function OBSLobby({
         return [...alive, {
           id: catIdRef.current++,
           frames,
-          x: Math.random() * 85,
+          x: Math.random() * 90,
           startTime: Date.now(),
           duration: baseDuration,
           peakY: 250 + Math.random() * 500,
           rotation: -60 + Math.random() * 120,
+          size: 1 + Math.random(),
+          mode: lobbyMode,
         }];
       });
     };
@@ -4105,8 +4109,8 @@ function OBSLobby({
   const currentPalette = selectedPalettes[paletteIdx];
 
   return (
-    <div className="relative" style={{ width: "1280px", height: "1080px" }}>
-      {/* Settings display */}
+    <div className="relative" style={{ width: "1920px", height: "1080px" }}>
+      {/* Settings display — stays in the left 2/3 */}
       <div
         className="absolute"
         style={{
@@ -4189,14 +4193,15 @@ function OBSLobby({
       {/* Flying cats — full screen, above everything */}
       <div className="absolute inset-0 z-50 overflow-hidden">
         {flyingCats.map((cat) => (
-          <FlyingCatSprite key={cat.id} cat={cat} mode={lobbyMode} swapSpeed={swapSpeed} moveSpeed={moveSpeed} />
+          <FlyingCatSprite key={cat.id} cat={cat} swapSpeed={swapSpeed} moveSpeed={moveSpeed} />
         ))}
       </div>
     </div>
   );
 }
 
-function FlyingCatSprite({ cat, mode = "fruit-ninja", swapSpeed = 1, moveSpeed = 1 }: { cat: FlyingCat; mode?: "fruit-ninja" | "matrix" | "dvd"; swapSpeed?: number; moveSpeed?: number }) {
+function FlyingCatSprite({ cat, swapSpeed = 1, moveSpeed = 1 }: { cat: FlyingCat; swapSpeed?: number; moveSpeed?: number }) {
+  const mode = cat.mode;
   const ref = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const frameRef = useRef(0);
@@ -4228,21 +4233,21 @@ function FlyingCatSprite({ cat, mode = "fruit-ninja", swapSpeed = 1, moveSpeed =
         ref.current.style.left = `${cat.x}%`;
         ref.current.style.top = `${yPos}px`;
         ref.current.style.bottom = "auto";
-        ref.current.style.transform = `scale(0.9)`;
+        ref.current.style.transform = `scale(${0.9 * cat.size})`;
         ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
       } else if (mode === "dvd") {
         // Bounce around — never expires
         const d = dvdRef.current;
         d.px += d.vx * 2 * moveSpeed;
         d.py += d.vy * 2 * moveSpeed;
-        if (d.px <= 0 || d.px >= 1160) d.vx *= -1;
+        if (d.px <= 0 || d.px >= 1780) d.vx *= -1;
         if (d.py <= 0 || d.py >= 960) d.vy *= -1;
-        d.px = Math.max(0, Math.min(1160, d.px));
+        d.px = Math.max(0, Math.min(1780, d.px));
         d.py = Math.max(0, Math.min(960, d.py));
         ref.current.style.left = `${d.px}px`;
         ref.current.style.top = `${d.py}px`;
         ref.current.style.bottom = "auto";
-        ref.current.style.transform = "scale(0.85)";
+        ref.current.style.transform = `scale(${0.85 * cat.size})`;
         ref.current.style.opacity = "1";
       } else {
         // Fruit ninja — arc from bottom
@@ -4269,8 +4274,8 @@ function FlyingCatSprite({ cat, mode = "fruit-ninja", swapSpeed = 1, moveSpeed =
         src={cat.frames[0]}
         alt=""
         style={{
-          width: "120px",
-          height: "120px",
+          width: `${Math.round(120 * cat.size)}px`,
+          height: `${Math.round(120 * cat.size)}px`,
           imageRendering: "pixelated",
           filter: [
             "drop-shadow(2px 0 0 white)",
