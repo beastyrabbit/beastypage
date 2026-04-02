@@ -1,8 +1,7 @@
 /**
- * Minimal layout for the OBS overlay page.
- * CSS custom properties for streamer customization via OBS Custom CSS.
- * The root layout's ConvexProviderWithAuth handles the Convex connection;
- * getSessionByApiKey is a public query that doesn't require auth.
+ * Fixed 1920x1080 layout for the OBS overlay page.
+ * OBS browser sources are always set to a specific resolution —
+ * this layout renders at exactly 1920x1080px, no responsive scaling.
  */
 export default function OBSOverlayLayout({
   children,
@@ -11,9 +10,12 @@ export default function OBSOverlayLayout({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[9999]"
+      className="fixed left-0 top-0 z-[9999] overflow-hidden"
       style={{
-        "--cam-zone-width": "33.33%",
+        width: "1920px",
+        height: "1080px",
+        "--cam-zone-width": "640px",
+        "--content-width": "1280px",
         "--accent-color": "#f59e0b",
       } as React.CSSProperties}
     >

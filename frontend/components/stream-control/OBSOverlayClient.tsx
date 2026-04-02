@@ -243,7 +243,7 @@ export function OBSOverlayClient({ apiKey }: { apiKey: string }) {
     >
       <div
         className="absolute top-0 bottom-0 left-0"
-        style={{ right: "var(--cam-zone-width, 33.33%)" }}
+        style={{ width: "var(--content-width, 1280px)" }}
       >
         {phase === "lobby" && (
           <LobbyPhase
@@ -331,7 +331,7 @@ function LobbyPhase({
               startX: 5 + Math.random() * 50,
               startTime: Date.now(),
               duration: CAT_FLIGHT_DURATION_MS + Math.random() * 1500,
-              peakY: 10 + Math.random() * 18,
+              peakY: 100 + Math.random() * 200, // pixels
               rotation: -20 + Math.random() * 40,
             },
           ];
@@ -379,7 +379,7 @@ function LobbyPhase({
         @keyframes lobby-pulse-ring { 0% { transform: scale(0.98); opacity: 0.5; } 50% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.98); opacity: 0.5; } }
       `}</style>
 
-      <div className="relative flex items-center justify-center" style={{ height: "66.67%" }}>
+      <div className="relative flex items-center justify-center" style={{ height: "720px" }}>
         {/* Ambient glow */}
         <div
           className="pointer-events-none absolute rounded-full blur-[100px]"
@@ -457,7 +457,7 @@ function LobbyPhase({
         </div>
       </div>
 
-      <div className="relative overflow-hidden" style={{ height: "33.33%" }}>
+      <div className="relative overflow-hidden" style={{ height: "360px" }}>
         {flyingCats.map((cat) => (
           <FlyingCatSprite key={cat.id} cat={cat} />
         ))}
@@ -490,7 +490,7 @@ function FlyingCatSprite({ cat }: { cat: FlyingCat }) {
       const opacity = progress < 0.12 ? progress / 0.12 : progress > 0.88 ? (1 - progress) / 0.12 : 1;
 
       ref.current.style.left = `${cat.startX + xDrift}%`;
-      ref.current.style.transform = `translateY(${-y}vh) rotate(${cat.rotation * progress}deg) scale(${0.8 + progress * 0.4})`;
+      ref.current.style.transform = `translateY(${-y}px) rotate(${cat.rotation * progress}deg) scale(${0.8 + progress * 0.4})`;
       ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
 
       if (cat.frames.length > 1 && now - lastFrameSwap > FRAME_CYCLE_MS) {
@@ -528,8 +528,8 @@ function CountdownPhase({ value }: { value: number }) {
     <div className="flex h-full items-center justify-center">
       <div
         key={value}
-        className="animate-in zoom-in-50 fade-in duration-500 text-[20vw] font-black text-white drop-shadow-[0_0_60px_rgba(245,158,11,0.6)]"
-        style={{ textShadow: "0 0 80px rgba(245,158,11,0.4)" }}
+        className="animate-in zoom-in-50 fade-in duration-500 font-black text-white drop-shadow-[0_0_60px_rgba(245,158,11,0.6)]"
+        style={{ fontSize: "300px", textShadow: "0 0 80px rgba(245,158,11,0.4)" }}
       >
         {value}
       </div>
@@ -553,54 +553,63 @@ function SpinPhase({
   isResult: boolean;
 }) {
   return (
-    <div className="flex h-full gap-4 p-6">
-      {/* Cat canvas — BIG, dominates */}
-      <div className="flex flex-1 items-center justify-center">
+    <div className="flex h-full">
+      <style>{`
+        @keyframes splitFlap {
+          0% { transform: rotateX(90deg); opacity: 0; }
+          60% { transform: rotateX(-10deg); opacity: 1; }
+          100% { transform: rotateX(0deg); opacity: 1; }
+        }
+      `}</style>
+
+      {/* Cat canvas — large, centered in left area */}
+      <div className="flex items-center justify-center" style={{ width: "720px" }}>
         {catImageUrl ? (
           <div className={isResult ? "animate-in zoom-in-75 fade-in duration-700" : ""}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={catImageUrl}
               alt="Cat"
-              className="h-[55vh] w-auto drop-shadow-[0_0_40px_rgba(245,158,11,0.35)]"
-              style={{ imageRendering: "pixelated" }}
+              style={{ width: "500px", height: "500px", imageRendering: "pixelated" }}
+              className="drop-shadow-[0_0_50px_rgba(245,158,11,0.3)]"
             />
           </div>
         ) : (
-          <div className="flex size-[40vh] items-center justify-center rounded-2xl bg-white/5">
-            <div className="size-16 animate-spin rounded-full border-4 border-amber-500/30 border-t-amber-500" />
+          <div className="flex items-center justify-center rounded-2xl bg-white/5" style={{ width: "400px", height: "400px" }}>
+            <div className="size-20 animate-spin rounded-full border-4 border-amber-500/30 border-t-amber-500" />
           </div>
         )}
       </div>
 
-      {/* Split-flap result table */}
-      <div className="flex w-[40%] max-w-md flex-col justify-center">
-        <div className="rounded-xl border border-amber-500/15 bg-black/85 p-5 shadow-[0_0_40px_rgba(0,0,0,0.5)] backdrop-blur-md">
-          <style>{`
-            @keyframes splitFlap {
-              0% { transform: rotateX(90deg); opacity: 0; }
-              60% { transform: rotateX(-10deg); opacity: 1; }
-              100% { transform: rotateX(0deg); opacity: 1; }
-            }
-          `}</style>
+      {/* Split-flap result table — right side of content area */}
+      <div className="flex flex-1 flex-col justify-center px-8">
+        <div className="rounded-2xl border border-amber-500/15 bg-black/85 p-6 shadow-[0_0_50px_rgba(0,0,0,0.6)] backdrop-blur-md">
+          {/* Header */}
+          <div className="mb-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-gradient-to-r from-amber-500/30 to-transparent" />
+            <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-400/50">
+              Parameters
+            </span>
+            <div className="h-px flex-1 bg-gradient-to-l from-amber-500/30 to-transparent" />
+          </div>
 
-          <div className="space-y-0.5">
+          <div className="space-y-1">
             {/* Revealed params */}
             {revealedParams.map((p, i) => (
               <div
                 key={`${p.id}-${i}`}
-                className="flex items-center justify-between rounded-md bg-amber-500/5 px-3 py-1.5"
+                className="flex items-center justify-between rounded-lg bg-white/[0.03] px-4 py-2.5"
               >
-                <span className="text-sm font-medium text-white/40">{p.label}</span>
+                <span className="text-base font-medium text-white/40">{p.label}</span>
                 <SplitFlapText text={p.value} />
               </div>
             ))}
 
-            {/* Currently active param (being revealed) */}
+            {/* Currently active param */}
             {activeParam && (
-              <div className="flex items-center justify-between rounded-md bg-amber-500/10 px-3 py-1.5 border border-amber-500/20">
-                <span className="text-sm font-bold text-amber-400">{activeParam.label}</span>
-                <span className="font-mono text-sm font-bold text-amber-300">
+              <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5">
+                <span className="text-base font-bold text-amber-400">{activeParam.label}</span>
+                <span className="font-mono text-base font-bold text-amber-300">
                   {activeParam.value}
                 </span>
               </div>
@@ -608,9 +617,9 @@ function SpinPhase({
 
             {/* Unrevealed placeholder rows */}
             {!isResult &&
-              Array.from({ length: Math.max(0, 6 - revealedParams.length - (activeParam ? 1 : 0)) }).map((_, i) => (
-                <div key={`placeholder-${i}`} className="flex items-center justify-between rounded-md px-3 py-1.5">
-                  <span className="text-sm text-white/10">???</span>
+              Array.from({ length: Math.max(0, 8 - revealedParams.length - (activeParam ? 1 : 0)) }).map((_, i) => (
+                <div key={`placeholder-${i}`} className="flex items-center justify-between rounded-lg px-4 py-2.5 opacity-40">
+                  <span className="text-base text-white/10">???</span>
                   <CyclingText />
                 </div>
               ))}
@@ -627,12 +636,12 @@ function SpinPhase({
 
 function SplitFlapText({ text }: { text: string }) {
   return (
-    <span className="inline-flex gap-px">
+    <span className="inline-flex gap-0.5">
       {text.split("").map((char, i) => (
         <span
           key={`${i}-${char}`}
-          className="inline-block rounded-sm bg-amber-500/10 px-[3px] py-[1px] font-mono text-sm font-bold text-amber-400"
-          style={{ animation: `splitFlap 0.25s ease-out ${i * 40}ms both` }}
+          className="inline-block rounded bg-amber-500/10 px-1 py-0.5 font-mono text-base font-bold text-amber-400"
+          style={{ animation: `splitFlap 0.25s ease-out ${i * 35}ms both` }}
         >
           {char}
         </span>
@@ -654,9 +663,9 @@ function CyclingText() {
   }, []);
 
   return (
-    <span className="inline-flex gap-px">
+    <span className="inline-flex gap-0.5">
       {text.split("").map((char, i) => (
-        <span key={i} className="inline-block rounded-sm bg-white/5 px-[3px] py-[1px] font-mono text-sm font-bold text-white/15">
+        <span key={i} className="inline-block rounded bg-white/5 px-1 py-0.5 font-mono text-base font-bold text-white/15">
           {char}
         </span>
       ))}
