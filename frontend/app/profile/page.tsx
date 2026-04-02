@@ -232,9 +232,9 @@ export default function ProfilePage() {
               return next;
             })
           }
-          onDeleteVariant={async (variantId) => {
+          onDeleteVariant={async (toolKey, variantId) => {
             try {
-              await removeVariant({ variantId });
+              await removeVariant({ toolKey, variantId });
               toast.success("Variant deleted");
             } catch (err) {
               toast.error(err instanceof Error ? err.message : "Failed to delete");
@@ -298,7 +298,7 @@ function VariantsSection({
   variants: VariantDoc[];
   expandedTools: Set<string>;
   onToggleTool: (tool: string) => void;
-  onDeleteVariant: (variantId: string) => Promise<void>;
+  onDeleteVariant: (toolKey: string, variantId: string) => Promise<void>;
   onImportBatch: (args: {
     toolKey: string;
     variants: {
@@ -563,7 +563,7 @@ function VariantsSection({
                             )}
                           </span>
                           <button
-                            onClick={() => void onDeleteVariant(v.variantId)}
+                            onClick={() => void onDeleteVariant(v.toolKey, v.variantId)}
                             className="text-xs text-muted-foreground hover:text-red-400 transition"
                           >
                             <Trash2 className="size-3.5" />

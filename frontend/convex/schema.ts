@@ -346,5 +346,5 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("byUserTool", ["userId", "toolKey"])
-    .index("byUserVariant", ["userId", "variantId"]),
+    .index("byUserVariant", ["userId", "toolKey", "variantId"]),
 });

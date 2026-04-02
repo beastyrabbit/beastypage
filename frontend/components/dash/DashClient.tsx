@@ -61,11 +61,13 @@ export function DashClient({
   }, [initialLoadError, initialSettings, initialSlug]);
 
   // Load settings from Convex once available
+  const justLoadedRef = useRef(false);
   useEffect(() => {
     if (loadedFromConvex || initialSlug) return;
     if (!convexVariants) return;
     const saved = convexVariants.find((v) => v.variantId === DASH_VARIANT_ID);
     if (saved) {
+      justLoadedRef.current = true;
       setSettings(parseDashPayload(saved.settings));
     }
     setLoadedFromConvex(true);
@@ -77,6 +79,10 @@ export function DashClient({
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
+      return;
+    }
+    if (justLoadedRef.current) {
+      justLoadedRef.current = false;
       return;
     }
     if (!isAuthenticated || !loadedFromConvex) return;

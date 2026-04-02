@@ -262,18 +262,18 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
   }, [useConvex, toolKey, upsertVariant, store.variants, store.activeId]);
 
   const deleteVariant = useCallback((id: string) => {
-    if (useConvex) {
-      removeVariant({ variantId: id }).catch((err) => console.error("[useVariants] delete sync failed:", err));
+    if (useConvex && toolKey) {
+      removeVariant({ toolKey, variantId: id }).catch((err) => console.error("[useVariants] delete sync failed:", err));
     }
     setLocalStore((prev) => ({
       activeId: prev.activeId === id ? null : prev.activeId,
       variants: prev.variants.filter((v) => v.id !== id),
     }));
-  }, [useConvex, removeVariant]);
+  }, [useConvex, toolKey, removeVariant]);
 
   const renameVariant = useCallback((id: string, name: string) => {
-    if (useConvex) {
-      renameVariantMut({ variantId: id, name }).catch((err) => console.error("[useVariants] rename sync failed:", err));
+    if (useConvex && toolKey) {
+      renameVariantMut({ toolKey, variantId: id, name }).catch((err) => console.error("[useVariants] rename sync failed:", err));
     }
     setLocalStore((prev) => ({
       ...prev,
@@ -281,7 +281,7 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
         v.id === id ? { ...v, name, updatedAt: Date.now() } : v
       ),
     }));
-  }, [useConvex, renameVariantMut]);
+  }, [useConvex, toolKey, renameVariantMut]);
 
   const setActive = useCallback((id: string | null) => {
     if (useConvex && toolKey) {

@@ -66,7 +66,7 @@ export const upsert = mutation({
     const existing = await ctx.db
       .query("user_variants")
       .withIndex("byUserVariant", (q) =>
-        q.eq("userId", userId).eq("variantId", args.variantId)
+        q.eq("userId", userId).eq("toolKey", args.toolKey).eq("variantId", args.variantId)
       )
       .unique();
 
@@ -97,13 +97,13 @@ export const upsert = mutation({
 
 /** Delete a variant. */
 export const remove = mutation({
-  args: { variantId: v.string() },
-  handler: async (ctx, { variantId }) => {
+  args: { toolKey: v.string(), variantId: v.string() },
+  handler: async (ctx, { toolKey, variantId }) => {
     const userId = await requireUserId(ctx);
     const variant = await ctx.db
       .query("user_variants")
       .withIndex("byUserVariant", (q) =>
-        q.eq("userId", userId).eq("variantId", variantId)
+        q.eq("userId", userId).eq("toolKey", toolKey).eq("variantId", variantId)
       )
       .unique();
     if (!variant) throw new Error("Variant not found");
@@ -113,13 +113,13 @@ export const remove = mutation({
 
 /** Rename a variant. */
 export const rename = mutation({
-  args: { variantId: v.string(), name: v.string() },
-  handler: async (ctx, { variantId, name }) => {
+  args: { toolKey: v.string(), variantId: v.string(), name: v.string() },
+  handler: async (ctx, { toolKey, variantId, name }) => {
     const userId = await requireUserId(ctx);
     const variant = await ctx.db
       .query("user_variants")
       .withIndex("byUserVariant", (q) =>
-        q.eq("userId", userId).eq("variantId", variantId)
+        q.eq("userId", userId).eq("toolKey", toolKey).eq("variantId", variantId)
       )
       .unique();
     if (!variant) throw new Error("Variant not found");
@@ -170,7 +170,7 @@ export const importBatch = mutation({
       const existing = await ctx.db
         .query("user_variants")
         .withIndex("byUserVariant", (q) =>
-          q.eq("userId", userId).eq("variantId", v.variantId)
+          q.eq("userId", userId).eq("toolKey", toolKey).eq("variantId", v.variantId)
         )
         .unique();
       if (existing) continue;
