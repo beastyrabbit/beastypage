@@ -74,7 +74,21 @@ export function StreamControlClient() {
   // Lobby animation settings
   const [lobbyMode, setLobbyMode] = useState<"fruit-ninja" | "matrix" | "dvd">("fruit-ninja");
   const [lobbyCatCount, setLobbyCatCount] = useState(4);
-  const [lobbyCatSpeed, setLobbyCatSpeed] = useState(1.0);
+  const [lobbyMoveSpeed, setLobbyMoveSpeed] = useState(1.0);
+  const [lobbySwapSpeed, setLobbySwapSpeed] = useState(1.0);
+
+  // Instant sync for lobby settings — no debounce
+  const syncLobbySettings = useCallback((updates: Record<string, unknown>) => {
+    const merged = {
+      ...settings,
+      lobbyMode,
+      lobbyCatCount,
+      lobbyMoveSpeed,
+      lobbySwapSpeed,
+      ...updates,
+    };
+    if (session) updateSettingsMut({ settings: merged }).catch(() => {});
+  }, [settings, lobbyMode, lobbyCatCount, lobbyMoveSpeed, lobbySwapSpeed, session, updateSettingsMut]);
 
   // Seed from session settings on first load
   useEffect(() => {
@@ -84,7 +98,8 @@ export function StreamControlClient() {
         setSettings((prev) => ({ ...prev, ...s }));
         if (s.lobbyMode) setLobbyMode(s.lobbyMode as typeof lobbyMode);
         if (s.lobbyCatCount) setLobbyCatCount(s.lobbyCatCount as number);
-        if (s.lobbyCatSpeed) setLobbyCatSpeed(s.lobbyCatSpeed as number);
+        if (s.lobbyMoveSpeed) setLobbyMoveSpeed(s.lobbyMoveSpeed as number);
+        if (s.lobbySwapSpeed) setLobbySwapSpeed(s.lobbySwapSpeed as number);
       }
       setInitialized(true);
     }
@@ -518,7 +533,7 @@ export function StreamControlClient() {
                 key={m}
                 onClick={() => {
                   setLobbyMode(m);
-                  updateSettingsMut({ settings: { ...settings, lobbyMode: m, lobbyCatCount, lobbyCatSpeed } }).catch(() => {});
+                  syncLobbySettings({ lobbyMode: m });
                 }}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition",
@@ -533,58 +548,37 @@ export function StreamControlClient() {
           </div>
 
           {/* Cat count */}
-          <div className="flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5">
-            <span className="text-xs text-muted-foreground">Cats:</span>
-            <button
-              onClick={() => {
-                const v = Math.max(1, lobbyCatCount - 1);
-                setLobbyCatCount(v);
-                updateSettingsMut({ settings: { ...settings, lobbyMode, lobbyCatCount: v, lobbyCatSpeed } }).catch(() => {});
-              }}
-              className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
-            >
-              <Minus className="size-3" />
-            </button>
-            <span className="w-5 text-center text-xs font-semibold text-foreground">{lobbyCatCount}</span>
-            <button
-              onClick={() => {
-                const v = Math.min(12, lobbyCatCount + 1);
-                setLobbyCatCount(v);
-                updateSettingsMut({ settings: { ...settings, lobbyMode, lobbyCatCount: v, lobbyCatSpeed } }).catch(() => {});
-              }}
-              className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
-            >
-              <Plus className="size-3" />
-            </button>
-          </div>
+          <LobbyControl
+            label="Cats"
+            value={lobbyCatCount}
+            min={1}
+            max={12}
+            step={1}
+            format={(v) => String(v)}
+            onChange={(v) => { setLobbyCatCount(v); syncLobbySettings({ lobbyCatCount: v }); }}
+          />
 
-          {/* Speed */}
-          <div className="flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5">
-            <Zap className="size-3 text-muted-foreground" />
-            <button
-              onClick={() => {
-                const v = Math.max(0.25, lobbyCatSpeed - 0.25);
-                setLobbyCatSpeed(v);
-                updateSettingsMut({ settings: { ...settings, lobbyMode, lobbyCatCount, lobbyCatSpeed: v } }).catch(() => {});
-              }}
-              className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
-            >
-              <Minus className="size-3" />
-            </button>
-            <span className="w-8 text-center text-xs font-semibold text-foreground">
-              {lobbyCatSpeed.toFixed(2).replace(/\.?0+$/, "")}x
-            </span>
-            <button
-              onClick={() => {
-                const v = Math.min(4, lobbyCatSpeed + 0.25);
-                setLobbyCatSpeed(v);
-                updateSettingsMut({ settings: { ...settings, lobbyMode, lobbyCatCount, lobbyCatSpeed: v } }).catch(() => {});
-              }}
-              className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
-            >
-              <Plus className="size-3" />
-            </button>
-          </div>
+          {/* Move speed */}
+          <LobbyControl
+            label="Move"
+            value={lobbyMoveSpeed}
+            min={0.25}
+            max={4}
+            step={0.25}
+            format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
+            onChange={(v) => { setLobbyMoveSpeed(v); syncLobbySettings({ lobbyMoveSpeed: v }); }}
+          />
+
+          {/* Swap speed */}
+          <LobbyControl
+            label="Swap"
+            value={lobbySwapSpeed}
+            min={0.25}
+            max={4}
+            step={0.25}
+            format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
+            onChange={(v) => { setLobbySwapSpeed(v); syncLobbySettings({ lobbySwapSpeed: v }); }}
+          />
         </div>
       </section>
 
@@ -740,6 +734,49 @@ function SettingsCode({
           Apply
         </button>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Lobby control — reusable +/- number input
+// ---------------------------------------------------------------------------
+
+function LobbyControl({
+  label,
+  value,
+  min,
+  max,
+  step,
+  format,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  format: (v: number) => string;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5">
+      <span className="text-xs text-muted-foreground">{label}:</span>
+      <button
+        onClick={() => onChange(Math.max(min, +(value - step).toFixed(2)))}
+        className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
+      >
+        <Minus className="size-3" />
+      </button>
+      <span className="w-8 text-center text-xs font-semibold text-foreground">
+        {format(value)}
+      </span>
+      <button
+        onClick={() => onChange(Math.min(max, +(value + step).toFixed(2)))}
+        className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
+      >
+        <Plus className="size-3" />
+      </button>
     </div>
   );
 }

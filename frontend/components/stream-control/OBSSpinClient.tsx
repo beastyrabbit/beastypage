@@ -3709,7 +3709,8 @@ export function OBSSpinClient({
         settings={{ mode, accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes: extendedModesArray, exactLayerCounts,
           lobbyMode: (sessionSettings as Record<string, unknown> | undefined)?.lobbyMode as string ?? "fruit-ninja",
           lobbyCatCount: (sessionSettings as Record<string, unknown> | undefined)?.lobbyCatCount as number ?? 4,
-          lobbyCatSpeed: (sessionSettings as Record<string, unknown> | undefined)?.lobbyCatSpeed as number ?? 1.0,
+          lobbyMoveSpeed: (sessionSettings as Record<string, unknown> | undefined)?.lobbyMoveSpeed as number ?? 1.0,
+          lobbySwapSpeed: (sessionSettings as Record<string, unknown> | undefined)?.lobbySwapSpeed as number ?? 1.0,
         }}
         generator={generatorRef.current}
       />
@@ -3967,13 +3968,15 @@ function OBSLobby({
     exactLayerCounts?: boolean;
     lobbyMode?: string;
     lobbyCatCount?: number;
-    lobbyCatSpeed?: number;
+    lobbyMoveSpeed?: number;
+    lobbySwapSpeed?: number;
   };
   generator: CatGeneratorApi | null;
 }) {
   const lobbyMode = (settings.lobbyMode ?? "fruit-ninja") as "fruit-ninja" | "matrix" | "dvd";
   const maxCats = settings.lobbyCatCount ?? 4;
-  const catSpeed = settings.lobbyCatSpeed ?? 1.0;
+  const moveSpeed = settings.lobbyMoveSpeed ?? 1.0;
+  const swapSpeed = settings.lobbySwapSpeed ?? 1.0;
   const [flyingCats, setFlyingCats] = useState<FlyingCat[]>([]);
   const [paletteIdx, setPaletteIdx] = useState(0);
   const catIdRef = useRef(0);
@@ -4049,8 +4052,8 @@ function OBSLobby({
         const alive = prev.filter((c) => Date.now() - c.startTime < c.duration);
         if (alive.length >= maxCats) return alive;
         const baseDuration = lobbyMode === "dvd"
-          ? 999999 // DVD cats bounce forever
-          : (3500 + Math.random() * 2000) / catSpeed;
+          ? 999999
+          : (3500 + Math.random() * 2000) / moveSpeed;
         return [...alive, {
           id: catIdRef.current++,
           frames,
@@ -4064,7 +4067,7 @@ function OBSLobby({
     };
 
     spawn();
-    const spawnInterval = Math.max(800, 3000 / catSpeed);
+    const spawnInterval = Math.max(800, 3000 / moveSpeed);
     const timer = setInterval(spawn, spawnInterval);
     return () => { cancelled = true; clearInterval(timer); };
   }, [generator, settings]);
@@ -4173,14 +4176,14 @@ function OBSLobby({
       {/* Flying cats — full screen, above everything */}
       <div className="absolute inset-0 z-50 overflow-hidden">
         {flyingCats.map((cat) => (
-          <FlyingCatSprite key={cat.id} cat={cat} mode={lobbyMode} />
+          <FlyingCatSprite key={cat.id} cat={cat} mode={lobbyMode} swapSpeed={swapSpeed} moveSpeed={moveSpeed} />
         ))}
       </div>
     </div>
   );
 }
 
-function FlyingCatSprite({ cat, mode = "fruit-ninja" }: { cat: FlyingCat; mode?: "fruit-ninja" | "matrix" | "dvd" }) {
+function FlyingCatSprite({ cat, mode = "fruit-ninja", swapSpeed = 1, moveSpeed = 1 }: { cat: FlyingCat; mode?: "fruit-ninja" | "matrix" | "dvd"; swapSpeed?: number; moveSpeed?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const frameRef = useRef(0);
@@ -4196,8 +4199,9 @@ function FlyingCatSprite({ cat, mode = "fruit-ninja" }: { cat: FlyingCat; mode?:
       const elapsed = now - cat.startTime;
       const t = Math.min(elapsed / cat.duration, 1);
 
-      // Frame cycling — same for all modes
-      if (cat.frames.length > 1 && now - lastSwap > 120) {
+      // Frame cycling — speed controlled by swapSpeed
+      const swapInterval = Math.max(40, 120 / swapSpeed);
+      if (cat.frames.length > 1 && now - lastSwap > swapInterval) {
         frameRef.current = (frameRef.current + 1) % cat.frames.length;
         if (imgRef.current) imgRef.current.src = cat.frames[frameRef.current];
         lastSwap = now;
@@ -4216,8 +4220,8 @@ function FlyingCatSprite({ cat, mode = "fruit-ninja" }: { cat: FlyingCat; mode?:
       } else if (mode === "dvd") {
         // Bounce around — never expires
         const d = dvdRef.current;
-        d.px += d.vx * 2;
-        d.py += d.vy * 2;
+        d.px += d.vx * 2 * moveSpeed;
+        d.py += d.vy * 2 * moveSpeed;
         if (d.px <= 0 || d.px >= 1160) d.vx *= -1;
         if (d.py <= 0 || d.py >= 960) d.vy *= -1;
         d.px = Math.max(0, Math.min(1160, d.px));
