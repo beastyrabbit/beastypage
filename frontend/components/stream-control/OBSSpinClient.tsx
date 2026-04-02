@@ -93,6 +93,9 @@ interface ParamRow {
   status: "pending" | "active" | "revealed";
 }
 
+/** Param IDs that map to layer-panel rows rather than the main param board. */
+const LAYER_PARAM_IDS = new Set(["accessory", "scar", "tortie", "tortieMask", "tortiePattern", "tortieColour"]);
+
 interface SpriteVariation {
   spriteNumber: number;
   name: string;
@@ -1850,40 +1853,33 @@ export function OBSSpinClient({
   }, []);
 
   // Prefill the param board with all slots in "pending" state
-  const layerParamIdSet = useMemo(
-    () => new Set(["accessory", "scar", "tortie", "tortieMask", "tortiePattern", "tortieColour"]),
-    []
-  );
   const initBoardRows = useCallback(() => {
     setParamRows(
       PARAM_SEQUENCE
-        .filter((def) => !layerParamIdSet.has(def.id))
+        .filter((def) => !LAYER_PARAM_IDS.has(def.id))
         .map((def) => ({ id: def.id, label: def.label, value: "???", status: "pending" as const }))
     );
-  }, [layerParamIdSet]);
+  }, []);
 
   // Prefill layer rows with MAX counts from range settings
   const initMaxLayerRows = useCallback(() => {
+    function placeholderRows(prefix: string, count: number) {
+      return Array.from({ length: count }, (_, i) => ({
+        label: `${prefix} ${i + 1}`, value: "???", status: "idle" as const,
+      }));
+    }
     setLayerRows({
-      accessories: Array.from({ length: accessoryRange.max }, (_, i) => ({
-        label: `Accessory ${i + 1}`, value: "???", status: "idle" as const,
-      })),
-      scars: Array.from({ length: scarRange.max }, (_, i) => ({
-        label: `Scar ${i + 1}`, value: "???", status: "idle" as const,
-      })),
-      torties: Array.from({ length: tortieRange.max }, (_, i) => ({
-        label: `Tortie ${i + 1}`, value: "???", status: "idle" as const,
-      })),
+      accessories: placeholderRows("Accessory", accessoryRange.max),
+      scars: placeholderRows("Scar", scarRange.max),
+      torties: placeholderRows("Tortie", tortieRange.max),
     });
   }, [accessoryRange.max, scarRange.max, tortieRange.max]);
 
-  // Trim layer rows to actual counts after count reveal
-  const trimLayerRows = useCallback((accCount: number, scarCount: number, tortieCount: number) => {
-    setLayerRows((prev) => ({
-      accessories: prev.accessories.slice(0, accCount),
-      scars: prev.scars.slice(0, scarCount),
-      torties: prev.torties.slice(0, tortieCount),
-    }));
+  // Brief highlight on a layer row before its spin begins
+  const flashLayer = useCallback(async (key: string) => {
+    setFlashLayerKey(key);
+    await wait(350);
+    setFlashLayerKey(null);
   }, []);
 
   const drawPlaceholder = useCallback(() => {
@@ -2018,10 +2014,7 @@ export function OBSSpinClient({
         const spinState = readSpinState();
         setRollerLabel(`Accessory ${i + 1}`);
 
-        // Flash the layer row before rolling
-        setFlashLayerKey(`accessories-${i}`);
-        await wait(350);
-        setFlashLayerKey(null);
+        await flashLayer(`accessories-${i}`);
 
         if (spinState.spinny) {
           updateLayerRow("accessories", i, { status: "active", value: "---" });
@@ -2140,6 +2133,7 @@ export function OBSSpinClient({
     [
       clearMirror,
       drawCanvas,
+      flashLayer,
       getDelayWithMultiplier,
       playFlip,
       renderCat,
@@ -2204,10 +2198,7 @@ export function OBSSpinClient({
         const spinState = readSpinState();
         setRollerLabel(`Scar ${i + 1}`);
 
-        // Flash the layer row before rolling
-        setFlashLayerKey(`scars-${i}`);
-        await wait(350);
-        setFlashLayerKey(null);
+        await flashLayer(`scars-${i}`);
 
         if (spinState.spinny) {
           updateLayerRow("scars", i, { status: "active", value: "---" });
@@ -2326,6 +2317,7 @@ export function OBSSpinClient({
     [
       clearMirror,
       drawCanvas,
+      flashLayer,
       getDelayWithMultiplier,
       playFlip,
       renderCat,
@@ -2391,10 +2383,7 @@ export function OBSSpinClient({
         const target = targetSlots[i];
         const spinState = readSpinState();
 
-        // Flash the layer row before rolling
-        setFlashLayerKey(`torties-${i}`);
-        await wait(350);
-        setFlashLayerKey(null);
+        await flashLayer(`torties-${i}`);
 
         if (!target) {
           updateLayerRow("torties", i, { value: "None", status: "revealed" });
@@ -2559,6 +2548,7 @@ export function OBSSpinClient({
       addActualDuration,
       clearMirror,
       drawCanvas,
+      flashLayer,
       getDelayWithMultiplier,
       playFlip,
       renderCat,
@@ -2832,7 +2822,8 @@ export function OBSSpinClient({
 
       setRollerLabel(null);
       setRollerActiveValue(null);
-      setParamRows([]); // clear count rows before main param spin
+      // Remove only the count-reveal rows (layer IDs), preserve prefilled pending rows
+      setParamRows((prev) => prev.filter((row) => !LAYER_PARAM_IDS.has(row.id)));
       clearMirror();
     },
     [drawCanvas, clearMirror, playFlip, settleRoller, getDelayWithMultiplier, readSpinState]
@@ -3003,7 +2994,7 @@ export function OBSSpinClient({
         if (generationIdRef.current !== token) return;
       }
 
-      // Count reveal done — show real layer counts in the bottom table
+      // Count reveal done — resize layer rows from max-prefill to actual slot counts
       resetLayerRows(accessorySlots, scarSlots, tortieSlots);
 
       for (const definition of PARAM_SEQUENCE) {
@@ -3037,6 +3028,7 @@ export function OBSSpinClient({
             );
           }
           // Fallback: append if not found (shouldn't happen with prefill)
+          console.warn(`[OBSSpinClient] Param row for "${definition.id}" not found in prefilled board — appending as fallback`);
           rowIndex = prev.length;
           return [
             ...prev,
@@ -3386,6 +3378,8 @@ export function OBSSpinClient({
       setRollerActiveValue(null);
       setRollerLabel(null);
       setRollerHighlight(false);
+      setFlashParamId(null);
+      setFlashLayerKey(null);
       setIsGenerating(false);
       window.setTimeout(() => {
         setRollerExpanded(false);
@@ -3408,7 +3402,6 @@ export function OBSSpinClient({
     revealLayerCounts,
     initBoardRows,
     initMaxLayerRows,
-    trimLayerRows,
     playFlip,
     clearMirror,
     drawPlaceholder,
@@ -3902,15 +3895,11 @@ export function OBSSpinClient({
     return map;
   }, [paramRows]);
 
-  // The fixed board slots — exclude accessory/scar (they have their own panel)
-  // Show tortie sub-params only if tortie was revealed as "Yes"
-  // Exclude all layer params — they have their own bottom panel
+  // The fixed board slots — exclude all layer params (accessory, scar, tortie sub-params)
+  // Those have their own bottom panel
   const boardSlots = PARAM_SEQUENCE.filter(
-    (def) => !layerParamIdSet.has(def.id)
+    (def) => !LAYER_PARAM_IDS.has(def.id)
   );
-
-  // All layer groups combined for the layer panel
-  const hasLayers = layerRows.accessories.length > 0 || layerRows.scars.length > 0 || layerRows.torties.length > 0;
 
   // Memoize lobby settings so OBSLobby doesn't restart animations on every render
   const rawSession = sessionSettings as Record<string, unknown> | undefined;
@@ -4288,20 +4277,26 @@ export function OBSSpinClient({
             // Hide "None" rows after reveal (fade out)
             if (isNone) return null;
 
-            // Don't show empty slots (only when not prefilled)
+            // Safety: skip if row is somehow missing (shouldn't happen with prefill)
             if (!row) return null;
 
-            const flapClass = isPending
-              ? "obs-flap-pending"
-              : isActive
-                ? "obs-flap-active"
-                : "obs-flap-done";
+            let flapClass: string;
+            if (isPending) {
+              flapClass = "obs-flap-pending";
+            } else if (isActive) {
+              flapClass = "obs-flap-active";
+            } else {
+              flapClass = "obs-flap-done";
+            }
 
-            const flapValue = isPending
-              ? "???".padEnd(3).toUpperCase()
-              : isActive
-                ? "?".repeat(row.value.length)
-                : row.value.toUpperCase();
+            let flapValue: string;
+            if (isPending) {
+              flapValue = "???";
+            } else if (isActive) {
+              flapValue = "?".repeat(row.value.length);
+            } else {
+              flapValue = row.value.toUpperCase();
+            }
 
             return (
               <div
