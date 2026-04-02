@@ -3659,6 +3659,16 @@ export function OBSSpinClient({
   const previewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /** Cancel running timers + reset roller/param state for phase transitions */
+  const resetCommandState = useCallback(() => {
+    if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+    if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
+    generationIdRef.current++;
+    setParamRows([]);
+    setRollerLabel(null);
+    setRollerActiveValue(null);
+  }, []);
+
   // Fade-in when entering active phase (5s)
   useEffect(() => {
     if (obsPhase === "active") {
@@ -3786,38 +3796,23 @@ export function OBSSpinClient({
         }
         break;
       case "clear":
-        // Cancel any running spin/countdown and fade out over 5s
-        if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
-        if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
-        generationIdRef.current++;
-        setParamRows([]);
-        setRollerLabel(null);
-        setRollerActiveValue(null);
+        resetCommandState();
         if (obsPhase === "active" || obsPhase === "countdown") {
-          // Fade out the spin/countdown, then go idle
           setObsPhase("fading");
-        } else if (obsPhase === "lobby") {
-          // Lobby has its own fade — just go idle
-          setObsPhase("idle");
         } else {
           setObsPhase("idle");
         }
         drawPlaceholder();
         break;
       case "lobby":
-        if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
-        if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
-        generationIdRef.current++;
-        setParamRows([]);
-        setRollerLabel(null);
-        setRollerActiveValue(null);
+        resetCommandState();
         setObsPhase("lobby");
         break;
       case "test":
         // Test mode — no-op for now, visual handled by session.testMode
         break;
     }
-  }, [session?.currentCommand, generationDisabled, generateCatPlus, drawPlaceholder]);
+  }, [session?.currentCommand, generationDisabled, generateCatPlus, drawPlaceholder, resetCommandState]);
 
   // =======================================================================
   // OBS: Fixed-position overlay — nothing moves, everything anchored
