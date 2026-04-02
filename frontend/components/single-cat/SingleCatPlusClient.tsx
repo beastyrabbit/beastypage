@@ -726,6 +726,51 @@ function buildFlipSequence(
   return sequence;
 }
 
+/**
+ * Composite a layer count frame: large number in the cat's dominant colour
+ * behind a semi-transparent cat sprite.
+ */
+function compositeCountFrame(
+  catCanvas: HTMLCanvasElement,
+  count: number
+): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = DISPLAY_SIZE;
+  canvas.height = DISPLAY_SIZE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return catCanvas;
+  ctx.imageSmoothingEnabled = false;
+
+  // Sample the centre pixel of the cat to get a representative colour
+  const srcCtx = catCanvas.getContext("2d");
+  let numberColour = "rgba(200, 160, 80, 0.6)";
+  if (srcCtx) {
+    const px = srcCtx.getImageData(
+      Math.floor(DISPLAY_SIZE / 2),
+      Math.floor(DISPLAY_SIZE / 2),
+      1,
+      1
+    ).data;
+    if (px[3] > 20) {
+      numberColour = `rgba(${px[0]}, ${px[1]}, ${px[2]}, 0.5)`;
+    }
+  }
+
+  // Draw large number
+  ctx.fillStyle = numberColour;
+  ctx.font = `bold ${Math.round(DISPLAY_SIZE * 0.7)}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(count), DISPLAY_SIZE / 2, DISPLAY_SIZE / 2);
+
+  // Draw cat on top, semi-transparent
+  ctx.globalAlpha = 0.6;
+  ctx.drawImage(catCanvas, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+  ctx.globalAlpha = 1.0;
+
+  return canvas;
+}
+
 function buildLayerOptionStrings(
   allValuesInput: string[] | null | undefined,
   target: string | null | undefined,
@@ -2677,6 +2722,159 @@ export function SingleCatPlusClient({
     return mapperRef.current;
   }, [includeBaseColours, extendedModesArray]);
 
+  // -------------------------------------------------------------------
+  // Layer count spinner — reveals accessory/scar/tortie counts visually
+  // -------------------------------------------------------------------
+
+  const revealLayerCounts = useCallback(
+    async (
+      generator: CatGeneratorApi,
+      layers: {
+        accessories: { range: LayerRange; count: number };
+        scars: { range: LayerRange; count: number };
+        torties: { range: LayerRange; count: number };
+      },
+      genOptions: {
+        experimentalColourMode: string | string[];
+        includeBaseColours: boolean;
+      },
+      token: number
+    ) => {
+      if (!generator.generateRandomCat) return;
+
+      const groups = [
+        { label: "Accessories", key: "accessory" as const, ...layers.accessories },
+        { label: "Scars", key: "scar" as const, ...layers.scars },
+        { label: "Tortie Layers", key: "tortieMask" as const, ...layers.torties },
+      ];
+
+      for (const group of groups) {
+        if (generationIdRef.current !== token) return;
+        const minCount = Math.min(group.range.min, group.range.max);
+        const maxCount = Math.max(group.range.min, group.range.max);
+        if (minCount === maxCount) continue;
+
+        // Show what we're about to roll
+        setRollerLabel(`Rolling: ${group.label}`);
+        setRollerActiveValue(`${minCount}–${maxCount}`);
+        setParamRows((prev) => [
+          ...prev,
+          { id: group.key, label: group.label, value: "?", status: "active" as const },
+        ]);
+        await wait(800); // let the viewer read what's being rolled
+
+        // Generate a fresh random cat with MAX count for this layer type
+        const catResult = await generator.generateRandomCat({
+          accessoryCount: group.key === "accessory" ? maxCount : 0,
+          scarCount: group.key === "scar" ? maxCount : 0,
+          tortieCount: group.key === "tortieMask" ? maxCount : 0,
+          exactLayerCounts: true,
+          experimentalColourMode: genOptions.experimentalColourMode,
+          includeBaseColours: genOptions.includeBaseColours,
+        });
+        if (generationIdRef.current !== token) return;
+
+        const baseParams = catResult.params;
+        baseParams.spriteNumber = 9; // always use longhair adult for count previews
+        const slots = catResult.slotSelections;
+
+        // Pre-render a frame for each possible count (0 to max), building up
+        const frames: VariationFrame[] = [];
+        for (let n = minCount; n <= maxCount; n++) {
+          if (generationIdRef.current !== token) return;
+          const previewParams = cloneParams(baseParams);
+
+          if (group.key === "accessory") {
+            const accSlice = (slots?.accessories ?? []).slice(0, n);
+            previewParams.accessories = accSlice;
+            previewParams.accessory = accSlice[0];
+          } else if (group.key === "scar") {
+            const scarSlice = (slots?.scars ?? []).slice(0, n);
+            previewParams.scars = scarSlice;
+            previewParams.scar = scarSlice[0];
+          } else {
+            const tortieSlice = (slots?.tortie ?? []).slice(0, n);
+            previewParams.isTortie = n > 0;
+            previewParams.tortie = tortieSlice;
+            if (tortieSlice[0]) {
+              previewParams.tortieMask = tortieSlice[0].mask;
+              previewParams.tortiePattern = tortieSlice[0].pattern;
+              previewParams.tortieColour = tortieSlice[0].colour;
+            } else {
+              previewParams.isTortie = false;
+              previewParams.tortie = [];
+            }
+          }
+
+          try {
+            const result = await generator.generateCat(previewParams);
+            const catCanvas = cloneSourceCanvas(
+              result.canvas as HTMLCanvasElement | OffscreenCanvas
+            );
+            const composited = compositeCountFrame(catCanvas, n);
+            frames.push({
+              option: { raw: n, display: String(n) },
+              canvas: composited,
+            });
+          } catch {
+            // skip failed render
+          }
+        }
+
+        if (frames.length === 0) continue;
+
+        // Reorder frames so the rolled count is last (buildFlipSequence targets the last frame)
+        const targetIdx = frames.findIndex((f) => f.option.raw === group.count);
+        if (targetIdx !== -1 && targetIdx !== frames.length - 1) {
+          const [target] = frames.splice(targetIdx, 1);
+          frames.push(target);
+        }
+
+        const sequence = buildFlipSequence(frames);
+
+        for (let idx = 0; idx < sequence.length; idx++) {
+          const step = sequence[idx];
+          if (generationIdRef.current !== token) return;
+
+          const baseDelay = getDelayWithMultiplier(group.key) * 2; // slower for count reveal
+          const stepDurations = computeStepDurations(
+            sequence.slice(idx),
+            baseDelay,
+            false // never fast-flip the count reveal
+          );
+          const stepDuration = stepDurations[0] ?? baseDelay;
+
+          setRollerActiveValue(step.frame.option.display);
+          drawCanvas(step.frame.canvas);
+          await playFlip(() => {}, stepDuration);
+          const stepState = readSpinState();
+          if (!stepState.spinny) break;
+        }
+
+        // Land on rolled count
+        const finalFrame = frames.find((f) => f.option.raw === group.count);
+        if (finalFrame) drawCanvas(finalFrame.canvas);
+        setRollerActiveValue(String(group.count));
+        setParamRows((prev) =>
+          prev.map((row) =>
+            row.id === group.key
+              ? { ...row, value: String(group.count), status: "revealed" as const }
+              : row
+          )
+        );
+        await settleRoller(token);
+        await wait(600); // hold the result so viewer can see it
+        if (generationIdRef.current !== token) return;
+      }
+
+      setRollerLabel(null);
+      setRollerActiveValue(null);
+      setParamRows([]); // clear count rows before main param spin
+      clearMirror();
+    },
+    [drawCanvas, clearMirror, playFlip, settleRoller, getDelayWithMultiplier, readSpinState]
+  );
+
   const generateCatPlus = useCallback(async () => {
     const generator = generatorRef.current;
     if (!generator) return;
@@ -2810,6 +3008,24 @@ export function SingleCatPlusClient({
 
       const rollerOptions = parameterOptionsRef.current;
       setParamRows([]);
+
+      // Count reveal phase — spin the accessory/scar/tortie counts before params
+      if (exactLayerCounts) {
+        await revealLayerCounts(
+          generator,
+          {
+            accessories: { range: accessoryRange, count: accessoryCount },
+            scars: { range: scarRange, count: scarCount },
+            torties: { range: tortieRange, count: tortieCount },
+          },
+          {
+            experimentalColourMode: experimentalMode,
+            includeBaseColours,
+          },
+          token
+        );
+        if (generationIdRef.current !== token) return;
+      }
 
       for (const definition of PARAM_SEQUENCE) {
         if (definition.id === "tortieMask" || definition.id === "tortiePattern" || definition.id === "tortieColour") {
@@ -3196,6 +3412,7 @@ export function SingleCatPlusClient({
     spinAccessorySlots,
     spinScarSlots,
     spinTortieSlots,
+    revealLayerCounts,
     playFlip,
     clearMirror,
     drawPlaceholder,
