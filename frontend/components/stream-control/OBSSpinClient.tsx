@@ -3619,7 +3619,7 @@ export function OBSSpinClient({
   const initializedSeqRef = useRef(false);
   /** When set, generateCatPlus uses these params instead of generating random ones */
   const overrideParamsRef = useRef<{ params: unknown; slots?: unknown } | null>(null);
-  const [obsPhase, setObsPhase] = useState<"idle" | "active">("idle");
+  const [obsPhase, setObsPhase] = useState<"idle" | "lobby" | "active">("idle");
 
   useEffect(() => {
     if (!session?.currentCommand) return;
@@ -3662,8 +3662,11 @@ export function OBSSpinClient({
         drawPlaceholder();
         break;
       case "lobby":
-        // For now, just show idle state
-        setObsPhase("active");
+        generationIdRef.current++;
+        setParamRows([]);
+        setRollerLabel(null);
+        setRollerActiveValue(null);
+        setObsPhase("lobby");
         break;
     }
   }, [session?.currentCommand, generationDisabled, generateCatPlus, drawPlaceholder]);
@@ -3696,6 +3699,16 @@ export function OBSSpinClient({
   // When idle (after clear), show nothing — fully transparent
   if (obsPhase === "idle" && !initializing) {
     return null;
+  }
+
+  // Lobby phase — settings overview + flying cats, no spin canvas
+  if (obsPhase === "lobby") {
+    return (
+      <OBSLobby
+        settings={{ mode, accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes: extendedModesArray }}
+        generator={generatorRef.current}
+      />
+    );
   }
 
   return (
@@ -3916,6 +3929,207 @@ export function OBSSpinClient({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OBS Lobby — settings overview + fruit-ninja flying cats
+// ---------------------------------------------------------------------------
+
+interface FlyingCat {
+  id: number;
+  frames: string[];
+  x: number;
+  startTime: number;
+  duration: number;
+  peakY: number;
+  rotation: number;
+}
+
+function OBSLobby({
+  settings,
+  generator,
+}: {
+  settings: {
+    mode: string;
+    accessoryRange: LayerRange;
+    scarRange: LayerRange;
+    tortieRange: LayerRange;
+    afterlifeMode: string;
+    includeBaseColours: boolean;
+    extendedModes: string[];
+  };
+  generator: CatGeneratorApi | null;
+}) {
+  const [flyingCats, setFlyingCats] = useState<FlyingCat[]>([]);
+  const catIdRef = useRef(0);
+
+  const afterlifeLabel =
+    AFTERLIFE_OPTIONS.find((o) => o.value === settings.afterlifeMode)?.label ?? "Off";
+  const rangeStr = (r: LayerRange) => `${r.min}–${r.max}`;
+
+  // Spawn flying cats
+  useEffect(() => {
+    if (!generator?.generateRandomCat) return;
+    let cancelled = false;
+
+    const spawn = async () => {
+      if (cancelled) return;
+      const frames: string[] = [];
+      for (let i = 0; i < 4; i++) {
+        if (cancelled) return;
+        try {
+          const result = await generator.generateRandomCat!();
+          if (result.canvas instanceof HTMLCanvasElement) {
+            frames.push(result.canvas.toDataURL("image/png"));
+          }
+        } catch { /* skip */ }
+      }
+      if (cancelled || frames.length === 0) return;
+
+      setFlyingCats((prev) => {
+        const alive = prev.filter((c) => Date.now() - c.startTime < c.duration);
+        if (alive.length >= 4) return alive;
+        return [...alive, {
+          id: catIdRef.current++,
+          frames,
+          x: 5 + Math.random() * 70,
+          startTime: Date.now(),
+          duration: 3500 + Math.random() * 2000,
+          peakY: 200 + Math.random() * 400,
+          rotation: -25 + Math.random() * 50,
+        }];
+      });
+    };
+
+    spawn();
+    const timer = setInterval(spawn, 2500);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [generator]);
+
+  // Cleanup
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFlyingCats((prev) => prev.filter((c) => Date.now() - c.startTime < c.duration + 500));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const chips = [
+    { label: "Mode", value: settings.mode },
+    { label: "Afterlife", value: afterlifeLabel },
+    { label: "Accessories", value: rangeStr(settings.accessoryRange) },
+    { label: "Scars", value: rangeStr(settings.scarRange) },
+    { label: "Torties", value: rangeStr(settings.tortieRange) },
+    { label: "Base Colours", value: settings.includeBaseColours ? "On" : "Off" },
+    ...(settings.extendedModes.length > 0
+      ? [{ label: "Palettes", value: `${settings.extendedModes.length} active` }]
+      : []),
+  ];
+
+  return (
+    <div className="relative" style={{ width: "1280px", height: "1080px" }}>
+      {/* Settings display — centered */}
+      <div className="absolute inset-0 flex items-center justify-center" style={{ bottom: "360px" }}>
+        <div
+          style={{
+            background: "rgba(0,0,0,0.88)",
+            borderRadius: "16px",
+            border: "1px solid #27272a",
+            padding: "32px 40px",
+            maxWidth: "600px",
+          }}
+        >
+          <div className="mb-6 flex items-center gap-3">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+            <span className="text-xs font-bold uppercase tracking-[0.4em] text-amber-500/60">
+              Spin Settings
+            </span>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {chips.map((chip) => (
+              <div
+                key={chip.label}
+                className="flex flex-col items-center rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3"
+              >
+                <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500">
+                  {chip.label}
+                </span>
+                <span className="mt-1 text-lg font-bold capitalize text-white">
+                  {chip.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Flying cats — bottom zone */}
+      <div className="absolute bottom-0 left-0 overflow-hidden" style={{ width: "1280px", height: "400px" }}>
+        {flyingCats.map((cat) => (
+          <FlyingCatSprite key={cat.id} cat={cat} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FlyingCatSprite({ cat }: { cat: FlyingCat }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const frameRef = useRef(0);
+
+  useEffect(() => {
+    let raf: number;
+    let lastSwap = 0;
+    const animate = () => {
+      if (!ref.current) return;
+      const now = Date.now();
+      const elapsed = now - cat.startTime;
+      const t = Math.min(elapsed / cat.duration, 1);
+      if (t >= 1) return;
+
+      const y = -4 * cat.peakY * t * (t - 1);
+      const xDrift = t * 15;
+      const opacity = t < 0.1 ? t / 0.1 : t > 0.9 ? (1 - t) / 0.1 : 1;
+
+      ref.current.style.left = `${cat.x + xDrift}%`;
+      ref.current.style.transform = `translateY(${-y}px) rotate(${cat.rotation * t}deg) scale(${0.7 + t * 0.5})`;
+      ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
+
+      if (cat.frames.length > 1 && now - lastSwap > 120) {
+        frameRef.current = (frameRef.current + 1) % cat.frames.length;
+        if (imgRef.current) imgRef.current.src = cat.frames[frameRef.current];
+        lastSwap = now;
+      }
+
+      raf = requestAnimationFrame(animate);
+    };
+    raf = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf);
+  }, [cat]);
+
+  return (
+    <div ref={ref} className="absolute bottom-0" style={{ opacity: 0 }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={imgRef}
+        src={cat.frames[0]}
+        alt=""
+        style={{
+          width: "120px",
+          height: "120px",
+          imageRendering: "pixelated",
+          filter: [
+            "drop-shadow(2px 0 0 white)",
+            "drop-shadow(-2px 0 0 white)",
+            "drop-shadow(0 2px 0 white)",
+            "drop-shadow(0 -2px 0 white)",
+          ].join(" "),
+        }}
+      />
     </div>
   );
 }
