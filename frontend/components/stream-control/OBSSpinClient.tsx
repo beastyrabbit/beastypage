@@ -3612,12 +3612,10 @@ export function OBSSpinClient({
 
   // The fixed board slots — exclude accessory/scar (they have their own panel)
   // Show tortie sub-params only if tortie was revealed as "Yes"
-  const isTortie = paramRows.some((r) => r.id === "tortie" && r.value.toLowerCase() === "yes");
+  // Exclude all layer params — they have their own bottom panel
+  const layerParamIds = new Set(["accessory", "scar", "tortie", "tortieMask", "tortiePattern", "tortieColour"]);
   const boardSlots = PARAM_SEQUENCE.filter(
-    (def) =>
-      def.id !== "accessory" &&
-      def.id !== "scar" &&
-      (!def.requiresTortie || isTortie)
+    (def) => !layerParamIds.has(def.id)
   );
 
   // All layer groups combined for the layer panel
@@ -3689,7 +3687,7 @@ export function OBSSpinClient({
             left: "0px",
             bottom: "0px",
             width: "1280px",
-            background: "rgba(0,0,0,0.85)",
+            background: "#09090b",
             borderTop: "1px solid #27272a",
             padding: "14px 32px",
           }}
@@ -3700,28 +3698,28 @@ export function OBSSpinClient({
               if (rows.length === 0) return null;
               return (
                 <div key={group} style={{ width: "400px" }}>
-                  <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-600">
+                  <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400">
                     {group === "torties" ? "Tortie Layers" : group.charAt(0).toUpperCase() + group.slice(1)}
                   </div>
                   {rows.map((row, i) => (
                     <div
                       key={`${group}-${i}`}
-                      className="flex items-center border-l-2 py-1 pl-3"
+                      className="flex items-center border-l-2 py-1.5 pl-3"
                       style={{
-                        borderColor: row.status === "active" ? "#f59e0b" : row.status === "revealed" ? "#27272a" : "transparent",
+                        borderColor: row.status === "active" ? "#f59e0b" : row.status === "revealed" ? "#3f3f46" : "transparent",
                       }}
                     >
                       <span className={cn(
-                        "w-[80px] shrink-0 text-sm",
+                        "w-[90px] shrink-0 text-sm",
                         row.status === "active" ? "font-semibold text-amber-400" :
-                        row.status === "revealed" ? "text-zinc-400" : "text-zinc-700"
+                        row.status === "revealed" ? "text-zinc-300" : "text-zinc-600"
                       )}>
                         {row.label}
                       </span>
                       <span className={cn(
                         "truncate font-mono text-sm font-bold",
                         row.status === "active" ? "text-white" :
-                        row.status === "revealed" ? "text-zinc-300" : "text-zinc-800"
+                        row.status === "revealed" ? "text-white" : "text-zinc-600"
                       )}>
                         {row.value}
                       </span>
