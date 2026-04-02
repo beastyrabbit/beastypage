@@ -3581,17 +3581,33 @@ export function OBSSpinClient({
   }, []);
 
   // =======================================================================
-  // OBS: Trigger spin when a Convex command arrives
+  // OBS: Trigger spin when a NEW Convex command arrives (not on reload)
   // =======================================================================
-  const lastSeqRef = useRef(0);
+  const lastSeqRef = useRef<number | null>(null); // null = not initialized yet
+  const initializedSeqRef = useRef(false);
 
   useEffect(() => {
     if (!session?.currentCommand) return;
     const cmd = session.currentCommand;
-    if (cmd.seq <= lastSeqRef.current) return;
+
+    // On first load, just record the current seq — don't replay it
+    if (!initializedSeqRef.current) {
+      initializedSeqRef.current = true;
+      lastSeqRef.current = cmd.seq;
+      return;
+    }
+
+    // Only act on NEW commands (seq must be higher than last seen)
+    if (lastSeqRef.current !== null && cmd.seq <= lastSeqRef.current) return;
     lastSeqRef.current = cmd.seq;
 
     if (cmd.type === "spin" && !generationDisabled) {
+      // Reset state from previous spin before starting new one
+      setParamRows([]);
+      setRollerLabel(null);
+      setRollerActiveValue(null);
+      setRollerHighlight(false);
+      setActiveParamId(null);
       generateCatPlus();
     }
   }, [session?.currentCommand, generationDisabled, generateCatPlus]);
@@ -3784,6 +3800,16 @@ export function OBSSpinClient({
             const row = revealedMap.get(def.id);
             const isActive = row?.status === "active";
             const isRevealed = row?.status === "revealed";
+            const isNone = isRevealed && row?.value?.toLowerCase() === "none";
+            const valueLen = row?.value?.length ?? 0;
+            // Use S size for long values (>12 chars), M for normal
+            const sizeClass = valueLen > 12 ? "S" : "M";
+
+            // Hide "None" rows after reveal (fade out)
+            if (isNone) return null;
+
+            // Don't show empty slots
+            if (!row) return null;
 
             return (
               <div
@@ -3798,27 +3824,21 @@ export function OBSSpinClient({
                 <span
                   className={cn(
                     "w-[130px] shrink-0 text-sm font-bold uppercase tracking-wide",
-                    isActive ? "text-amber-400" :
-                    isRevealed ? "text-zinc-400" :
-                    "text-zinc-800"
+                    isActive ? "text-amber-400" : "text-zinc-400"
                   )}
                 >
                   {def.label}
                 </span>
 
-                <div className="flex-1">
-                  {row ? (
-                    <FlapDisplay
-                      className={cn("obs-flap M", isActive ? "obs-flap-active" : isRevealed ? "obs-flap-done" : "")}
-                      chars={flapChars}
-                      length={row.value.length}
-                      value={row.value.toUpperCase()}
-                      timing={80}
-                      padMode="end"
-                    />
-                  ) : (
-                    <span className="text-sm text-zinc-800">—</span>
-                  )}
+                <div className="flex-1 overflow-hidden">
+                  <FlapDisplay
+                    className={cn("obs-flap", sizeClass, isActive ? "obs-flap-active" : "obs-flap-done")}
+                    chars={flapChars}
+                    length={row.value.length}
+                    value={row.value.toUpperCase()}
+                    timing={80}
+                    padMode="end"
+                  />
                 </div>
               </div>
             );
