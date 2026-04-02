@@ -3593,92 +3593,138 @@ export function OBSSpinClient({
   }, [session?.currentCommand, generationDisabled, generateCatPlus]);
 
   // =======================================================================
-  // OBS: Render — canvas + airport split-flap board
+  // OBS: Render — broadcast overlay layout (1280x1080 content zone)
   // =======================================================================
+  const flapChars = Presets.ALPHANUM + " .-()_/•–:";
+
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col" style={{ width: "1280px" }}>
       <style>{`
-        .flap-board {
-          background: #0d0b00;
-          border: 2px solid rgba(245, 158, 11, 0.2);
-          border-radius: 12px;
-          padding: 12px 8px;
-          box-shadow: 0 0 60px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.3);
+        @keyframes obs-pulse {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
         }
-        .flap-row {
+        @keyframes obs-scan {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+        .obs-roller-bar {
+          background: linear-gradient(180deg, rgba(15,12,0,0.95) 0%, rgba(10,8,0,0.9) 100%);
+          border-bottom: 2px solid rgba(245, 158, 11, 0.3);
+          box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+          position: relative;
+          overflow: hidden;
+        }
+        .obs-roller-bar::after {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: linear-gradient(90deg, transparent, rgba(245,158,11,0.03), transparent);
+          animation: obs-scan 3s ease-in-out infinite;
+          pointer-events: none;
+        }
+        .obs-board {
+          background: linear-gradient(180deg, rgba(8,6,0,0.95) 0%, rgba(12,10,2,0.92) 100%);
+          border-top: 2px solid rgba(245, 158, 11, 0.15);
+          border-radius: 0;
+        }
+        .obs-board-row {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          padding: 8px 16px;
-          border-bottom: 1px solid rgba(245, 158, 11, 0.06);
+          gap: 24px;
+          padding: 10px 32px;
+          border-bottom: 1px solid rgba(245, 158, 11, 0.04);
         }
-        .flap-row:last-child { border-bottom: none; }
-        /* Style the split-flap library chars */
-        .flap-board .split-flap-display { gap: 2px; }
+        .obs-board-row:last-child { border-bottom: none; }
+        .obs-board-row[data-active="true"] {
+          background: rgba(245, 158, 11, 0.04);
+          border-left: 3px solid rgba(245, 158, 11, 0.5);
+        }
       `}</style>
 
-      {/* Left: Cat canvas */}
-      <div className="flex items-center justify-center" style={{ width: "720px" }}>
+      {/* ── Top: Active roller bar ── */}
+      {rollerLabel ? (
+        <div className="obs-roller-bar flex items-center gap-6 px-8" style={{ height: "80px" }}>
+          {/* Pulsing dot */}
+          <div className="flex items-center gap-3">
+            <div
+              className="size-3 rounded-full bg-amber-500"
+              style={{ animation: "obs-pulse 1.2s ease-in-out infinite" }}
+            />
+            <span className="text-xs font-bold uppercase tracking-[0.5em] text-amber-500/70">
+              {rollerLabel}
+            </span>
+          </div>
+          {/* Active value in flap display */}
+          {rollerActiveValue && (
+            <div className="ml-auto">
+              <FlapDisplay
+                chars={flapChars}
+                length={Math.max(rollerActiveValue.length, 16)}
+                value={rollerActiveValue.toUpperCase()}
+                padMode="end"
+              />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ height: "80px" }} />
+      )}
+
+      {/* ── Center: Cat canvas — hero, massive ── */}
+      <div className="flex flex-1 items-center justify-center">
         <canvas
           ref={canvasRef}
           width={DISPLAY_SIZE}
           height={DISPLAY_SIZE}
-          className="drop-shadow-[0_0_50px_rgba(245,158,11,0.3)]"
-          style={{ width: "500px", height: "500px", imageRendering: "pixelated" }}
+          className="drop-shadow-[0_0_80px_rgba(245,158,11,0.2)]"
+          style={{
+            width: "620px",
+            height: "620px",
+            imageRendering: "pixelated",
+          }}
         />
       </div>
 
-      {/* Right: Airport split-flap departure board */}
-      <div className="flex flex-1 flex-col justify-center px-6">
-        {/* Active roller — what's currently spinning */}
-        {rollerLabel && (
-          <div className="mb-3 rounded-lg bg-black/80 px-4 py-3">
-            <div className="text-[11px] font-bold uppercase tracking-[0.4em] text-amber-500/50">
-              {rollerLabel}
+      {/* ── Bottom: Split-flap departure board ── */}
+      {paramRows.length > 0 && (
+        <div className="obs-board">
+          {paramRows.map((row, i) => (
+            <div
+              key={`${row.id}-${i}`}
+              className="obs-board-row"
+              data-active={row.status === "active"}
+            >
+              <span
+                className={cn(
+                  "w-[160px] shrink-0 text-base font-bold uppercase tracking-[0.15em]",
+                  row.status === "active"
+                    ? "text-amber-400"
+                    : "text-amber-700/70"
+                )}
+              >
+                {row.label}
+              </span>
+              <FlapDisplay
+                chars={flapChars}
+                length={Math.max(row.value.length, 14)}
+                value={row.value.toUpperCase()}
+                padMode="end"
+              />
             </div>
-            {rollerActiveValue && (
-              <div className="mt-2">
-                <FlapDisplay
-                  chars={Presets.ALPHANUM + " .-()_/•–"}
-                  length={Math.max(rollerActiveValue.length, 12)}
-                  value={rollerActiveValue.toUpperCase()}
-                  padMode="end"
-                />
-              </div>
-            )}
-          </div>
-        )}
+          ))}
+        </div>
+      )}
 
-        {/* Split-flap board */}
-        {paramRows.length > 0 && (
-          <div className="flap-board">
-            {paramRows.map((row, i) => (
-              <div key={`${row.id}-${i}`} className="flap-row">
-                <span className={cn(
-                  "w-[120px] shrink-0 text-sm font-semibold uppercase tracking-wider",
-                  row.status === "revealed" ? "text-amber-600/60" : "text-amber-400"
-                )}>
-                  {row.label}
-                </span>
-                <FlapDisplay
-                  chars={Presets.ALPHANUM + " .-()_/•–"}
-                  length={Math.max(row.value.length, 10)}
-                  value={row.value.toUpperCase()}
-                  padMode="end"
-                />
-              </div>
-            ))}
+      {/* Loading state */}
+      {initializing && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex items-center gap-3 rounded-xl bg-black/80 px-6 py-4 backdrop-blur">
+            <Loader2 className="size-5 animate-spin text-amber-500" />
+            <span className="text-sm font-medium text-amber-500/70">Initializing sprite engine…</span>
           </div>
-        )}
-
-        {/* Loading state */}
-        {initializing && (
-          <div className="flex items-center gap-2 text-sm text-white/30">
-            <Loader2 className="size-4 animate-spin" />
-            Loading sprite engine…
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
