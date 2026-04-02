@@ -25,6 +25,10 @@ import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import { LayerCountModeSelector } from "@/components/common/LayerCountModeSelector";
 import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
 import {
+  encodePortableSettings,
+  decodePortableSettings,
+} from "@/lib/portable-settings";
+import {
   DEFAULT_SINGLE_CAT_SETTINGS,
   type AfterlifeOption,
   type LayerRange,
@@ -305,6 +309,9 @@ export function StreamControlClient() {
                 compact
               />
             </div>
+
+            {/* Settings Code */}
+            <SettingsCode settings={settings} onApply={updateSettings} />
           </div>
         </section>
 
@@ -537,6 +544,106 @@ export function StreamControlClient() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Settings Code — encode/decode portable 6-word settings codes
+// ---------------------------------------------------------------------------
+
+function SettingsCode({
+  settings,
+  onApply,
+}: {
+  settings: SingleCatSettings;
+  onApply: (next: Partial<SingleCatSettings>) => void;
+}) {
+  const [codeInput, setCodeInput] = useState("");
+  const [copyFeedback, setCopyFeedback] = useState(false);
+
+  const liveCode = useMemo(
+    () =>
+      encodePortableSettings({
+        accessoryRange: settings.accessoryRange,
+        scarRange: settings.scarRange,
+        tortieRange: settings.tortieRange,
+        exactLayerCounts: settings.exactLayerCounts,
+        afterlifeMode: settings.afterlifeMode,
+        includeBaseColours: settings.includeBaseColours,
+        extendedModes: settings.extendedModes,
+      }),
+    [settings]
+  );
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(liveCode);
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 1500);
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
+  const handleApply = () => {
+    const trimmed = codeInput.trim();
+    if (!trimmed) return;
+    const decoded = decodePortableSettings(trimmed);
+    if (!decoded) {
+      toast.error("Invalid settings code");
+      return;
+    }
+    onApply({
+      accessoryRange: decoded.accessoryRange,
+      scarRange: decoded.scarRange,
+      tortieRange: decoded.tortieRange,
+      exactLayerCounts: decoded.exactLayerCounts,
+      afterlifeMode: decoded.afterlifeMode,
+      includeBaseColours: decoded.includeBaseColours,
+      extendedModes: decoded.extendedModes,
+    });
+    setCodeInput("");
+    toast.success("Settings applied!");
+  };
+
+  return (
+    <div className="space-y-2 border-t border-border/30 pt-4">
+      <span className="text-xs font-medium text-muted-foreground">
+        Settings Code
+      </span>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 truncate rounded-lg border border-border/40 bg-background/60 px-2.5 py-1.5 font-mono text-xs text-foreground">
+          {liveCode}
+        </code>
+        <button
+          onClick={handleCopy}
+          className={cn(
+            "shrink-0 rounded-md border px-2 py-1.5 text-[10px] font-medium transition",
+            copyFeedback
+              ? "border-emerald-500/40 text-emerald-400"
+              : "border-border/50 text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {copyFeedback ? "Copied!" : "Copy"}
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={codeInput}
+          onChange={(e) => setCodeInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleApply(); }}
+          placeholder="Paste code…"
+          className="min-w-0 flex-1 rounded-lg border border-border/40 bg-background/60 px-2.5 py-1.5 font-mono text-xs outline-none placeholder:text-muted-foreground/40 focus:border-primary/40"
+        />
+        <button
+          onClick={handleApply}
+          className="shrink-0 rounded-md border border-border/50 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground transition hover:text-foreground"
+        >
+          Apply
+        </button>
+      </div>
     </div>
   );
 }

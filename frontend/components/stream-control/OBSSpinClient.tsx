@@ -1448,6 +1448,25 @@ export function OBSSpinClient({
   const [includeBaseColours, setIncludeBaseColours] = useState(initialSettings.includeBaseColours);
   const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(() => new Set(initialSettings.extendedModes));
 
+  // OBS: Re-sync settings when the Convex session updates (control page changed them)
+  useEffect(() => {
+    if (!sessionSettings) return;
+    setMode(sessionSettings.mode);
+    setAccessoryRange(sessionSettings.accessoryRange);
+    setScarRange(sessionSettings.scarRange);
+    setTortieRange(sessionSettings.tortieRange);
+    setExactLayerCounts(sessionSettings.exactLayerCounts);
+    setAfterlifeMode(sessionSettings.afterlifeMode);
+    setIncludeBaseColours(sessionSettings.includeBaseColours);
+    setExtendedModes(new Set(sessionSettings.extendedModes));
+    if (sessionSettings.speedMultiplier !== undefined) {
+      setSpeedMultiplier(sessionSettings.speedMultiplier);
+    }
+    if (sessionSettings.timing) {
+      setTimingConfig(sessionSettings.timing);
+    }
+  }, [sessionSettings]);
+
   const [rollerLabel, setRollerLabel] = useState<string | null>(null);
   const [rollerActiveValue, setRollerActiveValue] = useState<string | null>(null);
   const [rollerHighlight, setRollerHighlight] = useState(false);
