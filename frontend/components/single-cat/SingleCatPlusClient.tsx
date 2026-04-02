@@ -2730,60 +2730,74 @@ export function SingleCatPlusClient({
   const revealLayerCounts = useCallback(
     async (
       generator: CatGeneratorApi,
-      finalParams: Partial<CatParams>,
       layers: {
-        accessories: { range: LayerRange; count: number; slots: string[] };
-        scars: { range: LayerRange; count: number; slots: string[] };
-        torties: { range: LayerRange; count: number; slots: (TortieSlot | null)[] };
+        accessories: { range: LayerRange; count: number };
+        scars: { range: LayerRange; count: number };
+        torties: { range: LayerRange; count: number };
+      },
+      genOptions: {
+        experimentalColourMode: string | string[];
+        includeBaseColours: boolean;
       },
       token: number
     ) => {
-      const groups: {
-        label: string;
-        type: "accessories" | "scars" | "torties";
-        range: LayerRange;
-        count: number;
-        slots: unknown[];
-      }[] = [
-        { label: "Accessories", type: "accessories", ...layers.accessories },
-        { label: "Scars", type: "scars", ...layers.scars },
-        { label: "Tortie Layers", type: "torties", ...layers.torties },
+      if (!generator.generateRandomCat) return;
+
+      const groups = [
+        { label: "Accessories", key: "accessory" as const, ...layers.accessories },
+        { label: "Scars", key: "scar" as const, ...layers.scars },
+        { label: "Tortie Layers", key: "tortieMask" as const, ...layers.torties },
       ];
 
       for (const group of groups) {
         if (generationIdRef.current !== token) return;
         const minCount = Math.min(group.range.min, group.range.max);
         const maxCount = Math.max(group.range.min, group.range.max);
-        // Skip if range is fixed — no suspense needed
         if (minCount === maxCount) continue;
 
         setRollerLabel(group.label);
         setRollerActiveValue("—");
         await wait(PRE_SPIN_DELAY);
 
-        // Pre-render a frame for each possible count
+        // Generate a fresh random cat with MAX count for this layer type
+        const catResult = await generator.generateRandomCat({
+          accessoryCount: group.key === "accessory" ? maxCount : 0,
+          scarCount: group.key === "scar" ? maxCount : 0,
+          tortieCount: group.key === "tortieMask" ? maxCount : 0,
+          exactLayerCounts: true,
+          experimentalColourMode: genOptions.experimentalColourMode,
+          includeBaseColours: genOptions.includeBaseColours,
+        });
+        if (generationIdRef.current !== token) return;
+
+        const baseParams = catResult.params;
+        const slots = catResult.slotSelections;
+
+        // Pre-render a frame for each possible count (0 to max), building up
         const frames: VariationFrame[] = [];
         for (let n = minCount; n <= maxCount; n++) {
           if (generationIdRef.current !== token) return;
-          const previewParams = cloneParams(finalParams);
+          const previewParams = cloneParams(baseParams);
 
-          // Apply n layers from the rolled slots (building up)
-          if (group.type === "accessories") {
-            const accSlots = layers.accessories.slots.slice(0, n);
-            previewParams.accessories = accSlots;
-            previewParams.accessory = accSlots[0];
-          } else if (group.type === "scars") {
-            const scarSlotsCut = layers.scars.slots.slice(0, n);
-            previewParams.scars = scarSlotsCut;
-            previewParams.scar = scarSlotsCut[0];
-          } else if (group.type === "torties") {
-            const tortieSlotsCut = layers.torties.slots.slice(0, n).filter(Boolean) as TortieSlot[];
+          if (group.key === "accessory") {
+            const accSlice = (slots?.accessories ?? []).slice(0, n);
+            previewParams.accessories = accSlice;
+            previewParams.accessory = accSlice[0];
+          } else if (group.key === "scar") {
+            const scarSlice = (slots?.scars ?? []).slice(0, n);
+            previewParams.scars = scarSlice;
+            previewParams.scar = scarSlice[0];
+          } else {
+            const tortieSlice = (slots?.tortie ?? []).slice(0, n);
             previewParams.isTortie = n > 0;
-            previewParams.tortie = tortieSlotsCut;
-            if (tortieSlotsCut[0]) {
-              previewParams.tortieMask = tortieSlotsCut[0].mask;
-              previewParams.tortiePattern = tortieSlotsCut[0].pattern;
-              previewParams.tortieColour = tortieSlotsCut[0].colour;
+            previewParams.tortie = tortieSlice;
+            if (tortieSlice[0]) {
+              previewParams.tortieMask = tortieSlice[0].mask;
+              previewParams.tortiePattern = tortieSlice[0].pattern;
+              previewParams.tortieColour = tortieSlice[0].colour;
+            } else {
+              previewParams.isTortie = false;
+              previewParams.tortie = [];
             }
           }
 
@@ -2792,21 +2806,19 @@ export function SingleCatPlusClient({
             const catCanvas = cloneSourceCanvas(
               result.canvas as HTMLCanvasElement | OffscreenCanvas
             );
-
-            // Composite: large number behind semi-transparent cat
             const composited = compositeCountFrame(catCanvas, n, previewParams);
             frames.push({
               option: { raw: n, display: String(n) },
               canvas: composited,
             });
           } catch {
-            // render failed, skip this count
+            // skip failed render
           }
         }
 
         if (frames.length === 0) continue;
 
-        // Build flip sequence and execute
+        // Flip through counts
         const sequence = buildFlipSequence(frames);
         const spinState = readSpinState();
         const currentConfig = timingConfigRef.current;
@@ -2815,13 +2827,7 @@ export function SingleCatPlusClient({
           const step = sequence[idx];
           if (generationIdRef.current !== token) return;
 
-          const baseDelay = getDelayWithMultiplier(
-            group.type === "accessories"
-              ? "accessory"
-              : group.type === "scars"
-                ? "scar"
-                : "tortieMask"
-          );
+          const baseDelay = getDelayWithMultiplier(group.key);
           const stepDurations = computeStepDurations(
             sequence.slice(idx),
             baseDelay,
@@ -2835,11 +2841,9 @@ export function SingleCatPlusClient({
           if (!spinState.spinny) break;
         }
 
-        // Land on the rolled count
+        // Land on rolled count
         const finalFrame = frames.find((f) => f.option.raw === group.count);
-        if (finalFrame) {
-          drawCanvas(finalFrame.canvas);
-        }
+        if (finalFrame) drawCanvas(finalFrame.canvas);
         setRollerActiveValue(String(group.count));
         await settleRoller(token);
         if (generationIdRef.current !== token) return;
@@ -2990,11 +2994,14 @@ export function SingleCatPlusClient({
       if (exactLayerCounts) {
         await revealLayerCounts(
           generator,
-          params,
           {
-            accessories: { range: accessoryRange, count: accessoryCount, slots: accessorySlots },
-            scars: { range: scarRange, count: scarCount, slots: scarSlots },
-            torties: { range: tortieRange, count: tortieCount, slots: tortieSlots },
+            accessories: { range: accessoryRange, count: accessoryCount },
+            scars: { range: scarRange, count: scarCount },
+            torties: { range: tortieRange, count: tortieCount },
+          },
+          {
+            experimentalColourMode: experimentalMode,
+            includeBaseColours,
           },
           token
         );
