@@ -590,10 +590,7 @@ export function StreamControlClient() {
                 }
                 onChange={(selected) =>
                   updateSettings({
-                    extendedModes: [
-                      ...(settings.includeBaseColours ? [] : []),
-                      ...Array.from(selected),
-                    ],
+                    extendedModes: Array.from(selected),
                   })
                 }
                 includeClassic={settings.includeBaseColours}
@@ -635,7 +632,10 @@ export function StreamControlClient() {
                 </button>
               )}
             </div>
-            <div className="relative aspect-video overflow-hidden rounded-lg border border-border/30 bg-black/90">
+            <div
+              ref={previewContainerRef}
+              className="relative aspect-video overflow-hidden rounded-lg border border-border/30 bg-black/90"
+            >
               {obsUrl ? (
                 <iframe
                   src={obsUrl}
@@ -646,16 +646,6 @@ export function StreamControlClient() {
                     transform: "scale(var(--preview-scale, 0.3))",
                   }}
                   title="OBS Overlay Preview"
-                  ref={(el) => {
-                    if (!el) return;
-                    const container = el.parentElement;
-                    if (!container) return;
-                    const observer = new ResizeObserver(([entry]) => {
-                      const scale = entry.contentRect.width / 1920;
-                      container.style.setProperty("--preview-scale", String(scale));
-                    });
-                    observer.observe(container);
-                  }}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-xs text-muted-foreground">

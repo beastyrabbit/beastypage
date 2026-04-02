@@ -390,6 +390,12 @@ function FlyingCatSprite({ cat, swapSpeed = 1, moveSpeed = 1 }: { cat: FlyingCat
   // DVD mode: bounce direction stored in ref
   const dvdRef = useRef({ vx: (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random()), vy: (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random()), px: cat.x * 12.8, py: Math.random() * 900 });
 
+  // Store speed props in refs so the animation loop always reads the latest values
+  const swapSpeedRef = useRef(swapSpeed);
+  useEffect(() => { swapSpeedRef.current = swapSpeed; }, [swapSpeed]);
+  const moveSpeedRef = useRef(moveSpeed);
+  useEffect(() => { moveSpeedRef.current = moveSpeed; }, [moveSpeed]);
+
   useEffect(() => {
     let raf: number;
     let lastSwap = 0;
@@ -400,7 +406,7 @@ function FlyingCatSprite({ cat, swapSpeed = 1, moveSpeed = 1 }: { cat: FlyingCat
       const t = Math.min(elapsed / cat.duration, 1);
 
       // Frame cycling — speed controlled by swapSpeed
-      const swapInterval = Math.max(300, 3000 / swapSpeed);
+      const swapInterval = Math.max(300, 3000 / swapSpeedRef.current);
       if (cat.frames.length > 1 && now - lastSwap > swapInterval) {
         frameRef.current = (frameRef.current + 1) % cat.frames.length;
         if (imgRef.current) imgRef.current.src = cat.frames[frameRef.current];
@@ -423,8 +429,8 @@ function FlyingCatSprite({ cat, swapSpeed = 1, moveSpeed = 1 }: { cat: FlyingCat
         const spriteW = Math.round(120 * cat.size);
         const spriteH = Math.round(120 * cat.size);
         const d = dvdRef.current;
-        d.px += d.vx * 2 * moveSpeed;
-        d.py += d.vy * 2 * moveSpeed;
+        d.px += d.vx * 2 * moveSpeedRef.current;
+        d.py += d.vy * 2 * moveSpeedRef.current;
         if (d.px <= 0 || d.px >= 1920 - spriteW) d.vx *= -1;
         if (d.py <= 0 || d.py >= 1080 - spriteH) d.vy *= -1;
         d.px = Math.max(0, Math.min(1920 - spriteW, d.px));
