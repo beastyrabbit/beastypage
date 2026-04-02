@@ -57,6 +57,7 @@ import {
   type LayerRange,
 } from "../../utils/singleCatVariants";
 import type { PaletteId } from "@/lib/palettes";
+import { ADDITIONAL_PALETTES } from "@/lib/palettes";
 import {
   MAX_LAYER_VALUE,
   clampLayerValue,
@@ -3705,7 +3706,7 @@ export function OBSSpinClient({
   if (obsPhase === "lobby") {
     return (
       <OBSLobby
-        settings={{ mode, accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes: extendedModesArray }}
+        settings={{ mode, accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes: extendedModesArray, exactLayerCounts }}
         generator={generatorRef.current}
       />
     );
@@ -3959,30 +3960,76 @@ function OBSLobby({
     afterlifeMode: string;
     includeBaseColours: boolean;
     extendedModes: string[];
+    exactLayerCounts?: boolean;
   };
   generator: CatGeneratorApi | null;
 }) {
   const [flyingCats, setFlyingCats] = useState<FlyingCat[]>([]);
+  const [paletteIdx, setPaletteIdx] = useState(0);
   const catIdRef = useRef(0);
 
   const afterlifeLabel =
     AFTERLIFE_OPTIONS.find((o) => o.value === settings.afterlifeMode)?.label ?? "Off";
   const rangeStr = (r: LayerRange) => `${r.min}–${r.max}`;
 
-  // Spawn flying cats
+  // Resolve palette data
+  const selectedPalettes = useMemo(
+    () => ADDITIONAL_PALETTES.filter((p) => settings.extendedModes.includes(p.id)),
+    [settings.extendedModes]
+  );
+
+  // Cycle palettes
+  useEffect(() => {
+    if (selectedPalettes.length <= 1) return;
+    const timer = setInterval(() => setPaletteIdx((i) => (i + 1) % selectedPalettes.length), 4000);
+    return () => clearInterval(timer);
+  }, [selectedPalettes.length]);
+
+  // Spawn flying cats WITH current settings + fixed sprite
   useEffect(() => {
     if (!generator?.generateRandomCat) return;
     let cancelled = false;
 
     const spawn = async () => {
       if (cancelled) return;
+      // Generate one cat with settings, then re-render with different params but SAME sprite
+      const firstResult = await generator.generateRandomCat!({
+        accessoryCount: settings.accessoryRange.max,
+        scarCount: settings.scarRange.max,
+        tortieCount: settings.tortieRange.max,
+        exactLayerCounts: settings.exactLayerCounts ?? true,
+        experimentalColourMode: settings.extendedModes.length > 0 ? settings.extendedModes : undefined,
+        includeBaseColours: settings.includeBaseColours,
+      }).catch(() => null);
+      if (cancelled || !firstResult) return;
+
+      const fixedSprite = firstResult.params.spriteNumber ?? 8;
       const frames: string[] = [];
-      for (let i = 0; i < 4; i++) {
+
+      // First frame from the initial result
+      if (firstResult.canvas instanceof HTMLCanvasElement) {
+        frames.push(firstResult.canvas.toDataURL("image/png"));
+      }
+
+      // More frames with same sprite but different params
+      for (let i = 0; i < 3; i++) {
         if (cancelled) return;
         try {
-          const result = await generator.generateRandomCat!();
-          if (result.canvas instanceof HTMLCanvasElement) {
-            frames.push(result.canvas.toDataURL("image/png"));
+          const r = await generator.generateRandomCat!({
+            accessoryCount: settings.accessoryRange.max,
+            scarCount: settings.scarRange.max,
+            tortieCount: settings.tortieRange.max,
+            exactLayerCounts: settings.exactLayerCounts ?? true,
+            experimentalColourMode: settings.extendedModes.length > 0 ? settings.extendedModes : undefined,
+            includeBaseColours: settings.includeBaseColours,
+          });
+          if (r.canvas instanceof HTMLCanvasElement) {
+            // Override sprite to keep it constant
+            const overrideParams = { ...r.params, spriteNumber: fixedSprite };
+            const rendered = await generator.generateCat(overrideParams);
+            if (rendered.canvas instanceof HTMLCanvasElement) {
+              frames.push(rendered.canvas.toDataURL("image/png"));
+            }
           }
         } catch { /* skip */ }
       }
@@ -4004,9 +4051,9 @@ function OBSLobby({
     };
 
     spawn();
-    const timer = setInterval(spawn, 2500);
+    const timer = setInterval(spawn, 3000);
     return () => { cancelled = true; clearInterval(timer); };
-  }, [generator]);
+  }, [generator, settings]);
 
   // Cleanup
   useEffect(() => {
@@ -4017,57 +4064,100 @@ function OBSLobby({
   }, []);
 
   const chips = [
-    { label: "Mode", value: settings.mode },
     { label: "Afterlife", value: afterlifeLabel },
+    { label: "Exact Count", value: settings.exactLayerCounts ? "Yes" : "No" },
     { label: "Accessories", value: rangeStr(settings.accessoryRange) },
     { label: "Scars", value: rangeStr(settings.scarRange) },
     { label: "Torties", value: rangeStr(settings.tortieRange) },
     { label: "Base Colours", value: settings.includeBaseColours ? "On" : "Off" },
-    ...(settings.extendedModes.length > 0
-      ? [{ label: "Palettes", value: `${settings.extendedModes.length} active` }]
-      : []),
   ];
+
+  const currentPalette = selectedPalettes[paletteIdx];
 
   return (
     <div className="relative" style={{ width: "1280px", height: "1080px" }}>
-      {/* Settings display — centered */}
-      <div className="absolute inset-0 flex items-center justify-center" style={{ bottom: "360px" }}>
-        <div
-          style={{
-            background: "rgba(0,0,0,0.88)",
-            borderRadius: "16px",
-            border: "1px solid #27272a",
-            padding: "32px 40px",
-            maxWidth: "600px",
-          }}
-        >
-          <div className="mb-6 flex items-center gap-3">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-            <span className="text-xs font-bold uppercase tracking-[0.4em] text-amber-500/60">
-              Spin Settings
-            </span>
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {chips.map((chip) => (
-              <div
-                key={chip.label}
-                className="flex flex-col items-center rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3"
-              >
-                <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500">
-                  {chip.label}
-                </span>
-                <span className="mt-1 text-lg font-bold capitalize text-white">
-                  {chip.value}
-                </span>
-              </div>
-            ))}
-          </div>
+      {/* Settings display */}
+      <div
+        className="absolute"
+        style={{
+          left: "40px",
+          top: "40px",
+          width: "700px",
+          background: "rgba(0,0,0,0.88)",
+          borderRadius: "16px",
+          border: "1px solid #27272a",
+          padding: "28px 32px",
+        }}
+      >
+        <div className="mb-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+          <span className="text-xs font-bold uppercase tracking-[0.4em] text-amber-500/60">
+            Spin Settings
+          </span>
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
         </div>
+        <div className="grid grid-cols-3 gap-2.5">
+          {chips.map((chip) => (
+            <div
+              key={chip.label}
+              className="flex flex-col items-center rounded-xl border border-zinc-800 bg-zinc-900/50 px-3 py-2.5"
+            >
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+                {chip.label}
+              </span>
+              <span className="mt-1 text-base font-bold capitalize text-white">
+                {chip.value}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Palette carousel */}
+        {selectedPalettes.length > 0 && (
+          <div className="mt-5 border-t border-zinc-800 pt-4">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-500/70">
+                {currentPalette?.label ?? "Palettes"}
+              </span>
+              <div className="flex gap-1">
+                {selectedPalettes.map((p, i) => (
+                  <div
+                    key={p.id}
+                    className="rounded-full transition-all"
+                    style={{
+                      width: i === paletteIdx ? "16px" : "6px",
+                      height: "6px",
+                      background: i === paletteIdx ? "#f59e0b" : "#3f3f46",
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            {currentPalette && (
+              <div className="flex flex-wrap gap-1">
+                {Object.entries(currentPalette.colors).slice(0, 32).map(([name, def]) => {
+                  const rgb = def.multiply ?? [128, 128, 128];
+                  return (
+                    <div
+                      key={name}
+                      className="rounded border border-white/10"
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        backgroundColor: `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`,
+                      }}
+                      title={name.replace(/_/g, " ")}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Flying cats — bottom zone */}
-      <div className="absolute bottom-0 left-0 overflow-hidden" style={{ width: "1280px", height: "400px" }}>
+      {/* Flying cats — full screen, above everything */}
+      <div className="absolute inset-0 z-50 overflow-hidden">
         {flyingCats.map((cat) => (
           <FlyingCatSprite key={cat.id} cat={cat} />
         ))}
