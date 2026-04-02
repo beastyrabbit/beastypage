@@ -732,8 +732,7 @@ function buildFlipSequence(
  */
 function compositeCountFrame(
   catCanvas: HTMLCanvasElement,
-  count: number,
-  params: Partial<CatParams>
+  count: number
 ): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = DISPLAY_SIZE;
@@ -2812,7 +2811,7 @@ export function SingleCatPlusClient({
             const catCanvas = cloneSourceCanvas(
               result.canvas as HTMLCanvasElement | OffscreenCanvas
             );
-            const composited = compositeCountFrame(catCanvas, n, previewParams);
+            const composited = compositeCountFrame(catCanvas, n);
             frames.push({
               option: { raw: n, display: String(n) },
               canvas: composited,
@@ -2824,10 +2823,14 @@ export function SingleCatPlusClient({
 
         if (frames.length === 0) continue;
 
-        // Flip through counts
+        // Reorder frames so the rolled count is last (buildFlipSequence targets the last frame)
+        const targetIdx = frames.findIndex((f) => f.option.raw === group.count);
+        if (targetIdx !== -1 && targetIdx !== frames.length - 1) {
+          const [target] = frames.splice(targetIdx, 1);
+          frames.push(target);
+        }
+
         const sequence = buildFlipSequence(frames);
-        const spinState = readSpinState();
-        const currentConfig = timingConfigRef.current;
 
         for (let idx = 0; idx < sequence.length; idx++) {
           const step = sequence[idx];
@@ -2844,7 +2847,8 @@ export function SingleCatPlusClient({
           setRollerActiveValue(step.frame.option.display);
           drawCanvas(step.frame.canvas);
           await playFlip(() => {}, stepDuration);
-          if (!spinState.spinny) break;
+          const stepState = readSpinState();
+          if (!stepState.spinny) break;
         }
 
         // Land on rolled count
