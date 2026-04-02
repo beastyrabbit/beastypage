@@ -127,6 +127,10 @@ export function StreamControlClient() {
         tortieCount: settings.tortieRange.max,
       });
 
+      // Flush settings to Convex immediately so OBS has them before spinning
+      clearTimeout(syncTimer.current);
+      await updateSettingsMut({ settings });
+
       await triggerSpinMut({
         params: result.params,
         slots: result.slotSelections,

@@ -2796,18 +2796,31 @@ export function OBSSpinClient({
       const tortieCount = computeLayerCount(tortieRange);
       const experimentalMode = extendedModesArray.length === 0 ? "off" : extendedModesArray;
 
-      if (!generator.generateRandomCat) {
-        throw new Error("Random cat generation not available");
+      // OBS: Use override params from the control page if available
+      const override = overrideParamsRef.current;
+      overrideParamsRef.current = null; // consume once
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let randomResult: any;
+      if (override?.params) {
+        randomResult = {
+          params: override.params as Record<string, unknown>,
+          slotSelections: override.slots as typeof randomResult.slotSelections,
+        };
+      } else {
+        if (!generator.generateRandomCat) {
+          throw new Error("Random cat generation not available");
+        }
+        randomResult = await generator.generateRandomCat({
+          accessoryCount,
+          scarCount,
+          tortieCount,
+          exactLayerCounts,
+          experimentalColourMode: experimentalMode,
+          whitePatchColourMode: "default",
+          includeBaseColours,
+        });
       }
-      const randomResult = await generator.generateRandomCat({
-        accessoryCount,
-        scarCount,
-        tortieCount,
-        exactLayerCounts,
-        experimentalColourMode: experimentalMode,
-        whitePatchColourMode: "default",
-        includeBaseColours,
-      });
 
       if (generationIdRef.current !== token) return;
 
@@ -2825,7 +2838,7 @@ export function OBSSpinClient({
         randomResult.slotSelections?.scars ??
         (params.scars ?? []).filter((entry): entry is string => typeof entry === "string");
       const tortieSlots: (TortieSlot | null)[] =
-        randomResult.slotSelections?.tortie?.map((slot) =>
+        randomResult.slotSelections?.tortie?.map((slot: any) =>
           slot?.mask && slot?.pattern && slot?.colour
             ? { mask: slot.mask, pattern: slot.pattern, colour: slot.colour }
             : null
@@ -2856,11 +2869,11 @@ export function OBSSpinClient({
       setHasTint(Boolean(enableDarkForest || enableDead));
       setSpriteGalleryOpen(false);
 
-      const uniqueAccessories = Array.from(
-        new Set(accessorySlots.filter((entry): entry is string => typeof entry === "string" && entry !== "none"))
+      const uniqueAccessories: string[] = Array.from(
+        new Set(accessorySlots.filter((entry: unknown): entry is string => typeof entry === "string" && entry !== "none"))
       );
-      const uniqueScars = Array.from(
-        new Set(scarSlots.filter((entry): entry is string => typeof entry === "string" && entry !== "none"))
+      const uniqueScars: string[] = Array.from(
+        new Set(scarSlots.filter((entry: unknown): entry is string => typeof entry === "string" && entry !== "none"))
       );
       const tortieChoices = tortieLayers.length ? tortieLayers : [];
 
@@ -3600,10 +3613,13 @@ export function OBSSpinClient({
   }, []);
 
   // =======================================================================
-  // OBS: Trigger spin when a NEW Convex command arrives (not on reload)
+  // OBS: Command handling — spin, clear, lobby
   // =======================================================================
-  const lastSeqRef = useRef<number | null>(null); // null = not initialized yet
+  const lastSeqRef = useRef<number | null>(null);
   const initializedSeqRef = useRef(false);
+  /** When set, generateCatPlus uses these params instead of generating random ones */
+  const overrideParamsRef = useRef<{ params: unknown; slots?: unknown } | null>(null);
+  const [obsPhase, setObsPhase] = useState<"idle" | "active">("idle");
 
   useEffect(() => {
     if (!session?.currentCommand) return;
@@ -3616,20 +3632,41 @@ export function OBSSpinClient({
       return;
     }
 
-    // Only act on NEW commands (seq must be higher than last seen)
     if (lastSeqRef.current !== null && cmd.seq <= lastSeqRef.current) return;
     lastSeqRef.current = cmd.seq;
 
-    if (cmd.type === "spin" && !generationDisabled) {
-      // Reset state from previous spin before starting new one
-      setParamRows([]);
-      setRollerLabel(null);
-      setRollerActiveValue(null);
-      setRollerHighlight(false);
-      setActiveParamId(null);
-      generateCatPlus();
+    switch (cmd.type) {
+      case "spin":
+        if (!generationDisabled) {
+          // Store the params from the control page so generateCatPlus uses them
+          overrideParamsRef.current = {
+            params: cmd.params,
+            slots: cmd.slots,
+          };
+          setParamRows([]);
+          setRollerLabel(null);
+          setRollerActiveValue(null);
+          setRollerHighlight(false);
+          setActiveParamId(null);
+          setObsPhase("active");
+          generateCatPlus();
+        }
+        break;
+      case "clear":
+        // Cancel any running spin and go transparent
+        generationIdRef.current++;
+        setParamRows([]);
+        setRollerLabel(null);
+        setRollerActiveValue(null);
+        setObsPhase("idle");
+        drawPlaceholder();
+        break;
+      case "lobby":
+        // For now, just show idle state
+        setObsPhase("active");
+        break;
     }
-  }, [session?.currentCommand, generationDisabled, generateCatPlus]);
+  }, [session?.currentCommand, generationDisabled, generateCatPlus, drawPlaceholder]);
 
   // =======================================================================
   // OBS: Fixed-position overlay — nothing moves, everything anchored
@@ -3655,6 +3692,11 @@ export function OBSSpinClient({
 
   // All layer groups combined for the layer panel
   const hasLayers = layerRows.accessories.length > 0 || layerRows.scars.length > 0 || layerRows.torties.length > 0;
+
+  // When idle (after clear), show nothing — fully transparent
+  if (obsPhase === "idle" && !initializing) {
+    return null;
+  }
 
   return (
     <div className="relative" style={{ width: "1280px", height: "1080px" }}>
