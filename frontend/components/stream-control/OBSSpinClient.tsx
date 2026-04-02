@@ -3611,9 +3611,11 @@ export function OBSSpinClient({
   }, [paramRows]);
 
   // The fixed board slots — always rendered, filled or empty
+  // Show tortie sub-params only if tortie was revealed as "Yes"
+  const isTortie = paramRows.some((r) => r.id === "tortie" && r.value.toLowerCase() === "yes");
   const boardSlots = PARAM_SEQUENCE.filter(
-    (def) => !def.requiresTortie || paramRows.some((r) => r.id === "tortie" || r.id === "tortieMask")
-  ).slice(0, 12); // cap at 12 visible rows
+    (def) => !def.requiresTortie || isTortie
+  );
 
   return (
     <div className="relative" style={{ width: "1280px", height: "1080px" }}>
@@ -3734,7 +3736,7 @@ export function OBSSpinClient({
                 key={def.id}
                 className="flex items-center gap-3 transition-colors duration-300"
                 style={{
-                  padding: "7px 20px",
+                  padding: "5px 20px",
                   borderLeft: isActive ? "3px solid rgba(245,158,11,0.7)" : "3px solid transparent",
                   background: isActive ? "rgba(245,158,11,0.04)" : "transparent",
                 }}
