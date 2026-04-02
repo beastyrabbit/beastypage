@@ -3593,135 +3593,180 @@ export function OBSSpinClient({
   }, [session?.currentCommand, generationDisabled, generateCatPlus]);
 
   // =======================================================================
-  // OBS: Render — broadcast overlay layout (1280x1080 content zone)
+  // OBS: Fixed-position overlay — nothing moves, everything anchored
   // =======================================================================
   const flapChars = Presets.ALPHANUM + " .-()_/•–:";
 
+  // Build a map of revealed params for the fixed board
+  const revealedMap = useMemo(() => {
+    const map = new Map<string, ParamRow>();
+    for (const row of paramRows) {
+      map.set(row.id, row);
+    }
+    return map;
+  }, [paramRows]);
+
+  // The fixed board slots — always rendered, filled or empty
+  const boardSlots = PARAM_SEQUENCE.filter(
+    (def) => !def.requiresTortie || paramRows.some((r) => r.id === "tortie" || r.id === "tortieMask")
+  ).slice(0, 12); // cap at 12 visible rows
+
   return (
-    <div className="flex h-full flex-col" style={{ width: "1280px" }}>
+    <div className="relative" style={{ width: "1280px", height: "1080px" }}>
       <style>{`
-        @keyframes obs-pulse {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
+        @keyframes obs-glow {
+          0%, 100% { box-shadow: 0 0 20px rgba(245,158,11,0.1); }
+          50% { box-shadow: 0 0 40px rgba(245,158,11,0.25); }
         }
-        @keyframes obs-scan {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(200%); }
-        }
-        .obs-roller-bar {
-          background: linear-gradient(180deg, rgba(15,12,0,0.95) 0%, rgba(10,8,0,0.9) 100%);
-          border-bottom: 2px solid rgba(245, 158, 11, 0.3);
-          box-shadow: 0 4px 30px rgba(0,0,0,0.5);
-          position: relative;
-          overflow: hidden;
-        }
-        .obs-roller-bar::after {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background: linear-gradient(90deg, transparent, rgba(245,158,11,0.03), transparent);
-          animation: obs-scan 3s ease-in-out infinite;
-          pointer-events: none;
-        }
-        .obs-board {
-          background: linear-gradient(180deg, rgba(8,6,0,0.95) 0%, rgba(12,10,2,0.92) 100%);
-          border-top: 2px solid rgba(245, 158, 11, 0.15);
-          border-radius: 0;
-        }
-        .obs-board-row {
-          display: flex;
-          align-items: center;
-          gap: 24px;
-          padding: 10px 32px;
-          border-bottom: 1px solid rgba(245, 158, 11, 0.04);
-        }
-        .obs-board-row:last-child { border-bottom: none; }
-        .obs-board-row[data-active="true"] {
-          background: rgba(245, 158, 11, 0.04);
-          border-left: 3px solid rgba(245, 158, 11, 0.5);
+        @keyframes obs-dot-pulse {
+          0%, 100% { opacity: 0.4; transform: scale(0.8); }
+          50% { opacity: 1; transform: scale(1); }
         }
       `}</style>
 
-      {/* ── Top: Active roller bar ── */}
-      {rollerLabel ? (
-        <div className="obs-roller-bar flex items-center gap-6 px-8" style={{ height: "80px" }}>
-          {/* Pulsing dot */}
-          <div className="flex items-center gap-3">
-            <div
-              className="size-3 rounded-full bg-amber-500"
-              style={{ animation: "obs-pulse 1.2s ease-in-out infinite" }}
-            />
-            <span className="text-xs font-bold uppercase tracking-[0.5em] text-amber-500/70">
-              {rollerLabel}
-            </span>
-          </div>
-          {/* Active value in flap display */}
-          {rollerActiveValue && (
-            <div className="ml-auto">
-              <FlapDisplay
-                chars={flapChars}
-                length={Math.max(rollerActiveValue.length, 16)}
-                value={rollerActiveValue.toUpperCase()}
-                padMode="end"
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        <div style={{ height: "80px" }} />
-      )}
-
-      {/* ── Center: Cat canvas — hero, massive ── */}
-      <div className="flex flex-1 items-center justify-center">
+      {/* ═══ Cat canvas — absolute center-left, always in the same spot ═══ */}
+      <div
+        className="absolute flex items-center justify-center"
+        style={{ left: "0px", top: "60px", width: "740px", height: "740px" }}
+      >
         <canvas
           ref={canvasRef}
           width={DISPLAY_SIZE}
           height={DISPLAY_SIZE}
-          className="drop-shadow-[0_0_80px_rgba(245,158,11,0.2)]"
+          className="drop-shadow-[0_0_60px_rgba(245,158,11,0.15)]"
           style={{
-            width: "620px",
-            height: "620px",
+            width: "680px",
+            height: "680px",
             imageRendering: "pixelated",
           }}
         />
       </div>
 
-      {/* ── Bottom: Split-flap departure board ── */}
-      {paramRows.length > 0 && (
-        <div className="obs-board">
-          {paramRows.map((row, i) => (
-            <div
-              key={`${row.id}-${i}`}
-              className="obs-board-row"
-              data-active={row.status === "active"}
-            >
-              <span
-                className={cn(
-                  "w-[160px] shrink-0 text-base font-bold uppercase tracking-[0.15em]",
-                  row.status === "active"
-                    ? "text-amber-400"
-                    : "text-amber-700/70"
-                )}
-              >
-                {row.label}
-              </span>
-              <FlapDisplay
-                chars={flapChars}
-                length={Math.max(row.value.length, 14)}
-                value={row.value.toUpperCase()}
-                padMode="end"
-              />
+      {/* ═══ Right panel — fixed board, always visible ═══ */}
+      <div
+        className="absolute flex flex-col"
+        style={{
+          right: "0px",
+          top: "40px",
+          width: "520px",
+          height: "1000px",
+        }}
+      >
+        {/* Active roller — what's currently spinning */}
+        <div
+          className="mb-4 rounded-l-xl"
+          style={{
+            minHeight: "72px",
+            background: "linear-gradient(135deg, rgba(12,10,2,0.95), rgba(8,6,0,0.9))",
+            borderLeft: rollerLabel ? "3px solid rgba(245,158,11,0.6)" : "3px solid rgba(245,158,11,0.08)",
+            padding: "14px 20px",
+          }}
+        >
+          {rollerLabel ? (
+            <>
+              <div className="flex items-center gap-2">
+                <div
+                  className="size-2.5 rounded-full bg-amber-500"
+                  style={{ animation: "obs-dot-pulse 1s ease-in-out infinite" }}
+                />
+                <span className="text-[11px] font-bold uppercase tracking-[0.4em] text-amber-500/60">
+                  {rollerLabel}
+                </span>
+              </div>
+              {rollerActiveValue && (
+                <div className="mt-2">
+                  <FlapDisplay
+                    chars={flapChars}
+                    length={Math.max(rollerActiveValue.length, 14)}
+                    value={rollerActiveValue.toUpperCase()}
+                    padMode="end"
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-[11px] font-bold uppercase tracking-[0.4em] text-white/8">
+              Waiting…
             </div>
-          ))}
+          )}
         </div>
-      )}
+
+        {/* Fixed board — all slots always rendered */}
+        <div
+          className="flex-1 rounded-l-xl"
+          style={{
+            background: "linear-gradient(180deg, rgba(6,5,0,0.92) 0%, rgba(10,8,2,0.88) 100%)",
+            borderLeft: "2px solid rgba(245,158,11,0.1)",
+            padding: "8px 0",
+            animation: paramRows.length > 0 ? "obs-glow 3s ease-in-out infinite" : "none",
+          }}
+        >
+          {boardSlots.map((def) => {
+            const row = revealedMap.get(def.id);
+            const isActive = row?.status === "active";
+            const isRevealed = row?.status === "revealed";
+            const isEmpty = !row;
+
+            return (
+              <div
+                key={def.id}
+                className="flex items-center gap-3 transition-colors duration-300"
+                style={{
+                  padding: "7px 20px",
+                  borderLeft: isActive ? "3px solid rgba(245,158,11,0.7)" : "3px solid transparent",
+                  background: isActive ? "rgba(245,158,11,0.04)" : "transparent",
+                }}
+              >
+                {/* Label — fixed width */}
+                <span
+                  className={cn(
+                    "w-[110px] shrink-0 text-[13px] font-semibold uppercase tracking-wide transition-colors duration-300",
+                    isActive ? "text-amber-400" :
+                    isRevealed ? "text-amber-600/50" :
+                    "text-white/6"
+                  )}
+                >
+                  {def.label}
+                </span>
+
+                {/* Value — flap display or empty placeholder */}
+                <div className="flex-1">
+                  {row ? (
+                    <FlapDisplay
+                      chars={flapChars}
+                      length={Math.max(row.value.length, 12)}
+                      value={row.value.toUpperCase()}
+                      padMode="end"
+                    />
+                  ) : (
+                    <div className="flex gap-[2px]">
+                      {Array.from({ length: 12 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="rounded-sm"
+                          style={{
+                            width: "14px",
+                            height: "22px",
+                            background: "rgba(245,158,11,0.02)",
+                            border: "1px solid rgba(245,158,11,0.03)",
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Loading state */}
       {initializing && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="flex items-center gap-3 rounded-xl bg-black/80 px-6 py-4 backdrop-blur">
+          <div className="flex items-center gap-3 rounded-xl bg-black/90 px-6 py-4">
             <Loader2 className="size-5 animate-spin text-amber-500" />
-            <span className="text-sm font-medium text-amber-500/70">Initializing sprite engine…</span>
+            <span className="text-sm font-medium text-amber-500/60">Loading…</span>
           </div>
         </div>
       )}
