@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
+import Link from "next/link";
 import {
+  ArrowUpRight,
   Copy,
+  Download,
   Eye,
   Loader2,
   Minus,
@@ -11,6 +14,8 @@ import {
   Plus,
   Radio,
   RotateCcw,
+  SendHorizontal,
+  Sparkles,
   Square,
   Timer,
   Tv,
@@ -23,7 +28,7 @@ import { cn } from "@/lib/utils";
 import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import { LayerCountModeSelector } from "@/components/common/LayerCountModeSelector";
-import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
+import { AFTERLIFE_OPTIONS, computeLayerCount } from "@/utils/catSettingsHelpers";
 import {
   encodePortableSettings,
   decodePortableSettings,
@@ -36,15 +41,17 @@ import {
 } from "@/utils/singleCatVariants";
 import type { PaletteId } from "@/lib/palettes";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
+import { useVariants } from "@/utils/variants";
+import type { Id } from "@/convex/_generated/dataModel";
 
 // ---------------------------------------------------------------------------
 // StreamControlClient
 // ---------------------------------------------------------------------------
 
 const LOBBY_MODE_DEFAULTS = {
-  "fruit-ninja": { cats: 5, move: 1, swap: 1 },
+  "fruit-ninja": { cats: 5, move: 1.5, swap: 1 },
   "matrix": { cats: 8, move: 1, swap: 1 },
-  "dvd": { cats: 3, move: 1, swap: 1 },
+  "dvd": { cats: 3, move: 0.5, swap: 1 },
 } as const;
 
 export function StreamControlClient() {
@@ -54,10 +61,6 @@ export function StreamControlClient() {
     api.catStream.getSession,
     isAuthenticated ? {} : "skip"
   );
-  const history = useQuery(
-    api.catStream.getHistory,
-    isAuthenticated ? { limit: 50 } : "skip"
-  );
 
   const ensureSession = useMutation(api.catStream.ensureSession);
   const updateSettingsMut = useMutation(api.catStream.updateSettings);
@@ -65,23 +68,43 @@ export function StreamControlClient() {
   const showLobbyMut = useMutation(api.catStream.showLobby);
   const clearOverlayMut = useMutation(api.catStream.clearOverlay);
   const toggleTestModeMut = useMutation(api.catStream.toggleTestMode);
-  const recordResultMut = useMutation(api.catStream.recordResult);
+  const createMapper = useMutation(api.mapper.create);
+  const updateMapperMeta = useMutation(api.mapper.updateMeta);
 
   const { generator, ready: generatorReady } = useCatGenerator();
+
+  // Variant management — read-only, reuses SingleCatPlus variants
+  const variants = useVariants<SingleCatSettings>({
+    storageKey: "singleCatPlus.variants",
+    toolKey: "singleCatPlus",
+  });
 
   // Local settings state — synced to Convex on change
   const [settings, setSettings] = useState<SingleCatSettings>(
     DEFAULT_SINGLE_CAT_SETTINGS
   );
-  const [countdownSeconds, setCountdownSeconds] = useState(3);
+  const [countdownSeconds, setCountdownSeconds] = useState(10);
   const [spinning, setSpinning] = useState(false);
   const [initialized, setInitialized] = useState(false);
+
+  // Cat profile state — for "Links & Actions" / history entry
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+  const [currentSlug, setCurrentSlug] = useState<string | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [catNameDraft, setCatNameDraft] = useState("");
+  const [creatorNameDraft, setCreatorNameDraft] = useState("");
+  const [metaDirty, setMetaDirty] = useState(false);
+  const [metaSaving, setMetaSaving] = useState(false);
+  const creatorFilledRef = useRef(false);
+  const lastResultRef = useRef<{ canvas: HTMLCanvasElement | OffscreenCanvas; params: Record<string, unknown> } | null>(null);
+  const [hasTint, setHasTint] = useState(false);
 
   // Lobby animation settings
   const [lobbyMode, setLobbyMode] = useState<"fruit-ninja" | "matrix" | "dvd">("fruit-ninja");
   const [lobbyCatCount, setLobbyCatCount] = useState(4);
   const [lobbyMoveSpeed, setLobbyMoveSpeed] = useState(1.0);
   const [lobbySwapSpeed, setLobbySwapSpeed] = useState(1.0);
+  const [paletteDisplayMode, setPaletteDisplayMode] = useState<"cycle" | "all">("cycle");
 
   // Instant sync for lobby settings — no debounce
   const syncLobbySettings = useCallback((updates: Record<string, unknown>) => {
@@ -91,10 +114,11 @@ export function StreamControlClient() {
       lobbyCatCount,
       lobbyMoveSpeed,
       lobbySwapSpeed,
+      paletteDisplayMode,
       ...updates,
     };
     if (session) updateSettingsMut({ settings: merged }).catch(() => {});
-  }, [settings, lobbyMode, lobbyCatCount, lobbyMoveSpeed, lobbySwapSpeed, session, updateSettingsMut]);
+  }, [settings, lobbyMode, lobbyCatCount, lobbyMoveSpeed, lobbySwapSpeed, paletteDisplayMode, session, updateSettingsMut]);
 
   // Seed from session settings on first load
   useEffect(() => {
@@ -106,6 +130,11 @@ export function StreamControlClient() {
         if (s.lobbyCatCount) setLobbyCatCount(s.lobbyCatCount as number);
         if (s.lobbyMoveSpeed) setLobbyMoveSpeed(s.lobbyMoveSpeed as number);
         if (s.lobbySwapSpeed) setLobbySwapSpeed(s.lobbySwapSpeed as number);
+        if (s.paletteDisplayMode) setPaletteDisplayMode(s.paletteDisplayMode as "cycle" | "all");
+        if (typeof s.creatorName === "string" && s.creatorName) {
+          setCreatorNameDraft(s.creatorName);
+          creatorFilledRef.current = true;
+        }
       }
       setInitialized(true);
     }
@@ -118,10 +147,21 @@ export function StreamControlClient() {
     }
   }, [isAuthenticated, session, ensureSession]);
 
-  // Sync settings to Convex (debounced)
+  // Auto-fill creator name from viewer username
+  useEffect(() => {
+    const username = viewer?.username;
+    if (username && !creatorFilledRef.current && !creatorNameDraft) {
+      setCreatorNameDraft(username);
+      creatorFilledRef.current = true;
+    }
+  }, [viewer?.username, creatorNameDraft]);
+
+  // Sync settings to Convex (debounced) — includes lobby fields so they aren't overwritten
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
 
   const updateSettings = useCallback(
     (next: Partial<SingleCatSettings>) => {
@@ -129,12 +169,23 @@ export function StreamControlClient() {
         const merged = { ...prev, ...next };
         clearTimeout(syncTimer.current);
         syncTimer.current = setTimeout(() => {
-          if (session) updateSettingsMut({ settings: merged }).catch(() => {});
+          if (sessionRef.current) {
+            // Merge lobby fields so they don't get overwritten
+            const full = {
+              ...merged,
+              lobbyMode,
+              lobbyCatCount,
+              lobbyMoveSpeed,
+              lobbySwapSpeed,
+              paletteDisplayMode,
+            };
+            updateSettingsMut({ settings: full }).catch(() => {});
+          }
         }, 500);
         return merged;
       });
     },
-    [updateSettingsMut]
+    [updateSettingsMut, lobbyMode, lobbyCatCount, lobbyMoveSpeed, lobbySwapSpeed, paletteDisplayMode]
   );
 
   // Spin handler
@@ -152,14 +203,20 @@ export function StreamControlClient() {
             : undefined,
         includeBaseColours: settings.includeBaseColours,
         exactLayerCounts: settings.exactLayerCounts,
-        accessoryCount: settings.accessoryRange.max,
-        scarCount: settings.scarRange.max,
-        tortieCount: settings.tortieRange.max,
+        accessoryCount: computeLayerCount(settings.accessoryRange),
+        scarCount: computeLayerCount(settings.scarRange),
+        tortieCount: computeLayerCount(settings.tortieRange),
       });
 
-      // Flush settings to Convex immediately so OBS has them before spinning
+      // Store result for export buttons
+      lastResultRef.current = { canvas: result.canvas, params: result.params as unknown as Record<string, unknown> };
+      const p = result.params as unknown as Record<string, unknown>;
+      setHasTint(Boolean(p.darkForest || p.darkMode || p.dead));
+
+      // Flush settings (including creatorName) to Convex so OBS has them before spinning
       clearTimeout(syncTimer.current);
-      await updateSettingsMut({ settings });
+      const settingsWithCreator = { ...settings, creatorName: creatorNameDraft };
+      await updateSettingsMut({ settings: settingsWithCreator });
 
       await triggerSpinMut({
         params: result.params,
@@ -167,9 +224,30 @@ export function StreamControlClient() {
         countdownSeconds,
       });
 
-      await recordResultMut({
+      // Persist to cat_profile (same as SingleCatPlus)
+      const catData = {
         params: result.params,
+        accessorySlots: result.slotSelections?.accessories ?? [],
+        scarSlots: result.slotSelections?.scars ?? [],
+        tortieSlots: result.slotSelections?.tortie ?? [],
+        counts: {
+          accessories: (result.slotSelections?.accessories ?? []).filter((s: string) => s !== "none").length,
+          scars: (result.slotSelections?.scars ?? []).filter((s: string) => s !== "none").length,
+          tortie: (result.slotSelections?.tortie ?? []).filter(Boolean).length,
+        },
+      };
+      const profile = await createMapper({
+        catData,
+        creatorName: creatorNameDraft.trim() || undefined,
       });
+      if (profile) {
+        setCurrentProfileId(profile.id);
+        setCurrentSlug(profile.slug);
+        const origin = typeof window !== "undefined" ? window.location.origin : "";
+        setShareLink(`${origin}/view/${profile.slug}`);
+        setCatNameDraft("");
+        setMetaDirty(false);
+      }
 
       toast.success("Spin triggered!");
     } catch (err) {
@@ -184,9 +262,123 @@ export function StreamControlClient() {
     spinning,
     settings,
     countdownSeconds,
+    creatorNameDraft,
     triggerSpinMut,
-    recordResultMut,
+    createMapper,
+    updateSettingsMut,
   ]);
+
+  // Save meta (cat name / creator name) to existing profile
+  const handleSaveMeta = useCallback(async () => {
+    if (!currentProfileId) {
+      toast.error("Roll a cat before saving.");
+      return;
+    }
+    setMetaSaving(true);
+    try {
+      await updateMapperMeta({
+        id: currentProfileId as Id<"cat_profile">,
+        catName: catNameDraft.trim() || undefined,
+        creatorName: creatorNameDraft.trim() || undefined,
+      });
+      setMetaDirty(false);
+      toast.success("Saved to history!");
+    } catch (err) {
+      toast.error("Unable to save history entry. Please try again.");
+    } finally {
+      setMetaSaving(false);
+    }
+  }, [currentProfileId, catNameDraft, creatorNameDraft, updateMapperMeta]);
+
+  // Variant selection handler
+  const handleVariantSelect = useCallback(
+    (variantId: string | null) => {
+      if (!variantId) {
+        variants.setActive(null);
+        updateSettings(DEFAULT_SINGLE_CAT_SETTINGS);
+        return;
+      }
+      const variant = variants.store.variants.find((v) => v.id === variantId);
+      if (!variant) return;
+      variants.setActive(variantId);
+      updateSettings(variant.settings);
+    },
+    [variants, updateSettings]
+  );
+
+  // Export handlers — copy / download the last generated cat
+  const FULL_EXPORT_SIZE = 700;
+
+  const copyCanvasToClipboard = useCallback(
+    async (canvas: HTMLCanvasElement, successMsg: string, fallbackName: string) => {
+      try {
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png");
+        });
+        if (navigator.clipboard && "write" in navigator.clipboard) {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+          toast.success(successMsg);
+          return;
+        }
+        // Fallback: download
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${fallbackName}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success("Image downloaded.");
+      } catch {
+        toast.error("Failed to copy image.");
+      }
+    },
+    []
+  );
+
+  const exportCat = useCallback(
+    async (options?: { noTint?: boolean; size?: number }) => {
+      const last = lastResultRef.current;
+      if (!last || !generator) return;
+      let sourceCanvas = last.canvas as HTMLCanvasElement;
+      if (options?.noTint) {
+        const params = { ...last.params, darkForest: false, darkMode: false, dead: false };
+        const rendered = await generator.generateCat(params);
+        sourceCanvas = rendered.canvas as HTMLCanvasElement;
+      }
+      const size = options?.size ?? FULL_EXPORT_SIZE;
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = size;
+      exportCanvas.height = size;
+      const ctx = exportCanvas.getContext("2d");
+      if (ctx) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(sourceCanvas, 0, 0, size, size);
+      }
+      const label = options?.noTint ? `Copied (no tint) ${size}x${size}!` : `Copied ${size}x${size}!`;
+      await copyCanvasToClipboard(exportCanvas, label, options?.noTint ? "cat-no-tint" : "cat");
+    },
+    [generator, copyCanvasToClipboard]
+  );
+
+  const handleDownload = useCallback(() => {
+    const last = lastResultRef.current;
+    if (!last) return;
+    const canvas = last.canvas as HTMLCanvasElement;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "cat.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("Downloaded PNG");
+    }, "image/png");
+  }, []);
 
   // Auth gate
   if (authLoading) {
@@ -232,6 +424,30 @@ export function StreamControlClient() {
             Settings
           </h3>
           <div className="space-y-4">
+            {/* Timing Variant */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Variant
+              </span>
+              <select
+                value={variants.store.activeId ?? ""}
+                onChange={(e) =>
+                  handleVariantSelect(e.target.value || null)
+                }
+                className={cn(
+                  "rounded-lg border border-border/50 bg-background px-3 py-1.5",
+                  "text-xs text-foreground"
+                )}
+              >
+                <option value="">Default</option>
+                {variants.store.variants.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Mode */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">
@@ -317,9 +533,30 @@ export function StreamControlClient() {
 
             {/* Palettes */}
             <div>
-              <span className="mb-1 block text-xs font-medium text-muted-foreground">
-                Palettes
-              </span>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Palettes
+                </span>
+                <div className="flex items-center gap-0.5 rounded-md border border-border/30 p-0.5">
+                  {(["cycle", "all"] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => {
+                        setPaletteDisplayMode(m);
+                        syncLobbySettings({ paletteDisplayMode: m });
+                      }}
+                      className={cn(
+                        "rounded px-2 py-0.5 text-[10px] font-semibold transition",
+                        paletteDisplayMode === m
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {m === "cycle" ? "Cycle" : "Show All"}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <PaletteMultiSelect
                 selected={
                   new Set(
@@ -612,57 +849,156 @@ export function StreamControlClient() {
         </div>
       </section>
 
-      {/* Spin History Table */}
+      {/* Links & Actions */}
       <section className="rounded-2xl border border-border/40 bg-background/80 p-5 backdrop-blur">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Spin History
-        </h3>
-        {!history || history.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            No spins yet. Click Spin! to get started.
+        <h3 className="text-sm font-semibold text-foreground">Links & Actions</h3>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+              "text-xs font-medium text-muted-foreground transition",
+              "hover:bg-foreground hover:text-background disabled:opacity-50"
+            )}
+            onClick={async () => {
+              if (!shareLink) return;
+              try {
+                await navigator.clipboard.writeText(shareLink);
+                toast.success("Share link copied!");
+              } catch {
+                window.prompt("Copy this link", shareLink);
+              }
+            }}
+            disabled={!shareLink}
+          >
+            <SendHorizontal className="size-4" /> Copy Share Link
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+              "text-xs font-medium text-muted-foreground transition",
+              "hover:bg-foreground hover:text-background disabled:opacity-50"
+            )}
+            onClick={() => {
+              if (!currentSlug) return;
+              window.open(`/view/${currentSlug}`, "_blank", "noopener=yes");
+            }}
+            disabled={!currentSlug}
+          >
+            <Sparkles className="size-4" /> Open Share Viewer
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+              "text-xs font-medium text-muted-foreground transition",
+              "hover:bg-foreground hover:text-background disabled:opacity-50"
+            )}
+            onClick={handleDownload}
+            disabled={!lastResultRef.current}
+          >
+            <Download className="size-4" /> Download PNG
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+              "text-xs font-medium text-muted-foreground transition",
+              "hover:bg-foreground hover:text-background disabled:opacity-50"
+            )}
+            onClick={() => exportCat()}
+            disabled={!lastResultRef.current}
+          >
+            <Copy className="size-4" /> Copy 700x700
+          </button>
+          {hasTint && (
+            <button
+              type="button"
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+                "text-xs font-medium text-muted-foreground transition",
+                "hover:bg-foreground hover:text-background disabled:opacity-50"
+              )}
+              onClick={() => exportCat({ noTint: true })}
+              disabled={!lastResultRef.current}
+            >
+              <Copy className="size-4" /> Copy (No Tint)
+            </button>
+          )}
+        </div>
+        {shareLink && (
+          <p className="mt-3 truncate text-xs text-muted-foreground">
+            Latest share: <span className="text-foreground">{shareLink}</span>
           </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/30 text-left text-xs text-muted-foreground">
-                  <th className="pb-2 pr-4">#</th>
-                  <th className="pb-2 pr-4">Time</th>
-                  <th className="pb-2 pr-4">Pelt</th>
-                  <th className="pb-2 pr-4">Colour</th>
-                  <th className="pb-2 pr-4">Eyes</th>
-                  <th className="pb-2 pr-4">Sprite</th>
-                  <th className="pb-2 pr-4">Tortie</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((row, i) => {
-                  const p = row.params ?? {};
-                  return (
-                    <tr
-                      key={row._id}
-                      className="border-b border-border/10 text-foreground/80"
-                    >
-                      <td className="py-2 pr-4 text-muted-foreground">
-                        {history.length - i}
-                      </td>
-                      <td className="py-2 pr-4 text-muted-foreground">
-                        {new Date(row.createdAt).toLocaleTimeString()}
-                      </td>
-                      <td className="py-2 pr-4">{p.peltName ?? "—"}</td>
-                      <td className="py-2 pr-4">{p.colour ?? "—"}</td>
-                      <td className="py-2 pr-4">{p.eyeColour ?? "—"}</td>
-                      <td className="py-2 pr-4">{p.spriteNumber ?? "—"}</td>
-                      <td className="py-2 pr-4">
-                        {p.isTortie ? "Yes" : "No"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         )}
+        <div className="mt-4 grid gap-3 rounded-xl border border-border/40 bg-background/50 p-4">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground/80">History Entry</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-muted-foreground/70">
+              <span>Cat Name</span>
+              <input
+                type="text"
+                value={catNameDraft}
+                onChange={(e) => {
+                  setCatNameDraft(e.target.value);
+                  setMetaDirty(true);
+                }}
+                placeholder="Optional"
+                className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-muted-foreground/70">
+              <span>Your Name</span>
+              <input
+                type="text"
+                value={creatorNameDraft}
+                onChange={(e) => {
+                  setCreatorNameDraft(e.target.value);
+                  setMetaDirty(true);
+                }}
+                placeholder="Optional"
+                className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+                "text-xs font-medium text-muted-foreground transition",
+                "hover:bg-foreground hover:text-background disabled:opacity-50"
+              )}
+              onClick={handleSaveMeta}
+              disabled={!currentProfileId || metaSaving || !metaDirty}
+            >
+              <Sparkles className="size-4" /> Save to History
+            </button>
+            <Link
+              href="/history"
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+                "text-xs font-medium text-muted-foreground transition",
+                "hover:bg-foreground hover:text-background"
+              )}
+            >
+              Browse History
+            </Link>
+            {currentSlug && (
+              <Link
+                href={`/view/${currentSlug}`}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+                  "text-xs font-medium text-muted-foreground transition",
+                  "hover:bg-foreground hover:text-background"
+                )}
+              >
+                <ArrowUpRight className="size-4" /> View Entry
+              </Link>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );

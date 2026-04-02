@@ -33,7 +33,7 @@ const TOOLS: ToolCard[] = [
     href: "/projects/tools/discord-bot",
   },
   {
-    title: "Single Cat Stream",
+    title: "Stream Control",
     icon: "🎬",
     description:
       "OBS overlay for live cat gacha spins — control settings from a dashboard, spin cats on stream with animated reveals.",

@@ -65,32 +65,6 @@ export const getSessionByApiKey = query({
   },
 });
 
-/**
- * Get spin history for the authenticated user's session.
- */
-export const getHistory = query({
-  args: { limit: v.optional(v.number()) },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return [];
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("byTokenIdentifier", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
-      )
-      .unique();
-    if (!user) return [];
-
-    const rows = await ctx.db
-      .query("cat_stream_history")
-      .withIndex("byUser", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .take(args.limit ?? 50);
-    return rows;
-  },
-});
-
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
@@ -265,43 +239,3 @@ export const toggleTestMode = mutation({
   },
 });
 
-/**
- * Record a spin result to history.
- */
-export const recordResult = mutation({
-  args: {
-    params: v.any(),
-    slots: v.optional(v.any()),
-    profileId: v.optional(v.string()),
-    shareUrl: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-
-    const session = await ctx.db
-      .query("cat_stream_sessions")
-      .withIndex("byUserId", (q) => q.eq("userId", user._id))
-      .unique();
-    if (!session) throw new Error("No stream session found");
-
-    const row: Record<string, unknown> = {
-      sessionId: session._id,
-      userId: user._id,
-      params: args.params,
-      createdAt: Date.now(),
-    };
-    if (args.slots !== undefined) row.slots = args.slots;
-    if (args.profileId !== undefined) row.profileId = args.profileId;
-    if (args.shareUrl !== undefined) row.shareUrl = args.shareUrl;
-
-    return ctx.db.insert(
-      "cat_stream_history",
-      row as {
-        sessionId: typeof session._id;
-        userId: typeof user._id;
-        params: unknown;
-        createdAt: number;
-      }
-    );
-  },
-});

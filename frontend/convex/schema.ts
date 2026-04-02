@@ -360,18 +360,6 @@ export default defineSchema({
   })
     .index("byUserId", ["userId"]),
 
-  cat_stream_history: defineTable({
-    sessionId: v.id("cat_stream_sessions"),
-    userId: v.id("users"),
-    params: v.any(),
-    slots: v.optional(v.any()),
-    profileId: v.optional(v.string()),
-    shareUrl: v.optional(v.string()),
-    createdAt: v.number(),
-  })
-    .index("bySession", ["sessionId"])
-    .index("byUser", ["userId", "createdAt"]),
-
   user_variants: defineTable({
     userId: v.id("users"),
     toolKey: v.string(),

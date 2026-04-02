@@ -6,7 +6,7 @@ import { PageHero } from "@/components/common/PageHero";
 import { StreamControlClient } from "@/components/stream-control/StreamControlClient";
 
 export const metadata: Metadata = {
-  title: "Single Cat Stream | BeastyPage",
+  title: "Stream Control | BeastyPage",
   description:
     "Stream control center for the Single Cat Plus gacha — spin cats live with an OBS overlay.",
 };
@@ -16,7 +16,7 @@ export default function SingleCatStreamPage() {
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-12 sm:px-6 lg:px-8">
       <PageHero
         eyebrow="Stream Tools"
-        title="Single Cat Stream"
+        title="Stream Control"
         description="Control your OBS cat gacha overlay. Configure settings, trigger spins, and track results."
       />
       <Suspense

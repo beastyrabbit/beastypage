@@ -65,6 +65,7 @@ import {
   resolveAfterlife,
   AFTERLIFE_OPTIONS,
 } from "@/utils/catSettingsHelpers";
+import { OBSLobby } from "./OBSLobby";
 
 // OBS stubs — functions referenced by the spin logic but not needed for overlay
 const track = (..._args: unknown[]) => {};
@@ -1466,6 +1467,9 @@ export function OBSSpinClient({
     if (sessionSettings.timing) {
       setTimingConfig(sessionSettings.timing);
     }
+    if (sessionSettings.creatorName) {
+      setCreatorNameDraft(sessionSettings.creatorName);
+    }
   }, [sessionSettings]);
 
   const [rollerLabel, setRollerLabel] = useState<string | null>(null);
@@ -1485,9 +1489,9 @@ export function OBSSpinClient({
   const [toast, setToast] = useState<string | null>(null);
   const [rollerExpanded, setRollerExpanded] = useState(false);
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
-  const defaultCreatorName = "";
+  const defaultCreatorName = sessionSettings?.creatorName ?? "";
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
-  const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName);
+  const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName || defaultCreatorName);
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaDirty, setMetaDirty] = useState(false);
 
@@ -1866,27 +1870,49 @@ export function OBSSpinClient({
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+
+    // Resolve source to a usable canvas
+    let src: HTMLCanvasElement;
     try {
-      ctx.drawImage(source as HTMLCanvasElement, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
-    } catch (error) {
-      console.warn("drawImage failed, creating fallback canvas", error);
+      // Test if source can be drawn directly
+      ctx.drawImage(source as HTMLCanvasElement, 0, 0, 1, 1);
+      ctx.clearRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+      src = source as HTMLCanvasElement;
+    } catch {
       const fallback = document.createElement("canvas");
-      const fallbackWidth =
-        "width" in source && typeof source.width === "number"
-          ? source.width
-          : DISPLAY_SIZE;
-      const fallbackHeight =
-        "height" in source && typeof source.height === "number"
-          ? source.height
-          : DISPLAY_SIZE;
-      fallback.width = fallbackWidth;
-      fallback.height = fallbackHeight;
-      const fallbackCtx = fallback.getContext("2d");
-      if (fallbackCtx) {
-        fallbackCtx.drawImage(source as HTMLCanvasElement, 0, 0);
-        ctx.drawImage(fallback, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
-      }
+      const w = "width" in source && typeof source.width === "number" ? source.width : DISPLAY_SIZE;
+      const h = "height" in source && typeof source.height === "number" ? source.height : DISPLAY_SIZE;
+      fallback.width = w;
+      fallback.height = h;
+      const fCtx = fallback.getContext("2d");
+      if (fCtx) fCtx.drawImage(source as HTMLCanvasElement, 0, 0);
+      src = fallback;
     }
+
+    // White sticker outline — draw source offset in 8 directions, tinted white
+    // This works in OBS unlike CSS drop-shadow
+    const outline = 3;
+    const offsets = [
+      [-outline, 0], [outline, 0], [0, -outline], [0, outline],
+      [-outline, -outline], [outline, -outline], [-outline, outline], [outline, outline],
+    ];
+    // Create a white-tinted version of the source
+    const tint = document.createElement("canvas");
+    tint.width = DISPLAY_SIZE;
+    tint.height = DISPLAY_SIZE;
+    const tCtx = tint.getContext("2d")!;
+    tCtx.imageSmoothingEnabled = false;
+    tCtx.drawImage(src, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+    tCtx.globalCompositeOperation = "source-in";
+    tCtx.fillStyle = "white";
+    tCtx.fillRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+
+    // Draw the white silhouette at each offset
+    for (const [dx, dy] of offsets) {
+      ctx.drawImage(tint, dx, dy);
+    }
+    // Draw the actual cat on top
+    ctx.drawImage(src, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
   }, []);
 
   const renderCat = useCallback(
@@ -3596,11 +3622,15 @@ export function OBSSpinClient({
   // OBS: Hide header/footer, transparent background
   // =======================================================================
   useEffect(() => {
-    // Green chroma key for dev preview — OBS uses transparent
+    // Dev preview shows background art — OBS uses transparent
     const isOBS = typeof window !== "undefined" && "obsstudio" in window;
-    const bg = isOBS ? "transparent" : "#00ff00";
-    document.documentElement.style.background = bg;
-    document.body.style.background = bg;
+    if (isOBS) {
+      document.documentElement.style.background = "transparent";
+      document.body.style.background = "transparent";
+    } else {
+      document.documentElement.style.background = "url(/assets/stream-bg.jpg) 0 0/1920px 1080px no-repeat fixed #000";
+      document.body.style.background = "url(/assets/stream-bg.jpg) 0 0/1920px 1080px no-repeat fixed #000";
+    }
     const header = document.querySelector("header");
     const footer = document.querySelector("footer");
     if (header instanceof HTMLElement) header.style.display = "none";
@@ -3620,7 +3650,29 @@ export function OBSSpinClient({
   const initializedSeqRef = useRef(false);
   /** When set, generateCatPlus uses these params instead of generating random ones */
   const overrideParamsRef = useRef<{ params: unknown; slots?: unknown } | null>(null);
-  const [obsPhase, setObsPhase] = useState<"idle" | "lobby" | "active">("idle");
+  const [obsPhase, setObsPhase] = useState<"idle" | "lobby" | "active" | "countdown" | "fading">("idle");
+  const [countdownValue, setCountdownValue] = useState(0);
+  const [countdownPreview, setCountdownPreview] = useState<string | null>(null);
+  const [spinVisible, setSpinVisible] = useState(false);
+  const [spinBoardVisible, setSpinBoardVisible] = useState(false);
+  const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fade-in when entering active phase (5s)
+  useEffect(() => {
+    if (obsPhase === "active") {
+      const raf = requestAnimationFrame(() => setSpinVisible(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    if (obsPhase === "fading") {
+      // Start fading out, then go idle after transition
+      setSpinVisible(false);
+      fadeTimerRef.current = setTimeout(() => setObsPhase("idle"), 1500);
+      return () => { if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current); };
+    }
+    setSpinVisible(false);
+  }, [obsPhase]);
 
   useEffect(() => {
     if (!session?.currentCommand) return;
@@ -3649,25 +3701,120 @@ export function OBSSpinClient({
           setRollerActiveValue(null);
           setRollerHighlight(false);
           setActiveParamId(null);
-          setObsPhase("active");
-          generateCatPlus();
+
+          const cdSeconds = (cmd as Record<string, unknown>).countdownSeconds as number | undefined;
+          if (cdSeconds && cdSeconds > 0) {
+            setObsPhase("countdown");
+            setCountdownValue(cdSeconds);
+            setCountdownPreview(null);
+            setSpinBoardVisible(false);
+            let remaining = cdSeconds;
+
+            // Rich full-screen fireworks
+            const fireConfetti = async () => {
+              try {
+                const confetti = (await import("canvas-confetti")).default;
+                const colors = ["#f59e0b", "#ef4444", "#3b82f6", "#22c55e", "#a855f7", "#ec4899", "#fbbf24"];
+                // Center burst
+                confetti({ particleCount: 80, spread: 100, origin: { x: 0.5, y: 0.5 }, colors, zIndex: 10000, startVelocity: 35 });
+                // Left side sprayer
+                confetti({ angle: 60, spread: 55, origin: { x: 0, y: 0.6 }, particleCount: 50, colors, zIndex: 10000, startVelocity: 45 });
+                // Right side sprayer
+                confetti({ angle: 120, spread: 55, origin: { x: 1, y: 0.6 }, particleCount: 50, colors, zIndex: 10000, startVelocity: 45 });
+                // Top burst with stars
+                confetti({ spread: 360, ticks: 60, startVelocity: 30, particleCount: 40, origin: { x: 0.3 + Math.random() * 0.4, y: Math.random() * 0.4 }, colors, shapes: ["star"], zIndex: 10000 });
+                // Random scatter
+                confetti({ particleCount: 30, spread: 120, origin: { x: Math.random(), y: Math.random() * 0.5 }, colors, zIndex: 10000 });
+              } catch { /* confetti unavailable */ }
+            };
+            fireConfetti();
+
+            // Cat preview cycling every 250ms
+            const genRef = generatorRef.current;
+            if (genRef?.generateRandomCat) {
+              const cycle = async () => {
+                try {
+                  const r = await genRef.generateRandomCat!({
+                    accessoryCount: computeLayerCount(accessoryRange),
+                    scarCount: computeLayerCount(scarRange),
+                    tortieCount: computeLayerCount(tortieRange),
+                    exactLayerCounts,
+                    experimentalColourMode: extendedModesArray.length > 0 ? extendedModesArray : undefined,
+                    includeBaseColours,
+                  });
+                  if (r.canvas instanceof HTMLCanvasElement) {
+                    setCountdownPreview(r.canvas.toDataURL("image/png"));
+                  }
+                } catch { /* skip */ }
+              };
+              cycle();
+              previewIntervalRef.current = setInterval(cycle, 250);
+            }
+
+            const tick = () => {
+              remaining--;
+              if (remaining <= 0) {
+                // "GO!" flash — big finale burst, hold 800ms then start spin
+                setCountdownValue(0);
+                if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
+                // Massive finale — triple burst
+                fireConfetti();
+                setTimeout(() => fireConfetti(), 150);
+                setTimeout(() => fireConfetti(), 300);
+                countdownTimerRef.current = setTimeout(() => {
+                  setCountdownPreview(null);
+                  setObsPhase("active");
+                  generateCatPlus();
+                }, 800);
+              } else {
+                setCountdownValue(remaining);
+                fireConfetti();
+                // Last 3 seconds — extra bursts + start fading in the spin board
+                if (remaining <= 3) {
+                  setTimeout(() => fireConfetti(), 400);
+                  setTimeout(() => fireConfetti(), 700);
+                  setSpinBoardVisible(true);
+                }
+                countdownTimerRef.current = setTimeout(tick, 1000);
+              }
+            };
+            countdownTimerRef.current = setTimeout(tick, 1000);
+          } else {
+            setObsPhase("active");
+            generateCatPlus();
+          }
         }
         break;
       case "clear":
-        // Cancel any running spin and go transparent
+        // Cancel any running spin/countdown and fade out over 5s
+        if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+        if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
         generationIdRef.current++;
         setParamRows([]);
         setRollerLabel(null);
         setRollerActiveValue(null);
-        setObsPhase("idle");
+        if (obsPhase === "active" || obsPhase === "countdown") {
+          // Fade out the spin/countdown, then go idle
+          setObsPhase("fading");
+        } else if (obsPhase === "lobby") {
+          // Lobby has its own fade — just go idle
+          setObsPhase("idle");
+        } else {
+          setObsPhase("idle");
+        }
         drawPlaceholder();
         break;
       case "lobby":
+        if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+        if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
         generationIdRef.current++;
         setParamRows([]);
         setRollerLabel(null);
         setRollerActiveValue(null);
         setObsPhase("lobby");
+        break;
+      case "test":
+        // Test mode — no-op for now, visual handled by session.testMode
         break;
     }
   }, [session?.currentCommand, generationDisabled, generateCatPlus, drawPlaceholder]);
@@ -3697,29 +3844,192 @@ export function OBSSpinClient({
   // All layer groups combined for the layer panel
   const hasLayers = layerRows.accessories.length > 0 || layerRows.scars.length > 0 || layerRows.torties.length > 0;
 
+  // Memoize lobby settings so OBSLobby doesn't restart animations on every render
+  const rawSession = sessionSettings as Record<string, unknown> | undefined;
+  const lobbySettings = useMemo(() => ({
+    mode,
+    accessoryRange,
+    scarRange,
+    tortieRange,
+    afterlifeMode,
+    includeBaseColours,
+    extendedModes: extendedModesArray,
+    exactLayerCounts,
+    lobbyMode: rawSession?.lobbyMode as string ?? "fruit-ninja",
+    lobbyCatCount: rawSession?.lobbyCatCount as number ?? 4,
+    lobbyMoveSpeed: rawSession?.lobbyMoveSpeed as number ?? 1.0,
+    lobbySwapSpeed: rawSession?.lobbySwapSpeed as number ?? 1.0,
+    lobbyClearSeq: rawSession?.lobbyClearSeq as number ?? 0,
+    paletteDisplayMode: rawSession?.paletteDisplayMode as "cycle" | "all" ?? "cycle",
+  }), [mode, accessoryRange, scarRange, tortieRange, afterlifeMode,
+       includeBaseColours, extendedModesArray, exactLayerCounts, rawSession]);
+
+  // Track whether lobby was showing before countdown (for crossfade)
+  const showLobbyLayer = obsPhase === "lobby" || obsPhase === "countdown";
+  const showCountdownLayer = obsPhase === "countdown";
+
   // When idle (after clear), show nothing — fully transparent
   if (obsPhase === "idle" && !initializing) {
     return null;
   }
 
-  // Lobby phase — settings overview + flying cats, no spin canvas
-  if (obsPhase === "lobby") {
+  // Lobby + Countdown crossfade: both render as overlapping layers.
+  // Lobby fades out over 3s while countdown fades in over 3s.
+  if (obsPhase === "lobby" || obsPhase === "countdown") {
     return (
-      <OBSLobby
-        settings={{ mode, accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes: extendedModesArray, exactLayerCounts,
-          lobbyMode: (sessionSettings as Record<string, unknown> | undefined)?.lobbyMode as string ?? "fruit-ninja",
-          lobbyCatCount: (sessionSettings as Record<string, unknown> | undefined)?.lobbyCatCount as number ?? 4,
-          lobbyMoveSpeed: (sessionSettings as Record<string, unknown> | undefined)?.lobbyMoveSpeed as number ?? 1.0,
-          lobbySwapSpeed: (sessionSettings as Record<string, unknown> | undefined)?.lobbySwapSpeed as number ?? 1.0,
-          lobbyClearSeq: (sessionSettings as Record<string, unknown> | undefined)?.lobbyClearSeq as number ?? 0,
-        }}
-        generator={generatorRef.current}
-      />
+      <div className="relative" style={{ width: "1920px", height: "1080px" }}>
+        {/* Lobby layer — fades out when countdown starts */}
+        <div
+          className="absolute inset-0"
+          style={{
+            opacity: showCountdownLayer ? 0 : 1,
+            transition: "opacity 3s ease-in-out",
+            pointerEvents: showCountdownLayer ? "none" : "auto",
+          }}
+        >
+          <OBSLobby
+            settings={lobbySettings}
+            generator={generatorRef.current}
+          />
+        </div>
+
+        {/* Countdown layer — fades in when countdown starts */}
+        {showCountdownLayer && (
+          <div
+            className="absolute inset-0"
+            style={{
+              opacity: 1,
+              animation: "countdown-fade-in 3s ease-in-out",
+            }}
+          >
+            <div className="relative" style={{ width: "1280px", height: "1080px" }}>
+              <style>{`
+                @keyframes countdown-pop {
+                  0% { transform: scale(1.4); opacity: 0.3; }
+                  30% { transform: scale(0.95); opacity: 1; }
+                  100% { transform: scale(1); opacity: 1; }
+                }
+                @keyframes countdown-go {
+                  0% { transform: scale(0.5); opacity: 0; }
+                  40% { transform: scale(1.2); opacity: 1; }
+                  100% { transform: scale(1); opacity: 1; }
+                }
+                @keyframes countdown-fade-in {
+                  0% { opacity: 0; }
+                  100% { opacity: 1; }
+                }
+              `}</style>
+
+              {/* Cat preview cycling behind the number — in the cat canvas area */}
+              <div
+                className="absolute flex items-center justify-center"
+                style={{ left: "0px", top: "0px", width: "750px", height: "780px" }}
+              >
+                {countdownPreview && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={countdownPreview}
+                    alt=""
+                    style={{
+                      width: "720px",
+                      height: "720px",
+                      imageRendering: "pixelated",
+                      opacity: 0.2,
+                      filter: "blur(2px) saturate(1.3)",
+                      transition: "opacity 0.15s",
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Countdown number / GO — centered over cat canvas area */}
+              <div
+                className="absolute flex items-center justify-center"
+                style={{ left: "0px", top: "0px", width: "750px", height: "780px" }}
+              >
+                <div
+                  key={countdownValue}
+                  style={{
+                    fontSize: countdownValue === 0 ? "220px" : "300px",
+                    fontWeight: 900,
+                    color: countdownValue === 0 ? "#22c55e" : "#fbbf24",
+                    textShadow: countdownValue === 0
+                      ? "0 0 100px rgba(34,197,94,0.6), 0 4px 30px rgba(0,0,0,0.7)"
+                      : "0 0 80px rgba(251,191,36,0.5), 0 4px 30px rgba(0,0,0,0.7)",
+                    lineHeight: 1,
+                    animation: countdownValue === 0
+                      ? "countdown-go 0.6s ease-out"
+                      : "countdown-pop 0.8s ease-out",
+                    fontFamily: "'Geist Mono', ui-monospace, monospace",
+                  }}
+                >
+                  {countdownValue === 0 ? "GO!" : countdownValue}
+                </div>
+              </div>
+
+              {/* Spin board preview — fades in 3s before GO */}
+              <div
+                className="absolute flex flex-col overflow-hidden"
+                style={{
+                  left: "750px",
+                  top: "20px",
+                  width: "510px",
+                  bottom: "220px",
+                  background: "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
+                  borderRadius: "20px",
+                  border: "2px solid rgba(245, 158, 11, 0.2)",
+                  boxShadow: "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+                  opacity: spinBoardVisible ? 1 : 0,
+                  transition: "opacity 3s ease-in-out",
+                }}
+              >
+                <div
+                  className="flex items-center justify-center"
+                  style={{ height: "100px", borderBottom: "1px solid rgba(245, 158, 11, 0.1)", padding: "20px 28px" }}
+                >
+                  <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
+                    Ready
+                  </span>
+                </div>
+              </div>
+
+              {/* Bottom layer bar preview — fades in with the board */}
+              <div
+                className="absolute overflow-hidden"
+                style={{
+                  left: "20px",
+                  bottom: "20px",
+                  right: "20px",
+                  background: "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 50%, rgba(10,10,10,0.92) 100%)",
+                  borderRadius: "16px",
+                  border: "2px solid rgba(245, 158, 11, 0.2)",
+                  boxShadow: "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+                  padding: "14px 32px",
+                  opacity: spinBoardVisible ? 1 : 0,
+                  transition: "opacity 3s ease-in-out",
+                }}
+              >
+                <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
+                  Layers
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     );
   }
 
   return (
-    <div className="relative" style={{ width: "1280px", height: "1080px" }}>
+    <div
+      className="relative"
+      style={{
+        width: "1280px",
+        height: "1080px",
+        opacity: spinVisible ? 1 : 0,
+        transition: "opacity 1.5s ease-in-out",
+      }}
+    >
       <style>{`
         @keyframes obs-dot-pulse {
           0%, 100% { opacity: 0.4; transform: scale(0.8); }
@@ -3762,30 +4072,22 @@ export function OBSSpinClient({
               width: "720px",
               height: "720px",
               imageRendering: "pixelated",
-              filter: [
-                "drop-shadow(3px 0 0 white)",
-                "drop-shadow(-3px 0 0 white)",
-                "drop-shadow(0 3px 0 white)",
-                "drop-shadow(0 -3px 0 white)",
-                "drop-shadow(3px 3px 0 white)",
-                "drop-shadow(-3px 3px 0 white)",
-                "drop-shadow(3px -3px 0 white)",
-                "drop-shadow(-3px -3px 0 white)",
-              ].join(" "),
             }}
           />
       </div>
 
-      {/* ═══ LAYER DETAILS — full width bottom bar, above right panel ═══ */}
+      {/* ═══ LAYER DETAILS — full width bottom bar ═══ */}
       {hasLayers && (
         <div
           className="absolute z-10 overflow-hidden"
           style={{
-            left: "0px",
-            bottom: "0px",
-            width: "1280px",
-            background: "#09090b",
-            borderTop: "1px solid #27272a",
+            left: "20px",
+            bottom: "20px",
+            right: "20px",
+            background: "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 50%, rgba(10,10,10,0.92) 100%)",
+            borderRadius: "16px",
+            border: "2px solid rgba(245, 158, 11, 0.2)",
+            boxShadow: "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
             padding: "14px 32px",
           }}
         >
@@ -3829,18 +4131,25 @@ export function OBSSpinClient({
         </div>
       )}
 
-      {/* ═══ RIGHT COLUMN: Roller + Param board ═══ */}
+      {/* ═══ RIGHT COLUMN: Roller + Param board — always leaves room for bottom bar ═══ */}
       <div
-        className="absolute flex flex-col"
-        style={{ left: "750px", top: "0px", width: "530px", height: "1080px" }}
+        className="absolute flex flex-col overflow-hidden"
+        style={{
+          left: "750px",
+          top: "20px",
+          width: "510px",
+          bottom: "220px",
+          background: "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
+          borderRadius: "20px",
+          border: "2px solid rgba(245, 158, 11, 0.2)",
+          boxShadow: "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+        }}
       >
         {/* Roller — current spinning param */}
         <div
           style={{
             height: "100px",
-            background: "rgba(0,0,0,0.88)",
-            borderBottom: "1px solid #27272a",
-            borderLeft: "1px solid #27272a",
+            borderBottom: "1px solid rgba(245, 158, 11, 0.1)",
             padding: "20px 28px",
           }}
         >
@@ -3871,11 +4180,7 @@ export function OBSSpinClient({
         {/* Param board — all slots, always visible */}
         <div
           className="flex-1 overflow-hidden"
-          style={{
-            background: "rgba(0,0,0,0.85)",
-            borderLeft: "1px solid #27272a",
-            padding: "12px 0",
-          }}
+          style={{ padding: "12px 0" }}
         >
           {boardSlots.map((def) => {
             const row = revealedMap.get(def.id);
@@ -3916,7 +4221,7 @@ export function OBSSpinClient({
                     className={cn("obs-flap", sizeClass, isActive ? "obs-flap-active" : "obs-flap-done")}
                     chars={flapChars}
                     length={row.value.length}
-                    value={row.value.toUpperCase()}
+                    value={isActive ? "?".repeat(row.value.length) : row.value.toUpperCase()}
                     timing={80}
                     padMode="end"
                   />
@@ -3940,351 +4245,3 @@ export function OBSSpinClient({
   );
 }
 
-// ---------------------------------------------------------------------------
-// OBS Lobby — settings overview + fruit-ninja flying cats
-// ---------------------------------------------------------------------------
-
-interface FlyingCat {
-  id: number;
-  frames: string[];
-  x: number;
-  startTime: number;
-  duration: number;
-  peakY: number;
-  rotation: number;
-  size: number; // 1.0 to 2.0
-  mode: "fruit-ninja" | "matrix" | "dvd"; // locked at spawn time
-}
-
-function OBSLobby({
-  settings,
-  generator,
-}: {
-  settings: {
-    mode: string;
-    accessoryRange: LayerRange;
-    scarRange: LayerRange;
-    tortieRange: LayerRange;
-    afterlifeMode: string;
-    includeBaseColours: boolean;
-    extendedModes: string[];
-    exactLayerCounts?: boolean;
-    lobbyMode?: string;
-    lobbyCatCount?: number;
-    lobbyMoveSpeed?: number;
-    lobbySwapSpeed?: number;
-    lobbyClearSeq?: number;
-  };
-  generator: CatGeneratorApi | null;
-}) {
-  const lobbyMode = (settings.lobbyMode ?? "fruit-ninja") as "fruit-ninja" | "matrix" | "dvd";
-  const maxCats = settings.lobbyCatCount ?? 4;
-  const moveSpeed = settings.lobbyMoveSpeed ?? 1.0;
-  const swapSpeed = settings.lobbySwapSpeed ?? 1.0;
-  const [flyingCats, setFlyingCats] = useState<FlyingCat[]>([]);
-  const [paletteIdx, setPaletteIdx] = useState(0);
-  const catIdRef = useRef(0);
-
-  const afterlifeLabel =
-    AFTERLIFE_OPTIONS.find((o) => o.value === settings.afterlifeMode)?.label ?? "Off";
-  const rangeStr = (r: LayerRange) => `${r.min}–${r.max}`;
-
-  // Resolve palette data
-  const selectedPalettes = useMemo(
-    () => ADDITIONAL_PALETTES.filter((p) => settings.extendedModes.includes(p.id)),
-    [settings.extendedModes]
-  );
-
-  // Cycle palettes
-  useEffect(() => {
-    if (selectedPalettes.length <= 1) return;
-    const timer = setInterval(() => setPaletteIdx((i) => (i + 1) % selectedPalettes.length), 4000);
-    return () => clearInterval(timer);
-  }, [selectedPalettes.length]);
-
-  // Spawn flying cats WITH current settings + fixed sprite
-  useEffect(() => {
-    if (!generator?.generateRandomCat) return;
-    let cancelled = false;
-
-    const spawn = async () => {
-      if (cancelled) return;
-      // Generate one cat with settings, then re-render with different params but SAME sprite
-      const firstResult = await generator.generateRandomCat!({
-        accessoryCount: settings.accessoryRange.max,
-        scarCount: settings.scarRange.max,
-        tortieCount: settings.tortieRange.max,
-        exactLayerCounts: settings.exactLayerCounts ?? true,
-        experimentalColourMode: settings.extendedModes.length > 0 ? settings.extendedModes : undefined,
-        includeBaseColours: settings.includeBaseColours,
-      }).catch(() => null);
-      if (cancelled || !firstResult) return;
-
-      const fixedSprite = firstResult.params.spriteNumber ?? 8;
-      const frames: string[] = [];
-
-      // First frame from the initial result
-      if (firstResult.canvas instanceof HTMLCanvasElement) {
-        frames.push(firstResult.canvas.toDataURL("image/png"));
-      }
-
-      // Generate 20 more frames — same sprite, no reverse, different params each time
-      for (let i = 0; i < 20; i++) {
-        if (cancelled) return;
-        try {
-          const r = await generator.generateRandomCat!({
-            accessoryCount: settings.accessoryRange.max,
-            scarCount: settings.scarRange.max,
-            tortieCount: settings.tortieRange.max,
-            exactLayerCounts: settings.exactLayerCounts ?? true,
-            experimentalColourMode: settings.extendedModes.length > 0 ? settings.extendedModes : undefined,
-            includeBaseColours: settings.includeBaseColours,
-          });
-          if (r.canvas instanceof HTMLCanvasElement) {
-            // Override sprite to keep it constant, lock reverse off
-            const overrideParams = { ...r.params, spriteNumber: fixedSprite, reverse: false };
-            const rendered = await generator.generateCat(overrideParams);
-            if (rendered.canvas instanceof HTMLCanvasElement) {
-              frames.push(rendered.canvas.toDataURL("image/png"));
-            }
-          }
-        } catch { /* skip */ }
-      }
-      if (cancelled || frames.length === 0) return;
-
-      setFlyingCats((prev) => {
-        const alive = prev.filter((c) => Date.now() - c.startTime < c.duration);
-        if (alive.length >= maxCats) return alive;
-        // Random duration 10-30s for natural fade, scaled by moveSpeed
-        const baseDuration = lobbyMode === "dvd"
-          ? 999999
-          : (10000 + Math.random() * 20000) / moveSpeed;
-        return [...alive, {
-          id: catIdRef.current++,
-          frames,
-          x: Math.random() * 90,
-          startTime: Date.now(),
-          duration: baseDuration,
-          peakY: 250 + Math.random() * 500,
-          rotation: -60 + Math.random() * 120,
-          size: 1 + Math.random(),
-          mode: lobbyMode,
-        }];
-      });
-    };
-
-    spawn();
-    // Spawn fast enough to maintain maxCats active — check every 500ms
-    const timer = setInterval(spawn, 500);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [generator, settings]);
-
-  // Cleanup expired cats
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setFlyingCats((prev) => prev.filter((c) => Date.now() - c.startTime < c.duration + 500));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Clear all cats when reset button is pressed
-  const clearSeqRef = useRef(settings.lobbyClearSeq ?? 0);
-  useEffect(() => {
-    const seq = settings.lobbyClearSeq ?? 0;
-    if (seq > clearSeqRef.current) {
-      clearSeqRef.current = seq;
-      setFlyingCats([]);
-    }
-  }, [settings.lobbyClearSeq]);
-
-  const chips = [
-    { label: "Afterlife", value: afterlifeLabel },
-    { label: "Exact Count", value: settings.exactLayerCounts ? "Yes" : "No" },
-    { label: "Accessories", value: rangeStr(settings.accessoryRange) },
-    { label: "Scars", value: rangeStr(settings.scarRange) },
-    { label: "Torties", value: rangeStr(settings.tortieRange) },
-    { label: "Base Colours", value: settings.includeBaseColours ? "On" : "Off" },
-  ];
-
-  const currentPalette = selectedPalettes[paletteIdx];
-
-  return (
-    <div className="relative" style={{ width: "1920px", height: "1080px" }}>
-      {/* Settings display — stays in the left 2/3 */}
-      <div
-        className="absolute"
-        style={{
-          left: "40px",
-          top: "40px",
-          width: "700px",
-          background: "rgba(0,0,0,0.88)",
-          borderRadius: "16px",
-          border: "1px solid #27272a",
-          padding: "28px 32px",
-        }}
-      >
-        <div className="mb-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-          <span className="text-xs font-bold uppercase tracking-[0.4em] text-amber-500/60">
-            Spin Settings
-          </span>
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-        </div>
-        <div className="grid grid-cols-3 gap-2.5">
-          {chips.map((chip) => (
-            <div
-              key={chip.label}
-              className="flex flex-col items-center rounded-xl border border-zinc-800 bg-zinc-900/50 px-3 py-2.5"
-            >
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-                {chip.label}
-              </span>
-              <span className="mt-1 text-base font-bold capitalize text-white">
-                {chip.value}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Palette carousel */}
-        {selectedPalettes.length > 0 && (
-          <div className="mt-5 border-t border-zinc-800 pt-4">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-500/70">
-                {currentPalette?.label ?? "Palettes"}
-              </span>
-              <div className="flex gap-1">
-                {selectedPalettes.map((p, i) => (
-                  <div
-                    key={p.id}
-                    className="rounded-full transition-all"
-                    style={{
-                      width: i === paletteIdx ? "16px" : "6px",
-                      height: "6px",
-                      background: i === paletteIdx ? "#f59e0b" : "#3f3f46",
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-            {currentPalette && (
-              <div className="flex flex-wrap gap-1">
-                {Object.entries(currentPalette.colors).slice(0, 32).map(([name, def]) => {
-                  const rgb = def.multiply ?? [128, 128, 128];
-                  return (
-                    <div
-                      key={name}
-                      className="rounded border border-white/10"
-                      style={{
-                        width: "28px",
-                        height: "28px",
-                        backgroundColor: `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`,
-                      }}
-                      title={name.replace(/_/g, " ")}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Flying cats — full screen, above everything */}
-      <div className="absolute inset-0 z-50 overflow-hidden">
-        {flyingCats.map((cat) => (
-          <FlyingCatSprite key={cat.id} cat={cat} swapSpeed={swapSpeed} moveSpeed={moveSpeed} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FlyingCatSprite({ cat, swapSpeed = 1, moveSpeed = 1 }: { cat: FlyingCat; swapSpeed?: number; moveSpeed?: number }) {
-  const mode = cat.mode;
-  const ref = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const frameRef = useRef(0);
-  // DVD mode: bounce direction stored in ref
-  const dvdRef = useRef({ vx: (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random()), vy: (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random()), px: cat.x * 12.8, py: Math.random() * 900 });
-
-  useEffect(() => {
-    let raf: number;
-    let lastSwap = 0;
-    const animate = () => {
-      if (!ref.current) return;
-      const now = Date.now();
-      const elapsed = now - cat.startTime;
-      const t = Math.min(elapsed / cat.duration, 1);
-
-      // Frame cycling — speed controlled by swapSpeed
-      const swapInterval = Math.max(200, 2000 / swapSpeed);
-      if (cat.frames.length > 1 && now - lastSwap > swapInterval) {
-        frameRef.current = (frameRef.current + 1) % cat.frames.length;
-        if (imgRef.current) imgRef.current.src = cat.frames[frameRef.current];
-        lastSwap = now;
-      }
-
-      if (mode === "matrix") {
-        // Fall from top to bottom
-        if (t >= 1) return;
-        const yPos = t * 1200 - 120;
-        const opacity = t < 0.05 ? t / 0.05 : t > 0.9 ? (1 - t) / 0.1 : 1;
-        ref.current.style.left = `${cat.x}%`;
-        ref.current.style.top = `${yPos}px`;
-        ref.current.style.bottom = "auto";
-        ref.current.style.transform = `scale(${0.9 * cat.size})`;
-        ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
-      } else if (mode === "dvd") {
-        // Bounce around — never expires
-        const d = dvdRef.current;
-        d.px += d.vx * 2 * moveSpeed;
-        d.py += d.vy * 2 * moveSpeed;
-        if (d.px <= 0 || d.px >= 1780) d.vx *= -1;
-        if (d.py <= 0 || d.py >= 960) d.vy *= -1;
-        d.px = Math.max(0, Math.min(1780, d.px));
-        d.py = Math.max(0, Math.min(960, d.py));
-        ref.current.style.left = `${d.px}px`;
-        ref.current.style.top = `${d.py}px`;
-        ref.current.style.bottom = "auto";
-        ref.current.style.transform = `scale(${0.85 * cat.size})`;
-        ref.current.style.opacity = "1";
-      } else {
-        // Fruit ninja — arc from bottom
-        if (t >= 1) return;
-        const y = -4 * cat.peakY * t * (t - 1);
-        const xDrift = t * 30 * (cat.rotation > 0 ? 1 : -1);
-        const opacity = t < 0.1 ? t / 0.1 : t > 0.9 ? (1 - t) / 0.1 : 1;
-        ref.current.style.left = `${cat.x + xDrift}%`;
-        ref.current.style.transform = `translateY(${-y}px) rotate(${cat.rotation * t}deg) scale(${0.7 + t * 0.5})`;
-        ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
-      }
-
-      raf = requestAnimationFrame(animate);
-    };
-    raf = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(raf);
-  }, [cat, mode]);
-
-  return (
-    <div ref={ref} className="absolute bottom-0" style={{ opacity: 0 }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        ref={imgRef}
-        src={cat.frames[0]}
-        alt=""
-        style={{
-          width: `${Math.round(120 * cat.size)}px`,
-          height: `${Math.round(120 * cat.size)}px`,
-          imageRendering: "pixelated",
-          filter: [
-            "drop-shadow(2px 0 0 white)",
-            "drop-shadow(-2px 0 0 white)",
-            "drop-shadow(0 2px 0 white)",
-            "drop-shadow(0 -2px 0 white)",
-          ].join(" "),
-        }}
-      />
-    </div>
-  );
-}
