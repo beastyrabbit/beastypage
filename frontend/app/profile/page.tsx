@@ -444,7 +444,7 @@ function VariantsSection({
       const result = await onImportBatch({
         toolKey: slugToolKey,
         variants: [{
-          variantId: crypto.randomUUID(),
+          variantId: `slug:${slugToolKey}:${slug}`,
           name: `Import ${slug.slice(0, 8)}`,
           slug,
           settings: json.config as Record<string, unknown>,

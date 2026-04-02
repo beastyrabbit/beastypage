@@ -166,6 +166,17 @@ export const importBatch = mutation({
     let imported = 0;
     let activeSet = false;
 
+    // Deactivate existing active variants if the batch contains an active one
+    if (variants.some((v) => v.isActive)) {
+      const existing = await ctx.db
+        .query("user_variants")
+        .withIndex("byUserTool", (q) => q.eq("userId", userId).eq("toolKey", toolKey))
+        .collect();
+      for (const doc of existing) {
+        if (doc.isActive) await ctx.db.patch(doc._id, { isActive: false });
+      }
+    }
+
     for (const v of variants) {
       const existing = await ctx.db
         .query("user_variants")
