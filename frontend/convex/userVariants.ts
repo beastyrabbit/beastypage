@@ -164,18 +164,7 @@ export const importBatch = mutation({
   handler: async (ctx, { toolKey, variants }) => {
     const userId = await requireUserId(ctx);
     let imported = 0;
-    let activeSet = false;
-
-    // Deactivate existing active variants if the batch contains an active one
-    if (variants.some((v) => v.isActive)) {
-      const existing = await ctx.db
-        .query("user_variants")
-        .withIndex("byUserTool", (q) => q.eq("userId", userId).eq("toolKey", toolKey))
-        .collect();
-      for (const doc of existing) {
-        if (doc.isActive) await ctx.db.patch(doc._id, { isActive: false });
-      }
-    }
+    let activeDeactivated = false;
 
     for (const v of variants) {
       const existing = await ctx.db
@@ -187,8 +176,18 @@ export const importBatch = mutation({
       if (existing) continue;
 
       // Enforce at most one active variant per tool
-      const isActive = v.isActive && !activeSet;
-      if (isActive) activeSet = true;
+      const isActive = v.isActive && !activeDeactivated;
+      if (isActive) {
+        // Deactivate existing active variants only when we're actually inserting an active one
+        const all = await ctx.db
+          .query("user_variants")
+          .withIndex("byUserTool", (q) => q.eq("userId", userId).eq("toolKey", toolKey))
+          .collect();
+        for (const doc of all) {
+          if (doc.isActive) await ctx.db.patch(doc._id, { isActive: false });
+        }
+        activeDeactivated = true;
+      }
 
       await ctx.db.insert("user_variants", {
         userId,
