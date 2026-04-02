@@ -3627,7 +3627,8 @@ export function OBSSpinClient({
           0%, 100% { opacity: 0.4; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
         }
-        /* Split-flap overrides — clean dark tiles, white text */
+        /* Split-flap overrides — clean dark tiles, single line */
+        .obs-flap { white-space: nowrap !important; flex-wrap: nowrap !important; }
         .obs-flap [data-kind="digit"] {
           color: #e4e4e7 !important;
           background: #18181b !important;
@@ -3795,26 +3796,13 @@ export function OBSSpinClient({
                     <FlapDisplay
                       className={cn("obs-flap M", isActive ? "obs-flap-active" : isRevealed ? "obs-flap-done" : "")}
                       chars={flapChars}
-                      length={Math.max(row.value.length, 14)}
+                      length={row.value.length}
                       value={row.value.toUpperCase()}
                       timing={80}
                       padMode="end"
                     />
                   ) : (
-                    <div className="flex gap-[3px]">
-                      {Array.from({ length: 14 }).map((_, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            width: "16px",
-                            height: "26px",
-                            background: "#0e0e10",
-                            border: "1px solid #1a1a1e",
-                            borderRadius: "3px",
-                          }}
-                        />
-                      ))}
-                    </div>
+                    <span className="text-sm text-zinc-800">—</span>
                   )}
                 </div>
               </div>
