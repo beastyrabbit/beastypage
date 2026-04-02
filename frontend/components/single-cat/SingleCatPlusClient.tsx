@@ -2755,9 +2755,14 @@ export function SingleCatPlusClient({
         const maxCount = Math.max(group.range.min, group.range.max);
         if (minCount === maxCount) continue;
 
-        setRollerLabel(group.label);
-        setRollerActiveValue("—");
-        await wait(PRE_SPIN_DELAY);
+        // Show what we're about to roll
+        setRollerLabel(`Rolling: ${group.label}`);
+        setRollerActiveValue(`${minCount}–${maxCount}`);
+        setParamRows((prev) => [
+          ...prev,
+          { id: group.key, label: group.label, value: "?", status: "active" as const },
+        ]);
+        await wait(800); // let the viewer read what's being rolled
 
         // Generate a fresh random cat with MAX count for this layer type
         const catResult = await generator.generateRandomCat({
@@ -2828,11 +2833,11 @@ export function SingleCatPlusClient({
           const step = sequence[idx];
           if (generationIdRef.current !== token) return;
 
-          const baseDelay = getDelayWithMultiplier(group.key);
+          const baseDelay = getDelayWithMultiplier(group.key) * 2; // slower for count reveal
           const stepDurations = computeStepDurations(
             sequence.slice(idx),
             baseDelay,
-            currentConfig.allowFastFlips
+            false // never fast-flip the count reveal
           );
           const stepDuration = stepDurations[0] ?? baseDelay;
 
@@ -2846,12 +2851,21 @@ export function SingleCatPlusClient({
         const finalFrame = frames.find((f) => f.option.raw === group.count);
         if (finalFrame) drawCanvas(finalFrame.canvas);
         setRollerActiveValue(String(group.count));
+        setParamRows((prev) =>
+          prev.map((row) =>
+            row.id === group.key
+              ? { ...row, value: String(group.count), status: "revealed" as const }
+              : row
+          )
+        );
         await settleRoller(token);
+        await wait(600); // hold the result so viewer can see it
         if (generationIdRef.current !== token) return;
       }
 
       setRollerLabel(null);
       setRollerActiveValue(null);
+      setParamRows([]); // clear count rows before main param spin
       clearMirror();
     },
     [drawCanvas, clearMirror, playFlip, settleRoller, getDelayWithMultiplier, readSpinState]
