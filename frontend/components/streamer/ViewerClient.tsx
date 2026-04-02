@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Vote } from "lucide-react";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
@@ -14,6 +14,7 @@ import { cloneParams, createStreamSteps, getDefaultStreamParams } from "@/lib/st
 import type { StreamerParams, StreamStep } from "@/lib/streamer/steps";
 import { cn } from "@/lib/utils";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
+import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import OptionPreview from "@/components/streamer/OptionPreview";
 import { ensureSpriteDataLoaded } from "@/lib/streamer/steps";
 
@@ -90,6 +91,7 @@ type ViewerClientProps = {
 };
 
 export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
+  const defaultCreatorName = useDefaultCreatorName();
   const [viewerSession, setViewerSession] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [nameError, setNameError] = useState<string | null>(null);
@@ -97,6 +99,15 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [mapperReady, setMapperReady] = useState(false);
   const { generator, ready: generatorReady } = useCatGenerator();
+
+  // Auto-fill display name when username loads and field is still empty
+  const nameFilledRef = useRef(false);
+  useEffect(() => {
+    if (defaultCreatorName && !nameFilledRef.current && !displayName) {
+      setDisplayName(defaultCreatorName);
+      nameFilledRef.current = true;
+    }
+  }, [defaultCreatorName, displayName]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

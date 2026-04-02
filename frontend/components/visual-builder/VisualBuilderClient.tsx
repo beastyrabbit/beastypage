@@ -13,6 +13,7 @@ import { useMutation } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { track } from "@/lib/analytics";
 import { createCatShare } from "@/lib/catShare";
 import { useCatGenerator, useSpriteMapperOptions } from "@/components/cat-builder/hooks";
@@ -190,9 +191,19 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
   const [shareInfo, setShareInfo] = useState<{ slug: string; url: string } | null>(null);
   const [shareStale, setShareStale] = useState(false);
   const [lockedShareSlug, setLockedShareSlug] = useState<string | null>(null);
+  const defaultCreatorName = useDefaultCreatorName();
   const [catName, setCatName] = useState("");
   const [creatorName, setCreatorName] = useState("");
   const [randomizing, setRandomizing] = useState(false);
+
+  // Auto-fill creator name when username loads and field is still empty
+  const creatorFilledRef = useRef(false);
+  useEffect(() => {
+    if (defaultCreatorName && !creatorFilledRef.current && !creatorName) {
+      setCreatorName(defaultCreatorName);
+      creatorFilledRef.current = true;
+    }
+  }, [defaultCreatorName, creatorName]);
   const [shareBusy, setShareBusy] = useState(false);
   const [expandedLayer, setExpandedLayer] = useState<number | null>(null);
   const [expandedMarking, setExpandedMarking] = useState<"white" | "points" | "vitiligo" | "tint" | null>(null);
@@ -211,7 +222,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     setLockedShareSlug(null);
     setShareInfo(null);
     setCatName("");
-    setCreatorName("");
+    setCreatorName(defaultCreatorName);
     if (typeof window !== "undefined") {
       const currentUrl = new URL(window.location.href);
       currentUrl.searchParams.delete("slug");
@@ -314,7 +325,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     setTortiePaletteMode(initialCat.tortiePaletteMode ?? "off");
     setInitialSpriteNumber(synced.spriteNumber ?? null);
     setCatName(initialCat.catName ?? "");
-    setCreatorName(initialCat.creatorName ?? "");
+    setCreatorName(initialCat.creatorName || defaultCreatorName);
     console.log("[visual-builder] load slug", {
       slug: initialCat.slug,
       shareUrl: initialCat.shareUrl,
@@ -1824,7 +1835,7 @@ export function VisualBuilderClient({ initialCat }: VisualBuilderClientProps = {
     setExperimentalColourMode("off");
     setTortiePaletteMode("off");
     setCatName("");
-    setCreatorName("");
+    setCreatorName(defaultCreatorName);
     setExpandedLayer(null);
     setExpandedTortieSub({});
     setExpandedMarking(null);

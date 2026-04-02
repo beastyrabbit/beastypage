@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useConvexAuth } from "convex/react";
 
 import { DiscordInviteButton } from "@/components/common/DiscordInviteButton";
 import { UserAuthButton } from "@/components/auth/UserAuthButton";
@@ -11,6 +12,9 @@ import { NAV_ITEMS } from "@/components/site-nav-config";
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const { isAuthenticated } = useConvexAuth();
+
+  const visibleItems = NAV_ITEMS.filter((item) => !item.authRequired || isAuthenticated);
 
   const isActive = (item: typeof NAV_ITEMS[0]) => {
     // For personal (home), only exact match
@@ -35,7 +39,7 @@ export function SiteHeader() {
           BeastyRabbit
         </Link>
         <nav className="hidden items-center gap-3 text-sm font-medium sm:flex">
-          {NAV_ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <Link
               key={item.key}
               href={item.href}

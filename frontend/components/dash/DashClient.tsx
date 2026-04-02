@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { toast } from "sonner";
-import { useVariants } from "@/utils/variants";
-import { VariantBar } from "@/components/common/VariantBar";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { TOOL_MAP } from "@/lib/dash/registry.generated";
 import { APP_VERSION } from "@/lib/dash/version";
 import { DEFAULT_DASH_SETTINGS, parseDashPayload, dashSettingsEqual } from "@/utils/dashVariants";
@@ -12,6 +12,8 @@ import { DashHero } from "./DashHero";
 import { WidgetGrid } from "./WidgetGrid";
 import { AddWidgetModal } from "./AddWidgetModal";
 import { ReleaseNotesModal } from "./ReleaseNotesModal";
+
+const DASH_VARIANT_ID = "dash-settings";
 
 type DashClientProps = {
   initialSlug?: string | null;
@@ -25,8 +27,14 @@ export function DashClient({
   initialLoadError = null,
 }: DashClientProps = {}) {
 
-  const variants = useVariants<DashSettings>({ storageKey: "dash.variants" });
-  const { activeVariant, setVariantSlug, saveToActive } = variants;
+  const { isAuthenticated } = useConvexAuth();
+
+  // Load settings from Convex
+  const convexVariants = useQuery(
+    api.userVariants.list,
+    isAuthenticated ? { toolKey: "dash" } : "skip"
+  );
+  const upsertVariant = useMutation(api.userVariants.upsert);
 
   // Local working copy of settings
   const [settings, setSettings] = useState<DashSettings>(() => (
@@ -37,6 +45,7 @@ export function DashClient({
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const [opening, setOpening] = useState(false);
   const initialLoadToastRef = useRef(false);
+  const [loadedFromConvex, setLoadedFromConvex] = useState(false);
 
   useEffect(() => {
     if (initialLoadToastRef.current) return;
@@ -51,24 +60,57 @@ export function DashClient({
     }
   }, [initialLoadError, initialSettings, initialSlug]);
 
-  // Sync settings from active variant
+  // Load settings from Convex once available
+  const justLoadedRef = useRef(false);
   useEffect(() => {
-    if (activeVariant && !initialSlug) {
-      queueMicrotask(() => {
-        setSettings(parseDashPayload(activeVariant.settings));
-        setEditing(false);
-      });
+    if (loadedFromConvex || initialSlug) return;
+    if (!convexVariants) return;
+    const saved = convexVariants.find((v) => v.variantId === DASH_VARIANT_ID);
+    if (saved) {
+      justLoadedRef.current = true;
+      setSettings(parseDashPayload(saved.settings));
     }
-  }, [activeVariant, initialSlug]);
+    setLoadedFromConvex(true);
+  }, [convexVariants, initialSlug, loadedFromConvex]);
 
-  // Auto-enter edit mode when there are no widgets and no variant or slug pending
+  // Save settings to Convex on change (debounced)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRender = useRef(true);
   useEffect(() => {
-    if (!activeVariant && !initialSlug && settings.widgets.length === 0) {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (justLoadedRef.current) {
+      justLoadedRef.current = false;
+      return;
+    }
+    if (!isAuthenticated || !loadedFromConvex) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void upsertVariant({
+        toolKey: "dash",
+        variantId: DASH_VARIANT_ID,
+        name: "Dashboard",
+        settings: settings as unknown as Record<string, unknown>,
+        isActive: true,
+      }).catch((err) => {
+        console.error("[Dash] save failed:", err);
+        toast.error("Failed to save dashboard");
+      });
+    }, 1000);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [settings, isAuthenticated, upsertVariant, loadedFromConvex]);
+
+  // Auto-enter edit mode when there are no widgets and no slug pending
+  useEffect(() => {
+    if (!initialSlug && settings.widgets.length === 0 && loadedFromConvex) {
       queueMicrotask(() => setEditing(true));
     }
-    // Only trigger on variant/slug changes, not on every settings mutation
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeVariant, initialSlug]);
+  }, [initialSlug, loadedFromConvex]);
 
   // Resolve widget IDs to tool metadata
   const resolvedWidgets = useMemo(
@@ -84,19 +126,6 @@ export function DashClient({
     settings.lastSeenVersion !== null &&
     settings.lastSeenVersion !== APP_VERSION;
 
-  // Re-parse active variant settings once (memoized) to avoid repeated work during dirty checks
-  const baseSettings = useMemo(
-    () => {
-      if (initialSlug && initialSettings) {
-        return parseDashPayload(initialSettings);
-      }
-      return activeVariant ? parseDashPayload(activeVariant.settings) : DEFAULT_DASH_SETTINGS;
-    },
-    [activeVariant, initialSettings, initialSlug],
-  );
-  const isDirty = !dashSettingsEqual(settings, baseSettings);
-
-  // Widget actions
   const handleAddWidget = useCallback((id: string) => {
     setSettings((prev) => {
       if (prev.widgets.includes(id)) return prev;
@@ -115,10 +144,6 @@ export function DashClient({
     setSettings((prev) => ({ ...prev, widgets: widgetIds }));
   }, []);
 
-  const handleApplyConfig = useCallback((config: DashSettings) => {
-    setSettings(parseDashPayload(config));
-  }, []);
-
   const handleReleaseNotesClose = useCallback((latestTag: string | null) => {
     setReleaseNotesOpen(false);
     if (latestTag) {
@@ -126,41 +151,14 @@ export function DashClient({
     }
   }, []);
 
-  const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
-    toast[type](message);
-  }, []);
-
-  const copyText = useCallback(async (text: string, successMessage: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(successMessage);
-    } catch (err) {
-      console.error("[DashClient] copyText failed", err);
-      toast.error("Failed to copy");
-    }
-  }, []);
-
   const handleOpen = useCallback(async () => {
-    // Fast path: clean variant with slug
-    if (activeVariant?.slug && !isDirty) {
-      window.open(`/dash?slug=${encodeURIComponent(activeVariant.slug)}`, "_blank");
-      return;
-    }
-
-    // Dirty or no slug: save locally first, then sync to DB
     setOpening(true);
     try {
-      if (activeVariant && isDirty) {
-        saveToActive(settings);
-      }
       const response = await fetch("/api/dash-settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({
-          config: settings,
-          ...(activeVariant?.slug ? { slug: activeVariant.slug } : {}),
-        }),
+        body: JSON.stringify({ config: settings }),
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null) as { error?: string } | null;
@@ -169,9 +167,6 @@ export function DashClient({
       const json = (await response.json()) as { slug?: string };
       const slug = json.slug?.trim();
       if (!slug) throw new Error("No slug returned");
-      if (activeVariant && !activeVariant.slug) {
-        setVariantSlug(activeVariant.id, slug);
-      }
       window.open(`/dash?slug=${encodeURIComponent(slug)}`, "_blank");
     } catch (error) {
       console.error("[DashClient] handleOpen", error);
@@ -179,28 +174,25 @@ export function DashClient({
     } finally {
       setOpening(false);
     }
-  }, [activeVariant, isDirty, settings, saveToActive, setVariantSlug]);
+  }, [settings]);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
+        <p className="text-sm text-muted-foreground">Sign in to access your dashboard.</p>
+      </div>
+    );
+  }
 
   return (
     <>
-      <VariantBar
-        variants={variants}
-        snapshotConfig={settings}
-        applyConfig={handleApplyConfig}
-        isDirty={isDirty}
-        showToast={showToast}
-        copyText={copyText}
-        apiPath="/api/dash-settings"
-        parsePayload={parseDashPayload}
-      />
-
       <DashHero
         version={APP_VERSION}
         hasNewVersion={hasNewVersion}
         onOpenReleaseNotes={() => setReleaseNotesOpen(true)}
         editing={editing}
         onToggleEditing={() => setEditing((e) => !e)}
-        hasVariant={!!activeVariant}
+        hasVariant={false}
         opening={opening}
         onOpen={handleOpen}
       />

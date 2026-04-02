@@ -9,6 +9,7 @@ import CopyIcon from "@/components/ui/copy-icon";
 import CheckedIcon from "@/components/ui/checked-icon";
 import LockIcon from "@/components/ui/lock-icon";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
+import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 
 interface SaveTreeDialogProps {
   currentName: string;
@@ -27,10 +28,11 @@ export function SaveTreeDialog({
   onSave,
   onClose,
 }: SaveTreeDialogProps) {
+  const defaultCreatorName = useDefaultCreatorName();
   // Capture initial values once on mount; dialog is opened/closed by mounting.
   const initialValuesRef = useRef({
     name: currentName,
-    creatorName: currentCreator ?? "",
+    creatorName: currentCreator || defaultCreatorName,
   });
   const [name, setName] = useState(initialValuesRef.current.name);
   const [creatorName, setCreatorName] = useState(initialValuesRef.current.creatorName);

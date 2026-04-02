@@ -33,6 +33,7 @@ import type * as singleCatSettings from "../singleCatSettings.js";
 import type * as streamParticipants from "../streamParticipants.js";
 import type * as streamSessions from "../streamSessions.js";
 import type * as streamVotes from "../streamVotes.js";
+import type * as userVariants from "../userVariants.js";
 import type * as users from "../users.js";
 import type * as utils from "../utils.js";
 import type * as wheel from "../wheel.js";
@@ -69,6 +70,7 @@ declare const fullApi: ApiFromModules<{
   streamParticipants: typeof streamParticipants;
   streamSessions: typeof streamSessions;
   streamVotes: typeof streamVotes;
+  userVariants: typeof userVariants;
   users: typeof users;
   utils: typeof utils;
   wheel: typeof wheel;

@@ -12,6 +12,7 @@ import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
+import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 
@@ -82,11 +83,21 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
   const [loadingMessage, setLoadingMessage] = useState<string | null>("Loading timeline…");
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<{ catName?: string | null; creatorName?: string | null; created?: number | null }>({});
+  const defaultCreatorName = useDefaultCreatorName();
   const [catNameDraft, setCatNameDraft] = useState("");
   const [creatorNameDraft, setCreatorNameDraft] = useState("");
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaSaved, setMetaSaved] = useState(false);
   const updateMeta = useMutation(api.mapper.updateMeta);
+
+  // Auto-fill creator name when username loads and field is still empty
+  const creatorFilledRef = useRef(false);
+  useEffect(() => {
+    if (defaultCreatorName && !creatorFilledRef.current && !creatorNameDraft) {
+      setCreatorNameDraft(defaultCreatorName);
+      creatorFilledRef.current = true;
+    }
+  }, [defaultCreatorName, creatorNameDraft]);
 
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const catDataRecord = mapperRecord?.cat_data ?? undefined;
@@ -140,7 +151,7 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
           created: mapperRecord.created ?? null,
         });
         setCatNameDraft((mapperRecord.catName ?? "").trim());
-        setCreatorNameDraft((mapperRecord.creatorName ?? "").trim());
+        setCreatorNameDraft((mapperRecord.creatorName ?? "").trim() || defaultCreatorName);
         const locked = metaLocked;
         setMetaSaved(locked || Boolean(mapperRecord.catName?.trim() || mapperRecord.creatorName?.trim()));
         setLoadingMessage(null);
@@ -150,21 +161,21 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
         setLoadingMessage(null);
       }
     }
-  }, [mapperRecord, slug, metaLocked]);
+  }, [mapperRecord, slug, metaLocked, defaultCreatorName]);
 
   useEffect(() => {
     if (mapperRecord) {
       if (!metaSaved) {
         setCatNameDraft((mapperRecord.catName ?? "").trim());
-        setCreatorNameDraft((mapperRecord.creatorName ?? "").trim());
+        setCreatorNameDraft((mapperRecord.creatorName ?? "").trim() || defaultCreatorName);
       }
     } else if (!mapperRecord && !slug) {
       if (!metaSaved) {
         setCatNameDraft("");
-        setCreatorNameDraft("");
+        setCreatorNameDraft(defaultCreatorName);
       }
     }
-  }, [mapperRecord, metaSaved, slug]);
+  }, [mapperRecord, metaSaved, slug, defaultCreatorName]);
 
   useEffect(() => {
     if (slug) return;
@@ -312,7 +323,7 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
         created: result?.created ?? mapperRecord?.created ?? null,
       });
       setCatNameDraft(resolvedName ?? "");
-      setCreatorNameDraft(resolvedCreator ?? "");
+      setCreatorNameDraft(resolvedCreator || defaultCreatorName);
       setMetaSaved(true);
       window.alert("Saved to history!");
     } catch (err) {

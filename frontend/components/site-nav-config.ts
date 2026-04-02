@@ -4,10 +4,11 @@ export type NavItem = {
   key: NavAccent;
   label: string;
   href: string;
+  authRequired?: boolean;
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { key: "dash", label: "Dash", href: "/dash" },
+  { key: "dash", label: "Dash", href: "/dash", authRequired: true },
   { key: "projects", label: "Projects", href: "/projects" },
   { key: "stream", label: "Stream Tools", href: "/stream" },
   { key: "collection", label: "Collection", href: "/collection" },

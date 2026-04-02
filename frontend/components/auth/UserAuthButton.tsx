@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Loader2, LogIn, LogOut, Settings, User } from "lucide-react";
-import { useSignIn, useSignOut, useProfilePic } from "@/lib/shooAuth";
+import { signIn, signOut } from "@/lib/shooAuth";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 
@@ -23,10 +23,7 @@ export function UserAuthButton() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const getOrCreateUser = useMutation(api.users.getOrCreateUser);
   const viewer = useQuery(api.users.viewer);
-  const profilePic = useProfilePic();
   const hasCreatedRef = useRef(false);
-  const handleSignIn = useSignIn();
-  const handleSignOut = useSignOut();
 
   // Ensure user doc exists in Convex after login
   useEffect(() => {
@@ -73,7 +70,7 @@ export function UserAuthButton() {
   if (!isAuthenticated) {
     return (
       <button
-        onClick={handleSignIn}
+        onClick={() => signIn()}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-lg border border-border/50",
           "px-3 py-1.5 text-xs font-semibold text-muted-foreground",
@@ -86,8 +83,6 @@ export function UserAuthButton() {
     );
   }
 
-  const showPic = viewer?.showProfilePic === true;
-  const picUrl = showPic ? profilePic : undefined;
   const initial = viewer?.username?.[0]?.toUpperCase();
 
   return (
@@ -101,22 +96,13 @@ export function UserAuthButton() {
         )}
         aria-label="User menu"
       >
-        {picUrl ? (
-          <img
-            src={picUrl}
-            alt=""
-            className="size-full rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="flex size-full items-center justify-center bg-primary/15 text-primary">
-            {initial ? (
-              <span className="text-xs font-bold">{initial}</span>
-            ) : (
-              <User className="size-4" />
-            )}
-          </div>
-        )}
+        <div className="flex size-full items-center justify-center bg-primary/15 text-primary">
+          {initial ? (
+            <span className="text-xs font-bold">{initial}</span>
+          ) : (
+            <User className="size-4" />
+          )}
+        </div>
       </button>
 
       {dropdownOpen && (
@@ -141,7 +127,7 @@ export function UserAuthButton() {
           <button
             onClick={() => {
               setDropdownOpen(false);
-              handleSignOut();
+              signOut();
             }}
             className={cn(
               "flex w-full items-center gap-2 rounded-b-lg px-3 py-2",

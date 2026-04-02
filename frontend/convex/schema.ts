@@ -332,5 +332,19 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("byTokenIdentifier", ["tokenIdentifier"])
-    .index("byUsername", ["username"])
+    .index("byUsername", ["username"]),
+
+  user_variants: defineTable({
+    userId: v.id("users"),
+    toolKey: v.string(),
+    variantId: v.string(),
+    name: v.string(),
+    slug: v.optional(v.string()),
+    settings: v.any(),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("byUserTool", ["userId", "toolKey"])
+    .index("byUserVariant", ["userId", "toolKey", "variantId"]),
 });

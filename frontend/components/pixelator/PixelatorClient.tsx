@@ -93,6 +93,7 @@ export function PixelatorClient() {
   // ---- Variant system ----
   const variants = useVariants<PixelatorSettings>({
     storageKey: "pixelator-variants",
+    toolKey: "pixelator",
   });
 
   const snapshotConfig = useMemo<PixelatorSettings>(
@@ -329,9 +330,6 @@ export function PixelatorClient() {
         applyConfig={applyConfig}
         isDirty={isDirty}
         showToast={(msg) => toast(msg)}
-        copyText={copyText}
-        apiPath="/api/pixelator-settings"
-        parsePayload={parsePixelatorPayload}
       />
 
       {!state.imageDataUrl ? (

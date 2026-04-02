@@ -49,6 +49,7 @@ import {
   stepCountsToMetrics,
 } from "../../utils/spinTiming";
 import { useVariants } from "../../utils/variants";
+import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import {
   DEFAULT_SINGLE_CAT_SETTINGS,
   parseSingleCatPayload,
@@ -1467,6 +1468,7 @@ export function SingleCatPlusClient({
   // Page variant management
   const variants = useVariants<SingleCatSettings>({
     storageKey: "singleCatPlus.variants",
+    toolKey: "singleCatPlus",
     migrate: migrateSingleCatTiming,
   });
   const [timingModalOpen, setTimingModalOpen] = useState(false);
@@ -1556,10 +1558,20 @@ export function SingleCatPlusClient({
   const [toast, setToast] = useState<string | null>(null);
   const [rollerExpanded, setRollerExpanded] = useState(false);
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
+  const defaultCreatorName = useDefaultCreatorName();
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
   const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName);
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaDirty, setMetaDirty] = useState(false);
+
+  // Auto-fill creator name when username loads and field is still empty
+  const creatorFilledRef = useRef(false);
+  useEffect(() => {
+    if (defaultCreatorName && !creatorFilledRef.current && !creatorNameDraft) {
+      setCreatorNameDraft(defaultCreatorName);
+      creatorFilledRef.current = true;
+    }
+  }, [defaultCreatorName, creatorNameDraft]);
 
   const rollerValueClass = useMemo(() => {
     if (!rollerActiveValue) {
@@ -1579,9 +1591,9 @@ export function SingleCatPlusClient({
 
   const resetMetaDrafts = useCallback((catName?: string | null, creatorName?: string | null) => {
     setCatNameDraft(catName ?? "");
-    setCreatorNameDraft(creatorName ?? "");
+    setCreatorNameDraft(creatorName || defaultCreatorName);
     setMetaDirty(false);
-  }, []);
+  }, [defaultCreatorName]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -1626,8 +1638,8 @@ export function SingleCatPlusClient({
     setExtendedModes(new Set(settings.extendedModes));
     setIncludeBaseColours(settings.includeBaseColours);
     setCatNameDraft(settings.catName);
-    setCreatorNameDraft(settings.creatorName);
-  }, []);
+    setCreatorNameDraft(settings.creatorName || defaultCreatorName);
+  }, [defaultCreatorName]);
 
   const variantDirty = useMemo(() => {
     if (!variants.activeVariant) return false;
@@ -3474,9 +3486,6 @@ export function SingleCatPlusClient({
         applyConfig={applyVariantConfig}
         isDirty={variantDirty}
         showToast={showToast}
-        copyText={copyText}
-        apiPath="/api/single-cat-settings"
-        parsePayload={parseSingleCatPayload}
       />
       <div className="glass-card px-6 py-8">
         <div className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,420px)] xl:items-start">
