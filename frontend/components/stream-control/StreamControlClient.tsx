@@ -48,6 +48,14 @@ import type { Id } from "@/convex/_generated/dataModel";
 // StreamControlClient
 // ---------------------------------------------------------------------------
 
+const FULL_EXPORT_SIZE = 700;
+
+const ACTION_BUTTON_CLASS = cn(
+  "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+  "text-xs font-medium text-muted-foreground transition",
+  "hover:bg-foreground hover:text-background disabled:opacity-50"
+);
+
 const LOBBY_MODE_DEFAULTS = {
   "fruit-ninja": { cats: 5, move: 1.5, swap: 1 },
   "matrix": { cats: 8, move: 1, swap: 1 },
@@ -98,6 +106,7 @@ export function StreamControlClient() {
   const creatorFilledRef = useRef(false);
   const lastResultRef = useRef<{ canvas: HTMLCanvasElement | OffscreenCanvas; params: Record<string, unknown> } | null>(null);
   const [hasTint, setHasTint] = useState(false);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
   // Lobby animation settings
   const [lobbyMode, setLobbyMode] = useState<"fruit-ninja" | "matrix" | "dvd">("fruit-ninja");
@@ -307,7 +316,6 @@ export function StreamControlClient() {
   );
 
   // Export handlers — copy / download the last generated cat
-  const FULL_EXPORT_SIZE = 700;
 
   const copyCanvasToClipboard = useCallback(
     async (canvas: HTMLCanvasElement, successMsg: string, fallbackName: string) => {
@@ -612,7 +620,10 @@ export function StreamControlClient() {
                 </button>
               )}
             </div>
-            <div className="relative aspect-video overflow-hidden rounded-lg border border-border/30 bg-black/90">
+            <div
+              ref={previewContainerRef}
+              className="relative aspect-video overflow-hidden rounded-lg border border-border/30 bg-black/90"
+            >
               {obsUrl ? (
                 <iframe
                   src={obsUrl}
@@ -623,16 +634,6 @@ export function StreamControlClient() {
                     transform: "scale(var(--preview-scale, 0.3))",
                   }}
                   title="OBS Overlay Preview"
-                  ref={(el) => {
-                    if (!el) return;
-                    const container = el.parentElement;
-                    if (!container) return;
-                    const observer = new ResizeObserver(([entry]) => {
-                      const scale = entry.contentRect.width / 1920;
-                      container.style.setProperty("--preview-scale", String(scale));
-                    });
-                    observer.observe(container);
-                  }}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
@@ -855,11 +856,7 @@ export function StreamControlClient() {
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            className={cn(
-              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
-              "text-xs font-medium text-muted-foreground transition",
-              "hover:bg-foreground hover:text-background disabled:opacity-50"
-            )}
+            className={ACTION_BUTTON_CLASS}
             onClick={async () => {
               if (!shareLink) return;
               try {
@@ -875,11 +872,7 @@ export function StreamControlClient() {
           </button>
           <button
             type="button"
-            className={cn(
-              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
-              "text-xs font-medium text-muted-foreground transition",
-              "hover:bg-foreground hover:text-background disabled:opacity-50"
-            )}
+            className={ACTION_BUTTON_CLASS}
             onClick={() => {
               if (!currentSlug) return;
               window.open(`/view/${currentSlug}`, "_blank", "noopener=yes");
@@ -890,11 +883,7 @@ export function StreamControlClient() {
           </button>
           <button
             type="button"
-            className={cn(
-              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
-              "text-xs font-medium text-muted-foreground transition",
-              "hover:bg-foreground hover:text-background disabled:opacity-50"
-            )}
+            className={ACTION_BUTTON_CLASS}
             onClick={handleDownload}
             disabled={!lastResultRef.current}
           >
@@ -902,11 +891,7 @@ export function StreamControlClient() {
           </button>
           <button
             type="button"
-            className={cn(
-              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
-              "text-xs font-medium text-muted-foreground transition",
-              "hover:bg-foreground hover:text-background disabled:opacity-50"
-            )}
+            className={ACTION_BUTTON_CLASS}
             onClick={() => exportCat()}
             disabled={!lastResultRef.current}
           >
@@ -915,11 +900,7 @@ export function StreamControlClient() {
           {hasTint && (
             <button
               type="button"
-              className={cn(
-                "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
-                "text-xs font-medium text-muted-foreground transition",
-                "hover:bg-foreground hover:text-background disabled:opacity-50"
-              )}
+              className={ACTION_BUTTON_CLASS}
               onClick={() => exportCat({ noTint: true })}
               disabled={!lastResultRef.current}
             >
@@ -965,11 +946,7 @@ export function StreamControlClient() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className={cn(
-                "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
-                "text-xs font-medium text-muted-foreground transition",
-                "hover:bg-foreground hover:text-background disabled:opacity-50"
-              )}
+              className={ACTION_BUTTON_CLASS}
               onClick={handleSaveMeta}
               disabled={!currentProfileId || metaSaving || !metaDirty}
             >
@@ -977,22 +954,14 @@ export function StreamControlClient() {
             </button>
             <Link
               href="/history"
-              className={cn(
-                "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
-                "text-xs font-medium text-muted-foreground transition",
-                "hover:bg-foreground hover:text-background"
-              )}
+              className={ACTION_BUTTON_CLASS}
             >
               Browse History
             </Link>
             {currentSlug && (
               <Link
                 href={`/view/${currentSlug}`}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
-                  "text-xs font-medium text-muted-foreground transition",
-                  "hover:bg-foreground hover:text-background"
-                )}
+                className={ACTION_BUTTON_CLASS}
               >
                 <ArrowUpRight className="size-4" /> View Entry
               </Link>

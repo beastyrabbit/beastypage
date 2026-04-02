@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ADDITIONAL_PALETTES, patternToCssBackground } from "@/lib/palettes";
 import type { PaletteColorDef, PaletteCategory } from "@/lib/palettes/types";
 import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
-import type { LayerRange } from "@/utils/singleCatVariants";
+import type { AfterlifeOption, ExtendedMode, LayerRange } from "@/utils/singleCatVariants";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { encodePortableSettings } from "@/lib/portable-settings";
 
@@ -236,9 +236,9 @@ export function OBSLobby({
         scarRange: settings.scarRange,
         tortieRange: settings.tortieRange,
         exactLayerCounts: settings.exactLayerCounts ?? true,
-        afterlifeMode: settings.afterlifeMode as import("@/utils/singleCatVariants").AfterlifeOption,
+        afterlifeMode: settings.afterlifeMode as AfterlifeOption,
         includeBaseColours: settings.includeBaseColours,
-        extendedModes: settings.extendedModes as import("@/utils/singleCatVariants").ExtendedMode[],
+        extendedModes: settings.extendedModes as ExtendedMode[],
       }),
     [settings]
   );
@@ -481,8 +481,7 @@ function FlyingCatSprite({ cat, swapSpeed = 1, moveSpeed = 1 }: { cat: FlyingCat
 // upward by exactly one copy's height, then jumps back — creating a seamless
 // infinite scroll with no scrollbar.
 
-const PALETTE_ROW_HEIGHT = 48; // approximate height per palette row (label + swatches)
-const SCROLL_SPEED_MS = 1500;  // ms per palette row
+const SCROLL_SPEED_MS = 1500; // ms per palette row
 
 function PaletteMarquee({ palettes }: { palettes: PaletteCategory[] }) {
   const count = palettes.length;
