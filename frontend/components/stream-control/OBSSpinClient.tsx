@@ -3706,7 +3706,11 @@ export function OBSSpinClient({
   if (obsPhase === "lobby") {
     return (
       <OBSLobby
-        settings={{ mode, accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes: extendedModesArray, exactLayerCounts }}
+        settings={{ mode, accessoryRange, scarRange, tortieRange, afterlifeMode, includeBaseColours, extendedModes: extendedModesArray, exactLayerCounts,
+          lobbyMode: (sessionSettings as Record<string, unknown> | undefined)?.lobbyMode as string ?? "fruit-ninja",
+          lobbyCatCount: (sessionSettings as Record<string, unknown> | undefined)?.lobbyCatCount as number ?? 4,
+          lobbyCatSpeed: (sessionSettings as Record<string, unknown> | undefined)?.lobbyCatSpeed as number ?? 1.0,
+        }}
         generator={generatorRef.current}
       />
     );
@@ -3961,9 +3965,15 @@ function OBSLobby({
     includeBaseColours: boolean;
     extendedModes: string[];
     exactLayerCounts?: boolean;
+    lobbyMode?: string;
+    lobbyCatCount?: number;
+    lobbyCatSpeed?: number;
   };
   generator: CatGeneratorApi | null;
 }) {
+  const lobbyMode = (settings.lobbyMode ?? "fruit-ninja") as "fruit-ninja" | "matrix" | "dvd";
+  const maxCats = settings.lobbyCatCount ?? 4;
+  const catSpeed = settings.lobbyCatSpeed ?? 1.0;
   const [flyingCats, setFlyingCats] = useState<FlyingCat[]>([]);
   const [paletteIdx, setPaletteIdx] = useState(0);
   const catIdRef = useRef(0);
@@ -4011,8 +4021,8 @@ function OBSLobby({
         frames.push(firstResult.canvas.toDataURL("image/png"));
       }
 
-      // More frames with same sprite but different params
-      for (let i = 0; i < 3; i++) {
+      // Generate 20 more frames — same sprite, no reverse, different params each time
+      for (let i = 0; i < 20; i++) {
         if (cancelled) return;
         try {
           const r = await generator.generateRandomCat!({
@@ -4024,8 +4034,8 @@ function OBSLobby({
             includeBaseColours: settings.includeBaseColours,
           });
           if (r.canvas instanceof HTMLCanvasElement) {
-            // Override sprite to keep it constant
-            const overrideParams = { ...r.params, spriteNumber: fixedSprite };
+            // Override sprite to keep it constant, lock reverse off
+            const overrideParams = { ...r.params, spriteNumber: fixedSprite, reverse: false };
             const rendered = await generator.generateCat(overrideParams);
             if (rendered.canvas instanceof HTMLCanvasElement) {
               frames.push(rendered.canvas.toDataURL("image/png"));
@@ -4037,13 +4047,16 @@ function OBSLobby({
 
       setFlyingCats((prev) => {
         const alive = prev.filter((c) => Date.now() - c.startTime < c.duration);
-        if (alive.length >= 4) return alive;
+        if (alive.length >= maxCats) return alive;
+        const baseDuration = lobbyMode === "dvd"
+          ? 999999 // DVD cats bounce forever
+          : (3500 + Math.random() * 2000) / catSpeed;
         return [...alive, {
           id: catIdRef.current++,
           frames,
           x: 5 + Math.random() * 70,
           startTime: Date.now(),
-          duration: 3500 + Math.random() * 2000,
+          duration: baseDuration,
           peakY: 200 + Math.random() * 400,
           rotation: -25 + Math.random() * 50,
         }];
@@ -4051,7 +4064,8 @@ function OBSLobby({
     };
 
     spawn();
-    const timer = setInterval(spawn, 3000);
+    const spawnInterval = Math.max(800, 3000 / catSpeed);
+    const timer = setInterval(spawn, spawnInterval);
     return () => { cancelled = true; clearInterval(timer); };
   }, [generator, settings]);
 
@@ -4159,17 +4173,19 @@ function OBSLobby({
       {/* Flying cats — full screen, above everything */}
       <div className="absolute inset-0 z-50 overflow-hidden">
         {flyingCats.map((cat) => (
-          <FlyingCatSprite key={cat.id} cat={cat} />
+          <FlyingCatSprite key={cat.id} cat={cat} mode={lobbyMode} />
         ))}
       </div>
     </div>
   );
 }
 
-function FlyingCatSprite({ cat }: { cat: FlyingCat }) {
+function FlyingCatSprite({ cat, mode = "fruit-ninja" }: { cat: FlyingCat; mode?: "fruit-ninja" | "matrix" | "dvd" }) {
   const ref = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const frameRef = useRef(0);
+  // DVD mode: bounce direction stored in ref
+  const dvdRef = useRef({ vx: (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random()), vy: (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random()), px: cat.x * 12.8, py: Math.random() * 900 });
 
   useEffect(() => {
     let raf: number;
@@ -4179,27 +4195,54 @@ function FlyingCatSprite({ cat }: { cat: FlyingCat }) {
       const now = Date.now();
       const elapsed = now - cat.startTime;
       const t = Math.min(elapsed / cat.duration, 1);
-      if (t >= 1) return;
 
-      const y = -4 * cat.peakY * t * (t - 1);
-      const xDrift = t * 15;
-      const opacity = t < 0.1 ? t / 0.1 : t > 0.9 ? (1 - t) / 0.1 : 1;
-
-      ref.current.style.left = `${cat.x + xDrift}%`;
-      ref.current.style.transform = `translateY(${-y}px) rotate(${cat.rotation * t}deg) scale(${0.7 + t * 0.5})`;
-      ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
-
+      // Frame cycling — same for all modes
       if (cat.frames.length > 1 && now - lastSwap > 120) {
         frameRef.current = (frameRef.current + 1) % cat.frames.length;
         if (imgRef.current) imgRef.current.src = cat.frames[frameRef.current];
         lastSwap = now;
       }
 
+      if (mode === "matrix") {
+        // Fall from top to bottom
+        if (t >= 1) return;
+        const yPos = t * 1200 - 120;
+        const opacity = t < 0.05 ? t / 0.05 : t > 0.9 ? (1 - t) / 0.1 : 1;
+        ref.current.style.left = `${cat.x}%`;
+        ref.current.style.top = `${yPos}px`;
+        ref.current.style.bottom = "auto";
+        ref.current.style.transform = `scale(0.9)`;
+        ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
+      } else if (mode === "dvd") {
+        // Bounce around — never expires
+        const d = dvdRef.current;
+        d.px += d.vx * 2;
+        d.py += d.vy * 2;
+        if (d.px <= 0 || d.px >= 1160) d.vx *= -1;
+        if (d.py <= 0 || d.py >= 960) d.vy *= -1;
+        d.px = Math.max(0, Math.min(1160, d.px));
+        d.py = Math.max(0, Math.min(960, d.py));
+        ref.current.style.left = `${d.px}px`;
+        ref.current.style.top = `${d.py}px`;
+        ref.current.style.bottom = "auto";
+        ref.current.style.transform = "scale(0.85)";
+        ref.current.style.opacity = "1";
+      } else {
+        // Fruit ninja — arc from bottom
+        if (t >= 1) return;
+        const y = -4 * cat.peakY * t * (t - 1);
+        const xDrift = t * 15;
+        const opacity = t < 0.1 ? t / 0.1 : t > 0.9 ? (1 - t) / 0.1 : 1;
+        ref.current.style.left = `${cat.x + xDrift}%`;
+        ref.current.style.transform = `translateY(${-y}px) rotate(${cat.rotation * t}deg) scale(${0.7 + t * 0.5})`;
+        ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
+      }
+
       raf = requestAnimationFrame(animate);
     };
     raf = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(raf);
-  }, [cat]);
+  }, [cat, mode]);
 
   return (
     <div ref={ref} className="absolute bottom-0" style={{ opacity: 0 }}>

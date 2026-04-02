@@ -71,11 +71,20 @@ export function StreamControlClient() {
   const [spinning, setSpinning] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
+  // Lobby animation settings
+  const [lobbyMode, setLobbyMode] = useState<"fruit-ninja" | "matrix" | "dvd">("fruit-ninja");
+  const [lobbyCatCount, setLobbyCatCount] = useState(4);
+  const [lobbyCatSpeed, setLobbyCatSpeed] = useState(1.0);
+
   // Seed from session settings on first load
   useEffect(() => {
     if (session && !initialized) {
       if (session.settings && typeof session.settings === "object") {
-        setSettings((prev) => ({ ...prev, ...session.settings }));
+        const s = session.settings as Record<string, unknown>;
+        setSettings((prev) => ({ ...prev, ...s }));
+        if (s.lobbyMode) setLobbyMode(s.lobbyMode as typeof lobbyMode);
+        if (s.lobbyCatCount) setLobbyCatCount(s.lobbyCatCount as number);
+        if (s.lobbyCatSpeed) setLobbyCatSpeed(s.lobbyCatSpeed as number);
       }
       setInitialized(true);
     }
@@ -495,6 +504,89 @@ export function StreamControlClient() {
           </section>
         </div>
       </div>
+
+      {/* Lobby Animation Settings */}
+      <section className="rounded-2xl border border-border/40 bg-background/80 p-5 backdrop-blur">
+        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Lobby Animation
+        </h3>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Mode */}
+          <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1">
+            {(["fruit-ninja", "matrix", "dvd"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => {
+                  setLobbyMode(m);
+                  updateSettingsMut({ settings: { ...settings, lobbyMode: m, lobbyCatCount, lobbyCatSpeed } }).catch(() => {});
+                }}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition",
+                  lobbyMode === m
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {m === "dvd" ? "DVD Bounce" : m === "matrix" ? "Matrix" : "Fruit Ninja"}
+              </button>
+            ))}
+          </div>
+
+          {/* Cat count */}
+          <div className="flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5">
+            <span className="text-xs text-muted-foreground">Cats:</span>
+            <button
+              onClick={() => {
+                const v = Math.max(1, lobbyCatCount - 1);
+                setLobbyCatCount(v);
+                updateSettingsMut({ settings: { ...settings, lobbyMode, lobbyCatCount: v, lobbyCatSpeed } }).catch(() => {});
+              }}
+              className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
+            >
+              <Minus className="size-3" />
+            </button>
+            <span className="w-5 text-center text-xs font-semibold text-foreground">{lobbyCatCount}</span>
+            <button
+              onClick={() => {
+                const v = Math.min(12, lobbyCatCount + 1);
+                setLobbyCatCount(v);
+                updateSettingsMut({ settings: { ...settings, lobbyMode, lobbyCatCount: v, lobbyCatSpeed } }).catch(() => {});
+              }}
+              className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
+            >
+              <Plus className="size-3" />
+            </button>
+          </div>
+
+          {/* Speed */}
+          <div className="flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5">
+            <Zap className="size-3 text-muted-foreground" />
+            <button
+              onClick={() => {
+                const v = Math.max(0.25, lobbyCatSpeed - 0.25);
+                setLobbyCatSpeed(v);
+                updateSettingsMut({ settings: { ...settings, lobbyMode, lobbyCatCount, lobbyCatSpeed: v } }).catch(() => {});
+              }}
+              className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
+            >
+              <Minus className="size-3" />
+            </button>
+            <span className="w-8 text-center text-xs font-semibold text-foreground">
+              {lobbyCatSpeed.toFixed(2).replace(/\.?0+$/, "")}x
+            </span>
+            <button
+              onClick={() => {
+                const v = Math.min(4, lobbyCatSpeed + 0.25);
+                setLobbyCatSpeed(v);
+                updateSettingsMut({ settings: { ...settings, lobbyMode, lobbyCatCount, lobbyCatSpeed: v } }).catch(() => {});
+              }}
+              className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
+            >
+              <Plus className="size-3" />
+            </button>
+          </div>
+        </div>
+      </section>
 
       {/* Spin History Table */}
       <section className="rounded-2xl border border-border/40 bg-background/80 p-5 backdrop-blur">
