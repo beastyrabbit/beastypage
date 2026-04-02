@@ -98,6 +98,7 @@ export function StreamControlClient() {
   const creatorFilledRef = useRef(false);
   const lastResultRef = useRef<{ canvas: HTMLCanvasElement | OffscreenCanvas; params: Record<string, unknown> } | null>(null);
   const [hasTint, setHasTint] = useState(false);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
   // Lobby animation settings
   const [lobbyMode, setLobbyMode] = useState<"fruit-ninja" | "matrix" | "dvd">("fruit-ninja");
@@ -156,12 +157,34 @@ export function StreamControlClient() {
     }
   }, [viewer?.username, creatorNameDraft]);
 
+  // Scale the OBS preview iframe to fit its container
+  useEffect(() => {
+    const container = previewContainerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const scale = entry.contentRect.width / 1920;
+      container.style.setProperty("--preview-scale", String(scale));
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
   // Sync settings to Convex (debounced) — includes lobby fields so they aren't overwritten
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const sessionRef = useRef(session);
   sessionRef.current = session;
+  const lobbyModeRef = useRef(lobbyMode);
+  lobbyModeRef.current = lobbyMode;
+  const lobbyCatCountRef = useRef(lobbyCatCount);
+  lobbyCatCountRef.current = lobbyCatCount;
+  const lobbyMoveSpeedRef = useRef(lobbyMoveSpeed);
+  lobbyMoveSpeedRef.current = lobbyMoveSpeed;
+  const lobbySwapSpeedRef = useRef(lobbySwapSpeed);
+  lobbySwapSpeedRef.current = lobbySwapSpeed;
+  const paletteDisplayModeRef = useRef(paletteDisplayMode);
+  paletteDisplayModeRef.current = paletteDisplayMode;
 
   const updateSettings = useCallback(
     (next: Partial<SingleCatSettings>) => {
@@ -170,14 +193,14 @@ export function StreamControlClient() {
         clearTimeout(syncTimer.current);
         syncTimer.current = setTimeout(() => {
           if (sessionRef.current) {
-            // Merge lobby fields so they don't get overwritten
+            // Read lobby values from refs to avoid stale closures
             const full = {
               ...merged,
-              lobbyMode,
-              lobbyCatCount,
-              lobbyMoveSpeed,
-              lobbySwapSpeed,
-              paletteDisplayMode,
+              lobbyMode: lobbyModeRef.current,
+              lobbyCatCount: lobbyCatCountRef.current,
+              lobbyMoveSpeed: lobbyMoveSpeedRef.current,
+              lobbySwapSpeed: lobbySwapSpeedRef.current,
+              paletteDisplayMode: paletteDisplayModeRef.current,
             };
             updateSettingsMut({ settings: full }).catch(() => {});
           }
@@ -185,7 +208,7 @@ export function StreamControlClient() {
         return merged;
       });
     },
-    [updateSettingsMut, lobbyMode, lobbyCatCount, lobbyMoveSpeed, lobbySwapSpeed, paletteDisplayMode]
+    [updateSettingsMut]
   );
 
   // Spin handler
