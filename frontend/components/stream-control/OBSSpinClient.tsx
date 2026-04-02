@@ -3659,8 +3659,21 @@ export function OBSSpinClient({
             ref={canvasRef}
             width={DISPLAY_SIZE}
             height={DISPLAY_SIZE}
-            className="drop-shadow-[0_0_50px_rgba(245,158,11,0.12)]"
-            style={{ width: "720px", height: "720px", imageRendering: "pixelated" }}
+            style={{
+              width: "720px",
+              height: "720px",
+              imageRendering: "pixelated",
+              filter: [
+                "drop-shadow(3px 0 0 white)",
+                "drop-shadow(-3px 0 0 white)",
+                "drop-shadow(0 3px 0 white)",
+                "drop-shadow(0 -3px 0 white)",
+                "drop-shadow(3px 3px 0 white)",
+                "drop-shadow(-3px 3px 0 white)",
+                "drop-shadow(3px -3px 0 white)",
+                "drop-shadow(-3px -3px 0 white)",
+              ].join(" "),
+            }}
           />
         </div>
 
