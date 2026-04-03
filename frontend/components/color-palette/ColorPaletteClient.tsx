@@ -415,6 +415,7 @@ export function ColorPaletteClient({
             <div className="flex gap-3">
               {toolbarLeft}
               <button
+                type="button"
                 onClick={handleReset}
                 className="flex items-center gap-2 rounded-xl border border-border/50 px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:border-foreground/30 hover:text-foreground"
                 disabled={state.isProcessing || isExternalLoading}
@@ -425,6 +426,7 @@ export function ColorPaletteClient({
 
               {!hasColors ? (
                 <button
+                  type="button"
                   onClick={performExtraction}
                   disabled={state.isProcessing}
                   className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/40 disabled:cursor-not-allowed disabled:opacity-50"

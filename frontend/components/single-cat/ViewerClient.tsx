@@ -501,19 +501,23 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     const accessories = (catPayload.accessorySlots ?? []).filter(
       (item) => item && item !== "none",
     );
-    accessories.forEach((item, index) => push(`Accessory ${index + 1}`, item));
+    accessories.forEach((item, index) => {
+      push(`Accessory ${index + 1}`, item);
+    });
 
     const scars = (catPayload.scarSlots ?? []).filter(
       (item) => item && item !== "none",
     );
-    scars.forEach((item, index) => push(`Scar ${index + 1}`, item));
+    scars.forEach((item, index) => {
+      push(`Scar ${index + 1}`, item);
+    });
 
     const torties = (catPayload.tortieSlots ?? []).filter(
       (slot): slot is TortieLayer => !!slot,
     );
-    torties.forEach((slot, index) =>
-      push(`Tortie ${index + 1}`, formatTortieLayer(slot)),
-    );
+    torties.forEach((slot, index) => {
+      push(`Tortie ${index + 1}`, formatTortieLayer(slot));
+    });
 
     push("Tint", params.tint);
     push("Skin", params.skinColour);

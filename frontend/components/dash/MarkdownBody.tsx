@@ -66,8 +66,9 @@ function inlineMarkdown(text: string): string {
     },
   );
 
-  // Restore code spans
+  // Restore code spans (uses NUL byte sentinels to mark placeholders)
   out = out.replace(
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional NUL byte sentinels
     /\x00CODE(\d+)\x00/g,
     (_m, idx: string) => codeSpans[parseInt(idx, 10)],
   );
@@ -222,6 +223,7 @@ export function MarkdownBody({ content }: MarkdownBodyProps) {
   return (
     <div
       className="prose-sm max-w-none text-sm leading-relaxed text-foreground/80"
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: content is sanitized via sanitize() on line 222
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

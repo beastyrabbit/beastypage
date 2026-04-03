@@ -109,7 +109,7 @@ function TortieComparison({
           <div key={i} className="space-y-1.5 text-center">
             <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border/30 bg-background/50">
               {cat ? (
-                // eslint-disable-next-line @next/next/no-img-element
+                // biome-ignore lint/performance/noImgElement: renders base64/dynamic src
                 <img
                   src={cat.imageDataUrl}
                   alt={`${i + 1} tortie layer${i > 0 ? "s" : ""}`}

@@ -110,6 +110,7 @@ export function PaletteGrid({
 
           return (
             <button
+              type="button"
               key={`${color.hex}-${color.position.x}-${color.position.y}`}
               onClick={() => onColorSelect(index)}
               onMouseEnter={() => onColorHover(index, color.rgb)}
@@ -202,6 +203,7 @@ export function PaletteGrid({
                   const cellRgb = hexToRgb(cell.hex);
                   return (
                     <button
+                      type="button"
                       key={`${cell.hex}-${cell.factor}`}
                       onClick={() => copyToClipboard(cell.hex)}
                       onMouseEnter={() => onColorHover(rowIndex, cellRgb)}
@@ -268,6 +270,7 @@ export function PaletteGrid({
                   const cellRgb = hexToRgb(cell.hex);
                   return (
                     <button
+                      type="button"
                       key={`${cell.hex}-${cell.shift}`}
                       onClick={() => copyToClipboard(cell.hex)}
                       onMouseEnter={() => onColorHover(rowIndex, cellRgb)}

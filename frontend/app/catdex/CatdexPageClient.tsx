@@ -1153,9 +1153,9 @@ function MassUploadModal({
 
   useEffect(() => {
     return () => {
-      entriesRef.current.forEach((entry) =>
-        URL.revokeObjectURL(entry.previewUrl),
-      );
+      entriesRef.current.forEach((entry) => {
+        URL.revokeObjectURL(entry.previewUrl);
+      });
     };
   }, []);
 
@@ -1291,7 +1291,9 @@ function MassUploadModal({
       setStatus(`Uploaded ${success} card${success === 1 ? "" : "s"}.`);
       track("catdex_mass_upload_submitted", { card_count: success });
       setEntries((prev) => {
-        prev.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
+        prev.forEach((entry) => {
+          URL.revokeObjectURL(entry.previewUrl);
+        });
         return [];
       });
       setOwner(owner);

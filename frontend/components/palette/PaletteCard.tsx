@@ -51,6 +51,7 @@ const MODE_COLORS: Record<string, string> = {
 function PipetteIcon({ color }: { color: string }) {
   return (
     <svg
+      aria-hidden="true"
       width="10"
       height="10"
       viewBox="0 0 24 24"
@@ -234,6 +235,7 @@ export function PaletteCard({
               swatchKeyCounts.set(hex, swatchCount + 1);
 
               return (
+                // biome-ignore lint/a11y/noStaticElementInteractions: hover effects only, click handled by nested button
                 <div
                   key={`${palette.id}-${hex}-${swatchCount}`}
                   className={cn(

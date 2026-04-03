@@ -1973,7 +1973,9 @@ export function VisualBuilderClient({
       mapperInstance?.getAccessories?.() ?? [],
     );
     grouped.forEach((group) => {
-      group.options.forEach((option) => allAccessories.delete(option));
+      group.options.forEach((option) => {
+        allAccessories.delete(option);
+      });
     });
     const misc = Array.from(allAccessories);
     if (misc.length) {

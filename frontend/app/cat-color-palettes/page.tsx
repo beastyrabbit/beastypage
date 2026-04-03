@@ -131,6 +131,7 @@ function PaletteDownload({ palette }: { palette: PaletteCategory }) {
 
   return (
     <button
+      type="button"
       onClick={handleExport}
       className="flex h-7 items-center gap-1.5 rounded-md bg-primary/15 px-2.5 text-xs font-medium text-primary transition hover:bg-primary/25"
     >
@@ -178,6 +179,7 @@ function ColorCard({
 
   return (
     <button
+      type="button"
       onClick={copyToClipboard}
       className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-lg border border-border/30 transition hover:scale-105 hover:shadow-lg"
       style={bgStyle}

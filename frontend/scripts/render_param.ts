@@ -220,6 +220,6 @@ if (!inputPath) {
 
 const params = JSON.parse(readFileSync(inputPath, "utf-8"));
 const result = await catGenerator.render(params, { outputFormat: "canvas" });
-const canvas: any = result.canvas;
+const canvas = result.canvas as { toBuffer(format: string): Buffer };
 const buffer: Buffer = canvas.toBuffer("image/png");
 process.stdout.write(buffer.toString("base64"));

@@ -1,4 +1,5 @@
 import { ConvexHttpClient } from "convex/browser";
+import type { FunctionReturnType } from "convex/server";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -61,7 +62,7 @@ export default async function ViewAncestryTreePage({ params }: PageParams) {
     notFound();
   }
 
-  let treeData;
+  let treeData: FunctionReturnType<typeof api.ancestryTree.getBySlug>;
   try {
     const convex = new ConvexHttpClient(convexUrl);
     treeData = await convex.query(api.ancestryTree.getBySlug, { slug });

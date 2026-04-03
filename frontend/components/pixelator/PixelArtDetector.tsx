@@ -46,6 +46,7 @@ export function PixelArtDetector({
   return (
     <div className="glass-card p-4">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-2 text-left"
       >
@@ -61,6 +62,7 @@ export function PixelArtDetector({
         <div className="mt-3 flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={handleDetect}
               disabled={detecting}
               className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 disabled:opacity-50"

@@ -116,6 +116,7 @@ export default function ProfilePage() {
         />
         <div className="flex justify-center">
           <button
+            type="button"
             onClick={() => signIn()}
             className={cn(
               "inline-flex items-center gap-2 rounded-lg border border-border/50",
@@ -232,6 +233,7 @@ export default function ProfilePage() {
               {/* Save Button */}
               <div className="flex justify-end pt-2">
                 <button
+                  type="button"
                   onClick={handleSave}
                   disabled={saving}
                   className={cn(
@@ -308,6 +310,7 @@ export default function ProfilePage() {
                 </p>
               </div>
               <button
+                type="button"
                 onClick={handleDelete}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-lg border border-red-500/50 px-4 py-2",
@@ -383,6 +386,7 @@ function ApiKeySection({
           {revealed ? (apiKey ?? "—") : masked}
         </div>
         <button
+          type="button"
           onClick={() => setRevealed((prev) => !prev)}
           className={cn(
             "rounded-lg border border-border/50 p-2 text-muted-foreground",
@@ -397,6 +401,7 @@ function ApiKeySection({
           )}
         </button>
         <button
+          type="button"
           onClick={handleCopy}
           disabled={!apiKey}
           className={cn(
@@ -408,6 +413,7 @@ function ApiKeySection({
           <Copy className="size-4" />
         </button>
         <button
+          type="button"
           onClick={handleRegenerate}
           disabled={regenerating}
           className={cn(
@@ -674,6 +680,7 @@ function VariantsSection({
       {/* Import / Export row */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
+          type="button"
           onClick={handleImportFromBrowser}
           disabled={importing}
           className={btnClass}
@@ -686,6 +693,7 @@ function VariantsSection({
           From browser
         </button>
         <button
+          type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={importing}
           className={btnClass}
@@ -701,7 +709,7 @@ function VariantsSection({
           onChange={handleImportFile}
         />
         {variants.length > 0 && (
-          <button onClick={handleExportAll} className={btnClass}>
+          <button type="button" onClick={handleExportAll} className={btnClass}>
             <Download className="size-3" />
             Export all
           </button>
@@ -732,6 +740,7 @@ function VariantsSection({
           className="flex-1 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
         />
         <button
+          type="button"
           onClick={() => void handleImportSlug()}
           disabled={slugImporting}
           className={btnClass}
@@ -751,6 +760,7 @@ function VariantsSection({
           return (
             <div key={toolKey} className="rounded-lg border border-border/30">
               <button
+                type="button"
                 onClick={() => onToggleTool(toolKey)}
                 className={cn(
                   "flex w-full items-center justify-between px-4 py-2.5",
@@ -791,6 +801,7 @@ function VariantsSection({
                           )}
                         </span>
                         <button
+                          type="button"
                           onClick={() =>
                             void onDeleteVariant(v.toolKey, v.variantId)
                           }

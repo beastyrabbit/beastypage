@@ -45,7 +45,7 @@ function GalleryItem({ item }: { item: ScarPreview }) {
     <div className="group relative flex flex-col items-center gap-1">
       <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-border/30 bg-background/50">
         {item.imageDataUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
+          // biome-ignore lint/performance/noImgElement: renders base64/dynamic src
           <img
             src={item.imageDataUrl}
             alt={formatName(item.name)}
@@ -120,7 +120,9 @@ export function ScarsStep(props: WizardStepProps) {
     poolRef.current = shuffled;
 
     const initial = shuffled.slice(0, INITIAL_COUNT);
-    initial.forEach((n) => shownNamesRef.current.add(n));
+    initial.forEach((n) => {
+      shownNamesRef.current.add(n);
+    });
     setIsRendering(true);
 
     (async () => {
@@ -143,7 +145,9 @@ export function ScarsStep(props: WizardStepProps) {
     );
     if (remaining.length === 0) return;
 
-    remaining.forEach((n) => shownNamesRef.current.add(n));
+    remaining.forEach((n) => {
+      shownNamesRef.current.add(n);
+    });
     setExpanded(true);
     setIsRendering(true);
 

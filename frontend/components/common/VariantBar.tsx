@@ -158,6 +158,7 @@ export function VariantBar<T>({
                 {activeVariant ? activeVariant.name : "No variant"}
               </span>
               <svg
+                aria-hidden="true"
                 className="size-3 shrink-0 opacity-60"
                 viewBox="0 0 12 12"
                 fill="none"

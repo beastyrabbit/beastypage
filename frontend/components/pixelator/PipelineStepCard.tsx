@@ -75,6 +75,7 @@ export function PipelineStepCard({
         </button>
 
         <button
+          type="button"
           onClick={() => setExpanded(!expanded)}
           className="text-muted-foreground hover:text-foreground"
         >
@@ -108,6 +109,7 @@ export function PipelineStepCard({
         </label>
 
         <button
+          type="button"
           onClick={() => onRemove(step.id)}
           className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           aria-label="Remove step"

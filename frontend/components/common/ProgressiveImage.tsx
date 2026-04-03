@@ -57,6 +57,7 @@ export function ProgressiveImage({
 
   return (
     <div className={cn("relative h-full w-full overflow-hidden", className)}>
+      {/* biome-ignore lint/performance/noImgElement: progressive loading with dynamic src */}
       <img
         src={state.src}
         alt={alt}

@@ -85,6 +85,7 @@ export function GeneratorControls({
               >
                 {isLoading ? (
                   <svg
+                    aria-hidden="true"
                     className="size-3 animate-spin"
                     viewBox="0 0 24 24"
                     fill="none"

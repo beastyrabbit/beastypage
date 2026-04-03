@@ -990,7 +990,9 @@ export function GuidedBuilderClient() {
       } else {
         setDesiredTortieLayers(0);
         applyTortieLayers([], false);
-        TORTIE_LAYER_STEPS.forEach((stepId) => lockStep(stepId));
+        TORTIE_LAYER_STEPS.forEach((stepId) => {
+          lockStep(stepId);
+        });
       }
     },
     [
@@ -1853,7 +1855,9 @@ export function GuidedBuilderClient() {
     ];
     const allAccessories = new Set<string>(mapper?.getAccessories?.() ?? []);
     grouped.forEach((group) => {
-      group.options.forEach((option) => allAccessories.delete(option));
+      group.options.forEach((option) => {
+        allAccessories.delete(option);
+      });
     });
     const legacyOptions = Array.from(allAccessories);
     if (legacyOptions.length) {

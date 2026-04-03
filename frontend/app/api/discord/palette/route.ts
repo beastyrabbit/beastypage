@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Extract colors
-  let colors;
+  let colors: Awaited<ReturnType<typeof extractColorsServer>>;
   try {
     colors = await extractColorsServer(imageBuffer, { k: colorCount });
   } catch (error) {

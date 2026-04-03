@@ -106,6 +106,7 @@ export function PaletteSettings({
     <div className="overflow-hidden rounded-xl border border-border/30 bg-background/30">
       {/* Header - always visible */}
       <button
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-primary/5"
       >
@@ -147,6 +148,7 @@ export function PaletteSettings({
               <div className="flex flex-wrap gap-2">
                 {BRIGHTNESS_PRESETS.map((preset) => (
                   <button
+                    type="button"
                     key={preset.label}
                     onClick={() => {
                       onBrightnessFactorsChange(preset.values);
@@ -162,6 +164,7 @@ export function PaletteSettings({
                   </button>
                 ))}
                 <button
+                  type="button"
                   onClick={openCustomBrightness}
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
                     isCustomBrightness && !showCustomBrightness
@@ -191,12 +194,14 @@ export function PaletteSettings({
                     }}
                   />
                   <button
+                    type="button"
                     onClick={handleCustomBrightnessSubmit}
                     className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                   >
                     Apply
                   </button>
                   <button
+                    type="button"
                     onClick={() => setShowCustomBrightness(false)}
                     className="rounded-lg bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
                   >
@@ -222,6 +227,7 @@ export function PaletteSettings({
               <div className="flex flex-wrap gap-2">
                 {HUE_PRESETS.map((preset) => (
                   <button
+                    type="button"
                     key={preset.label}
                     onClick={() => {
                       onHueShiftsChange(preset.values);
@@ -237,6 +243,7 @@ export function PaletteSettings({
                   </button>
                 ))}
                 <button
+                  type="button"
                   onClick={openCustomHue}
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
                     isCustomHue && !showCustomHue
@@ -266,12 +273,14 @@ export function PaletteSettings({
                     }}
                   />
                   <button
+                    type="button"
                     onClick={handleCustomHueSubmit}
                     className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
                   >
                     Apply
                   </button>
                   <button
+                    type="button"
                     onClick={() => setShowCustomHue(false)}
                     className="rounded-lg bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
                   >
@@ -312,6 +321,7 @@ export function PaletteSettings({
 
             {/* Reset button */}
             <button
+              type="button"
               onClick={resetToDefaults}
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-border/50 py-2 text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
             >

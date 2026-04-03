@@ -10,8 +10,8 @@ import { createCanvas, Image } from "@napi-rs/canvas";
 import catGenerator from "../lib/single-cat/catGeneratorV2.js";
 
 const redirectLog =
-  (_logger: (...args: any[]) => void) =>
-  (...args: any[]) => {
+  (_logger: (...args: unknown[]) => void) =>
+  (...args: unknown[]) => {
     const message = args
       .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
       .join(" ");
@@ -213,7 +213,7 @@ async function renderRandomCat() {
     ignoreForbiddenSprites: true,
   });
   const result = await catGenerator.render(params, { outputFormat: "canvas" });
-  const canvas: any = result.canvas;
+  const canvas = result.canvas as { toBuffer(format: string): Buffer };
   const buffer: Buffer = canvas.toBuffer("image/png");
   return {
     params,

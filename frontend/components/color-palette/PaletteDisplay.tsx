@@ -39,6 +39,7 @@ export function PaletteDisplay({
         </h3>
         {selectedIndex !== null && (
           <button
+            type="button"
             onClick={() => onColorSelect(null)}
             className="text-xs text-muted-foreground hover:text-foreground"
           >

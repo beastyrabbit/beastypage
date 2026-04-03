@@ -81,6 +81,7 @@ export function PreviewCanvas({
       <div className="flex items-center gap-3 border-t border-border/50 px-4 py-2">
         {resultUrl && (
           <button
+            type="button"
             onClick={() => setShowOriginal(!showOriginal)}
             className="rounded-md border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/40"
           >
@@ -89,6 +90,7 @@ export function PreviewCanvas({
         )}
 
         <button
+          type="button"
           onClick={onChangeImage}
           className="rounded-md border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary/40"
         >
@@ -130,6 +132,7 @@ function GridOverlay({
 
   return (
     <svg
+      aria-hidden="true"
       className="pointer-events-none absolute"
       style={{
         width: imgDims.w,
