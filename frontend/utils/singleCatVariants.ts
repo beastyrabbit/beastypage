@@ -336,11 +336,16 @@ export function singleCatSettingsEqual(
   };
   const parsedA = normalize(parseSingleCatPayload(a));
   const parsedB = normalize(parseSingleCatPayload(b));
-  // Sort keys for consistent comparison (Convex may return different key order)
-  return (
-    JSON.stringify(parsedA, Object.keys(parsedA).sort()) ===
-    JSON.stringify(parsedB, Object.keys(parsedB).sort())
-  );
+  // Sort keys at every nesting level for consistent comparison
+  const sortedStringify = (obj: unknown) =>
+    JSON.stringify(obj, (_, v) =>
+      v && typeof v === "object" && !Array.isArray(v)
+        ? Object.fromEntries(
+            Object.entries(v).sort(([a], [b]) => a.localeCompare(b)),
+          )
+        : v,
+    );
+  return sortedStringify(parsedA) === sortedStringify(parsedB);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ import { Loader2, LogIn, LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
-import { signIn, signOut } from "@/lib/shooAuth";
+import { useClerk, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,6 +18,8 @@ export function setAccountDeleting(v: boolean) {
 }
 
 export function UserAuthButton() {
+  const clerk = useClerk();
+  const { user: clerkUser } = useUser();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -74,7 +76,7 @@ export function UserAuthButton() {
     return (
       <button
         type="button"
-        onClick={() => signIn()}
+        onClick={() => clerk.openSignIn()}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-lg border border-border/50",
           "px-3 py-1.5 text-xs font-semibold text-muted-foreground",
@@ -101,13 +103,17 @@ export function UserAuthButton() {
         )}
         aria-label="User menu"
       >
-        <div className="flex size-full items-center justify-center bg-primary/15 text-primary">
-          {initial ? (
-            <span className="text-xs font-bold">{initial}</span>
-          ) : (
-            <User className="size-4" />
-          )}
-        </div>
+        {clerkUser?.imageUrl ? (
+          <img src={clerkUser.imageUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <div className="flex size-full items-center justify-center bg-primary/15 text-primary">
+            {initial ? (
+              <span className="text-xs font-bold">{initial}</span>
+            ) : (
+              <User className="size-4" />
+            )}
+          </div>
+        )}
       </button>
 
       {dropdownOpen && (
@@ -133,7 +139,7 @@ export function UserAuthButton() {
             type="button"
             onClick={() => {
               setDropdownOpen(false);
-              signOut();
+              clerk.signOut();
             }}
             className={cn(
               "flex w-full items-center gap-2 rounded-b-lg px-3 py-2",

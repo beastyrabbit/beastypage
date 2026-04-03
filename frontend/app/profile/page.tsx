@@ -20,10 +20,12 @@ import { toast } from "sonner";
 import { setAccountDeleting } from "@/components/auth/UserAuthButton";
 import { PageHero } from "@/components/common/PageHero";
 import { api } from "@/convex/_generated/api";
-import { signIn, signOut } from "@/lib/shooAuth";
+import { useClerk, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
+  const clerk = useClerk();
+  const { user: clerkUser } = useUser();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const viewer = useQuery(api.users.viewer);
   const updateProfile = useMutation(api.users.updateProfile);
@@ -37,7 +39,6 @@ export default function ProfilePage() {
   const importBatchMut = useMutation(api.userVariants.importBatch);
 
   const [username, setUsername] = useState("");
-  const [showProfilePic, setShowProfilePic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
@@ -46,7 +47,6 @@ export default function ProfilePage() {
   useEffect(() => {
     if (viewer && !initialized) {
       setUsername(viewer.username ?? "");
-      setShowProfilePic(viewer.showProfilePic ?? true);
       setInitialized(true);
     }
   }, [viewer, initialized]);
@@ -56,7 +56,6 @@ export default function ProfilePage() {
     if (!isAuthenticated) {
       setInitialized(false);
       setUsername("");
-      setShowProfilePic(true);
     }
   }, [isAuthenticated]);
 
@@ -78,16 +77,20 @@ export default function ProfilePage() {
       );
       return;
     }
-    signOut();
+    clerk.signOut();
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateProfile({
-        username: username.trim() || undefined,
-        showProfilePic,
-      });
+      const trimmed = username.trim() || undefined;
+      await updateProfile({ username: trimmed });
+      // Sync username to Clerk
+      if (trimmed && clerkUser) {
+        await clerkUser.update({ username: trimmed }).catch((err) => {
+          console.warn("[Profile] Clerk username sync failed:", err);
+        });
+      }
       toast.success("Profile updated");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save");
@@ -117,7 +120,7 @@ export default function ProfilePage() {
         <div className="flex justify-center">
           <button
             type="button"
-            onClick={() => signIn()}
+            onClick={() => clerk.openSignIn()}
             className={cn(
               "inline-flex items-center gap-2 rounded-lg border border-border/50",
               "px-5 py-2.5 text-sm font-semibold text-muted-foreground",
@@ -157,7 +160,9 @@ export default function ProfilePage() {
                     "border border-border/50 bg-primary/15",
                   )}
                 >
-                  {initial ? (
+                  {clerkUser?.imageUrl ? (
+                    <img src={clerkUser.imageUrl} alt="" className="size-full object-cover" />
+                  ) : initial ? (
                     <span className="text-xl font-bold text-primary">
                       {initial}
                     </span>
@@ -197,37 +202,6 @@ export default function ProfilePage() {
                   Letters, numbers, hyphens, and underscores only.{" "}
                   {username.length}/30
                 </p>
-              </div>
-
-              {/* Show Profile Picture Toggle */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    Show Profile Picture
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    When disabled, a generic icon will be shown instead.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={showProfilePic}
-                  onClick={() => setShowProfilePic((prev) => !prev)}
-                  className={cn(
-                    "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full",
-                    "border-2 border-transparent transition-colors",
-                    showProfilePic ? "bg-primary" : "bg-muted",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "pointer-events-none inline-block size-5 rounded-full bg-white shadow-lg",
-                      "transition-transform",
-                      showProfilePic ? "translate-x-5" : "translate-x-0",
-                    )}
-                  />
-                </button>
               </div>
 
               {/* Save Button */}

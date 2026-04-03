@@ -1,10 +1,10 @@
+import type { AuthConfig } from "convex/server";
+
 export default {
   providers: [
     {
-      type: "customJwt" as const,
-      issuer: "https://shoo.dev",
-      jwks: "https://shoo.dev/.well-known/jwks.json",
-      algorithm: "ES256" as const,
+      domain: process.env.CLERK_JWT_ISSUER_DOMAIN!,
+      applicationID: "convex",
     },
   ],
-};
+} satisfies AuthConfig;
