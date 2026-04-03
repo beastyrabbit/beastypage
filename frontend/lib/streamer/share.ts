@@ -1,5 +1,5 @@
-import { cloneParams } from "./steps";
 import type { StreamerParams } from "./steps";
+import { cloneParams } from "./steps";
 
 export type StreamerHistoryEntry = {
   step_id?: string;
@@ -14,7 +14,7 @@ function sanitizeParams(params: StreamerParams): StreamerParams {
 
   // Filter out internal keys using Object.fromEntries
   const filtered = Object.fromEntries(
-    Object.entries(cloned).filter(([key]) => !key.startsWith("_"))
+    Object.entries(cloned).filter(([key]) => !key.startsWith("_")),
   ) as StreamerParams;
 
   const accessories = Array.isArray(filtered.accessories)
@@ -24,18 +24,25 @@ function sanitizeParams(params: StreamerParams): StreamerParams {
     ? filtered.scars.filter((item) => item !== undefined)
     : [];
 
-  filtered.accessories = accessories.map((item) => (item === null ? null : String(item)));
+  filtered.accessories = accessories.map((item) =>
+    item === null ? null : String(item),
+  );
   filtered.scars = scars.map((item) => (item === null ? null : String(item)));
   filtered.accessory =
-    filtered.accessories.find((item) => typeof item === "string" && item) ?? undefined;
-  filtered.scar = filtered.scars.find((item) => typeof item === "string" && item) ?? undefined;
+    filtered.accessories.find((item) => typeof item === "string" && item) ??
+    undefined;
+  filtered.scar =
+    filtered.scars.find((item) => typeof item === "string" && item) ??
+    undefined;
 
   const tortieLayers = Array.isArray(filtered.tortie)
-    ? filtered.tortie.filter((layer) => layer && typeof layer === "object").map((layer) => ({
-        mask: layer?.mask ?? "ONE",
-        pattern: layer?.pattern ?? filtered.peltName ?? "SingleColour",
-        colour: layer?.colour ?? filtered.colour ?? "GINGER",
-      }))
+    ? filtered.tortie
+        .filter((layer) => layer && typeof layer === "object")
+        .map((layer) => ({
+          mask: layer?.mask ?? "ONE",
+          pattern: layer?.pattern ?? filtered.peltName ?? "SingleColour",
+          colour: layer?.colour ?? filtered.colour ?? "GINGER",
+        }))
     : [];
 
   filtered.tortie = tortieLayers;
@@ -53,13 +60,17 @@ function sanitizeParams(params: StreamerParams): StreamerParams {
 
 export function buildStreamerSharePayload(
   params: StreamerParams,
-  history: StreamerHistoryEntry[]
+  history: StreamerHistoryEntry[],
 ) {
   const packaged = sanitizeParams(params);
 
   const counts = {
-    accessories: packaged.accessories?.filter((item) => typeof item === "string" && item).length ?? 0,
-    scars: packaged.scars?.filter((item) => typeof item === "string" && item).length ?? 0,
+    accessories:
+      packaged.accessories?.filter((item) => typeof item === "string" && item)
+        .length ?? 0,
+    scars:
+      packaged.scars?.filter((item) => typeof item === "string" && item)
+        .length ?? 0,
     tortie: packaged.tortie?.length ?? 0,
   };
 

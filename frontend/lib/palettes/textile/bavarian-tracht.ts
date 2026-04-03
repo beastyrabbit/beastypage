@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const bavarianTrachtPalette: PaletteCategory = {
-  id: 'bavarian-tracht',
-  label: 'Bavarian Tracht',
-  description: 'German traditional — Dirndl blues, Lederhosen browns, alpine whites and edelweiss',
+  id: "bavarian-tracht",
+  label: "Bavarian Tracht",
+  description:
+    "German traditional — Dirndl blues, Lederhosen browns, alpine whites and edelweiss",
   colors: {
     BV_ALPINENIGHT: { multiply: [10, 18, 42] },
     BV_DEEPBAVARIAN: { multiply: [18, 30, 68] },

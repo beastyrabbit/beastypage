@@ -1,55 +1,130 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const polkadotPatternsPalette: PaletteCategory = {
-  id: 'polkadot-patterns',
-  label: 'Polka Dot Patterns',
+  id: "polkadot-patterns",
+  label: "Polka Dot Patterns",
   description:
-    'Classic circular dots at 3 scales — fine (tiny dots), medium, and bold (big dots)',
+    "Classic circular dots at 3 scales — fine (tiny dots), medium, and bold (big dots)",
   colors: {
     PD_REDWHITE_FINE: {
-      pattern: { type: 'polkadot', tileSize: 6, background: [200, 30, 30], foreground: [245, 240, 235] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 6,
+        background: [200, 30, 30],
+        foreground: [245, 240, 235],
+      },
     },
     PD_REDWHITE_MED: {
-      pattern: { type: 'polkadot', tileSize: 12, background: [200, 30, 30], foreground: [245, 240, 235] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 12,
+        background: [200, 30, 30],
+        foreground: [245, 240, 235],
+      },
     },
     PD_REDWHITE_BOLD: {
-      pattern: { type: 'polkadot', tileSize: 20, background: [200, 30, 30], foreground: [245, 240, 235] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 20,
+        background: [200, 30, 30],
+        foreground: [245, 240, 235],
+      },
     },
     PD_NAVYWHITE_FINE: {
-      pattern: { type: 'polkadot', tileSize: 6, background: [18, 22, 65], foreground: [235, 235, 245] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 6,
+        background: [18, 22, 65],
+        foreground: [235, 235, 245],
+      },
     },
     PD_NAVYWHITE_MED: {
-      pattern: { type: 'polkadot', tileSize: 12, background: [18, 22, 65], foreground: [235, 235, 245] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 12,
+        background: [18, 22, 65],
+        foreground: [235, 235, 245],
+      },
     },
     PD_NAVYWHITE_BOLD: {
-      pattern: { type: 'polkadot', tileSize: 20, background: [18, 22, 65], foreground: [235, 235, 245] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 20,
+        background: [18, 22, 65],
+        foreground: [235, 235, 245],
+      },
     },
     PD_BLACKWHITE_FINE: {
-      pattern: { type: 'polkadot', tileSize: 6, background: [15, 15, 18], foreground: [240, 240, 240] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 6,
+        background: [15, 15, 18],
+        foreground: [240, 240, 240],
+      },
     },
     PD_BLACKWHITE_MED: {
-      pattern: { type: 'polkadot', tileSize: 12, background: [15, 15, 18], foreground: [240, 240, 240] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 12,
+        background: [15, 15, 18],
+        foreground: [240, 240, 240],
+      },
     },
     PD_BLACKWHITE_BOLD: {
-      pattern: { type: 'polkadot', tileSize: 20, background: [15, 15, 18], foreground: [240, 240, 240] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 20,
+        background: [15, 15, 18],
+        foreground: [240, 240, 240],
+      },
     },
     PD_PINK_FINE: {
-      pattern: { type: 'polkadot', tileSize: 6, background: [220, 90, 130], foreground: [250, 240, 245] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 6,
+        background: [220, 90, 130],
+        foreground: [250, 240, 245],
+      },
     },
     PD_PINK_MED: {
-      pattern: { type: 'polkadot', tileSize: 12, background: [220, 90, 130], foreground: [250, 240, 245] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 12,
+        background: [220, 90, 130],
+        foreground: [250, 240, 245],
+      },
     },
     PD_PINK_BOLD: {
-      pattern: { type: 'polkadot', tileSize: 20, background: [220, 90, 130], foreground: [250, 240, 245] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 20,
+        background: [220, 90, 130],
+        foreground: [250, 240, 245],
+      },
     },
     PD_MINT_FINE: {
-      pattern: { type: 'polkadot', tileSize: 6, background: [165, 220, 195], foreground: [245, 250, 248] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 6,
+        background: [165, 220, 195],
+        foreground: [245, 250, 248],
+      },
     },
     PD_MINT_MED: {
-      pattern: { type: 'polkadot', tileSize: 12, background: [165, 220, 195], foreground: [245, 250, 248] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 12,
+        background: [165, 220, 195],
+        foreground: [245, 250, 248],
+      },
     },
     PD_MINT_BOLD: {
-      pattern: { type: 'polkadot', tileSize: 20, background: [165, 220, 195], foreground: [245, 250, 248] },
+      pattern: {
+        type: "polkadot",
+        tileSize: 20,
+        background: [165, 220, 195],
+        foreground: [245, 250, 248],
+      },
     },
   },
 };

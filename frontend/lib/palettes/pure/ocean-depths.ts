@@ -1,9 +1,9 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const oceanDepthsPalette: PaletteCategory = {
-  id: 'ocean-depths',
-  label: 'Ocean Depths',
-  description: 'Blue — from violet-tinged abyss to sun-dappled shallows',
+  id: "ocean-depths",
+  label: "Ocean Depths",
+  description: "Blue — from violet-tinged abyss to sun-dappled shallows",
   colors: {
     OD_VOIDTRENCH: { multiply: [8, 5, 28] },
     OD_ABYSS: { multiply: [12, 8, 42] },

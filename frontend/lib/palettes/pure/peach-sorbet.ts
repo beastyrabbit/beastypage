@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const peachSorbetPalette: PaletteCategory = {
-  id: 'peach-sorbet',
-  label: 'Peach Sorbet',
-  description: 'Peach / Apricot — cool russet shadows through warm nectarine to pale golden-cream',
+  id: "peach-sorbet",
+  label: "Peach Sorbet",
+  description:
+    "Peach / Apricot — cool russet shadows through warm nectarine to pale golden-cream",
   colors: {
     PS_COOLRUSSET: { multiply: [38, 18, 14] },
     PS_DEEPAPRICOT: { multiply: [55, 28, 18] },

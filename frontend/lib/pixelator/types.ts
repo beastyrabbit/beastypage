@@ -104,7 +104,15 @@ export const OPERATIONS: OperationDefinition[] = [
     description: "Classic pixel look by averaging color blocks",
     category: "pixelate",
     params: [
-      { key: "blockSize", label: "Block Size", type: "number", min: 2, max: 128, step: 1, default: 16 },
+      {
+        key: "blockSize",
+        label: "Block Size",
+        type: "number",
+        min: 2,
+        max: 128,
+        step: 1,
+        default: 16,
+      },
     ],
   },
   {
@@ -113,7 +121,15 @@ export const OPERATIONS: OperationDefinition[] = [
     description: "Crisp pixel edges using nearest-neighbor sampling",
     category: "pixelate",
     params: [
-      { key: "blockSize", label: "Block Size", type: "number", min: 2, max: 128, step: 1, default: 16 },
+      {
+        key: "blockSize",
+        label: "Block Size",
+        type: "number",
+        min: 2,
+        max: 128,
+        step: 1,
+        default: 16,
+      },
     ],
   },
   {
@@ -122,8 +138,24 @@ export const OPERATIONS: OperationDefinition[] = [
     description: "Ordered dithering with Bayer matrix pattern",
     category: "dither",
     params: [
-      { key: "matrixSize", label: "Matrix Size", type: "number", min: 2, max: 8, step: 2, default: 4 },
-      { key: "levels", label: "Color Levels", type: "number", min: 2, max: 32, step: 1, default: 8 },
+      {
+        key: "matrixSize",
+        label: "Matrix Size",
+        type: "number",
+        min: 2,
+        max: 8,
+        step: 2,
+        default: 4,
+      },
+      {
+        key: "levels",
+        label: "Color Levels",
+        type: "number",
+        min: 2,
+        max: 32,
+        step: 1,
+        default: 8,
+      },
     ],
   },
   {
@@ -132,7 +164,15 @@ export const OPERATIONS: OperationDefinition[] = [
     description: "Error diffusion dithering for smooth gradients",
     category: "dither",
     params: [
-      { key: "levels", label: "Color Levels", type: "number", min: 2, max: 32, step: 1, default: 4 },
+      {
+        key: "levels",
+        label: "Color Levels",
+        type: "number",
+        min: 2,
+        max: 32,
+        step: 1,
+        default: 4,
+      },
     ],
   },
   {
@@ -141,7 +181,15 @@ export const OPERATIONS: OperationDefinition[] = [
     description: "Retro Mac-style dithering with lighter distribution",
     category: "dither",
     params: [
-      { key: "levels", label: "Color Levels", type: "number", min: 2, max: 32, step: 1, default: 4 },
+      {
+        key: "levels",
+        label: "Color Levels",
+        type: "number",
+        min: 2,
+        max: 32,
+        step: 1,
+        default: 4,
+      },
     ],
   },
   {
@@ -150,7 +198,15 @@ export const OPERATIONS: OperationDefinition[] = [
     description: "Reduce color palette to a set number of colors",
     category: "color",
     params: [
-      { key: "colors", label: "Colors", type: "number", min: 2, max: 256, step: 1, default: 16 },
+      {
+        key: "colors",
+        label: "Colors",
+        type: "number",
+        min: 2,
+        max: 256,
+        step: 1,
+        default: 16,
+      },
       { key: "dither", label: "Dither", type: "boolean", default: true },
     ],
   },
@@ -160,8 +216,24 @@ export const OPERATIONS: OperationDefinition[] = [
     description: "Organic hand-drawn feel via sub-pixel displacement",
     category: "effect",
     params: [
-      { key: "amount", label: "Amount", type: "number", min: 0.5, max: 20, step: 0.5, default: 3 },
-      { key: "seed", label: "Seed", type: "number", min: 0, max: 9999, step: 1, default: 42 },
+      {
+        key: "amount",
+        label: "Amount",
+        type: "number",
+        min: 0.5,
+        max: 20,
+        step: 0.5,
+        default: 3,
+      },
+      {
+        key: "seed",
+        label: "Seed",
+        type: "number",
+        min: 0,
+        max: 9999,
+        step: 1,
+        default: 42,
+      },
     ],
   },
   {
@@ -170,7 +242,15 @@ export const OPERATIONS: OperationDefinition[] = [
     description: "Sobel edge detection for outlines and contours",
     category: "effect",
     params: [
-      { key: "threshold", label: "Threshold", type: "number", min: 0, max: 255, step: 5, default: 30 },
+      {
+        key: "threshold",
+        label: "Threshold",
+        type: "number",
+        min: 0,
+        max: 255,
+        step: 5,
+        default: 30,
+      },
       { key: "invert", label: "Invert", type: "boolean", default: false },
     ],
   },

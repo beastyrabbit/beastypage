@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const countryTweedPalette: PaletteCategory = {
-  id: 'country-tweed',
-  label: 'Country Tweed',
-  description: 'English countryside — earthy browns, mossy greens, heather mauves and oatmeal wool',
+  id: "country-tweed",
+  label: "Country Tweed",
+  description:
+    "English countryside — earthy browns, mossy greens, heather mauves and oatmeal wool",
   colors: {
     ET_PEATBOG: { multiply: [28, 22, 15] },
     ET_DARKLOAM: { multiply: [45, 35, 22] },
