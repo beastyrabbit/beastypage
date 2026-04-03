@@ -1,4 +1,8 @@
-import { DISPLAY_FORMATS, type DisplayFormat, type GeneratedPalette } from "@/lib/palette-generator/types";
+import {
+  DISPLAY_FORMATS,
+  type DisplayFormat,
+  type GeneratedPalette,
+} from "@/lib/palette-generator/types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,7 +30,9 @@ export const DEFAULT_PALETTE_GENERATOR_SETTINGS: PaletteGeneratorSettings = {
 // Payload parsing
 // ---------------------------------------------------------------------------
 
-export function parsePaletteGeneratorPayload(payload: unknown): PaletteGeneratorSettings {
+export function parsePaletteGeneratorPayload(
+  payload: unknown,
+): PaletteGeneratorSettings {
   if (!payload || typeof payload !== "object") {
     return { ...DEFAULT_PALETTE_GENERATOR_SETTINGS };
   }
@@ -64,13 +70,18 @@ export function paletteGeneratorSettingsEqual(
   a: PaletteGeneratorSettings,
   b: PaletteGeneratorSettings,
 ): boolean {
-  if (a.paletteSize !== b.paletteSize || a.displayFormat !== b.displayFormat) return false;
+  if (a.paletteSize !== b.paletteSize || a.displayFormat !== b.displayFormat)
+    return false;
   if (a.collection.length !== b.collection.length) return false;
   for (let i = 0; i < a.collection.length; i++) {
     if (a.collection[i].id !== b.collection[i].id) return false;
     const aColors = a.collection[i].colors;
     const bColors = b.collection[i].colors;
-    if (aColors.length !== bColors.length || aColors.some((c, j) => c !== bColors[j])) return false;
+    if (
+      aColors.length !== bColors.length ||
+      aColors.some((c, j) => c !== bColors[j])
+    )
+      return false;
   }
   return true;
 }

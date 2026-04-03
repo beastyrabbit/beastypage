@@ -1,6 +1,6 @@
-import { query, mutation } from "./_generated/server.js";
 import { v } from "convex/values";
-import type { QueryCtx, MutationCtx } from "./_generated/server.js";
+import type { MutationCtx, QueryCtx } from "./_generated/server.js";
+import { mutation, query } from "./_generated/server.js";
 
 /** Resolve the authenticated user's _id, or throw. */
 async function requireUserId(ctx: QueryCtx | MutationCtx) {
@@ -9,7 +9,7 @@ async function requireUserId(ctx: QueryCtx | MutationCtx) {
   const user = await ctx.db
     .query("users")
     .withIndex("byTokenIdentifier", (q) =>
-      q.eq("tokenIdentifier", identity.tokenIdentifier)
+      q.eq("tokenIdentifier", identity.tokenIdentifier),
     )
     .unique();
   if (!user) throw new Error("User not found");
@@ -25,13 +25,15 @@ export const list = query({
     const user = await ctx.db
       .query("users")
       .withIndex("byTokenIdentifier", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
     if (!user) return [];
     return ctx.db
       .query("user_variants")
-      .withIndex("byUserTool", (q) => q.eq("userId", user._id).eq("toolKey", toolKey))
+      .withIndex("byUserTool", (q) =>
+        q.eq("userId", user._id).eq("toolKey", toolKey),
+      )
       .collect();
   },
 });
@@ -54,7 +56,9 @@ export const upsert = mutation({
     if (args.isActive) {
       const others = await ctx.db
         .query("user_variants")
-        .withIndex("byUserTool", (q) => q.eq("userId", userId).eq("toolKey", args.toolKey))
+        .withIndex("byUserTool", (q) =>
+          q.eq("userId", userId).eq("toolKey", args.toolKey),
+        )
         .collect();
       for (const other of others) {
         if (other.isActive && other.variantId !== args.variantId) {
@@ -66,7 +70,10 @@ export const upsert = mutation({
     const existing = await ctx.db
       .query("user_variants")
       .withIndex("byUserVariant", (q) =>
-        q.eq("userId", userId).eq("toolKey", args.toolKey).eq("variantId", args.variantId)
+        q
+          .eq("userId", userId)
+          .eq("toolKey", args.toolKey)
+          .eq("variantId", args.variantId),
       )
       .unique();
 
@@ -103,7 +110,10 @@ export const remove = mutation({
     const variant = await ctx.db
       .query("user_variants")
       .withIndex("byUserVariant", (q) =>
-        q.eq("userId", userId).eq("toolKey", toolKey).eq("variantId", variantId)
+        q
+          .eq("userId", userId)
+          .eq("toolKey", toolKey)
+          .eq("variantId", variantId),
       )
       .unique();
     if (!variant) throw new Error("Variant not found");
@@ -119,7 +129,10 @@ export const rename = mutation({
     const variant = await ctx.db
       .query("user_variants")
       .withIndex("byUserVariant", (q) =>
-        q.eq("userId", userId).eq("toolKey", toolKey).eq("variantId", variantId)
+        q
+          .eq("userId", userId)
+          .eq("toolKey", toolKey)
+          .eq("variantId", variantId),
       )
       .unique();
     if (!variant) throw new Error("Variant not found");
@@ -134,7 +147,9 @@ export const setActive = mutation({
     const userId = await requireUserId(ctx);
     const variants = await ctx.db
       .query("user_variants")
-      .withIndex("byUserTool", (q) => q.eq("userId", userId).eq("toolKey", toolKey))
+      .withIndex("byUserTool", (q) =>
+        q.eq("userId", userId).eq("toolKey", toolKey),
+      )
       .collect();
     for (const v of variants) {
       const shouldBeActive = v.variantId === variantId;
@@ -158,7 +173,7 @@ export const importBatch = mutation({
         isActive: v.boolean(),
         createdAt: v.number(),
         updatedAt: v.number(),
-      })
+      }),
     ),
   },
   handler: async (ctx, { toolKey, variants }) => {
@@ -170,7 +185,10 @@ export const importBatch = mutation({
       const existing = await ctx.db
         .query("user_variants")
         .withIndex("byUserVariant", (q) =>
-          q.eq("userId", userId).eq("toolKey", toolKey).eq("variantId", v.variantId)
+          q
+            .eq("userId", userId)
+            .eq("toolKey", toolKey)
+            .eq("variantId", v.variantId),
         )
         .unique();
       if (existing) continue;
@@ -181,7 +199,9 @@ export const importBatch = mutation({
         // Deactivate existing active variants only when we're actually inserting an active one
         const all = await ctx.db
           .query("user_variants")
-          .withIndex("byUserTool", (q) => q.eq("userId", userId).eq("toolKey", toolKey))
+          .withIndex("byUserTool", (q) =>
+            q.eq("userId", userId).eq("toolKey", toolKey),
+          )
           .collect();
         for (const doc of all) {
           if (doc.isActive) await ctx.db.patch(doc._id, { isActive: false });
@@ -215,7 +235,7 @@ export const listAll = query({
     const user = await ctx.db
       .query("users")
       .withIndex("byTokenIdentifier", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
     if (!user) return [];

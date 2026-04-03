@@ -10,7 +10,7 @@ export default defineSchema({
     cardBackWidth: v.optional(v.number()),
     cardBackHeight: v.optional(v.number()),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   })
     .index("byName", ["seasonName"])
     .index("byShort", ["shortName"]),
@@ -20,7 +20,7 @@ export default defineSchema({
     stars: v.optional(v.number()),
     chancePercent: v.optional(v.number()),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   }).index("byName", ["rarityName"]),
 
   catdex: defineTable({
@@ -47,7 +47,7 @@ export default defineSchema({
     customCardThumbWidth: v.optional(v.number()),
     customCardThumbHeight: v.optional(v.number()),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   })
     .index("bySeason", ["seasonId"])
     .index("byRarity", ["rarityId"])
@@ -71,13 +71,13 @@ export default defineSchema({
     focusX: v.optional(v.number()),
     focusY: v.optional(v.number()),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   }).index("byArtist", ["artistName"]),
 
   coinflipper_scores: defineTable({
     playerName: v.string(),
     score: v.number(),
-    createdAt: v.number()
+    createdAt: v.number(),
   })
     .index("byScore", ["score", "createdAt"])
     .index("byCreated", ["createdAt"]),
@@ -90,7 +90,7 @@ export default defineSchema({
     adoptionBatchId: v.optional(v.id("adoption_batch")),
     previewsUpdatedAt: v.optional(v.number()),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   })
     .index("bySlug", ["slug"])
     .index("byCreated", ["createdAt"]),
@@ -101,7 +101,7 @@ export default defineSchema({
       v.literal("tiny"),
       v.literal("preview"),
       v.literal("full"),
-      v.literal("spriteSheet")
+      v.literal("spriteSheet"),
     ),
     storageId: v.id("_storage"),
     filename: v.optional(v.string()),
@@ -109,7 +109,7 @@ export default defineSchema({
     width: v.optional(v.number()),
     height: v.optional(v.number()),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   })
     .index("byProfile", ["catProfileId"])
     .index("byProfileKind", ["catProfileId", "kind"]),
@@ -144,11 +144,11 @@ export default defineSchema({
         encoded: v.optional(v.string()),
         shareToken: v.optional(v.string()),
         catName: v.optional(v.string()),
-        creatorName: v.optional(v.string())
-      })
+        creatorName: v.optional(v.string()),
+      }),
     ),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   })
     .index("bySlug", ["slug"])
     .index("byCreated", ["createdAt"]),
@@ -162,7 +162,7 @@ export default defineSchema({
     params: v.optional(v.any()),
     allowRepeatIps: v.optional(v.boolean()),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   })
     .index("byViewerKey", ["viewerKey"])
     .index("byStatus", ["status"]),
@@ -174,7 +174,7 @@ export default defineSchema({
     status: v.string(),
     fingerprint: v.optional(v.string()),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   })
     .index("bySession", ["sessionId"])
     .index("byViewerSession", ["viewerSession"]),
@@ -186,7 +186,7 @@ export default defineSchema({
     optionMeta: v.optional(v.any()),
     votedBy: v.optional(v.id("stream_participants")),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   })
     .index("bySession", ["sessionId"])
     .index("byStep", ["sessionId", "stepId"]),
@@ -195,7 +195,7 @@ export default defineSchema({
     prizeName: v.string(),
     forced: v.boolean(),
     randomBucket: v.optional(v.number()),
-    createdAt: v.number()
+    createdAt: v.number(),
   })
     .index("byPrize", ["prizeName"])
     .index("byCreated", ["createdAt"]),
@@ -206,7 +206,7 @@ export default defineSchema({
     salt: v.string(),
     expiresAt: v.number(),
     createdAt: v.number(),
-    usedAt: v.optional(v.number())
+    usedAt: v.optional(v.number()),
   })
     .index("byToken", ["token"])
     .index("byExpiresAt", ["expiresAt"]),
@@ -220,7 +220,7 @@ export default defineSchema({
     appearances: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
-    lastShownAt: v.optional(v.number())
+    lastShownAt: v.optional(v.number()),
   })
     .index("byHash", ["hash"])
     .index("byRating", ["rating", "createdAt"])
@@ -231,7 +231,7 @@ export default defineSchema({
     catBId: v.id("perfect_cats"),
     winnerId: v.id("perfect_cats"),
     clientId: v.optional(v.string()),
-    createdAt: v.number()
+    createdAt: v.number(),
   })
     .index("byClient", ["clientId", "createdAt"])
     .index("byCats", ["catAId", "catBId", "createdAt"]),
@@ -283,25 +283,27 @@ export default defineSchema({
     name: v.string(),
     foundingMotherId: v.string(),
     foundingFatherId: v.string(),
-    cats: v.array(v.object({
-      id: v.string(),
-      name: v.object({
-        prefix: v.string(),
-        suffix: v.string(),
-        full: v.string()
+    cats: v.array(
+      v.object({
+        id: v.string(),
+        name: v.object({
+          prefix: v.string(),
+          suffix: v.string(),
+          full: v.string(),
+        }),
+        gender: v.union(v.literal("M"), v.literal("F")),
+        lifeStage: v.string(),
+        params: v.any(),
+        motherId: v.union(v.string(), v.null()),
+        fatherId: v.union(v.string(), v.null()),
+        partnerIds: v.array(v.string()),
+        childrenIds: v.array(v.string()),
+        genetics: v.any(),
+        source: v.string(),
+        historyProfileId: v.optional(v.string()),
+        generation: v.number(),
       }),
-      gender: v.union(v.literal("M"), v.literal("F")),
-      lifeStage: v.string(),
-      params: v.any(),
-      motherId: v.union(v.string(), v.null()),
-      fatherId: v.union(v.string(), v.null()),
-      partnerIds: v.array(v.string()),
-      childrenIds: v.array(v.string()),
-      genetics: v.any(),
-      source: v.string(),
-      historyProfileId: v.optional(v.string()),
-      generation: v.number()
-    })),
+    ),
     config: v.object({
       minChildren: v.number(),
       maxChildren: v.number(),
@@ -309,17 +311,19 @@ export default defineSchema({
       genderRatio: v.number(),
       partnerChance: v.optional(v.number()),
       paletteModes: v.optional(v.array(v.string())),
-      offspringOptions: v.optional(v.object({
-        accessoryChance: v.number(),
-        maxAccessories: v.number(),
-        scarChance: v.number(),
-        maxScars: v.number()
-      }))
+      offspringOptions: v.optional(
+        v.object({
+          accessoryChance: v.number(),
+          maxAccessories: v.number(),
+          scarChance: v.number(),
+          maxScars: v.number(),
+        }),
+      ),
     }),
     creatorName: v.optional(v.string()),
     passwordHash: v.optional(v.string()),
     createdAt: v.number(),
-    updatedAt: v.number()
+    updatedAt: v.number(),
   })
     .index("bySlug", ["slug"])
     .index("byCreated", ["createdAt"]),
@@ -340,25 +344,26 @@ export default defineSchema({
     userId: v.id("users"),
     status: v.union(v.literal("active"), v.literal("idle")),
     settings: v.any(),
-    currentCommand: v.optional(v.object({
-      type: v.union(
-        v.literal("spin"),
-        v.literal("countdown"),
-        v.literal("clear"),
-        v.literal("test"),
-        v.literal("lobby"),
-      ),
-      seq: v.number(),
-      params: v.optional(v.any()),
-      slots: v.optional(v.any()),
-      countdownSeconds: v.optional(v.number()),
-      timestamp: v.number(),
-    })),
+    currentCommand: v.optional(
+      v.object({
+        type: v.union(
+          v.literal("spin"),
+          v.literal("countdown"),
+          v.literal("clear"),
+          v.literal("test"),
+          v.literal("lobby"),
+        ),
+        seq: v.number(),
+        params: v.optional(v.any()),
+        slots: v.optional(v.any()),
+        countdownSeconds: v.optional(v.number()),
+        timestamp: v.number(),
+      }),
+    ),
     testMode: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  })
-    .index("byUserId", ["userId"]),
+  }).index("byUserId", ["userId"]),
 
   user_variants: defineTable({
     userId: v.id("users"),

@@ -1,18 +1,17 @@
-import { mutation, query } from "./_generated/server.js";
-import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel.js";
+import type { MutationCtx, QueryCtx } from "./_generated/server.js";
+import { mutation, query } from "./_generated/server.js";
 import { docIdToString, toId } from "./utils.js";
-import { api } from "./_generated/api.js";
 
-const SLUG_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const SLUG_ALPHABET =
+  "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const SLUG_LENGTH = 8;
 
 type ProfileDoc = Doc<"cat_profile">;
 type ProfileInsert = Omit<ProfileDoc, "_id" | "_creationTime">;
 type ImageDoc = Doc<"cat_images">;
 type ImageInsert = Omit<ImageDoc, "_id" | "_creationTime">;
-
 
 function randomSlug(): string {
   let slug = "";
@@ -97,7 +96,7 @@ export const getBySlug = query({
     try {
       const asId = await ctx.db.get(toId("cat_profile", args.slugOrId));
       return asId ? await profileToClient(ctx, asId) : null;
-    } catch (error) {
+    } catch (_error) {
       return null;
     }
   },
@@ -131,7 +130,8 @@ export const updateMeta = mutation({
 export const listHistory = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const limit = args.limit && args.limit > 0 ? Math.min(args.limit, 500) : 200;
+    const limit =
+      args.limit && args.limit > 0 ? Math.min(args.limit, 500) : 200;
     const docs = await ctx.db
       .query("cat_profile")
       .withIndex("byCreated")
@@ -189,26 +189,26 @@ export const applyPreviewUpdates = mutation({
       v.object({
         storageId: v.id("_storage"),
         filename: v.optional(v.string()),
-      })
+      }),
     ),
     preview: v.optional(
       v.object({
         storageId: v.id("_storage"),
         filename: v.optional(v.string()),
-      })
+      }),
     ),
     full: v.optional(
       v.object({
         storageId: v.id("_storage"),
         filename: v.optional(v.string()),
-      })
+      }),
     ),
     spriteSheet: v.optional(
       v.object({
         storageId: v.id("_storage"),
         filename: v.optional(v.string()),
         meta: v.optional(v.any()),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -236,13 +236,19 @@ async function upsertImage(
   ctx: MutationCtx,
   profileId: Id<"cat_profile">,
   kind: "tiny" | "preview" | "full" | "spriteSheet",
-  payload?: { storageId: Id<"_storage">; filename?: string | null; meta?: unknown }
+  payload?: {
+    storageId: Id<"_storage">;
+    filename?: string | null;
+    meta?: unknown;
+  },
 ) {
   if (!payload) return;
 
   const existing = await ctx.db
     .query("cat_images")
-    .withIndex("byProfileKind", (q) => q.eq("catProfileId", profileId).eq("kind", kind))
+    .withIndex("byProfileKind", (q) =>
+      q.eq("catProfileId", profileId).eq("kind", kind),
+    )
     .unique();
 
   const now = Date.now();
@@ -276,13 +282,23 @@ async function upsertImage(
   }
 }
 
-async function loadImageRefs(ctx: QueryCtx | MutationCtx, profileId: Id<"cat_profile">) {
+async function loadImageRefs(
+  ctx: QueryCtx | MutationCtx,
+  profileId: Id<"cat_profile">,
+) {
   const entries = await ctx.db
     .query("cat_images")
     .withIndex("byProfile", (q) => q.eq("catProfileId", profileId))
     .collect();
 
-  const refs: Record<string, { storageId: Id<"_storage">; filename?: string | null; meta?: unknown } | null> = {
+  const refs: Record<
+    string,
+    {
+      storageId: Id<"_storage">;
+      filename?: string | null;
+      meta?: unknown;
+    } | null
+  > = {
     tiny: null,
     preview: null,
     full: null,
@@ -301,7 +317,11 @@ async function loadImageRefs(ctx: QueryCtx | MutationCtx, profileId: Id<"cat_pro
 }
 
 async function profileToClient(ctx: QueryCtx | MutationCtx, doc: ProfileDoc) {
-  const previews = await buildPreviewPayload(ctx, doc._id, doc.previewsUpdatedAt ?? null);
+  const previews = await buildPreviewPayload(
+    ctx,
+    doc._id,
+    doc.previewsUpdatedAt ?? null,
+  );
   return {
     id: docIdToString(doc._id),
     shareToken: doc.slug,
@@ -309,7 +329,9 @@ async function profileToClient(ctx: QueryCtx | MutationCtx, doc: ProfileDoc) {
     cat_data: doc.catData,
     catName: doc.catName ?? null,
     creatorName: doc.creatorName ?? null,
-    adoptionBatchId: doc.adoptionBatchId ? docIdToString(doc.adoptionBatchId) : null,
+    adoptionBatchId: doc.adoptionBatchId
+      ? docIdToString(doc.adoptionBatchId)
+      : null,
     previews,
     created: doc.createdAt,
     updated: doc.updatedAt,
@@ -323,20 +345,27 @@ async function profileToClient(ctx: QueryCtx | MutationCtx, doc: ProfileDoc) {
 async function buildPreviewPayload(
   ctx: QueryCtx | MutationCtx,
   profileId: Id<"cat_profile">,
-  updatedAt: number | null
+  updatedAt: number | null,
 ) {
   const refs = await loadImageRefs(ctx, profileId);
 
   const tinyUrl = refs.tiny ? await safeGetUrl(ctx, refs.tiny.storageId) : null;
-  const previewUrl = refs.preview ? await safeGetUrl(ctx, refs.preview.storageId) : null;
+  const previewUrl = refs.preview
+    ? await safeGetUrl(ctx, refs.preview.storageId)
+    : null;
   const fullUrl = refs.full ? await safeGetUrl(ctx, refs.full.storageId) : null;
-  const spriteSheetUrl = refs.spriteSheet ? await safeGetUrl(ctx, refs.spriteSheet.storageId) : null;
+  const spriteSheetUrl = refs.spriteSheet
+    ? await safeGetUrl(ctx, refs.spriteSheet.storageId)
+    : null;
   const computedUpdatedAt =
-    updatedAt ?? (tinyUrl || previewUrl || fullUrl || spriteSheetUrl ? Date.now() : null);
+    updatedAt ??
+    (tinyUrl || previewUrl || fullUrl || spriteSheetUrl ? Date.now() : null);
 
   return {
     tiny: tinyUrl ? { url: tinyUrl, name: refs.tiny?.filename ?? null } : null,
-    preview: previewUrl ? { url: previewUrl, name: refs.preview?.filename ?? null } : null,
+    preview: previewUrl
+      ? { url: previewUrl, name: refs.preview?.filename ?? null }
+      : null,
     full: fullUrl ? { url: fullUrl, name: refs.full?.filename ?? null } : null,
     spriteSheet: spriteSheetUrl
       ? {
@@ -349,7 +378,10 @@ async function buildPreviewPayload(
   };
 }
 
-async function safeGetUrl(ctx: QueryCtx | MutationCtx, id: Id<"_storage">): Promise<string | null> {
+async function safeGetUrl(
+  ctx: QueryCtx | MutationCtx,
+  id: Id<"_storage">,
+): Promise<string | null> {
   try {
     // Convex Cloud returns proper absolute URLs from storage.getUrl()
     // Return directly without normalization to avoid URL object property access restrictions

@@ -1983,10 +1983,12 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         pauseDelays: {
           flashyMs:
             timingConfig.pauseDelays?.flashyMs ??
-            DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ?? 520,
+            DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ??
+            520,
           calmMs:
             timingConfig.pauseDelays?.calmMs ??
-            DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ?? 420,
+            DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ??
+            420,
           [kind]: nextMs,
         },
       });

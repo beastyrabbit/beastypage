@@ -1,8 +1,9 @@
-import { mutation, query, type MutationCtx } from "./_generated/server.js";
 import { v } from "convex/values";
+import { type MutationCtx, mutation, query } from "./_generated/server.js";
 
 // Omits 0, 1, O, I, l to avoid visual ambiguity in URLs
-const SLUG_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const SLUG_ALPHABET =
+  "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const SLUG_LENGTH = 7;
 
 function randomSlug() {

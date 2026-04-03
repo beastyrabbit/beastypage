@@ -34,7 +34,14 @@ declare module "spin-wheel" {
     radius: number;
     itemLabelFontSizeMax: number;
     onRest?: (event: { currentIndex: number }) => void;
-    spinToItem(itemIndex: number, duration: number, spinToCenter?: boolean, numberOfRevolutions?: number, direction?: number, easingFunction?: ((n: number) => number) | null): void;
+    spinToItem(
+      itemIndex: number,
+      duration: number,
+      spinToCenter?: boolean,
+      numberOfRevolutions?: number,
+      direction?: number,
+      easingFunction?: ((n: number) => number) | null,
+    ): void;
     resize(): void;
     remove(): void;
   }

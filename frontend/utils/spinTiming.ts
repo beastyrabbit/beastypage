@@ -94,7 +94,9 @@ export const PARAM_TIMING_LABELS: Record<ParamTimingKey, string> = {
   reverse: "Reverse",
 } as const;
 
-export const PARAM_DEFAULT_STEP_COUNTS: Partial<Record<ParamTimingKey, number>> = {
+export const PARAM_DEFAULT_STEP_COUNTS: Partial<
+  Record<ParamTimingKey, number>
+> = {
   colour: 19,
   pelt: 10,
   eyeColour: 8,
@@ -146,7 +148,10 @@ const STORAGE_KEY = "singleCatPlus.paramTiming";
 export const DEFAULT_TIMING_CONFIG: SpinTimingConfig = {
   allowFastFlips: false,
   delays: Object.fromEntries(
-    PARAM_TIMING_ORDER.map((key) => [key, PARAM_TIMING_PRESETS[key]?.normal ?? 180])
+    PARAM_TIMING_ORDER.map((key) => [
+      key,
+      PARAM_TIMING_PRESETS[key]?.normal ?? 180,
+    ]),
   ),
   subsetLimits: {},
   pauseDelays: {
@@ -156,15 +161,21 @@ export const DEFAULT_TIMING_CONFIG: SpinTimingConfig = {
 };
 
 export function clampDelay(value: number, allowFast: boolean): number {
-  const candidate = Number.isFinite(value) ? Math.max(value, ABSOLUTE_MIN_STEP_MS) : MIN_SAFE_STEP_MS;
+  const candidate = Number.isFinite(value)
+    ? Math.max(value, ABSOLUTE_MIN_STEP_MS)
+    : MIN_SAFE_STEP_MS;
   if (allowFast) {
     return candidate;
   }
   return Math.max(candidate, MIN_SAFE_STEP_MS);
 }
 
-export function getDelayForKey(config: SpinTimingConfig, key: ParamTimingKey): number {
-  const base = config.delays[key] ?? PARAM_TIMING_PRESETS[key]?.normal ?? MIN_SAFE_STEP_MS;
+export function getDelayForKey(
+  config: SpinTimingConfig,
+  key: ParamTimingKey,
+): number {
+  const base =
+    config.delays[key] ?? PARAM_TIMING_PRESETS[key]?.normal ?? MIN_SAFE_STEP_MS;
   return clampDelay(base, config.allowFastFlips);
 }
 
@@ -182,12 +193,21 @@ function normaliseMetric(metric: TimingMetric | undefined): TimingMetric {
   }
   return {
     steps: Number.isFinite(metric.steps) && metric.steps > 0 ? metric.steps : 0,
-    overheadMs: Number.isFinite(metric.overheadMs) && metric.overheadMs > 0 ? metric.overheadMs : 0,
-    variants: Number.isFinite(metric.variants) && metric.variants > 0 ? metric.variants : 0,
+    overheadMs:
+      Number.isFinite(metric.overheadMs) && metric.overheadMs > 0
+        ? metric.overheadMs
+        : 0,
+    variants:
+      Number.isFinite(metric.variants) && metric.variants > 0
+        ? metric.variants
+        : 0,
   };
 }
 
-export function computeTimingTotals(config: SpinTimingConfig, metrics: TimingMetrics): TimingTotals {
+export function computeTimingTotals(
+  config: SpinTimingConfig,
+  metrics: TimingMetrics,
+): TimingTotals {
   const perKey: Partial<Record<ParamTimingKey, number>> = {};
   let total = 0;
   PARAM_TIMING_ORDER.forEach((key) => {
@@ -201,22 +221,27 @@ export function computeTimingTotals(config: SpinTimingConfig, metrics: TimingMet
 }
 
 export function computeDefaultTotal(config: SpinTimingConfig): number {
-  const totals = computeTimingTotals(config, stepCountsToMetrics(PARAM_DEFAULT_STEP_COUNTS));
+  const totals = computeTimingTotals(
+    config,
+    stepCountsToMetrics(PARAM_DEFAULT_STEP_COUNTS),
+  );
   return totals.total;
 }
 
 export function stepCountsToMetrics(
-  counts: Partial<Record<ParamTimingKey, number>>
+  counts: Partial<Record<ParamTimingKey, number>>,
 ): TimingMetrics {
   const metrics: TimingMetrics = {};
-  (Object.entries(counts) as Array<[ParamTimingKey, number]>).forEach(([key, value]) => {
-    if (!Number.isFinite(value) || value <= 0) return;
-    metrics[key] = {
-      steps: value,
-      overheadMs: 0,
-      variants: 0,
-    };
-  });
+  (Object.entries(counts) as Array<[ParamTimingKey, number]>).forEach(
+    ([key, value]) => {
+      if (!Number.isFinite(value) || value <= 0) return;
+      metrics[key] = {
+        steps: value,
+        overheadMs: 0,
+        variants: 0,
+      };
+    },
+  );
   return metrics;
 }
 
@@ -230,10 +255,19 @@ export function loadTimingConfig(): SpinTimingConfig {
     const hydrated: SpinTimingConfig = {
       allowFastFlips: false,
       delays: { ...DEFAULT_TIMING_CONFIG.delays, ...(parsed.delays ?? {}) },
-      subsetLimits: { ...(DEFAULT_TIMING_CONFIG.subsetLimits ?? {}), ...(parsed.subsetLimits ?? {}) },
+      subsetLimits: {
+        ...(DEFAULT_TIMING_CONFIG.subsetLimits ?? {}),
+        ...(parsed.subsetLimits ?? {}),
+      },
       pauseDelays: {
-        flashyMs: parsed.pauseDelays?.flashyMs ?? DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ?? 1000,
-        calmMs: parsed.pauseDelays?.calmMs ?? DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ?? 1000,
+        flashyMs:
+          parsed.pauseDelays?.flashyMs ??
+          DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ??
+          1000,
+        calmMs:
+          parsed.pauseDelays?.calmMs ??
+          DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ??
+          1000,
       },
     };
     return hydrated;
@@ -252,7 +286,7 @@ export function saveTimingConfig(config: SpinTimingConfig) {
         ...config,
         subsetLimits: config.subsetLimits ?? {},
         pauseDelays: config.pauseDelays ?? DEFAULT_TIMING_CONFIG.pauseDelays,
-      })
+      }),
     );
   } catch (error) {
     console.warn("Failed to persist spin timing config", error);

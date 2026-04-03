@@ -57,7 +57,11 @@ async function main() {
     drifted.push(palette.id);
     if (checkOnly) continue;
 
-    await writeFile(filePath, `${JSON.stringify(nextPayload, null, 2)}\n`, "utf8");
+    await writeFile(
+      filePath,
+      `${JSON.stringify(nextPayload, null, 2)}\n`,
+      "utf8",
+    );
     written += 1;
   }
 
@@ -70,7 +74,9 @@ async function main() {
   }
 
   if (checkOnly) {
-    console.log(`Renderer palette data is in sync (${unchanged} palette files checked).`);
+    console.log(
+      `Renderer palette data is in sync (${unchanged} palette files checked).`,
+    );
     return;
   }
 
