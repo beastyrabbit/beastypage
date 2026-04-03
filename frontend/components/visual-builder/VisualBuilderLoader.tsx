@@ -1,10 +1,14 @@
 "use client";
+import { useQuery } from "convex/react";
 import { Loader2 } from "lucide-react";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
-import { useQuery } from "convex/react";
-
+import {
+  DEFAULT_PARAMS,
+  VALID_PALETTE_IDS,
+  VisualBuilderClient,
+  type VisualBuilderInitialPayload,
+} from "@/components/visual-builder/VisualBuilderClient";
 import { api } from "@/convex/_generated/api";
-import { VisualBuilderClient, DEFAULT_PARAMS, VALID_PALETTE_IDS, type VisualBuilderInitialPayload } from "@/components/visual-builder/VisualBuilderClient";
 
 import type { Id } from "@/convex/_generated/dataModel";
 import type { PaletteMode } from "@/lib/palettes";
@@ -24,14 +28,20 @@ type MapperRecord = {
   creatorName?: string | null;
 };
 
-function coerceString(value: unknown, fallback: string | undefined = undefined): string | undefined {
+function coerceString(
+  value: unknown,
+  fallback: string | undefined = undefined,
+): string | undefined {
   if (typeof value !== "string") return fallback;
   const trimmed = value.trim();
   if (!trimmed) return fallback;
   return trimmed;
 }
 
-function coerceColour(value: unknown, fallback: string | undefined = undefined): string | undefined {
+function coerceColour(
+  value: unknown,
+  fallback: string | undefined = undefined,
+): string | undefined {
   const normalised = coerceString(value, fallback);
   return normalised ? normalised.toUpperCase() : fallback;
 }
@@ -58,7 +68,9 @@ function toStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value
       .map((entry) => coerceString(entry))
-      .filter((entry): entry is string => !!entry && entry.toLowerCase() !== "none");
+      .filter(
+        (entry): entry is string => !!entry && entry.toLowerCase() !== "none",
+      );
   }
   const single = coerceString(value);
   if (single && single.toLowerCase() !== "none") {
@@ -90,40 +102,74 @@ function sanitizeOption(value: unknown): string | undefined {
 }
 
 function toRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
-function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayload {
+function extractInitialPayload(
+  record: MapperRecord,
+): VisualBuilderInitialPayload {
   const catData = toRecord(record.cat_data);
-  const rawParamsSource = catData.params ?? catData.finalParams ?? record.cat_data;
+  const rawParamsSource =
+    catData.params ?? catData.finalParams ?? record.cat_data;
   const rawParams = toRecord(rawParamsSource);
-  const shareSlug = coerceString(catData["shareSlug"]);
+  const shareSlug = coerceString(catData.shareSlug);
 
   const params = {
     ...DEFAULT_PARAMS,
     spriteNumber: coerceNumber(
-      rawParams["spriteNumber"] ?? rawParams["sprite"] ?? rawParams["sprite_number"],
-      DEFAULT_PARAMS.spriteNumber
+      rawParams.spriteNumber ?? rawParams.sprite ?? rawParams.sprite_number,
+      DEFAULT_PARAMS.spriteNumber,
     ),
-    peltName: coerceString(rawParams["peltName"], DEFAULT_PARAMS.peltName) ?? DEFAULT_PARAMS.peltName,
-    colour: coerceColour(rawParams["colour"] ?? rawParams["color"], DEFAULT_PARAMS.colour) ?? DEFAULT_PARAMS.colour,
-    eyeColour: coerceColour(rawParams["eyeColour"] ?? rawParams["eye_color"], DEFAULT_PARAMS.eyeColour) ?? DEFAULT_PARAMS.eyeColour,
-    eyeColour2: sanitizeOption(rawParams["eyeColour2"] ?? rawParams["eye_color2"] ?? rawParams["eyeColourSecondary"]),
-    skinColour: coerceColour(rawParams["skinColour"] ?? rawParams["skin_color"], DEFAULT_PARAMS.skinColour) ?? DEFAULT_PARAMS.skinColour,
-    whitePatches: sanitizeOption(rawParams["whitePatches"] ?? rawParams["white_patches"]),
+    peltName:
+      coerceString(rawParams.peltName, DEFAULT_PARAMS.peltName) ??
+      DEFAULT_PARAMS.peltName,
+    colour:
+      coerceColour(
+        rawParams.colour ?? rawParams.color,
+        DEFAULT_PARAMS.colour,
+      ) ?? DEFAULT_PARAMS.colour,
+    eyeColour:
+      coerceColour(
+        rawParams.eyeColour ?? rawParams.eye_color,
+        DEFAULT_PARAMS.eyeColour,
+      ) ?? DEFAULT_PARAMS.eyeColour,
+    eyeColour2: sanitizeOption(
+      rawParams.eyeColour2 ??
+        rawParams.eye_color2 ??
+        rawParams.eyeColourSecondary,
+    ),
+    skinColour:
+      coerceColour(
+        rawParams.skinColour ?? rawParams.skin_color,
+        DEFAULT_PARAMS.skinColour,
+      ) ?? DEFAULT_PARAMS.skinColour,
+    whitePatches: sanitizeOption(
+      rawParams.whitePatches ?? rawParams.white_patches,
+    ),
     whitePatchesTint:
-      coerceString(rawParams["whitePatchesTint"] ?? rawParams["white_patches_tint"], DEFAULT_PARAMS.whitePatchesTint) ??
-      DEFAULT_PARAMS.whitePatchesTint,
-    points: sanitizeOption(rawParams["points"]),
-    vitiligo: sanitizeOption(rawParams["vitiligo"]),
-    tint: coerceString(rawParams["tint"], DEFAULT_PARAMS.tint) ?? DEFAULT_PARAMS.tint,
-    shading: coerceBoolean(rawParams["shading"], DEFAULT_PARAMS.shading),
-    reverse: coerceBoolean(rawParams["reverse"], DEFAULT_PARAMS.reverse),
+      coerceString(
+        rawParams.whitePatchesTint ?? rawParams.white_patches_tint,
+        DEFAULT_PARAMS.whitePatchesTint,
+      ) ?? DEFAULT_PARAMS.whitePatchesTint,
+    points: sanitizeOption(rawParams.points),
+    vitiligo: sanitizeOption(rawParams.vitiligo),
+    tint:
+      coerceString(rawParams.tint, DEFAULT_PARAMS.tint) ?? DEFAULT_PARAMS.tint,
+    shading: coerceBoolean(rawParams.shading, DEFAULT_PARAMS.shading),
+    reverse: coerceBoolean(rawParams.reverse, DEFAULT_PARAMS.reverse),
   } satisfies typeof DEFAULT_PARAMS;
 
-  const accessories = toStringArray(catData["accessorySlots"] ?? rawParams["accessories"] ?? rawParams["accessory"]);
-  const scars = toStringArray(catData["scarSlots"] ?? rawParams["scars"] ?? rawParams["scar"]);
-  const tortieLayers = normalizeTortieLayers(catData["tortieSlots"] ?? rawParams["tortie"]);
+  const accessories = toStringArray(
+    catData.accessorySlots ?? rawParams.accessories ?? rawParams.accessory,
+  );
+  const scars = toStringArray(
+    catData.scarSlots ?? rawParams.scars ?? rawParams.scar,
+  );
+  const tortieLayers = normalizeTortieLayers(
+    catData.tortieSlots ?? rawParams.tortie,
+  );
 
   params.accessories = accessories;
   params.accessory = accessories[0] ?? undefined;
@@ -147,8 +193,8 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
     params.tint = "none";
   }
 
-  const palette = coerceString(catData["basePalette"])?.toLowerCase();
-  const tortiePalette = coerceString(catData["tortiePalette"])?.toLowerCase();
+  const palette = coerceString(catData.basePalette)?.toLowerCase();
+  const tortiePalette = coerceString(catData.tortiePalette)?.toLowerCase();
 
   const slugValue = shareSlug ?? record.slug ?? record.shareToken ?? null;
   return {
@@ -156,8 +202,12 @@ function extractInitialPayload(record: MapperRecord): VisualBuilderInitialPayloa
     tortie: tortieLayers,
     accessories,
     scars,
-    paletteMode: VALID_PALETTE_IDS.includes(palette as PaletteMode) ? (palette as PaletteMode) : undefined,
-    tortiePaletteMode: VALID_PALETTE_IDS.includes(tortiePalette as PaletteMode) ? (tortiePalette as PaletteMode) : undefined,
+    paletteMode: VALID_PALETTE_IDS.includes(palette as PaletteMode)
+      ? (palette as PaletteMode)
+      : undefined,
+    tortiePaletteMode: VALID_PALETTE_IDS.includes(tortiePalette as PaletteMode)
+      ? (tortiePalette as PaletteMode)
+      : undefined,
     slug: slugValue,
     shareUrl: slugValue
       ? shareSlug
@@ -174,7 +224,10 @@ type VisualBuilderLoaderProps = {
 };
 
 export function VisualBuilderLoader({ slug }: VisualBuilderLoaderProps) {
-  const record = useQuery(api.mapper.getBySlug, slug ? { slugOrId: slug } : "skip") as MapperRecord | null | undefined;
+  const record = useQuery(
+    api.mapper.getBySlug,
+    slug ? { slugOrId: slug } : "skip",
+  ) as MapperRecord | null | undefined;
 
   if (!slug) {
     return (

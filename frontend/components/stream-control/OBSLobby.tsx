@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ADDITIONAL_PALETTES, patternToCssBackground } from "@/lib/palettes";
-import type { PaletteColorDef, PaletteCategory } from "@/lib/palettes/types";
-import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
-import type { AfterlifeOption, ExtendedMode, LayerRange } from "@/utils/singleCatVariants";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
+import { ADDITIONAL_PALETTES, patternToCssBackground } from "@/lib/palettes";
+import type { PaletteCategory, PaletteColorDef } from "@/lib/palettes/types";
 import { encodePortableSettings } from "@/lib/portable-settings";
+import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
+import type {
+  AfterlifeOption,
+  ExtendedMode,
+  LayerRange,
+} from "@/utils/singleCatVariants";
 
 /** Build CSS style for a palette swatch — uses pattern rendering for pattern palettes. */
 function swatchStyle(def: PaletteColorDef, size: number): React.CSSProperties {
@@ -67,7 +71,10 @@ export function OBSLobby({
   settings: LobbySettings;
   generator: CatGeneratorApi | null;
 }) {
-  const lobbyMode = (settings.lobbyMode ?? "fruit-ninja") as "fruit-ninja" | "matrix" | "dvd";
+  const lobbyMode = (settings.lobbyMode ?? "fruit-ninja") as
+    | "fruit-ninja"
+    | "matrix"
+    | "dvd";
   const maxCats = settings.lobbyCatCount ?? 4;
   const moveSpeed = settings.lobbyMoveSpeed ?? 1.0;
   const swapSpeed = settings.lobbySwapSpeed ?? 1.0;
@@ -82,7 +89,10 @@ export function OBSLobby({
   useEffect(() => {
     const raf = requestAnimationFrame(() => setLobbyVisible(true));
     const spawnTimer = setTimeout(() => setSpawnReady(true), 8000);
-    return () => { cancelAnimationFrame(raf); clearTimeout(spawnTimer); };
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(spawnTimer);
+    };
   }, []);
 
   // Refs for animation-only settings — changing these should NOT restart the spawn loop
@@ -94,30 +104,44 @@ export function OBSLobby({
   moveSpeedRef.current = moveSpeed;
 
   // Generation-relevant settings — only these should restart the spawn loop
-  const genSettings = useMemo(() => ({
-    accessoryMax: settings.accessoryRange.max,
-    scarMax: settings.scarRange.max,
-    tortieMax: settings.tortieRange.max,
-    exactLayerCounts: settings.exactLayerCounts ?? true,
-    extendedModes: settings.extendedModes,
-    includeBaseColours: settings.includeBaseColours,
-  }), [settings.accessoryRange.max, settings.scarRange.max, settings.tortieRange.max,
-       settings.exactLayerCounts, settings.extendedModes, settings.includeBaseColours]);
+  const genSettings = useMemo(
+    () => ({
+      accessoryMax: settings.accessoryRange.max,
+      scarMax: settings.scarRange.max,
+      tortieMax: settings.tortieRange.max,
+      exactLayerCounts: settings.exactLayerCounts ?? true,
+      extendedModes: settings.extendedModes,
+      includeBaseColours: settings.includeBaseColours,
+    }),
+    [
+      settings.accessoryRange.max,
+      settings.scarRange.max,
+      settings.tortieRange.max,
+      settings.exactLayerCounts,
+      settings.extendedModes,
+      settings.includeBaseColours,
+    ],
+  );
 
   const afterlifeLabel =
-    AFTERLIFE_OPTIONS.find((o) => o.value === settings.afterlifeMode)?.label ?? "Off";
+    AFTERLIFE_OPTIONS.find((o) => o.value === settings.afterlifeMode)?.label ??
+    "Off";
   const rangeStr = (r: LayerRange) => `${r.min}–${r.max}`;
 
   // Resolve palette data
   const selectedPalettes = useMemo(
-    () => ADDITIONAL_PALETTES.filter((p) => settings.extendedModes.includes(p.id)),
-    [settings.extendedModes]
+    () =>
+      ADDITIONAL_PALETTES.filter((p) => settings.extendedModes.includes(p.id)),
+    [settings.extendedModes],
   );
 
   // Cycle palettes
   useEffect(() => {
     if (selectedPalettes.length <= 1) return;
-    const timer = setInterval(() => setPaletteIdx((i) => (i + 1) % selectedPalettes.length), 4000);
+    const timer = setInterval(
+      () => setPaletteIdx((i) => (i + 1) % selectedPalettes.length),
+      4000,
+    );
     return () => clearInterval(timer);
   }, [selectedPalettes.length]);
 
@@ -130,14 +154,18 @@ export function OBSLobby({
     const spawn = async () => {
       if (cancelled) return;
       const gs = genSettings;
-      const firstResult = await generator.generateRandomCat!({
-        accessoryCount: gs.accessoryMax,
-        scarCount: gs.scarMax,
-        tortieCount: gs.tortieMax,
-        exactLayerCounts: gs.exactLayerCounts,
-        experimentalColourMode: gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
-        includeBaseColours: gs.includeBaseColours,
-      }).catch(() => null);
+      // biome-ignore lint/style/noNonNullAssertion: generator is guaranteed available here
+      const firstResult = await generator
+        .generateRandomCat!({
+          accessoryCount: gs.accessoryMax,
+          scarCount: gs.scarMax,
+          tortieCount: gs.tortieMax,
+          exactLayerCounts: gs.exactLayerCounts,
+          experimentalColourMode:
+            gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
+          includeBaseColours: gs.includeBaseColours,
+        })
+        .catch(() => null);
       if (cancelled || !firstResult) return;
 
       const fixedSprite = firstResult.params.spriteNumber ?? 8;
@@ -151,22 +179,29 @@ export function OBSLobby({
       for (let i = 0; i < 5; i++) {
         if (cancelled) return;
         try {
-          const r = await generator.generateRandomCat!({
+          const r = await generator.generateRandomCat?.({
             accessoryCount: gs.accessoryMax,
             scarCount: gs.scarMax,
             tortieCount: gs.tortieMax,
             exactLayerCounts: gs.exactLayerCounts,
-            experimentalColourMode: gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
+            experimentalColourMode:
+              gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
             includeBaseColours: gs.includeBaseColours,
           });
-          if (r.canvas instanceof HTMLCanvasElement) {
-            const overrideParams = { ...r.params, spriteNumber: fixedSprite, reverse: false };
+          if (r && r.canvas instanceof HTMLCanvasElement) {
+            const overrideParams = {
+              ...r.params,
+              spriteNumber: fixedSprite,
+              reverse: false,
+            };
             const rendered = await generator.generateCat(overrideParams);
             if (rendered.canvas instanceof HTMLCanvasElement) {
               frames.push(rendered.canvas.toDataURL("image/png"));
             }
           }
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
       if (cancelled || frames.length === 0) return;
 
@@ -178,32 +213,41 @@ export function OBSLobby({
       setFlyingCats((prev) => {
         const alive = prev.filter((c) => Date.now() - c.startTime < c.duration);
         if (alive.length >= curMaxCats) return alive;
-        const baseDuration = curMode === "dvd"
-          ? 999999
-          : (10000 + Math.random() * 20000) / curMoveSpeed;
-        return [...alive, {
-          id: catIdRef.current++,
-          frames,
-          x: Math.random() * 95,
-          startTime: Date.now(),
-          duration: baseDuration,
-          peakY: 250 + Math.random() * 500,
-          rotation: -60 + Math.random() * 120,
-          size: 1 + Math.random(),
-          mode: curMode,
-        }];
+        const baseDuration =
+          curMode === "dvd"
+            ? 999999
+            : (10000 + Math.random() * 20000) / curMoveSpeed;
+        return [
+          ...alive,
+          {
+            id: catIdRef.current++,
+            frames,
+            x: Math.random() * 95,
+            startTime: Date.now(),
+            duration: baseDuration,
+            peakY: 250 + Math.random() * 500,
+            rotation: -60 + Math.random() * 120,
+            size: 1 + Math.random(),
+            mode: curMode,
+          },
+        ];
       });
     };
 
     spawn();
     const timer = setInterval(spawn, 500);
-    return () => { cancelled = true; clearInterval(timer); };
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [spawnReady, generator, genSettings]);
 
   // Cleanup expired cats
   useEffect(() => {
     const timer = setInterval(() => {
-      setFlyingCats((prev) => prev.filter((c) => Date.now() - c.startTime < c.duration + 500));
+      setFlyingCats((prev) =>
+        prev.filter((c) => Date.now() - c.startTime < c.duration + 500),
+      );
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -222,7 +266,10 @@ export function OBSLobby({
     // Top row: toggles/modes
     { label: "Afterlife", value: afterlifeLabel },
     { label: "Exact Count", value: settings.exactLayerCounts ? "Yes" : "No" },
-    { label: "Base Colours", value: settings.includeBaseColours ? "On" : "Off" },
+    {
+      label: "Base Colours",
+      value: settings.includeBaseColours ? "On" : "Off",
+    },
     // Bottom row: range values
     { label: "Accessories", value: rangeStr(settings.accessoryRange) },
     { label: "Scars", value: rangeStr(settings.scarRange) },
@@ -240,7 +287,7 @@ export function OBSLobby({
         includeBaseColours: settings.includeBaseColours,
         extendedModes: settings.extendedModes as ExtendedMode[],
       }),
-    [settings]
+    [settings],
   );
 
   const currentPalette = selectedPalettes[paletteIdx];
@@ -315,13 +362,15 @@ export function OBSLobby({
                         {palette.label}
                       </span>
                       <div className="flex flex-wrap gap-0.5">
-                        {Object.entries(palette.colors).slice(0, 24).map(([name, def]) => (
-                          <div
-                            key={name}
-                            style={swatchStyle(def, 22)}
-                            title={name.replace(/_/g, " ")}
-                          />
-                        ))}
+                        {Object.entries(palette.colors)
+                          .slice(0, 24)
+                          .map(([name, def]) => (
+                            <div
+                              key={name}
+                              style={swatchStyle(def, 22)}
+                              title={name.replace(/_/g, " ")}
+                            />
+                          ))}
                       </div>
                     </div>
                   ))}
@@ -329,7 +378,6 @@ export function OBSLobby({
               ) : (
                 <PaletteMarquee palettes={selectedPalettes} />
               )
-
             ) : (
               // Cycle through palettes one at a time (carousel)
               <>
@@ -353,13 +401,15 @@ export function OBSLobby({
                 </div>
                 {currentPalette && (
                   <div className="flex flex-wrap gap-1">
-                    {Object.entries(currentPalette.colors).slice(0, 32).map(([name, def]) => (
+                    {Object.entries(currentPalette.colors)
+                      .slice(0, 32)
+                      .map(([name, def]) => (
                         <div
                           key={name}
                           style={swatchStyle(def, 28)}
                           title={name.replace(/_/g, " ")}
                         />
-                    ))}
+                      ))}
                   </div>
                 )}
               </>
@@ -371,7 +421,12 @@ export function OBSLobby({
       {/* Flying cats — full screen, above everything */}
       <div className="absolute inset-0 z-50 overflow-hidden">
         {flyingCats.map((cat) => (
-          <FlyingCatSprite key={cat.id} cat={cat} swapSpeed={swapSpeed} moveSpeed={moveSpeed} />
+          <FlyingCatSprite
+            key={cat.id}
+            cat={cat}
+            swapSpeed={swapSpeed}
+            moveSpeed={moveSpeed}
+          />
         ))}
       </div>
     </div>
@@ -382,19 +437,36 @@ export function OBSLobby({
 // FlyingCatSprite — animates a single lobby cat
 // ---------------------------------------------------------------------------
 
-function FlyingCatSprite({ cat, swapSpeed = 1, moveSpeed = 1 }: { cat: FlyingCat; swapSpeed?: number; moveSpeed?: number }) {
+function FlyingCatSprite({
+  cat,
+  swapSpeed = 1,
+  moveSpeed = 1,
+}: {
+  cat: FlyingCat;
+  swapSpeed?: number;
+  moveSpeed?: number;
+}) {
   const mode = cat.mode;
   const ref = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const frameRef = useRef(0);
   // DVD mode: bounce direction stored in ref
-  const dvdRef = useRef({ vx: (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random()), vy: (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random()), px: cat.x * 12.8, py: Math.random() * 900 });
+  const dvdRef = useRef({
+    vx: (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random()),
+    vy: (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random()),
+    px: cat.x * 12.8,
+    py: Math.random() * 900,
+  });
 
   // Store speed props in refs so the animation loop always reads the latest values
   const swapSpeedRef = useRef(swapSpeed);
-  useEffect(() => { swapSpeedRef.current = swapSpeed; }, [swapSpeed]);
+  useEffect(() => {
+    swapSpeedRef.current = swapSpeed;
+  }, [swapSpeed]);
   const moveSpeedRef = useRef(moveSpeed);
-  useEffect(() => { moveSpeedRef.current = moveSpeed; }, [moveSpeed]);
+  useEffect(() => {
+    moveSpeedRef.current = moveSpeed;
+  }, [moveSpeed]);
 
   useEffect(() => {
     let raf: number;
@@ -501,13 +573,15 @@ function PaletteMarquee({ palettes }: { palettes: PaletteCategory[] }) {
           {palette.label}
         </span>
         <div className="flex flex-wrap gap-0.5">
-          {Object.entries(palette.colors).slice(0, 24).map(([name, def]) => (
-            <div
-              key={name}
-              style={swatchStyle(def, 22)}
-              title={name.replace(/_/g, " ")}
-            />
-          ))}
+          {Object.entries(palette.colors)
+            .slice(0, 24)
+            .map(([name, def]) => (
+              <div
+                key={name}
+                style={swatchStyle(def, 22)}
+                title={name.replace(/_/g, " ")}
+              />
+            ))}
         </div>
       </div>
     ));
@@ -517,8 +591,10 @@ function PaletteMarquee({ palettes }: { palettes: PaletteCategory[] }) {
       style={{
         maxHeight: "500px",
         overflow: "hidden",
-        maskImage: "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)",
-        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)",
+        maskImage:
+          "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)",
+        WebkitMaskImage:
+          "linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)",
       }}
     >
       <style>{`

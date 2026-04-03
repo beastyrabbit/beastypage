@@ -1,22 +1,23 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
-import { usePathname } from "next/navigation";
 import { useConvexAuth } from "convex/react";
-
-import { DiscordInviteButton } from "@/components/common/DiscordInviteButton";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { UserAuthButton } from "@/components/auth/UserAuthButton";
-import { cn } from "@/lib/utils";
+import { DiscordInviteButton } from "@/components/common/DiscordInviteButton";
 import { NAV_ITEMS } from "@/components/site-nav-config";
+import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const { isAuthenticated } = useConvexAuth();
 
-  const visibleItems = NAV_ITEMS.filter((item) => !item.authRequired || isAuthenticated);
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.authRequired || isAuthenticated,
+  );
 
-  const isActive = (item: typeof NAV_ITEMS[0]) => {
+  const isActive = (item: (typeof NAV_ITEMS)[0]) => {
     // For personal (home), only exact match
     if (item.key === "personal") {
       return pathname === "/";
@@ -32,9 +33,19 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-wide">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-sm font-semibold tracking-wide"
+        >
           <span className="inline-flex size-8 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-primary">
-            <Image src="/favicon.png" alt="BeastyRabbit" width={32} height={32} className="h-6 w-6 rounded-full" priority />
+            <Image
+              src="/favicon.png"
+              alt="BeastyRabbit"
+              width={32}
+              height={32}
+              className="h-6 w-6 rounded-full"
+              priority
+            />
           </span>
           BeastyRabbit
         </Link>
