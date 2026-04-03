@@ -1,9 +1,9 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const boldPalette: PaletteCategory = {
-  id: 'bold',
-  label: 'Bold',
-  description: 'Vibrant, saturated colors that pop with energy',
+  id: "bold",
+  label: "Bold",
+  description: "Vibrant, saturated colors that pop with energy",
   colors: {
     CHARTREUSE: { multiply: [184, 255, 80], screen: [210, 255, 120, 0.2] },
     CERULEAN: { multiply: [90, 160, 254] },

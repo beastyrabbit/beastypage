@@ -6,19 +6,22 @@
  * routes and other Node.js contexts.
  */
 
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import type { CatParams, RandomGenerationOptions } from './types';
-import { materializeStringSlots, materializeTortieSlots } from './slotMaterializer';
-import { getColorNamesForPalette, type PaletteId } from '@/lib/palettes';
-import config from './random-config.json';
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { getColorNamesForPalette, type PaletteId } from "@/lib/palettes";
+import config from "./random-config.json";
+import {
+  materializeStringSlots,
+  materializeTortieSlots,
+} from "./slotMaterializer";
+import type { CatParams, RandomGenerationOptions } from "./types";
 
 // ---------------------------------------------------------------------------
 // Config types (same as randomGenerator.ts)
 // ---------------------------------------------------------------------------
 
-type CountCategory = 'tortie' | 'accessories' | 'scars';
-type CountStrategy = 'weighted' | 'uniform';
+type CountCategory = "tortie" | "accessories" | "scars";
+type CountStrategy = "weighted" | "uniform";
 
 interface CountConfig {
   weights?: Record<string, number>;
@@ -70,7 +73,8 @@ function resolvePublicPath(relativePath: string): string {
   // In both dev and standalone Docker builds, public/ is at ${cwd}/public.
   // Standalone: Dockerfile copies public/ to /app/public, WORKDIR is /app.
   // Dev: cwd is the frontend/ directory which contains public/.
-  const root = process.env.NEXT_PUBLIC_DIR ?? path.join(process.cwd(), 'public');
+  const root =
+    process.env.NEXT_PUBLIC_DIR ?? path.join(process.cwd(), "public");
   return path.join(root, relativePath);
 }
 
@@ -81,8 +85,8 @@ async function loadSpriteData(): Promise<SpriteData> {
   loadPromise = (async () => {
     try {
       const [indexRaw, peltRaw] = await Promise.all([
-        readFile(resolvePublicPath('sprite-data/spritesIndex.json'), 'utf-8'),
-        readFile(resolvePublicPath('sprite-data/peltInfo.json'), 'utf-8'),
+        readFile(resolvePublicPath("sprite-data/spritesIndex.json"), "utf-8"),
+        readFile(resolvePublicPath("sprite-data/peltInfo.json"), "utf-8"),
       ]);
 
       const spritesIndex = JSON.parse(indexRaw) as Record<string, unknown>;
@@ -110,16 +114,36 @@ function extractLists(
 ): SpriteData {
   // --- Pelt names ---
   const patterns = [
-    'single', 'tabby', 'marbled', 'rosette', 'smoke', 'ticked',
-    'speckled', 'bengal', 'mackerel', 'classic', 'sokoke',
-    'agouti', 'singlestripe', 'masked',
+    "single",
+    "tabby",
+    "marbled",
+    "rosette",
+    "smoke",
+    "ticked",
+    "speckled",
+    "bengal",
+    "mackerel",
+    "classic",
+    "sokoke",
+    "agouti",
+    "singlestripe",
+    "masked",
   ];
   const patternMap: Record<string, string> = {
-    single: 'SingleColour', tabby: 'Tabby', marbled: 'Marbled',
-    rosette: 'Rosette', smoke: 'Smoke', ticked: 'Ticked',
-    speckled: 'Speckled', bengal: 'Bengal', mackerel: 'Mackerel',
-    classic: 'Classic', sokoke: 'Sokoke', agouti: 'Agouti',
-    singlestripe: 'Singlestripe', masked: 'Masked',
+    single: "SingleColour",
+    tabby: "Tabby",
+    marbled: "Marbled",
+    rosette: "Rosette",
+    smoke: "Smoke",
+    ticked: "Ticked",
+    speckled: "Speckled",
+    bengal: "Bengal",
+    mackerel: "Mackerel",
+    classic: "Classic",
+    sokoke: "Sokoke",
+    agouti: "Agouti",
+    singlestripe: "Singlestripe",
+    masked: "Masked",
   };
 
   const peltPatterns = new Set<string>();
@@ -131,66 +155,171 @@ function extractLists(
   const peltNames = Array.from(peltPatterns)
     .map((p) => patternMap[p])
     .filter(Boolean) as string[];
-  if (peltNames.includes('SingleColour') && !peltNames.includes('TwoColour')) {
-    const idx = peltNames.indexOf('SingleColour');
-    peltNames.splice(idx + 1, 0, 'TwoColour');
+  if (peltNames.includes("SingleColour") && !peltNames.includes("TwoColour")) {
+    const idx = peltNames.indexOf("SingleColour");
+    peltNames.splice(idx + 1, 0, "TwoColour");
   }
 
   // --- Colours ---
   const colours = [
-    'WHITE', 'PALEGREY', 'SILVER', 'GREY', 'DARKGREY', 'GHOST', 'BLACK',
-    'CREAM', 'PALEGINGER', 'GOLDEN', 'GINGER', 'DARKGINGER', 'SIENNA',
-    'LIGHTBROWN', 'LILAC', 'BROWN', 'GOLDEN-BROWN', 'DARKBROWN', 'CHOCOLATE',
+    "WHITE",
+    "PALEGREY",
+    "SILVER",
+    "GREY",
+    "DARKGREY",
+    "GHOST",
+    "BLACK",
+    "CREAM",
+    "PALEGINGER",
+    "GOLDEN",
+    "GINGER",
+    "DARKGINGER",
+    "SIENNA",
+    "LIGHTBROWN",
+    "LILAC",
+    "BROWN",
+    "GOLDEN-BROWN",
+    "DARKBROWN",
+    "CHOCOLATE",
   ];
 
   // --- Eye colours ---
   const eyeColours = [
-    'YELLOW', 'AMBER', 'HAZEL', 'PALEGREEN', 'GREEN', 'BLUE', 'DARKBLUE',
-    'GREY', 'CYAN', 'EMERALD', 'HEATHERBLUE', 'SUNLITICE', 'COPPER',
-    'SAGE', 'COBALT', 'PALEBLUE', 'PALEYELLOW', 'GOLD', 'GREENYELLOW',
-    'BRONZE', 'SILVER',
+    "YELLOW",
+    "AMBER",
+    "HAZEL",
+    "PALEGREEN",
+    "GREEN",
+    "BLUE",
+    "DARKBLUE",
+    "GREY",
+    "CYAN",
+    "EMERALD",
+    "HEATHERBLUE",
+    "SUNLITICE",
+    "COPPER",
+    "SAGE",
+    "COBALT",
+    "PALEBLUE",
+    "PALEYELLOW",
+    "GOLD",
+    "GREENYELLOW",
+    "BRONZE",
+    "SILVER",
   ];
 
   // --- Skin colours ---
   const skinColors = new Set<string>();
   for (const key of Object.keys(spritesIndex)) {
-    if (key.startsWith('skin') && key !== 'skin' && key !== 'skinparalyzed') {
-      const color = key.replace('skin', '');
+    if (key.startsWith("skin") && key !== "skin" && key !== "skinparalyzed") {
+      const color = key.replace("skin", "");
       if (color) skinColors.add(color);
     }
   }
-  const skinColours = skinColors.size > 0
-    ? Array.from(skinColors)
-    : ['BLACK', 'PINK', 'DARKBROWN', 'BROWN', 'LIGHTBROWN', 'DARK', 'DARKGREY',
-       'GREY', 'DARKSALMON', 'SALMON', 'PEACH', 'DARKMARBLED', 'MARBLED',
-       'LIGHTMARBLED', 'DARKBLUE', 'BLUE', 'LIGHTBLUE', 'RED'];
+  const skinColours =
+    skinColors.size > 0
+      ? Array.from(skinColors)
+      : [
+          "BLACK",
+          "PINK",
+          "DARKBROWN",
+          "BROWN",
+          "LIGHTBROWN",
+          "DARK",
+          "DARKGREY",
+          "GREY",
+          "DARKSALMON",
+          "SALMON",
+          "PEACH",
+          "DARKMARBLED",
+          "MARBLED",
+          "LIGHTMARBLED",
+          "DARKBLUE",
+          "BLUE",
+          "LIGHTBLUE",
+          "RED",
+        ];
 
   // --- Tortie masks ---
   const tortieMaskSet = new Set<string>();
   for (const key of Object.keys(spritesIndex)) {
-    if (key.startsWith('tortiemask') && key !== 'tortiepatchesmasks') {
-      const mask = key.replace('tortiemask', '');
+    if (key.startsWith("tortiemask") && key !== "tortiepatchesmasks") {
+      const mask = key.replace("tortiemask", "");
       if (mask) tortieMaskSet.add(mask);
     }
   }
-  const tortieMasks = tortieMaskSet.size > 0
-    ? Array.from(tortieMaskSet)
-    : ['ONE', 'TWO', 'THREE', 'FOUR', 'REDTAIL', 'DELILAH', 'MINIMALONE',
-       'MINIMALTWO', 'MINIMALTHREE', 'MINIMALFOUR', 'HALF', 'OREO', 'SWOOP',
-       'MOTTLED', 'SIDEMASK', 'EYEDOT', 'BANDANA', 'PACMAN', 'STREAMSTRIKE',
-       'ORIOLE', 'CHIMERA', 'DAUB', 'EMBER', 'BLANKET', 'ROBIN', 'BRINDLE',
-       'PAIGE', 'ROSETAIL', 'SAFI', 'SMUDGED', 'DAPPLENIGHT', 'STREAK', 'MASK',
-       'CHEST', 'ARMTAIL', 'SMOKE', 'GRUMPYFACE', 'BRIE', 'BELOVED', 'BODY',
-       'SHILOH', 'FRECKLED', 'HEARTBEAT'];
+  const tortieMasks =
+    tortieMaskSet.size > 0
+      ? Array.from(tortieMaskSet)
+      : [
+          "ONE",
+          "TWO",
+          "THREE",
+          "FOUR",
+          "REDTAIL",
+          "DELILAH",
+          "MINIMALONE",
+          "MINIMALTWO",
+          "MINIMALTHREE",
+          "MINIMALFOUR",
+          "HALF",
+          "OREO",
+          "SWOOP",
+          "MOTTLED",
+          "SIDEMASK",
+          "EYEDOT",
+          "BANDANA",
+          "PACMAN",
+          "STREAMSTRIKE",
+          "ORIOLE",
+          "CHIMERA",
+          "DAUB",
+          "EMBER",
+          "BLANKET",
+          "ROBIN",
+          "BRINDLE",
+          "PAIGE",
+          "ROSETAIL",
+          "SAFI",
+          "SMUDGED",
+          "DAPPLENIGHT",
+          "STREAK",
+          "MASK",
+          "CHEST",
+          "ARMTAIL",
+          "SMOKE",
+          "GRUMPYFACE",
+          "BRIE",
+          "BELOVED",
+          "BODY",
+          "SHILOH",
+          "FRECKLED",
+          "HEARTBEAT",
+        ];
 
   // --- Points & vitiligo ---
-  const points = ['COLOURPOINT', 'RAGDOLL', 'SEPIAPOINT', 'MINKPOINT', 'SEALPOINT'];
-  const vitiligo = ['VITILIGO', 'VITILIGOTWO', 'MOON', 'PHANTOM', 'KARPATI', 'POWDER', 'BLEACHED', 'SMOKEY'];
+  const points = [
+    "COLOURPOINT",
+    "RAGDOLL",
+    "SEPIAPOINT",
+    "MINKPOINT",
+    "SEALPOINT",
+  ];
+  const vitiligo = [
+    "VITILIGO",
+    "VITILIGOTWO",
+    "MOON",
+    "PHANTOM",
+    "KARPATI",
+    "POWDER",
+    "BLEACHED",
+    "SMOKEY",
+  ];
 
   // --- White patches ---
   const whitePatchSet = new Set<string>();
   for (const key of Object.keys(spritesIndex)) {
-    if (key.startsWith('white') && key !== 'whitepatches') {
+    if (key.startsWith("white") && key !== "whitepatches") {
       const patch = key.substring(5);
       if (patch) whitePatchSet.add(patch);
     }
@@ -203,10 +332,12 @@ function extractLists(
 
   // --- Accessories ---
   const accessories: string[] = [];
-  if (peltInfo.plant_accessories) accessories.push(...peltInfo.plant_accessories);
+  if (peltInfo.plant_accessories)
+    accessories.push(...peltInfo.plant_accessories);
   if (peltInfo.wild_accessories) accessories.push(...peltInfo.wild_accessories);
   if (peltInfo.collars) accessories.push(...peltInfo.collars);
-  if (peltInfo.extra_accessories) accessories.push(...peltInfo.extra_accessories);
+  if (peltInfo.extra_accessories)
+    accessories.push(...peltInfo.extra_accessories);
 
   // --- Scars ---
   const scars: string[] = [];
@@ -215,13 +346,35 @@ function extractLists(
   if (peltInfo.scars3) scars.push(...peltInfo.scars3);
 
   // --- Tints ---
-  const tints = ['none', 'pink', 'gray', 'red', 'black', 'orange', 'yellow', 'purple', 'blue', 'dilute', 'warmdilute', 'cooldilute'];
-  const whiteTints = ['none', 'darkcream', 'cream', 'offwhite', 'gray', 'pink'];
+  const tints = [
+    "none",
+    "pink",
+    "gray",
+    "red",
+    "black",
+    "orange",
+    "yellow",
+    "purple",
+    "blue",
+    "dilute",
+    "warmdilute",
+    "cooldilute",
+  ];
+  const whiteTints = ["none", "darkcream", "cream", "offwhite", "gray", "pink"];
 
   return {
-    peltNames, colours, eyeColours, skinColours,
-    accessories, scars, tortieMasks, whitePatches,
-    points, vitiligo, tints, whiteTints,
+    peltNames,
+    colours,
+    eyeColours,
+    skinColours,
+    accessories,
+    scars,
+    tortieMasks,
+    whitePatches,
+    points,
+    vitiligo,
+    tints,
+    whiteTints,
   };
 }
 
@@ -236,14 +389,20 @@ function roll(probability: number | undefined): boolean {
 }
 
 function pickOne<T>(items: readonly T[]): T {
-  if (!items.length) throw new Error('Attempted to pick from an empty list');
+  if (!items.length) throw new Error("Attempted to pick from an empty list");
   return items[Math.floor(Math.random() * items.length)];
 }
 
-function weightedPick(values: Record<string, number>, fallback: () => number): number {
+function weightedPick(
+  values: Record<string, number>,
+  fallback: () => number,
+): number {
   const entries = Object.entries(values ?? {})
     .map(([key, weight]) => ({ value: Number(key), weight: Number(weight) }))
-    .filter((e) => Number.isFinite(e.value) && Number.isFinite(e.weight) && e.weight > 0);
+    .filter(
+      (e) =>
+        Number.isFinite(e.value) && Number.isFinite(e.weight) && e.weight > 0,
+    );
   if (!entries.length) return fallback();
   const total = entries.reduce((s, e) => s + e.weight, 0);
   const target = Math.random() * total;
@@ -298,7 +457,7 @@ function flattenPools(pools: readonly string[][]): string[] {
 function pickColourFromPools(pools: readonly string[][]): string {
   const availablePools = pools.filter((pool) => pool.length > 0);
   if (!availablePools.length) {
-    throw new Error('Attempted to pick from an empty colour pool');
+    throw new Error("Attempted to pick from an empty colour pool");
   }
   return pickOne(pickOne([...availablePools]));
 }
@@ -307,9 +466,9 @@ function resolveCountsMode(
   category: CountCategory,
   override?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>,
 ): CountStrategy {
-  if (!override) return 'weighted';
-  if (typeof override === 'string') return override;
-  return override[category] ?? 'weighted';
+  if (!override) return "weighted";
+  if (typeof override === "string") return override;
+  return override[category] ?? "weighted";
 }
 
 function hasOverride(
@@ -317,28 +476,34 @@ function hasOverride(
   override?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>,
 ): boolean {
   if (!override) return false;
-  if (typeof override === 'string') return true;
+  if (typeof override === "string") return true;
   return override[category] !== undefined;
 }
 
-function resolveCount(category: CountCategory, mode: CountStrategy, cfg: CountConfig): number {
+function resolveCount(
+  _category: CountCategory,
+  mode: CountStrategy,
+  cfg: CountConfig,
+): number {
   const min = cfg.min ?? 0;
   const max = cfg.max ?? min;
   const clamp = (v: number) => Math.min(Math.max(v, min), max);
   if (min >= max) return min;
-  if (mode === 'uniform') {
+  if (mode === "uniform") {
     const range = [];
     for (let i = min; i <= max; i++) range.push(i);
     return pickOne(range);
   }
-  return clamp(weightedPick(cfg.weights ?? {}, () => {
-    const range = [];
-    for (let i = min; i <= max; i++) range.push(i);
-    return pickOne(range);
-  }));
+  return clamp(
+    weightedPick(cfg.weights ?? {}, () => {
+      const range = [];
+      for (let i = min; i <= max; i++) range.push(i);
+      return pickOne(range);
+    }),
+  );
 }
 
-function determineSlotCount(
+function _determineSlotCount(
   category: CountCategory,
   cfg: CountConfig,
   defaults: Record<string, number> | undefined,
@@ -364,9 +529,9 @@ export interface DiscordCatOverrides {
   colour?: string;
   eyeColour?: string;
   shading?: boolean;
-  accessories?: number;  // pin slot count 0-4
-  scars?: number;        // pin slot count 0-3
-  torties?: number;      // pin layer count 0-4; 0 = force no tortie
+  accessories?: number; // pin slot count 0-4
+  scars?: number; // pin slot count 0-3
+  torties?: number; // pin layer count 0-4; 0 = force no tortie
   // Ranges (from user config)
   accessoriesMin?: number;
   accessoriesMax?: number;
@@ -399,51 +564,64 @@ export async function generateRandomParamsServer(
   const exactLayerCounts = options.exactLayerCounts === true;
 
   const spritePool = ensureArray(RANDOM_CONFIG.spritePool.include);
-  if (!spritePool.length) throw new Error('Sprite pool is empty');
+  if (!spritePool.length) throw new Error("Sprite pool is empty");
 
-  const spriteNumber = overrides.sprite && spritePool.includes(overrides.sprite)
-    ? overrides.sprite
-    : pickOne(spritePool);
+  const spriteNumber =
+    overrides.sprite && spritePool.includes(overrides.sprite)
+      ? overrides.sprite
+      : pickOne(spritePool);
 
-  const pelts = data.peltNames.filter((p) => p !== 'Tortie' && p !== 'Calico');
+  const pelts = data.peltNames.filter((p) => p !== "Tortie" && p !== "Calico");
 
   const colourPools = buildColourPools(data.colours, overrides.palettes);
   const colourPool = flattenPools(colourPools);
   if (!colourPool.length) {
-    throw new Error('Colour pool is empty');
+    throw new Error("Colour pool is empty");
   }
   const pickColour = () => pickColourFromPools(colourPools);
 
   // Afterlife: respect overrides, otherwise 10% chance
   const isDarkForest =
-    overrides.darkForest === true ? true :
-    overrides.darkForest === false ? false :
-    Math.random() < 0.1;
+    overrides.darkForest === true
+      ? true
+      : overrides.darkForest === false
+        ? false
+        : Math.random() < 0.1;
 
   const params: CatParams = {
     spriteNumber,
-    peltName: overrides.pelt && pelts.includes(overrides.pelt) ? overrides.pelt : pickOne(pelts),
-    colour: overrides.colour && (data.colours.includes(overrides.colour) || colourPool.includes(overrides.colour))
-      ? overrides.colour
-      : pickColour(),
+    peltName:
+      overrides.pelt && pelts.includes(overrides.pelt)
+        ? overrides.pelt
+        : pickOne(pelts),
+    colour:
+      overrides.colour &&
+      (data.colours.includes(overrides.colour) ||
+        colourPool.includes(overrides.colour))
+        ? overrides.colour
+        : pickColour(),
     tint: pickOne(data.tints),
     skinColour: pickOne(data.skinColours),
-    eyeColour: overrides.eyeColour && data.eyeColours.includes(overrides.eyeColour)
-      ? overrides.eyeColour
-      : pickOne(data.eyeColours),
+    eyeColour:
+      overrides.eyeColour && data.eyeColours.includes(overrides.eyeColour)
+        ? overrides.eyeColour
+        : pickOne(data.eyeColours),
     shading: overrides.shading ?? roll(RANDOM_CONFIG.probabilities.shading),
     reverse: roll(RANDOM_CONFIG.probabilities.reverse),
     isTortie: false,
     darkForest: isDarkForest,
     darkMode: isDarkForest,
-    dead: overrides.starclan === true ? true :
-          overrides.starclan === false ? false :
-          undefined,
+    dead:
+      overrides.starclan === true
+        ? true
+        : overrides.starclan === false
+          ? false
+          : undefined,
   };
 
   // Heterochromia
   if (roll(RANDOM_CONFIG.probabilities.heterochromia)) {
-    const pool = ['', ...data.eyeColours];
+    const pool = ["", ...data.eyeColours];
     const selected = pickOne(pool);
     if (selected) params.eyeColour2 = selected;
   }
@@ -465,7 +643,10 @@ export async function generateRandomParamsServer(
     const tortieConfig = RANDOM_CONFIG.counts.tortie;
     const masks = data.tortieMasks;
     const uniqueMasks = tortieConfig.unique !== false;
-    const layerProb = RANDOM_CONFIG.probabilities.tortieLayer ?? RANDOM_CONFIG.probabilities.isTortie ?? 0.5;
+    const layerProb =
+      RANDOM_CONFIG.probabilities.tortieLayer ??
+      RANDOM_CONFIG.probabilities.isTortie ??
+      0.5;
     const tortieResult = materializeTortieSlots({
       slotCount,
       masks,
@@ -506,21 +687,30 @@ export async function generateRandomParamsServer(
 
   // White patches
   if (roll(RANDOM_CONFIG.probabilities.whitePatchGroup)) {
-    if (roll(RANDOM_CONFIG.probabilities.whitePatch) && data.whitePatches.length > 0) {
+    if (
+      roll(RANDOM_CONFIG.probabilities.whitePatch) &&
+      data.whitePatches.length > 0
+    ) {
       params.whitePatches = pickOne(data.whitePatches);
     }
 
     const allowNone = RANDOM_CONFIG.whitePatches.allowNoneTint !== false;
-    const filteredTints = allowNone ? data.whiteTints : data.whiteTints.filter((t) => t !== 'none');
+    const filteredTints = allowNone
+      ? data.whiteTints
+      : data.whiteTints.filter((t) => t !== "none");
     if (filteredTints.length > 0) {
       const candidate = pickOne(filteredTints);
-      if (candidate && candidate !== 'none') params.whitePatchesTint = candidate;
+      if (candidate && candidate !== "none")
+        params.whitePatchesTint = candidate;
     }
 
     if (roll(RANDOM_CONFIG.probabilities.points) && data.points.length > 0) {
       params.points = pickOne(data.points);
     }
-    if (roll(RANDOM_CONFIG.probabilities.vitiligo) && data.vitiligo.length > 0) {
+    if (
+      roll(RANDOM_CONFIG.probabilities.vitiligo) &&
+      data.vitiligo.length > 0
+    ) {
       params.vitiligo = pickOne(data.vitiligo);
     }
   }
@@ -532,13 +722,16 @@ export async function generateRandomParamsServer(
   if (accSlots > 0 && data.accessories.length > 0) {
     const accConfig = RANDOM_CONFIG.counts.accessories;
     const uniqueAcc = accConfig.unique !== false;
-    const accProb = RANDOM_CONFIG.probabilities.accessorySlot ?? RANDOM_CONFIG.probabilities.accessory ?? 0.5;
+    const accProb =
+      RANDOM_CONFIG.probabilities.accessorySlot ??
+      RANDOM_CONFIG.probabilities.accessory ??
+      0.5;
     const accResult = materializeStringSlots({
       slotCount: accSlots,
       availableChoices: data.accessories,
       unique: uniqueAcc,
       exactCount: exactLayerCounts,
-      placeholder: 'none',
+      placeholder: "none",
       shouldFillSlot: () => roll(accProb),
     });
     if (accResult.selectedValues.length > 0) {
@@ -554,13 +747,16 @@ export async function generateRandomParamsServer(
   if (scarSlots > 0 && data.scars.length > 0) {
     const scarsConfig = RANDOM_CONFIG.counts.scars;
     const uniqueScars = scarsConfig.unique !== false;
-    const scarProb = RANDOM_CONFIG.probabilities.scarSlot ?? RANDOM_CONFIG.probabilities.scar ?? 0.5;
+    const scarProb =
+      RANDOM_CONFIG.probabilities.scarSlot ??
+      RANDOM_CONFIG.probabilities.scar ??
+      0.5;
     const scarResult = materializeStringSlots({
       slotCount: scarSlots,
       availableChoices: data.scars,
       unique: uniqueScars,
       exactCount: exactLayerCounts,
-      placeholder: 'none',
+      placeholder: "none",
       shouldFillSlot: () => roll(scarProb),
     });
     if (scarResult.selectedValues.length > 0) {

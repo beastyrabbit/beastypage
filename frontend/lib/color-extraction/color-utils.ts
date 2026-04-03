@@ -2,7 +2,7 @@
  * Color utility functions for conversions and adjustments
  */
 
-import type { RGB, HSL, HSV, CMYK, OKLCH } from "./types";
+import type { CMYK, HSL, HSV, OKLCH, RGB } from "./types";
 
 /**
  * Convert RGB to HEX
@@ -165,7 +165,7 @@ export function rgbToOklch(rgb: RGB): OKLCH {
   // sRGB to linear sRGB
   const linearize = (c: number) => {
     const s = c / 255;
-    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
   };
 
   const lr = linearize(rgb.r);
@@ -183,9 +183,9 @@ export function rgbToOklch(rgb: RGB): OKLCH {
   const s1 = Math.cbrt(s_);
 
   // LMS to OKLAB
-  const L = 0.2104542553 * l1 + 0.7936177850 * m1 - 0.0040720468 * s1;
-  const a = 1.9779984951 * l1 - 2.4285922050 * m1 + 0.4505937099 * s1;
-  const bVal = 0.0259040371 * l1 + 0.7827717662 * m1 - 0.8086757660 * s1;
+  const L = 0.2104542553 * l1 + 0.793617785 * m1 - 0.0040720468 * s1;
+  const a = 1.9779984951 * l1 - 2.428592205 * m1 + 0.4505937099 * s1;
+  const bVal = 0.0259040371 * l1 + 0.7827717662 * m1 - 0.808675766 * s1;
 
   // OKLAB to OKLCH
   const C = Math.sqrt(a * a + bVal * bVal);
@@ -228,9 +228,7 @@ export function adjustHue(rgb: RGB, degrees: number): RGB {
  */
 export function colorDistance(c1: RGB, c2: RGB): number {
   return Math.sqrt(
-    Math.pow(c1.r - c2.r, 2) +
-      Math.pow(c1.g - c2.g, 2) +
-      Math.pow(c1.b - c2.b, 2)
+    (c1.r - c2.r) ** 2 + (c1.g - c2.g) ** 2 + (c1.b - c2.b) ** 2,
   );
 }
 

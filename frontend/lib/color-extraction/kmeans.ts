@@ -2,15 +2,20 @@
  * K-Means color extraction algorithm
  */
 
+import {
+  colorDistance,
+  isBlackOrWhite,
+  rgbToHex,
+  rgbToHsl,
+} from "./color-utils";
+import { getImagePixels } from "./image-processing";
 import type {
+  Centroid,
   ExtractedColor,
   KMeansOptions,
   PixelData,
-  Centroid,
   RGB,
 } from "./types";
-import { rgbToHex, rgbToHsl, isBlackOrWhite, colorDistance } from "./color-utils";
-import { getImagePixels } from "./image-processing";
 
 /** Max possible Euclidean RGB distance (black to white) */
 const MAX_COLOR_DIST = Math.sqrt(255 * 255 * 3);
@@ -36,7 +41,7 @@ function countUniqueColors(pixels: PixelData[]): number {
  */
 export function extractColors(
   img: HTMLImageElement,
-  options: KMeansOptions
+  options: KMeansOptions,
 ): ExtractedColor[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const { data, width, height } = getImagePixels(img);
@@ -60,7 +65,11 @@ export function extractColors(
   const totalPixels = pixels.length;
   const colors = clusters
     .map(({ centroid: c, members }) => ({
-      hex: rgbToHex({ r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) }),
+      hex: rgbToHex({
+        r: Math.round(c.r),
+        g: Math.round(c.g),
+        b: Math.round(c.b),
+      }),
       rgb: {
         r: Math.round(c.r),
         g: Math.round(c.g),
@@ -87,7 +96,7 @@ function samplePixels(
   data: Uint8ClampedArray,
   width: number,
   height: number,
-  opts: Required<KMeansOptions>
+  opts: Required<KMeansOptions>,
 ): PixelData[] {
   // Validate sampleStep to prevent infinite loops
   const step = opts.sampleStep;
@@ -139,8 +148,8 @@ function initializeCentroids(pixels: PixelData[], k: number): Centroid[] {
     const distances = pixels.map((p) => {
       const minDist = Math.min(
         ...centroids.map((c) =>
-          colorDistance({ r: p.r, g: p.g, b: p.b }, { r: c.r, g: c.g, b: c.b })
-        )
+          colorDistance({ r: p.r, g: p.g, b: p.b }, { r: c.r, g: c.g, b: c.b }),
+        ),
       );
       return minDist * minDist; // Square for probability weighting
     });
@@ -171,7 +180,7 @@ function initializeCentroids(pixels: PixelData[], k: number): Centroid[] {
  */
 function assignPixels(
   pixels: PixelData[],
-  centroids: Centroid[]
+  centroids: Centroid[],
 ): Map<number, PixelData[]> {
   const clusters = new Map<number, PixelData[]>();
 
@@ -186,7 +195,7 @@ function assignPixels(
     for (let i = 0; i < centroids.length; i++) {
       const dist = colorDistance(
         { r: pixel.r, g: pixel.g, b: pixel.b },
-        { r: centroids[i].r, g: centroids[i].g, b: centroids[i].b }
+        { r: centroids[i].r, g: centroids[i].g, b: centroids[i].b },
       );
       if (dist < minDist) {
         minDist = dist;
@@ -194,7 +203,7 @@ function assignPixels(
       }
     }
 
-    clusters.get(closestIdx)!.push(pixel);
+    clusters.get(closestIdx)?.push(pixel);
   }
 
   return clusters;
@@ -206,7 +215,7 @@ function assignPixels(
  */
 function updateCentroids(
   clusters: Map<number, PixelData[]>,
-  previousCentroids: Centroid[]
+  previousCentroids: Centroid[],
 ): Centroid[] {
   const newCentroids: Centroid[] = [];
 
@@ -248,12 +257,12 @@ function updateCentroids(
 function hasConverged(
   oldCentroids: Centroid[],
   newCentroids: Centroid[],
-  threshold = 1
+  threshold = 1,
 ): boolean {
   for (let i = 0; i < oldCentroids.length; i++) {
     const dist = colorDistance(
       { r: oldCentroids[i].r, g: oldCentroids[i].g, b: oldCentroids[i].b },
-      { r: newCentroids[i].r, g: newCentroids[i].g, b: newCentroids[i].b }
+      { r: newCentroids[i].r, g: newCentroids[i].g, b: newCentroids[i].b },
     );
     if (dist > threshold) return false;
   }
@@ -276,7 +285,7 @@ interface KMeansResult {
 function kMeans(
   pixels: PixelData[],
   k: number,
-  maxIterations: number
+  maxIterations: number,
 ): KMeansResult {
   let centroids = initializeCentroids(pixels, k);
 
@@ -301,7 +310,7 @@ function kMeans(
 
 function buildResult(
   centroids: Centroid[],
-  clusterMap: Map<number, PixelData[]>
+  clusterMap: Map<number, PixelData[]>,
 ): KMeansResult {
   return {
     clusters: centroids.map((centroid, idx) => ({
@@ -321,7 +330,7 @@ function findBestPosition(
   centroid: Centroid,
   clusterPixels: readonly PixelData[],
   imageWidth: number,
-  imageHeight: number
+  imageHeight: number,
 ): { x: number; y: number } {
   if (clusterPixels.length === 0) {
     return { x: centroid.x, y: centroid.y };
@@ -358,7 +367,7 @@ function findBestPosition(
 export function findMatchingPixels(
   img: HTMLImageElement,
   targetColor: RGB,
-  threshold = 30
+  threshold = 30,
 ): { x: number; y: number }[] {
   const { data, width, height } = getImagePixels(img);
   const matches: { x: number; y: number }[] = [];
@@ -384,7 +393,7 @@ export function findMatchingPixels(
 export function createSpotlightMask(
   img: HTMLImageElement,
   targetColor: RGB,
-  threshold = 30
+  threshold = 30,
 ): ImageData {
   const { data, width, height } = getImagePixels(img);
   const maskData = new Uint8ClampedArray(width * height * 4);
@@ -433,7 +442,7 @@ export function createSpotlightMask(
 export function createSpotlightImage(
   img: HTMLImageElement,
   targetColor: RGB,
-  threshold = 30
+  threshold = 30,
 ): string {
   const { data, width, height } = getImagePixels(img);
 
@@ -486,7 +495,7 @@ export function createSpotlightImage(
 export function createMultiColorSpotlightImage(
   img: HTMLImageElement,
   targetColors: RGB[],
-  threshold = 30
+  threshold = 30,
 ): string {
   const { data, width, height } = getImagePixels(img);
 
@@ -542,7 +551,7 @@ export function createMultiColorSpotlightImage(
  */
 function colorBrightness(color: RGB): number {
   return Math.sqrt(
-    0.299 * (color.r ** 2) + 0.587 * (color.g ** 2) + 0.114 * (color.b ** 2)
+    0.299 * color.r ** 2 + 0.587 * color.g ** 2 + 0.114 * color.b ** 2,
   );
 }
 
@@ -558,7 +567,7 @@ export function extractFamilyColors(
   img: HTMLImageElement,
   topColors: ExtractedColor[],
   options: KMeansOptions,
-  similarityThreshold = 50
+  similarityThreshold = 50,
 ): ExtractedColor[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const { data, width, height } = getImagePixels(img);
@@ -611,7 +620,11 @@ export function extractFamilyColors(
 
     // Convert to colors and sort by brightness (brightest first, like Python version)
     const allColors = clusters.map(({ centroid: c, members }) => ({
-      hex: rgbToHex({ r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) }),
+      hex: rgbToHex({
+        r: Math.round(c.r),
+        g: Math.round(c.g),
+        b: Math.round(c.b),
+      }),
       rgb: {
         r: Math.round(c.r),
         g: Math.round(c.g),
@@ -638,7 +651,7 @@ export function extractFamilyColors(
     const familyColors: ExtractedColor[] = [];
     for (const color of allColors) {
       const isTooSimilar = topColors.some(
-        (topColor) => colorDistance(color.rgb, topColor.rgb) < threshold
+        (topColor) => colorDistance(color.rgb, topColor.rgb) < threshold,
       );
 
       if (!isTooSimilar) {

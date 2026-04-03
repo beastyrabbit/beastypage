@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const espressoBeanPalette: PaletteCategory = {
-  id: 'espresso-bean',
-  label: 'Espresso Bean',
-  description: 'Brown — cool charcoal shadows through rich chocolate to warm golden caramel',
+  id: "espresso-bean",
+  label: "Espresso Bean",
+  description:
+    "Brown — cool charcoal shadows through rich chocolate to warm golden caramel",
   colors: {
     EB_CHARCOALBROWN: { multiply: [18, 12, 14] },
     EB_DARKROAST: { multiply: [28, 18, 16] },
