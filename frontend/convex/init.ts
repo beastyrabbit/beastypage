@@ -10,5 +10,5 @@ export const seed = internalMutation({
     await upsertDefaultRarities(ctx, now);
 
     await upsertDefaultSeasons(ctx, now);
-  }
+  },
 });

@@ -32,10 +32,12 @@ export function parsePixelatorPayload(payload: unknown): PixelatorSettings {
   }
   const data = payload as Record<string, unknown>;
 
-  const pixelArtMode = typeof data.pixelArtMode === "boolean" ? data.pixelArtMode : false;
+  const pixelArtMode =
+    typeof data.pixelArtMode === "boolean" ? data.pixelArtMode : false;
 
   const pixelArtGridSize =
-    typeof data.pixelArtGridSize === "number" && Number.isFinite(data.pixelArtGridSize)
+    typeof data.pixelArtGridSize === "number" &&
+    Number.isFinite(data.pixelArtGridSize)
       ? Math.max(1, Math.min(128, Math.round(data.pixelArtGridSize)))
       : null;
 
@@ -69,10 +71,16 @@ export function pixelatorSettingsEqual(
   for (let i = 0; i < a.pipeline.steps.length; i++) {
     const sa = a.pipeline.steps[i]!;
     const sb = b.pipeline.steps[i]!;
-    if (sa.id !== sb.id || sa.algorithm !== sb.algorithm || sa.enabled !== sb.enabled) return false;
+    if (
+      sa.id !== sb.id ||
+      sa.algorithm !== sb.algorithm ||
+      sa.enabled !== sb.enabled
+    )
+      return false;
     if (sa.inputSource !== sb.inputSource) return false;
     if (JSON.stringify(sa.params) !== JSON.stringify(sb.params)) return false;
-    if (JSON.stringify(sa.blendWith) !== JSON.stringify(sb.blendWith)) return false;
+    if (JSON.stringify(sa.blendWith) !== JSON.stringify(sb.blendWith))
+      return false;
   }
 
   return true;

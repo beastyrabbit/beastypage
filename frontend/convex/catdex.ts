@@ -1,9 +1,9 @@
-import { mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
+import { api } from "./_generated/api.js";
 import type { Doc } from "./_generated/dataModel.js";
 import type { QueryCtx } from "./_generated/server.js";
+import { mutation, query } from "./_generated/server.js";
 import { docIdToString } from "./utils.js";
-import { api } from "./_generated/api.js";
 
 type CatdexDoc = Doc<"catdex">;
 type SeasonDoc = Doc<"card_season">;
@@ -13,16 +13,18 @@ export type CatdexPayload = Awaited<ReturnType<typeof catdexRecordToClient>>;
 
 export const list = query({
   args: {
-    approved: v.optional(v.boolean())
+    approved: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     let cats = await ctx.db.query("catdex").collect();
     if (typeof args.approved === "boolean") {
       cats = cats.filter((c) => Boolean(c.approved) === args.approved);
     }
-    cats.sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt));
+    cats.sort(
+      (a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt),
+    );
     return Promise.all(cats.map((doc) => catdexRecordToClient(ctx, doc)));
-  }
+  },
 });
 
 export const pendingCount = query({
@@ -30,7 +32,7 @@ export const pendingCount = query({
   handler: async (ctx) => {
     const cats = await ctx.db.query("catdex").collect();
     return cats.filter((c) => !c.approved).length;
-  }
+  },
 });
 
 export const totalCount = query({
@@ -41,27 +43,27 @@ export const totalCount = query({
       count += 1;
     }
     return count;
-  }
+  },
 });
 
 export const get = query({
   args: {
-    id: v.id("catdex")
+    id: v.id("catdex"),
   },
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
     if (!doc) return null;
     return catdexRecordToClient(ctx, doc);
-  }
+  },
 });
 
 export const getDoc = query({
   args: {
-    id: v.id("catdex")
+    id: v.id("catdex"),
   },
   handler: async (ctx, args) => {
     return ctx.db.get(args.id);
-  }
+  },
 });
 
 export const create = mutation({
@@ -73,14 +75,14 @@ export const create = mutation({
     cardNumber: v.optional(v.string()),
     defaultCard: v.object({
       storageId: v.id("_storage"),
-      fileName: v.string()
+      fileName: v.string(),
     }),
     customCard: v.optional(
       v.object({
         storageId: v.id("_storage"),
-        fileName: v.string()
-      })
-    )
+        fileName: v.string(),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     const nowTs = Date.now();
@@ -98,9 +100,9 @@ export const create = mutation({
       ...(args.customCard
         ? {
             customCardStorageId: args.customCard.storageId,
-            customCardName: args.customCard.fileName
+            customCardName: args.customCard.fileName,
           }
-        : {})
+        : {}),
     } satisfies Omit<CatdexDoc, "_id" | "_creationTime">;
 
     const docId = await ctx.db.insert("catdex", insertDoc);
@@ -108,9 +110,11 @@ export const create = mutation({
     if (!doc) {
       throw new Error("Failed to create catdex record");
     }
-    await ctx.scheduler.runAfter(0, api.imageService.generateForCat, { id: docId });
+    await ctx.scheduler.runAfter(0, api.imageService.generateForCat, {
+      id: docId,
+    });
     return catdexRecordToClient(ctx, doc);
-  }
+  },
 });
 
 async function catdexRecordToClient(ctx: QueryCtx, doc: CatdexDoc) {
@@ -124,10 +128,18 @@ async function catdexRecordToClient(ctx: QueryCtx, doc: CatdexDoc) {
   const rarityName = rarityInfo?.rarity_name ?? null;
 
   // Convex Cloud returns proper absolute URLs - no normalization needed
-  const defaultCardUrl = doc.defaultCardStorageId ? await ctx.storage.getUrl(doc.defaultCardStorageId) : null;
-  const defaultCardThumbUrl = doc.defaultCardThumbStorageId ? await ctx.storage.getUrl(doc.defaultCardThumbStorageId) : null;
-  const customCardUrl = doc.customCardStorageId ? await ctx.storage.getUrl(doc.customCardStorageId) : null;
-  const customCardThumbUrl = doc.customCardThumbStorageId ? await ctx.storage.getUrl(doc.customCardThumbStorageId) : null;
+  const defaultCardUrl = doc.defaultCardStorageId
+    ? await ctx.storage.getUrl(doc.defaultCardStorageId)
+    : null;
+  const defaultCardThumbUrl = doc.defaultCardThumbStorageId
+    ? await ctx.storage.getUrl(doc.defaultCardThumbStorageId)
+    : null;
+  const customCardUrl = doc.customCardStorageId
+    ? await ctx.storage.getUrl(doc.customCardStorageId)
+    : null;
+  const customCardThumbUrl = doc.customCardThumbStorageId
+    ? await ctx.storage.getUrl(doc.customCardThumbStorageId)
+    : null;
 
   return {
     id,
@@ -162,7 +174,7 @@ async function catdexRecordToClient(ctx: QueryCtx, doc: CatdexDoc) {
     rarityRaw: rarityInfo,
     rarityStars: rarityInfo?.stars ?? null,
     created: doc.createdAt,
-    updated: doc.updatedAt
+    updated: doc.updatedAt,
   } as const;
 }
 
@@ -175,7 +187,7 @@ function seasonRecordToClient(doc: SeasonDoc) {
     card_back: doc.cardBackName ?? null,
     card_back_storage_id: doc.cardBackStorageId ?? null,
     created: doc.createdAt,
-    updated: doc.updatedAt
+    updated: doc.updatedAt,
   };
 }
 
@@ -186,7 +198,7 @@ function rarityRecordToClient(doc: RarityDoc) {
     stars: doc.stars ?? null,
     chance_percent: doc.chancePercent ?? null,
     created: doc.createdAt,
-    updated: doc.updatedAt
+    updated: doc.updatedAt,
   };
 }
 
@@ -200,8 +212,8 @@ export const applyThumbnailUpdates = mutation({
         thumbWidth: v.optional(v.number()),
         thumbHeight: v.optional(v.number()),
         width: v.optional(v.number()),
-        height: v.optional(v.number())
-      })
+        height: v.optional(v.number()),
+      }),
     ),
     customCard: v.optional(
       v.object({
@@ -210,13 +222,13 @@ export const applyThumbnailUpdates = mutation({
         thumbWidth: v.optional(v.number()),
         thumbHeight: v.optional(v.number()),
         width: v.optional(v.number()),
-        height: v.optional(v.number())
-      })
-    )
+        height: v.optional(v.number()),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     const updates: Partial<CatdexDoc> = {
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
 
     if (args.defaultCard) {
@@ -255,27 +267,33 @@ export const applyThumbnailUpdates = mutation({
 
     await ctx.db.patch(args.id, updates);
     return { success: true };
-  }
+  },
 });
 
 export const enqueueMissingThumbnails = mutation({
   args: {
-    limit: v.optional(v.number())
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const max = Math.max(1, Math.min(args.limit ?? 25, 200));
     let enqueued = 0;
 
     for await (const cat of ctx.db.query("catdex")) {
-      const needsDefault = Boolean(cat.defaultCardStorageId && !cat.defaultCardThumbStorageId);
-      const needsCustom = Boolean(cat.customCardStorageId && !cat.customCardThumbStorageId);
+      const needsDefault = Boolean(
+        cat.defaultCardStorageId && !cat.defaultCardThumbStorageId,
+      );
+      const needsCustom = Boolean(
+        cat.customCardStorageId && !cat.customCardThumbStorageId,
+      );
       if (!needsDefault && !needsCustom) continue;
 
-      await ctx.scheduler.runAfter(0, api.imageService.generateForCat, { id: cat._id });
+      await ctx.scheduler.runAfter(0, api.imageService.generateForCat, {
+        id: cat._id,
+      });
       enqueued += 1;
       if (enqueued >= max) break;
     }
 
     return { enqueued };
-  }
+  },
 });

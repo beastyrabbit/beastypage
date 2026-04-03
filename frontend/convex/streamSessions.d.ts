@@ -1,23 +1,32 @@
-export declare const list: import("convex/server").RegisteredQuery<"internal", {
+export declare const list: import("convex/server").RegisteredQuery<
+  "internal",
+  {
     viewerKey?: string;
     status?: string;
     exclude?: string;
     limit: number;
-}, Promise<{
-    id: string;
-    viewer_key: string;
-    status: string;
-    current_step: string | undefined;
-    step_index: number;
-    step_history: any;
-    params: any;
-    allow_repeat_ips: boolean;
-    created: number;
-    updated: number;
-}[]>>;
-export declare const get: import("convex/server").RegisteredQuery<"internal", {
+  },
+  Promise<
+    {
+      id: string;
+      viewer_key: string;
+      status: string;
+      current_step: string | undefined;
+      step_index: number;
+      step_history: any;
+      params: any;
+      allow_repeat_ips: boolean;
+      created: number;
+      updated: number;
+    }[]
+  >
+>;
+export declare const get: import("convex/server").RegisteredQuery<
+  "internal",
+  {
     id: import("convex/values").GenericId<"stream_sessions">;
-}, Promise<{
+  },
+  Promise<{
     id: string;
     viewer_key: string;
     status: string;
@@ -28,8 +37,11 @@ export declare const get: import("convex/server").RegisteredQuery<"internal", {
     allow_repeat_ips: boolean;
     created: number;
     updated: number;
-} | null>>;
-export declare const create: import("convex/server").RegisteredMutation<"internal", {
+  } | null>
+>;
+export declare const create: import("convex/server").RegisteredMutation<
+  "internal",
+  {
     currentStep?: string;
     stepIndex?: number;
     stepHistory?: any;
@@ -37,7 +49,8 @@ export declare const create: import("convex/server").RegisteredMutation<"interna
     allowRepeatIps?: boolean;
     viewerKey: string;
     status: string;
-}, Promise<{
+  },
+  Promise<{
     id: string;
     viewer_key: string;
     status: string;
@@ -48,8 +61,11 @@ export declare const create: import("convex/server").RegisteredMutation<"interna
     allow_repeat_ips: boolean;
     created: number;
     updated: number;
-} | null>>;
-export declare const update: import("convex/server").RegisteredMutation<"internal", {
+  } | null>
+>;
+export declare const update: import("convex/server").RegisteredMutation<
+  "internal",
+  {
     viewerKey?: string;
     status?: string;
     currentStep?: string;
@@ -58,7 +74,8 @@ export declare const update: import("convex/server").RegisteredMutation<"interna
     params?: any;
     allowRepeatIps?: boolean;
     id: import("convex/values").GenericId<"stream_sessions">;
-}, Promise<{
+  },
+  Promise<{
     id: string;
     viewer_key: string;
     status: string;
@@ -69,5 +86,6 @@ export declare const update: import("convex/server").RegisteredMutation<"interna
     allow_repeat_ips: boolean;
     created: number;
     updated: number;
-} | null>>;
+  } | null>
+>;
 //# sourceMappingURL=streamSessions.d.ts.map

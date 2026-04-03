@@ -1,6 +1,6 @@
-import { mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
+import { mutation, query } from "./_generated/server.js";
 import { docIdToString } from "./utils.js";
 
 const MAX_NAME_LENGTH = 12;
@@ -25,44 +25,50 @@ function toClient(doc: ScoreDoc): ScoreRecord {
     id: docIdToString(doc._id),
     name: doc.playerName,
     score: doc.score,
-    createdAt: doc.createdAt
+    createdAt: doc.createdAt,
   };
 }
 
 export const leaderboard = query({
   args: {
-    limit: v.optional(v.number())
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit && args.limit > 0 ? Math.min(args.limit, MAX_LEADERBOARD_LIMIT) : 10;
+    const limit =
+      args.limit && args.limit > 0
+        ? Math.min(args.limit, MAX_LEADERBOARD_LIMIT)
+        : 10;
     const docs = await ctx.db
       .query("coinflipper_scores")
       .withIndex("byScore")
       .order("desc")
       .take(limit);
     return docs.map(toClient);
-  }
+  },
 });
 
 export const listScores = query({
   args: {
-    limit: v.optional(v.number())
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit && args.limit > 0 ? Math.min(args.limit, MAX_SCORE_ARCHIVE_LIMIT) : 200;
+    const limit =
+      args.limit && args.limit > 0
+        ? Math.min(args.limit, MAX_SCORE_ARCHIVE_LIMIT)
+        : 200;
     const docs = await ctx.db
       .query("coinflipper_scores")
       .withIndex("byScore")
       .order("desc")
       .take(limit);
     return docs.map(toClient);
-  }
+  },
 });
 
 export const submitScore = mutation({
   args: {
     name: v.string(),
-    score: v.number()
+    score: v.number(),
   },
   handler: async (ctx, args) => {
     const name = sanitizeName(args.name);
@@ -80,7 +86,7 @@ export const submitScore = mutation({
     const id = await ctx.db.insert("coinflipper_scores", {
       playerName: name,
       score,
-      createdAt: now
+      createdAt: now,
     });
 
     const inserted = await ctx.db.get(id);
@@ -89,5 +95,5 @@ export const submitScore = mutation({
     }
 
     return toClient(inserted);
-  }
+  },
 });

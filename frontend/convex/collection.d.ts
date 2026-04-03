@@ -1,6 +1,9 @@
-export declare const getDoc: import("convex/server").RegisteredQuery<"internal", {
+export declare const getDoc: import("convex/server").RegisteredQuery<
+  "internal",
+  {
     id: import("convex/values").GenericId<"collection">;
-}, Promise<{
+  },
+  Promise<{
     _id: import("convex/values").GenericId<"collection">;
     _creationTime: number;
     blurImgStorageId?: import("convex/values").GenericId<"_storage">;
@@ -14,5 +17,6 @@ export declare const getDoc: import("convex/server").RegisteredQuery<"internal",
     artistName: string;
     animal: string;
     link: string;
-} | null>>;
+  } | null>
+>;
 //# sourceMappingURL=collection.d.ts.map

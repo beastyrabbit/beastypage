@@ -1,5 +1,5 @@
-import { watch } from "node:fs";
 import { spawn } from "node:child_process";
+import { watch } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,10 +28,14 @@ async function runSync(reason: string) {
       proc.on("error", (err) => reject(err));
     });
     if (exitCode !== 0) {
-      console.error(`[palette-watch] sync failed after ${reason} (exit ${exitCode})`);
+      console.error(
+        `[palette-watch] sync failed after ${reason} (exit ${exitCode})`,
+      );
     } else {
       const duration = Date.now() - startedAt;
-      console.log(`[palette-watch] synced renderer palettes after ${reason} in ${duration}ms`);
+      console.log(
+        `[palette-watch] synced renderer palettes after ${reason} in ${duration}ms`,
+      );
     }
   } catch (error) {
     console.error("[palette-watch] sync crashed", error);

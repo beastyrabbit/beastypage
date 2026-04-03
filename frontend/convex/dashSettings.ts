@@ -1,7 +1,8 @@
-import { mutation, query, type MutationCtx } from "./_generated/server.js";
 import { v } from "convex/values";
+import { type MutationCtx, mutation, query } from "./_generated/server.js";
 
-const SLUG_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const SLUG_ALPHABET =
+  "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const SLUG_LENGTH = 7;
 
 function randomSlug() {
@@ -41,13 +42,21 @@ export const save = mutation({
         .withIndex("bySlug", (q) => q.eq("slug", trimmed))
         .unique();
       if (existing) {
-        await ctx.db.patch(existing._id, { config: args.config, updatedAt: now });
+        await ctx.db.patch(existing._id, {
+          config: args.config,
+          updatedAt: now,
+        });
         return { slug: existing.slug, id: existing._id, updated: true };
       }
     }
 
     const slug = trimmed || (await generateUniqueSlug(ctx));
-    const id = await ctx.db.insert("dash_settings", { slug, config: args.config, createdAt: now, updatedAt: now });
+    const id = await ctx.db.insert("dash_settings", {
+      slug,
+      config: args.config,
+      createdAt: now,
+      updatedAt: now,
+    });
     return { slug, id, updated: false };
   },
 });
@@ -60,6 +69,12 @@ export const get = query({
       .withIndex("bySlug", (q) => q.eq("slug", args.slug))
       .unique();
     if (!record) return null;
-    return { slug: record.slug, config: record.config, id: record._id, createdAt: record.createdAt, updatedAt: record.updatedAt };
+    return {
+      slug: record.slug,
+      config: record.config,
+      id: record._id,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
   },
 });

@@ -1,11 +1,22 @@
-import { DEFAULT_TIMING_CONFIG, type SpinTimingConfig, type ParamTimingKey, isParamTimingKey } from "./spinTiming";
 import type { PaletteId } from "@/lib/palettes/types";
+import {
+  DEFAULT_TIMING_CONFIG,
+  isParamTimingKey,
+  type ParamTimingKey,
+  type SpinTimingConfig,
+} from "./spinTiming";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type AfterlifeOption = "off" | "dark10" | "star10" | "both10" | "darkForce" | "starForce";
+export type AfterlifeOption =
+  | "off"
+  | "dark10"
+  | "star10"
+  | "both10"
+  | "darkForce"
+  | "starForce";
 
 /** "base" means classic ClanGen colours; any PaletteId selects an extended palette. */
 export type ExtendedMode = "base" | PaletteId;
@@ -60,34 +71,92 @@ export const DEFAULT_SINGLE_CAT_SETTINGS: SingleCatSettings = {
 const EXTENDED_MODE_VALUES: Set<string> = new Set([
   "base",
   // Original 14
-  "mood", "bold", "darker", "blackout",
-  "mononoke", "howl", "demonslayer", "titanic", "deathnote",
-  "slime", "ghostintheshell", "mushishi", "chisweethome", "fma",
+  "mood",
+  "bold",
+  "darker",
+  "blackout",
+  "mononoke",
+  "howl",
+  "demonslayer",
+  "titanic",
+  "deathnote",
+  "slime",
+  "ghostintheshell",
+  "mushishi",
+  "chisweethome",
+  "fma",
   // Pure/monochromatic
-  "ocean-depths", "midnight-velvet", "arctic-waters", "emerald-forest",
-  "jade-mist", "electric-grass", "golden-hour", "ember-glow",
-  "crimson-flame", "rose-garden", "neon-blossom", "royal-amethyst",
-  "twilight-haze", "espresso-bean", "desert-sand", "storm-cloud",
-  "coral-reef", "tropical-lagoon", "midnight-wine", "peach-sorbet",
-  "greyscale", "cold-steel", "ink-wash",
+  "ocean-depths",
+  "midnight-velvet",
+  "arctic-waters",
+  "emerald-forest",
+  "jade-mist",
+  "electric-grass",
+  "golden-hour",
+  "ember-glow",
+  "crimson-flame",
+  "rose-garden",
+  "neon-blossom",
+  "royal-amethyst",
+  "twilight-haze",
+  "espresso-bean",
+  "desert-sand",
+  "storm-cloud",
+  "coral-reef",
+  "tropical-lagoon",
+  "midnight-wine",
+  "peach-sorbet",
+  "greyscale",
+  "cold-steel",
+  "ink-wash",
   // Textile
-  "royal-stewart", "black-watch", "country-tweed", "savile-row",
-  "bavarian-tracht", "oktoberfest",
+  "royal-stewart",
+  "black-watch",
+  "country-tweed",
+  "savile-row",
+  "bavarian-tracht",
+  "oktoberfest",
   // Pattern
-  "tartan-patterns", "gingham-patterns", "houndstooth-patterns",
-  "pinstripe-patterns", "chevron-patterns", "polkadot-patterns",
-  "argyle-patterns", "buffalo-patterns", "checkerboard-patterns",
-  "windowpane-patterns", "diagonal-patterns", "basketweave-patterns",
-  "flag-patterns", "scottish-clans", "japanese-patterns", "middle-eastern-rugs",
+  "tartan-patterns",
+  "gingham-patterns",
+  "houndstooth-patterns",
+  "pinstripe-patterns",
+  "chevron-patterns",
+  "polkadot-patterns",
+  "argyle-patterns",
+  "buffalo-patterns",
+  "checkerboard-patterns",
+  "windowpane-patterns",
+  "diagonal-patterns",
+  "basketweave-patterns",
+  "flag-patterns",
+  "scottish-clans",
+  "japanese-patterns",
+  "middle-eastern-rugs",
   // Cultural Phase 1
-  "european-ornate", "art-deco-patterns", "indian-patterns",
+  "european-ornate",
+  "art-deco-patterns",
+  "indian-patterns",
   // Cultural Phase 2
-  "chinese-patterns", "african-patterns", "indonesian-patterns", "korean-patterns",
+  "chinese-patterns",
+  "african-patterns",
+  "indonesian-patterns",
+  "korean-patterns",
   // Cultural Phase 2b
-  "scandinavian-patterns", "medieval-patterns", "american-patterns", "famous-patterns",
+  "scandinavian-patterns",
+  "medieval-patterns",
+  "american-patterns",
+  "famous-patterns",
 ]);
 
-const AFTERLIFE_VALUES: Set<string> = new Set(["off", "dark10", "star10", "both10", "darkForce", "starForce"]);
+const AFTERLIFE_VALUES: Set<string> = new Set([
+  "off",
+  "dark10",
+  "star10",
+  "both10",
+  "darkForce",
+  "starForce",
+]);
 
 function isAfterlifeOption(value: unknown): value is AfterlifeOption {
   return typeof value === "string" && AFTERLIFE_VALUES.has(value);
@@ -124,7 +193,11 @@ function sanitizeTiming(raw: unknown): SpinTimingConfig {
   const delays: Partial<Record<ParamTimingKey, number>> = {};
   if (t.delays && typeof t.delays === "object") {
     for (const [key, value] of Object.entries(t.delays)) {
-      if (isParamTimingKey(key) && typeof value === "number" && Number.isFinite(value)) {
+      if (
+        isParamTimingKey(key) &&
+        typeof value === "number" &&
+        Number.isFinite(value)
+      ) {
         delays[key] = Math.max(0, value);
       }
     }
@@ -141,10 +214,17 @@ function sanitizeTiming(raw: unknown): SpinTimingConfig {
 
   const defaultFlashy = DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ?? 1000;
   const defaultCalm = DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ?? 1000;
-  const incomingPause = (t.pauseDelays && typeof t.pauseDelays === "object") ? t.pauseDelays : {};
+  const incomingPause =
+    t.pauseDelays && typeof t.pauseDelays === "object" ? t.pauseDelays : {};
   const pauseDelays = {
-    flashyMs: clampPauseMs((incomingPause as Record<string, unknown>).flashyMs, defaultFlashy),
-    calmMs: clampPauseMs((incomingPause as Record<string, unknown>).calmMs, defaultCalm),
+    flashyMs: clampPauseMs(
+      (incomingPause as Record<string, unknown>).flashyMs,
+      defaultFlashy,
+    ),
+    calmMs: clampPauseMs(
+      (incomingPause as Record<string, unknown>).calmMs,
+      defaultCalm,
+    ),
   };
 
   return {
@@ -166,7 +246,10 @@ interface V1Payload {
 
 /** Converts a v1 payload (or any unknown input) into a v2 SingleCatSettings, using defaults for all non-timing fields. */
 export function migrateV1ToV2(v1Payload: unknown): SingleCatSettings {
-  const data = (v1Payload && typeof v1Payload === "object") ? v1Payload as V1Payload : { v: 1, timing: DEFAULT_TIMING_CONFIG };
+  const data =
+    v1Payload && typeof v1Payload === "object"
+      ? (v1Payload as V1Payload)
+      : { v: 1, timing: DEFAULT_TIMING_CONFIG };
   return {
     ...DEFAULT_SINGLE_CAT_SETTINGS,
     timing: sanitizeTiming(data.timing),
@@ -191,18 +274,46 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
       v: 2,
       mode: data.mode === "calm" ? "calm" : "flashy",
       timing: sanitizeTiming(data.timing),
-      speedMultiplier: typeof data.speedMultiplier === "number" && Number.isFinite(data.speedMultiplier)
-        ? Math.min(10, Math.max(0.1, data.speedMultiplier))
-        : 1.0,
-      accessoryRange: isValidRange(data.accessoryRange) ? data.accessoryRange as LayerRange : DEFAULT_SINGLE_CAT_SETTINGS.accessoryRange,
-      scarRange: isValidRange(data.scarRange) ? data.scarRange as LayerRange : DEFAULT_SINGLE_CAT_SETTINGS.scarRange,
-      tortieRange: isValidRange(data.tortieRange) ? data.tortieRange as LayerRange : DEFAULT_SINGLE_CAT_SETTINGS.tortieRange,
-      exactLayerCounts: typeof data.exactLayerCounts === "boolean" ? data.exactLayerCounts : true,
-      afterlifeMode: isAfterlifeOption(data.afterlifeMode) ? data.afterlifeMode : DEFAULT_SINGLE_CAT_SETTINGS.afterlifeMode,
-      extendedModes: Array.isArray(modes) ? [...new Set((modes as string[]).filter((m): m is ExtendedMode => EXTENDED_MODE_VALUES.has(m)))].sort() : [],
-      includeBaseColours: typeof data.includeBaseColours === "boolean" ? data.includeBaseColours : true,
-      catName: typeof data.catName === "string" ? data.catName.slice(0, 100) : "",
-      creatorName: typeof data.creatorName === "string" ? data.creatorName.slice(0, 100) : "",
+      speedMultiplier:
+        typeof data.speedMultiplier === "number" &&
+        Number.isFinite(data.speedMultiplier)
+          ? Math.min(10, Math.max(0.1, data.speedMultiplier))
+          : 1.0,
+      accessoryRange: isValidRange(data.accessoryRange)
+        ? (data.accessoryRange as LayerRange)
+        : DEFAULT_SINGLE_CAT_SETTINGS.accessoryRange,
+      scarRange: isValidRange(data.scarRange)
+        ? (data.scarRange as LayerRange)
+        : DEFAULT_SINGLE_CAT_SETTINGS.scarRange,
+      tortieRange: isValidRange(data.tortieRange)
+        ? (data.tortieRange as LayerRange)
+        : DEFAULT_SINGLE_CAT_SETTINGS.tortieRange,
+      exactLayerCounts:
+        typeof data.exactLayerCounts === "boolean"
+          ? data.exactLayerCounts
+          : true,
+      afterlifeMode: isAfterlifeOption(data.afterlifeMode)
+        ? data.afterlifeMode
+        : DEFAULT_SINGLE_CAT_SETTINGS.afterlifeMode,
+      extendedModes: Array.isArray(modes)
+        ? [
+            ...new Set(
+              (modes as string[]).filter((m): m is ExtendedMode =>
+                EXTENDED_MODE_VALUES.has(m),
+              ),
+            ),
+          ].sort()
+        : [],
+      includeBaseColours:
+        typeof data.includeBaseColours === "boolean"
+          ? data.includeBaseColours
+          : true,
+      catName:
+        typeof data.catName === "string" ? data.catName.slice(0, 100) : "",
+      creatorName:
+        typeof data.creatorName === "string"
+          ? data.creatorName.slice(0, 100)
+          : "",
     };
   }
 
@@ -215,7 +326,10 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
 // ---------------------------------------------------------------------------
 
 /** JSON comparison that normalizes both sides through parseSingleCatPayload and ignores metadata fields. */
-export function singleCatSettingsEqual(a: SingleCatSettings, b: unknown): boolean {
+export function singleCatSettingsEqual(
+  a: SingleCatSettings,
+  b: unknown,
+): boolean {
   const normalize = (s: SingleCatSettings) => {
     const { catName: _cn, creatorName: _cr, ...rest } = s;
     return { ...rest, extendedModes: [...s.extendedModes].sort() };
@@ -223,8 +337,10 @@ export function singleCatSettingsEqual(a: SingleCatSettings, b: unknown): boolea
   const parsedA = normalize(parseSingleCatPayload(a));
   const parsedB = normalize(parseSingleCatPayload(b));
   // Sort keys for consistent comparison (Convex may return different key order)
-  return JSON.stringify(parsedA, Object.keys(parsedA).sort()) ===
-    JSON.stringify(parsedB, Object.keys(parsedB).sort());
+  return (
+    JSON.stringify(parsedA, Object.keys(parsedA).sort()) ===
+    JSON.stringify(parsedB, Object.keys(parsedB).sort())
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -234,7 +350,11 @@ export function singleCatSettingsEqual(a: SingleCatSettings, b: unknown): boolea
 const OLD_TIMING_KEY = "singleCatPlus.paramTiming";
 
 /** One-time migration: reads old singleCatPlus.paramTiming from localStorage and converts to a variant. The old key is removed via the returned cleanup callback only after the caller has persisted the migrated data. */
-export function migrateSingleCatTiming(): { name: string; settings: SingleCatSettings; cleanup?: () => void } | null {
+export function migrateSingleCatTiming(): {
+  name: string;
+  settings: SingleCatSettings;
+  cleanup?: () => void;
+} | null {
   if (typeof window === "undefined") return null;
   try {
     const oldRaw = localStorage.getItem(OLD_TIMING_KEY);

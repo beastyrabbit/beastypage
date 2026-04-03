@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
 
 // ---------------------------------------------------------------------------
@@ -35,14 +35,27 @@ function loadVariantStore<T>(storageKey: string): VariantStore<T> | null {
     const validVariants = parsed.variants.filter((v: unknown) => {
       if (!v || typeof v !== "object") return false;
       const entry = v as Record<string, unknown>;
-      return typeof entry.id === "string" && typeof entry.name === "string" && entry.settings != null;
+      return (
+        typeof entry.id === "string" &&
+        typeof entry.name === "string" &&
+        entry.settings != null
+      );
     });
 
-    const activeId = typeof parsed.activeId === "string" ? parsed.activeId : null;
-    const activeExists = activeId !== null && validVariants.some((v: Variant<T>) => v.id === activeId);
-    return { activeId: activeExists ? activeId : null, variants: validVariants } as VariantStore<T>;
+    const activeId =
+      typeof parsed.activeId === "string" ? parsed.activeId : null;
+    const activeExists =
+      activeId !== null &&
+      validVariants.some((v: Variant<T>) => v.id === activeId);
+    return {
+      activeId: activeExists ? activeId : null,
+      variants: validVariants,
+    } as VariantStore<T>;
   } catch (error) {
-    console.error(`Failed to load variant store from localStorage (${storageKey})`, error);
+    console.error(
+      `Failed to load variant store from localStorage (${storageKey})`,
+      error,
+    );
   }
   return null;
 }
@@ -52,7 +65,10 @@ function saveVariantStore<T>(storageKey: string, store: VariantStore<T>): void {
   try {
     localStorage.setItem(storageKey, JSON.stringify(store));
   } catch (error) {
-    console.error(`Failed to persist variant store to localStorage (${storageKey})`, error);
+    console.error(
+      `Failed to persist variant store to localStorage (${storageKey})`,
+      error,
+    );
   }
 }
 
@@ -61,7 +77,10 @@ function clearVariantStore(storageKey: string): void {
   try {
     localStorage.removeItem(storageKey);
   } catch (error) {
-    console.warn(`[variants] Failed to clear localStorage key "${storageKey}":`, error);
+    console.warn(
+      `[variants] Failed to clear localStorage key "${storageKey}":`,
+      error,
+    );
   }
 }
 
@@ -88,14 +107,16 @@ interface UseVariantsOptions<T> {
   migrate?: () => { name: string; settings: T; cleanup?: () => void } | null;
 }
 
-export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsReturn<T> {
+export function useVariants<T>(
+  options: UseVariantsOptions<T>,
+): UseVariantsReturn<T> {
   const { storageKey, toolKey, migrate } = options;
   const { isAuthenticated } = useConvexAuth();
 
   // Convex queries/mutations — only active when toolKey is provided and authenticated
   const convexVariants = useQuery(
     api.userVariants.list,
-    toolKey && isAuthenticated ? { toolKey } : "skip"
+    toolKey && isAuthenticated ? { toolKey } : "skip",
   );
   const upsertVariant = useMutation(api.userVariants.upsert);
   const removeVariant = useMutation(api.userVariants.remove);
@@ -105,7 +126,10 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
 
   const useConvex = Boolean(toolKey && isAuthenticated);
 
-  const [localStore, setLocalStore] = useState<VariantStore<T>>({ activeId: null, variants: [] });
+  const [localStore, setLocalStore] = useState<VariantStore<T>>({
+    activeId: null,
+    variants: [],
+  });
   const initialized = useRef(false);
   const importedRef = useRef(false);
 
@@ -131,7 +155,10 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
           createdAt: now,
           updatedAt: now,
         };
-        const newStore: VariantStore<T> = { activeId: variant.id, variants: [variant] };
+        const newStore: VariantStore<T> = {
+          activeId: variant.id,
+          variants: [variant],
+        };
         saveVariantStore(storageKey, newStore);
         migrated.cleanup?.();
         setLocalStore(newStore);
@@ -172,12 +199,14 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
         createdAt: v.createdAt,
         updatedAt: v.updatedAt,
       })),
-    }).then(() => {
-      clearVariantStore(storageKey);
-    }).catch((err) => {
-      console.error("[useVariants] auto-import failed:", err);
-      importedRef.current = false; // allow retry on next mount
-    });
+    })
+      .then(() => {
+        clearVariantStore(storageKey);
+      })
+      .catch((err) => {
+        console.error("[useVariants] auto-import failed:", err);
+        importedRef.current = false; // allow retry on next mount
+      });
   }, [useConvex, toolKey, convexVariants, storageKey, importBatchMut]);
 
   // Persist localStorage changes (anonymous mode only)
@@ -192,125 +221,164 @@ export function useVariants<T>(options: UseVariantsOptions<T>): UseVariantsRetur
   }, [storageKey, localStore, useConvex]);
 
   // Build the effective store from Convex data when authenticated
-  const store: VariantStore<T> = useConvex && convexVariants
-    ? {
-        activeId: convexVariants.find((v) => v.isActive)?.variantId ?? null,
-        variants: convexVariants.map((v) => ({
-          id: v.variantId,
-          name: v.name,
-          slug: v.slug,
-          settings: v.settings as T,
-          createdAt: v.createdAt,
-          updatedAt: v.updatedAt,
-        })),
-      }
-    : localStore;
+  const store: VariantStore<T> =
+    useConvex && convexVariants
+      ? {
+          activeId: convexVariants.find((v) => v.isActive)?.variantId ?? null,
+          variants: convexVariants.map((v) => ({
+            id: v.variantId,
+            name: v.name,
+            slug: v.slug,
+            settings: v.settings as T,
+            createdAt: v.createdAt,
+            updatedAt: v.updatedAt,
+          })),
+        }
+      : localStore;
 
-  const activeVariant = store.variants.find((v) => v.id === store.activeId) ?? null;
+  const activeVariant =
+    store.variants.find((v) => v.id === store.activeId) ?? null;
 
-  const createVariant = useCallback((name: string, settings: T): Variant<T> => {
-    const now = Date.now();
-    const variant: Variant<T> = {
-      id: crypto.randomUUID(),
-      name,
-      settings,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    if (useConvex && toolKey) {
-      upsertVariant({
-        toolKey,
-        variantId: variant.id,
+  const createVariant = useCallback(
+    (name: string, settings: T): Variant<T> => {
+      const now = Date.now();
+      const variant: Variant<T> = {
+        id: crypto.randomUUID(),
         name,
-        settings: settings as Record<string, unknown>,
-        isActive: true,
-      }).catch((err) => console.error("[useVariants] create sync failed:", err));
-    }
+        settings,
+        createdAt: now,
+        updatedAt: now,
+      };
 
-    setLocalStore((prev) => ({
-      activeId: variant.id,
-      variants: [...prev.variants, variant],
-    }));
-    return variant;
-  }, [useConvex, toolKey, upsertVariant]);
-
-  const saveToActive = useCallback((settings: T) => {
-    if (useConvex && toolKey) {
-      const active = store.variants.find((v) => v.id === store.activeId);
-      if (active) {
+      if (useConvex && toolKey) {
         upsertVariant({
           toolKey,
-          variantId: active.id,
-          name: active.name,
+          variantId: variant.id,
+          name,
           settings: settings as Record<string, unknown>,
           isActive: true,
-        }).catch((err) => console.error("[useVariants] save sync failed:", err));
+        }).catch((err) =>
+          console.error("[useVariants] create sync failed:", err),
+        );
       }
-    }
-    setLocalStore((prev) => {
-      if (!prev.activeId) return prev;
-      return {
+
+      setLocalStore((prev) => ({
+        activeId: variant.id,
+        variants: [...prev.variants, variant],
+      }));
+      return variant;
+    },
+    [useConvex, toolKey, upsertVariant],
+  );
+
+  const saveToActive = useCallback(
+    (settings: T) => {
+      if (useConvex && toolKey) {
+        const active = store.variants.find((v) => v.id === store.activeId);
+        if (active) {
+          upsertVariant({
+            toolKey,
+            variantId: active.id,
+            name: active.name,
+            settings: settings as Record<string, unknown>,
+            isActive: true,
+          }).catch((err) =>
+            console.error("[useVariants] save sync failed:", err),
+          );
+        }
+      }
+      setLocalStore((prev) => {
+        if (!prev.activeId) return prev;
+        return {
+          ...prev,
+          variants: prev.variants.map((v) =>
+            v.id === prev.activeId
+              ? { ...v, settings, updatedAt: Date.now() }
+              : v,
+          ),
+        };
+      });
+    },
+    [useConvex, toolKey, upsertVariant, store.variants, store.activeId],
+  );
+
+  const deleteVariant = useCallback(
+    (id: string) => {
+      if (useConvex && toolKey) {
+        removeVariant({ toolKey, variantId: id }).catch((err) =>
+          console.error("[useVariants] delete sync failed:", err),
+        );
+      }
+      setLocalStore((prev) => ({
+        activeId: prev.activeId === id ? null : prev.activeId,
+        variants: prev.variants.filter((v) => v.id !== id),
+      }));
+    },
+    [useConvex, toolKey, removeVariant],
+  );
+
+  const renameVariant = useCallback(
+    (id: string, name: string) => {
+      if (useConvex && toolKey) {
+        renameVariantMut({ toolKey, variantId: id, name }).catch((err) =>
+          console.error("[useVariants] rename sync failed:", err),
+        );
+      }
+      setLocalStore((prev) => ({
         ...prev,
         variants: prev.variants.map((v) =>
-          v.id === prev.activeId
-            ? { ...v, settings, updatedAt: Date.now() }
-            : v
+          v.id === id ? { ...v, name, updatedAt: Date.now() } : v,
         ),
-      };
-    });
-  }, [useConvex, toolKey, upsertVariant, store.variants, store.activeId]);
+      }));
+    },
+    [useConvex, toolKey, renameVariantMut],
+  );
 
-  const deleteVariant = useCallback((id: string) => {
-    if (useConvex && toolKey) {
-      removeVariant({ toolKey, variantId: id }).catch((err) => console.error("[useVariants] delete sync failed:", err));
-    }
-    setLocalStore((prev) => ({
-      activeId: prev.activeId === id ? null : prev.activeId,
-      variants: prev.variants.filter((v) => v.id !== id),
-    }));
-  }, [useConvex, toolKey, removeVariant]);
-
-  const renameVariant = useCallback((id: string, name: string) => {
-    if (useConvex && toolKey) {
-      renameVariantMut({ toolKey, variantId: id, name }).catch((err) => console.error("[useVariants] rename sync failed:", err));
-    }
-    setLocalStore((prev) => ({
-      ...prev,
-      variants: prev.variants.map((v) =>
-        v.id === id ? { ...v, name, updatedAt: Date.now() } : v
-      ),
-    }));
-  }, [useConvex, toolKey, renameVariantMut]);
-
-  const setActive = useCallback((id: string | null) => {
-    if (useConvex && toolKey) {
-      setActiveMut({ toolKey, variantId: id ?? undefined }).catch((err) => console.error("[useVariants] setActive sync failed:", err));
-    }
-    setLocalStore((prev) => ({ ...prev, activeId: id }));
-  }, [useConvex, toolKey, setActiveMut]);
-
-  const setVariantSlug = useCallback((id: string, slug: string) => {
-    if (useConvex && toolKey) {
-      const variant = store.variants.find((v) => v.id === id);
-      if (variant) {
-        upsertVariant({
-          toolKey,
-          variantId: id,
-          name: variant.name,
-          slug,
-          settings: variant.settings as Record<string, unknown>,
-          isActive: variant.id === store.activeId,
-        }).catch((err) => console.error("[useVariants] slug sync failed:", err));
+  const setActive = useCallback(
+    (id: string | null) => {
+      if (useConvex && toolKey) {
+        setActiveMut({ toolKey, variantId: id ?? undefined }).catch((err) =>
+          console.error("[useVariants] setActive sync failed:", err),
+        );
       }
-    }
-    setLocalStore((prev) => ({
-      ...prev,
-      variants: prev.variants.map((v) =>
-        v.id === id ? { ...v, slug } : v
-      ),
-    }));
-  }, [useConvex, toolKey, upsertVariant, store.variants, store.activeId]);
+      setLocalStore((prev) => ({ ...prev, activeId: id }));
+    },
+    [useConvex, toolKey, setActiveMut],
+  );
 
-  return { store, activeVariant, createVariant, saveToActive, deleteVariant, renameVariant, setActive, setVariantSlug };
+  const setVariantSlug = useCallback(
+    (id: string, slug: string) => {
+      if (useConvex && toolKey) {
+        const variant = store.variants.find((v) => v.id === id);
+        if (variant) {
+          upsertVariant({
+            toolKey,
+            variantId: id,
+            name: variant.name,
+            slug,
+            settings: variant.settings as Record<string, unknown>,
+            isActive: variant.id === store.activeId,
+          }).catch((err) =>
+            console.error("[useVariants] slug sync failed:", err),
+          );
+        }
+      }
+      setLocalStore((prev) => ({
+        ...prev,
+        variants: prev.variants.map((v) => (v.id === id ? { ...v, slug } : v)),
+      }));
+    },
+    [useConvex, toolKey, upsertVariant, store.variants, store.activeId],
+  );
+
+  return {
+    store,
+    activeVariant,
+    createVariant,
+    saveToActive,
+    deleteVariant,
+    renameVariant,
+    setActive,
+    setVariantSlug,
+  };
 }
