@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const blackWatchPalette: PaletteCategory = {
-  id: 'black-watch',
-  label: 'Black Watch',
-  description: 'Scottish tartan — deep forest greens and midnight navies of the Highland regiment',
+  id: "black-watch",
+  label: "Black Watch",
+  description:
+    "Scottish tartan — deep forest greens and midnight navies of the Highland regiment",
   colors: {
     BW_MIDNIGHTPINE: { multiply: [5, 15, 10] },
     BW_DARKWATCH: { multiply: [8, 25, 18] },

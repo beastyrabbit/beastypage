@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const tropicalLagoonPalette: PaletteCategory = {
-  id: 'tropical-lagoon',
-  label: 'Tropical Lagoon',
-  description: 'Turquoise — deep ocean navy through vivid aquamarine to warm pale mint',
+  id: "tropical-lagoon",
+  label: "Tropical Lagoon",
+  description:
+    "Turquoise — deep ocean navy through vivid aquamarine to warm pale mint",
   colors: {
     TL_OCEANFLOOR: { multiply: [5, 22, 28] },
     TL_DEEPLAGOON: { multiply: [8, 35, 40] },

@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const midnightVelvetPalette: PaletteCategory = {
-  id: 'midnight-velvet',
-  label: 'Midnight Velvet',
-  description: 'Navy / Indigo — plum-tinged navies woven from the deepest night',
+  id: "midnight-velvet",
+  label: "Midnight Velvet",
+  description:
+    "Navy / Indigo — plum-tinged navies woven from the deepest night",
   colors: {
     MV_BLACKPLUM: { multiply: [10, 4, 22] },
     MV_VOIDNAVY: { multiply: [14, 7, 35] },

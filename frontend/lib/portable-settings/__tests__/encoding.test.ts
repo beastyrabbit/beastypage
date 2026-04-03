@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import {
-  encodePortableSettings,
-  decodePortableSettings,
-  isValidSettingsCode,
-} from "../encoding";
-import { extractPortableSettings, applyPortableSettings } from "../helpers";
-import { PORTABLE_PALETTE_REGISTRY } from "../registry";
-import type { SingleCatPortableSettings } from "../types";
 import type { SingleCatSettings } from "@/utils/singleCatVariants";
 import { DEFAULT_SINGLE_CAT_SETTINGS } from "@/utils/singleCatVariants";
+import {
+  decodePortableSettings,
+  encodePortableSettings,
+  isValidSettingsCode,
+} from "../encoding";
+import { applyPortableSettings, extractPortableSettings } from "../helpers";
+import { PORTABLE_PALETTE_REGISTRY } from "../registry";
+import type { SingleCatPortableSettings } from "../types";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -33,13 +33,13 @@ function assertRoundTrip(settings: SingleCatPortableSettings) {
   const code = encodePortableSettings(settings);
   const decoded = decodePortableSettings(code);
   expect(decoded).not.toBeNull();
-  expect(decoded!.accessoryRange).toEqual(settings.accessoryRange);
-  expect(decoded!.scarRange).toEqual(settings.scarRange);
-  expect(decoded!.tortieRange).toEqual(settings.tortieRange);
-  expect(decoded!.exactLayerCounts).toBe(settings.exactLayerCounts);
-  expect(decoded!.afterlifeMode).toBe(settings.afterlifeMode);
-  expect(decoded!.includeBaseColours).toBe(settings.includeBaseColours);
-  expect([...decoded!.extendedModes].sort()).toEqual(
+  expect(decoded?.accessoryRange).toEqual(settings.accessoryRange);
+  expect(decoded?.scarRange).toEqual(settings.scarRange);
+  expect(decoded?.tortieRange).toEqual(settings.tortieRange);
+  expect(decoded?.exactLayerCounts).toBe(settings.exactLayerCounts);
+  expect(decoded?.afterlifeMode).toBe(settings.afterlifeMode);
+  expect(decoded?.includeBaseColours).toBe(settings.includeBaseColours);
+  expect([...(decoded?.extendedModes ?? [])].sort()).toEqual(
     [...settings.extendedModes].sort(),
   );
 }
@@ -68,7 +68,9 @@ describe("encodePortableSettings / decodePortableSettings", () => {
   });
 
   it("round-trips with all palettes selected", () => {
-    assertRoundTrip(makeSettings({ extendedModes: [...PORTABLE_PALETTE_REGISTRY] }));
+    assertRoundTrip(
+      makeSettings({ extendedModes: [...PORTABLE_PALETTE_REGISTRY] }),
+    );
   });
 
   it("round-trips each palette individually", () => {
@@ -79,7 +81,15 @@ describe("encodePortableSettings / decodePortableSettings", () => {
 
   it("round-trips with mixed palette selection", () => {
     assertRoundTrip(
-      makeSettings({ extendedModes: ["mood", "demonslayer", "fma", "scottish-clans", "flag-patterns"] }),
+      makeSettings({
+        extendedModes: [
+          "mood",
+          "demonslayer",
+          "fma",
+          "scottish-clans",
+          "flag-patterns",
+        ],
+      }),
     );
   });
 
@@ -114,7 +124,12 @@ describe("encodePortableSettings / decodePortableSettings", () => {
 
   it("round-trips every afterlife option", () => {
     const options = [
-      "off", "dark10", "star10", "both10", "darkForce", "starForce",
+      "off",
+      "dark10",
+      "star10",
+      "both10",
+      "darkForce",
+      "starForce",
     ] as const;
     for (const opt of options) {
       assertRoundTrip(makeSettings({ afterlifeMode: opt }));
@@ -172,7 +187,9 @@ describe("encodePortableSettings / decodePortableSettings", () => {
   });
 
   it("rejects unknown words", () => {
-    expect(decodePortableSettings("that with this have xyznotaword extra")).toBeNull();
+    expect(
+      decodePortableSettings("that with this have xyznotaword extra"),
+    ).toBeNull();
     expect(decodePortableSettings("qqq www eee rrr ttt uuu")).toBeNull();
   });
 
@@ -182,14 +199,18 @@ describe("encodePortableSettings / decodePortableSettings", () => {
 
   it("produces different codes for different settings", () => {
     const a = encodePortableSettings(makeSettings({ afterlifeMode: "off" }));
-    const b = encodePortableSettings(makeSettings({ afterlifeMode: "starForce" }));
+    const b = encodePortableSettings(
+      makeSettings({ afterlifeMode: "starForce" }),
+    );
     expect(a).not.toBe(b);
   });
 
   it("decodes pre-change codes as exactLayerCounts = true", () => {
-    const decoded = decodePortableSettings("alkaloids-which-that-that-that-that");
+    const decoded = decodePortableSettings(
+      "alkaloids-which-that-that-that-that",
+    );
     expect(decoded).not.toBeNull();
-    expect(decoded!.exactLayerCounts).toBe(true);
+    expect(decoded?.exactLayerCounts).toBe(true);
   });
 });
 
@@ -240,7 +261,9 @@ describe("individual palette encoding", () => {
 
   it("round-trips solid-ext palettes individually", () => {
     assertRoundTrip(
-      makeSettings({ extendedModes: ["ocean-depths", "ink-wash", "golden-hour"] }),
+      makeSettings({
+        extendedModes: ["ocean-depths", "ink-wash", "golden-hour"],
+      }),
     );
   });
 
@@ -249,19 +272,28 @@ describe("individual palette encoding", () => {
   });
 
   it("round-trips all palettes at once", () => {
-    assertRoundTrip(makeSettings({ extendedModes: [...PORTABLE_PALETTE_REGISTRY] }));
+    assertRoundTrip(
+      makeSettings({ extendedModes: [...PORTABLE_PALETTE_REGISTRY] }),
+    );
   });
 
   it("round-trips a large cross-category mix", () => {
     assertRoundTrip(
       makeSettings({
         extendedModes: [
-          "mood", "bold", "fma",                               // core
-          "ocean-depths", "crimson-flame", "greyscale",        // solid-ext
-          "royal-stewart", "gingham-patterns",                  // textile
-          "european-ornate",                                    // ornate
-          "scottish-clans", "japanese-patterns", "korean-patterns", // heritage
-          "flag-patterns",                                      // flags
+          "mood",
+          "bold",
+          "fma", // core
+          "ocean-depths",
+          "crimson-flame",
+          "greyscale", // solid-ext
+          "royal-stewart",
+          "gingham-patterns", // textile
+          "european-ornate", // ornate
+          "scottish-clans",
+          "japanese-patterns",
+          "korean-patterns", // heritage
+          "flag-patterns", // flags
         ],
       }),
     );
@@ -300,9 +332,12 @@ describe("append-compatibility", () => {
     });
     const code = encodePortableSettings(settings);
     const decoded = decodePortableSettings(code)!;
-    expect([...decoded.extendedModes].sort()).toEqual(
-      ["blackout", "fma", "mood", "scottish-clans"],
-    );
+    expect([...decoded.extendedModes].sort()).toEqual([
+      "blackout",
+      "fma",
+      "mood",
+      "scottish-clans",
+    ]);
     expect(decoded.accessoryRange).toEqual({ min: 2, max: 4 });
   });
 });
