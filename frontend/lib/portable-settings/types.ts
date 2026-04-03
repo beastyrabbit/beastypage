@@ -1,4 +1,8 @@
-import type { LayerRange, AfterlifeOption, ExtendedMode } from "@/utils/singleCatVariants";
+import type {
+  AfterlifeOption,
+  ExtendedMode,
+  LayerRange,
+} from "@/utils/singleCatVariants";
 
 /**
  * Portable subset of SingleCatSettings — only the non-timing fields.

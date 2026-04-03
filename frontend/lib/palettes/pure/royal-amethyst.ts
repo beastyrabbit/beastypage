@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const royalAmethystPalette: PaletteCategory = {
-  id: 'royal-amethyst',
-  label: 'Royal Amethyst',
-  description: 'Purple — midnight blue gem shadows through regal purple to warm dusty mauve',
+  id: "royal-amethyst",
+  label: "Royal Amethyst",
+  description:
+    "Purple — midnight blue gem shadows through regal purple to warm dusty mauve",
   colors: {
     RA_MIDNIGHTGEM: { multiply: [12, 5, 32] },
     RA_IMPERIALNIGHT: { multiply: [18, 8, 48] },

@@ -1,5 +1,10 @@
-import type { ProcessRequest, ProcessResponse, DetectGridResponse, ProcessMode } from "./types";
-import type { Pipeline } from "./types";
+import type {
+  DetectGridResponse,
+  Pipeline,
+  ProcessMode,
+  ProcessRequest,
+  ProcessResponse,
+} from "./types";
 
 export async function processImage(
   image: string,
@@ -24,7 +29,9 @@ export async function processImage(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Unknown error" }));
-    throw new Error((err as { error?: string }).error ?? `Processing failed (${res.status})`);
+    throw new Error(
+      (err as { error?: string }).error ?? `Processing failed (${res.status})`,
+    );
   }
 
   return res.json() as Promise<ProcessResponse>;
@@ -39,7 +46,9 @@ export async function detectGrid(image: string): Promise<DetectGridResponse> {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Unknown error" }));
-    throw new Error((err as { error?: string }).error ?? `Detection failed (${res.status})`);
+    throw new Error(
+      (err as { error?: string }).error ?? `Detection failed (${res.status})`,
+    );
   }
 
   return res.json() as Promise<DetectGridResponse>;

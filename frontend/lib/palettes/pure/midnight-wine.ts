@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const midnightWinePalette: PaletteCategory = {
-  id: 'midnight-wine',
-  label: 'Midnight Wine',
-  description: 'Plum / Wine — blue-shadowed plum depths through rich merlot to warm dusty rose',
+  id: "midnight-wine",
+  label: "Midnight Wine",
+  description:
+    "Plum / Wine — blue-shadowed plum depths through rich merlot to warm dusty rose",
   colors: {
     MW_INKYPLUM: { multiply: [18, 4, 20] },
     MW_DARKGRAPE: { multiply: [30, 8, 28] },

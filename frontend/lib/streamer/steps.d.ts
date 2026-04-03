@@ -1,4 +1,4 @@
-import type { CatParams } from '@/lib/cat-v3/types';
+import type { CatParams } from "@/lib/cat-v3/types";
 
 export type StreamerParams = CatParams & {
   _tortieLayers?: number;
@@ -21,15 +21,28 @@ export type StreamStep = {
   id: string;
   title: string;
   description: string;
-  getOptions: (state: { params: StreamerParams; [key: string]: unknown }) => Array<{
+  getOptions: (state: {
+    params: StreamerParams;
+    [key: string]: unknown;
+  }) => Array<{
     key: string;
     label: string;
-    mutate?: (params: StreamerParams, state: { params: StreamerParams; [key: string]: unknown }) => void;
+    mutate?: (
+      params: StreamerParams,
+      state: { params: StreamerParams; [key: string]: unknown },
+    ) => void;
   }>;
   summarize: (option: { label: string }) => string;
   apply: (
-    option: { key: string; label: string; mutate?: (params: StreamerParams, state: { params: StreamerParams; [key: string]: unknown }) => void },
-    state: { params: StreamerParams; [key: string]: unknown }
+    option: {
+      key: string;
+      label: string;
+      mutate?: (
+        params: StreamerParams,
+        state: { params: StreamerParams; [key: string]: unknown },
+      ) => void;
+    },
+    state: { params: StreamerParams; [key: string]: unknown },
   ) => void;
 };
 
@@ -37,5 +50,7 @@ export function getDefaultStreamParams(): StreamerParams;
 export function formatDisplayName(value: unknown): string;
 export function ensureSpriteDataLoaded(): Promise<void>;
 export function cloneParams<T>(params: T): T;
-export function createStreamSteps(state?: { params: StreamerParams }): StreamStep[];
+export function createStreamSteps(state?: {
+  params: StreamerParams;
+}): StreamStep[];
 export function getStepById(steps: StreamStep[], id: string): StreamStep | null;

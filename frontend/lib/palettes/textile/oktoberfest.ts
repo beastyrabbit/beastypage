@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const oktoberfestPalette: PaletteCategory = {
-  id: 'oktoberfest',
-  label: 'Oktoberfest',
-  description: 'German festive — golden Masskrug amber, pretzel brown, Festzelt greens and Radler sunshine',
+  id: "oktoberfest",
+  label: "Oktoberfest",
+  description:
+    "German festive — golden Masskrug amber, pretzel brown, Festzelt greens and Radler sunshine",
   colors: {
     OK_DUNKELWEIZEN: { multiply: [42, 25, 10] },
     OK_DOPPELBOCK: { multiply: [68, 35, 12] },

@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const savileRowPalette: PaletteCategory = {
-  id: 'savile-row',
-  label: 'Savile Row',
-  description: 'English tailoring — pinstripe charcoals, bespoke navies, chalk whites and silk lining',
+  id: "savile-row",
+  label: "Savile Row",
+  description:
+    "English tailoring — pinstripe charcoals, bespoke navies, chalk whites and silk lining",
   colors: {
     SV_JETBLACK: { multiply: [10, 10, 12] },
     SV_CHARCOALSUIT: { multiply: [32, 32, 36] },

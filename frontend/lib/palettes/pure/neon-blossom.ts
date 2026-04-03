@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const neonBlossomPalette: PaletteCategory = {
-  id: 'neon-blossom',
-  label: 'Neon Blossom',
-  description: 'Magenta / Fuchsia — electric violet depths through hot fuchsia to warm orchid glow',
+  id: "neon-blossom",
+  label: "Neon Blossom",
+  description:
+    "Magenta / Fuchsia — electric violet depths through hot fuchsia to warm orchid glow",
   colors: {
     NB_DEEPPURPLE: { multiply: [30, 4, 28] },
     NB_DARKFUCHSIA: { multiply: [45, 8, 40] },
