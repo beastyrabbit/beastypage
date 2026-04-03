@@ -29,11 +29,11 @@ import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { PaletteId } from "@/lib/palettes";
+import { useClerk } from "@clerk/nextjs";
 import {
   decodePortableSettings,
   encodePortableSettings,
 } from "@/lib/portable-settings";
-import { useClerk } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import {
   AFTERLIFE_OPTIONS,

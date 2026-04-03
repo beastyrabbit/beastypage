@@ -325,27 +325,31 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
 // Comparison
 // ---------------------------------------------------------------------------
 
-/** JSON comparison that normalizes both sides through parseSingleCatPayload and ignores metadata fields. */
+/** Stable JSON.stringify that sorts object keys at every nesting level. */
+function sortedStringify(obj: unknown): string {
+  return JSON.stringify(obj, (_, v) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.entries(v).sort(([a], [b]) => a.localeCompare(b)),
+        )
+      : v,
+  );
+}
+
+/** Compare two settings objects, ignoring metadata fields (catName, creatorName). */
 export function singleCatSettingsEqual(
   a: SingleCatSettings,
   b: unknown,
 ): boolean {
-  const normalize = (s: SingleCatSettings) => {
+  const stripMeta = (s: SingleCatSettings) => {
     const { catName: _cn, creatorName: _cr, ...rest } = s;
-    return { ...rest, extendedModes: [...s.extendedModes].sort() };
+    return rest;
   };
-  const parsedA = normalize(parseSingleCatPayload(a));
-  const parsedB = normalize(parseSingleCatPayload(b));
-  // Sort keys at every nesting level for consistent comparison
-  const sortedStringify = (obj: unknown) =>
-    JSON.stringify(obj, (_, v) =>
-      v && typeof v === "object" && !Array.isArray(v)
-        ? Object.fromEntries(
-            Object.entries(v).sort(([a], [b]) => a.localeCompare(b)),
-          )
-        : v,
-    );
-  return sortedStringify(parsedA) === sortedStringify(parsedB);
+  // parseSingleCatPayload already sorts extendedModes, so no extra sort needed
+  return (
+    sortedStringify(stripMeta(parseSingleCatPayload(a))) ===
+    sortedStringify(stripMeta(parseSingleCatPayload(b)))
+  );
 }
 
 // ---------------------------------------------------------------------------

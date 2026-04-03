@@ -17,10 +17,10 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useClerk, useUser } from "@clerk/nextjs";
 import { setAccountDeleting } from "@/components/auth/UserAuthButton";
 import { PageHero } from "@/components/common/PageHero";
 import { api } from "@/convex/_generated/api";
-import { useClerk, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
@@ -77,7 +77,11 @@ export default function ProfilePage() {
       );
       return;
     }
-    clerk.signOut();
+    try {
+      await clerk.signOut();
+    } catch {
+      window.location.href = "/";
+    }
   };
 
   const handleSave = async () => {
@@ -87,9 +91,12 @@ export default function ProfilePage() {
       await updateProfile({ username: trimmed });
       // Sync username to Clerk
       if (trimmed && clerkUser) {
-        await clerkUser.update({ username: trimmed }).catch((err) => {
-          console.warn("[Profile] Clerk username sync failed:", err);
-        });
+        try {
+          await clerkUser.update({ username: trimmed });
+        } catch (err) {
+          console.error("[Profile] Clerk username sync failed:", err);
+          toast.warning("Profile saved, but username sync to login provider failed.");
+        }
       }
       toast.success("Profile updated");
     } catch (err) {

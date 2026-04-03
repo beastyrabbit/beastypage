@@ -4,8 +4,8 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Loader2, LogIn, LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { api } from "@/convex/_generated/api";
 import { useClerk, useUser } from "@clerk/nextjs";
+import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 
 /**
