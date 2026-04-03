@@ -41,10 +41,12 @@ export interface RandomGenerationOptions {
   includeBaseColours?: boolean;
   exactLayerCounts?: boolean;
   countsMode?:
-    | 'weighted'
-    | 'uniform'
-    | Partial<Record<'tortie' | 'accessories' | 'scars', 'weighted' | 'uniform'>>;
-  slotOverrides?: Partial<Record<'tortie' | 'accessories' | 'scars', number>>;
+    | "weighted"
+    | "uniform"
+    | Partial<
+        Record<"tortie" | "accessories" | "scars", "weighted" | "uniform">
+      >;
+  slotOverrides?: Partial<Record<"tortie" | "accessories" | "scars", number>>;
   whitePatchColourMode?: string;
   // Legacy count options (mapped to slotOverrides internally)
   accessoryCount?: number;
@@ -65,7 +67,7 @@ export interface RandomGenerationResult {
 
 export interface CatRenderParams {
   spriteNumber: number;
-  params: Partial<Omit<CatParams, 'spriteNumber'>>;
+  params: Partial<Omit<CatParams, "spriteNumber">>;
   collectLayers?: boolean;
   includeLayerImages?: boolean;
 }

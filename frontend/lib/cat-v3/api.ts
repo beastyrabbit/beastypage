@@ -1,37 +1,37 @@
-type RequestPriority = 'high' | 'low' | 'auto';
+type RequestPriority = "high" | "low" | "auto";
 
-import {
-  CatRenderParams,
-  RendererResponse,
+import type {
   BatchRenderRequest,
   BatchRenderResponse,
-} from './types';
+  CatRenderParams,
+  RendererResponse,
+} from "./types";
 
-const PUBLIC_RENDERER_BASE = '/api/renderer';
-const INTERNAL_RENDERER_BASE = 'http://renderer:8001';
+const PUBLIC_RENDERER_BASE = "/api/renderer";
+const INTERNAL_RENDERER_BASE = "http://renderer:8001";
 
 function resolveRendererBase(baseUrl?: string): string {
   if (baseUrl) return stripTrailingSlash(baseUrl);
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     return stripTrailingSlash(PUBLIC_RENDERER_BASE);
   }
   return stripTrailingSlash(INTERNAL_RENDERER_BASE);
 }
 
 function stripTrailingSlash(input: string): string {
-  return input.replace(/\/+$/, '');
+  return input.replace(/\/+$/, "");
 }
 
 function buildRendererUrl(base: string, pathname: string): string {
-  const normalized = stripTrailingSlash(base || '');
+  const normalized = stripTrailingSlash(base || "");
   if (/^https?:\/\//i.test(base)) {
     return `${normalized}${pathname}`;
   }
-  if (pathname === '/render') {
-    return normalized || '/api/renderer';
+  if (pathname === "/render") {
+    return normalized || "/api/renderer";
   }
-  if (pathname.startsWith('/render/')) {
-    return `${normalized}${pathname.slice('/render'.length)}` || normalized;
+  if (pathname.startsWith("/render/")) {
+    return `${normalized}${pathname.slice("/render".length)}` || normalized;
   }
   return `${normalized}${pathname}`;
 }
@@ -52,21 +52,21 @@ interface RawLayerDiagnostic {
 
 interface RawRenderResponse {
   image: string;
-  meta: RendererResponse['meta'];
+  meta: RendererResponse["meta"];
   layers?: RawLayerDiagnostic[];
 }
 
 export async function renderCatV3(
   payload: CatRenderParams,
-  options: RenderOptions = {}
+  options: RenderOptions = {},
 ): Promise<RendererResponse> {
   const baseUrl = resolveRendererBase(options.baseUrl);
   const collectLayers = Boolean(payload.collectLayers);
   const includeLayerImages = Boolean(payload.includeLayerImages);
   const requestInit: RequestInit & { priority?: RequestPriority } = {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
       payload: {
@@ -83,12 +83,16 @@ export async function renderCatV3(
     requestInit.priority = options.priority;
   }
 
-  const response = await fetchWithRetry(buildRendererUrl(baseUrl, '/render'), requestInit, {
-    attempts: 3,
-    baseDelayMs: 100,
-    maxDelayMs: 1200,
-    context: 'render-single',
-  });
+  const response = await fetchWithRetry(
+    buildRendererUrl(baseUrl, "/render"),
+    requestInit,
+    {
+      attempts: 3,
+      baseDelayMs: 100,
+      maxDelayMs: 1200,
+      context: "render-single",
+    },
+  );
 
   if (!response.ok) {
     const message = await safeReadError(response);
@@ -119,16 +123,18 @@ async function safeReadError(response: Response): Promise<string> {
   }
 }
 
-export async function decodeImageFromDataUrl(dataUrl: string): Promise<HTMLCanvasElement> {
+export async function decodeImageFromDataUrl(
+  dataUrl: string,
+): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
       canvas.width = image.width;
       canvas.height = image.height;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext("2d");
       if (!ctx) {
-        reject(new Error('Failed to acquire canvas context'));
+        reject(new Error("Failed to acquire canvas context"));
         return;
       }
       ctx.drawImage(image, 0, 0);
@@ -143,13 +149,13 @@ export async function decodeImageFromDataUrl(dataUrl: string): Promise<HTMLCanva
 
 export async function renderCatBatchV3(
   request: BatchRenderRequest,
-  options: RenderOptions = {}
+  options: RenderOptions = {},
 ): Promise<BatchRenderResponse> {
   const baseUrl = resolveRendererBase(options.baseUrl);
   const requestInit: RequestInit & { priority?: RequestPriority } = {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(request),
   };
@@ -157,16 +163,22 @@ export async function renderCatBatchV3(
     requestInit.priority = options.priority;
   }
 
-  const response = await fetchWithRetry(buildRendererUrl(baseUrl, '/render/batch'), requestInit, {
-    attempts: 3,
-    baseDelayMs: 100,
-    maxDelayMs: 1500,
-    context: 'render-batch',
-  });
+  const response = await fetchWithRetry(
+    buildRendererUrl(baseUrl, "/render/batch"),
+    requestInit,
+    {
+      attempts: 3,
+      baseDelayMs: 100,
+      maxDelayMs: 1500,
+      context: "render-batch",
+    },
+  );
 
   if (!response.ok) {
     const message = await safeReadError(response);
-    throw new Error(`Renderer batch request failed (${response.status}): ${message}`);
+    throw new Error(
+      `Renderer batch request failed (${response.status}): ${message}`,
+    );
   }
 
   const data = await response.json();
@@ -189,7 +201,9 @@ export async function renderCatBatchV3(
   };
 
   const framesData: RawFrame[] = Array.isArray(data.frames) ? data.frames : [];
-  const sourcesData: RawSource[] | undefined = Array.isArray(data.sources) ? data.sources : undefined;
+  const sourcesData: RawSource[] | undefined = Array.isArray(data.sources)
+    ? data.sources
+    : undefined;
 
   return {
     sheetDataUrl: data.sheet,
@@ -225,7 +239,12 @@ interface RetryConfig {
 async function fetchWithRetry(
   input: RequestInfo | URL,
   init: RequestInit & { priority?: RequestPriority },
-  { attempts = 3, baseDelayMs = 100, maxDelayMs = 1000, context }: RetryConfig = {}
+  {
+    attempts = 3,
+    baseDelayMs = 100,
+    maxDelayMs = 1000,
+    context,
+  }: RetryConfig = {},
 ): Promise<Response> {
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -237,7 +256,6 @@ async function fetchWithRetry(
       const delay = computeBackoffDelay(baseDelayMs, attempt, maxDelayMs);
       logRetry(context, attempt + 1, response.status, delay);
       await wait(delay);
-      continue;
     } catch (error) {
       lastError = error;
       if (attempt === attempts - 1) {
@@ -251,7 +269,7 @@ async function fetchWithRetry(
 
   throw lastError instanceof Error
     ? lastError
-    : new Error('Renderer request failed after retries');
+    : new Error("Renderer request failed after retries");
 }
 
 function shouldRetryResponse(response: Response): boolean {
@@ -260,7 +278,11 @@ function shouldRetryResponse(response: Response): boolean {
   return false;
 }
 
-function computeBackoffDelay(base: number, attempt: number, maxDelay: number): number {
+function computeBackoffDelay(
+  base: number,
+  attempt: number,
+  maxDelay: number,
+): number {
   const jitter = Math.random() * 0.3 + 0.85;
   const delay = Math.min(maxDelay, base * 2 ** attempt);
   return Math.round(delay * jitter);
@@ -277,14 +299,19 @@ function logRetry(
   attemptNumber: number,
   status: number | null,
   delayMs: number,
-  error?: unknown
+  error?: unknown,
 ) {
-  if (process.env.NODE_ENV === 'development') {
-    const prefix = context ? `[renderer:${context}]` : '[renderer]';
+  if (process.env.NODE_ENV === "development") {
+    const prefix = context ? `[renderer:${context}]` : "[renderer]";
     if (status !== null) {
-      console.warn(`${prefix} retrying after status ${status} (attempt ${attemptNumber}) in ${delayMs}ms`);
+      console.warn(
+        `${prefix} retrying after status ${status} (attempt ${attemptNumber}) in ${delayMs}ms`,
+      );
     } else {
-      console.warn(`${prefix} retrying after error (attempt ${attemptNumber}) in ${delayMs}ms`, error);
+      console.warn(
+        `${prefix} retrying after error (attempt ${attemptNumber}) in ${delayMs}ms`,
+        error,
+      );
     }
   }
 }

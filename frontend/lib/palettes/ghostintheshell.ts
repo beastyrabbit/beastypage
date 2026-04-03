@@ -1,9 +1,10 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const ghostintheshellPalette: PaletteCategory = {
-  id: 'ghostintheshell',
-  label: 'Ghost in the Shell',
-  description: 'Cyberpunk neons, digital consciousness, and futuristic Tokyo aesthetics',
+  id: "ghostintheshell",
+  label: "Ghost in the Shell",
+  description:
+    "Cyberpunk neons, digital consciousness, and futuristic Tokyo aesthetics",
   colors: {
     GITS_TEALCYAN: { multiply: [162, 208, 216] },
     GITS_BRIGHTCYAN: { multiply: [116, 230, 247] },

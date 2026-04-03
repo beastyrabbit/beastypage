@@ -1,4 +1,4 @@
-import type { TortieLayer } from './types';
+import type { TortieLayer } from "./types";
 
 export interface MaterializedSlotsResult<TValue, TSlot = TValue | null> {
   selectedValues: TValue[];
@@ -37,7 +37,7 @@ function drawUnique<T>(available: T[]): T | null {
 
 function pickOne<T>(items: readonly T[]): T {
   if (!items.length) {
-    throw new Error('Attempted to pick from an empty list');
+    throw new Error("Attempted to pick from an empty list");
   }
   const index = Math.floor(Math.random() * items.length);
   return items[index];
@@ -57,10 +57,16 @@ export function materializeStringSlots<TChoice, TValue = TChoice>({
   shouldFillSlot,
   mapChoice: mapChoiceFn,
   mapValueToSlot: mapValueToSlotFn,
-}: BaseSlotOptions<TChoice, TValue, TValue | TChoice | string>): MaterializedSlotsResult<TValue, TValue | TChoice | string> {
+}: BaseSlotOptions<
+  TChoice,
+  TValue,
+  TValue | TChoice | string
+>): MaterializedSlotsResult<TValue, TValue | TChoice | string> {
   const identity = <T>(x: T): T => x;
   const mapChoice = mapChoiceFn ?? (identity as (choice: TChoice) => TValue);
-  const mapValueToSlot = mapValueToSlotFn ?? (identity as (value: TValue) => TValue | TChoice | string);
+  const mapValueToSlot =
+    mapValueToSlotFn ??
+    (identity as (value: TValue) => TValue | TChoice | string);
 
   const selectedValues: TValue[] = [];
   const slotSelections: Array<TValue | TChoice | string> = [];
@@ -96,7 +102,10 @@ export function materializeTortieSlots({
   uniqueMasks = true,
   exactCount,
   shouldFillSlot,
-}: TortieSlotOptions): MaterializedSlotsResult<TortieLayer, TortieLayer | null> {
+}: TortieSlotOptions): MaterializedSlotsResult<
+  TortieLayer,
+  TortieLayer | null
+> {
   const selectedValues: TortieLayer[] = [];
   const slotSelections: Array<TortieLayer | null> = [];
   const availableMasks = [...masks];

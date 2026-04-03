@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const goldenHourPalette: PaletteCategory = {
-  id: 'golden-hour',
-  label: 'Golden Hour',
-  description: 'Yellow / Amber — burnt sienna shadows through rich saffron to pale butter',
+  id: "golden-hour",
+  label: "Golden Hour",
+  description:
+    "Yellow / Amber — burnt sienna shadows through rich saffron to pale butter",
   colors: {
     GH_BURNTUMBER: { multiply: [35, 18, 6] },
     GH_DEEPAMBER: { multiply: [48, 28, 8] },

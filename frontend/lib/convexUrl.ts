@@ -6,7 +6,9 @@ export function requireClientConvexUrl(): string {
   const rawConvexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 
   if (!rawConvexUrl) {
-    throw new Error("NEXT_PUBLIC_CONVEX_URL must be defined to initialize Convex.");
+    throw new Error(
+      "NEXT_PUBLIC_CONVEX_URL must be defined to initialize Convex.",
+    );
   }
 
   return normalizeConvexUrl(rawConvexUrl);

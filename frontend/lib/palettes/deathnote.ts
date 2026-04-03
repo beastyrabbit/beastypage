@@ -1,9 +1,10 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const deathnotePalette: PaletteCategory = {
-  id: 'deathnote',
-  label: 'Death Note',
-  description: 'Shinigami shadows, notebook pages, and the battle between Light and L',
+  id: "deathnote",
+  label: "Death Note",
+  description:
+    "Shinigami shadows, notebook pages, and the battle between Light and L",
   colors: {
     DN_LBLACK: { multiply: [26, 29, 26] },
     DN_LDARK: { multiply: [42, 45, 47] },

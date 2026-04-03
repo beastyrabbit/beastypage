@@ -2,9 +2,9 @@
  * Shared utilities for ancestry tree components
  */
 
-import type { AncestryTreeCat } from './types';
-import type { CatParams } from '@/lib/cat-v3/types';
-import { encodeCatShare } from '@/lib/catShare';
+import type { CatParams } from "@/lib/cat-v3/types";
+import { encodeCatShare } from "@/lib/catShare";
+import type { AncestryTreeCat } from "./types";
 
 /**
  * Maximum sprite pose number (0-20)
@@ -15,8 +15,16 @@ export const MAX_SPRITE_POSE = 20;
  * Warrior cat name suffixes used when aging up to warrior
  */
 export const WARRIOR_SUFFIXES = [
-  'fur', 'pelt', 'tail', 'claw', 'heart',
-  'stripe', 'leaf', 'storm', 'wing', 'shine'
+  "fur",
+  "pelt",
+  "tail",
+  "claw",
+  "heart",
+  "stripe",
+  "leaf",
+  "storm",
+  "wing",
+  "shine",
 ] as const;
 
 /**

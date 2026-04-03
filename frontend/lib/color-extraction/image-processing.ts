@@ -61,8 +61,8 @@ export async function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
             new Error(
               "Cannot access image data due to CORS restrictions. " +
                 "The image server must include Access-Control-Allow-Origin headers. " +
-                "Try downloading the image first and uploading it locally."
-            )
+                "Try downloading the image first and uploading it locally.",
+            ),
           );
         } else {
           reject(error);
@@ -71,7 +71,9 @@ export async function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
     };
 
     img.onerror = () =>
-      reject(new Error("Failed to load image from URL. Try downloading it first."));
+      reject(
+        new Error("Failed to load image from URL. Try downloading it first."),
+      );
     img.src = url;
   });
 }
@@ -81,7 +83,7 @@ export async function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
  */
 export function imageToDataUrl(
   img: HTMLImageElement,
-  maxDimension = MAX_DIMENSION
+  maxDimension = MAX_DIMENSION,
 ): string {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
@@ -140,7 +142,7 @@ export function getImagePixels(img: HTMLImageElement): {
 export function getColorAtPosition(
   img: HTMLImageElement,
   x: number,
-  y: number
+  y: number,
 ): { r: number; g: number; b: number } {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
@@ -171,7 +173,7 @@ export function getColorAtPosition(
  */
 export function getScaledDimensions(
   img: HTMLImageElement,
-  maxDimension = MAX_DIMENSION
+  maxDimension = MAX_DIMENSION,
 ): { width: number; height: number } {
   let { width, height } = img;
   if (width > maxDimension || height > maxDimension) {

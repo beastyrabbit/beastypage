@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const arcticWatersPalette: PaletteCategory = {
-  id: 'arctic-waters',
-  label: 'Arctic Waters',
-  description: 'Cyan / Teal — navy-shadowed depths to warm seafoam fjord colors',
+  id: "arctic-waters",
+  label: "Arctic Waters",
+  description:
+    "Cyan / Teal — navy-shadowed depths to warm seafoam fjord colors",
   colors: {
     AW_ABYSSNAVY: { multiply: [5, 18, 30] },
     AW_DEEPFJORD: { multiply: [8, 28, 42] },

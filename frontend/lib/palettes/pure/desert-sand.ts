@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const desertSandPalette: PaletteCategory = {
-  id: 'desert-sand',
-  label: 'Desert Sand',
-  description: 'Tan / Beige — cool olive-umber shadows through warm sandstone to golden-cream dunes',
+  id: "desert-sand",
+  label: "Desert Sand",
+  description:
+    "Tan / Beige — cool olive-umber shadows through warm sandstone to golden-cream dunes",
   colors: {
     DS_RAWUMBER: { multiply: [28, 22, 14] },
     DS_DARKSAND: { multiply: [42, 32, 20] },

@@ -1,12 +1,12 @@
-import type { RGB } from "@/lib/color-extraction/types";
 import {
   hexToRgb,
+  rgbToCmyk,
   rgbToHex,
   rgbToHsl,
   rgbToHsv,
-  rgbToCmyk,
   rgbToOklch,
 } from "@/lib/color-extraction/color-utils";
+import type { RGB } from "@/lib/color-extraction/types";
 import type { DisplayFormat } from "./types";
 
 export function formatColor(

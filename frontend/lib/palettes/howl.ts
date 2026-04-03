@@ -1,9 +1,10 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const howlPalette: PaletteCategory = {
-  id: 'howl',
+  id: "howl",
   label: "Howl's Moving Castle",
-  description: "Calcifer's warmth, Howl's magic, Sophie's journey, and enchanted Ghibli skies",
+  description:
+    "Calcifer's warmth, Howl's magic, Sophie's journey, and enchanted Ghibli skies",
   colors: {
     HOWL_CALCIFER: { multiply: [255, 99, 71] },
     HOWL_FLAME: { multiply: [234, 196, 26] },

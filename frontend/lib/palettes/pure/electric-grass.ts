@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const electricGrassPalette: PaletteCategory = {
-  id: 'electric-grass',
-  label: 'Electric Grass',
-  description: 'Lime / Chartreuse — olive shadows through acid-green voltage to sunny yellow-lime',
+  id: "electric-grass",
+  label: "Electric Grass",
+  description:
+    "Lime / Chartreuse — olive shadows through acid-green voltage to sunny yellow-lime",
   colors: {
     EG_DEEPOLIVE: { multiply: [14, 25, 8] },
     EG_JUNGLEFLOOR: { multiply: [22, 38, 12] },

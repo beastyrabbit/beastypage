@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const greyscalePalette: PaletteCategory = {
-  id: 'greyscale',
-  label: 'Silver Screen',
-  description: 'Greyscale — classic film noir tones from darkroom black to projector white',
+  id: "greyscale",
+  label: "Silver Screen",
+  description:
+    "Greyscale — classic film noir tones from darkroom black to projector white",
   colors: {
     SS_FILMREEL: { multiply: [8, 8, 8] },
     SS_DARKROOM: { multiply: [18, 18, 18] },

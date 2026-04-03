@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const coldSteelPalette: PaletteCategory = {
-  id: 'cold-steel',
-  label: 'Cold Steel',
-  description: 'Cool grey — blue-tinged industrial tones from forge black to frozen chrome',
+  id: "cold-steel",
+  label: "Cold Steel",
+  description:
+    "Cool grey — blue-tinged industrial tones from forge black to frozen chrome",
   colors: {
     CS_FORGEBLACK: { multiply: [6, 8, 14] },
     CS_ANVIL: { multiply: [14, 17, 25] },

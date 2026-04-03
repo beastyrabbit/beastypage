@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const crimsonFlamePalette: PaletteCategory = {
-  id: 'crimson-flame',
-  label: 'Crimson Flame',
-  description: 'Red — plum-shadowed blood reds through fierce scarlet to warm coral fire',
+  id: "crimson-flame",
+  label: "Crimson Flame",
+  description:
+    "Red — plum-shadowed blood reds through fierce scarlet to warm coral fire",
   colors: {
     CF_DARKBLOOD: { multiply: [25, 5, 12] },
     CF_BLOODSTONE: { multiply: [38, 8, 15] },
