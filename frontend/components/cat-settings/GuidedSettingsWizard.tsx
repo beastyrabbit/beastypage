@@ -1,22 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { cn } from "@/lib/utils";
-import {
-  encodePortableSettings,
-} from "@/lib/portable-settings";
 import type { SingleCatPortableSettings } from "@/lib/portable-settings";
-import type { AfterlifeOption, ExtendedMode, LayerRange } from "@/utils/singleCatVariants";
+import { encodePortableSettings } from "@/lib/portable-settings";
+import { cn } from "@/lib/utils";
+import type {
+  AfterlifeOption,
+  ExtendedMode,
+  LayerRange,
+} from "@/utils/singleCatVariants";
 import { DEFAULT_SINGLE_CAT_SETTINGS } from "@/utils/singleCatVariants";
-import { WIZARD_STEPS } from "./wizard-steps/types";
-import type { WizardStepProps } from "./wizard-steps/types";
-import { WelcomeStep } from "./wizard-steps/WelcomeStep";
 import { AccessoriesStep } from "./wizard-steps/AccessoriesStep";
-import { ScarsStep } from "./wizard-steps/ScarsStep";
-import { TortieStep } from "./wizard-steps/TortieStep";
 import { AfterlifeStep } from "./wizard-steps/AfterlifeStep";
 import { PalettesStep } from "./wizard-steps/PalettesStep";
+import { ScarsStep } from "./wizard-steps/ScarsStep";
 import { SummaryStep } from "./wizard-steps/SummaryStep";
+import { TortieStep } from "./wizard-steps/TortieStep";
+import type { WizardStepProps } from "./wizard-steps/types";
+import { WIZARD_STEPS } from "./wizard-steps/types";
+import { WelcomeStep } from "./wizard-steps/WelcomeStep";
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -62,13 +64,21 @@ export function GuidedSettingsWizard({
   const init = initialSettings ?? DEFAULTS;
 
   // ─── Settings state ───
-  const [accessoryRange, setAccessoryRange] = useState<LayerRange>(init.accessoryRange);
+  const [accessoryRange, setAccessoryRange] = useState<LayerRange>(
+    init.accessoryRange,
+  );
   const [scarRange, setScarRange] = useState<LayerRange>(init.scarRange);
   const [tortieRange, setTortieRange] = useState<LayerRange>(init.tortieRange);
   const [exactLayerCounts] = useState(init.exactLayerCounts);
-  const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(init.afterlifeMode);
-  const [includeBaseColours, setIncludeBaseColours] = useState(init.includeBaseColours);
-  const [extendedModes, setExtendedModes] = useState<ExtendedMode[]>(init.extendedModes);
+  const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(
+    init.afterlifeMode,
+  );
+  const [includeBaseColours, setIncludeBaseColours] = useState(
+    init.includeBaseColours,
+  );
+  const [extendedModes, setExtendedModes] = useState<ExtendedMode[]>(
+    init.extendedModes,
+  );
 
   // ─── Navigation state ───
   const [activeStepIndex, setActiveStepIndex] = useState(0);
@@ -84,7 +94,15 @@ export function GuidedSettingsWizard({
       includeBaseColours,
       extendedModes,
     }),
-    [accessoryRange, scarRange, tortieRange, exactLayerCounts, afterlifeMode, includeBaseColours, extendedModes],
+    [
+      accessoryRange,
+      scarRange,
+      tortieRange,
+      exactLayerCounts,
+      afterlifeMode,
+      includeBaseColours,
+      extendedModes,
+    ],
   );
 
   const liveCode = useMemo(

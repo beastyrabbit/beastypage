@@ -1,9 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { createPortal } from "react-dom";
 import { useMutation } from "convex/react";
 import { Loader2, ShieldQuestion } from "lucide-react";
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import XIcon from "@/components/ui/x-icon";
@@ -11,7 +18,13 @@ import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 
-type InviteStatus = "idle" | "loadingChallenge" | "ready" | "submitting" | "success" | "error";
+type InviteStatus =
+  | "idle"
+  | "loadingChallenge"
+  | "ready"
+  | "submitting"
+  | "success"
+  | "error";
 
 interface ChallengePayload {
   token: string;
@@ -36,7 +49,7 @@ function getCooldownDuration(attempt: number): number {
   }
   const extra = attempt - schedule.length;
   const base = schedule[schedule.length - 1];
-  return base * Math.pow(2, extra);
+  return base * 2 ** extra;
 }
 
 function formatDuration(ms: number): string {
@@ -95,7 +108,9 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         setChallenge(null);
         setAnswer("");
         setCopied(false);
-        setError(`Please wait ${formatDuration(cooldownUntil - now)} before trying again.`);
+        setError(
+          `Please wait ${formatDuration(cooldownUntil - now)} before trying again.`,
+        );
         return;
       }
 
@@ -109,7 +124,10 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         let payload = await issueChallenge();
         if (typeof options?.avoidAnswer === "number") {
           let attempts = 0;
-          while (sumFromPrompt(payload.prompt) === options.avoidAnswer && attempts < 5) {
+          while (
+            sumFromPrompt(payload.prompt) === options.avoidAnswer &&
+            attempts < 5
+          ) {
             payload = await issueChallenge();
             attempts += 1;
           }
@@ -126,10 +144,12 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         setStatus("error");
         setInviteUrl(null);
         setChallenge(null);
-        setError(err instanceof Error ? err.message : "Unable to start challenge.");
+        setError(
+          err instanceof Error ? err.message : "Unable to start challenge.",
+        );
       }
     },
-    [cooldownUntil, issueChallenge]
+    [cooldownUntil, issueChallenge],
   );
 
   const submitAnswer = useCallback(async () => {
@@ -139,12 +159,12 @@ export function DiscordInviteButton({ className }: { className?: string }) {
     setStatus("submitting");
     setError(null);
 
-    const previousAnswer = Number.parseInt(answer, 10);
+    const _previousAnswer = Number.parseInt(answer, 10);
 
     try {
       const result = await redeemChallenge({
         token: challenge.token,
-        answer
+        answer,
       });
 
       if (result && typeof result === "object") {
@@ -170,7 +190,9 @@ export function DiscordInviteButton({ className }: { className?: string }) {
             setInviteUrl(null);
             setChallenge(null);
             setAnswer("");
-            setError(`${result.message ?? "Incorrect answer."} Try again in ${formatDuration(waitSeconds * 1000)}.`);
+            setError(
+              `${result.message ?? "Incorrect answer."} Try again in ${formatDuration(waitSeconds * 1000)}.`,
+            );
             return;
           }
 
@@ -180,11 +202,15 @@ export function DiscordInviteButton({ className }: { className?: string }) {
           setError(result.message);
           return;
         }
-
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Something went wrong.";
-      if (/incorrect answer/i.test(message) || /answer must be a number/i.test(message) || /challenge (expired|timed out)/i.test(message)) {
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+      if (
+        /incorrect answer/i.test(message) ||
+        /answer must be a number/i.test(message) ||
+        /challenge (expired|timed out)/i.test(message)
+      ) {
         const nextAttempt = attemptCount + 1;
         setAttemptCount(nextAttempt);
         const waitSeconds = getCooldownDuration(nextAttempt);
@@ -195,7 +221,9 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         setInviteUrl(null);
         setChallenge(null);
         setAnswer("");
-        setError(`Not quite! Try again in ${formatDuration(waitSeconds * 1000)}.`);
+        setError(
+          `Not quite! Try again in ${formatDuration(waitSeconds * 1000)}.`,
+        );
         return;
       }
 
@@ -238,7 +266,11 @@ export function DiscordInviteButton({ className }: { className?: string }) {
   }, [open, closeDialog]);
 
   useEffect(() => {
-    if ((status === "ready" || status === "submitting") && challenge && inputRef.current) {
+    if (
+      (status === "ready" || status === "submitting") &&
+      challenge &&
+      inputRef.current
+    ) {
       try {
         inputRef.current.focus({ preventScroll: true });
       } catch {
@@ -318,7 +350,11 @@ export function DiscordInviteButton({ className }: { className?: string }) {
 
   const overlay = (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur" aria-hidden onClick={closeDialog} />
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur"
+        aria-hidden
+        onClick={closeDialog}
+      />
       <div className="relative z-[81] flex w-full max-w-xl justify-center">
         <div
           role="dialog"
@@ -326,7 +362,10 @@ export function DiscordInviteButton({ className }: { className?: string }) {
           aria-labelledby="discord-invite-title"
           className="relative w-full max-w-md transform overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-b from-background via-background/95 to-background shadow-[0_40px_120px_-30px_rgba(15,15,45,0.65)] ring-1 ring-border/40 transition-all duration-200 ease-out"
         >
-          <div ref={contentRef} className="max-h-[85dvh] overflow-auto px-6 pb-7 pt-8 sm:px-9 sm:pb-9">
+          <div
+            ref={contentRef}
+            className="max-h-[85dvh] overflow-auto px-6 pb-7 pt-8 sm:px-9 sm:pb-9"
+          >
             <button
               type="button"
               onClick={closeDialog}
@@ -342,10 +381,15 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                   <ShieldQuestion className="h-6 w-6" />
                 </span>
                 <div>
-                  <h2 id="discord-invite-title" className="text-lg font-semibold leading-tight">
+                  <h2
+                    id="discord-invite-title"
+                    className="text-lg font-semibold leading-tight"
+                  >
                     Unlock the Discord invite
                   </h2>
-                  <p className="text-xs text-muted-foreground">Solve a quick challenge so bots stay out.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Solve a quick challenge so bots stay out.
+                  </p>
                 </div>
               </div>
 
@@ -369,17 +413,26 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                       className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <RefreshIcon size={14} />
-                      {cooldownActive && cooldownLabel ? `Try again in ${cooldownLabel}` : "Try another challenge"}
+                      {cooldownActive && cooldownLabel
+                        ? `Try again in ${cooldownLabel}`
+                        : "Try another challenge"}
                     </button>
                   </div>
                 ) : null}
 
-                {(status === "ready" || status === "submitting") && challenge ? (
+                {(status === "ready" || status === "submitting") &&
+                challenge ? (
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <p>
-                      What is <span className="font-semibold">{challenge.prompt}</span>? Enter the answer to reveal the invite.
+                      What is{" "}
+                      <span className="font-semibold">{challenge.prompt}</span>?
+                      Enter the answer to reveal the invite.
                     </p>
-                    {expiresLabel ? <p className="text-xs text-muted-foreground">{expiresLabel}</p> : null}
+                    {expiresLabel ? (
+                      <p className="text-xs text-muted-foreground">
+                        {expiresLabel}
+                      </p>
+                    ) : null}
                     <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
                       Your answer
                       <input
@@ -391,11 +444,16 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                         ref={inputRef}
                         className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                         required
-                        aria-describedby={error ? "discord-invite-error" : undefined}
+                        aria-describedby={
+                          error ? "discord-invite-error" : undefined
+                        }
                       />
                     </label>
                     {error && status === "ready" ? (
-                      <p id="discord-invite-error" className="text-xs text-destructive">
+                      <p
+                        id="discord-invite-error"
+                        className="text-xs text-destructive"
+                      >
                         {error}
                       </p>
                     ) : null}
@@ -405,7 +463,9 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                         disabled={status === "submitting"}
                         className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        {status === "submitting" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        {status === "submitting" ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : null}
                         Reveal invite
                       </button>
                       <button
@@ -415,7 +475,9 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                         className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <RefreshIcon size={14} />
-                        {cooldownActive && cooldownLabel ? `Wait ${cooldownLabel}` : "New challenge"}
+                        {cooldownActive && cooldownLabel
+                          ? `Wait ${cooldownLabel}`
+                          : "New challenge"}
                       </button>
                     </div>
                   </form>
@@ -427,13 +489,21 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                       <FilledCheckedIcon size={16} className="text-primary" />
                       <div>
                         <p className="font-semibold">Invite unlocked</p>
-                        <p className="text-xs text-muted-foreground">Open the invite in a new tab or copy it for later.</p>
+                        <p className="text-xs text-muted-foreground">
+                          Open the invite in a new tab or copy it for later.
+                        </p>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <button
                         type="button"
-                        onClick={() => window.open(inviteUrl, "_blank", "noopener,noreferrer")}
+                        onClick={() =>
+                          window.open(
+                            inviteUrl,
+                            "_blank",
+                            "noopener,noreferrer",
+                          )
+                        }
                         className="inline-flex flex-1 items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90"
                       >
                         Open Discord
@@ -463,13 +533,15 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         onClick={handleOpen}
         className={cn(
           "rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background transition hover:opacity-90",
-          className
+          className,
         )}
       >
         Join the Discord
       </button>
 
-      {typeof document !== "undefined" && open ? createPortal(overlay, document.body) : null}
+      {typeof document !== "undefined" && open
+        ? createPortal(overlay, document.body)
+        : null}
     </>
   );
 }

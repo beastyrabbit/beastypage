@@ -1,7 +1,7 @@
 "use client";
 
-import { memo, useMemo, forwardRef } from "react";
 import Image from "next/image";
+import { forwardRef, memo, useMemo } from "react";
 import type { AncestryTreeCat } from "@/lib/ancestry-tree/types";
 import { getCatPreviewUrl } from "@/lib/ancestry-tree/utils";
 
@@ -32,7 +32,7 @@ export const CatNode = memo(
       highlighted = false,
       dimmed = false,
     },
-    ref
+    ref,
   ) {
     const pixelSize = SIZE_MAP[size];
 
@@ -49,7 +49,9 @@ export const CatNode = memo(
         onMouseEnter={() => onHover?.(cat.id)}
         onMouseLeave={() => onHover?.(null)}
         className={`group flex flex-col items-center gap-1 rounded-lg p-2 transition-all duration-200 hover:bg-white/10 ${
-          highlighted ? "ring-2 ring-amber-500 bg-amber-500/10 scale-105 z-10" : ""
+          highlighted
+            ? "ring-2 ring-amber-500 bg-amber-500/10 scale-105 z-10"
+            : ""
         } ${dimmed ? "opacity-40" : ""}`}
       >
         <div
@@ -77,5 +79,5 @@ export const CatNode = memo(
         )}
       </button>
     );
-  })
+  }),
 );

@@ -28,7 +28,12 @@ export function LayerCountModeSelector({
           compact && "p-2.5",
         )}
       >
-        <span className={cn("text-sm font-semibold", value ? "text-foreground" : "text-muted-foreground")}>
+        <span
+          className={cn(
+            "text-sm font-semibold",
+            value ? "text-foreground" : "text-muted-foreground",
+          )}
+        >
           Exact rolled count
         </span>
         <span

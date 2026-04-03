@@ -1,13 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useImperativeHandle, forwardRef } from "react";
-import * as f3 from "family-chart";
 import type { TreeDatum } from "family-chart";
+import * as f3 from "family-chart";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+} from "react";
 import "family-chart/styles/family-chart.css";
 import "./family-chart-custom.css";
 
-import type { AncestryTreeCat, SerializedAncestryTree } from "@/lib/ancestry-tree/types";
 import { convertToFamilyChartFormat } from "@/lib/ancestry-tree/familyChartAdapter";
+import type {
+  AncestryTreeCat,
+  SerializedAncestryTree,
+} from "@/lib/ancestry-tree/types";
 
 export type TreeOrientation = "vertical" | "horizontal";
 
@@ -24,7 +33,11 @@ interface FamilyChartTreeProps {
   tree: SerializedAncestryTree;
   orientation: TreeOrientation;
   onSelectCat: (cat: AncestryTreeCat) => void;
-  onAddRelative?: (type: RelativeType, parentCat: AncestryTreeCat, otherParentId?: string) => void;
+  onAddRelative?: (
+    type: RelativeType,
+    parentCat: AncestryTreeCat,
+    otherParentId?: string,
+  ) => void;
   onAddRelativeError?: (message: string) => void;
   onMainIdChange?: (mainId: string | null) => void;
   onEditModeChanged?: (isEditing: boolean) => void;
@@ -32,22 +45,36 @@ interface FamilyChartTreeProps {
 
 // Extract our custom data from family-chart's TreeDatum
 interface CustomData {
-  'first name': string;
-  'last name': string;
-  gender: 'M' | 'F';
+  "first name": string;
+  "last name": string;
+  gender: "M" | "F";
   avatar?: string;
   catData: AncestryTreeCat;
 }
 
-export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreeProps>(
-  function FamilyChartTree(
-    { tree, orientation, onSelectCat, onAddRelative, onAddRelativeError, onMainIdChange, onEditModeChanged },
-    ref
-  ) {
+export const FamilyChartTree = forwardRef<
+  FamilyChartTreeRef,
+  FamilyChartTreeProps
+>(function FamilyChartTree(
+  {
+    tree,
+    orientation,
+    onSelectCat,
+    onAddRelative,
+    onAddRelativeError,
+    onMainIdChange,
+    onEditModeChanged,
+  },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof f3.createChart> | null>(null);
-  const editTreeRef = useRef<ReturnType<ReturnType<typeof f3.createChart>["editTree"]> | null>(null);
-  const cardRef = useRef<ReturnType<ReturnType<typeof f3.createChart>["setCardHtml"]> | null>(null);
+  const editTreeRef = useRef<ReturnType<
+    ReturnType<typeof f3.createChart>["editTree"]
+  > | null>(null);
+  const cardRef = useRef<ReturnType<
+    ReturnType<typeof f3.createChart>["setCardHtml"]
+  > | null>(null);
   const prevDataLengthRef = useRef<number>(0);
   const currentMainIdRef = useRef<string | null>(null);
 
@@ -70,7 +97,13 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     onAddRelativeErrorRef.current = onAddRelativeError;
     onMainIdChangeRef.current = onMainIdChange;
     onEditModeChangedRef.current = onEditModeChanged;
-  }, [onSelectCat, onAddRelative, onAddRelativeError, onMainIdChange, onEditModeChanged]);
+  }, [
+    onSelectCat,
+    onAddRelative,
+    onAddRelativeError,
+    onMainIdChange,
+    onEditModeChanged,
+  ]);
 
   // Keep chartData ref current for use in event handlers
   useEffect(() => {
@@ -81,7 +114,9 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
   const rootId = tree.foundingMotherId;
 
   // Helper function to safely get the main datum
-  const safeGetMainDatum = (): ReturnType<ReturnType<typeof f3.createChart>["getMainDatum"]> | null => {
+  const safeGetMainDatum = (): ReturnType<
+    ReturnType<typeof f3.createChart>["getMainDatum"]
+  > | null => {
     if (!chartRef.current) return null;
     try {
       return chartRef.current.getMainDatum();
@@ -92,100 +127,126 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
   };
 
   // Expose methods via ref
-  useImperativeHandle(ref, () => ({
-    startAddRelative: () => {
-      // Use the editTree API to show add-relative options on the graph
-      if (!editTreeRef.current || !chartRef.current) return;
+  useImperativeHandle(
+    ref,
+    () => ({
+      startAddRelative: () => {
+        // Use the editTree API to show add-relative options on the graph
+        if (!editTreeRef.current || !chartRef.current) return;
 
-      // Step 1: Ensure the main ID is synced with the current chart data
-      if (currentMainIdRef.current) {
-        try {
-          chartRef.current.updateMainId(currentMainIdRef.current);
-        } catch (error) {
-          // updateMainId can fail if the ID doesn't exist in the data
-          console.error("[FamilyChartTree] Failed to sync main ID before add-relative mode:", error);
-          onAddRelativeErrorRef.current?.("Couldn't focus the selected cat. Pick another cat and try again.");
-        }
-      }
-
-      // Step 2: Try to get the main datum
-      let mainDatum = safeGetMainDatum();
-
-      // Step 3: If no main datum, try updating the tree first
-      if (!mainDatum) {
-        try {
-          chartRef.current.updateTree({ tree_position: "inherit" });
-          mainDatum = safeGetMainDatum();
-        } catch (error) {
-          // Tree update failed
-          console.error("[FamilyChartTree] Failed to refresh tree before add-relative mode:", error);
-          onAddRelativeErrorRef.current?.("Couldn't refresh the tree for add-relative mode. Please try again.");
-        }
-      }
-
-      // Step 4: If still no main datum, fall back to first cat in data
-      if (!mainDatum && chartData.length > 0) {
-        const fallbackId = currentMainIdRef.current || chartData[0].id;
-        try {
-          chartRef.current.updateMainId(fallbackId);
-          chartRef.current.updateTree({ tree_position: "main_to_middle" });
-          mainDatum = safeGetMainDatum();
-          if (mainDatum) {
-            currentMainIdRef.current = fallbackId;
-            onMainIdChangeRef.current?.(fallbackId);
+        // Step 1: Ensure the main ID is synced with the current chart data
+        if (currentMainIdRef.current) {
+          try {
+            chartRef.current.updateMainId(currentMainIdRef.current);
+          } catch (error) {
+            // updateMainId can fail if the ID doesn't exist in the data
+            console.error(
+              "[FamilyChartTree] Failed to sync main ID before add-relative mode:",
+              error,
+            );
+            onAddRelativeErrorRef.current?.(
+              "Couldn't focus the selected cat. Pick another cat and try again.",
+            );
           }
-        } catch (error) {
-          // Fallback also failed
-          console.error("[FamilyChartTree] Failed fallback main ID recovery for add-relative mode:", error);
-          onAddRelativeErrorRef.current?.("Couldn't recover tree focus for add-relative mode. Please try selecting a cat first.");
         }
-      }
 
-      // Step 5: Start add-relative mode if we have a valid datum
-      if (!mainDatum) {
-        onEditModeChangedRef.current?.(false);
-        onAddRelativeErrorRef.current?.("Could not open add-relative mode because no focused cat was found.");
-        return;
-      }
+        // Step 2: Try to get the main datum
+        let mainDatum = safeGetMainDatum();
 
-      if (editTreeRef.current) {
-        try {
-          editTreeRef.current.addRelative(mainDatum);
-        } catch (error) {
-          console.error("[FamilyChartTree] Failed to start add-relative mode:", error);
+        // Step 3: If no main datum, try updating the tree first
+        if (!mainDatum) {
+          try {
+            chartRef.current.updateTree({ tree_position: "inherit" });
+            mainDatum = safeGetMainDatum();
+          } catch (error) {
+            // Tree update failed
+            console.error(
+              "[FamilyChartTree] Failed to refresh tree before add-relative mode:",
+              error,
+            );
+            onAddRelativeErrorRef.current?.(
+              "Couldn't refresh the tree for add-relative mode. Please try again.",
+            );
+          }
+        }
+
+        // Step 4: If still no main datum, fall back to first cat in data
+        if (!mainDatum && chartData.length > 0) {
+          const fallbackId = currentMainIdRef.current || chartData[0].id;
+          try {
+            chartRef.current.updateMainId(fallbackId);
+            chartRef.current.updateTree({ tree_position: "main_to_middle" });
+            mainDatum = safeGetMainDatum();
+            if (mainDatum) {
+              currentMainIdRef.current = fallbackId;
+              onMainIdChangeRef.current?.(fallbackId);
+            }
+          } catch (error) {
+            // Fallback also failed
+            console.error(
+              "[FamilyChartTree] Failed fallback main ID recovery for add-relative mode:",
+              error,
+            );
+            onAddRelativeErrorRef.current?.(
+              "Couldn't recover tree focus for add-relative mode. Please try selecting a cat first.",
+            );
+          }
+        }
+
+        // Step 5: Start add-relative mode if we have a valid datum
+        if (!mainDatum) {
           onEditModeChangedRef.current?.(false);
-          onAddRelativeErrorRef.current?.("Failed to start add-relative mode. Please try again.");
+          onAddRelativeErrorRef.current?.(
+            "Could not open add-relative mode because no focused cat was found.",
+          );
+          return;
         }
-      }
-    },
-    stopAddRelative: () => {
-      // Cancel the add-relative mode and clean up placeholder cards
-      if (editTreeRef.current && chartRef.current) {
-        // Access the addRelativeInstance to properly cancel
-        const editTree = editTreeRef.current as unknown as {
-          addRelativeInstance?: {
-            is_active: boolean;
-            onCancel: () => void;
-          };
-        };
 
-        if (editTree.addRelativeInstance?.is_active) {
-          // Call onCancel to properly reset state and clean up placeholders
-          editTree.addRelativeInstance.onCancel();
+        if (editTreeRef.current) {
+          try {
+            editTreeRef.current.addRelative(mainDatum);
+          } catch (error) {
+            console.error(
+              "[FamilyChartTree] Failed to start add-relative mode:",
+              error,
+            );
+            onEditModeChangedRef.current?.(false);
+            onAddRelativeErrorRef.current?.(
+              "Failed to start add-relative mode. Please try again.",
+            );
+          }
         }
-      }
-    },
-    showFullGraph: () => {
-      if (chartRef.current && rootId) {
-        // Use updateMainId to reset to the root (founding mother)
-        chartRef.current.updateMainId(rootId);
-        chartRef.current.updateTree({ tree_position: "main_to_middle" });
-        currentMainIdRef.current = rootId;
-        onMainIdChangeRef.current?.(rootId);
-      }
-    },
-    getCurrentMainId: () => currentMainIdRef.current,
-  }), [rootId, chartData]);
+      },
+      stopAddRelative: () => {
+        // Cancel the add-relative mode and clean up placeholder cards
+        if (editTreeRef.current && chartRef.current) {
+          // Access the addRelativeInstance to properly cancel
+          const editTree = editTreeRef.current as unknown as {
+            addRelativeInstance?: {
+              is_active: boolean;
+              onCancel: () => void;
+            };
+          };
+
+          if (editTree.addRelativeInstance?.is_active) {
+            // Call onCancel to properly reset state and clean up placeholders
+            editTree.addRelativeInstance.onCancel();
+          }
+        }
+      },
+      showFullGraph: () => {
+        if (chartRef.current && rootId) {
+          // Use updateMainId to reset to the root (founding mother)
+          chartRef.current.updateMainId(rootId);
+          chartRef.current.updateTree({ tree_position: "main_to_middle" });
+          currentMainIdRef.current = rootId;
+          onMainIdChangeRef.current?.(rootId);
+        }
+      },
+      getCurrentMainId: () => currentMainIdRef.current,
+    }),
+    [rootId, chartData, safeGetMainDatum],
+  );
 
   // Initialize chart
   useEffect(() => {
@@ -206,11 +267,12 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     }
 
     // Create chart with proper spacing
-    const chart = f3.createChart(container, chartData)
+    const chart = f3
+      .createChart(container, chartData)
       .setTransitionTime(300)
       .setCardXSpacing(220)
       .setCardYSpacing(150)
-      .setSingleParentEmptyCard(false);  // Hide empty spouse placeholder cards (the "ADD" cards)
+      .setSingleParentEmptyCard(false); // Hide empty spouse placeholder cards (the "ADD" cards)
 
     // Set orientation
     if (orientation === "horizontal") {
@@ -220,7 +282,8 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     }
 
     // Setup card display - show full name on one line
-    const f3Card = chart.setCardHtml()
+    const f3Card = chart
+      .setCardHtml()
       .setStyle("imageRect")
       .setCardDisplay([["full name"]])
       .setCardImageField("avatar")
@@ -230,8 +293,7 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
 
     // Setup editTree for add-relative functionality
     // We use setNoEdit() so clicking cards doesn't open the library's edit form
-    const f3EditTree = chart.editTree()
-      .setNoEdit();  // Don't show the library's edit form (we use our sidebar)
+    const f3EditTree = chart.editTree().setNoEdit(); // Don't show the library's edit form (we use our sidebar)
 
     editTreeRef.current = f3EditTree;
 
@@ -241,21 +303,27 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
 
       // Check if this is an "add relative" placeholder card
       // Structure: d.data._new_rel_data = { rel_type, label, rel_id, other_parent_id? }
-      const newRelData = (d.data as unknown as {
-        _new_rel_data?: {
-          rel_type: string;
-          rel_id: string;
-          other_parent_id?: string;
+      const newRelData = (
+        d.data as unknown as {
+          _new_rel_data?: {
+            rel_type: string;
+            rel_id: string;
+            other_parent_id?: string;
+          };
         }
-      })._new_rel_data;
+      )._new_rel_data;
 
       if (newRelData && onAddRelativeRef.current) {
         // User clicked "Add Son", "Add Daughter", or "Add Spouse" placeholder
         // Find the parent cat from the current chartData using rel_id
         // Note: Use chartDataRef.current to get the latest data (not stale closure)
         const currentChartData = chartDataRef.current;
-        const parentDatum = currentChartData.find(datum => datum.id === newRelData.rel_id);
-        const parentCatData = parentDatum?.data as unknown as CustomData | undefined;
+        const parentDatum = currentChartData.find(
+          (datum) => datum.id === newRelData.rel_id,
+        );
+        const parentCatData = parentDatum?.data as unknown as
+          | CustomData
+          | undefined;
 
         if (parentCatData?.catData) {
           // Map rel_type from library to our RelativeType
@@ -272,13 +340,17 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
             if (mainDatum && editTreeRef.current) {
               // Clean up the add-relative placeholders
               const editTree = editTreeRef.current as unknown as {
-                addRelativeInstance?: { cleanUp: () => void }
+                addRelativeInstance?: { cleanUp: () => void };
               };
               editTree.addRelativeInstance?.cleanUp();
             }
           }
 
-          onAddRelativeRef.current(relType, parentCatData.catData, newRelData.other_parent_id);
+          onAddRelativeRef.current(
+            relType,
+            parentCatData.catData,
+            newRelData.other_parent_id,
+          );
         }
         return;
       }
@@ -346,7 +418,7 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
       currentMainIdRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orientation]); // Only recreate on orientation change, chartData handled separately
+  }, [orientation, rootId, chartData.length, chartData]); // Only recreate on orientation change, chartData handled separately
 
   // Handle data updates (partial update) - triggers on any chartData change
   useEffect(() => {
@@ -361,7 +433,9 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
     // This ensures getMainDatum() returns a valid datum from the new data
     if (currentMainIdRef.current) {
       // Verify the main ID still exists in the new data
-      const mainIdExists = chartData.some(d => d.id === currentMainIdRef.current);
+      const mainIdExists = chartData.some(
+        (d) => d.id === currentMainIdRef.current,
+      );
       if (mainIdExists) {
         chartRef.current.updateMainId(currentMainIdRef.current);
       }
@@ -381,11 +455,7 @@ export const FamilyChartTree = forwardRef<FamilyChartTreeRef, FamilyChartTreePro
 
   return (
     <div className="family-chart-wrapper h-full w-full relative overflow-hidden bg-black/20">
-      <div
-        ref={containerRef}
-        className="f3 w-full h-full"
-        id="FamilyChart"
-      />
+      <div ref={containerRef} className="f3 w-full h-full" id="FamilyChart" />
     </div>
   );
 });

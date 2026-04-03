@@ -1,17 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { toast } from "sonner";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { TOOL_MAP } from "@/lib/dash/registry.generated";
-import { APP_VERSION } from "@/lib/dash/version";
-import { DEFAULT_DASH_SETTINGS, parseDashPayload, dashSettingsEqual } from "@/utils/dashVariants";
 import type { DashSettings, ToolWidgetMeta } from "@/lib/dash/types";
-import { DashHero } from "./DashHero";
-import { WidgetGrid } from "./WidgetGrid";
+import { APP_VERSION } from "@/lib/dash/version";
+import { DEFAULT_DASH_SETTINGS, parseDashPayload } from "@/utils/dashVariants";
 import { AddWidgetModal } from "./AddWidgetModal";
+import { DashHero } from "./DashHero";
 import { ReleaseNotesModal } from "./ReleaseNotesModal";
+import { WidgetGrid } from "./WidgetGrid";
 
 const DASH_VARIANT_ID = "dash-settings";
 
@@ -26,20 +26,21 @@ export function DashClient({
   initialSettings = null,
   initialLoadError = null,
 }: DashClientProps = {}) {
-
   const { isAuthenticated } = useConvexAuth();
 
   // Load settings from Convex
   const convexVariants = useQuery(
     api.userVariants.list,
-    isAuthenticated ? { toolKey: "dash" } : "skip"
+    isAuthenticated ? { toolKey: "dash" } : "skip",
   );
   const upsertVariant = useMutation(api.userVariants.upsert);
 
   // Local working copy of settings
-  const [settings, setSettings] = useState<DashSettings>(() => (
-    initialSettings ? parseDashPayload(initialSettings) : { ...DEFAULT_DASH_SETTINGS }
-  ));
+  const [settings, setSettings] = useState<DashSettings>(() =>
+    initialSettings
+      ? parseDashPayload(initialSettings)
+      : { ...DEFAULT_DASH_SETTINGS },
+  );
   const [editing, setEditing] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
@@ -110,15 +111,21 @@ export function DashClient({
       queueMicrotask(() => setEditing(true));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSlug, loadedFromConvex]);
+  }, [initialSlug, loadedFromConvex, settings.widgets.length]);
 
   // Resolve widget IDs to tool metadata
   const resolvedWidgets = useMemo(
-    () => settings.widgets.map((id) => TOOL_MAP.get(id)).filter(Boolean) as ToolWidgetMeta[],
+    () =>
+      settings.widgets
+        .map((id) => TOOL_MAP.get(id))
+        .filter(Boolean) as ToolWidgetMeta[],
     [settings.widgets],
   );
 
-  const placedIds = useMemo(() => new Set(settings.widgets), [settings.widgets]);
+  const placedIds = useMemo(
+    () => new Set(settings.widgets),
+    [settings.widgets],
+  );
 
   // Version tracking
   const hasNewVersion =
@@ -161,7 +168,9 @@ export function DashClient({
         body: JSON.stringify({ config: settings }),
       });
       if (!response.ok) {
-        const body = await response.json().catch(() => null) as { error?: string } | null;
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
         throw new Error(body?.error ?? `HTTP ${response.status}`);
       }
       const json = (await response.json()) as { slug?: string };
@@ -179,7 +188,9 @@ export function DashClient({
   if (!isAuthenticated) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3">
-        <p className="text-sm text-muted-foreground">Sign in to access your dashboard.</p>
+        <p className="text-sm text-muted-foreground">
+          Sign in to access your dashboard.
+        </p>
       </div>
     );
   }

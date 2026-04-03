@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
+import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
+import type { ExtendedMode } from "@/utils/singleCatVariants";
 import { WizardExampleCats } from "../WizardExampleCats";
 import { ForceInitialRollInfo } from "./ForceInitialRollInfo";
 import type { WizardStepProps } from "./types";
-import type { ExtendedMode } from "@/utils/singleCatVariants";
 
 // ---------------------------------------------------------------------------
 // Comparison — same base cat rendered with 1, 2, 3, 4 tortie layers
@@ -17,9 +17,18 @@ interface ComparisonCat {
   imageDataUrl: string;
 }
 
-function TortieComparison({ settings }: { settings: WizardStepProps["settings"] }) {
+function TortieComparison({
+  settings,
+}: {
+  settings: WizardStepProps["settings"];
+}) {
   const { generator, ready } = useCatGenerator();
-  const [cats, setCats] = useState<(ComparisonCat | null)[]>([null, null, null, null]);
+  const [cats, setCats] = useState<(ComparisonCat | null)[]>([
+    null,
+    null,
+    null,
+    null,
+  ]);
   const [isGenerating, setIsGenerating] = useState(false);
   const generatedRef = useRef(false);
 
@@ -162,7 +171,11 @@ export function TortieStep(props: WizardStepProps) {
           onChange={setTortieRange}
           compact
         />
-        <ForceInitialRollInfo range={settings.tortieRange} layerName="tortie layer" exactLayerCounts={settings.exactLayerCounts} />
+        <ForceInitialRollInfo
+          range={settings.tortieRange}
+          layerName="tortie layer"
+          exactLayerCounts={settings.exactLayerCounts}
+        />
       </section>
 
       {/* Live preview */}

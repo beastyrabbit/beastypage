@@ -2,7 +2,10 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { SingleCatPortableSettings } from "@/lib/portable-settings";
-import { computeLayerCount, resolveAfterlife } from "@/utils/catSettingsHelpers";
+import {
+  computeLayerCount,
+  resolveAfterlife,
+} from "@/utils/catSettingsHelpers";
 import type { ExtendedMode } from "@/utils/singleCatVariants";
 
 // ---------------------------------------------------------------------------
@@ -71,14 +74,14 @@ export function WizardExampleCats({
       const extModes = settings.extendedModes.filter(
         (m): m is ExtendedMode => m !== "base",
       );
-      const experimentalColourMode =
-        extModes.length > 0 ? extModes : undefined;
+      const experimentalColourMode = extModes.length > 0 ? extModes : undefined;
 
       for (let i = 0; i < count; i++) {
         if (abortRef.current) break;
 
         const accessoryCount =
-          overrides?.accessoryCount ?? computeLayerCount(settings.accessoryRange);
+          overrides?.accessoryCount ??
+          computeLayerCount(settings.accessoryRange);
         const scarCount =
           overrides?.scarCount ?? computeLayerCount(settings.scarRange);
         const tortieCount =

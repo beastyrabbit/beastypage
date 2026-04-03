@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import type { CatGeneratorApi } from "@/components/cat-builder/types";
+import DownChevron from "@/components/ui/down-chevron";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import DownChevron from "@/components/ui/down-chevron";
-import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { ColorPaletteClient } from "./ColorPaletteClient";
 
 const EXPORT_SIZE = 700;
 // Exclude forbidden sprites (see FORBIDDEN_SPRITES in cat-builder/types.ts: 0, 1, 2, 3, 4, 19, 20)
-const VALID_SPRITES = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] as const;
+const VALID_SPRITES = [
+  5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+] as const;
 const GRID_COLS = 5;
 const GRID_ROWS = 3;
 const SPRITE_SIZE = 50;
@@ -32,7 +34,6 @@ export function ColorPaletteContent({
   imageUrl = null,
   paletteSlug = null,
 }: ColorPaletteContentProps = {}) {
-
   const [initialImage, setInitialImage] = useState<string | null>(null);
   const [generatorReady, setGeneratorReady] = useState(false);
   const [selectedSprite, setSelectedSprite] = useState<SpriteSelection>(8);
@@ -46,13 +47,13 @@ export function ColorPaletteContent({
   // Load cat data from Convex if slug is provided
   const mapperRecord = useQuery(
     api.mapper.getBySlug,
-    slug ? { slugOrId: slug } : "skip"
+    slug ? { slugOrId: slug } : "skip",
   );
 
   // Load palette config from Convex if paletteSlug is provided
   const paletteRecord = useQuery(
     api.paletteGeneratorSettings.get,
-    paletteSlug ? { slug: paletteSlug } : "skip"
+    paletteSlug ? { slug: paletteSlug } : "skip",
   );
 
   // Get image download URL from Convex storage for palette slug
@@ -63,7 +64,7 @@ export function ColorPaletteContent({
     api.paletteGeneratorSettings.getImageUrl,
     paletteConfig?.imageStorageId
       ? { storageId: paletteConfig.imageStorageId as Id<"_storage"> }
-      : "skip"
+      : "skip",
   );
 
   // Compute cat params with dark forest override
@@ -93,7 +94,9 @@ export function ColorPaletteContent({
     let cancelled = false;
     (async () => {
       try {
-        const { default: catGenerator } = await import("@/lib/single-cat/catGeneratorV3");
+        const { default: catGenerator } = await import(
+          "@/lib/single-cat/catGeneratorV3"
+        );
         if (!cancelled) {
           generatorRef.current = catGenerator as CatGeneratorApi;
           setGeneratorReady(true);
@@ -109,51 +112,62 @@ export function ColorPaletteContent({
   }, [slug]);
 
   // Render function for a single sprite
-  const renderSingleSprite = useCallback(async (
-    generator: CatGeneratorApi,
-    params: Record<string, unknown>,
-    spriteNumber: number,
-    size: number
-  ): Promise<HTMLCanvasElement> => {
-    const result = await generator.generateCat({ ...params, spriteNumber });
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Failed to get canvas context");
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(result.canvas as HTMLCanvasElement, 0, 0, size, size);
-    return canvas;
-  }, []);
+  const renderSingleSprite = useCallback(
+    async (
+      generator: CatGeneratorApi,
+      params: Record<string, unknown>,
+      spriteNumber: number,
+      size: number,
+    ): Promise<HTMLCanvasElement> => {
+      const result = await generator.generateCat({ ...params, spriteNumber });
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Failed to get canvas context");
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(result.canvas as HTMLCanvasElement, 0, 0, size, size);
+      return canvas;
+    },
+    [],
+  );
 
   // Render all sprites in a grid
-  const renderAllSprites = useCallback(async (
-    generator: CatGeneratorApi,
-    params: Record<string, unknown>
-  ): Promise<string> => {
-    const gridCanvas = document.createElement("canvas");
-    gridCanvas.width = ALL_SPRITES_SIZE;
-    gridCanvas.height = GRID_ROWS * SPRITE_SIZE;
-    const ctx = gridCanvas.getContext("2d");
-    if (!ctx) throw new Error("Failed to get canvas context");
+  const renderAllSprites = useCallback(
+    async (
+      generator: CatGeneratorApi,
+      params: Record<string, unknown>,
+    ): Promise<string> => {
+      const gridCanvas = document.createElement("canvas");
+      gridCanvas.width = ALL_SPRITES_SIZE;
+      gridCanvas.height = GRID_ROWS * SPRITE_SIZE;
+      const ctx = gridCanvas.getContext("2d");
+      if (!ctx) throw new Error("Failed to get canvas context");
 
-    ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = false;
 
-    for (let i = 0; i < VALID_SPRITES.length; i++) {
-      const spriteNumber = VALID_SPRITES[i];
-      const col = i % GRID_COLS;
-      const row = Math.floor(i / GRID_COLS);
+      for (let i = 0; i < VALID_SPRITES.length; i++) {
+        const spriteNumber = VALID_SPRITES[i];
+        const col = i % GRID_COLS;
+        const row = Math.floor(i / GRID_COLS);
 
-      try {
-        const spriteCanvas = await renderSingleSprite(generator, params, spriteNumber, SPRITE_SIZE);
-        ctx.drawImage(spriteCanvas, col * SPRITE_SIZE, row * SPRITE_SIZE);
-      } catch (err) {
-        console.warn(`Failed to render sprite ${spriteNumber}`, err);
+        try {
+          const spriteCanvas = await renderSingleSprite(
+            generator,
+            params,
+            spriteNumber,
+            SPRITE_SIZE,
+          );
+          ctx.drawImage(spriteCanvas, col * SPRITE_SIZE, row * SPRITE_SIZE);
+        } catch (err) {
+          console.warn(`Failed to render sprite ${spriteNumber}`, err);
+        }
       }
-    }
 
-    return gridCanvas.toDataURL("image/png");
-  }, [renderSingleSprite]);
+      return gridCanvas.toDataURL("image/png");
+    },
+    [renderSingleSprite],
+  );
 
   // Render sprite(s) when selection changes or params are ready
   useEffect(() => {
@@ -173,7 +187,12 @@ export function ColorPaletteContent({
         if (selectedSprite === "all") {
           dataUrl = await renderAllSprites(generator, catParams);
         } else {
-          const canvas = await renderSingleSprite(generator, catParams, selectedSprite, EXPORT_SIZE);
+          const canvas = await renderSingleSprite(
+            generator,
+            catParams,
+            selectedSprite,
+            EXPORT_SIZE,
+          );
           dataUrl = canvas.toDataURL("image/png");
         }
 
@@ -192,7 +211,14 @@ export function ColorPaletteContent({
     return () => {
       cancelled = true;
     };
-  }, [slug, generatorReady, catParams, selectedSprite, renderSingleSprite, renderAllSprites]);
+  }, [
+    slug,
+    generatorReady,
+    catParams,
+    selectedSprite,
+    renderSingleSprite,
+    renderAllSprites,
+  ]);
 
   // Handle direct image URL (for regular uploads)
   useEffect(() => {
@@ -227,8 +253,10 @@ export function ColorPaletteContent({
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (
-        buttonRef.current && !buttonRef.current.contains(target) &&
-        dropdownRef.current && !dropdownRef.current.contains(target)
+        buttonRef.current &&
+        !buttonRef.current.contains(target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target)
       ) {
         setDropdownOpen(false);
       }
@@ -267,52 +295,62 @@ export function ColorPaletteContent({
         className="flex items-center gap-2 rounded-xl border border-border/50 px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:border-foreground/30 disabled:opacity-50"
       >
         <span>
-          {selectedSprite === "all" ? "All Sprites" : `Sprite ${selectedSprite}`}
+          {selectedSprite === "all"
+            ? "All Sprites"
+            : `Sprite ${selectedSprite}`}
         </span>
-        <DownChevron size={16} className={`transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
+        <DownChevron
+          size={16}
+          className={`transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
+        />
       </button>
 
-      {dropdownOpen && createPortal(
-        <div
-          ref={dropdownRef}
-          className="fixed max-h-64 w-48 overflow-y-auto rounded-xl border border-border/50 bg-background/95 py-1 shadow-lg backdrop-blur-sm"
-          style={{
-            top: dropdownPosition.top,
-            left: dropdownPosition.left,
-            zIndex: 9999,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedSprite("all");
-              setDropdownOpen(false);
+      {dropdownOpen &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed max-h-64 w-48 overflow-y-auto rounded-xl border border-border/50 bg-background/95 py-1 shadow-lg backdrop-blur-sm"
+            style={{
+              top: dropdownPosition.top,
+              left: dropdownPosition.left,
+              zIndex: 9999,
             }}
-            className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-foreground/10 ${
-              selectedSprite === "all" ? "bg-primary/20 text-primary" : "text-foreground"
-            }`}
           >
-            All Sprites (Grid)
-          </button>
-          <div className="mx-2 my-1 border-t border-border/30" />
-          {VALID_SPRITES.map((num) => (
             <button
-              key={num}
               type="button"
               onClick={() => {
-                setSelectedSprite(num);
+                setSelectedSprite("all");
                 setDropdownOpen(false);
               }}
               className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-foreground/10 ${
-                selectedSprite === num ? "bg-primary/20 text-primary" : "text-foreground"
+                selectedSprite === "all"
+                  ? "bg-primary/20 text-primary"
+                  : "text-foreground"
               }`}
             >
-              Sprite {num}
+              All Sprites (Grid)
             </button>
-          ))}
-        </div>,
-        document.body
-      )}
+            <div className="mx-2 my-1 border-t border-border/30" />
+            {VALID_SPRITES.map((num) => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => {
+                  setSelectedSprite(num);
+                  setDropdownOpen(false);
+                }}
+                className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-foreground/10 ${
+                  selectedSprite === num
+                    ? "bg-primary/20 text-primary"
+                    : "text-foreground"
+                }`}
+              >
+                Sprite {num}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </>
   ) : null;
 
@@ -320,14 +358,18 @@ export function ColorPaletteContent({
   if (slug && !initialImage) {
     return (
       <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-        {mapperRecord === undefined ? "Loading cat data..." : "Rendering sprite..."}
+        {mapperRecord === undefined
+          ? "Loading cat data..."
+          : "Rendering sprite..."}
       </div>
     );
   }
   if (paletteSlug && !initialImage) {
     return (
       <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-        {paletteRecord === undefined ? "Loading palette..." : "Loading image..."}
+        {paletteRecord === undefined
+          ? "Loading palette..."
+          : "Loading image..."}
       </div>
     );
   }

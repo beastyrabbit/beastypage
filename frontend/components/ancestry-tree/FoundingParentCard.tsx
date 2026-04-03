@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
-import Image from "next/image";
 import { Loader2 } from "lucide-react";
+import Image from "next/image";
+import { useMemo } from "react";
 import RefreshIcon from "@/components/ui/refresh-icon";
-import type { CatParams } from "@/lib/cat-v3/types";
 import type { CatName } from "@/lib/ancestry-tree/types";
 import { getParamsPreviewUrl } from "@/lib/ancestry-tree/utils";
+import type { CatParams } from "@/lib/cat-v3/types";
 
 interface FoundingParentCardProps {
   gender: "F" | "M";
@@ -33,10 +33,13 @@ export function FoundingParentCard({
   const genderIcon = gender === "F" ? "♀" : "♂";
   const genderColor = gender === "F" ? "text-pink-400" : "text-blue-400";
   const bgColor = gender === "F" ? "bg-pink-500/10" : "bg-blue-500/10";
-  const borderColor = gender === "F" ? "border-pink-500/30" : "border-blue-500/30";
+  const borderColor =
+    gender === "F" ? "border-pink-500/30" : "border-blue-500/30";
 
   return (
-    <div className={`flex flex-col items-center gap-4 rounded-2xl p-5 ${bgColor} border ${borderColor}`}>
+    <div
+      className={`flex flex-col items-center gap-4 rounded-2xl p-5 ${bgColor} border ${borderColor}`}
+    >
       <span className={`text-base font-medium ${genderColor}`}>
         {label ?? (gender === "F" ? "Mother" : "Father")} {genderIcon}
       </span>

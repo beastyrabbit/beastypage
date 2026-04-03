@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-
-import type { RGB } from "@/lib/color-extraction/types";
 import { createSpotlightMask } from "@/lib/color-extraction/kmeans";
+import type { RGB } from "@/lib/color-extraction/types";
 
 interface SpotlightOverlayProps {
   image: HTMLImageElement;
