@@ -1,25 +1,39 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
-import { createPortal } from "react-dom";
-import { LazyMotion, domAnimation, m } from "motion/react";
+import { domAnimation, LazyMotion, m } from "motion/react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { HexColorPicker } from "react-colorful";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { hexToRgb, getContrastColor } from "@/lib/color-extraction/color-utils";
-import { formatColor } from "@/lib/palette-generator/format-color";
-import { exportPalettes } from "@/lib/palette-generator/export-utils";
-import { PaletteExportMenu } from "./PaletteExportMenu";
 import CopyIcon from "@/components/ui/copy-icon";
 import XIcon from "@/components/ui/x-icon";
 import { track } from "@/lib/analytics";
-import type { GeneratedPalette, DisplayFormat, ExportFormat } from "@/lib/palette-generator/types";
+import { getContrastColor, hexToRgb } from "@/lib/color-extraction/color-utils";
+import { exportPalettes } from "@/lib/palette-generator/export-utils";
+import { formatColor } from "@/lib/palette-generator/format-color";
+import type {
+  DisplayFormat,
+  ExportFormat,
+  GeneratedPalette,
+} from "@/lib/palette-generator/types";
+import { cn } from "@/lib/utils";
+import { PaletteExportMenu } from "./PaletteExportMenu";
 
 interface PaletteCardProps {
   palette: GeneratedPalette;
   displayFormat: DisplayFormat;
   onRemove: (id: string) => void;
-  onUpdateColor: (paletteId: string, colorIndex: number, newHex: string) => void;
+  onUpdateColor: (
+    paletteId: string,
+    colorIndex: number,
+    newHex: string,
+  ) => void;
   showToast: (message: string) => void;
 }
 
@@ -36,7 +50,16 @@ const MODE_COLORS: Record<string, string> = {
 
 function PipetteIcon({ color }: { color: string }) {
   return (
-    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="m2 22 1-1h3l9-9" />
       <path d="M3 21v-3l9-9" />
       <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9" />
@@ -46,11 +69,20 @@ function PipetteIcon({ color }: { color: string }) {
   );
 }
 
-export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, showToast }: PaletteCardProps) {
+export function PaletteCard({
+  palette,
+  displayFormat,
+  onRemove,
+  onUpdateColor,
+  showToast,
+}: PaletteCardProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [pickerIndex, setPickerIndex] = useState<number | null>(null);
-  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
+  const [pickerPos, setPickerPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const pickerRef = useRef<HTMLDivElement>(null);
   const triggerRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -103,7 +135,7 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
     const handleClick = (e: MouseEvent) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
         const trigger = triggerRefs.current[pickerIndex];
-        if (trigger && trigger.contains(e.target as Node)) return;
+        if (trigger?.contains(e.target as Node)) return;
         setPickerIndex(null);
       }
     };
@@ -129,7 +161,9 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
   );
 
   const copyPalette = useCallback(async () => {
-    const text = palette.colors.map((hex) => formatColor(hex, displayFormat).clipboard).join("\n");
+    const text = palette.colors
+      .map((hex) => formatColor(hex, displayFormat).clipboard)
+      .join("\n");
     try {
       await navigator.clipboard.writeText(text);
       showToast("Palette copied");
@@ -142,7 +176,12 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
   const handleExport = useCallback(
     (format: ExportFormat) => {
       try {
-        exportPalettes([palette], format, displayFormat, `palette-${palette.seed}`);
+        exportPalettes(
+          [palette],
+          format,
+          displayFormat,
+          `palette-${palette.seed}`,
+        );
         showToast(`Exported as ${format.toUpperCase()}`);
         track("palette_generator_exported", { format, palette_count: 1 });
       } catch (error) {
@@ -181,157 +220,165 @@ export function PaletteCard({ palette, displayFormat, onRemove, onUpdateColor, s
         transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
         className="group relative"
       >
-      {/* Card body */}
-      <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] shadow-lg shadow-black/20 backdrop-blur-sm transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.05] hover:shadow-xl hover:shadow-black/30">
-        {/* Color swatches — tall, with gaps */}
-        <div className="flex gap-[2px] p-[6px]">
-          {palette.colors.map((hex, i) => {
-            const rgb = hexToRgb(hex);
-            const textColor = getContrastColor(rgb);
-            const { display } = formatColor(hex, displayFormat);
-            const isCopied = copiedIndex === i;
-            const isActive = hoveredIndex === i || pickerIndex === i;
-            const swatchCount = swatchKeyCounts.get(hex) ?? 0;
-            swatchKeyCounts.set(hex, swatchCount + 1);
+        {/* Card body */}
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] shadow-lg shadow-black/20 backdrop-blur-sm transition-all duration-300 hover:border-white/[0.12] hover:bg-white/[0.05] hover:shadow-xl hover:shadow-black/30">
+          {/* Color swatches — tall, with gaps */}
+          <div className="flex gap-[2px] p-[6px]">
+            {palette.colors.map((hex, i) => {
+              const rgb = hexToRgb(hex);
+              const textColor = getContrastColor(rgb);
+              const { display } = formatColor(hex, displayFormat);
+              const isCopied = copiedIndex === i;
+              const isActive = hoveredIndex === i || pickerIndex === i;
+              const swatchCount = swatchKeyCounts.get(hex) ?? 0;
+              swatchKeyCounts.set(hex, swatchCount + 1);
 
-            return (
-              <div
-                key={`${palette.id}-${hex}-${swatchCount}`}
-                className={cn(
-                  "relative flex flex-1 transition-all duration-200",
-                  i === 0 && "rounded-l-xl",
-                  i === palette.colors.length - 1 && "rounded-r-xl",
-                  isActive ? "flex-[1.6] shadow-lg" : "shadow-sm",
-                )}
-                style={{ height: isActive ? "7rem" : "6rem" }}
-                onMouseEnter={() => setHoveredIndex(i)}
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
-                {/* Main clickable area — copies color */}
-                <button
-                  type="button"
+              return (
+                <div
+                  key={`${palette.id}-${hex}-${swatchCount}`}
                   className={cn(
-                    "flex h-full w-full flex-col items-center justify-center overflow-hidden",
+                    "relative flex flex-1 transition-all duration-200",
                     i === 0 && "rounded-l-xl",
                     i === palette.colors.length - 1 && "rounded-r-xl",
+                    isActive ? "flex-[1.6] shadow-lg" : "shadow-sm",
                   )}
-                  style={{ backgroundColor: hex }}
-                  onClick={() => copyColor(hex, i)}
-                  title={`Click to copy ${hex.toUpperCase()}`}
+                  style={{ height: isActive ? "7rem" : "6rem" }}
+                  onMouseEnter={() => setHoveredIndex(i)}
+                  onMouseLeave={() => setHoveredIndex(null)}
                 >
-                  {/* Hover overlay with color value */}
-                  <div
+                  {/* Main clickable area — copies color */}
+                  <button
+                    type="button"
                     className={cn(
-                      "flex flex-col items-center justify-center gap-1 transition-opacity duration-150",
-                      isActive ? "opacity-100" : "opacity-0",
+                      "flex h-full w-full flex-col items-center justify-center overflow-hidden",
+                      i === 0 && "rounded-l-xl",
+                      i === palette.colors.length - 1 && "rounded-r-xl",
                     )}
+                    style={{ backgroundColor: hex }}
+                    onClick={() => copyColor(hex, i)}
+                    title={`Click to copy ${hex.toUpperCase()}`}
                   >
-                    {isCopied ? (
-                      <span
-                        className="text-[11px] font-bold tracking-wider"
-                        style={{ color: textColor }}
-                      >
-                        COPIED
-                      </span>
-                    ) : (
-                      <>
+                    {/* Hover overlay with color value */}
+                    <div
+                      className={cn(
+                        "flex flex-col items-center justify-center gap-1 transition-opacity duration-150",
+                        isActive ? "opacity-100" : "opacity-0",
+                      )}
+                    >
+                      {isCopied ? (
                         <span
-                          className="text-[11px] font-bold tracking-wide"
+                          className="text-[11px] font-bold tracking-wider"
                           style={{ color: textColor }}
                         >
-                          {hex.toUpperCase()}
+                          COPIED
                         </span>
-                        <span
-                          className="max-w-full truncate px-1 font-mono text-[9px] tracking-wide"
-                          style={{ color: textColor, opacity: 0.7 }}
-                        >
-                          {display}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </button>
-
-                {/* Color picker trigger — bottom-right corner */}
-                <button
-                  ref={(el) => { triggerRefs.current[i] = el; }}
-                  type="button"
-                  onClick={(e) => handlePickerOpen(e, i)}
-                  className={cn(
-                    "absolute bottom-1 right-1 z-10 flex items-center justify-center rounded-md p-1 transition-all duration-150",
-                    pickerIndex === i && "opacity-100 scale-110",
-                    pickerIndex !== i && isActive && "opacity-80 hover:opacity-100 hover:scale-110",
-                    !isActive && "opacity-0 pointer-events-none",
-                  )}
-                  style={{ backgroundColor: `${textColor}20` }}
-                  title="Change color"
-                >
-                  <PipetteIcon color={textColor} />
-                </button>
-
-                {/* Color picker popover — rendered via portal to avoid clipping */}
-                {pickerIndex === i && pickerPos && createPortal(
-                  <div
-                    ref={pickerRef}
-                    className="fixed z-[9999]"
-                    style={{ top: pickerPos.top, left: pickerPos.left }}
-                  >
-                    <div className="rounded-xl border border-white/10 bg-black/90 p-3 shadow-2xl backdrop-blur-xl">
-                      <HexColorPicker color={hex} onChange={handleColorChange} />
+                      ) : (
+                        <>
+                          <span
+                            className="text-[11px] font-bold tracking-wide"
+                            style={{ color: textColor }}
+                          >
+                            {hex.toUpperCase()}
+                          </span>
+                          <span
+                            className="max-w-full truncate px-1 font-mono text-[9px] tracking-wide"
+                            style={{ color: textColor, opacity: 0.7 }}
+                          >
+                            {display}
+                          </span>
+                        </>
+                      )}
                     </div>
-                  </div>,
-                  document.body,
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  </button>
 
-        {/* Footer */}
-        <div className="flex items-center gap-2 px-3 pb-2.5 pt-1.5">
-          {/* Mode badge */}
-          <span
-            className={cn(
-              "inline-flex items-center rounded-full bg-gradient-to-r px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm",
-              modeGradient,
-            )}
-          >
-            {palette.mode.replace("-", " ")}
-          </span>
+                  {/* Color picker trigger — bottom-right corner */}
+                  <button
+                    ref={(el) => {
+                      triggerRefs.current[i] = el;
+                    }}
+                    type="button"
+                    onClick={(e) => handlePickerOpen(e, i)}
+                    className={cn(
+                      "absolute bottom-1 right-1 z-10 flex items-center justify-center rounded-md p-1 transition-all duration-150",
+                      pickerIndex === i && "opacity-100 scale-110",
+                      pickerIndex !== i &&
+                        isActive &&
+                        "opacity-80 hover:opacity-100 hover:scale-110",
+                      !isActive && "opacity-0 pointer-events-none",
+                    )}
+                    style={{ backgroundColor: `${textColor}20` }}
+                    title="Change color"
+                  >
+                    <PipetteIcon color={textColor} />
+                  </button>
 
-          {/* Seed */}
-          <span className="font-mono text-[10px] tracking-wide text-muted-foreground/40">
-            #{palette.seed.toUpperCase()}
-          </span>
+                  {/* Color picker popover — rendered via portal to avoid clipping */}
+                  {pickerIndex === i &&
+                    pickerPos &&
+                    createPortal(
+                      <div
+                        ref={pickerRef}
+                        className="fixed z-[9999]"
+                        style={{ top: pickerPos.top, left: pickerPos.left }}
+                      >
+                        <div className="rounded-xl border border-white/10 bg-black/90 p-3 shadow-2xl backdrop-blur-xl">
+                          <HexColorPicker
+                            color={hex}
+                            onChange={handleColorChange}
+                          />
+                        </div>
+                      </div>,
+                      document.body,
+                    )}
+                </div>
+              );
+            })}
+          </div>
 
-          {/* Response time */}
-          <span className="text-[10px] text-muted-foreground/30">
-            {palette.source === "fallback" ? "fallback" : `${palette.ms}ms`}
-          </span>
-
-          {/* Actions — pushed right */}
-          <div className="ml-auto flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-            <button
-              type="button"
-              onClick={copyPalette}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+          {/* Footer */}
+          <div className="flex items-center gap-2 px-3 pb-2.5 pt-1.5">
+            {/* Mode badge */}
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full bg-gradient-to-r px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm",
+                modeGradient,
+              )}
             >
-              <CopyIcon size={11} />
-              Copy
-            </button>
-            <PaletteExportMenu onExport={handleExport} />
-            <button
-              type="button"
-              onClick={() => onRemove(palette.id)}
-              className="inline-flex items-center rounded-lg px-1.5 py-1 text-muted-foreground/50 transition hover:bg-red-500/10 hover:text-red-400"
-              title="Remove palette"
-            >
-              <XIcon size={12} />
-            </button>
+              {palette.mode.replace("-", " ")}
+            </span>
+
+            {/* Seed */}
+            <span className="font-mono text-[10px] tracking-wide text-muted-foreground/40">
+              #{palette.seed.toUpperCase()}
+            </span>
+
+            {/* Response time */}
+            <span className="text-[10px] text-muted-foreground/30">
+              {palette.source === "fallback" ? "fallback" : `${palette.ms}ms`}
+            </span>
+
+            {/* Actions — pushed right */}
+            <div className="ml-auto flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={copyPalette}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+              >
+                <CopyIcon size={11} />
+                Copy
+              </button>
+              <PaletteExportMenu onExport={handleExport} />
+              <button
+                type="button"
+                onClick={() => onRemove(palette.id)}
+                className="inline-flex items-center rounded-lg px-1.5 py-1 text-muted-foreground/50 transition hover:bg-red-500/10 hover:text-red-400"
+                title="Remove palette"
+              >
+                <XIcon size={12} />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
       </m.div>
     </LazyMotion>
   );

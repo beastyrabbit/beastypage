@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-
-import { cloneParams, ensureSpriteDataLoaded } from "@/lib/streamer/steps";
-import type { StreamerParams, StreamStep } from "@/lib/streamer/steps";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
-import type { CatParams } from "@/lib/cat-v3/types";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
+import type { CatParams } from "@/lib/cat-v3/types";
+import type { StreamerParams, StreamStep } from "@/lib/streamer/steps";
+import { cloneParams, ensureSpriteDataLoaded } from "@/lib/streamer/steps";
 
 type StepOption = ReturnType<StreamStep["getOptions"]>[number];
 
@@ -35,9 +34,17 @@ type OptionPreviewProps = {
   size?: number;
 };
 const OPTION_PREVIEW_CACHE = new Map<string, string | null>();
-const CHUNK_PROMISE_CACHE = new Map<string, Promise<Map<string, string | null>>>();
+const CHUNK_PROMISE_CACHE = new Map<
+  string,
+  Promise<Map<string, string | null>>
+>();
 
-function buildOptionCacheKey(stepId: string | undefined, optionKey: string, baseSignature: string, size: number) {
+function buildOptionCacheKey(
+  stepId: string | undefined,
+  optionKey: string,
+  baseSignature: string,
+  size: number,
+) {
   return `${stepId ?? "unknown"}|${optionKey}|${size}|${baseSignature}`;
 }
 
@@ -46,7 +53,7 @@ function buildChunkCacheKey(
   baseSignature: string,
   size: number,
   chunkOptionKeys: string[],
-  chunkSize: number
+  chunkSize: number,
 ) {
   return `${stepId ?? "unknown"}|chunk|${size}|${chunkSize}|${baseSignature}|${chunkOptionKeys.join(",")}`;
 }
@@ -67,7 +74,7 @@ async function renderChunkPreviews(
   baseParams: StreamerParams,
   step: StreamStep,
   options: StepOption[],
-  size: number
+  size: number,
 ): Promise<Map<string, string | null>> {
   const result = new Map<string, string | null>();
 
@@ -78,7 +85,11 @@ async function renderChunkPreviews(
   const sanitizedBase = stripInternalFields(baseParams);
   const descriptors = options.map((opt) => {
     const variantParams = cloneParams(baseParams);
-    const state: { params: StreamerParams; history: unknown[]; [key: string]: unknown } = {
+    const state: {
+      params: StreamerParams;
+      history: unknown[];
+      [key: string]: unknown;
+    } = {
       params: variantParams,
       history: [] as unknown[],
     };
@@ -102,12 +113,14 @@ async function renderChunkPreviews(
           includeBase: false,
           frameMode: "composed",
           priority: "auto",
-        }
+        },
       )) as VariantSheetResult;
 
       if (sheet.frames.length > 0) {
         const sheetCanvas = await decodeImageFromDataUrl(sheet.sheetDataUrl);
-        const frameMap = new Map<string, VariantSheetFrame>(sheet.frames.map((frame) => [frame.id, frame]));
+        const frameMap = new Map<string, VariantSheetFrame>(
+          sheet.frames.map((frame) => [frame.id, frame]),
+        );
 
         for (const descriptor of descriptors) {
           const frame = frameMap.get(descriptor.key);
@@ -125,7 +138,17 @@ async function renderChunkPreviews(
           }
           ctx.imageSmoothingEnabled = false;
           ctx.clearRect(0, 0, size, size);
-          ctx.drawImage(sheetCanvas, frame.x, frame.y, frame.width, frame.height, 0, 0, size, size);
+          ctx.drawImage(
+            sheetCanvas,
+            frame.x,
+            frame.y,
+            frame.width,
+            frame.height,
+            0,
+            0,
+            size,
+            size,
+          );
           result.set(descriptor.key, canvas.toDataURL("image/png"));
         }
 
@@ -133,7 +156,10 @@ async function renderChunkPreviews(
       }
     }
   } catch (error) {
-    console.warn("Variant sheet preview failed, falling back to per-option renders", error);
+    console.warn(
+      "Variant sheet preview failed, falling back to per-option renders",
+      error,
+    );
   }
 
   // Fallback: render each option individually.
@@ -186,8 +212,14 @@ export function OptionPreview({
   const chunkDescriptor = useMemo(() => {
     const index = optionsSource.findIndex((item) => item.key === option.key);
     const effectiveChunkSize = Math.max(1, chunkSize);
-    const chunkStart = index >= 0 ? Math.floor(index / effectiveChunkSize) * effectiveChunkSize : 0;
-    const slice = optionsSource.slice(chunkStart, chunkStart + effectiveChunkSize);
+    const chunkStart =
+      index >= 0
+        ? Math.floor(index / effectiveChunkSize) * effectiveChunkSize
+        : 0;
+    const slice = optionsSource.slice(
+      chunkStart,
+      chunkStart + effectiveChunkSize,
+    );
     const includesOption = slice.some((item) => item.key === option.key);
     if (!includesOption) {
       slice.push(option);
@@ -208,7 +240,13 @@ export function OptionPreview({
 
   const chunkCacheKey = useMemo(() => {
     if (!step) return null;
-    return buildChunkCacheKey(step.id, baseSignature, size, chunkDescriptor.keys, chunkDescriptor.chunkSize);
+    return buildChunkCacheKey(
+      step.id,
+      baseSignature,
+      size,
+      chunkDescriptor.keys,
+      chunkDescriptor.chunkSize,
+    );
   }, [step, baseSignature, size, chunkDescriptor]);
 
   useEffect(() => {
@@ -243,10 +281,21 @@ export function OptionPreview({
 
     let chunkPromise = CHUNK_PROMISE_CACHE.get(chunkCacheKey);
     if (!chunkPromise) {
-      chunkPromise = renderChunkPreviews(generator, baseParams, step, chunkDescriptor.options, size)
+      chunkPromise = renderChunkPreviews(
+        generator,
+        baseParams,
+        step,
+        chunkDescriptor.options,
+        size,
+      )
         .then((map) => {
           for (const [key, value] of map) {
-            const optionKeyForCache = buildOptionCacheKey(step.id, key, baseSignature, size);
+            const optionKeyForCache = buildOptionCacheKey(
+              step.id,
+              key,
+              baseSignature,
+              size,
+            );
             OPTION_PREVIEW_CACHE.set(optionKeyForCache, value ?? null);
           }
           return map;
@@ -263,7 +312,11 @@ export function OptionPreview({
         if (!OPTION_PREVIEW_CACHE.has(optionCacheKey)) {
           OPTION_PREVIEW_CACHE.set(optionCacheKey, map.get(option.key) ?? null);
         }
-        setSrc(map.get(option.key) ?? OPTION_PREVIEW_CACHE.get(optionCacheKey) ?? null);
+        setSrc(
+          map.get(option.key) ??
+            OPTION_PREVIEW_CACHE.get(optionCacheKey) ??
+            null,
+        );
         setLoading(false);
       })
       .catch((error) => {
@@ -293,7 +346,10 @@ export function OptionPreview({
   ]);
 
   const dimension = size;
-  const wrapperStyle = { width: `${dimension}px`, height: `${dimension}px` } as const;
+  const wrapperStyle = {
+    width: `${dimension}px`,
+    height: `${dimension}px`,
+  } as const;
 
   if (loading) {
     return (

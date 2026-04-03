@@ -1,17 +1,21 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import CopyIcon from "@/components/ui/copy-icon";
 import XIcon from "@/components/ui/x-icon";
 import { track } from "@/lib/analytics";
-import { PaletteExportMenu } from "./PaletteExportMenu";
-import type { GeneratedPalette, DisplayFormat, ExportFormat } from "@/lib/palette-generator/types";
 import {
-  exportPalettes,
   buildClipboardText,
+  exportPalettes,
 } from "@/lib/palette-generator/export-utils";
+import type {
+  DisplayFormat,
+  ExportFormat,
+  GeneratedPalette,
+} from "@/lib/palette-generator/types";
+import { cn } from "@/lib/utils";
+import { PaletteExportMenu } from "./PaletteExportMenu";
 
 interface CollectionActionBarProps {
   palettes: GeneratedPalette[];
@@ -48,8 +52,13 @@ export function CollectionActionBar({
     (format: ExportFormat) => {
       try {
         exportPalettes(palettes, format, displayFormat);
-        showToast(`Exported ${palettes.length} palette(s) as ${format.toUpperCase()}`);
-        track("palette_generator_exported", { format, palette_count: palettes.length });
+        showToast(
+          `Exported ${palettes.length} palette(s) as ${format.toUpperCase()}`,
+        );
+        track("palette_generator_exported", {
+          format,
+          palette_count: palettes.length,
+        });
       } catch (error) {
         console.error(`[PaletteGenerator] Export as ${format} failed`, error);
         toast.error(`${format.toUpperCase()} export failed. Please try again.`);

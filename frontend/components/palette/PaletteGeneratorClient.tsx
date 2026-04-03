@@ -1,17 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PageHero } from "@/components/common/PageHero";
-import { DEFAULT_PALETTE_GENERATOR_SETTINGS } from "@/utils/paletteGeneratorVariants";
-import { type DisplayFormat, type GeneratedPalette } from "@/lib/palette-generator/types";
-import { fetchPaletteFromAPI } from "@/lib/palette-generator/api";
 import SparklesIcon from "@/components/ui/sparkles-icon";
-import { GeneratorControls } from "./GeneratorControls";
-import { CollectionActionBar } from "./CollectionActionBar";
-import { PaletteCard } from "./PaletteCard";
 import { track } from "@/lib/analytics";
+import { fetchPaletteFromAPI } from "@/lib/palette-generator/api";
+import type {
+  DisplayFormat,
+  GeneratedPalette,
+} from "@/lib/palette-generator/types";
+import { DEFAULT_PALETTE_GENERATOR_SETTINGS } from "@/utils/paletteGeneratorVariants";
+import { CollectionActionBar } from "./CollectionActionBar";
+import { GeneratorControls } from "./GeneratorControls";
+import { PaletteCard } from "./PaletteCard";
 
 const COLLECTION_KEY = "paletteGenerator.collection";
 
@@ -22,12 +25,17 @@ function loadCollection(): GeneratedPalette[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) {
-      console.error("[PaletteGenerator] Stored collection is not an array, resetting");
+      console.error(
+        "[PaletteGenerator] Stored collection is not an array, resetting",
+      );
       return [];
     }
     return parsed;
   } catch (error) {
-    console.error("[PaletteGenerator] Failed to load saved collection from localStorage", error);
+    console.error(
+      "[PaletteGenerator] Failed to load saved collection from localStorage",
+      error,
+    );
     return [];
   }
 }
@@ -36,7 +44,9 @@ export function PaletteGeneratorClient() {
   // -------------------------------------------------------------------------
   // Config state
   // -------------------------------------------------------------------------
-  const [paletteSize, setPaletteSize] = useState(DEFAULT_PALETTE_GENERATOR_SETTINGS.paletteSize);
+  const [paletteSize, setPaletteSize] = useState(
+    DEFAULT_PALETTE_GENERATOR_SETTINGS.paletteSize,
+  );
   const [displayFormat, setDisplayFormat] = useState<DisplayFormat>(
     DEFAULT_PALETTE_GENERATOR_SETTINGS.displayFormat,
   );
@@ -59,8 +69,13 @@ export function PaletteGeneratorClient() {
     try {
       localStorage.setItem(COLLECTION_KEY, JSON.stringify(collection));
     } catch (error) {
-      console.error("[PaletteGenerator] Failed to persist palette collection", error);
-      toast.error("Could not save collection locally. Consider exporting before leaving.");
+      console.error(
+        "[PaletteGenerator] Failed to persist palette collection",
+        error,
+      );
+      toast.error(
+        "Could not save collection locally. Consider exporting before leaving.",
+      );
     }
   }, [collection]);
 
@@ -71,15 +86,18 @@ export function PaletteGeneratorClient() {
     toast.success(message);
   }, []);
 
-  const copyText = useCallback(async (text: string, successMessage: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(successMessage);
-    } catch (error) {
-      console.error("[PaletteGenerator] Clipboard write failed", error);
-      toast.error("Clipboard unavailable");
-    }
-  }, []);
+  const _copyText = useCallback(
+    async (text: string, successMessage: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success(successMessage);
+      } catch (error) {
+        console.error("[PaletteGenerator] Clipboard write failed", error);
+        toast.error("Clipboard unavailable");
+      }
+    },
+    [],
+  );
 
   // -------------------------------------------------------------------------
   // Generation logic
@@ -92,10 +110,16 @@ export function PaletteGeneratorClient() {
       try {
         const palette = await fetchPaletteFromAPI(mode, paletteSize);
         if (palette.source === "fallback") {
-          toast.warning("Color API unavailable — showing a placeholder palette");
+          toast.warning(
+            "Color API unavailable — showing a placeholder palette",
+          );
         }
         setCollection((prev) => [palette, ...prev]);
-        track("palette_generator_generated", { mode, count: paletteSize, source: palette.source });
+        track("palette_generator_generated", {
+          mode,
+          count: paletteSize,
+          source: palette.source,
+        });
       } catch (error) {
         console.error("[PaletteGenerator] Generation failed", error);
         toast.error("Failed to generate palette. Please try again.");
@@ -113,16 +137,19 @@ export function PaletteGeneratorClient() {
     setCollection((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  const handleUpdateColor = useCallback((paletteId: string, colorIndex: number, newHex: string) => {
-    setCollection((prev) =>
-      prev.map((p) => {
-        if (p.id !== paletteId) return p;
-        const colors = [...p.colors];
-        colors[colorIndex] = newHex;
-        return { ...p, colors };
-      }),
-    );
-  }, []);
+  const handleUpdateColor = useCallback(
+    (paletteId: string, colorIndex: number, newHex: string) => {
+      setCollection((prev) =>
+        prev.map((p) => {
+          if (p.id !== paletteId) return p;
+          const colors = [...p.colors];
+          colors[colorIndex] = newHex;
+          return { ...p, colors };
+        }),
+      );
+    },
+    [],
+  );
 
   const handleClear = useCallback(() => {
     setCollection([]);
@@ -176,7 +203,9 @@ export function PaletteGeneratorClient() {
               <SparklesIcon size={48} />
             </div>
             <p className="text-sm text-muted-foreground/40">
-              Pick a <strong className="text-muted-foreground/60">harmony mode</strong> above to generate your first palette
+              Pick a{" "}
+              <strong className="text-muted-foreground/60">harmony mode</strong>{" "}
+              above to generate your first palette
             </p>
           </div>
         )}

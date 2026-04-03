@@ -1,4 +1,9 @@
-export type NavAccent = "dash" | "projects" | "stream" | "collection" | "personal";
+export type NavAccent =
+  | "dash"
+  | "projects"
+  | "stream"
+  | "collection"
+  | "personal";
 
 export type NavItem = {
   key: NavAccent;
@@ -16,7 +21,12 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 // Projects sub-navigation categories
-export type ProjectCategory = "warrior-cats" | "gacha" | "artist" | "games" | "tools";
+export type ProjectCategory =
+  | "warrior-cats"
+  | "gacha"
+  | "artist"
+  | "games"
+  | "tools";
 
 export type ProjectCategoryConfig = {
   key: ProjectCategory;

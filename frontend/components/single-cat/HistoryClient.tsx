@@ -1,17 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "convex/react";
+import {
+  ArrowUpRight,
+  ChevronLeft,
+  Loader2,
+  SlidersHorizontal,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Loader2, ArrowUpRight, SlidersHorizontal, ChevronLeft } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
-import XIcon from "@/components/ui/x-icon";
 import RightChevron from "@/components/ui/right-chevron";
+import XIcon from "@/components/ui/x-icon";
+import { api } from "@/convex/_generated/api";
+import { track } from "@/lib/analytics";
 import { encodeCatShare } from "@/lib/catShare";
 import { HistoryAncestryTreeCard } from "./HistoryAncestryTreeCard";
-import { track } from "@/lib/analytics";
 
 type SortMode = "newest" | "oldest" | "name";
 
@@ -32,7 +37,18 @@ type TreePreviewCat = {
 };
 
 type HistoryItem =
-  | { kind: "single"; id: string; title: string; creator: string | null; created: number | null; previewUrl: string | null; fullUrl: string | null; slug: string; variant: "single" | "guided" | "discordkitten"; href: string }
+  | {
+      kind: "single";
+      id: string;
+      title: string;
+      creator: string | null;
+      created: number | null;
+      previewUrl: string | null;
+      fullUrl: string | null;
+      slug: string;
+      variant: "single" | "guided" | "discordkitten";
+      href: string;
+    }
   | {
       kind: "adoption";
       id: string;
@@ -75,12 +91,17 @@ function getPreviewUrl(
     tiny?: { url: string | null } | null;
     preview?: { url: string | null } | null;
     full?: { url: string | null } | null;
-  }
+  },
 ): string | null {
-  const cached = previews?.preview?.url ?? previews?.full?.url ?? previews?.tiny?.url ?? null;
+  const cached =
+    previews?.preview?.url ??
+    previews?.full?.url ??
+    previews?.tiny?.url ??
+    null;
   if (cached) return cached;
   // Use encoded cat data for on-demand rendering
-  if (encodedCatData) return `/api/preview/_?cat=${encodeURIComponent(encodedCatData)}`;
+  if (encodedCatData)
+    return `/api/preview/_?cat=${encodeURIComponent(encodedCatData)}`;
   // Fallback to profile ID lookup
   if (profileId) return `/api/preview/${profileId}`;
   return null;
@@ -89,7 +110,10 @@ function getPreviewUrl(
 export function HistoryClient() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
-  const [focusedPreview, setFocusedPreview] = useState<{ url: string; title: string } | null>(null);
+  const [focusedPreview, setFocusedPreview] = useState<{
+    url: string;
+    title: string;
+  } | null>(null);
   const hasTrackedView = useRef(false);
   const searchDebounceRef = useRef<number | null>(null);
 
@@ -134,13 +158,23 @@ export function HistoryClient() {
       const catData = profile.cat_data as Record<string, unknown> | null;
       const mode = (catData as { mode?: string } | null)?.mode ?? null;
       // Detect discordkitten source in both wrapped ({ params: { source } }) and flat ({ source }) formats
-      const source = (catData?.params as Record<string, unknown> | undefined)?.source ?? catData?.source;
+      const source =
+        (catData?.params as Record<string, unknown> | undefined)?.source ??
+        catData?.source;
       const variant: "single" | "guided" | "discordkitten" =
-        source === "discordkitten" ? "discordkitten" :
-        mode === "wizard-timeline" ? "guided" : "single";
+        source === "discordkitten"
+          ? "discordkitten"
+          : mode === "wizard-timeline"
+            ? "guided"
+            : "single";
       const slug = profile.slug ?? profile.shareToken ?? profile.id;
-      const href = variant === "guided" ? `/guided-builder/view/${slug}` : `/view/${slug}`;
-      const previewUrl = getPreviewUrl(profile.id, null, profile.previews ?? undefined);
+      const href =
+        variant === "guided" ? `/guided-builder/view/${slug}` : `/view/${slug}`;
+      const previewUrl = getPreviewUrl(
+        profile.id,
+        null,
+        profile.previews ?? undefined,
+      );
       return {
         kind: "single" as const,
         id: profile.id,
@@ -178,7 +212,11 @@ export function HistoryClient() {
             ? `${origin}/view?cat=${encoded}`
             : `/view?cat=${encoded}`
           : null;
-      const previewUrl = getPreviewUrl(cat.profileId ?? null, encoded, cat.previews ?? undefined);
+      const previewUrl = getPreviewUrl(
+        cat.profileId ?? null,
+        encoded,
+        cat.previews ?? undefined,
+      );
       const fullUrl = previewUrl;
       return {
         index,
@@ -219,7 +257,10 @@ export function HistoryClient() {
     previewCats: tree.previewCats ?? [],
   }));
 
-  const allItems = useMemo(() => [...singleItems, ...adoptionItems, ...treeItems], [singleItems, adoptionItems, treeItems]);
+  const allItems = useMemo(
+    () => [...singleItems, ...adoptionItems, ...treeItems],
+    [singleItems, adoptionItems, treeItems],
+  );
 
   const filteredItems = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -227,7 +268,7 @@ export function HistoryClient() {
     return allItems.filter((item) =>
       [item.title, item.creator, item.slug]
         .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(term))
+        .some((value) => value?.toLowerCase().includes(term)),
     );
   }, [allItems, searchTerm]);
 
@@ -236,23 +277,25 @@ export function HistoryClient() {
       switch (sortMode) {
         case "oldest":
           return (a.created ?? 0) - (b.created ?? 0);
-        case "name":
-          {
-            const aEmpty = !a.title;
-            const bEmpty = !b.title;
-            if (aEmpty && bEmpty) return 0;
-            if (aEmpty) return 1;
-            if (bEmpty) return -1;
-            return a.title.localeCompare(b.title);
-          }
-        case "newest":
+        case "name": {
+          const aEmpty = !a.title;
+          const bEmpty = !b.title;
+          if (aEmpty && bEmpty) return 0;
+          if (aEmpty) return 1;
+          if (bEmpty) return -1;
+          return a.title.localeCompare(b.title);
+        }
         default:
           return (b.created ?? 0) - (a.created ?? 0);
       }
     });
   }, [filteredItems, sortMode]);
 
-  if (profilesQuery === undefined || batchesQuery === undefined || treesQuery === undefined) {
+  if (
+    profilesQuery === undefined ||
+    batchesQuery === undefined ||
+    treesQuery === undefined
+  ) {
     return (
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center gap-3 px-6 py-16 text-muted-foreground">
         <Loader2 className="size-6 animate-spin text-primary" />
@@ -305,11 +348,13 @@ export function HistoryClient() {
               <SlidersHorizontal className="size-3" /> Sort
             </span>
             <div className="flex flex-wrap justify-start gap-2 md:justify-end">
-              {([
-                { label: "Newest", value: "newest" },
-                { label: "Oldest", value: "oldest" },
-                { label: "Name", value: "name" },
-              ] as const).map((option) => (
+              {(
+                [
+                  { label: "Newest", value: "newest" },
+                  { label: "Oldest", value: "oldest" },
+                  { label: "Name", value: "name" },
+                ] as const
+              ).map((option) => (
                 <button
                   key={option.value}
                   type="button"
@@ -355,7 +400,10 @@ export function HistoryClient() {
               event.preventDefault();
               setFocusedPreview(null);
             }
-            if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+            if (
+              (event.key === "Enter" || event.key === " ") &&
+              event.target === event.currentTarget
+            ) {
               event.preventDefault();
               setFocusedPreview(null);
             }
@@ -371,7 +419,9 @@ export function HistoryClient() {
               <XIcon size={16} />
             </button>
             <div className="flex flex-col items-center gap-6">
-              <h2 className="text-xl font-semibold text-foreground">{focusedPreview.title}</h2>
+              <h2 className="text-xl font-semibold text-foreground">
+                {focusedPreview.title}
+              </h2>
               <div className="w-full overflow-hidden rounded-2xl border border-border/40 bg-background/80">
                 <Image
                   src={focusedPreview.url}
@@ -416,7 +466,12 @@ function HistorySingleCard({ item, onPreview }: HistorySingleCardProps) {
   const fullUrl = item.fullUrl ?? previewUrl;
   const creator = cleanDisplay(item.creator);
   const href = item.href;
-  const variantLabel = item.variant === "guided" ? "Guided" : item.variant === "discordkitten" ? "Discord Kitten" : "Single";
+  const variantLabel =
+    item.variant === "guided"
+      ? "Guided"
+      : item.variant === "discordkitten"
+        ? "Discord Kitten"
+        : "Single";
   const actionLabel = item.variant === "guided" ? "Open tour" : "View";
 
   return (
@@ -428,7 +483,9 @@ function HistorySingleCard({ item, onPreview }: HistorySingleCardProps) {
         }}
         className="relative aspect-square w-full overflow-hidden rounded-xl border border-border/30 bg-background transition hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
         disabled={!fullUrl}
-        aria-label={fullUrl ? `Open preview for ${title}` : "Preview unavailable"}
+        aria-label={
+          fullUrl ? `Open preview for ${title}` : "Preview unavailable"
+        }
       >
         {previewUrl ? (
           <Image
@@ -450,10 +507,16 @@ function HistorySingleCard({ item, onPreview }: HistorySingleCardProps) {
       </button>
 
       <div className="flex flex-col gap-2">
-        {title ? <h2 className="text-base font-semibold text-foreground">{title}</h2> : null}
-        {creator ? <p className="text-xs text-muted-foreground">by {creator}</p> : null}
+        {title ? (
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        ) : null}
+        {creator ? (
+          <p className="text-xs text-muted-foreground">by {creator}</p>
+        ) : null}
         {item.created ? (
-          <p className="text-xs text-muted-foreground/80">{new Date(item.created).toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground/80">
+            {new Date(item.created).toLocaleString()}
+          </p>
         ) : null}
       </div>
 
@@ -475,7 +538,9 @@ type HistoryAdoptionCardProps = {
 function HistoryAdoptionCard({ item, onPreview }: HistoryAdoptionCardProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const totalCats = item.cats.length;
-  const safeIndex = totalCats ? ((activeIndex % totalCats) + totalCats) % totalCats : 0;
+  const safeIndex = totalCats
+    ? ((activeIndex % totalCats) + totalCats) % totalCats
+    : 0;
   const activeCat = totalCats ? item.cats[safeIndex] : null;
 
   useEffect(() => {
@@ -498,7 +563,11 @@ function HistoryAdoptionCard({ item, onPreview }: HistoryAdoptionCardProps) {
 
   const cardTitle = cleanDisplay(item.title);
   const creator = cleanDisplay(item.creator);
-  const activeDisplayName = cleanDisplay(activeCat?.catName) || cleanDisplay(activeCat?.label) || cardTitle || "Adoption preview";
+  const activeDisplayName =
+    cleanDisplay(activeCat?.catName) ||
+    cleanDisplay(activeCat?.label) ||
+    cardTitle ||
+    "Adoption preview";
   const href = `/adoption/${item.slug}`;
 
   return (
@@ -530,8 +599,10 @@ function HistoryAdoptionCard({ item, onPreview }: HistoryAdoptionCardProps) {
         <button
           type="button"
           onClick={() => {
-            if (activeCat?.fullUrl) onPreview(activeDisplayName, activeCat.fullUrl);
-            else if (activeCat?.previewUrl) onPreview(activeDisplayName, activeCat.previewUrl);
+            if (activeCat?.fullUrl)
+              onPreview(activeDisplayName, activeCat.fullUrl);
+            else if (activeCat?.previewUrl)
+              onPreview(activeDisplayName, activeCat.previewUrl);
           }}
           className="flex h-full w-full items-center justify-center"
           disabled={!activeCat?.previewUrl && !activeCat?.fullUrl}
@@ -551,14 +622,21 @@ function HistoryAdoptionCard({ item, onPreview }: HistoryAdoptionCardProps) {
             </div>
           )}
         </button>
-
       </div>
 
       <div className="flex flex-col gap-2">
-        {cardTitle ? <h2 className="text-base font-semibold text-foreground">{cardTitle}</h2> : null}
-        {creator ? <p className="text-xs text-muted-foreground">by {creator}</p> : null}
+        {cardTitle ? (
+          <h2 className="text-base font-semibold text-foreground">
+            {cardTitle}
+          </h2>
+        ) : null}
+        {creator ? (
+          <p className="text-xs text-muted-foreground">by {creator}</p>
+        ) : null}
         {item.created ? (
-          <p className="text-xs text-muted-foreground/80">{new Date(item.created).toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground/80">
+            {new Date(item.created).toLocaleString()}
+          </p>
         ) : null}
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useId } from "react";
+import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 import { detectGrid } from "@/lib/pixelator/api";
 
@@ -88,7 +88,10 @@ export function PixelArtDetector({
 
           {pixelArtMode && (
             <div className="flex items-center gap-3">
-              <label htmlFor={gridSizeId} className="text-xs font-medium text-muted-foreground">
+              <label
+                htmlFor={gridSizeId}
+                className="text-xs font-medium text-muted-foreground"
+              >
                 Grid Size
               </label>
               <input
@@ -98,7 +101,7 @@ export function PixelArtDetector({
                 max={128}
                 value={gridSize ?? ""}
                 onChange={(e) => {
-                  const v = parseInt(e.target.value);
+                  const v = parseInt(e.target.value, 10);
                   onGridSizeChange(Number.isFinite(v) && v > 0 ? v : null);
                 }}
                 className="w-20 rounded border border-border bg-background px-2 py-1 text-xs text-foreground"

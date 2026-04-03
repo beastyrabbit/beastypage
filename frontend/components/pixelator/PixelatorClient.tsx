@@ -1,41 +1,40 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
-  DragOverlay,
-  pointerWithin,
   type DragEndEvent,
+  DragOverlay,
   type DragStartEvent,
+  pointerWithin,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ImageUploader } from "@/components/color-palette/ImageUploader";
 import { VariantBar } from "@/components/common/VariantBar";
 import {
+  imageToDataUrl,
   loadImageFromFile,
   loadImageFromUrl,
-  imageToDataUrl,
 } from "@/lib/color-extraction/image-processing";
 import { processImage } from "@/lib/pixelator/api";
 import {
   OPERATIONS,
+  type OperationType,
   type PipelineStep,
   type ProcessMode,
-  type OperationType,
 } from "@/lib/pixelator/types";
-import { useVariants } from "@/utils/variants";
 import {
-  parsePixelatorPayload,
-  pixelatorSettingsEqual,
   type PixelatorSettings,
+  pixelatorSettingsEqual,
 } from "@/utils/pixelatorVariants";
+import { useVariants } from "@/utils/variants";
 
 import { OperationToolbox, ToolboxDragOverlay } from "./OperationToolbox";
 import { PipelineBuilder } from "./PipelineBuilder";
-import { PreviewCanvas } from "./PreviewCanvas";
 import { PixelArtDetector } from "./PixelArtDetector";
+import { PreviewCanvas } from "./PreviewCanvas";
 
 // ---------------------------------------------------------------------------
 // State
@@ -71,7 +70,7 @@ const AUTO_PROCESS_DELAY = 600;
 // Clipboard helper
 // ---------------------------------------------------------------------------
 
-async function copyText(text: string, successMessage: string) {
+async function _copyText(text: string, successMessage: string) {
   try {
     await navigator.clipboard.writeText(text);
     toast.success(successMessage);
@@ -118,7 +117,10 @@ export function PixelatorClient() {
 
   const isDirty = useMemo(() => {
     if (!variants.activeVariant) return false;
-    return !pixelatorSettingsEqual(snapshotConfig, variants.activeVariant.settings);
+    return !pixelatorSettingsEqual(
+      snapshotConfig,
+      variants.activeVariant.settings,
+    );
   }, [snapshotConfig, variants.activeVariant]);
 
   // ---- Image loading ----
@@ -167,18 +169,21 @@ export function PixelatorClient() {
     setState((prev) => {
       const steps = [...prev.steps, step];
       if (steps.length > 1) {
-        step.inputSource = steps[steps.length - 2]!.id;
+        step.inputSource = steps[steps.length - 2]?.id;
       }
       return { ...prev, steps };
     });
   }, []);
 
-  const updateStep = useCallback((id: string, updates: Partial<PipelineStep>) => {
-    setState((prev) => ({
-      ...prev,
-      steps: prev.steps.map((s) => (s.id === id ? { ...s, ...updates } : s)),
-    }));
-  }, []);
+  const updateStep = useCallback(
+    (id: string, updates: Partial<PipelineStep>) => {
+      setState((prev) => ({
+        ...prev,
+        steps: prev.steps.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+      }));
+    },
+    [],
+  );
 
   const removeStep = useCallback((id: string) => {
     setState((prev) => {
@@ -188,7 +193,8 @@ export function PixelatorClient() {
         steps: filtered.map((s) => ({
           ...s,
           inputSource:
-            s.inputSource !== "original" && !filtered.some((f) => f.id === s.inputSource)
+            s.inputSource !== "original" &&
+            !filtered.some((f) => f.id === s.inputSource)
               ? "original"
               : s.inputSource,
           blendWith:
@@ -250,7 +256,7 @@ export function PixelatorClient() {
   );
 
   // ---- Auto-process on pipeline changes ----
-  const stepsFingerprint = useMemo(
+  const _stepsFingerprint = useMemo(
     () => JSON.stringify(state.steps),
     [state.steps],
   );
@@ -266,7 +272,14 @@ export function PixelatorClient() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stepsFingerprint, state.imageDataUrl, state.processMode, handleProcess]);
+  }, [
+    state.imageDataUrl,
+    state.processMode,
+    handleProcess,
+    state.steps.length,
+    state.steps.filter,
+    state.steps,
+  ]);
 
   // ---- Pixel art detection ----
   const handleGridDetected = useCallback((gridSize: number | null) => {
@@ -290,7 +303,9 @@ export function PixelatorClient() {
 
   // ---- DnD handlers ----
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const type = event.active.data.current?.operationType as OperationType | undefined;
+    const type = event.active.data.current?.operationType as
+      | OperationType
+      | undefined;
     if (type) setDraggedOp(type);
   }, []);
 
@@ -302,7 +317,9 @@ export function PixelatorClient() {
       if (!over) return;
 
       // Dropping from toolbox — add step regardless of which pipeline element caught the drop
-      const opType = active.data.current?.operationType as OperationType | undefined;
+      const opType = active.data.current?.operationType as
+        | OperationType
+        | undefined;
       if (opType) {
         addStep(opType);
         return;
@@ -415,7 +432,9 @@ export function PixelatorClient() {
           </div>
 
           <DragOverlay>
-            {draggedOp ? <ToolboxDragOverlay operationType={draggedOp} /> : null}
+            {draggedOp ? (
+              <ToolboxDragOverlay operationType={draggedOp} />
+            ) : null}
           </DragOverlay>
         </DndContext>
       )}
@@ -437,8 +456,16 @@ const MODE_OPTIONS: Array<{
   label: string;
   activeClass: string;
 }> = [
-  { mode: "preview", label: "Preview", activeClass: "bg-primary text-primary-foreground shadow-sm" },
-  { mode: "full", label: "Full Image", activeClass: "bg-amber-600 text-white shadow-sm" },
+  {
+    mode: "preview",
+    label: "Preview",
+    activeClass: "bg-primary text-primary-foreground shadow-sm",
+  },
+  {
+    mode: "full",
+    label: "Full Image",
+    activeClass: "bg-amber-600 text-white shadow-sm",
+  },
 ];
 
 function ModeToggle({ current, onChange }: ModeToggleProps): React.ReactNode {
@@ -449,7 +476,9 @@ function ModeToggle({ current, onChange }: ModeToggleProps): React.ReactNode {
           key={mode}
           onClick={() => onChange(mode)}
           className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${
-            current === mode ? activeClass : "text-muted-foreground hover:text-foreground"
+            current === mode
+              ? activeClass
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           {label}
