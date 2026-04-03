@@ -1,10 +1,10 @@
 "use node";
-import { action } from "./_generated/server.js";
-import type { ActionCtx } from "./_generated/server.js";
-import type { Id } from "./_generated/dataModel.js";
 import { v } from "convex/values";
-import { api } from "./_generated/api.js";
 import { Jimp } from "jimp";
+import { api } from "./_generated/api.js";
+import type { Id } from "./_generated/dataModel.js";
+import type { ActionCtx } from "./_generated/server.js";
+import { action } from "./_generated/server.js";
 
 type Variant = "default" | "custom";
 
@@ -37,12 +37,24 @@ export const generateForCat = action({
     const tasks: Array<Promise<VariantResult | null>> = [];
     if (cat.defaultCardStorageId && !cat.defaultCardThumbStorageId) {
       tasks.push(
-        generateThumbnail(ctx, args.id, "default", cat.defaultCardStorageId, cat.defaultCardName),
+        generateThumbnail(
+          ctx,
+          args.id,
+          "default",
+          cat.defaultCardStorageId,
+          cat.defaultCardName,
+        ),
       );
     }
     if (cat.customCardStorageId && !cat.customCardThumbStorageId) {
       tasks.push(
-        generateThumbnail(ctx, args.id, "custom", cat.customCardStorageId, cat.customCardName),
+        generateThumbnail(
+          ctx,
+          args.id,
+          "custom",
+          cat.customCardStorageId,
+          cat.customCardName,
+        ),
       );
     }
 
@@ -55,8 +67,12 @@ export const generateForCat = action({
       return { success: false, reason: "nothing_to_generate" } as const;
     }
 
-    const defaultCard = results.find((entry) => entry.variant === "default")?.payload;
-    const customCard = results.find((entry) => entry.variant === "custom")?.payload;
+    const defaultCard = results.find(
+      (entry) => entry.variant === "default",
+    )?.payload;
+    const customCard = results.find(
+      (entry) => entry.variant === "custom",
+    )?.payload;
 
     await ctx.runMutation(api.catdex.applyThumbnailUpdates, {
       id: args.id,
@@ -64,7 +80,10 @@ export const generateForCat = action({
       ...(customCard ? { customCard } : {}),
     });
 
-    return { success: true, generated: results.map((entry) => entry.variant) } as const;
+    return {
+      success: true,
+      generated: results.map((entry) => entry.variant),
+    } as const;
   },
 });
 
@@ -77,7 +96,10 @@ async function generateThumbnail(
 ): Promise<VariantResult | null> {
   const downloadUrl = await ctx.storage.getUrl(storageId);
   if (!downloadUrl) {
-    console.warn("Unable to resolve storage URL for thumbnail variant", { catId, variant });
+    console.warn("Unable to resolve storage URL for thumbnail variant", {
+      catId,
+      variant,
+    });
     return null;
   }
 
@@ -85,7 +107,11 @@ async function generateThumbnail(
     // Fetch the original image
     const response = await fetch(downloadUrl);
     if (!response.ok) {
-      console.warn("Failed to fetch image for thumbnail", { catId, variant, status: response.status });
+      console.warn("Failed to fetch image for thumbnail", {
+        catId,
+        variant,
+        status: response.status,
+      });
       return null;
     }
 
@@ -117,7 +143,7 @@ async function generateThumbnail(
 
     // Store the thumbnail
     const thumbStorageId = await ctx.storage.store(
-      new Blob([new Uint8Array(processed)], { type: "image/jpeg" })
+      new Blob([new Uint8Array(processed)], { type: "image/jpeg" }),
     );
 
     const thumbName = `${name ?? variant}-card-thumb.jpg`;
@@ -134,7 +160,11 @@ async function generateThumbnail(
       },
     };
   } catch (error) {
-    console.warn("Error generating thumbnail with jimp", { catId, variant, error });
+    console.warn("Error generating thumbnail with jimp", {
+      catId,
+      variant,
+      error,
+    });
     return null;
   }
 }

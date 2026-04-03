@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 const DEFAULT_REDIRECT = normalizeRoute(process.env.NEXT_ENTRY_REDIRECT);
 const HOST_ROUTE_MAP = parseHostMap(process.env.NEXT_ENTRY_HOST_MAP);
@@ -10,7 +10,7 @@ function parseHostMap(raw: string | undefined) {
     return Object.fromEntries(
       Object.entries(parsed)
         .filter(([, value]) => typeof value === "string")
-        .map(([key, value]) => [key.toLowerCase(), normalizeRoute(value)])
+        .map(([key, value]) => [key.toLowerCase(), normalizeRoute(value)]),
     );
   } catch (error) {
     console.warn("Invalid NEXT_ENTRY_HOST_MAP JSON", error);

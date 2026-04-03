@@ -1,7 +1,6 @@
 import { v } from "convex/values";
-
-import { mutation } from "./_generated/server.js";
 import type { MutationCtx } from "./_generated/server.js";
+import { mutation } from "./_generated/server.js";
 
 const CHALLENGE_EXPIRY_MS = 5 * 60 * 1000;
 
@@ -34,7 +33,9 @@ function randomHex(bytes: number) {
   if (globalThis.crypto?.getRandomValues) {
     const buffer = new Uint8Array(bytes);
     globalThis.crypto.getRandomValues(buffer);
-    return Array.from(buffer, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return Array.from(buffer, (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
   }
   let output = "";
   for (let i = 0; i < bytes; i += 1) {
@@ -74,7 +75,10 @@ async function pruneExpiredChallenges(ctx: MutationCtx, now: number) {
   }
 }
 
-async function createChallenge(ctx: MutationCtx, options: ChallengeOptions = {}) {
+async function createChallenge(
+  ctx: MutationCtx,
+  options: ChallengeOptions = {},
+) {
   const now = Date.now();
   let left = randomIntInclusive(2, 10);
   let right = randomIntInclusive(2, 10);
@@ -97,13 +101,13 @@ async function createChallenge(ctx: MutationCtx, options: ChallengeOptions = {})
     answerHash: await hashAnswer(answerStr, salt),
     salt,
     expiresAt: now + CHALLENGE_EXPIRY_MS,
-    createdAt: now
+    createdAt: now,
   });
 
   return {
     token,
     prompt: `${left} + ${right}`,
-    expiresAt: now + CHALLENGE_EXPIRY_MS
+    expiresAt: now + CHALLENGE_EXPIRY_MS,
   } as const;
 }
 
@@ -112,13 +116,13 @@ export const issueChallenge = mutation({
   handler: async (ctx) => {
     await pruneExpiredChallenges(ctx, Date.now());
     return createChallenge(ctx);
-  }
+  },
 });
 
 export const redeemChallenge = mutation({
   args: {
     token: v.string(),
-    answer: v.string()
+    answer: v.string(),
   },
   handler: async (ctx, args) => {
     const record = await ctx.db
@@ -132,7 +136,7 @@ export const redeemChallenge = mutation({
       return {
         status: "retry",
         message: "That challenge timed out. Try this new one!",
-        challenge: freshChallenge
+        challenge: freshChallenge,
       } as const;
     }
 
@@ -143,38 +147,44 @@ export const redeemChallenge = mutation({
       return {
         status: "retry",
         message: "That challenge expired. Try again with a fresh puzzle!",
-        challenge: freshChallenge
+        challenge: freshChallenge,
       } as const;
     }
 
     if (!INVITE_URL) {
       return {
         status: "error",
-        message: "Discord invite isn't configured yet. Please try again later."
+        message: "Discord invite isn't configured yet. Please try again later.",
       } as const;
     }
 
     const cleanedAnswer = args.answer.trim();
     const answerNumber = Number.parseInt(cleanedAnswer, 10);
 
-    if (!cleanedAnswer || !/^\d+$/.test(cleanedAnswer) || Number.isNaN(answerNumber)) {
+    if (
+      !cleanedAnswer ||
+      !/^\d+$/.test(cleanedAnswer) ||
+      Number.isNaN(answerNumber)
+    ) {
       await ctx.db.delete(record._id);
       const freshChallenge = await createChallenge(ctx);
       return {
         status: "retry",
         message: "Answers must be numbers. Here's a new challenge!",
-        challenge: freshChallenge
+        challenge: freshChallenge,
       } as const;
     }
 
     const answerHash = await hashAnswer(cleanedAnswer, record.salt);
     if (answerHash !== record.answerHash) {
       await ctx.db.delete(record._id);
-      const freshChallenge = await createChallenge(ctx, { avoidAnswer: answerNumber });
+      const freshChallenge = await createChallenge(ctx, {
+        avoidAnswer: answerNumber,
+      });
       return {
         status: "retry",
         message: "Not quite! Try this new puzzle.",
-        challenge: freshChallenge
+        challenge: freshChallenge,
       } as const;
     }
 
@@ -182,7 +192,7 @@ export const redeemChallenge = mutation({
 
     return {
       status: "success",
-      inviteUrl: INVITE_URL
+      inviteUrl: INVITE_URL,
     } as const;
-  }
+  },
 });

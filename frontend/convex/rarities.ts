@@ -1,6 +1,6 @@
-import { mutation, query } from "./_generated/server.js";
-import type { MutationCtx } from "./_generated/server.js";
 import type { Doc } from "./_generated/dataModel.js";
+import type { MutationCtx } from "./_generated/server.js";
+import { mutation, query } from "./_generated/server.js";
 import { docIdToString } from "./utils.js";
 
 type RarityDoc = Doc<"rarity">;
@@ -18,7 +18,7 @@ export const DEFAULT_RARITIES: Array<{
   { name: "Celestara", chancePercent: 10, stars: 4 },
   { name: "Divinara", chancePercent: 6, stars: 5 },
   { name: "Holo Nova", chancePercent: 3, stars: 6 },
-  { name: "Singularity", chancePercent: 1, stars: 7 }
+  { name: "Singularity", chancePercent: 1, stars: 7 },
 ];
 
 export const list = query({
@@ -27,7 +27,7 @@ export const list = query({
     const rarities = await ctx.db.query("rarity").collect();
     rarities.sort((a, b) => (a.stars ?? 0) - (b.stars ?? 0));
     return rarities.map((doc) => rarityRecordToClient(doc));
-  }
+  },
 });
 
 export const totalCount = query({
@@ -38,14 +38,14 @@ export const totalCount = query({
       count += 1;
     }
     return count;
-  }
+  },
 });
 
 export const ensureDefaults = mutation({
   args: {},
   handler: async (ctx) => {
     await upsertDefaultRarities(ctx, Date.now());
-  }
+  },
 });
 
 function rarityRecordToClient(doc: RarityDoc) {
@@ -55,11 +55,14 @@ function rarityRecordToClient(doc: RarityDoc) {
     stars: doc.stars ?? null,
     chance_percent: doc.chancePercent ?? null,
     created: doc.createdAt,
-    updated: doc.updatedAt
+    updated: doc.updatedAt,
   };
 }
 
-export async function upsertDefaultRarities(ctx: Pick<MutationCtx, "db">, now: number) {
+export async function upsertDefaultRarities(
+  ctx: Pick<MutationCtx, "db">,
+  now: number,
+) {
   const { db } = ctx;
   for (const rarity of DEFAULT_RARITIES) {
     const existing = await db
@@ -76,7 +79,7 @@ export async function upsertDefaultRarities(ctx: Pick<MutationCtx, "db">, now: n
         await db.patch(existing._id, {
           chancePercent: rarity.chancePercent,
           stars: rarity.stars,
-          updatedAt: now
+          updatedAt: now,
         });
       }
     } else {
@@ -85,7 +88,7 @@ export async function upsertDefaultRarities(ctx: Pick<MutationCtx, "db">, now: n
         chancePercent: rarity.chancePercent,
         stars: rarity.stars,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       });
     }
   }

@@ -1,6 +1,6 @@
-import { query, mutation } from "./_generated/server.js";
 import { v } from "convex/values";
 import type { MutationCtx } from "./_generated/server.js";
+import { mutation, query } from "./_generated/server.js";
 
 /** Helper: get the authenticated user or throw. */
 async function requireUser(ctx: MutationCtx) {
@@ -10,7 +10,7 @@ async function requireUser(ctx: MutationCtx) {
   const user = await ctx.db
     .query("users")
     .withIndex("byTokenIdentifier", (q) =>
-      q.eq("tokenIdentifier", identity.tokenIdentifier)
+      q.eq("tokenIdentifier", identity.tokenIdentifier),
     )
     .unique();
   if (!user) throw new Error("User not found");
@@ -33,7 +33,7 @@ export const getSession = query({
     const user = await ctx.db
       .query("users")
       .withIndex("byTokenIdentifier", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
+        q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
     if (!user) return null;
@@ -238,4 +238,3 @@ export const toggleTestMode = mutation({
     });
   },
 });
-

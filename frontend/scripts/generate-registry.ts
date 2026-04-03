@@ -1,8 +1,9 @@
 // Scans app/**/widget.ts files and generates the tool registry.
 // Run: tsx scripts/generate-registry.ts
-import { resolve, relative, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+
 import { writeFileSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { globSync } from "glob";
 import type { ToolWidgetMeta } from "../lib/dash/types";
 
@@ -10,7 +11,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const OUT = resolve(ROOT, "lib/dash/registry.generated.ts");
 
-const paths = globSync("app/**/widget.ts", { cwd: ROOT, absolute: true }).sort();
+const paths = globSync("app/**/widget.ts", {
+  cwd: ROOT,
+  absolute: true,
+}).sort();
 
 interface WidgetModule {
   default: ToolWidgetMeta;
@@ -27,7 +31,9 @@ for (const abs of paths) {
     continue;
   }
   if (seenIds.has(mod.default.id)) {
-    console.error(`Duplicate widget ID "${mod.default.id}" in ${relative(ROOT, abs)}`);
+    console.error(
+      `Duplicate widget ID "${mod.default.id}" in ${relative(ROOT, abs)}`,
+    );
     process.exit(1);
   }
   seenIds.add(mod.default.id);
@@ -37,7 +43,9 @@ for (const abs of paths) {
     for (const extra of mod.extras) {
       if (!extra?.id) continue;
       if (seenIds.has(extra.id)) {
-        console.error(`Duplicate widget ID "${extra.id}" in ${relative(ROOT, abs)} extras`);
+        console.error(
+          `Duplicate widget ID "${extra.id}" in ${relative(ROOT, abs)} extras`,
+        );
         process.exit(1);
       }
       seenIds.add(extra.id);

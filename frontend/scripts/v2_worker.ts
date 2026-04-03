@@ -1,20 +1,21 @@
 #!/usr/bin/env -S tsx
 
-import { createInterface } from 'node:readline';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
 
-import { createCanvas, Image } from '@napi-rs/canvas';
+import { createCanvas, Image } from "@napi-rs/canvas";
 
-import catGenerator from '../lib/single-cat/catGeneratorV2.js';
-import spriteSheetLoader from '../lib/single-cat/spriteSheetLoader.js';
-import spriteMapper from '../lib/single-cat/spriteMapper.js';
+import catGenerator from "../lib/single-cat/catGeneratorV2.js";
 
-const redirectLog = (logger: (...args: any[]) => void) =>
+const redirectLog =
+  (_logger: (...args: any[]) => void) =>
   (...args: any[]) => {
-    const message = args.map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ');
-    process.stderr.write(message + '\n');
+    const message = args
+      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .join(" ");
+    process.stderr.write(`${message}\n`);
   };
 
 console.log = redirectLog(console.log);
@@ -23,14 +24,14 @@ console.error = redirectLog(console.error);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..', '..');
-const publicDir = path.join(projectRoot, 'frontend', 'public');
+const projectRoot = path.resolve(__dirname, "..", "..");
+const publicDir = path.join(projectRoot, "frontend", "public");
 
 const resolvePublicPath = (url: string): string => {
   if (/^https?:/i.test(url)) {
     return url;
   }
-  if (url.startsWith('/')) {
+  if (url.startsWith("/")) {
     const normalisedRoot = url.slice(1);
     return path.join(publicDir, normalisedRoot);
   }
@@ -52,7 +53,7 @@ globalThis.localStorage = {
 } as unknown as Storage;
 
 globalThis.navigator = {
-  userAgent: 'node',
+  userAgent: "node",
 } as Navigator;
 
 class NodeOffscreenCanvas {
@@ -80,15 +81,17 @@ class NodeOffscreenCanvas {
   }
 
   getContext(type: string): CanvasRenderingContext2D | null {
-    return this.canvas.getContext(type as '2d') as unknown as CanvasRenderingContext2D | null;
+    return this.canvas.getContext(
+      type as "2d",
+    ) as unknown as CanvasRenderingContext2D | null;
   }
 
   toBuffer(mimeType?: string) {
-    return this.canvas.toBuffer(mimeType as 'image/png');
+    return this.canvas.toBuffer(mimeType as "image/png");
   }
 
   toDataURL(mimeType?: string) {
-    return this.canvas.toDataURL(mimeType as 'image/png');
+    return this.canvas.toDataURL(mimeType as "image/png");
   }
 }
 
@@ -103,21 +106,20 @@ function createSpriteImage(): Image {
   const img = new Image();
 
   // Store original src property descriptor
-  const originalDescriptor = Object.getOwnPropertyDescriptor(img, 'src') ||
-    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(img), 'src');
+  const originalDescriptor =
+    Object.getOwnPropertyDescriptor(img, "src") ||
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(img), "src");
 
-  let customSrc: string | Buffer = '';
+  let customSrc: string | Buffer = "";
 
-  Object.defineProperty(img, 'src', {
+  Object.defineProperty(img, "src", {
     get() {
       return customSrc;
     },
     set(value: string | Buffer) {
-      if (typeof value === 'string') {
+      if (typeof value === "string") {
         const resolved = resolvePublicPath(value);
-        const finalSrc = resolved.startsWith('http')
-          ? resolved
-          : resolved;
+        const finalSrc = resolved.startsWith("http") ? resolved : resolved;
         process.stderr.write(`[sprite] load ${finalSrc}\n`);
         customSrc = finalSrc;
         // Set on the underlying Image using the original setter or direct assignment
@@ -125,7 +127,9 @@ function createSpriteImage(): Image {
           originalDescriptor.set.call(img, finalSrc);
         } else {
           // napi-rs Image should always have a setter - warn if missing
-          console.warn('Image descriptor setter not found, image may not load correctly');
+          console.warn(
+            "Image descriptor setter not found, image may not load correctly",
+          );
         }
       } else {
         customSrc = value;
@@ -142,19 +146,20 @@ function createSpriteImage(): Image {
 }
 
 // Create a class that TypeScript will accept as an Image constructor
-const SpriteImage = function(this: Image) {
+const SpriteImage = function (this: Image) {
   return createSpriteImage();
 } as unknown as typeof Image;
 SpriteImage.prototype = Image.prototype;
 
-globalThis.OffscreenCanvas = NodeOffscreenCanvas as unknown as typeof OffscreenCanvas;
+globalThis.OffscreenCanvas =
+  NodeOffscreenCanvas as unknown as typeof OffscreenCanvas;
 (globalThis as unknown as { Image: typeof Image }).Image = SpriteImage;
 globalThis.document = {
   createElement(tag: string) {
-    if (tag === 'canvas') {
+    if (tag === "canvas") {
       return createNodeCanvas(50, 50);
     }
-    if (tag === 'img') {
+    if (tag === "img") {
       return new SpriteImage();
     }
     throw new Error(`Unsupported element requested: ${tag}`);
@@ -163,18 +168,26 @@ globalThis.document = {
 
 // Node 22+ provides fetch/Response/Blob/atob/btoa. Override fetch for local assets.
 const originalFetch = globalThis.fetch;
-const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-  if (url.startsWith('/sprite-data/')) {
+const customFetch = async (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> => {
+  const url =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url;
+  if (url.startsWith("/sprite-data/")) {
     const filePath = resolvePublicPath(url);
     process.stderr.write(`[fetch] ${url} -> ${filePath}\n`);
     const data = await readFile(filePath);
     return new Response(data, {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     });
   }
-  if (url.startsWith('file://')) {
+  if (url.startsWith("file://")) {
     const filePath = fileURLToPath(url);
     const data = await readFile(filePath);
     return new Response(data, { status: 200 });
@@ -192,15 +205,19 @@ async function initOnce() {
 }
 
 async function renderRandomCat() {
-  const params = await (catGenerator.generateRandomParams as (opts: { ignoreForbiddenSprites?: boolean }) => Promise<unknown>)({
+  const params = await (
+    catGenerator.generateRandomParams as (opts: {
+      ignoreForbiddenSprites?: boolean;
+    }) => Promise<unknown>
+  )({
     ignoreForbiddenSprites: true,
   });
-  const result = await catGenerator.render(params, { outputFormat: 'canvas' });
+  const result = await catGenerator.render(params, { outputFormat: "canvas" });
   const canvas: any = result.canvas;
-  const buffer: Buffer = canvas.toBuffer('image/png');
+  const buffer: Buffer = canvas.toBuffer("image/png");
   return {
     params,
-    imageBase64: buffer.toString('base64'),
+    imageBase64: buffer.toString("base64"),
   };
 }
 
@@ -215,38 +232,38 @@ const rl = createInterface({
 });
 
 await initOnce();
-process.stdout.write(JSON.stringify({ ok: true, ready: true }) + '\n');
+process.stdout.write(`${JSON.stringify({ ok: true, ready: true })}\n`);
 
-rl.on('line', async (line) => {
+rl.on("line", async (line) => {
   const command = line.trim();
   if (!command) {
     return;
   }
 
-  if (command === 'random') {
+  if (command === "random") {
     try {
       const payload = await renderRandomCat();
       process.stdout.write(
-        JSON.stringify({ ok: true, type: 'random', ...payload }) + '\n',
+        `${JSON.stringify({ ok: true, type: "random", ...payload })}\n`,
       );
     } catch (error) {
       const err = error as Error;
       process.stdout.write(
-        JSON.stringify({
+        `${JSON.stringify({
           ok: false,
           error: err.message,
           stack: err.stack,
-        }) + '\n',
+        })}\n`,
       );
     }
     return;
   }
 
   process.stdout.write(
-    JSON.stringify({ ok: false, error: `Unknown command: ${command}` }) + '\n',
+    `${JSON.stringify({ ok: false, error: `Unknown command: ${command}` })}\n`,
   );
 });
 
-rl.on('close', () => {
+rl.on("close", () => {
   process.exit(0);
 });

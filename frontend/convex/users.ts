@@ -1,16 +1,16 @@
-import { query, mutation, internalQuery } from "./_generated/server.js";
 import { v } from "convex/values";
-import type { QueryCtx, MutationCtx } from "./_generated/server.js";
+import type { MutationCtx, QueryCtx } from "./_generated/server.js";
+import { internalQuery, mutation, query } from "./_generated/server.js";
 
 /** Look up a user document by their auth token identifier. */
 async function getUserByToken(
   ctx: QueryCtx | MutationCtx,
-  tokenIdentifier: string
+  tokenIdentifier: string,
 ) {
   return ctx.db
     .query("users")
     .withIndex("byTokenIdentifier", (q) =>
-      q.eq("tokenIdentifier", tokenIdentifier)
+      q.eq("tokenIdentifier", tokenIdentifier),
     )
     .unique();
 }
@@ -26,7 +26,7 @@ function validateUsername(raw: string): string {
   }
   if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
     throw new Error(
-      "Username can only contain letters, numbers, hyphens, and underscores"
+      "Username can only contain letters, numbers, hyphens, and underscores",
     );
   }
   return trimmed;

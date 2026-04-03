@@ -1,13 +1,13 @@
-import { action, mutation } from "./_generated/server.js";
-import { v, type Infer } from "convex/values";
+import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel.js";
 import type { ActionCtx, MutationCtx } from "./_generated/server.js";
+import { action, mutation } from "./_generated/server.js";
 
 const imageReference = v.object({
   fileName: v.string(),
   storageId: v.id("_storage"),
   width: v.optional(v.number()),
-  height: v.optional(v.number())
+  height: v.optional(v.number()),
 });
 
 const optionalImageReference = v.optional(imageReference);
@@ -15,13 +15,13 @@ const optionalImageReference = v.optional(imageReference);
 const seasonPayload = v.object({
   name: v.string(),
   shortName: v.optional(v.string()),
-  cardBack: optionalImageReference
+  cardBack: optionalImageReference,
 });
 
 const rarityPayload = v.object({
   name: v.string(),
   stars: v.optional(v.number()),
-  chancePercent: v.optional(v.number())
+  chancePercent: v.optional(v.number()),
 });
 
 const catdexRecordPayload = v.object({
@@ -37,7 +37,7 @@ const catdexRecordPayload = v.object({
   defaultCard: imageReference,
   defaultCardThumb: optionalImageReference,
   customCard: optionalImageReference,
-  customCardThumb: optionalImageReference
+  customCardThumb: optionalImageReference,
 });
 
 const collectionRecordPayload = v.object({
@@ -49,7 +49,7 @@ const collectionRecordPayload = v.object({
   updatedAt: v.optional(v.number()),
   blurImage: optionalImageReference,
   previewImage: optionalImageReference,
-  fullImage: optionalImageReference
+  fullImage: optionalImageReference,
 });
 type SeasonPayload = Infer<typeof seasonPayload>;
 type RarityPayload = Infer<typeof rarityPayload>;
@@ -57,7 +57,9 @@ type CatdexRecordPayload = Infer<typeof catdexRecordPayload>;
 type CollectionRecordPayload = Infer<typeof collectionRecordPayload>;
 
 async function requireAdmin(ctx: ActionCtx | MutationCtx) {
-  const getAdminIdentity = (ctx.auth as { getAdminIdentity?: () => Promise<unknown> }).getAdminIdentity;
+  const getAdminIdentity = (
+    ctx.auth as { getAdminIdentity?: () => Promise<unknown> }
+  ).getAdminIdentity;
   if (!getAdminIdentity) {
     return null;
   }
@@ -67,7 +69,7 @@ async function requireAdmin(ctx: ActionCtx | MutationCtx) {
       return null;
     }
     return identity;
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
@@ -77,20 +79,20 @@ export const prepareUploadUrls = action({
     assets: v.array(
       v.object({
         key: v.string(),
-        contentType: v.optional(v.string())
-      })
-    )
+        contentType: v.optional(v.string()),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
     const uploads = await Promise.all(
       args.assets.map(async (asset) => ({
         key: asset.key,
-        uploadUrl: await ctx.storage.generateUploadUrl()
-      }))
+        uploadUrl: await ctx.storage.generateUploadUrl(),
+      })),
     );
     return uploads;
-  }
+  },
 });
 
 export const ingestBundle = mutation({
@@ -99,8 +101,8 @@ export const ingestBundle = mutation({
       seasons: v.array(seasonPayload),
       rarities: v.array(rarityPayload),
       catdex: v.array(catdexRecordPayload),
-      collection: v.array(collectionRecordPayload)
-    })
+      collection: v.array(collectionRecordPayload),
+    }),
   },
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
@@ -110,7 +112,7 @@ export const ingestBundle = mutation({
 
     if (existingCat || existingCollection) {
       throw new Error(
-        "Target tables already contain data. Please start with an empty Convex instance or clear the catdex and collection tables before importing."
+        "Target tables already contain data. Please start with an empty Convex instance or clear the catdex and collection tables before importing.",
       );
     }
 
@@ -124,17 +126,21 @@ export const ingestBundle = mutation({
       args.bundle.catdex,
       seasonIdByName,
       rarityIdByName,
-      now
+      now,
     );
-    const collectionInserted = await insertCollectionRecords(ctx, args.bundle.collection, now);
+    const collectionInserted = await insertCollectionRecords(
+      ctx,
+      args.bundle.collection,
+      now,
+    );
 
     return {
       catdexInserted,
       collectionInserted,
       seasonsInserted: seasonIdByName.size,
-      raritiesInserted: rarityIdByName.size
+      raritiesInserted: rarityIdByName.size,
     } as const;
-  }
+  },
 });
 
 function storageId(id: string): Id<"_storage"> {
@@ -144,7 +150,7 @@ function storageId(id: string): Id<"_storage"> {
 async function upsertSeasons(
   ctx: MutationCtx,
   seasons: SeasonPayload[],
-  now: number
+  now: number,
 ): Promise<Map<string, Id<"card_season">>> {
   const map = new Map<string, Id<"card_season">>();
 
@@ -183,7 +189,7 @@ async function upsertSeasons(
     const insertDoc: Omit<Doc<"card_season">, "_id" | "_creationTime"> = {
       seasonName,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
     if (season.shortName !== undefined) {
       insertDoc.shortName = season.shortName;
@@ -191,8 +197,10 @@ async function upsertSeasons(
     if (cardBack) {
       insertDoc.cardBackStorageId = storageId(cardBack.storageId);
       insertDoc.cardBackName = cardBack.fileName;
-      if (cardBack.width !== undefined) insertDoc.cardBackWidth = cardBack.width;
-      if (cardBack.height !== undefined) insertDoc.cardBackHeight = cardBack.height;
+      if (cardBack.width !== undefined)
+        insertDoc.cardBackWidth = cardBack.width;
+      if (cardBack.height !== undefined)
+        insertDoc.cardBackHeight = cardBack.height;
     }
 
     const id = await ctx.db.insert("card_season", insertDoc);
@@ -205,7 +213,7 @@ async function upsertSeasons(
 async function upsertRarities(
   ctx: MutationCtx,
   rarities: RarityPayload[],
-  now: number
+  now: number,
 ): Promise<Map<string, Id<"rarity">>> {
   const map = new Map<string, Id<"rarity">>();
 
@@ -228,7 +236,7 @@ async function upsertRarities(
         await ctx.db.patch(existing._id, {
           stars: rarity.stars ?? undefined,
           chancePercent: rarity.chancePercent ?? undefined,
-          updatedAt: now
+          updatedAt: now,
         });
       }
       map.set(rarityName, existing._id);
@@ -238,10 +246,11 @@ async function upsertRarities(
     const rarityDoc: Omit<Doc<"rarity">, "_id" | "_creationTime"> = {
       rarityName,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
     if (rarity.stars !== undefined) rarityDoc.stars = rarity.stars;
-    if (rarity.chancePercent !== undefined) rarityDoc.chancePercent = rarity.chancePercent;
+    if (rarity.chancePercent !== undefined)
+      rarityDoc.chancePercent = rarity.chancePercent;
 
     const id = await ctx.db.insert("rarity", rarityDoc);
     map.set(rarityName, id);
@@ -255,18 +264,22 @@ async function insertCatdexRecords(
   records: CatdexRecordPayload[],
   seasonIdByName: Map<string, Id<"card_season">>,
   rarityIdByName: Map<string, Id<"rarity">>,
-  defaultNow: number
+  defaultNow: number,
 ): Promise<number> {
   let inserted = 0;
 
   for (const record of records) {
     const seasonId = seasonIdByName.get(record.seasonName.trim());
     if (!seasonId) {
-      throw new Error(`Unknown season referenced in catdex record: ${record.seasonName}`);
+      throw new Error(
+        `Unknown season referenced in catdex record: ${record.seasonName}`,
+      );
     }
     const rarityId = rarityIdByName.get(record.rarityName.trim());
     if (!rarityId) {
-      throw new Error(`Unknown rarity referenced in catdex record: ${record.rarityName}`);
+      throw new Error(
+        `Unknown rarity referenced in catdex record: ${record.rarityName}`,
+      );
     }
 
     const createdAt = record.createdAt ?? defaultNow;
@@ -281,13 +294,17 @@ async function insertCatdexRecords(
       createdAt,
       updatedAt,
       defaultCardStorageId: storageId(record.defaultCard.storageId),
-      defaultCardName: record.defaultCard.fileName
+      defaultCardName: record.defaultCard.fileName,
     };
     if (record.cardNumber) insertDoc.cardNumber = record.cardNumber;
-    if (record.defaultCard.width !== undefined) insertDoc.defaultCardWidth = record.defaultCard.width;
-    if (record.defaultCard.height !== undefined) insertDoc.defaultCardHeight = record.defaultCard.height;
+    if (record.defaultCard.width !== undefined)
+      insertDoc.defaultCardWidth = record.defaultCard.width;
+    if (record.defaultCard.height !== undefined)
+      insertDoc.defaultCardHeight = record.defaultCard.height;
     if (record.defaultCardThumb) {
-      insertDoc.defaultCardThumbStorageId = storageId(record.defaultCardThumb.storageId);
+      insertDoc.defaultCardThumbStorageId = storageId(
+        record.defaultCardThumb.storageId,
+      );
       insertDoc.defaultCardThumbName = record.defaultCardThumb.fileName;
       if (record.defaultCardThumb.width !== undefined) {
         insertDoc.defaultCardThumbWidth = record.defaultCardThumb.width;
@@ -299,11 +316,15 @@ async function insertCatdexRecords(
     if (record.customCard) {
       insertDoc.customCardStorageId = storageId(record.customCard.storageId);
       insertDoc.customCardName = record.customCard.fileName;
-      if (record.customCard.width !== undefined) insertDoc.customCardWidth = record.customCard.width;
-      if (record.customCard.height !== undefined) insertDoc.customCardHeight = record.customCard.height;
+      if (record.customCard.width !== undefined)
+        insertDoc.customCardWidth = record.customCard.width;
+      if (record.customCard.height !== undefined)
+        insertDoc.customCardHeight = record.customCard.height;
     }
     if (record.customCardThumb) {
-      insertDoc.customCardThumbStorageId = storageId(record.customCardThumb.storageId);
+      insertDoc.customCardThumbStorageId = storageId(
+        record.customCardThumb.storageId,
+      );
       insertDoc.customCardThumbName = record.customCardThumb.fileName;
       if (record.customCardThumb.width !== undefined) {
         insertDoc.customCardThumbWidth = record.customCardThumb.width;
@@ -323,7 +344,7 @@ async function insertCatdexRecords(
 async function insertCollectionRecords(
   ctx: MutationCtx,
   records: CollectionRecordPayload[],
-  defaultNow: number
+  defaultNow: number,
 ): Promise<number> {
   let inserted = 0;
 
@@ -336,7 +357,7 @@ async function insertCollectionRecords(
       animal: record.animal,
       link: record.link ?? "",
       createdAt,
-      updatedAt
+      updatedAt,
     };
     if (record.blurImage) {
       insertDoc.blurImgStorageId = storageId(record.blurImage.storageId);
@@ -345,14 +366,18 @@ async function insertCollectionRecords(
     if (record.previewImage) {
       insertDoc.previewImgStorageId = storageId(record.previewImage.storageId);
       insertDoc.previewImgName = record.previewImage.fileName;
-      if (record.previewImage.width !== undefined) insertDoc.previewImgWidth = record.previewImage.width;
-      if (record.previewImage.height !== undefined) insertDoc.previewImgHeight = record.previewImage.height;
+      if (record.previewImage.width !== undefined)
+        insertDoc.previewImgWidth = record.previewImage.width;
+      if (record.previewImage.height !== undefined)
+        insertDoc.previewImgHeight = record.previewImage.height;
     }
     if (record.fullImage) {
       insertDoc.fullImgStorageId = storageId(record.fullImage.storageId);
       insertDoc.fullImgName = record.fullImage.fileName;
-      if (record.fullImage.width !== undefined) insertDoc.fullImgWidth = record.fullImage.width;
-      if (record.fullImage.height !== undefined) insertDoc.fullImgHeight = record.fullImage.height;
+      if (record.fullImage.width !== undefined)
+        insertDoc.fullImgWidth = record.fullImage.width;
+      if (record.fullImage.height !== undefined)
+        insertDoc.fullImgHeight = record.fullImage.height;
     }
 
     await ctx.db.insert("collection", insertDoc);
