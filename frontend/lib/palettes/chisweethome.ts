@@ -1,9 +1,9 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const chisweethomePalette: PaletteCategory = {
-  id: 'chisweethome',
+  id: "chisweethome",
   label: "Chi's Sweet Home",
-  description: 'Soft pastel slice-of-life warmth and cozy kitten comfort',
+  description: "Soft pastel slice-of-life warmth and cozy kitten comfort",
   colors: {
     CHI_GREY: { multiply: [154, 154, 154] },
     CHI_STRIPE: { multiply: [90, 90, 90] },

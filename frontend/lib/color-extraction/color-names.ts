@@ -27,7 +27,7 @@ export async function fetchColorName(hex: string): Promise<string> {
         headers: {
           Accept: "application/json",
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -54,7 +54,7 @@ function normalizeHex(hex: string): string {
  * Returns a Map of normalized hex (uppercase, no #) -> name
  */
 export async function fetchColorNames(
-  colors: ExtractedColor[]
+  colors: ExtractedColor[],
 ): Promise<Map<string, string>> {
   const nameMap = new Map<string, string>();
 
@@ -72,7 +72,7 @@ export async function fetchColorNames(
         // hex is already normalized (no #, uppercase)
         const name = await fetchColorName(hex);
         return { hex, name };
-      })
+      }),
     );
 
     for (const { hex, name } of results) {
@@ -97,14 +97,17 @@ export function generateColorDisplayName(
   index: number,
   colorName: string,
   type: "dominant" | "accent",
-  variation?: { brightnessMultiplier?: number; hueShift?: number }
+  variation?: { brightnessMultiplier?: number; hueShift?: number },
 ): string {
   const prefix = type === "dominant" ? "dom" : "acc";
 
   // Build variation parts
   const parts: string[] = [];
 
-  if (variation?.brightnessMultiplier !== undefined && variation.brightnessMultiplier !== 1.0) {
+  if (
+    variation?.brightnessMultiplier !== undefined &&
+    variation.brightnessMultiplier !== 1.0
+  ) {
     parts.push(`${variation.brightnessMultiplier}x`);
   }
 

@@ -78,4 +78,3 @@ export function generateACO(colors: PaletteColor[]): ArrayBuffer {
 
   return buffer;
 }
-

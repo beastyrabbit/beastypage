@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const emeraldForestPalette: PaletteCategory = {
-  id: 'emerald-forest',
-  label: 'Emerald Forest',
-  description: 'Green — cool teal shadows through rich canopy to sun-kissed leaves',
+  id: "emerald-forest",
+  label: "Emerald Forest",
+  description:
+    "Green — cool teal shadows through rich canopy to sun-kissed leaves",
   colors: {
     EF_ROOTDARK: { multiply: [6, 20, 18] },
     EF_UNDERGROWTH: { multiply: [8, 32, 28] },

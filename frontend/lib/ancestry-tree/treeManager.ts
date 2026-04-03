@@ -1,4 +1,10 @@
-import type { CatParams } from '@/lib/cat-v3/types';
+import type { CatParams } from "@/lib/cat-v3/types";
+import {
+  createGeneticsFromParams,
+  geneticsToParams,
+  inheritGenetics,
+} from "./genetics";
+import { generateWarriorName, pickOne } from "./nameGenerator";
 import type {
   AncestryTree,
   AncestryTreeCat,
@@ -11,18 +17,16 @@ import type {
   OffspringOptions,
   SerializedAncestryTree,
   TreeGenerationConfig,
-} from './types';
-import { DEFAULT_TREE_CONFIG, DEFAULT_OFFSPRING_OPTIONS } from './types';
-import { createGeneticsFromParams, inheritGenetics, geneticsToParams } from './genetics';
-import { generateWarriorName, pickOne } from './nameGenerator';
-import { WARRIOR_SUFFIXES } from './utils';
+} from "./types";
+import { DEFAULT_OFFSPRING_OPTIONS, DEFAULT_TREE_CONFIG } from "./types";
+import { WARRIOR_SUFFIXES } from "./utils";
 
 function generateId(): string {
   return crypto.randomUUID();
 }
 
 // Relationship constants
-const MULTIPLE_PARTNERS_CHANCE = 0.20; // 20% chance for multiple partners
+const MULTIPLE_PARTNERS_CHANCE = 0.2; // 20% chance for multiple partners
 
 function generateSlug(): string {
   return `tree-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -40,28 +44,32 @@ export interface MutationPool {
   tortieMasks: string[];
 }
 
-type RelationshipType = 'sibling' | 'cousin' | 'unrelated' | 'unknown';
+type RelationshipType = "sibling" | "cousin" | "unrelated" | "unknown";
 
 export class AncestryTreeManager {
   private tree: AncestryTree;
   private usedNames: Set<string>;
   private mutationPool: MutationPool;
   // State for incremental generation (used by generateGeneration)
-  private couplesPerGeneration: Array<{ motherId: CatId; fatherId: CatId }[]> = [];
+  private couplesPerGeneration: Array<{ motherId: CatId; fatherId: CatId }[]> =
+    [];
 
   /**
    * Check relationship between two cats.
    * Siblings share both parents.
    * Cousins share at least one grandparent.
    */
-  private getRelationship(cat1: AncestryTreeCat, cat2: AncestryTreeCat): RelationshipType {
+  private getRelationship(
+    cat1: AncestryTreeCat,
+    cat2: AncestryTreeCat,
+  ): RelationshipType {
     // Can't marry yourself
-    if (cat1.id === cat2.id) return 'sibling';
+    if (cat1.id === cat2.id) return "sibling";
 
     // Check for siblings (same parents)
     if (cat1.motherId && cat1.fatherId && cat2.motherId && cat2.fatherId) {
       if (cat1.motherId === cat2.motherId && cat1.fatherId === cat2.fatherId) {
-        return 'sibling';
+        return "sibling";
       }
     }
 
@@ -70,7 +78,7 @@ export class AncestryTreeManager {
       (cat1.motherId && cat1.motherId === cat2.motherId) ||
       (cat1.fatherId && cat1.fatherId === cat2.fatherId)
     ) {
-      return 'sibling'; // Treat half-siblings as siblings for marriage purposes
+      return "sibling"; // Treat half-siblings as siblings for marriage purposes
     }
 
     // Check for cousins (share grandparents)
@@ -79,11 +87,11 @@ export class AncestryTreeManager {
 
     for (const gp of cat1Grandparents) {
       if (cat2Grandparents.has(gp)) {
-        return 'cousin';
+        return "cousin";
       }
     }
 
-    return 'unrelated';
+    return "unrelated";
   }
 
   /**
@@ -115,9 +123,9 @@ export class AncestryTreeManager {
     this.tree = {
       id: generateId(),
       slug: generateSlug(),
-      name: 'Unnamed Tree',
-      foundingMotherId: '',
-      foundingFatherId: '',
+      name: "Unnamed Tree",
+      foundingMotherId: "",
+      foundingFatherId: "",
       cats: new Map(),
       config: { ...DEFAULT_TREE_CONFIG },
       createdAt: Date.now(),
@@ -157,11 +165,18 @@ export class AncestryTreeManager {
     return result;
   }
 
-  private applyOffspringOptions(params: CatParams, options: OffspringOptions): CatParams {
+  private applyOffspringOptions(
+    params: CatParams,
+    options: OffspringOptions,
+  ): CatParams {
     const result = { ...params };
 
     // Apply accessory chance (only if maxAccessories > 0)
-    if (options.maxAccessories > 0 && options.accessoryChance > 0 && Math.random() < options.accessoryChance) {
+    if (
+      options.maxAccessories > 0 &&
+      options.accessoryChance > 0 &&
+      Math.random() < options.accessoryChance
+    ) {
       const count = Math.floor(Math.random() * options.maxAccessories) + 1;
       const accessories = this.pickAccessories(count);
       if (accessories.length > 0) {
@@ -171,7 +186,11 @@ export class AncestryTreeManager {
     }
 
     // Apply scar chance (only if maxScars > 0)
-    if (options.maxScars > 0 && options.scarChance > 0 && Math.random() < options.scarChance) {
+    if (
+      options.maxScars > 0 &&
+      options.scarChance > 0 &&
+      Math.random() < options.scarChance
+    ) {
       const count = Math.floor(Math.random() * options.maxScars) + 1;
       const scars = this.pickScars(count);
       if (scars.length > 0) {
@@ -216,15 +235,18 @@ export class AncestryTreeManager {
     motherId: CatId | null,
     fatherId: CatId | null,
     genetics: CatGenetics,
-    source: 'history' | 'generated' | 'edited' = 'generated',
+    source: "history" | "generated" | "edited" = "generated",
     historyProfileId?: string,
-    existingName?: { prefix: string; suffix: string; full: string }
+    existingName?: { prefix: string; suffix: string; full: string },
   ): AncestryTreeCat {
     // Founders are warriors, offspring get random life stages for variety
     // (This breaks Warrior Cats lore where all kits have 'kit' suffix, but gives more name variety)
-    const lifeStage: LifeStage = generation === 0
-      ? 'warrior'
-      : (['kit', 'apprentice', 'warrior'] as const)[Math.floor(Math.random() * 3)];
+    const lifeStage: LifeStage =
+      generation === 0
+        ? "warrior"
+        : (["kit", "apprentice", "warrior"] as const)[
+            Math.floor(Math.random() * 3)
+          ];
     const name = existingName ?? generateWarriorName(lifeStage, this.usedNames);
     this.usedNames.add(name.full.toLowerCase());
 
@@ -248,35 +270,38 @@ export class AncestryTreeManager {
     return cat;
   }
 
-  initializeFoundingCouple(input: FoundingCoupleInput): { mother: AncestryTreeCat; father: AncestryTreeCat } {
+  initializeFoundingCouple(input: FoundingCoupleInput): {
+    mother: AncestryTreeCat;
+    father: AncestryTreeCat;
+  } {
     // Clear existing tree
     this.tree.cats.clear();
     this.usedNames.clear();
 
-    const motherGenetics = createGeneticsFromParams(input.mother.params, 'F');
+    const motherGenetics = createGeneticsFromParams(input.mother.params, "F");
     const mother = this.createCat(
       input.mother.params,
-      'F',
+      "F",
       0,
       null,
       null,
       motherGenetics,
-      input.mother.historyProfileId ? 'history' : 'generated',
+      input.mother.historyProfileId ? "history" : "generated",
       input.mother.historyProfileId,
-      input.mother.name
+      input.mother.name,
     );
 
-    const fatherGenetics = createGeneticsFromParams(input.father.params, 'M');
+    const fatherGenetics = createGeneticsFromParams(input.father.params, "M");
     const father = this.createCat(
       input.father.params,
-      'M',
+      "M",
       0,
       null,
       null,
       fatherGenetics,
-      input.father.historyProfileId ? 'history' : 'generated',
+      input.father.historyProfileId ? "history" : "generated",
       input.father.historyProfileId,
-      input.father.name
+      input.father.name,
     );
 
     // Link partners
@@ -294,40 +319,52 @@ export class AncestryTreeManager {
     motherId: CatId,
     fatherId: CatId,
     generation: number,
-    forcedGender?: Gender
+    forcedGender?: Gender,
   ): AncestryTreeCat[] {
     const mother = this.tree.cats.get(motherId);
     const father = this.tree.cats.get(fatherId);
 
     if (!mother || !father) {
-      throw new Error('Parent not found');
+      throw new Error("Parent not found");
     }
 
-    const { minChildren, maxChildren, genderRatio, offspringOptions } = this.tree.config;
+    const { minChildren, maxChildren, genderRatio, offspringOptions } =
+      this.tree.config;
     const effectiveOptions = offspringOptions ?? DEFAULT_OFFSPRING_OPTIONS;
-    const childCount = Math.floor(Math.random() * (maxChildren - minChildren + 1)) + minChildren;
+    const childCount =
+      Math.floor(Math.random() * (maxChildren - minChildren + 1)) + minChildren;
     const children: AncestryTreeCat[] = [];
 
     for (let i = 0; i < childCount; i++) {
       // Use forced gender for first child if provided, otherwise random
-      const gender: Gender = (i === 0 && forcedGender) ? forcedGender : (Math.random() < genderRatio ? 'M' : 'F');
+      const gender: Gender =
+        i === 0 && forcedGender
+          ? forcedGender
+          : Math.random() < genderRatio
+            ? "M"
+            : "F";
 
       const childGenetics = inheritGenetics(
         mother.genetics,
         father.genetics,
         gender,
-        this.mutationPool
+        this.mutationPool,
       );
 
-      const spriteNumber = this.mutationPool.spriteNumbers.length > 0
-        ? pickOne(this.mutationPool.spriteNumbers)
-        : 0;
+      const spriteNumber =
+        this.mutationPool.spriteNumbers.length > 0
+          ? pickOne(this.mutationPool.spriteNumbers)
+          : 0;
 
-      let childParams = geneticsToParams(childGenetics, { spriteNumber }, {
-        pelts: this.mutationPool.pelts,
-        colours: this.mutationPool.colours,
-        tortieMasks: this.mutationPool.tortieMasks,
-      });
+      let childParams = geneticsToParams(
+        childGenetics,
+        { spriteNumber },
+        {
+          pelts: this.mutationPool.pelts,
+          colours: this.mutationPool.colours,
+          tortieMasks: this.mutationPool.tortieMasks,
+        },
+      );
 
       // Apply offspring options (accessories/scars)
       childParams = this.applyOffspringOptions(childParams, effectiveOptions);
@@ -338,7 +375,7 @@ export class AncestryTreeManager {
         generation,
         motherId,
         fatherId,
-        childGenetics
+        childGenetics,
       );
 
       children.push(child);
@@ -357,7 +394,7 @@ export class AncestryTreeManager {
    */
   prepareForFullTree(): void {
     if (!this.tree.foundingMotherId || !this.tree.foundingFatherId) {
-      throw new Error('Founding couple not initialized');
+      throw new Error("Founding couple not initialized");
     }
 
     // Clear existing cats beyond generation 0 (keep founding couple)
@@ -365,7 +402,7 @@ export class AncestryTreeManager {
     const foundingFather = this.tree.cats.get(this.tree.foundingFatherId);
 
     if (!foundingMother || !foundingFather) {
-      throw new Error('Founding couple not found');
+      throw new Error("Founding couple not found");
     }
 
     // Reset founding couple's children and preserve only them
@@ -384,7 +421,12 @@ export class AncestryTreeManager {
 
     // Initialize couples tracking with founding couple
     this.couplesPerGeneration = [
-      [{ motherId: this.tree.foundingMotherId, fatherId: this.tree.foundingFatherId }],
+      [
+        {
+          motherId: this.tree.foundingMotherId,
+          fatherId: this.tree.foundingFatherId,
+        },
+      ],
     ];
 
     this.tree.updatedAt = Date.now();
@@ -400,11 +442,15 @@ export class AncestryTreeManager {
     const { depth } = this.tree.config;
 
     if (generation < 1 || generation > depth) {
-      throw new Error(`Invalid generation ${generation}, must be between 1 and ${depth}`);
+      throw new Error(
+        `Invalid generation ${generation}, must be between 1 and ${depth}`,
+      );
     }
 
     if (generation > this.couplesPerGeneration.length) {
-      throw new Error(`Cannot generate generation ${generation} - previous generation not generated yet`);
+      throw new Error(
+        `Cannot generate generation ${generation} - previous generation not generated yet`,
+      );
     }
 
     const previousCouples = this.couplesPerGeneration[generation - 1];
@@ -412,7 +458,11 @@ export class AncestryTreeManager {
     let catsGenerated = 0;
 
     for (const couple of previousCouples) {
-      const children = this.generateOffspring(couple.motherId, couple.fatherId, generation);
+      const children = this.generateOffspring(
+        couple.motherId,
+        couple.fatherId,
+        generation,
+      );
       catsGenerated += children.length;
 
       // Pair up children for next generation (if not last generation)
@@ -420,8 +470,8 @@ export class AncestryTreeManager {
         const { partnerChance } = this.tree.config;
 
         // Partner source chances
-        const COUSIN_CHANCE = 0.01;        // 1% chance to marry a cousin
-        const DISTANT_RELATIVE_CHANCE = 0.10;  // 10% chance to marry a distant relative
+        const COUSIN_CHANCE = 0.01; // 1% chance to marry a cousin
+        const DISTANT_RELATIVE_CHANCE = 0.1; // 10% chance to marry a distant relative
 
         // Process each child - both males and females have equal chance to find partners
         for (const child of children) {
@@ -432,13 +482,14 @@ export class AncestryTreeManager {
           if (Math.random() >= partnerChance) continue;
 
           // Age up to warrior
-          child.lifeStage = 'warrior';
+          child.lifeStage = "warrior";
           child.name = {
             prefix: child.name.prefix,
             suffix: pickOne([...WARRIOR_SUFFIXES]),
-            full: '',
+            full: "",
           };
-          child.name.full = child.name.prefix.charAt(0).toUpperCase() +
+          child.name.full =
+            child.name.prefix.charAt(0).toUpperCase() +
             child.name.prefix.slice(1).toLowerCase() +
             child.name.suffix;
 
@@ -452,20 +503,27 @@ export class AncestryTreeManager {
             let partner: AncestryTreeCat | undefined;
 
             // Get all potential partners from the tree (opposite gender, unpartnered, same generation)
-            const oppositeGender: Gender = child.gender === 'F' ? 'M' : 'F';
-            const allPotentialPartners = Array.from(this.tree.cats.values()).filter(
-              (c) => c.gender === oppositeGender &&
-                     c.generation === generation &&
-                     c.partnerIds.length === 0 &&
-                     c.id !== child.id
+            const oppositeGender: Gender = child.gender === "F" ? "M" : "F";
+            const allPotentialPartners = Array.from(
+              this.tree.cats.values(),
+            ).filter(
+              (c) =>
+                c.gender === oppositeGender &&
+                c.generation === generation &&
+                c.partnerIds.length === 0 &&
+                c.id !== child.id,
             );
 
             if (roll < COUSIN_CHANCE) {
               // Try to find a cousin (1% chance)
-              partner = allPotentialPartners.find((c) => this.getRelationship(child, c) === 'cousin');
+              partner = allPotentialPartners.find(
+                (c) => this.getRelationship(child, c) === "cousin",
+              );
             } else if (roll < COUSIN_CHANCE + DISTANT_RELATIVE_CHANCE) {
               // Try to find a distant relative - someone from tree who isn't sibling or cousin (10% chance)
-              partner = allPotentialPartners.find((c) => this.getRelationship(child, c) === 'unrelated');
+              partner = allPotentialPartners.find(
+                (c) => this.getRelationship(child, c) === "unrelated",
+              );
             }
             // else: outsider (89% chance) - partner stays undefined
 
@@ -479,15 +537,22 @@ export class AncestryTreeManager {
               const partnerGenetics = createGeneticsFromParams(
                 {
                   ...geneticsToParams(child.genetics, {}, tortiePool),
-                  peltName: this.mutationPool.pelts.length > 0 ? pickOne(this.mutationPool.pelts) : 'Tabby',
-                  colour: this.mutationPool.colours.length > 0 ? pickOne(this.mutationPool.colours) : 'BLACK',
+                  peltName:
+                    this.mutationPool.pelts.length > 0
+                      ? pickOne(this.mutationPool.pelts)
+                      : "Tabby",
+                  colour:
+                    this.mutationPool.colours.length > 0
+                      ? pickOne(this.mutationPool.colours)
+                      : "BLACK",
                 },
-                oppositeGender
+                oppositeGender,
               );
 
-              const spriteNumber = this.mutationPool.spriteNumbers.length > 0
-                ? pickOne(this.mutationPool.spriteNumbers)
-                : 0;
+              const spriteNumber =
+                this.mutationPool.spriteNumbers.length > 0
+                  ? pickOne(this.mutationPool.spriteNumbers)
+                  : 0;
 
               partner = this.createCat(
                 geneticsToParams(partnerGenetics, { spriteNumber }, tortiePool),
@@ -495,19 +560,31 @@ export class AncestryTreeManager {
                 generation,
                 null,
                 null,
-                partnerGenetics
+                partnerGenetics,
               );
-              partner.lifeStage = 'warrior';
+              partner.lifeStage = "warrior";
               catsGenerated++;
             } else {
               // Age up the partner found from the tree
-              partner.lifeStage = 'warrior';
+              partner.lifeStage = "warrior";
               partner.name = {
                 prefix: partner.name.prefix,
-                suffix: pickOne(['fur', 'pelt', 'tail', 'claw', 'heart', 'stripe', 'leaf', 'storm', 'wing', 'shine']),
-                full: '',
+                suffix: pickOne([
+                  "fur",
+                  "pelt",
+                  "tail",
+                  "claw",
+                  "heart",
+                  "stripe",
+                  "leaf",
+                  "storm",
+                  "wing",
+                  "shine",
+                ]),
+                full: "",
               };
-              partner.name.full = partner.name.prefix.charAt(0).toUpperCase() +
+              partner.name.full =
+                partner.name.prefix.charAt(0).toUpperCase() +
                 partner.name.prefix.slice(1).toLowerCase() +
                 partner.name.suffix;
             }
@@ -521,8 +598,8 @@ export class AncestryTreeManager {
             }
 
             // Add to couples list (female first for consistency)
-            const motherId = child.gender === 'F' ? child.id : partner.id;
-            const fatherId = child.gender === 'M' ? child.id : partner.id;
+            const motherId = child.gender === "F" ? child.id : partner.id;
+            const fatherId = child.gender === "M" ? child.id : partner.id;
             newCouples.push({ motherId, fatherId });
           }
         }
@@ -552,25 +629,30 @@ export class AncestryTreeManager {
   replacePartner(
     catId: CatId,
     newPartnerParams: CatParams,
-    newPartnerName?: { prefix: string; suffix: string; full: string }
+    newPartnerName?: { prefix: string; suffix: string; full: string },
   ): AncestryTreeCat {
     const cat = this.tree.cats.get(catId);
     if (!cat) {
-      throw new Error('Cat not found');
+      throw new Error("Cat not found");
     }
 
     // Remove old partner links (clear all existing partners)
     for (const oldPartnerId of cat.partnerIds) {
       const oldPartner = this.tree.cats.get(oldPartnerId);
       if (oldPartner) {
-        oldPartner.partnerIds = oldPartner.partnerIds.filter(id => id !== cat.id);
+        oldPartner.partnerIds = oldPartner.partnerIds.filter(
+          (id) => id !== cat.id,
+        );
       }
     }
     cat.partnerIds = [];
 
     // Create new partner
-    const newPartnerGender: Gender = cat.gender === 'F' ? 'M' : 'F';
-    const newPartnerGenetics = createGeneticsFromParams(newPartnerParams, newPartnerGender);
+    const newPartnerGender: Gender = cat.gender === "F" ? "M" : "F";
+    const newPartnerGenetics = createGeneticsFromParams(
+      newPartnerParams,
+      newPartnerGender,
+    );
 
     const newPartner = this.createCat(
       newPartnerParams,
@@ -579,9 +661,9 @@ export class AncestryTreeManager {
       null,
       null,
       newPartnerGenetics,
-      'generated',
+      "generated",
       undefined,
-      newPartnerName
+      newPartnerName,
     );
 
     newPartner.lifeStage = cat.lifeStage;
@@ -607,16 +689,19 @@ export class AncestryTreeManager {
     catId: CatId,
     newPartnerParams: CatParams,
     newPartnerName?: { prefix: string; suffix: string; full: string },
-    generateChildren = false
+    generateChildren = false,
   ): AncestryTreeCat {
     const cat = this.tree.cats.get(catId);
     if (!cat) {
-      throw new Error('Cat not found');
+      throw new Error("Cat not found");
     }
 
     // Create new partner (allows multiple spouses)
-    const newPartnerGender: Gender = cat.gender === 'F' ? 'M' : 'F';
-    const newPartnerGenetics = createGeneticsFromParams(newPartnerParams, newPartnerGender);
+    const newPartnerGender: Gender = cat.gender === "F" ? "M" : "F";
+    const newPartnerGenetics = createGeneticsFromParams(
+      newPartnerParams,
+      newPartnerGender,
+    );
 
     const newPartner = this.createCat(
       newPartnerParams,
@@ -625,9 +710,9 @@ export class AncestryTreeManager {
       null,
       null,
       newPartnerGenetics,
-      'generated',
+      "generated",
       undefined,
-      newPartnerName
+      newPartnerName,
     );
 
     newPartner.lifeStage = cat.lifeStage;
@@ -638,8 +723,8 @@ export class AncestryTreeManager {
 
     // Generate offspring if requested and not at max depth
     if (generateChildren && cat.generation < this.tree.config.depth) {
-      const motherId = cat.gender === 'F' ? cat.id : newPartner.id;
-      const fatherId = cat.gender === 'M' ? cat.id : newPartner.id;
+      const motherId = cat.gender === "F" ? cat.id : newPartner.id;
+      const fatherId = cat.gender === "M" ? cat.id : newPartner.id;
       this.generateOffspring(motherId, fatherId, cat.generation + 1);
     }
 
@@ -654,24 +739,24 @@ export class AncestryTreeManager {
   addParent(
     childId: CatId,
     parentParams: CatParams,
-    parentType: 'father' | 'mother',
-    parentName?: CatName
+    parentType: "father" | "mother",
+    parentName?: CatName,
   ): AncestryTreeCat | null {
     const child = this.tree.cats.get(childId);
     if (!child) return null;
 
     // Check if parent already exists
-    if (parentType === 'father' && child.fatherId) {
-      console.warn('[addParent] Cat already has a father');
+    if (parentType === "father" && child.fatherId) {
+      console.warn("[addParent] Cat already has a father");
       return null;
     }
-    if (parentType === 'mother' && child.motherId) {
-      console.warn('[addParent] Cat already has a mother');
+    if (parentType === "mother" && child.motherId) {
+      console.warn("[addParent] Cat already has a mother");
       return null;
     }
 
-    const parentGender: Gender = parentType === 'father' ? 'M' : 'F';
-    const name = parentName ?? generateWarriorName('warrior');
+    const parentGender: Gender = parentType === "father" ? "M" : "F";
+    const name = parentName ?? generateWarriorName("warrior");
 
     // Create genetics from params
     const genetics = createGeneticsFromParams(parentParams, parentGender);
@@ -686,15 +771,15 @@ export class AncestryTreeManager {
       null, // No grandparents
       null,
       genetics,
-      'generated',
+      "generated",
       undefined,
-      name
+      name,
     );
 
     // Note: createCat already adds the cat to this.tree.cats
 
     // Update child's parent reference
-    if (parentType === 'father') {
+    if (parentType === "father") {
       child.fatherId = newParent.id;
     } else {
       child.motherId = newParent.id;
@@ -704,7 +789,8 @@ export class AncestryTreeManager {
     newParent.childrenIds.push(child.id);
 
     // If the child has the other parent, make them partners
-    const otherParentId = parentType === 'father' ? child.motherId : child.fatherId;
+    const otherParentId =
+      parentType === "father" ? child.motherId : child.fatherId;
     if (otherParentId) {
       const otherParent = this.tree.cats.get(otherParentId);
       if (otherParent) {
@@ -735,33 +821,37 @@ export class AncestryTreeManager {
       if (!child) continue;
 
       // Update parent reference
-      if (parent.gender === 'F') {
+      if (parent.gender === "F") {
         child.fatherId = newPartnerId;
       } else {
         child.motherId = newPartnerId;
       }
 
       // Recalculate genetics
-      const mother = parent.gender === 'F' ? parent : newPartner;
-      const father = parent.gender === 'M' ? parent : newPartner;
+      const mother = parent.gender === "F" ? parent : newPartner;
+      const father = parent.gender === "M" ? parent : newPartner;
 
       child.genetics = inheritGenetics(
         mother.genetics,
         father.genetics,
         child.gender,
-        this.mutationPool
+        this.mutationPool,
       );
 
       // Update params based on new genetics
-      child.params = geneticsToParams(child.genetics, {
-        spriteNumber: child.params.spriteNumber,
-        shading: child.params.shading,
-        reverse: child.params.reverse,
-      }, {
-        pelts: this.mutationPool.pelts,
-        colours: this.mutationPool.colours,
-        tortieMasks: this.mutationPool.tortieMasks,
-      });
+      child.params = geneticsToParams(
+        child.genetics,
+        {
+          spriteNumber: child.params.spriteNumber,
+          shading: child.params.shading,
+          reverse: child.params.reverse,
+        },
+        {
+          pelts: this.mutationPool.pelts,
+          colours: this.mutationPool.colours,
+          tortieMasks: this.mutationPool.tortieMasks,
+        },
+      );
 
       // Add child to new partner's children list
       if (!newPartner.childrenIds.includes(childId)) {
@@ -792,14 +882,18 @@ export class AncestryTreeManager {
     };
   }
 
-  static deserialize(data: SerializedAncestryTree, mutationPool?: MutationPool): AncestryTreeManager {
+  static deserialize(
+    data: SerializedAncestryTree,
+    mutationPool?: MutationPool,
+  ): AncestryTreeManager {
     const manager = new AncestryTreeManager(mutationPool);
 
     // Migrate cats from old partnerId format to new partnerIds array format
     const migratedCats = data.cats.map((cat) => {
       // If cat already has partnerIds array, use it; otherwise migrate from partnerId
       const legacyCat = cat as AncestryTreeCat & { partnerId?: string | null };
-      const partnerIds = cat.partnerIds ?? (legacyCat.partnerId ? [legacyCat.partnerId] : []);
+      const partnerIds =
+        cat.partnerIds ?? (legacyCat.partnerId ? [legacyCat.partnerId] : []);
 
       return {
         ...cat,
@@ -821,12 +915,16 @@ export class AncestryTreeManager {
     };
 
     // Rebuild used names set
-    manager.usedNames = new Set(data.cats.map((cat) => cat.name.full.toLowerCase()));
+    manager.usedNames = new Set(
+      data.cats.map((cat) => cat.name.full.toLowerCase()),
+    );
 
     return manager;
   }
 }
 
-export function createTreeManager(mutationPool?: MutationPool): AncestryTreeManager {
+export function createTreeManager(
+  mutationPool?: MutationPool,
+): AncestryTreeManager {
   return new AncestryTreeManager(mutationPool);
 }

@@ -1,9 +1,9 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const moodPalette: PaletteCategory = {
-  id: 'mood',
-  label: 'Mood',
-  description: 'Soft, dreamy pastels and gentle nature-inspired tones',
+  id: "mood",
+  label: "Mood",
+  description: "Soft, dreamy pastels and gentle nature-inspired tones",
   colors: {
     AQUA: { multiply: [96, 212, 255] },
     APRICOT: { multiply: [255, 198, 150], screen: [255, 220, 190, 0.25] },

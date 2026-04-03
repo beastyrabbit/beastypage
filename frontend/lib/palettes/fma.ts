@@ -1,9 +1,10 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const fmaPalette: PaletteCategory = {
-  id: 'fma',
-  label: 'Fullmetal Alchemist',
-  description: "Alchemy transmutation colors, automail steel, and the Philosopher's Stone",
+  id: "fma",
+  label: "Fullmetal Alchemist",
+  description:
+    "Alchemy transmutation colors, automail steel, and the Philosopher's Stone",
   colors: {
     FMA_EDWARDBROWN: { multiply: [55, 43, 43] },
     FMA_DEEPRED: { multiply: [133, 10, 10] },

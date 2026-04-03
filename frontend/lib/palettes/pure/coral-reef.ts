@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const coralReefPalette: PaletteCategory = {
-  id: 'coral-reef',
-  label: 'Coral Reef',
-  description: 'Coral — wine-terracotta depths through living coral to warm peach-gold shallows',
+  id: "coral-reef",
+  label: "Coral Reef",
+  description:
+    "Coral — wine-terracotta depths through living coral to warm peach-gold shallows",
   colors: {
     CR_WINEDEPTH: { multiply: [35, 10, 12] },
     CR_DEEPCORAL: { multiply: [50, 15, 14] },

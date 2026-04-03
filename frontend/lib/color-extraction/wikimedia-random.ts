@@ -9,7 +9,7 @@ const FETCH_TIMEOUT_MS = 15000; // 15 second timeout
  */
 async function fetchWithTimeout(
   url: string,
-  timeoutMs = FETCH_TIMEOUT_MS
+  timeoutMs = FETCH_TIMEOUT_MS,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -32,11 +32,14 @@ interface WikiSearchResult {
 
 interface WikiImageInfoResult {
   query?: {
-    pages?: Record<string, {
-      imageinfo?: Array<{
-        url: string;
-      }>;
-    }>;
+    pages?: Record<
+      string,
+      {
+        imageinfo?: Array<{
+          url: string;
+        }>;
+      }
+    >;
   };
 }
 
@@ -135,18 +138,21 @@ const MAX_RETRIES = 10;
  * Retries with different random categories up to MAX_RETRIES times.
  */
 export async function fetchRandomWikimediaImage(
-  type: ImageCategory = "nature"
+  type: ImageCategory = "nature",
 ): Promise<string> {
   const categories = CATEGORY_MAP[type];
 
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const randomCategory = categories[Math.floor(Math.random() * categories.length)]!;
+    const randomCategory =
+      categories[Math.floor(Math.random() * categories.length)]!;
 
     try {
       const titles = await searchImages(randomCategory);
       if (titles.length === 0) {
-        console.warn(`[wikimedia] Category "${randomCategory}" returned no results (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        console.warn(
+          `[wikimedia] Category "${randomCategory}" returned no results (attempt ${attempt + 1}/${MAX_RETRIES})`,
+        );
         continue;
       }
 
@@ -154,12 +160,17 @@ export async function fetchRandomWikimediaImage(
       return await getImageUrl(randomTitle);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      console.warn(`[wikimedia] Attempt ${attempt + 1}/${MAX_RETRIES} failed:`, lastError.message);
-      continue;
+      console.warn(
+        `[wikimedia] Attempt ${attempt + 1}/${MAX_RETRIES} failed:`,
+        lastError.message,
+      );
     }
   }
 
-  throw lastError ?? new Error(`No images found after ${MAX_RETRIES} attempts — try again`);
+  throw (
+    lastError ??
+    new Error(`No images found after ${MAX_RETRIES} attempts — try again`)
+  );
 }
 
 /**

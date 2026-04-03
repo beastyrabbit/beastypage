@@ -1,9 +1,9 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const darkerPalette: PaletteCategory = {
-  id: 'darker',
-  label: 'Darker',
-  description: 'Deep, rich tones with shadow and mystery',
+  id: "darker",
+  label: "Darker",
+  description: "Deep, rich tones with shadow and mystery",
   colors: {
     MIDNIGHT: { multiply: [23, 29, 58] },
     OBSIDIAN: { multiply: [18, 21, 29] },

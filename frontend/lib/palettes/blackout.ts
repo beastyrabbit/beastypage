@@ -1,9 +1,9 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const blackoutPalette: PaletteCategory = {
-  id: 'blackout',
-  label: 'Blackout',
-  description: 'Near-black shades with subtle color hints for dramatic effect',
+  id: "blackout",
+  label: "Blackout",
+  description: "Near-black shades with subtle color hints for dramatic effect",
   colors: {
     BLACKOUTBLUE: { multiply: [10, 12, 26], screen: [30, 36, 76, 0.08] },
     BLACKOUTPURPLE: { multiply: [12, 10, 24], screen: [54, 30, 80, 0.08] },
