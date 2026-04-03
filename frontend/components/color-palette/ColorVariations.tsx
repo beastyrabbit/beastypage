@@ -1,19 +1,18 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
 import { Sun } from "lucide-react";
+import { useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import CopyIcon from "@/components/ui/copy-icon";
 import PaintIcon from "@/components/ui/paint-icon";
-import { toast } from "sonner";
-
-import type { ExtractedColor } from "@/lib/color-extraction/types";
 import {
   adjustBrightness,
   adjustHue,
-  rgbToHex,
   getContrastColor,
   hexToRgb,
+  rgbToHex,
 } from "@/lib/color-extraction/color-utils";
+import type { ExtractedColor } from "@/lib/color-extraction/types";
 
 interface ColorVariationsProps {
   color: ExtractedColor;
@@ -32,7 +31,7 @@ export function ColorVariations({ color }: ColorVariationsProps) {
           label: step === 0 ? "Original" : `${step > 0 ? "+" : ""}${step}%`,
         };
       }),
-    [color.rgb]
+    [color.rgb],
   );
 
   const hueVariations = useMemo(
@@ -44,7 +43,7 @@ export function ColorVariations({ color }: ColorVariationsProps) {
           label: step === 0 ? "Original" : `${step > 0 ? "+" : ""}${step}°`,
         };
       }),
-    [color.rgb]
+    [color.rgb],
   );
 
   const copyToClipboard = useCallback(async (hex: string) => {
@@ -65,7 +64,9 @@ export function ColorVariations({ color }: ColorVariationsProps) {
         />
         <div>
           <h3 className="font-semibold text-foreground">Color Variations</h3>
-          <p className="text-sm text-muted-foreground">{color.hex.toUpperCase()}</p>
+          <p className="text-sm text-muted-foreground">
+            {color.hex.toUpperCase()}
+          </p>
         </div>
       </div>
 

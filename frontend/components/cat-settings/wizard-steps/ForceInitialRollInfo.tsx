@@ -28,7 +28,10 @@ function pluralize(name: string): string {
  * Derive badge state from both the range and the global exactLayerCounts toggle.
  * Disabled when range produces nothing; ON only when exactLayerCounts is true.
  */
-function deriveForceState(range: LayerRange, exactLayerCounts: boolean): ForceState {
+function deriveForceState(
+  range: LayerRange,
+  exactLayerCounts: boolean,
+): ForceState {
   if (range.min === 0 && range.max === 0) return "disabled";
   return exactLayerCounts ? "on" : "off";
 }
@@ -47,7 +50,11 @@ const BADGE_LABELS: Record<ForceState, string> = {
   off: "OFF",
 };
 
-function getMessage(state: ForceState, layerName: string, range: LayerRange): string {
+function getMessage(
+  state: ForceState,
+  layerName: string,
+  range: LayerRange,
+): string {
   const plural = pluralize(layerName);
   switch (state) {
     case "disabled":
@@ -63,17 +70,21 @@ function getMessage(state: ForceState, layerName: string, range: LayerRange): st
 // Component
 // ---------------------------------------------------------------------------
 
-export function ForceInitialRollInfo({ range, layerName, exactLayerCounts }: ForceInitialRollInfoProps) {
+export function ForceInitialRollInfo({
+  range,
+  layerName,
+  exactLayerCounts,
+}: ForceInitialRollInfoProps) {
   const state = deriveForceState(range, exactLayerCounts);
   const plural = pluralize(layerName);
 
   return (
     <div className="mt-3 space-y-2 rounded-lg border border-border/30 bg-background/40 p-3">
       <p className="text-xs leading-relaxed text-muted-foreground/70">
-        The system picks a random count from your range.{" "}
-        With <strong className="text-muted-foreground/90">force initial roll</strong> on,
-        you get exactly that many {plural}.
-        With it off, each slot has a coin-flip chance of being filled, so you may end up with fewer.
+        The system picks a random count from your range. With{" "}
+        <strong className="text-muted-foreground/90">force initial roll</strong>{" "}
+        on, you get exactly that many {plural}. With it off, each slot has a
+        coin-flip chance of being filled, so you may end up with fewer.
       </p>
       <div className="flex items-center gap-2">
         <span

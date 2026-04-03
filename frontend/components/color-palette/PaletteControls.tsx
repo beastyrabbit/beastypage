@@ -2,8 +2,8 @@
 
 import { Loader2 } from "lucide-react";
 import { useId } from "react";
-import SparklesIcon from "@/components/ui/sparkles-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
 
 interface PaletteControlsProps {
   colorCount: number;
@@ -33,7 +33,10 @@ export function PaletteControls({
     <div className="glass-card flex flex-wrap items-center gap-4 p-4 sm:gap-6 sm:p-6">
       {/* Color count slider */}
       <div className="flex flex-col gap-2">
-        <label htmlFor={colorCountId} className="text-xs font-medium text-muted-foreground">
+        <label
+          htmlFor={colorCountId}
+          className="text-xs font-medium text-muted-foreground"
+        >
           Colors: {colorCount}
         </label>
         <input
@@ -42,7 +45,7 @@ export function PaletteControls({
           min={3}
           max={12}
           value={colorCount}
-          onChange={(e) => onColorCountChange(parseInt(e.target.value))}
+          onChange={(e) => onColorCountChange(parseInt(e.target.value, 10))}
           className="h-2 w-32 cursor-pointer appearance-none rounded-lg bg-border/50 accent-primary [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
           disabled={isProcessing}
         />
@@ -50,7 +53,10 @@ export function PaletteControls({
 
       {/* Filter toggle */}
       <div className="flex items-center gap-3">
-        <label htmlFor={filterToggleId} className="relative inline-flex cursor-pointer items-center gap-3">
+        <label
+          htmlFor={filterToggleId}
+          className="relative inline-flex cursor-pointer items-center gap-3"
+        >
           <input
             id={filterToggleId}
             type="checkbox"
@@ -60,7 +66,9 @@ export function PaletteControls({
             disabled={isProcessing}
           />
           <div className="peer h-6 w-11 rounded-full bg-border/50 after:absolute after:start-[2px] after:top-[2px] after:size-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-focus:outline-none peer-disabled:cursor-not-allowed peer-disabled:opacity-50" />
-          <span className="text-sm text-muted-foreground">Filter black/white</span>
+          <span className="text-sm text-muted-foreground">
+            Filter black/white
+          </span>
         </label>
       </div>
 

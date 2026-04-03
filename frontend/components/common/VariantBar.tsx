@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
 import { useConvexAuth } from "convex/react";
-import { Check, Loader2, Pencil, Trash2, X } from "lucide-react";
+import { Check, Pencil, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { UseVariantsReturn } from "@/utils/variants";
 
@@ -22,7 +22,15 @@ export function VariantBar<T>({
   showToast,
 }: VariantBarProps<T>) {
   const { isAuthenticated } = useConvexAuth();
-  const { store, activeVariant, createVariant, saveToActive, deleteVariant, renameVariant, setActive } = variants;
+  const {
+    store,
+    activeVariant,
+    createVariant,
+    saveToActive,
+    deleteVariant,
+    renameVariant,
+    setActive,
+  } = variants;
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -37,7 +45,10 @@ export function VariantBar<T>({
   useEffect(() => {
     if (!dropdownOpen) return;
     const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setDropdownOpen(false);
       }
     };
@@ -105,24 +116,27 @@ export function VariantBar<T>({
     setRenamingId(null);
   }, [renamingId, renameValue, renameVariant]);
 
-  const handleDelete = useCallback((id: string) => {
-    if (confirmDeleteId !== id) {
-      setConfirmDeleteId(id);
-      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
-      confirmTimerRef.current = setTimeout(() => {
-        setConfirmDeleteId(null);
+  const handleDelete = useCallback(
+    (id: string) => {
+      if (confirmDeleteId !== id) {
+        setConfirmDeleteId(id);
+        if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+        confirmTimerRef.current = setTimeout(() => {
+          setConfirmDeleteId(null);
+          confirmTimerRef.current = null;
+        }, 3000);
+        return;
+      }
+      if (confirmTimerRef.current) {
+        clearTimeout(confirmTimerRef.current);
         confirmTimerRef.current = null;
-      }, 3000);
-      return;
-    }
-    if (confirmTimerRef.current) {
-      clearTimeout(confirmTimerRef.current);
-      confirmTimerRef.current = null;
-    }
-    deleteVariant(id);
-    setConfirmDeleteId(null);
-    showToast("Variant deleted");
-  }, [confirmDeleteId, deleteVariant, showToast]);
+      }
+      deleteVariant(id);
+      setConfirmDeleteId(null);
+      showToast("Variant deleted");
+    },
+    [confirmDeleteId, deleteVariant, showToast],
+  );
 
   if (!isAuthenticated) return null;
 
@@ -143,8 +157,18 @@ export function VariantBar<T>({
               <span className="truncate">
                 {activeVariant ? activeVariant.name : "No variant"}
               </span>
-              <svg className="size-3 shrink-0 opacity-60" viewBox="0 0 12 12" fill="none">
-                <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <svg
+                className="size-3 shrink-0 opacity-60"
+                viewBox="0 0 12 12"
+                fill="none"
+              >
+                <path
+                  d="M3 5l3 3 3-3"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </button>
             {dropdownOpen && (
@@ -166,7 +190,8 @@ export function VariantBar<T>({
                     onClick={() => handleSelectVariant(v.id)}
                     className={cn(
                       "w-full px-3 py-2 text-left text-xs transition hover:bg-foreground/10",
-                      v.id === store.activeId && "font-semibold text-foreground",
+                      v.id === store.activeId &&
+                        "font-semibold text-foreground",
                     )}
                   >
                     {v.name}
@@ -178,12 +203,20 @@ export function VariantBar<T>({
 
           {/* Dirty indicator */}
           {activeVariant && isDirty && (
-            <span className="size-2 rounded-full bg-amber-400" title="Unsaved changes" />
+            <span
+              className="size-2 rounded-full bg-amber-400"
+              title="Unsaved changes"
+            />
           )}
 
           {/* Save */}
           {activeVariant && (
-            <button type="button" onClick={handleSave} disabled={!isDirty} className={buttonClass}>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!isDirty}
+              className={buttonClass}
+            >
               Save
             </button>
           )}
@@ -195,7 +228,11 @@ export function VariantBar<T>({
 
           {/* Manage */}
           {store.variants.length > 0 && (
-            <button type="button" onClick={() => setManageOpen(true)} className={buttonClass}>
+            <button
+              type="button"
+              onClick={() => setManageOpen(true)}
+              className={buttonClass}
+            >
               Manage
             </button>
           )}
@@ -227,7 +264,9 @@ export function VariantBar<T>({
               <X className="size-4" />
             </button>
 
-            <h2 className="mb-4 text-sm font-semibold text-foreground">Manage Variants</h2>
+            <h2 className="mb-4 text-sm font-semibold text-foreground">
+              Manage Variants
+            </h2>
 
             <div className="space-y-1">
               {store.variants.map((v) => (
@@ -237,20 +276,24 @@ export function VariantBar<T>({
                     "flex items-center gap-2 rounded-lg px-3 py-2 transition",
                     v.id === store.activeId
                       ? "bg-primary/10 border border-primary/30"
-                      : "border border-transparent hover:bg-foreground/5"
+                      : "border border-transparent hover:bg-foreground/5",
                   )}
                 >
                   {/* Active indicator / select button */}
                   <button
                     type="button"
-                    onClick={() => handleSelectVariant(v.id === store.activeId ? null : v.id)}
+                    onClick={() =>
+                      handleSelectVariant(v.id === store.activeId ? null : v.id)
+                    }
                     className={cn(
                       "flex size-5 shrink-0 items-center justify-center rounded-full border transition",
                       v.id === store.activeId
                         ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border/50 text-transparent hover:border-primary/50"
+                        : "border-border/50 text-transparent hover:border-primary/50",
                     )}
-                    title={v.id === store.activeId ? "Deselect" : "Set as active"}
+                    title={
+                      v.id === store.activeId ? "Deselect" : "Set as active"
+                    }
                   >
                     <Check className="size-3" />
                   </button>
@@ -271,7 +314,9 @@ export function VariantBar<T>({
                         className="w-full rounded border border-border/50 bg-background/80 px-2 py-0.5 text-xs text-foreground focus:border-primary focus:outline-none"
                       />
                     ) : (
-                      <span className="text-xs text-foreground truncate block">{v.name}</span>
+                      <span className="text-xs text-foreground truncate block">
+                        {v.name}
+                      </span>
                     )}
                   </div>
 
@@ -293,9 +338,13 @@ export function VariantBar<T>({
                       "shrink-0 transition",
                       confirmDeleteId === v.id
                         ? "text-red-400 animate-pulse"
-                        : "text-muted-foreground hover:text-red-400"
+                        : "text-muted-foreground hover:text-red-400",
                     )}
-                    title={confirmDeleteId === v.id ? "Click again to confirm" : "Delete"}
+                    title={
+                      confirmDeleteId === v.id
+                        ? "Click again to confirm"
+                        : "Delete"
+                    }
                   >
                     <Trash2 className="size-3.5" />
                   </button>

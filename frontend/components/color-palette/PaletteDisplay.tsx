@@ -63,7 +63,8 @@ export function PaletteDisplay({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Hover swatches to highlight matching regions. Click to view variations. Drag crosshairs on the image to pick new colors.
+        Hover swatches to highlight matching regions. Click to view variations.
+        Drag crosshairs on the image to pick new colors.
       </p>
     </div>
   );

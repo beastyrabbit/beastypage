@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
-import { useSpriteMapperOptions, useCatGenerator } from "@/components/cat-builder/hooks";
+import {
+  useCatGenerator,
+  useSpriteMapperOptions,
+} from "@/components/cat-builder/hooks";
 import { formatName } from "@/components/cat-builder/utils";
+import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import { WizardExampleCats } from "../WizardExampleCats";
 import { ForceInitialRollInfo } from "./ForceInitialRollInfo";
 import type { WizardStepProps } from "./types";
@@ -95,7 +98,10 @@ export function AccessoriesStep(props: WizardStepProps) {
           accessories: [accessoryName],
           accessory: accessoryName,
         });
-        return { name: accessoryName, imageDataUrl: result.imageDataUrl ?? null };
+        return {
+          name: accessoryName,
+          imageDataUrl: result.imageDataUrl ?? null,
+        };
       } catch {
         return { name: accessoryName, imageDataUrl: null };
       }
@@ -108,11 +114,15 @@ export function AccessoriesStep(props: WizardStepProps) {
     if (!ready || !generator || !mapper || generatedRef.current) return;
     generatedRef.current = true;
 
-    const all = Array.from(new Set(mapper.getAccessories?.() ?? [
-      ...(options?.plantAccessories ?? []),
-      ...(options?.wildAccessories ?? []),
-      ...(options?.collarAccessories ?? []),
-    ]));
+    const all = Array.from(
+      new Set(
+        mapper.getAccessories?.() ?? [
+          ...(options?.plantAccessories ?? []),
+          ...(options?.wildAccessories ?? []),
+          ...(options?.collarAccessories ?? []),
+        ],
+      ),
+    );
     // Shuffle the entire pool once
     const shuffled = pickRandom(all, all.length);
     poolRef.current = shuffled;
@@ -138,7 +148,9 @@ export function AccessoriesStep(props: WizardStepProps) {
   const handleShowMore = useCallback(async () => {
     if (!generator || isRendering) return;
     // Pool is already shuffled; grab everything after INITIAL_COUNT
-    const remaining = poolRef.current.filter((n) => !shownNamesRef.current.has(n));
+    const remaining = poolRef.current.filter(
+      (n) => !shownNamesRef.current.has(n),
+    );
     if (remaining.length === 0) return;
 
     remaining.forEach((n) => shownNamesRef.current.add(n));
@@ -163,8 +175,9 @@ export function AccessoriesStep(props: WizardStepProps) {
         </h2>
         <p className="text-base leading-relaxed text-muted-foreground">
           Accessories are items your cat wears &mdash; plants, collars,
-          feathers, and more. There are <strong>{poolRef.current.length || "360"}+</strong> options
-          that get randomly selected. You control how many your cat can wear.
+          feathers, and more. There are{" "}
+          <strong>{poolRef.current.length || "360"}+</strong> options that get
+          randomly selected. You control how many your cat can wear.
         </p>
       </section>
 
@@ -182,7 +195,11 @@ export function AccessoriesStep(props: WizardStepProps) {
           onChange={setAccessoryRange}
           compact
         />
-        <ForceInitialRollInfo range={settings.accessoryRange} layerName="accessory" exactLayerCounts={settings.exactLayerCounts} />
+        <ForceInitialRollInfo
+          range={settings.accessoryRange}
+          layerName="accessory"
+          exactLayerCounts={settings.exactLayerCounts}
+        />
       </section>
 
       {/* Accessory gallery — below the selector */}
@@ -190,7 +207,10 @@ export function AccessoriesStep(props: WizardStepProps) {
         <h3 className="mb-4 text-[10px] uppercase tracking-widest text-muted-foreground/70">
           Example Accessories
           {isRendering && expanded && (
-            <span className="text-amber-200/70"> &mdash; loading previews...</span>
+            <span className="text-amber-200/70">
+              {" "}
+              &mdash; loading previews...
+            </span>
           )}
         </h3>
         {/* 3 rows of 4 cols = ~420px, then scroll */}
@@ -201,11 +221,16 @@ export function AccessoriesStep(props: WizardStepProps) {
             ))}
             {isRendering &&
               gallery.length < INITIAL_COUNT &&
-              Array.from({ length: INITIAL_COUNT - gallery.length }).map((_, i) => (
-                <div key={`ph-${i}`} className="flex aspect-square items-center justify-center rounded-xl border border-border/30 bg-background/50">
-                  <div className="size-5 animate-pulse rounded-full bg-muted-foreground/20" />
-                </div>
-              ))}
+              Array.from({ length: INITIAL_COUNT - gallery.length }).map(
+                (_, i) => (
+                  <div
+                    key={`ph-${i}`}
+                    className="flex aspect-square items-center justify-center rounded-xl border border-border/30 bg-background/50"
+                  >
+                    <div className="size-5 animate-pulse rounded-full bg-muted-foreground/20" />
+                  </div>
+                ),
+              )}
           </div>
         </div>
         {!expanded && remainingCount > 0 && (

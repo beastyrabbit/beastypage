@@ -1,8 +1,8 @@
 "use client";
 
+import { Check, ExternalLink, Github, Loader2, Pencil } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { Pencil, Check, Github, ExternalLink, Loader2 } from "lucide-react";
 import { DiscordInviteButton } from "@/components/common/DiscordInviteButton";
 
 interface DashHeroProps {
@@ -48,7 +48,10 @@ export function DashHero({
       <div className="relative z-10 px-8 py-12 text-balance">
         <p className="section-eyebrow text-emerald-200/90">Dashboard</p>
         <h1 className="mt-4 text-5xl font-bold leading-tight sm:text-6xl">
-          Hey there, I&apos;m <span className="text-gradient-dash animate-shimmer bg-[length:200%_auto]">Beasty.</span>
+          Hey there, I&apos;m{" "}
+          <span className="text-gradient-dash animate-shimmer bg-[length:200%_auto]">
+            Beasty.
+          </span>
         </h1>
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -81,7 +84,11 @@ export function DashHero({
               title={hasVariant ? "Open shareable link" : "No variant"}
               className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:border-white/20 hover:bg-white/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {opening ? <Loader2 className="size-3 animate-spin" /> : <ExternalLink className="size-3" />}
+              {opening ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <ExternalLink className="size-3" />
+              )}
               Open
             </button>
 

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { ADDITIONAL_PALETTES, type PaletteId } from '@/lib/palettes';
+import { useMemo } from "react";
+import { ADDITIONAL_PALETTES, type PaletteId } from "@/lib/palettes";
 
 export interface PaletteOption {
   id: PaletteId;
@@ -19,7 +19,12 @@ export function usePaletteOptions(): PaletteOption[] {
       // Get first 4 colors for preview
       const previewColors = colorEntries
         .slice(0, 4)
-        .map(([, def]) => def.multiply ?? def.pattern?.background ?? ([128, 128, 128] as [number, number, number]));
+        .map(
+          ([, def]) =>
+            def.multiply ??
+            def.pattern?.background ??
+            ([128, 128, 128] as [number, number, number]),
+        );
 
       return {
         id: palette.id,

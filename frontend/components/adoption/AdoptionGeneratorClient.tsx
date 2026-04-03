@@ -1,19 +1,22 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { Loader2 } from "lucide-react";
-import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
-import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
-import ExternalLinkIcon from "@/components/ui/external-link-icon";
-import { track } from "@/lib/analytics";
-import { AdoptionMetadataPanel, AdoptionMetadata } from "@/components/adoption/AdoptionMetadataPanel";
+import Link from "next/link";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+  type AdoptionMetadata,
+  AdoptionMetadataPanel,
+} from "@/components/adoption/AdoptionMetadataPanel";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
-import type { PaletteId } from "@/lib/palettes";
+import ExternalLinkIcon from "@/components/ui/external-link-icon";
+import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
+import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
+import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { toId } from "@/convex/utils";
+import { track } from "@/lib/analytics";
+import type { PaletteId } from "@/lib/palettes";
 
 interface LegacyBatchCat {
   label?: string | null;
@@ -65,7 +68,7 @@ const LegacyCatGrid = memo(
   function LegacyCatGrid() {
     return <div id="catGrid" className="cat-grid" aria-live="polite" />;
   },
-  () => true
+  () => true,
 );
 
 export function AdoptionGeneratorClient() {
@@ -79,13 +82,18 @@ export function AdoptionGeneratorClient() {
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [generationComplete, setGenerationComplete] = useState(false);
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
-  const [savedMetadata, setSavedMetadata] = useState<AdoptionMetadata>({ title: "", creator: "" });
+  const [savedMetadata, setSavedMetadata] = useState<AdoptionMetadata>({
+    title: "",
+    creator: "",
+  });
   const savedMetadataRef = useRef<AdoptionMetadata>(savedMetadata);
   const [metadataMessage, setMetadataMessage] = useState<string | null>(null);
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [metadataSaving, setMetadataSaving] = useState(false);
   const [speed, setSpeed] = useState<string>("normal");
-  const [selectedPalettes, setSelectedPalettes] = useState<Set<PaletteId>>(new Set());
+  const [selectedPalettes, setSelectedPalettes] = useState<Set<PaletteId>>(
+    new Set(),
+  );
   const [includeClassic, setIncludeClassic] = useState(true);
 
   useEffect(() => {
@@ -144,7 +152,8 @@ export function AdoptionGeneratorClient() {
         },
         onBatchFinalized: async (payload: LegacyBatchPayload) => {
           if (!payload?.cats?.length) return;
-          const payloadToken = typeof payload.token === "string" ? payload.token : null;
+          const payloadToken =
+            typeof payload.token === "string" ? payload.token : null;
           if (payloadToken && payloadToken === lastTokenRef.current) {
             return;
           }
@@ -155,10 +164,17 @@ export function AdoptionGeneratorClient() {
           try {
             const catsPayload: AdoptionCatPayload[] = await Promise.all(
               payload.cats.map(async (cat, index) => {
-                const label = cat.label?.trim() ? cat.label : `Cat ${index + 1}`;
-                const encoded = typeof cat.encoded === "string" ? cat.encoded : undefined;
-                let shareToken = typeof cat.shareToken === "string" ? cat.shareToken : undefined;
-                let profileIdStr = typeof cat.profileId === "string" ? cat.profileId : undefined;
+                const label = cat.label?.trim()
+                  ? cat.label
+                  : `Cat ${index + 1}`;
+                const encoded =
+                  typeof cat.encoded === "string" ? cat.encoded : undefined;
+                let shareToken =
+                  typeof cat.shareToken === "string"
+                    ? cat.shareToken
+                    : undefined;
+                let profileIdStr =
+                  typeof cat.profileId === "string" ? cat.profileId : undefined;
 
                 if (!shareToken || !profileIdStr) {
                   try {
@@ -173,7 +189,11 @@ export function AdoptionGeneratorClient() {
                         shareToken?: string | null;
                         slug?: string | null;
                       };
-                      shareToken = shareToken ?? mapperPayload.shareToken ?? mapperPayload.slug ?? mapperPayload.id;
+                      shareToken =
+                        shareToken ??
+                        mapperPayload.shareToken ??
+                        mapperPayload.slug ??
+                        mapperPayload.id;
                       profileIdStr = profileIdStr ?? mapperPayload.id;
                     }
                   } catch (error) {
@@ -184,13 +204,15 @@ export function AdoptionGeneratorClient() {
                 return {
                   label,
                   catData: cat.catData,
-                  profileId: profileIdStr ? toId("cat_profile", profileIdStr) : undefined,
+                  profileId: profileIdStr
+                    ? toId("cat_profile", profileIdStr)
+                    : undefined,
                   encoded,
                   shareToken,
                   catName: cat.catName ?? undefined,
                   creatorName: cat.creatorName ?? undefined,
                 } satisfies AdoptionCatPayload;
-              })
+              }),
             );
 
             const currentMeta = savedMetadataRef.current;
@@ -211,7 +233,10 @@ export function AdoptionGeneratorClient() {
             });
 
             if (result?.shareToken || result?.slug) {
-              const token = (result as { shareToken?: string }).shareToken ?? result.slug ?? null;
+              const token =
+                (result as { shareToken?: string }).shareToken ??
+                result.slug ??
+                null;
               setLastSavedToken(token);
               setLastSavedAt(Date.now());
               setLastSavedId(result.id ?? null);
@@ -239,7 +264,9 @@ export function AdoptionGeneratorClient() {
     if (!group) return;
     group.setAttribute("data-value", speed);
     const detail = { value: speed };
-    group.dispatchEvent(new CustomEvent("sl-change", { detail, bubbles: true }));
+    group.dispatchEvent(
+      new CustomEvent("sl-change", { detail, bubbles: true }),
+    );
   }, [speed]);
 
   // Dispatch custom event when palette selection changes
@@ -249,7 +276,9 @@ export function AdoptionGeneratorClient() {
       selectedModes: Array.from(selectedPalettes),
       includeBase: includeClassic,
     };
-    window.dispatchEvent(new CustomEvent("adoption-palette-change", { detail }));
+    window.dispatchEvent(
+      new CustomEvent("adoption-palette-change", { detail }),
+    );
   }, [selectedPalettes, includeClassic]);
 
   useEffect(() => {
@@ -266,35 +295,40 @@ export function AdoptionGeneratorClient() {
     return () => window.clearTimeout(timeout);
   }, [metadataMessage]);
 
-  const handleMetadataSave = useCallback(async (nextMetadata: AdoptionMetadata) => {
-    if (!lastSavedId) {
-      setMetadataError("Save the batch first.");
-      return;
-    }
-    const dirty = nextMetadata.title !== savedMetadata.title || nextMetadata.creator !== savedMetadata.creator;
-    if (!dirty) {
-      setMetadataMessage("Nothing to save");
-      return;
-    }
-    try {
-      setMetadataSaving(true);
-      setMetadataMessage(null);
-      setMetadataError(null);
-      await updateBatchMeta({
-        id: lastSavedId as Id<"adoption_batch">,
-        title: nextMetadata.title,
-        creatorName: nextMetadata.creator,
-      });
-      setSavedMetadata(nextMetadata);
-      savedMetadataRef.current = nextMetadata;
-      setMetadataMessage("Saved");
-    } catch (error) {
-      console.error("Failed to save metadata", error);
-      setMetadataError("Failed to save metadata.");
-    } finally {
-      setMetadataSaving(false);
-    }
-  }, [lastSavedId, savedMetadata, updateBatchMeta]);
+  const handleMetadataSave = useCallback(
+    async (nextMetadata: AdoptionMetadata) => {
+      if (!lastSavedId) {
+        setMetadataError("Save the batch first.");
+        return;
+      }
+      const dirty =
+        nextMetadata.title !== savedMetadata.title ||
+        nextMetadata.creator !== savedMetadata.creator;
+      if (!dirty) {
+        setMetadataMessage("Nothing to save");
+        return;
+      }
+      try {
+        setMetadataSaving(true);
+        setMetadataMessage(null);
+        setMetadataError(null);
+        await updateBatchMeta({
+          id: lastSavedId as Id<"adoption_batch">,
+          title: nextMetadata.title,
+          creatorName: nextMetadata.creator,
+        });
+        setSavedMetadata(nextMetadata);
+        savedMetadataRef.current = nextMetadata;
+        setMetadataMessage("Saved");
+      } catch (error) {
+        console.error("Failed to save metadata", error);
+        setMetadataError("Failed to save metadata.");
+      } finally {
+        setMetadataSaving(false);
+      }
+    },
+    [lastSavedId, savedMetadata, updateBatchMeta],
+  );
 
   const statusNode = (() => {
     switch (saveState) {
@@ -313,21 +347,27 @@ export function AdoptionGeneratorClient() {
               {lastSavedToken ? (
                 <>
                   :{" "}
-                  <Link href={`/adoption/${lastSavedToken}`} className="inline-flex items-center gap-1 underline">
+                  <Link
+                    href={`/adoption/${lastSavedToken}`}
+                    className="inline-flex items-center gap-1 underline"
+                  >
                     view batch <ExternalLinkIcon size={12} />
                   </Link>
                 </>
               ) : null}
             </span>
             {lastSavedAt ? (
-              <span className="text-xs text-emerald-100/80">({new Date(lastSavedAt).toLocaleTimeString()})</span>
+              <span className="text-xs text-emerald-100/80">
+                ({new Date(lastSavedAt).toLocaleTimeString()})
+              </span>
             ) : null}
           </span>
         );
       case "error":
         return (
           <span className="inline-flex items-center gap-2 text-sm text-red-200">
-            <TriangleAlertIcon size={16} /> Failed to save batch. Try again after regenerating.
+            <TriangleAlertIcon size={16} /> Failed to save batch. Try again
+            after regenerating.
           </span>
         );
       default:
@@ -341,7 +381,8 @@ export function AdoptionGeneratorClient() {
         <header className="page-header">
           <h1>Adoption Generator</h1>
           <p className="page-subtitle">
-            Roll a full litter at once, prune after every reveal, and finish with ten finalists.
+            Roll a full litter at once, prune after every reveal, and finish
+            with ten finalists.
           </p>
           <div className="stage-info">
             <span id="stageStatus" className="stage-status">
@@ -356,28 +397,32 @@ export function AdoptionGeneratorClient() {
 
         <section className="controls-panel">
           <div className="controls-left">
-            <button id="generateButton" className="generate-button" type="button">
+            <button
+              id="generateButton"
+              className="generate-button"
+              type="button"
+            >
               Generate Adoption
             </button>
-              <div className="sl-toggle-group">
-                <span className="setting-label">Speed:</span>
-                <div id="speedGroup" className="sl-segment" data-value={speed}>
-                  {SPEED_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      data-speed-option
-                      data-value={option.value}
-                      aria-pressed={speed === option.value}
-                      className={`palette-toggle${speed === option.value ? " active" : ""}`}
-                      onClick={() => setSpeed(option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
+            <div className="sl-toggle-group">
+              <span className="setting-label">Speed:</span>
+              <div id="speedGroup" className="sl-segment" data-value={speed}>
+                {SPEED_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    data-speed-option
+                    data-value={option.value}
+                    aria-pressed={speed === option.value}
+                    className={`palette-toggle${speed === option.value ? " active" : ""}`}
+                    onClick={() => setSpeed(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
             </div>
+          </div>
           <div className="controls-right">
             <div className="control-row">
               <span className="toggle-label">Layer Counts:</span>
@@ -432,7 +477,10 @@ export function AdoptionGeneratorClient() {
                   <div className="select-inner">
                     <select id="afterlifeMode" defaultValue="both10">
                       {AFTERLIFE_OPTIONS.map((option) => (
-                        <option key={`afterlife-${option.value}`} value={option.value}>
+                        <option
+                          key={`afterlife-${option.value}`}
+                          value={option.value}
+                        >
                           {option.label}
                         </option>
                       ))}
@@ -443,7 +491,10 @@ export function AdoptionGeneratorClient() {
             </div>
             <div className="control-row" id="extendedPaletteControls">
               <span className="setting-label">Color Palettes:</span>
-              <div className="palette-select-wrap" style={{ flex: 1, maxWidth: 320 }}>
+              <div
+                className="palette-select-wrap"
+                style={{ flex: 1, maxWidth: 320 }}
+              >
                 <PaletteMultiSelect
                   selected={selectedPalettes}
                   onChange={setSelectedPalettes}
@@ -483,10 +534,24 @@ export function AdoptionGeneratorClient() {
           </section>
         ) : null}
       </main>
-      <div id="catDetailOverlay" className="cat-detail-overlay" aria-hidden="true">
+      <div
+        id="catDetailOverlay"
+        className="cat-detail-overlay"
+        aria-hidden="true"
+      >
         <div className="overlay-backdrop" data-overlay-close />
-        <div className="overlay-content" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
-          <button className="overlay-close" type="button" data-overlay-close title="Close">
+        <div
+          className="overlay-content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="detailTitle"
+        >
+          <button
+            className="overlay-close"
+            type="button"
+            data-overlay-close
+            title="Close"
+          >
             ✕
           </button>
           <div className="overlay-body">
@@ -496,18 +561,37 @@ export function AdoptionGeneratorClient() {
               </div>
               <div className="overlay-panel">
                 <h2 id="detailTitle">Cat</h2>
-                <div id="detailTable" className="detail-table overlay-parameter-table" />
+                <div
+                  id="detailTable"
+                  className="detail-table overlay-parameter-table"
+                />
                 <div className="overlay-actions overlay-actions-row flex flex-wrap gap-2">
-                  <button id="detailCopyBig" type="button" className="overlay-action-btn">
+                  <button
+                    id="detailCopyBig"
+                    type="button"
+                    className="overlay-action-btn"
+                  >
                     Copy 700×700
                   </button>
-                  <button id="detailCopyShare" type="button" className="overlay-action-btn">
+                  <button
+                    id="detailCopyShare"
+                    type="button"
+                    className="overlay-action-btn"
+                  >
                     Copy share URL
                   </button>
-                  <button id="detailOpenViewer" type="button" className="overlay-action-btn">
+                  <button
+                    id="detailOpenViewer"
+                    type="button"
+                    className="overlay-action-btn"
+                  >
                     Open in viewer
                   </button>
-                  <button id="detailOpenSprites" type="button" className="overlay-action-btn">
+                  <button
+                    id="detailOpenSprites"
+                    type="button"
+                    className="overlay-action-btn"
+                  >
                     View sprite gallery
                   </button>
                 </div>
@@ -516,10 +600,24 @@ export function AdoptionGeneratorClient() {
           </div>
         </div>
       </div>
-      <div id="spriteGalleryOverlay" className="cat-detail-overlay sprite-gallery-overlay" aria-hidden="true">
+      <div
+        id="spriteGalleryOverlay"
+        className="cat-detail-overlay sprite-gallery-overlay"
+        aria-hidden="true"
+      >
         <div className="overlay-backdrop" data-sprite-gallery-close />
-        <div className="overlay-content" role="dialog" aria-modal="true" aria-labelledby="spriteGalleryTitle">
-          <button className="overlay-close" type="button" data-sprite-gallery-close title="Close">
+        <div
+          className="overlay-content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="spriteGalleryTitle"
+        >
+          <button
+            className="overlay-close"
+            type="button"
+            data-sprite-gallery-close
+            title="Close"
+          >
             ✕
           </button>
           <div className="overlay-body">

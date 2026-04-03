@@ -1,23 +1,22 @@
 "use client";
 
-import { useCallback, useRef, useState, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
-import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
-import DownChevron from "@/components/ui/down-chevron";
-import CheckedIcon from "@/components/ui/checked-icon";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
+import CheckedIcon from "@/components/ui/checked-icon";
+import DownChevron from "@/components/ui/down-chevron";
 import { track } from "@/lib/analytics";
-
-import type { ExtractedColor, RGB } from "@/lib/color-extraction/types";
+import { generateColorDisplayName } from "@/lib/color-extraction/color-names";
 import {
   adjustBrightness,
   adjustHue,
   rgbToHex,
 } from "@/lib/color-extraction/color-utils";
-import { generateColorDisplayName } from "@/lib/color-extraction/color-names";
 import { createMultiColorSpotlightImage } from "@/lib/color-extraction/kmeans";
 import { generateACO } from "@/lib/color-extraction/palette-formats";
+import type { ExtractedColor, RGB } from "@/lib/color-extraction/types";
 
 interface PaletteExportProps {
   topColors: ExtractedColor[];
@@ -50,18 +49,22 @@ const BLACK_WHITE_THRESHOLD = 15;
  * Check if a color is nearly black
  */
 function isNearBlack(rgb: RGB): boolean {
-  return rgb.r <= BLACK_WHITE_THRESHOLD &&
-         rgb.g <= BLACK_WHITE_THRESHOLD &&
-         rgb.b <= BLACK_WHITE_THRESHOLD;
+  return (
+    rgb.r <= BLACK_WHITE_THRESHOLD &&
+    rgb.g <= BLACK_WHITE_THRESHOLD &&
+    rgb.b <= BLACK_WHITE_THRESHOLD
+  );
 }
 
 /**
  * Check if a color is nearly white
  */
 function isNearWhite(rgb: RGB): boolean {
-  return rgb.r >= 255 - BLACK_WHITE_THRESHOLD &&
-         rgb.g >= 255 - BLACK_WHITE_THRESHOLD &&
-         rgb.b >= 255 - BLACK_WHITE_THRESHOLD;
+  return (
+    rgb.r >= 255 - BLACK_WHITE_THRESHOLD &&
+    rgb.g >= 255 - BLACK_WHITE_THRESHOLD &&
+    rgb.b >= 255 - BLACK_WHITE_THRESHOLD
+  );
 }
 
 /**
@@ -76,7 +79,7 @@ function colorKey(rgb: RGB): string {
  */
 function filterExtractedColors(
   colors: ExtractedColor[],
-  seenColors?: Set<string>
+  seenColors?: Set<string>,
 ): ExtractedColor[] {
   const seen = seenColors ?? new Set<string>();
   return colors.filter((color) => {
@@ -96,7 +99,7 @@ function collectAllColorsForExport(
   topColors: ExtractedColor[],
   familyColors: ExtractedColor[],
   brightnessFactors: number[],
-  hueShifts: number[]
+  hueShifts: number[],
 ): Array<{ rgb: RGB; name: string }> {
   const result: Array<{ rgb: RGB; name: string }> = [];
   const seenColors = new Set<string>();
@@ -115,13 +118,13 @@ function collectAllColorsForExport(
   // Process a color set (dominant or accent)
   const processColorSet = (
     colors: ExtractedColor[],
-    type: "dominant" | "accent"
+    type: "dominant" | "accent",
   ) => {
     colors.forEach((color, index) => {
       // Base color
       addColor(
         color.rgb,
-        generateColorDisplayName(index, color.name || "Color", type)
+        generateColorDisplayName(index, color.name || "Color", type),
       );
 
       // Brightness variations
@@ -133,7 +136,7 @@ function collectAllColorsForExport(
             adjusted,
             generateColorDisplayName(index, color.name || "Color", type, {
               brightnessMultiplier: factor,
-            })
+            }),
           );
         }
       });
@@ -146,7 +149,7 @@ function collectAllColorsForExport(
             adjusted,
             generateColorDisplayName(index, color.name || "Color", type, {
               hueShift: shift,
-            })
+            }),
           );
         }
       });
@@ -171,10 +174,13 @@ export function PaletteExport({
   const buttonRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>(
-    EXPORT_FORMATS[0]
+    EXPORT_FORMATS[0],
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    right: 0,
+  });
 
   // Calculate dropdown position when opening
   useEffect(() => {
@@ -192,8 +198,10 @@ export function PaletteExport({
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
       if (
-        buttonRef.current && !buttonRef.current.contains(target) &&
-        dropdownRef.current && !dropdownRef.current.contains(target)
+        buttonRef.current &&
+        !buttonRef.current.contains(target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target)
       ) {
         setIsDropdownOpen(false);
       }
@@ -212,7 +220,10 @@ export function PaletteExport({
     // Filter out black, white, and duplicate colors
     const seenColors = new Set<string>();
     const filteredTopColors = filterExtractedColors(topColors, seenColors);
-    const filteredFamilyColors = filterExtractedColors(familyColors, seenColors);
+    const filteredFamilyColors = filterExtractedColors(
+      familyColors,
+      seenColors,
+    );
 
     // Calculate number of sections
     // Each color set has: palette strip + brightness grid + hue grid
@@ -238,7 +249,12 @@ export function PaletteExport({
         .reverse()
         .forEach((color, index) => {
           ctx.fillStyle = color.hex;
-          ctx.fillRect(0, startY + index * colorHeight, SECTION_SIZE, colorHeight);
+          ctx.fillRect(
+            0,
+            startY + index * colorHeight,
+            SECTION_SIZE,
+            colorHeight,
+          );
         });
 
       return startY + SECTION_SIZE;
@@ -263,7 +279,7 @@ export function PaletteExport({
               colIndex * factorWidth,
               startY + rowIndex * colorHeight,
               factorWidth,
-              colorHeight
+              colorHeight,
             );
           });
         });
@@ -288,7 +304,7 @@ export function PaletteExport({
               colIndex * shiftWidth,
               startY + rowIndex * colorHeight,
               shiftWidth,
-              colorHeight
+              colorHeight,
             );
           });
         });
@@ -324,7 +340,7 @@ export function PaletteExport({
       topColors,
       familyColors,
       brightnessFactors,
-      hueShifts
+      hueShifts,
     );
 
     if (allColors.length === 0) {
@@ -368,7 +384,7 @@ export function PaletteExport({
       link.click();
 
       toast.success("Spotlight image downloaded!");
-    } catch (err) {
+    } catch (_err) {
       toast.error("Failed to create spotlight image");
     }
   }, [image, topColors, familyColors]);
@@ -428,40 +444,54 @@ export function PaletteExport({
             disabled={isProcessing || !hasColors}
             className="flex h-10 items-center justify-center rounded-r-lg border-l border-primary-foreground/20 bg-primary px-2 text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <DownChevron size={16} className={`transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
+            <DownChevron
+              size={16}
+              className={`transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+            />
           </button>
         </div>
       </div>
 
       {/* Dropdown menu - rendered via portal to avoid z-index issues */}
-      {isDropdownOpen && createPortal(
-        <div
-          ref={dropdownRef}
-          className="fixed min-w-[180px] overflow-hidden rounded-lg border border-border/50 bg-card shadow-xl"
-          style={{
-            top: dropdownPosition.top,
-            right: dropdownPosition.right,
-            zIndex: 9999,
-          }}
-        >
-          {EXPORT_FORMATS.map((format) => (
-            <button
-              key={format.id}
-              onClick={() => handleFormatSelect(format)}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"
-            >
-              <CheckedIcon
-                size={16}
-                className={selectedFormat.id === format.id ? "text-primary" : "text-transparent"}
-              />
-              <span className={selectedFormat.id === format.id ? "font-medium text-foreground" : "text-muted-foreground"}>
-                {format.label}
-              </span>
-            </button>
-          ))}
-        </div>,
-        document.body
-      )}
+      {isDropdownOpen &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed min-w-[180px] overflow-hidden rounded-lg border border-border/50 bg-card shadow-xl"
+            style={{
+              top: dropdownPosition.top,
+              right: dropdownPosition.right,
+              zIndex: 9999,
+            }}
+          >
+            {EXPORT_FORMATS.map((format) => (
+              <button
+                key={format.id}
+                onClick={() => handleFormatSelect(format)}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"
+              >
+                <CheckedIcon
+                  size={16}
+                  className={
+                    selectedFormat.id === format.id
+                      ? "text-primary"
+                      : "text-transparent"
+                  }
+                />
+                <span
+                  className={
+                    selectedFormat.id === format.id
+                      ? "font-medium text-foreground"
+                      : "text-muted-foreground"
+                  }
+                >
+                  {format.label}
+                </span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
