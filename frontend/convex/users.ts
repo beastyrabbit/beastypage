@@ -43,7 +43,10 @@ async function deriveUniqueUsername(
     (identity.email ? identity.email.split("@")[0] : undefined);
   if (!raw) return undefined;
 
-  const sanitized = raw.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 30);
+  const sanitized = raw
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .replace(/^[-_]+|[-_]+$/g, "")
+    .slice(0, 30);
   if (sanitized.length === 0) return undefined;
 
   // Try the sanitized name first, then fall back to suffixed variants

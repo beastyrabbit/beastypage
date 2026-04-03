@@ -137,9 +137,13 @@ export function UserAuthButton() {
           </Link>
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               setDropdownOpen(false);
-              clerk.signOut();
+              try {
+                await clerk.signOut();
+              } catch {
+                window.location.href = "/";
+              }
             }}
             className={cn(
               "flex w-full items-center gap-2 rounded-b-lg px-3 py-2",
