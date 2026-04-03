@@ -5,7 +5,7 @@ Next.js app that powers the Catdex, history tools, and collection gallery.
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 22+
-- [pnpm](https://pnpm.io/) 9+
+- [pnpm](https://pnpm.io/) 10+
 - [Convex CLI](https://docs.convex.dev/quickstart)
 
 ## Local Setup

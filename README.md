@@ -23,7 +23,7 @@ A pixel cat gacha platform featuring generators, wheels, and collection tools bu
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (v22+)
-- [pnpm](https://pnpm.io/) (v9+)
+- [pnpm](https://pnpm.io/) (v10+)
 - [Convex](https://convex.dev) account (for database)
 - Python 3.11+ with [uv](https://github.com/astral-sh/uv) (for renderer service)
 

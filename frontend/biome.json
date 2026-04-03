@@ -25,13 +25,13 @@
   "files": {
     "includes": [
       "**",
-      "!!.next/**",
-      "!!out/**",
-      "!!build/**",
-      "!!convex/_generated/**",
-      "!!lib/single-cat/**",
+      "!!.next",
+      "!!out",
+      "!!build",
+      "!!convex/_generated",
+      "!!lib/single-cat",
       "!!lib/streamer/steps.js",
-      "!!node_modules/**"
+      "!!node_modules"
     ]
   }
 }
