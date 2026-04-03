@@ -1,8 +1,8 @@
 "use client";
 
+import { motion, useAnimate } from "motion/react";
 import { forwardRef, useImperativeHandle } from "react";
 import type { AnimatedIconHandle, AnimatedIconProps } from "./types";
-import { motion, useAnimate } from "motion/react";
 
 const ArrowBackIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
   (

@@ -1,24 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "convex/react";
+import { ArrowUpRight, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { encodeCatShare, decodeCatShare, createCatShare } from "@/lib/catShare";
-import { cn } from "@/lib/utils";
-import type { TortieLayer } from "@/lib/cat-v3/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
-import {
-  ArrowUpRight,
-  Loader2,
-} from "lucide-react";
-import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
-import DownChevron from "@/components/ui/down-chevron";
 import CopyIcon from "@/components/ui/copy-icon";
+import DownChevron from "@/components/ui/down-chevron";
 import PaintIcon from "@/components/ui/paint-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
+import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
+import { api } from "@/convex/_generated/api";
+import type { TortieLayer } from "@/lib/cat-v3/types";
+import { createCatShare, decodeCatShare, encodeCatShare } from "@/lib/catShare";
+import { cn } from "@/lib/utils";
 
 type ViewerClientProps = {
   slug?: string | null;
@@ -41,7 +38,11 @@ interface ProfilePreviews {
   tiny?: { url: string | null; name?: string | null } | null;
   preview?: { url: string | null; name?: string | null } | null;
   full?: { url: string | null; name?: string | null } | null;
-  spriteSheet?: { url: string | null; name?: string | null; meta?: unknown } | null;
+  spriteSheet?: {
+    url: string | null;
+    name?: string | null;
+    meta?: unknown;
+  } | null;
   updatedAt?: number | null;
 }
 
@@ -80,9 +81,13 @@ function normalizeCatPayload(data: Record<string, unknown>): CatSharePayload {
     return data as unknown as CatSharePayload;
   }
   // Flat format — wrap it
-  const accessories = Array.isArray(data.accessories) ? data.accessories as string[] : [];
-  const scars = Array.isArray(data.scars) ? data.scars as string[] : [];
-  const tortie = Array.isArray(data.tortie) ? data.tortie as (TortieLayer | null)[] : [];
+  const accessories = Array.isArray(data.accessories)
+    ? (data.accessories as string[])
+    : [];
+  const scars = Array.isArray(data.scars) ? (data.scars as string[]) : [];
+  const tortie = Array.isArray(data.tortie)
+    ? (data.tortie as (TortieLayer | null)[])
+    : [];
   return {
     params: data,
     accessorySlots: accessories,
@@ -100,9 +105,16 @@ const VALID_SPRITES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
 const DISPLAY_CANVAS_SIZE = 900;
 const PREVIEW_CANVAS_SIZE = 360;
 
-type BuilderMeta = { slug?: string | null; catName?: string | null; creatorName?: string | null };
+type BuilderMeta = {
+  slug?: string | null;
+  catName?: string | null;
+  creatorName?: string | null;
+};
 
-function buildVisualBuilderUrl(payload: CatSharePayload | null, meta?: BuilderMeta): string | null {
+function buildVisualBuilderUrl(
+  payload: CatSharePayload | null,
+  meta?: BuilderMeta,
+): string | null {
   if (meta?.slug) {
     return `/visual-builder?slug=${encodeURIComponent(meta.slug)}`;
   }
@@ -130,12 +142,17 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
 
   const mapperRecord = useQuery(
     api.mapper.getBySlug,
-    slug ? { slugOrId: slug } : "skip"
+    slug ? { slugOrId: slug } : "skip",
   ) as MapperRecord | null | undefined;
 
   // Use cached preview if available, otherwise use on-demand endpoint
-  const cachedPreviewUrl = mapperRecord?.previews?.full?.url ?? mapperRecord?.previews?.preview?.url ?? null;
-  const previewImageUrl = cachedPreviewUrl ?? (mapperRecord?.id ? `/api/preview/${mapperRecord.id}` : null);
+  const cachedPreviewUrl =
+    mapperRecord?.previews?.full?.url ??
+    mapperRecord?.previews?.preview?.url ??
+    null;
+  const previewImageUrl =
+    cachedPreviewUrl ??
+    (mapperRecord?.id ? `/api/preview/${mapperRecord.id}` : null);
 
   const [catPayload, setCatPayload] = useState<CatSharePayload | null>(null);
   const [meta, setMeta] = useState<{
@@ -147,10 +164,14 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   } | null>(null);
   const [rendererReady, setRendererReady] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [loadingMessage, setLoadingMessage] = useState<string | null>("Loading cat…");
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(
+    "Loading cat…",
+  );
   const [error, setError] = useState<string | null>(null);
 
-  const [spriteVariants, setSpriteVariants] = useState<SpriteVariantPreview[]>([]);
+  const [spriteVariants, setSpriteVariants] = useState<SpriteVariantPreview[]>(
+    [],
+  );
   const [spriteVariantsLoading, setSpriteVariantsLoading] = useState(false);
   const [spriteVariantsOpen, setSpriteVariantsOpen] = useState(false);
 
@@ -163,8 +184,11 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       return null;
     }
     const slugRef = meta?.slug ?? meta?.shareToken ?? null;
-    const rawName = catPayload?.params ? (catPayload.params as Record<string, unknown>)?.["catName"] : null;
-    const catName = meta?.catName ?? (typeof rawName === "string" ? rawName : null);
+    const rawName = catPayload?.params
+      ? (catPayload.params as Record<string, unknown>)?.catName
+      : null;
+    const catName =
+      meta?.catName ?? (typeof rawName === "string" ? rawName : null);
     const creatorName = meta?.creatorName ?? null;
 
     if (!slugRef && !catPayload?.params) {
@@ -182,7 +206,9 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     let cancelled = false;
     (async () => {
       try {
-        const { default: catGenerator } = await import("@/lib/single-cat/catGeneratorV3");
+        const { default: catGenerator } = await import(
+          "@/lib/single-cat/catGeneratorV3"
+        );
         if (cancelled) return;
         generatorRef.current = catGenerator as CatGeneratorApi;
         if (!cancelled) {
@@ -213,9 +239,14 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       return;
     }
     if (mapperRecord.cat_data) {
-      setCatPayload(normalizeCatPayload(mapperRecord.cat_data as unknown as Record<string, unknown>));
+      setCatPayload(
+        normalizeCatPayload(
+          mapperRecord.cat_data as unknown as Record<string, unknown>,
+        ),
+      );
       setMeta({
-        shareToken: mapperRecord.shareToken ?? mapperRecord.slug ?? mapperRecord.id,
+        shareToken:
+          mapperRecord.shareToken ?? mapperRecord.slug ?? mapperRecord.id,
         slug: mapperRecord.slug ?? mapperRecord.shareToken ?? mapperRecord.id,
         catName: mapperRecord.catName ?? null,
         creatorName: mapperRecord.creatorName ?? null,
@@ -233,7 +264,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       try {
         const decoded = await decodeCatShare(encoded);
         if (cancelled) return;
-        if (!decoded || !decoded.params) {
+        if (!decoded?.params) {
           throw new Error("Invalid payload");
         }
         setCatPayload(decoded as CatSharePayload);
@@ -254,20 +285,30 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   useEffect(() => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     if (meta?.shareToken) {
-      setShareUrl(origin ? `${origin}/view/${meta.shareToken}` : `/view/${meta.shareToken}`);
+      setShareUrl(
+        origin
+          ? `${origin}/view/${meta.shareToken}`
+          : `/view/${meta.shareToken}`,
+      );
       return;
     }
     if (encoded) {
-      setShareUrl(origin ? `${origin}/view?cat=${encoded}` : `/view?cat=${encoded}`);
+      setShareUrl(
+        origin ? `${origin}/view?cat=${encoded}` : `/view?cat=${encoded}`,
+      );
       return;
     }
     if (catPayload) {
       try {
         const encodedPayload = encodeCatShare(catPayload);
-        setShareUrl(origin ? `${origin}/view?cat=${encodedPayload}` : `/view?cat=${encodedPayload}`);
+        setShareUrl(
+          origin
+            ? `${origin}/view?cat=${encodedPayload}`
+            : `/view?cat=${encodedPayload}`,
+        );
         return;
       } catch (err) {
-        console.warn('Failed to encode share link', err);
+        console.warn("Failed to encode share link", err);
       }
     }
     setShareUrl(null);
@@ -298,7 +339,13 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
         const result = await generator.generateCat(params);
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(result.canvas as HTMLCanvasElement, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(
+          result.canvas as HTMLCanvasElement,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
       } catch (err) {
         console.error("Failed to render cat", err);
         setError("Unable to render this cat payload.");
@@ -315,13 +362,16 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
         ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
       };
       image.onerror = () => {
-        console.warn('Preview image failed to load, falling back to renderer');
+        console.warn("Preview image failed to load, falling back to renderer");
         renderFromRenderer();
       };
       image.src = url;
     };
 
-    if (previewImageUrl && (showDarkForestTint || !catPayload.params.darkForest)) {
+    if (
+      previewImageUrl &&
+      (showDarkForestTint || !catPayload.params.darkForest)
+    ) {
       drawFromImage(previewImageUrl);
       return;
     }
@@ -359,7 +409,9 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     (async () => {
       const shareRecord = await createCatShare(shareSeed);
       if (!cancelled && shareRecord?.slug) {
-        setBuilderBaseUrl(`/visual-builder?share=${encodeURIComponent(shareRecord.slug)}`);
+        setBuilderBaseUrl(
+          `/visual-builder?share=${encodeURIComponent(shareRecord.slug)}`,
+        );
       }
     })();
 
@@ -403,7 +455,13 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
           const ctx = previewCanvas.getContext("2d");
           if (!ctx) continue;
           ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(result.canvas as HTMLCanvasElement, 0, 0, PREVIEW_CANVAS_SIZE, PREVIEW_CANVAS_SIZE);
+          ctx.drawImage(
+            result.canvas as HTMLCanvasElement,
+            0,
+            0,
+            PREVIEW_CANVAS_SIZE,
+            PREVIEW_CANVAS_SIZE,
+          );
           previews.push({
             id: `sprite-${spriteNumber}`,
             spriteNumber,
@@ -425,8 +483,6 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     };
   }, [rendererReady, catPayload]);
 
-  
-
   const traitRows = useMemo(() => {
     if (!catPayload?.params) return [] as TraitRow[];
     const params = catPayload.params;
@@ -442,14 +498,22 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     push("Eyes", buildEyeLabel(params));
     push("Eye Colour 2", params.eyeColour2);
 
-    const accessories = (catPayload.accessorySlots ?? []).filter((item) => item && item !== "none");
+    const accessories = (catPayload.accessorySlots ?? []).filter(
+      (item) => item && item !== "none",
+    );
     accessories.forEach((item, index) => push(`Accessory ${index + 1}`, item));
 
-    const scars = (catPayload.scarSlots ?? []).filter((item) => item && item !== "none");
+    const scars = (catPayload.scarSlots ?? []).filter(
+      (item) => item && item !== "none",
+    );
     scars.forEach((item, index) => push(`Scar ${index + 1}`, item));
 
-    const torties = (catPayload.tortieSlots ?? []).filter((slot): slot is TortieLayer => !!slot);
-    torties.forEach((slot, index) => push(`Tortie ${index + 1}`, formatTortieLayer(slot)));
+    const torties = (catPayload.tortieSlots ?? []).filter(
+      (slot): slot is TortieLayer => !!slot,
+    );
+    torties.forEach((slot, index) =>
+      push(`Tortie ${index + 1}`, formatTortieLayer(slot)),
+    );
 
     push("Tint", params.tint);
     push("Skin", params.skinColour);
@@ -475,8 +539,8 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   const spriteVariantsSubtitle = spriteVariantsLoading
     ? "Rendering preview sprites…"
     : spriteVariants.length > 0
-    ? `${spriteVariants.length} sprite${spriteVariants.length === 1 ? "" : "s"} available`
-    : "Sprite previews unavailable";
+      ? `${spriteVariants.length} sprite${spriteVariants.length === 1 ? "" : "s"} available`
+      : "Sprite previews unavailable";
 
   const showLoader = !!loadingMessage || (slug && mapperRecord === undefined);
   const showCanvas = !showLoader && !error && !!catPayload;
@@ -518,7 +582,11 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
           resolve(null);
         }
       });
-      if (blob && typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+      if (
+        blob &&
+        typeof ClipboardItem !== "undefined" &&
+        navigator.clipboard?.write
+      ) {
         try {
           await navigator.clipboard.write([
             new ClipboardItem({ "image/png": blob }),
@@ -554,7 +622,10 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       try {
         const response = await fetch(dataUrl);
         const blob = await response.blob();
-        if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        if (
+          typeof ClipboardItem !== "undefined" &&
+          navigator.clipboard?.write
+        ) {
           try {
             await navigator.clipboard.write([
               new ClipboardItem({ "image/png": blob }),
@@ -573,7 +644,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
         window.alert("Clipboard unavailable; downloaded instead.");
       }
     },
-    [downloadDataUrl]
+    [downloadDataUrl],
   );
 
   const handleOpenPaletteCreator = useCallback(() => {
@@ -592,18 +663,27 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   const catDisplayName = useMemo(() => {
     const metaName = meta?.catName?.trim();
     if (metaName) return metaName;
-    const payloadName = typeof (catPayload?.params as Record<string, unknown> | undefined)?.catName === "string"
-      ? ((catPayload?.params as Record<string, unknown>).catName as string).trim()
-      : "";
+    const payloadName =
+      typeof (catPayload?.params as Record<string, unknown> | undefined)
+        ?.catName === "string"
+        ? (
+            (catPayload?.params as Record<string, unknown>).catName as string
+          ).trim()
+        : "";
     return payloadName || "Shared Cat";
   }, [catPayload, meta]);
 
   const creatorDisplayName = useMemo(() => {
     const metaCreator = meta?.creatorName?.trim();
     if (metaCreator) return metaCreator;
-    const payloadCreator = typeof (catPayload?.params as Record<string, unknown> | undefined)?.creatorName === "string"
-      ? ((catPayload?.params as Record<string, unknown>).creatorName as string).trim()
-      : "";
+    const payloadCreator =
+      typeof (catPayload?.params as Record<string, unknown> | undefined)
+        ?.creatorName === "string"
+        ? (
+            (catPayload?.params as Record<string, unknown>)
+              .creatorName as string
+          ).trim()
+        : "";
     return payloadCreator || null;
   }, [catPayload, meta]);
 
@@ -619,10 +699,16 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
-        <p className="text-xs uppercase tracking-widest text-amber-200/90">Shared Cat Viewer</p>
-        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">{catDisplayName}</h1>
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">
+          Shared Cat Viewer
+        </p>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">
+          {catDisplayName}
+        </h1>
         <p className="mt-3 max-w-2xl text-sm text-neutral-200/85 sm:text-base">
-          {creatorDisplayName ? `Created by ${creatorDisplayName}` : "Shared from the cat builder pipeline"}
+          {creatorDisplayName
+            ? `Created by ${creatorDisplayName}`
+            : "Shared from the cat builder pipeline"}
           {createdDisplay ? ` • ${createdDisplay}` : null}
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-200/80">
@@ -700,9 +786,13 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                   <div className="flex items-center gap-2">
                     <SparklesIcon size={16} className="text-primary" />
                     <div>
-                      <h2 className="text-sm font-semibold text-foreground">Trait Breakdown</h2>
+                      <h2 className="text-sm font-semibold text-foreground">
+                        Trait Breakdown
+                      </h2>
                       <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-                        {traitRows.length > 0 ? `${traitRows.length} trait${traitRows.length !== 1 ? "s" : ""}` : "No traits available"}
+                        {traitRows.length > 0
+                          ? `${traitRows.length} trait${traitRows.length !== 1 ? "s" : ""}`
+                          : "No traits available"}
                       </p>
                     </div>
                   </div>
@@ -710,18 +800,56 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                     size={16}
                     className={cn(
                       "text-muted-foreground transition-transform",
-                      traitsOpen ? "rotate-180" : "rotate-0"
+                      traitsOpen ? "rotate-180" : "rotate-0",
                     )}
                   />
                 </button>
                 <div
                   className={cn(
                     "grid overflow-hidden transition-all duration-300",
-                    traitsOpen ? "mt-4 max-h-[9999px] gap-2" : "max-h-0 gap-0"
+                    traitsOpen ? "mt-4 max-h-[9999px] gap-2" : "max-h-0 gap-0",
                   )}
                 >
-                  {traitsOpen && traitRows.map((row) => {
-                    if (row.type === "darkForest") {
+                  {traitsOpen &&
+                    traitRows.map((row) => {
+                      if (row.type === "darkForest") {
+                        return (
+                          <div
+                            key={row.label}
+                            className="flex flex-col gap-1 rounded-xl border border-border/30 bg-background/60 px-3 py-2"
+                          >
+                            <dt className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
+                              {row.label}
+                            </dt>
+                            <dd className="flex items-center justify-between font-mono text-xs text-foreground sm:text-sm">
+                              <span>Enabled</span>
+                              <button
+                                type="button"
+                                aria-pressed={showDarkForestTint}
+                                aria-label="Toggle dark forest tint"
+                                onClick={() =>
+                                  setShowDarkForestTint((prev) => !prev)
+                                }
+                                className={cn(
+                                  "relative inline-flex h-6 w-11 items-center rounded-full border border-border/40 bg-background/70 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40",
+                                  showDarkForestTint &&
+                                    "border-primary/60 bg-primary/80",
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "inline-block h-4 w-4 transform rounded-full bg-background shadow-sm transition-transform",
+                                    showDarkForestTint
+                                      ? "translate-x-5"
+                                      : "translate-x-1",
+                                  )}
+                                />
+                              </button>
+                            </dd>
+                          </div>
+                        );
+                      }
+
                       return (
                         <div
                           key={row.label}
@@ -730,46 +858,16 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                           <dt className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
                             {row.label}
                           </dt>
-                          <dd className="flex items-center justify-between font-mono text-xs text-foreground sm:text-sm">
-                            <span>Enabled</span>
-                            <button
-                              type="button"
-                              aria-pressed={showDarkForestTint}
-                              aria-label="Toggle dark forest tint"
-                              onClick={() => setShowDarkForestTint((prev) => !prev)}
-                              className={cn(
-                                "relative inline-flex h-6 w-11 items-center rounded-full border border-border/40 bg-background/70 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40",
-                                showDarkForestTint && "border-primary/60 bg-primary/80"
-                              )}
-                            >
-                              <span
-                                className={cn(
-                                  "inline-block h-4 w-4 transform rounded-full bg-background shadow-sm transition-transform",
-                                  showDarkForestTint ? "translate-x-5" : "translate-x-1"
-                                )}
-                              />
-                            </button>
+                          <dd className="font-mono text-xs text-foreground sm:text-sm break-words">
+                            {row.value}
                           </dd>
                         </div>
                       );
-                    }
-
-                    return (
-                      <div
-                        key={row.label}
-                        className="flex flex-col gap-1 rounded-xl border border-border/30 bg-background/60 px-3 py-2"
-                      >
-                        <dt className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                          {row.label}
-                        </dt>
-                        <dd className="font-mono text-xs text-foreground sm:text-sm break-words">
-                          {row.value}
-                        </dd>
-                      </div>
-                    );
-                  })}
+                    })}
                   {traitsOpen && traitRows.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No trait information available.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No trait information available.
+                    </p>
                   )}
                 </div>
               </div>
@@ -784,7 +882,9 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                 className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/70 px-4 py-3 text-left transition hover:bg-background"
               >
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">Sprite Variations</h3>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Sprite Variations
+                  </h3>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
                     {spriteVariantsSubtitle}
                   </p>
@@ -793,7 +893,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                   size={16}
                   className={cn(
                     "text-muted-foreground transition-transform",
-                    spriteVariantsOpen ? "rotate-180" : "rotate-0"
+                    spriteVariantsOpen ? "rotate-180" : "rotate-0",
                   )}
                 />
               </button>
@@ -802,17 +902,23 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                   "grid overflow-hidden transition-all duration-300",
                   spriteVariantsOpen
                     ? "mt-4 max-h-[9999px] gap-4 md:grid-cols-2 xl:grid-cols-3"
-                    : "max-h-0 gap-0"
+                    : "max-h-0 gap-0",
                 )}
               >
-                {spriteVariantsOpen && spriteVariants.length === 0 && spriteVariantsLoading && (
-                  <p className="col-span-full text-sm text-muted-foreground">Rendering preview sprites…</p>
-                )}
-                {spriteVariantsOpen && !spriteVariantsLoading && spriteVariants.length === 0 && (
-                  <p className="col-span-full text-sm text-muted-foreground">
-                    Sprite previews unavailable for this cat.
-                  </p>
-                )}
+                {spriteVariantsOpen &&
+                  spriteVariants.length === 0 &&
+                  spriteVariantsLoading && (
+                    <p className="col-span-full text-sm text-muted-foreground">
+                      Rendering preview sprites…
+                    </p>
+                  )}
+                {spriteVariantsOpen &&
+                  !spriteVariantsLoading &&
+                  spriteVariants.length === 0 && (
+                    <p className="col-span-full text-sm text-muted-foreground">
+                      Sprite previews unavailable for this cat.
+                    </p>
+                  )}
                 {spriteVariantsOpen &&
                   spriteVariants.map((variant) => (
                     <div
@@ -820,8 +926,12 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                       className="rounded-2xl border border-border/40 bg-background/70 p-4"
                     >
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-foreground">{variant.name}</p>
-                        <span className="text-xs text-muted-foreground">#{variant.spriteNumber}</span>
+                        <p className="text-sm font-semibold text-foreground">
+                          {variant.name}
+                        </p>
+                        <span className="text-xs text-muted-foreground">
+                          #{variant.spriteNumber}
+                        </span>
                       </div>
                       <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
                         <Image
@@ -835,7 +945,12 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                       </div>
                       <button
                         type="button"
-                        onClick={() => handleCopyVariantSprite(variant.dataUrl, `${variant.name || "sprite"}.png`)}
+                        onClick={() =>
+                          handleCopyVariantSprite(
+                            variant.dataUrl,
+                            `${variant.name || "sprite"}.png`,
+                          )
+                        }
                         className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary"
                       >
                         <CopyIcon size={12} /> Copy sprite
@@ -844,7 +959,6 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                   ))}
               </div>
             </div>
-
           </div>
         </div>
       )}
@@ -852,7 +966,10 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/40 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
         <div>
           <span className="font-medium text-foreground">Need more cats?</span>
-          <p className="text-xs text-muted-foreground">Roll a new cat and check the history page for every saved generation.</p>
+          <p className="text-xs text-muted-foreground">
+            Roll a new cat and check the history page for every saved
+            generation.
+          </p>
         </div>
         <div className="flex gap-2">
           <Link
@@ -874,7 +991,12 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
 }
 
 function formatValue(value: unknown): string {
-  if (value === undefined || value === null || value === "" || value === "none") {
+  if (
+    value === undefined ||
+    value === null ||
+    value === "" ||
+    value === "none"
+  ) {
     return "None";
   }
   if (typeof value === "boolean") {

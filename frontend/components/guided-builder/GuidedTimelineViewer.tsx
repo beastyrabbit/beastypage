@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { Loader2 } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
-
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { cn } from "@/lib/utils";
+import type { CatParams } from "@/lib/cat-v3/types";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
-import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
-import type { CatGeneratorApi } from "@/components/cat-builder/types";
+import { cn } from "@/lib/utils";
 
 type StepId =
   | "colour"
@@ -61,7 +60,6 @@ interface MapperRecord {
   created?: number;
 }
 
-
 type GuidedTimelineViewerProps = {
   slug?: string | null;
   encoded?: string | null;
@@ -69,20 +67,31 @@ type GuidedTimelineViewerProps = {
 
 const PREVIEW_SIZE = 420;
 
-export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProps) {
+export function GuidedTimelineViewer({
+  slug,
+  encoded,
+}: GuidedTimelineViewerProps) {
   const mapperRecord = useQuery(
     api.mapper.getBySlug,
-    slug ? { slugOrId: slug } : "skip"
+    slug ? { slugOrId: slug } : "skip",
   ) as MapperRecord | null | undefined;
 
   const [payload, setPayload] = useState<TimelinePayload | null>(null);
   const [activeIndex, setActiveIndex] = useState<number>(-1);
   const [activeImage, setActiveImage] = useState<string | null>(null);
-  const [timelinePreviews, setTimelinePreviews] = useState<Record<number, string>>({});
+  const [timelinePreviews, setTimelinePreviews] = useState<
+    Record<number, string>
+  >({});
   const [rendererReady, setRendererReady] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState<string | null>("Loading timeline…");
+  const [loadingMessage, setLoadingMessage] = useState<string | null>(
+    "Loading timeline…",
+  );
   const [error, setError] = useState<string | null>(null);
-  const [meta, setMeta] = useState<{ catName?: string | null; creatorName?: string | null; created?: number | null }>({});
+  const [meta, setMeta] = useState<{
+    catName?: string | null;
+    creatorName?: string | null;
+    created?: number | null;
+  }>({});
   const defaultCreatorName = useDefaultCreatorName();
   const [catNameDraft, setCatNameDraft] = useState("");
   const [creatorNameDraft, setCreatorNameDraft] = useState("");
@@ -107,7 +116,9 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
     let cancelled = false;
     (async () => {
       try {
-        const { default: generator } = (await import("@/lib/single-cat/catGeneratorV3")) as {
+        const { default: generator } = (await import(
+          "@/lib/single-cat/catGeneratorV3"
+        )) as {
           default: CatGeneratorApi;
         };
         if (!cancelled) {
@@ -151,9 +162,16 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
           created: mapperRecord.created ?? null,
         });
         setCatNameDraft((mapperRecord.catName ?? "").trim());
-        setCreatorNameDraft((mapperRecord.creatorName ?? "").trim() || defaultCreatorName);
+        setCreatorNameDraft(
+          (mapperRecord.creatorName ?? "").trim() || defaultCreatorName,
+        );
         const locked = metaLocked;
-        setMetaSaved(locked || Boolean(mapperRecord.catName?.trim() || mapperRecord.creatorName?.trim()));
+        setMetaSaved(
+          locked ||
+            Boolean(
+              mapperRecord.catName?.trim() || mapperRecord.creatorName?.trim(),
+            ),
+        );
         setLoadingMessage(null);
       } catch (err) {
         console.error("Invalid timeline payload", err);
@@ -167,7 +185,9 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
     if (mapperRecord) {
       if (!metaSaved) {
         setCatNameDraft((mapperRecord.catName ?? "").trim());
-        setCreatorNameDraft((mapperRecord.creatorName ?? "").trim() || defaultCreatorName);
+        setCreatorNameDraft(
+          (mapperRecord.creatorName ?? "").trim() || defaultCreatorName,
+        );
       }
     } else if (!mapperRecord && !slug) {
       if (!metaSaved) {
@@ -182,14 +202,14 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
     if (!encoded) return;
     try {
       const decoded = decodeSharePayload(encoded);
-    if (!decoded || decoded.mode !== "wizard-timeline") {
-      throw new Error("Invalid payload");
-    }
-    setPayload(decoded);
-    setMeta({});
-    setMetaSaved(false);
-    setLoadingMessage(null);
-  } catch (err) {
+      if (!decoded || decoded.mode !== "wizard-timeline") {
+        throw new Error("Invalid payload");
+      }
+      setPayload(decoded);
+      setMeta({});
+      setMetaSaved(false);
+      setLoadingMessage(null);
+    } catch (err) {
       console.error("Failed to decode payload", err);
       setError("The provided share data is invalid or corrupted.");
       setLoadingMessage(null);
@@ -231,7 +251,8 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
     if (!generator) return;
 
     const index = activeIndex >= 0 ? activeIndex : payload.steps.length - 1;
-    const params = index >= 0 ? payload.steps[index]?.params : payload.finalParams;
+    const params =
+      index >= 0 ? payload.steps[index]?.params : payload.finalParams;
     if (!params) return;
 
     let cancelled = false;
@@ -264,7 +285,10 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
     const params = activeStep?.params ?? payload?.finalParams;
     if (!params) return [];
     const entries: Array<[string, string]> = [
-      ["Pose", params.spriteNumber !== undefined ? `Pose ${params.spriteNumber}` : "—"],
+      [
+        "Pose",
+        params.spriteNumber !== undefined ? `Pose ${params.spriteNumber}` : "—",
+      ],
       ["Pattern", params.peltName ?? "—"],
       ["Base Colour", params.colour ?? "—"],
       ["Eye Colour", params.eyeColour ?? "—"],
@@ -276,8 +300,12 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
       ["Points", params.points ?? "none"],
       ["Vitiligo", params.vitiligo ?? "none"],
     ];
-    const accessories = params.accessories ?? (params.accessory ? [params.accessory] : []);
-    entries.push(["Accessories", accessories.length ? accessories.join(", ") : "none"]);
+    const accessories =
+      params.accessories ?? (params.accessory ? [params.accessory] : []);
+    entries.push([
+      "Accessories",
+      accessories.length ? accessories.join(", ") : "none",
+    ]);
     const scars = params.scars ?? (params.scar ? [params.scar] : []);
     entries.push(["Scars", scars.length ? scars.join(", ") : "none"]);
     if (params.isTortie && Array.isArray(params.tortie)) {
@@ -297,10 +325,10 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
   const recordId = mapperRecord?.id ?? null;
   const allowMetaEdit = Boolean(
     recordId &&
-    slug &&
-    !metaSaved &&
-    !metaLocked &&
-    (!mapperRecord?.catName?.trim() || !mapperRecord?.creatorName?.trim())
+      slug &&
+      !metaSaved &&
+      !metaLocked &&
+      (!mapperRecord?.catName?.trim() || !mapperRecord?.creatorName?.trim()),
   );
 
   const handleMetaSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -351,7 +379,10 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
       <div className="mx-auto max-w-2xl rounded-3xl border border-red-500/40 bg-red-500/10 p-8 text-red-100">
         <h1 className="text-2xl font-semibold">Timeline unavailable</h1>
         <p className="mt-3 text-sm">{error}</p>
-        <Link href="/guided-builder" className="mt-5 inline-flex items-center gap-2 rounded-xl border border-red-500/50 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/20">
+        <Link
+          href="/guided-builder"
+          className="mt-5 inline-flex items-center gap-2 rounded-xl border border-red-500/50 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/20"
+        >
           <RefreshIcon size={16} />
           Back to builder
         </Link>
@@ -365,7 +396,9 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
     <div className="grid gap-6 lg:grid-cols-[20rem,1fr]">
       <aside className="rounded-3xl border border-slate-800 bg-slate-950/70 p-6">
         <header className="space-y-3">
-          <p className="text-xs uppercase tracking-wide text-neutral-400">Guided tour</p>
+          <p className="text-xs uppercase tracking-wide text-neutral-400">
+            Guided tour
+          </p>
           <h1 className="text-2xl font-semibold text-white">Timeline viewer</h1>
           <p className="text-sm text-neutral-300">
             Step back through each decision and export the final sprite.
@@ -390,7 +423,7 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
                   type="button"
                   className={cn(
                     "flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/50 p-3 text-left transition hover:border-amber-400/60",
-                    active && "border-amber-400 bg-amber-500/10 text-amber-100"
+                    active && "border-amber-400 bg-amber-500/10 text-amber-100",
                   )}
                   onClick={() => setActiveIndex(index)}
                 >
@@ -412,8 +445,12 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
                     )}
                   </div>
                   <div className="flex-1">
-                    <div className="text-sm font-semibold">{step.title ?? formatName(step.id)}</div>
-                    <p className="line-clamp-2 text-xs text-neutral-300/80">{step.summary ?? "—"}</p>
+                    <div className="text-sm font-semibold">
+                      {step.title ?? formatName(step.id)}
+                    </div>
+                    <p className="line-clamp-2 text-xs text-neutral-300/80">
+                      {step.summary ?? "—"}
+                    </p>
                   </div>
                 </button>
               );
@@ -450,8 +487,14 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
             </div>
             <div className="flex w-full flex-col gap-3 lg:w-60">
               <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-neutral-200">
-                <div className="text-base font-semibold text-white">{displayName}</div>
-                {displayCreator ? <div className="text-xs text-neutral-300">by {displayCreator}</div> : null}
+                <div className="text-base font-semibold text-white">
+                  {displayName}
+                </div>
+                {displayCreator ? (
+                  <div className="text-xs text-neutral-300">
+                    by {displayCreator}
+                  </div>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -486,50 +529,69 @@ export function GuidedTimelineViewer({ slug, encoded }: GuidedTimelineViewerProp
               </button>
             </div>
           </div>
-      </section>
-
-      {allowMetaEdit && (
-        <section className="rounded-3xl border border-slate-800 bg-slate-950/70 p-6">
-          <h3 className="text-sm font-semibold text-neutral-200">Name this cat</h3>
-          <p className="mt-1 text-xs text-neutral-400">Set a display name and creator credit for history. This can only be done once.</p>
-          <form className="mt-4 grid gap-3 sm:grid-cols-[1fr,1fr,auto]" onSubmit={handleMetaSubmit}>
-            <input
-              type="text"
-              value={catNameDraft}
-              onChange={(event) => setCatNameDraft(event.target.value)}
-              placeholder="Cat name"
-              className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-neutral-100 focus:border-amber-400 focus:outline-none"
-              maxLength={60}
-            />
-            <input
-              type="text"
-              value={creatorNameDraft}
-              onChange={(event) => setCreatorNameDraft(event.target.value)}
-              placeholder="Creator"
-              className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-neutral-100 focus:border-amber-400 focus:outline-none"
-              maxLength={60}
-            />
-            <button
-              type="submit"
-              disabled={metaSaving}
-              className="inline-flex items-center justify-center rounded-xl border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {metaSaving ? "Saving…" : "Save to history"}
-            </button>
-          </form>
         </section>
-      )}
 
-      <section className="rounded-3xl border border-slate-800 bg-slate-950/70 p-6">
-        <header className="mb-6 border-b border-slate-800 pb-4">
-          <h2 className="text-xl font-semibold text-white">Traits for this step</h2>
-          {activeStep?.summary && <p className="mt-1 text-sm text-neutral-300">{activeStep.summary}</p>}
+        {allowMetaEdit && (
+          <section className="rounded-3xl border border-slate-800 bg-slate-950/70 p-6">
+            <h3 className="text-sm font-semibold text-neutral-200">
+              Name this cat
+            </h3>
+            <p className="mt-1 text-xs text-neutral-400">
+              Set a display name and creator credit for history. This can only
+              be done once.
+            </p>
+            <form
+              className="mt-4 grid gap-3 sm:grid-cols-[1fr,1fr,auto]"
+              onSubmit={handleMetaSubmit}
+            >
+              <input
+                type="text"
+                value={catNameDraft}
+                onChange={(event) => setCatNameDraft(event.target.value)}
+                placeholder="Cat name"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-neutral-100 focus:border-amber-400 focus:outline-none"
+                maxLength={60}
+              />
+              <input
+                type="text"
+                value={creatorNameDraft}
+                onChange={(event) => setCreatorNameDraft(event.target.value)}
+                placeholder="Creator"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-neutral-100 focus:border-amber-400 focus:outline-none"
+                maxLength={60}
+              />
+              <button
+                type="submit"
+                disabled={metaSaving}
+                className="inline-flex items-center justify-center rounded-xl border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {metaSaving ? "Saving…" : "Save to history"}
+              </button>
+            </form>
+          </section>
+        )}
+
+        <section className="rounded-3xl border border-slate-800 bg-slate-950/70 p-6">
+          <header className="mb-6 border-b border-slate-800 pb-4">
+            <h2 className="text-xl font-semibold text-white">
+              Traits for this step
+            </h2>
+            {activeStep?.summary && (
+              <p className="mt-1 text-sm text-neutral-300">
+                {activeStep.summary}
+              </p>
+            )}
           </header>
           <table className="w-full table-fixed text-sm text-neutral-300">
             <tbody>
               {infoRows.map(([label, value]) => (
-                <tr key={label} className="border-b border-slate-800/80 last:border-none">
-                  <th className="w-40 py-2 pr-4 text-left font-medium text-neutral-400">{label}</th>
+                <tr
+                  key={label}
+                  className="border-b border-slate-800/80 last:border-none"
+                >
+                  <th className="w-40 py-2 pr-4 text-left font-medium text-neutral-400">
+                    {label}
+                  </th>
                   <td className="py-2 text-white">{formatName(value)}</td>
                 </tr>
               ))}
@@ -549,7 +611,10 @@ function decodeSharePayload(encoded: string): TimelinePayload {
   throw new Error("Base64 decoding unavailable in this environment");
 }
 
-async function renderParams(generator: CatGeneratorApi, params: CatParams): Promise<string> {
+async function renderParams(
+  generator: CatGeneratorApi,
+  params: CatParams,
+): Promise<string> {
   const result = await generator.generateCat({
     ...params,
     spriteNumber: params.spriteNumber,
@@ -573,10 +638,12 @@ async function renderParams(generator: CatGeneratorApi, params: CatParams): Prom
 function formatName(value: unknown): string {
   if (value === null || value === undefined) return "None";
   if (typeof value === "number") return `#${value}`;
-  return String(value)
-    .replace(/[_-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase()) || "None";
+  return (
+    String(value)
+      .replace(/[_-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase()) || "None"
+  );
 }

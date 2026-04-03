@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { ArrowUpRight, ChevronLeft, Trees } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Trees, ChevronLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 import LockIcon from "@/components/ui/lock-icon";
 import RightChevron from "@/components/ui/right-chevron";
 import { encodeCatShare } from "@/lib/catShare";
@@ -33,25 +33,32 @@ type HistoryAncestryTreeCardProps = {
 };
 
 function getPreviewUrlFromParams(params: Record<string, unknown>): string {
-  const tortieSlots = params?.tortie as Array<Record<string, unknown> | null> | undefined;
+  const tortieSlots = params?.tortie as
+    | Array<Record<string, unknown> | null>
+    | undefined;
   const encoded = encodeCatShare({
     params,
     accessorySlots: (params?.accessories as string[]) ?? [],
     scarSlots: (params?.scars as string[]) ?? [],
     tortieSlots: tortieSlots ?? [],
     counts: {
-      accessories: ((params?.accessories as string[])?.length ?? 0),
-      scars: ((params?.scars as string[])?.length ?? 0),
-      tortie: (tortieSlots?.length ?? 0),
+      accessories: (params?.accessories as string[])?.length ?? 0,
+      scars: (params?.scars as string[])?.length ?? 0,
+      tortie: tortieSlots?.length ?? 0,
     },
   });
   return `/api/preview/_?cat=${encodeURIComponent(encoded)}`;
 }
 
-export function HistoryAncestryTreeCard({ item, onPreview }: HistoryAncestryTreeCardProps) {
+export function HistoryAncestryTreeCard({
+  item,
+  onPreview,
+}: HistoryAncestryTreeCardProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const totalCats = item.previewCats.length;
-  const safeIndex = totalCats ? ((activeIndex % totalCats) + totalCats) % totalCats : 0;
+  const safeIndex = totalCats
+    ? ((activeIndex % totalCats) + totalCats) % totalCats
+    : 0;
   const activeCat = totalCats ? item.previewCats[safeIndex] : null;
 
   useEffect(() => {
@@ -74,7 +81,9 @@ export function HistoryAncestryTreeCard({ item, onPreview }: HistoryAncestryTree
 
   const cardTitle = item.title || "Ancestry Tree";
   const creator = item.creator;
-  const activePreviewUrl = activeCat ? getPreviewUrlFromParams(activeCat.params) : null;
+  const activePreviewUrl = activeCat
+    ? getPreviewUrlFromParams(activeCat.params)
+    : null;
   const activeDisplayName = activeCat?.name || cardTitle;
   const href = `/ancestry-tree/${item.slug}`;
   const generations = item.depth + 1;
@@ -87,7 +96,10 @@ export function HistoryAncestryTreeCard({ item, onPreview }: HistoryAncestryTree
           Tree
         </span>
         {item.hasPassword && (
-          <span className="absolute right-3 top-3 z-10" title="Password protected">
+          <span
+            className="absolute right-3 top-3 z-10"
+            title="Password protected"
+          >
             <LockIcon size={16} className="text-amber-400" />
           </span>
         )}
@@ -114,7 +126,8 @@ export function HistoryAncestryTreeCard({ item, onPreview }: HistoryAncestryTree
         <button
           type="button"
           onClick={() => {
-            if (activePreviewUrl) onPreview(activeDisplayName, activePreviewUrl);
+            if (activePreviewUrl)
+              onPreview(activeDisplayName, activePreviewUrl);
           }}
           className="flex h-full w-full items-center justify-center"
           disabled={!activePreviewUrl}
@@ -142,11 +155,17 @@ export function HistoryAncestryTreeCard({ item, onPreview }: HistoryAncestryTree
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span>{item.catCount} cats</span>
           <span className="text-white/20">•</span>
-          <span>{generations} gen{generations !== 1 ? "s" : ""}</span>
+          <span>
+            {generations} gen{generations !== 1 ? "s" : ""}
+          </span>
         </div>
-        {creator && <p className="text-xs text-muted-foreground">by {creator}</p>}
+        {creator && (
+          <p className="text-xs text-muted-foreground">by {creator}</p>
+        )}
         {item.created && (
-          <p className="text-xs text-muted-foreground/80">{new Date(item.created).toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground/80">
+            {new Date(item.created).toLocaleString()}
+          </p>
         )}
       </div>
 
