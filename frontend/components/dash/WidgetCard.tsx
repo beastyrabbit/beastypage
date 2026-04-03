@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowRight, GripVertical, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import Link from "next/link";
 import type { ToolWidgetMeta } from "@/lib/dash/types";
+import { cn } from "@/lib/utils";
 
 interface WidgetCardProps {
   tool: ToolWidgetMeta;
@@ -14,7 +14,12 @@ interface WidgetCardProps {
   index: number;
 }
 
-export function WidgetCard({ tool, editing, onRemove, index }: WidgetCardProps) {
+export function WidgetCard({
+  tool,
+  editing,
+  onRemove,
+  index,
+}: WidgetCardProps) {
   const {
     attributes,
     listeners,
@@ -39,7 +44,8 @@ export function WidgetCard({ tool, editing, onRemove, index }: WidgetCardProps) 
       className={cn(
         "glass-card relative flex h-full flex-col gap-3 p-5 overflow-hidden group animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards",
         // Only apply hover transitions when NOT dragging
-        !isDragging && "transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:border-emerald-400/30",
+        !isDragging &&
+          "transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:border-emerald-400/30",
         isDragging && "opacity-50 z-50 shadow-2xl",
       )}
     >
@@ -88,7 +94,11 @@ export function WidgetCard({ tool, editing, onRemove, index }: WidgetCardProps) 
           <span className="mt-auto inline-flex items-center gap-1 text-xs font-bold text-emerald-400 transition-transform group-hover:translate-x-2 pt-2">
             Open <ArrowRight className="size-3" />
           </span>
-          <Link href={tool.href} className="absolute inset-0 z-20" aria-label={`Open ${tool.title}`} />
+          <Link
+            href={tool.href}
+            className="absolute inset-0 z-20"
+            aria-label={`Open ${tool.title}`}
+          />
         </>
       )}
     </div>

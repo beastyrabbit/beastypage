@@ -9,36 +9,40 @@
 }
 
 .family-chart-wrapper .f3 {
-  background: transparent !important;
+  background: transparent;
 }
 
 /* Card styling */
 .family-chart-wrapper .f3 .card {
-  background: var(--f3-card-bg) !important;
-  border: 2px solid var(--f3-card-border) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+  background: var(--f3-card-bg);
+  border: 2px solid var(--f3-card-border);
+  border-radius: 12px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.3),
+    0 2px 4px -1px rgba(0, 0, 0, 0.2);
   overflow: hidden;
-  transition: border-color 0.2s, transform 0.2s !important;
+  transition:
+    border-color 0.2s,
+    transform 0.2s;
 }
 
 .family-chart-wrapper .f3 .card:hover {
-  border-color: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.2);
   transform: scale(1.02);
 }
 
 .family-chart-wrapper .f3 .card.main {
-  border-color: #f59e0b !important;
+  border-color: #f59e0b;
 }
 
 /* Make card images pixelated for cat sprites */
 .family-chart-wrapper .f3 .card img {
-  image-rendering: pixelated !important;
+  image-rendering: pixelated;
 }
 
 /* Square image container with rounded corners */
 .family-chart-wrapper .f3 .card .card-image-cont {
-  border-radius: 8px !important;
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -109,18 +113,18 @@
 
 /* Connection lines */
 .family-chart-wrapper .f3 .link {
-  stroke: var(--f3-line-color) !important;
-  stroke-width: 2px !important;
+  stroke: var(--f3-line-color);
+  stroke-width: 2px;
 }
 
 .family-chart-wrapper .f3 .link.spouse {
-  stroke: #ec4899 !important;
-  stroke-dasharray: 4, 4 !important;
+  stroke: #ec4899;
+  stroke-dasharray: 4, 4;
 }
 
 .family-chart-wrapper .f3 .link.highlight {
-  stroke: var(--f3-line-highlight) !important;
-  stroke-width: 3px !important;
+  stroke: var(--f3-line-highlight);
+  stroke-width: 3px;
 }
 
 /* Hide default card image (we use custom HTML) */
@@ -130,24 +134,26 @@
 
 /* SVG text styling */
 .family-chart-wrapper .f3 text {
-  fill: rgba(255, 255, 255, 0.8) !important;
-  font-family: inherit !important;
+  fill: rgba(255, 255, 255, 0.8);
+  font-family: inherit;
 }
 
 /* Path to main highlighting */
 .family-chart-wrapper .f3 .card.path-to-main {
-  border-color: #f59e0b !important;
+  border-color: #f59e0b;
 }
 
 .family-chart-wrapper .f3 .link.path-to-main {
-  stroke: #f59e0b !important;
-  stroke-width: 3px !important;
+  stroke: #f59e0b;
+  stroke-width: 3px;
 }
 
 /* Card action buttons */
 .family-chart-wrapper .cat-action-btn {
   opacity: 0;
-  transition: opacity 0.2s, transform 0.1s;
+  transition:
+    opacity 0.2s,
+    transform 0.1s;
 }
 
 .family-chart-wrapper .f3 .card:hover .cat-action-btn {
@@ -217,31 +223,31 @@
 /* Hide the library's built-in edit form (we use our sidebar instead) */
 .family-chart-wrapper .f3-form,
 .family-chart-wrapper .f3-edit-tree-form {
-  display: none !important;
+  display: none;
 }
 
 /* Style for placeholder cards (Add Son, Add Daughter, Add Spouse) */
 .family-chart-wrapper .f3 .card.f3-placeholder,
 .family-chart-wrapper .f3 .card[data-new-rel] {
-  background: rgba(99, 102, 241, 0.15) !important;
-  border: 2px dashed rgba(99, 102, 241, 0.5) !important;
-  border-radius: 12px !important;
+  background: rgba(99, 102, 241, 0.15);
+  border: 2px dashed rgba(99, 102, 241, 0.5);
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .family-chart-wrapper .f3 .card.f3-placeholder:hover,
 .family-chart-wrapper .f3 .card[data-new-rel]:hover {
-  background: rgba(99, 102, 241, 0.25) !important;
-  border-color: rgba(99, 102, 241, 0.8) !important;
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.8);
   transform: scale(1.05);
 }
 
 /* Placeholder card content styling */
 .family-chart-wrapper .f3 .card.f3-placeholder text,
 .family-chart-wrapper .f3 .card[data-new-rel] text {
-  fill: rgba(99, 102, 241, 0.9) !important;
-  font-weight: 600 !important;
+  fill: rgba(99, 102, 241, 0.9);
+  font-weight: 600;
 }
 
 /* Add button styling (the + icon that triggers add relative mode) */
@@ -279,7 +285,8 @@
 
 /* Animation for placeholder cards appearing */
 @keyframes placeholderPulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.8;
   }
   50% {
@@ -294,19 +301,19 @@
 
 /* Edit mode indicator on the current main card */
 .family-chart-wrapper .f3 .card.main.editing {
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5);
 }
 
 /* Spouse connection line when adding spouse */
 .family-chart-wrapper .f3 .link.spouse-placeholder {
-  stroke: rgba(99, 102, 241, 0.5) !important;
-  stroke-dasharray: 8, 4 !important;
+  stroke: rgba(99, 102, 241, 0.5);
+  stroke-dasharray: 8, 4;
 }
 
 /* Child connection line when adding child */
 .family-chart-wrapper .f3 .link.child-placeholder {
-  stroke: rgba(99, 102, 241, 0.5) !important;
-  stroke-dasharray: 6, 3 !important;
+  stroke: rgba(99, 102, 241, 0.5);
+  stroke-dasharray: 6, 3;
 }
 
 /* ==========================================
@@ -333,7 +340,9 @@
   border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .slider-amber::-webkit-slider-thumb:hover {
@@ -353,7 +362,9 @@
   border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .slider-amber::-moz-range-thumb:hover {
@@ -373,5 +384,7 @@
 }
 
 .slider-amber:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3), 0 2px 6px rgba(245, 158, 11, 0.4);
+  box-shadow:
+    0 0 0 3px rgba(245, 158, 11, 0.3),
+    0 2px 6px rgba(245, 158, 11, 0.4);
 }

@@ -1,9 +1,20 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  rectSortingStrategy,
+  SortableContext,
+} from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
+import { useCallback, useMemo } from "react";
 import type { ToolWidgetMeta } from "@/lib/dash/types";
 import { WidgetCard } from "./WidgetCard";
 
@@ -15,7 +26,13 @@ interface WidgetGridProps {
   onReorder: (widgetIds: string[]) => void;
 }
 
-export function WidgetGrid({ widgets, editing, onAddClick, onRemove, onReorder }: WidgetGridProps) {
+export function WidgetGrid({
+  widgets,
+  editing,
+  onAddClick,
+  onRemove,
+  onReorder,
+}: WidgetGridProps) {
   // Require 5px of movement before starting a drag to prevent accidental drags
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -39,7 +56,11 @@ export function WidgetGrid({ widgets, editing, onAddClick, onRemove, onReorder }
   );
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
       <SortableContext items={widgetIds} strategy={rectSortingStrategy}>
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {widgets.map((tool, i) => (

@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Save, Loader2 } from "lucide-react";
-import XIcon from "@/components/ui/x-icon";
-import CopyIcon from "@/components/ui/copy-icon";
+import { Loader2, Save } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import CheckedIcon from "@/components/ui/checked-icon";
-import LockIcon from "@/components/ui/lock-icon";
+import CopyIcon from "@/components/ui/copy-icon";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
+import LockIcon from "@/components/ui/lock-icon";
+import XIcon from "@/components/ui/x-icon";
+import { api } from "@/convex/_generated/api";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 
 interface SaveTreeDialogProps {
@@ -16,7 +16,16 @@ interface SaveTreeDialogProps {
   currentCreator?: string;
   currentSlug: string;
   hasPassword?: boolean;
-  onSave: (name: string, creatorName: string, password?: string) => Promise<{ success: boolean; error?: string; slug?: string; isNew?: boolean }>;
+  onSave: (
+    name: string,
+    creatorName: string,
+    password?: string,
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    slug?: string;
+    isNew?: boolean;
+  }>;
   onClose: () => void;
 }
 
@@ -35,7 +44,9 @@ export function SaveTreeDialog({
     creatorName: currentCreator || defaultCreatorName,
   });
   const [name, setName] = useState(initialValuesRef.current.name);
-  const [creatorName, setCreatorName] = useState(initialValuesRef.current.creatorName);
+  const [creatorName, setCreatorName] = useState(
+    initialValuesRef.current.creatorName,
+  );
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -79,8 +90,13 @@ export function SaveTreeDialog({
 
     try {
       // Pass password for verification (existing tree) or newPassword for setting (new tree)
-      const passwordToSend = slugExists && treeHasPassword ? password : newPassword || undefined;
-      const result = await onSave(name.trim(), creatorName.trim(), passwordToSend);
+      const passwordToSend =
+        slugExists && treeHasPassword ? password : newPassword || undefined;
+      const result = await onSave(
+        name.trim(),
+        creatorName.trim(),
+        passwordToSend,
+      );
 
       if (!result.success) {
         if (result.error === "password_required") {
@@ -144,7 +160,10 @@ export function SaveTreeDialog({
             event.preventDefault();
             onClose();
           }
-          if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+          if (
+            (event.key === "Enter" || event.key === " ") &&
+            event.target === event.currentTarget
+          ) {
             event.preventDefault();
             onClose();
           }
@@ -170,7 +189,9 @@ export function SaveTreeDialog({
 
             {/* URL Display */}
             <div className="bg-white/5 rounded-lg p-3 text-left">
-              <p className="block text-xs text-muted-foreground mb-1">Share URL</p>
+              <p className="block text-xs text-muted-foreground mb-1">
+                Share URL
+              </p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 text-sm text-amber-400 truncate">
                   {getTreeUrl()}
@@ -228,7 +249,10 @@ export function SaveTreeDialog({
           event.preventDefault();
           onClose();
         }
-        if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+        if (
+          (event.key === "Enter" || event.key === " ") &&
+          event.target === event.currentTarget
+        ) {
           event.preventDefault();
           onClose();
         }
@@ -247,7 +271,10 @@ export function SaveTreeDialog({
 
         <div className="space-y-4">
           <div>
-            <label htmlFor="treeName" className="block text-sm font-medium mb-1">
+            <label
+              htmlFor="treeName"
+              className="block text-sm font-medium mb-1"
+            >
               Tree Name <span className="text-red-400">*</span>
             </label>
             <input
@@ -261,8 +288,12 @@ export function SaveTreeDialog({
           </div>
 
           <div>
-            <label htmlFor="creatorName" className="block text-sm font-medium mb-1">
-              Creator Name <span className="text-muted-foreground">(optional)</span>
+            <label
+              htmlFor="creatorName"
+              className="block text-sm font-medium mb-1"
+            >
+              Creator Name{" "}
+              <span className="text-muted-foreground">(optional)</span>
             </label>
             <input
               type="text"
@@ -278,7 +309,10 @@ export function SaveTreeDialog({
           {slugExists && treeHasPassword ? (
             // Tree exists and has password - need to enter it to overwrite
             <div>
-              <label htmlFor="password" className="flex items-center gap-2 text-sm font-medium mb-1">
+              <label
+                htmlFor="password"
+                className="flex items-center gap-2 text-sm font-medium mb-1"
+              >
                 <LockIcon size={14} className="text-amber-400" />
                 Password to Overwrite
                 <span className="text-red-400">*</span>
@@ -292,15 +326,20 @@ export function SaveTreeDialog({
                 className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm placeholder:text-muted-foreground focus:border-amber-500 focus:outline-none"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                This tree is password protected. Enter the password to update it.
+                This tree is password protected. Enter the password to update
+                it.
               </p>
             </div>
           ) : (
             // New tree or unprotected tree - offer to set a password
             <div>
-              <label htmlFor="newPassword" className="flex items-center gap-2 text-sm font-medium mb-1">
+              <label
+                htmlFor="newPassword"
+                className="flex items-center gap-2 text-sm font-medium mb-1"
+              >
                 <LockIcon size={14} />
-                Set Password <span className="text-muted-foreground">(optional)</span>
+                Set Password{" "}
+                <span className="text-muted-foreground">(optional)</span>
               </label>
               <input
                 type="password"
@@ -316,9 +355,7 @@ export function SaveTreeDialog({
             </div>
           )}
 
-          {error && (
-            <p className="text-sm text-red-400">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-400">{error}</p>}
 
           <div className="flex justify-end gap-3 pt-4">
             <button

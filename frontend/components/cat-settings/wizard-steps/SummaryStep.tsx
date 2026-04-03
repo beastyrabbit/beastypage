@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { cn } from "@/lib/utils";
 import CopyIcon from "@/components/ui/copy-icon";
+import { cn } from "@/lib/utils";
 import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
 import { WizardExampleCats } from "../WizardExampleCats";
 import type { WizardStepProps } from "./types";

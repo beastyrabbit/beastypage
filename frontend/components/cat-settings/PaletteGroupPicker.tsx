@@ -1,11 +1,15 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { cn } from "@/lib/utils";
-import { ADDITIONAL_PALETTES, patternToCssBackground } from "@/lib/palettes";
-import type { PaletteGroup, PaletteCategory, PatternDefinition } from "@/lib/palettes/types";
-import type { ExtendedMode } from "@/utils/singleCatVariants";
 import PaintIcon from "@/components/ui/paint-icon";
+import { ADDITIONAL_PALETTES, patternToCssBackground } from "@/lib/palettes";
+import type {
+  PaletteCategory,
+  PaletteGroup,
+  PatternDefinition,
+} from "@/lib/palettes/types";
+import { cn } from "@/lib/utils";
+import type { ExtendedMode } from "@/utils/singleCatVariants";
 
 // ---------------------------------------------------------------------------
 // Filter groups — mirrors the cat-color-palettes page
@@ -53,7 +57,12 @@ function MiniColorCard({
       title={`${name.replace(/_/g, " ")}${pattern ? ` (${pattern.type})` : ""}`}
     >
       {/* Detail overlay — only visible on hover (when scaled up) */}
-      <div className={cn("absolute inset-0 flex flex-col items-center justify-center opacity-0 transition-opacity group-hover/card:opacity-100", textColor)}>
+      <div
+        className={cn(
+          "absolute inset-0 flex flex-col items-center justify-center opacity-0 transition-opacity group-hover/card:opacity-100",
+          textColor,
+        )}
+      >
         <div className="text-[3px] font-bold uppercase leading-tight tracking-wide">
           {name.replace(/_/g, " ")}
         </div>
@@ -69,7 +78,9 @@ function MiniColorCard({
         <div className="absolute bottom-[1px] right-[1px]">
           <div
             className="size-[2px] rounded-full border border-white/30"
-            style={{ backgroundColor: `rgba(${screen[0]}, ${screen[1]}, ${screen[2]}, ${screen[3]})` }}
+            style={{
+              backgroundColor: `rgba(${screen[0]}, ${screen[1]}, ${screen[2]}, ${screen[3]})`,
+            }}
           />
         </div>
       )}
@@ -123,7 +134,13 @@ function PaletteCard({
           >
             {isSelected && (
               <svg className="size-3.5" viewBox="0 0 12 12" fill="none">
-                <path d="M3 6l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path
+                  d="M3 6l2 2 4-4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             )}
           </button>
@@ -165,7 +182,10 @@ interface PaletteGroupPickerProps {
   onChange: (next: ExtendedMode[]) => void;
 }
 
-export function PaletteGroupPicker({ selected, onChange }: PaletteGroupPickerProps) {
+export function PaletteGroupPicker({
+  selected,
+  onChange,
+}: PaletteGroupPickerProps) {
   const [activeFilter, setActiveFilter] = useState<FilterValue>("all");
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
@@ -198,7 +218,9 @@ export function PaletteGroupPicker({ selected, onChange }: PaletteGroupPickerPro
 
   // Counts
   const visibleCount = filteredPalettes.length;
-  const visibleSelectedCount = filteredPalettes.filter((p) => selectedSet.has(p.id as ExtendedMode)).length;
+  const visibleSelectedCount = filteredPalettes.filter((p) =>
+    selectedSet.has(p.id as ExtendedMode),
+  ).length;
 
   return (
     <div className="space-y-4">
@@ -260,10 +282,12 @@ export function PaletteGroupPicker({ selected, onChange }: PaletteGroupPickerPro
         </span>
         {selected.length > 0 ? (
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {selected.map((id) => {
-              const p = ADDITIONAL_PALETTES.find((pal) => pal.id === id);
-              return p?.label ?? id;
-            }).join(", ")}
+            {selected
+              .map((id) => {
+                const p = ADDITIONAL_PALETTES.find((pal) => pal.id === id);
+                return p?.label ?? id;
+              })
+              .join(", ")}
           </p>
         ) : (
           <p className="mt-0.5 text-xs text-muted-foreground/50">

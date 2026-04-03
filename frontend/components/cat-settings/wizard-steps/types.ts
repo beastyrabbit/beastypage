@@ -1,5 +1,9 @@
 import type { SingleCatPortableSettings } from "@/lib/portable-settings";
-import type { AfterlifeOption, ExtendedMode, LayerRange } from "@/utils/singleCatVariants";
+import type {
+  AfterlifeOption,
+  ExtendedMode,
+  LayerRange,
+} from "@/utils/singleCatVariants";
 
 /**
  * Props shared by every wizard step component.

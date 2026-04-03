@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
 import NextImage from "next/image";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ExtractedColor, RGB } from "@/lib/color-extraction/types";
 
@@ -20,7 +20,12 @@ interface ImageCanvasProps {
   selectedDotType: "dominant" | "accent" | null;
   highlightedDotIndex: number | null;
   highlightedDotType: "dominant" | "accent" | null;
-  onCrosshairMove: (index: number, x: number, y: number, type: "dominant" | "accent") => void;
+  onCrosshairMove: (
+    index: number,
+    x: number,
+    y: number,
+    type: "dominant" | "accent",
+  ) => void;
   onDotSelect: (index: number, type: "dominant" | "accent") => void;
 }
 
@@ -59,28 +64,28 @@ export function ImageCanvas({
     (index: number, x: number, y: number) => {
       onCrosshairMove(index, x, y, "dominant");
     },
-    [onCrosshairMove]
+    [onCrosshairMove],
   );
 
   const handleFamilyCrosshairMove = useCallback(
     (index: number, x: number, y: number) => {
       onCrosshairMove(index, x, y, "accent");
     },
-    [onCrosshairMove]
+    [onCrosshairMove],
   );
 
   const handleTopDotSelect = useCallback(
     (index: number) => {
       onDotSelect(index, "dominant");
     },
-    [onDotSelect]
+    [onDotSelect],
   );
 
   const handleFamilyDotSelect = useCallback(
     (index: number) => {
       onDotSelect(index, "accent");
     },
-    [onDotSelect]
+    [onDotSelect],
   );
 
   const handleDragStart = useCallback(() => {
@@ -114,10 +119,7 @@ export function ImageCanvas({
 
         {/* Spotlight overlay when hovering a color (but not when dragging) */}
         {hoveredColor && loadedImage && !isDragging && (
-          <SpotlightOverlay
-            image={loadedImage}
-            targetColor={hoveredColor}
-          />
+          <SpotlightOverlay image={loadedImage} targetColor={hoveredColor} />
         )}
 
         {/* Crosshairs for dominant colors */}
@@ -129,8 +131,12 @@ export function ImageCanvas({
             color={color.hex}
             index={index}
             type="dominant"
-            isSelected={selectedDotType === "dominant" && selectedDotIndex === index}
-            isHighlighted={highlightedDotType === "dominant" && highlightedDotIndex === index}
+            isSelected={
+              selectedDotType === "dominant" && selectedDotIndex === index
+            }
+            isHighlighted={
+              highlightedDotType === "dominant" && highlightedDotIndex === index
+            }
             containerRef={containerRef}
             imageElement={loadedImage}
             imageDimensions={imageDimensions}
@@ -150,8 +156,12 @@ export function ImageCanvas({
             color={color.hex}
             index={index}
             type="accent"
-            isSelected={selectedDotType === "accent" && selectedDotIndex === index}
-            isHighlighted={highlightedDotType === "accent" && highlightedDotIndex === index}
+            isSelected={
+              selectedDotType === "accent" && selectedDotIndex === index
+            }
+            isHighlighted={
+              highlightedDotType === "accent" && highlightedDotIndex === index
+            }
             containerRef={containerRef}
             imageElement={loadedImage}
             imageDimensions={imageDimensions}

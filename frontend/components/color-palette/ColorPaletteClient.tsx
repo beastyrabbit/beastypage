@@ -1,29 +1,34 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { toast } from "sonner";
-import { track } from "@/lib/analytics";
 import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import RefreshIcon from "@/components/ui/refresh-icon";
-
-import type { ExtractedColor, PaletteState, RGB } from "@/lib/color-extraction/types";
-import { extractColors, extractFamilyColors } from "@/lib/color-extraction/kmeans";
+import { track } from "@/lib/analytics";
+import { fetchColorNames } from "@/lib/color-extraction/color-names";
+import { rgbToHex, rgbToHsl } from "@/lib/color-extraction/color-utils";
 import {
-  loadImageFromFile,
-  loadImageFromUrl,
-  imageToDataUrl,
   getColorAtPosition,
   getScaledDimensions,
+  imageToDataUrl,
+  loadImageFromFile,
+  loadImageFromUrl,
 } from "@/lib/color-extraction/image-processing";
-import { rgbToHex, rgbToHsl } from "@/lib/color-extraction/color-utils";
-import { fetchColorNames } from "@/lib/color-extraction/color-names";
-
-import { ImageUploader } from "./ImageUploader";
+import {
+  extractColors,
+  extractFamilyColors,
+} from "@/lib/color-extraction/kmeans";
+import type {
+  ExtractedColor,
+  PaletteState,
+  RGB,
+} from "@/lib/color-extraction/types";
 import { ImageCanvas } from "./ImageCanvas";
-import { PaletteSliders } from "./PaletteSliders";
+import { ImageUploader } from "./ImageUploader";
+import { PaletteExport } from "./PaletteExport";
 import { PaletteGrid } from "./PaletteGrid";
 import { PaletteSettings } from "./PaletteSettings";
-import { PaletteExport } from "./PaletteExport";
+import { PaletteSliders } from "./PaletteSliders";
 
 const DEFAULT_BRIGHTNESS_FACTORS = [0.5, 0.75, 1.0, 1.25, 1.5];
 const DEFAULT_HUE_SHIFTS = [0, 10, 20, 30];
@@ -67,7 +72,11 @@ interface ColorPaletteClientProps {
   isExternalLoading?: boolean;
 }
 
-export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoading }: ColorPaletteClientProps) {
+export function ColorPaletteClient({
+  initialImageUrl,
+  toolbarLeft,
+  isExternalLoading,
+}: ColorPaletteClientProps) {
   const [state, setState] = useState<PaletteState>(INITIAL_STATE);
   const [selection, setSelection] = useState<SelectionState>(INITIAL_SELECTION);
   const extractionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -125,34 +134,35 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
   }, [initialImageUrl, handleImageLoad]);
 
   // Fetch color names from API and update state
-  const fetchAndUpdateColorNames = useCallback(async (
-    topColors: ExtractedColor[],
-    familyColors: ExtractedColor[]
-  ) => {
-    try {
-      // Combine all colors for name fetching
-      const allColors = [...topColors, ...familyColors];
-      const nameMap = await fetchColorNames(allColors);
+  const fetchAndUpdateColorNames = useCallback(
+    async (topColors: ExtractedColor[], familyColors: ExtractedColor[]) => {
+      try {
+        // Combine all colors for name fetching
+        const allColors = [...topColors, ...familyColors];
+        const nameMap = await fetchColorNames(allColors);
 
-      // Update colors with names - use passed-in arrays as source of truth
-      // to avoid stale state issues from async fetch
-      // nameMap keys are normalized: uppercase without # prefix
-      const normalizeHex = (hex: string) => hex.replace(/^#/, "").toUpperCase();
-      setState((prev) => ({
-        ...prev,
-        topColors: topColors.map((color) => ({
-          ...color,
-          name: nameMap.get(normalizeHex(color.hex)) || "Unknown",
-        })),
-        familyColors: familyColors.map((color) => ({
-          ...color,
-          name: nameMap.get(normalizeHex(color.hex)) || "Unknown",
-        })),
-      }));
-    } catch (error) {
-      console.error("Failed to fetch color names:", error);
-    }
-  }, []);
+        // Update colors with names - use passed-in arrays as source of truth
+        // to avoid stale state issues from async fetch
+        // nameMap keys are normalized: uppercase without # prefix
+        const normalizeHex = (hex: string) =>
+          hex.replace(/^#/, "").toUpperCase();
+        setState((prev) => ({
+          ...prev,
+          topColors: topColors.map((color) => ({
+            ...color,
+            name: nameMap.get(normalizeHex(color.hex)) || "Unknown",
+          })),
+          familyColors: familyColors.map((color) => ({
+            ...color,
+            name: nameMap.get(normalizeHex(color.hex)) || "Unknown",
+          })),
+        }));
+      } catch (error) {
+        console.error("Failed to fetch color names:", error);
+      }
+    },
+    [],
+  );
 
   // Extract colors function that handles both top and family colors
   const performExtraction = useCallback(() => {
@@ -174,7 +184,7 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
             k: state.familyColorCount,
             filterBlackWhite: state.filterBlackWhite,
           },
-          50
+          50,
         );
 
         setState((prev) => ({
@@ -187,7 +197,10 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
         hasExtractedRef.current = true;
         setSelection(INITIAL_SELECTION);
 
-        const familyMsg = familyColors.length > 0 ? ` and ${familyColors.length} family colors` : "";
+        const familyMsg =
+          familyColors.length > 0
+            ? ` and ${familyColors.length} family colors`
+            : "";
         toast.success(`Extracted ${topColors.length} top colors${familyMsg}`);
 
         // Fetch color names in the background (don't block UI)
@@ -196,14 +209,21 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
         setState((prev) => ({
           ...prev,
           isProcessing: false,
-          error: err instanceof Error ? err.message : "Failed to extract colors",
+          error:
+            err instanceof Error ? err.message : "Failed to extract colors",
         }));
         toast.error(
-          err instanceof Error ? err.message : "Failed to extract colors"
+          err instanceof Error ? err.message : "Failed to extract colors",
         );
       }
     });
-  }, [state.image, state.topColorCount, state.familyColorCount, state.filterBlackWhite, fetchAndUpdateColorNames]);
+  }, [
+    state.image,
+    state.topColorCount,
+    state.familyColorCount,
+    state.filterBlackWhite,
+    fetchAndUpdateColorNames,
+  ]);
 
   // Debounced extraction when sliders change
   const debouncedExtraction = useCallback(() => {
@@ -238,7 +258,7 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
     if (state.image && hasExtractedRef.current) {
       debouncedExtraction();
     }
-  }, [state.image, state.topColorCount, state.familyColorCount, state.filterBlackWhite, debouncedExtraction]);
+  }, [state.image, debouncedExtraction]);
 
   const handleBrightnessFactorsChange = useCallback((factors: number[]) => {
     setState((prev) => ({ ...prev, brightnessFactors: factors }));
@@ -302,19 +322,22 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
         }
       });
     },
-    [state.image]
+    [state.image],
   );
 
   // Handle dot selection (from clicking on dot or swatch)
-  const handleDotSelect = useCallback((index: number, type: "dominant" | "accent") => {
-    setSelection((prev) => {
-      // Toggle off if clicking the same one
-      if (prev.selectedDotIndex === index && prev.selectedDotType === type) {
-        return { ...prev, selectedDotIndex: null, selectedDotType: null };
-      }
-      return { ...prev, selectedDotIndex: index, selectedDotType: type };
-    });
-  }, []);
+  const handleDotSelect = useCallback(
+    (index: number, type: "dominant" | "accent") => {
+      setSelection((prev) => {
+        // Toggle off if clicking the same one
+        if (prev.selectedDotIndex === index && prev.selectedDotType === type) {
+          return { ...prev, selectedDotIndex: null, selectedDotType: null };
+        }
+        return { ...prev, selectedDotIndex: index, selectedDotType: type };
+      });
+    },
+    [],
+  );
 
   // Handle swatch hover (highlights corresponding dot)
   const handleDominantHover = useCallback((index: number | null, rgb?: RGB) => {
@@ -336,13 +359,19 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
   }, []);
 
   // Handle swatch selection
-  const handleDominantSelect = useCallback((index: number) => {
-    handleDotSelect(index, "dominant");
-  }, [handleDotSelect]);
+  const handleDominantSelect = useCallback(
+    (index: number) => {
+      handleDotSelect(index, "dominant");
+    },
+    [handleDotSelect],
+  );
 
-  const handleAccentSelect = useCallback((index: number) => {
-    handleDotSelect(index, "accent");
-  }, [handleDotSelect]);
+  const handleAccentSelect = useCallback(
+    (index: number) => {
+      handleDotSelect(index, "accent");
+    },
+    [handleDotSelect],
+  );
 
   const hasColors = state.topColors.length > 0;
 
@@ -442,8 +471,16 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
                   hueShifts={state.hueShifts}
                   title="Dominant Colors"
                   type="dominant"
-                  selectedIndex={selection.selectedDotType === "dominant" ? selection.selectedDotIndex : null}
-                  highlightedIndex={selection.highlightedDotType === "dominant" ? selection.highlightedDotIndex : null}
+                  selectedIndex={
+                    selection.selectedDotType === "dominant"
+                      ? selection.selectedDotIndex
+                      : null
+                  }
+                  highlightedIndex={
+                    selection.highlightedDotType === "dominant"
+                      ? selection.highlightedDotIndex
+                      : null
+                  }
                   onColorHover={handleDominantHover}
                   onColorSelect={handleDominantSelect}
                 />
@@ -455,8 +492,16 @@ export function ColorPaletteClient({ initialImageUrl, toolbarLeft, isExternalLoa
                     hueShifts={state.hueShifts}
                     title="Accent Colors"
                     type="accent"
-                    selectedIndex={selection.selectedDotType === "accent" ? selection.selectedDotIndex : null}
-                    highlightedIndex={selection.highlightedDotType === "accent" ? selection.highlightedDotIndex : null}
+                    selectedIndex={
+                      selection.selectedDotType === "accent"
+                        ? selection.selectedDotIndex
+                        : null
+                    }
+                    highlightedIndex={
+                      selection.highlightedDotType === "accent"
+                        ? selection.highlightedDotIndex
+                        : null
+                    }
                     onColorHover={handleAccentHover}
                     onColorSelect={handleAccentSelect}
                   />

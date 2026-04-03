@@ -34,7 +34,9 @@ function inlineMarkdown(text: string): string {
   const codeSpans: string[] = [];
   let out = text.replace(/`([^`]+)`/g, (_m, code: string) => {
     const idx = codeSpans.length;
-    codeSpans.push(`<code class="rounded bg-white/10 px-1 py-0.5 text-[0.85em]">${escapeHtml(code)}</code>`);
+    codeSpans.push(
+      `<code class="rounded bg-white/10 px-1 py-0.5 text-[0.85em]">${escapeHtml(code)}</code>`,
+    );
     return `\x00CODE${idx}\x00`;
   });
 
@@ -48,18 +50,27 @@ function inlineMarkdown(text: string): string {
   out = out.replace(/\*(.+?)\*/g, "<em>$1</em>");
   out = out.replace(/_(.+?)_/g, "<em>$1</em>");
   // Images — attributes already escaped by escapeHtml above
-  out = out.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt: string, src: string) => {
-    const safeSrc = src.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
-    return `<img src="${escapeHtml(safeSrc)}" alt="${alt}" class="max-w-full rounded" />`;
-  });
+  out = out.replace(
+    /!\[([^\]]*)\]\(([^)]+)\)/g,
+    (_m, alt: string, src: string) => {
+      const safeSrc = src.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
+      return `<img src="${escapeHtml(safeSrc)}" alt="${alt}" class="max-w-full rounded" />`;
+    },
+  );
   // Links — label is already HTML-escaped, escape href
-  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, href: string) => {
-    const safeHref = href.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
-    return `<a href="${escapeHtml(safeHref)}" target="_blank" rel="noopener noreferrer" class="underline text-emerald-400 hover:text-emerald-300">${label}</a>`;
-  });
+  out = out.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    (_m, label: string, href: string) => {
+      const safeHref = href.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
+      return `<a href="${escapeHtml(safeHref)}" target="_blank" rel="noopener noreferrer" class="underline text-emerald-400 hover:text-emerald-300">${label}</a>`;
+    },
+  );
 
   // Restore code spans
-  out = out.replace(/\x00CODE(\d+)\x00/g, (_m, idx: string) => codeSpans[parseInt(idx, 10)]);
+  out = out.replace(
+    /\x00CODE(\d+)\x00/g,
+    (_m, idx: string) => codeSpans[parseInt(idx, 10)],
+  );
 
   return out;
 }
@@ -108,7 +119,9 @@ function markdownToHtml(md: string): string {
     }
 
     // GitHub-style admonitions: > [!NOTE], > [!WARNING], etc.
-    const admonitionMatch = line.match(/^>\s*\[!(NOTE|TIP|WARNING|CAUTION|IMPORTANT)\]/);
+    const admonitionMatch = line.match(
+      /^>\s*\[!(NOTE|TIP|WARNING|CAUTION|IMPORTANT)\]/,
+    );
     if (admonitionMatch) {
       const type = admonitionMatch[1].toLowerCase();
       const bodyLines: string[] = [];
@@ -140,7 +153,9 @@ function markdownToHtml(md: string): string {
     const headingMatch = line.match(/^(#{1,6})\s+(.+)/);
     if (headingMatch) {
       const level = headingMatch[1].length;
-      out.push(`<h${level} class="${HEADING_SIZES[level]} mt-3 mb-1">${inlineMarkdown(headingMatch[2])}</h${level}>`);
+      out.push(
+        `<h${level} class="${HEADING_SIZES[level]} mt-3 mb-1">${inlineMarkdown(headingMatch[2])}</h${level}>`,
+      );
       i++;
       continue;
     }
@@ -149,10 +164,14 @@ function markdownToHtml(md: string): string {
     if (/^[-*+]\s/.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^[-*+]\s/.test(lines[i])) {
-        items.push(`<li>${inlineMarkdown(lines[i].replace(/^[-*+]\s/, ""))}</li>`);
+        items.push(
+          `<li>${inlineMarkdown(lines[i].replace(/^[-*+]\s/, ""))}</li>`,
+        );
         i++;
       }
-      out.push(`<ul class="list-disc pl-5 space-y-0.5 my-2">${items.join("")}</ul>`);
+      out.push(
+        `<ul class="list-disc pl-5 space-y-0.5 my-2">${items.join("")}</ul>`,
+      );
       continue;
     }
 
@@ -160,10 +179,14 @@ function markdownToHtml(md: string): string {
     if (/^\d+\.\s/.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
-        items.push(`<li>${inlineMarkdown(lines[i].replace(/^\d+\.\s/, ""))}</li>`);
+        items.push(
+          `<li>${inlineMarkdown(lines[i].replace(/^\d+\.\s/, ""))}</li>`,
+        );
         i++;
       }
-      out.push(`<ol class="list-decimal pl-5 space-y-0.5 my-2">${items.join("")}</ol>`);
+      out.push(
+        `<ol class="list-decimal pl-5 space-y-0.5 my-2">${items.join("")}</ol>`,
+      );
       continue;
     }
 
