@@ -1,64 +1,77 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useCallback } from 'react';
-import ArrowBigDownDashIcon from '@/components/ui/arrow-big-down-dash-icon';
-import PaintIcon from '@/components/ui/paint-icon';
-import CheckedIcon from '@/components/ui/checked-icon';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import { PageHero } from '@/components/common/PageHero';
-import { ADDITIONAL_PALETTES, patternToCssBackground, type PaletteCategory, type PatternDefinition, type PaletteGroup } from '@/lib/palettes';
+import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { PageHero } from "@/components/common/PageHero";
+import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
+import CheckedIcon from "@/components/ui/checked-icon";
+import PaintIcon from "@/components/ui/paint-icon";
 import {
+  rgbToCmyk,
   rgbToHex,
   rgbToHsl,
   rgbToHsv,
-  rgbToCmyk,
   rgbToOklch,
-} from '@/lib/color-extraction/color-utils';
-import type { RGB } from '@/lib/color-extraction/types';
-import { generateACO } from '@/lib/color-extraction/palette-formats';
+} from "@/lib/color-extraction/color-utils";
+import { generateACO } from "@/lib/color-extraction/palette-formats";
+import type { RGB } from "@/lib/color-extraction/types";
+import {
+  ADDITIONAL_PALETTES,
+  type PaletteCategory,
+  type PaletteGroup,
+  type PatternDefinition,
+  patternToCssBackground,
+} from "@/lib/palettes";
+import { cn } from "@/lib/utils";
 
-const COLOR_FORMATS = ['hex', 'rgb', 'hsl', 'hsv', 'cmyk', 'oklch'] as const;
+const COLOR_FORMATS = ["hex", "rgb", "hsl", "hsv", "cmyk", "oklch"] as const;
 
 type ColorFormat = (typeof COLOR_FORMATS)[number];
 
 const PALETTE_GROUP_LABELS: Record<PaletteGroup, string> = {
-  solid: 'Solid Colors',
-  anime: 'Anime & Film',
-  textile: 'Textile',
-  ornate: 'Ornate',
-  heritage: 'World Heritage',
-  flags: 'Flags',
+  solid: "Solid Colors",
+  anime: "Anime & Film",
+  textile: "Textile",
+  ornate: "Ornate",
+  heritage: "World Heritage",
+  flags: "Flags",
 };
 
-const PALETTE_GROUPS: PaletteGroup[] = ['solid', 'anime', 'textile', 'ornate', 'heritage', 'flags'];
+const PALETTE_GROUPS: PaletteGroup[] = [
+  "solid",
+  "anime",
+  "textile",
+  "ornate",
+  "heritage",
+  "flags",
+];
 
 function formatColor(
   rgb: [number, number, number],
-  format: ColorFormat
+  format: ColorFormat,
 ): { display: string; clipboard: string } {
   const rgbObj: RGB = { r: rgb[0], g: rgb[1], b: rgb[2] };
 
   switch (format) {
-    case 'hex': {
+    case "hex": {
       const hex = rgbToHex(rgbObj).toUpperCase();
       return { display: hex, clipboard: hex };
     }
-    case 'rgb': {
+    case "rgb": {
       const display = `${rgb[0]}, ${rgb[1]}, ${rgb[2]}`;
       return { display, clipboard: `rgb(${display})` };
     }
-    case 'hsl': {
+    case "hsl": {
       const hsl = rgbToHsl(rgbObj);
       const display = `${hsl.h}\u00B0, ${hsl.s}%, ${hsl.l}%`;
       return { display, clipboard: `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)` };
     }
-    case 'hsv': {
+    case "hsv": {
       const hsv = rgbToHsv(rgbObj);
       const display = `${hsv.h}\u00B0, ${hsv.s}%, ${hsv.v}%`;
       return { display, clipboard: `hsv(${hsv.h}, ${hsv.s}%, ${hsv.v}%)` };
     }
-    case 'cmyk': {
+    case "cmyk": {
       const cmyk = rgbToCmyk(rgbObj);
       const display = `${cmyk.c}, ${cmyk.m}, ${cmyk.y}, ${cmyk.k}`;
       return {
@@ -66,7 +79,7 @@ function formatColor(
         clipboard: `cmyk(${cmyk.c}%, ${cmyk.m}%, ${cmyk.y}%, ${cmyk.k}%)`,
       };
     }
-    case 'oklch': {
+    case "oklch": {
       const oklch = rgbToOklch(rgbObj);
       const display = `${oklch.l}, ${oklch.c}, ${oklch.h}`;
       return { display, clipboard: `oklch(${oklch.l} ${oklch.c} ${oklch.h})` };
@@ -79,33 +92,39 @@ function PaletteDownload({ palette }: { palette: PaletteCategory }) {
     const colors = Object.entries(palette.colors)
       .filter(([, def]) => def.multiply)
       .map(([name, def]) => ({
-        rgb: { r: def.multiply![0], g: def.multiply![1], b: def.multiply![2] },
-        name: name.replace(/_/g, ' '),
+        rgb: {
+          r: def.multiply?.[0] ?? 0,
+          g: def.multiply?.[1] ?? 0,
+          b: def.multiply?.[2] ?? 0,
+        },
+        name: name.replace(/_/g, " "),
       }));
 
     if (colors.length === 0) {
-      const hasPatterns = Object.values(palette.colors).some((def) => def.pattern);
+      const hasPatterns = Object.values(palette.colors).some(
+        (def) => def.pattern,
+      );
       toast.error(
         hasPatterns
-          ? 'Pattern palettes cannot be exported as ACO (flat color format)'
-          : 'No colors to export'
+          ? "Pattern palettes cannot be exported as ACO (flat color format)"
+          : "No colors to export",
       );
       return;
     }
 
     try {
       const data = generateACO(colors);
-      const blob = new Blob([data], { type: 'application/octet-stream' });
+      const blob = new Blob([data], { type: "application/octet-stream" });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      const safeName = palette.label.replace(/[/\\:*?"<>|]/g, '_');
+      const link = document.createElement("a");
+      const safeName = palette.label.replace(/[/\\:*?"<>|]/g, "_");
       link.download = `${safeName}.aco`;
       link.href = url;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success(`Downloaded ${palette.label} as ACO`);
     } catch (err) {
-      console.error('ACO export failed:', err);
+      console.error("ACO export failed:", err);
       toast.error(`Failed to export ${palette.label} as ACO`);
     }
   }, [palette]);
@@ -145,13 +164,13 @@ function ColorCard({
       toast.success(`Copied ${value}`);
       setTimeout(() => setCopied(false), 1500);
     } catch (error) {
-      console.error('Clipboard copy failed:', error);
-      toast.error('Failed to copy');
+      console.error("Clipboard copy failed:", error);
+      toast.error("Failed to copy");
     }
   };
 
   const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
-  const textColor = luminance > 0.5 ? 'text-black/80' : 'text-white/90';
+  const textColor = luminance > 0.5 ? "text-black/80" : "text-white/90";
 
   const bgStyle: React.CSSProperties = pattern
     ? patternToCssBackground(pattern)
@@ -166,7 +185,7 @@ function ColorCard({
     >
       <div className={`text-center ${textColor}`}>
         <div className="text-[10px] font-bold uppercase tracking-wide opacity-80 group-hover:opacity-100">
-          {name.replace(/_/g, ' ')}
+          {name.replace(/_/g, " ")}
         </div>
         <div className="mt-0.5 text-[9px] font-mono opacity-60 group-hover:opacity-90">
           {pattern ? pattern.type : display}
@@ -223,7 +242,9 @@ function PaletteSection({
             </span>
           </h2>
           {palette.description && (
-            <p className="mt-1 text-sm text-muted-foreground">{palette.description}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {palette.description}
+            </p>
           )}
         </div>
         <PaletteDownload palette={palette} />
@@ -248,20 +269,24 @@ function PaletteSection({
 }
 
 export default function CatColorPalettesPage() {
-  const [colorFormat, setColorFormat] = useState<ColorFormat>('hex');
-  const [activeGroup, setActiveGroup] = useState<PaletteGroup | 'all'>('all');
+  const [colorFormat, setColorFormat] = useState<ColorFormat>("hex");
+  const [activeGroup, setActiveGroup] = useState<PaletteGroup | "all">("all");
 
   const filteredPalettes = useMemo(
     () =>
-      activeGroup === 'all'
+      activeGroup === "all"
         ? ADDITIONAL_PALETTES
         : ADDITIONAL_PALETTES.filter((p) => p.group === activeGroup),
-    [activeGroup]
+    [activeGroup],
   );
 
   const totalColors = useMemo(
-    () => filteredPalettes.reduce((sum, p) => sum + Object.keys(p.colors).length, 0),
-    [filteredPalettes]
+    () =>
+      filteredPalettes.reduce(
+        (sum, p) => sum + Object.keys(p.colors).length,
+        0,
+      ),
+    [filteredPalettes],
   );
 
   return (
@@ -277,17 +302,19 @@ export default function CatColorPalettesPage() {
         <div className="space-y-4">
           <div className="glass-card flex flex-col gap-3 px-6 py-3 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
-              <span className="text-xs font-medium text-muted-foreground">Color format</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                Color format
+              </span>
               <div className="inline-flex items-center gap-1 rounded-full border border-border/30 bg-muted/30 p-1">
                 {COLOR_FORMATS.map((fmt) => (
                   <button
                     key={fmt}
                     type="button"
                     className={cn(
-                      'rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition',
+                      "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide transition",
                       colorFormat === fmt
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
                     onClick={() => setColorFormat(fmt)}
                   >
@@ -301,17 +328,19 @@ export default function CatColorPalettesPage() {
           {/* Category filter bar */}
           <div className="glass-card overflow-x-auto px-6 py-3">
             <div className="flex items-center gap-3">
-              <span className="shrink-0 text-xs font-medium text-muted-foreground">Category</span>
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                Category
+              </span>
               <div className="inline-flex items-center gap-1 rounded-full border border-border/30 bg-muted/30 p-1">
                 <button
                   type="button"
                   className={cn(
-                    'rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition whitespace-nowrap',
-                    activeGroup === 'all'
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
+                    "rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition whitespace-nowrap",
+                    activeGroup === "all"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
-                  onClick={() => setActiveGroup('all')}
+                  onClick={() => setActiveGroup("all")}
                 >
                   All
                 </button>
@@ -320,10 +349,10 @@ export default function CatColorPalettesPage() {
                     key={group}
                     type="button"
                     className={cn(
-                      'rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition whitespace-nowrap',
+                      "rounded-full px-3 py-1 text-xs font-semibold tracking-wide transition whitespace-nowrap",
                       activeGroup === group
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
                     onClick={() => setActiveGroup(group)}
                   >
@@ -335,16 +364,21 @@ export default function CatColorPalettesPage() {
           </div>
 
           {filteredPalettes.map((palette) => (
-            <PaletteSection key={palette.id} palette={palette} colorFormat={colorFormat} />
+            <PaletteSection
+              key={palette.id}
+              palette={palette}
+              colorFormat={colorFormat}
+            />
           ))}
         </div>
 
         {/* Info footer */}
         <div className="mt-8 rounded-lg border border-border/30 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
           <p>
-            These colors are applied using multiply blend mode on WHITE base sprites. Colors with a
-            small dot indicator also have a screen overlay for added depth. Pattern swatches (marked
-            with a letter badge) use repeating tile patterns instead of flat colors.
+            These colors are applied using multiply blend mode on WHITE base
+            sprites. Colors with a small dot indicator also have a screen
+            overlay for added depth. Pattern swatches (marked with a letter
+            badge) use repeating tile patterns instead of flat colors.
           </p>
         </div>
       </div>

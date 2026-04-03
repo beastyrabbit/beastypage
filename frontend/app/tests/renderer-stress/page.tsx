@@ -106,7 +106,10 @@ export default function RendererStressHarness() {
 
   const summary = useMemo(() => {
     if (!metrics) return null;
-    const duration = metrics.finishedAt && metrics.startedAt ? metrics.finishedAt - metrics.startedAt : null;
+    const duration =
+      metrics.finishedAt && metrics.startedAt
+        ? metrics.finishedAt - metrics.startedAt
+        : null;
     return {
       ...metrics,
       duration,
@@ -115,7 +118,9 @@ export default function RendererStressHarness() {
 
   const refreshHealth = useCallback(async () => {
     try {
-      const response = await fetch("/api/renderer/health", { cache: "no-store" });
+      const response = await fetch("/api/renderer/health", {
+        cache: "no-store",
+      });
       if (!response.ok) {
         throw new Error(`Status ${response.status}`);
       }
@@ -176,11 +181,14 @@ export default function RendererStressHarness() {
       },
     };
 
-    const pick = <T,>(source: readonly T[]): T => source[Math.floor(Math.random() * source.length)];
+    const pick = <T,>(source: readonly T[]): T =>
+      source[Math.floor(Math.random() * source.length)];
 
-    const buildPayload = (id: number): CatRenderParams => {
+    const buildPayload = (_id: number): CatRenderParams => {
       const useExperimental = Math.random() > 0.5;
-      const colour = useExperimental ? pick(EXPERIMENTAL_COLOURS) : pick(BASE_COLOURS);
+      const colour = useExperimental
+        ? pick(EXPERIMENTAL_COLOURS)
+        : pick(BASE_COLOURS);
       return {
         spriteNumber: pick(SPRITES),
         params: {
@@ -197,7 +205,7 @@ export default function RendererStressHarness() {
       };
     };
 
-    const worker = async (workerId: number) => {
+    const worker = async (_workerId: number) => {
       while (!cancelled) {
         const current = nextIndex;
         if (current >= total) break;
@@ -253,10 +261,17 @@ export default function RendererStressHarness() {
 
     const finishedAt = performance.now();
     const orderedDurations = durations.slice().sort((a, b) => a - b);
-    const avg = durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length : null;
+    const avg = durations.length
+      ? durations.reduce((sum, value) => sum + value, 0) / durations.length
+      : null;
     const p95 =
       orderedDurations.length > 0
-        ? orderedDurations[Math.min(orderedDurations.length - 1, Math.floor(orderedDurations.length * 0.95))]
+        ? orderedDurations[
+            Math.min(
+              orderedDurations.length - 1,
+              Math.floor(orderedDurations.length * 0.95),
+            )
+          ]
         : null;
 
     setMetrics({
@@ -278,17 +293,22 @@ export default function RendererStressHarness() {
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 py-16">
       <header className="theme-hero px-8 py-12 text-balance">
         <div className="section-eyebrow">Renderer Reliability</div>
-        <h1 className="mt-4 text-4xl font-semibold sm:text-5xl">Stress Test Runner</h1>
+        <h1 className="mt-4 text-4xl font-semibold sm:text-5xl">
+          Stress Test Runner
+        </h1>
         <p className="mt-6 max-w-3xl text-lg text-muted-foreground">
-          Launch controlled bursts against <code>/api/renderer</code>, exercise the retry helper, and watch the queue /
-          circuit breaker metrics update in real time.
+          Launch controlled bursts against <code>/api/renderer</code>, exercise
+          the retry helper, and watch the queue / circuit breaker metrics update
+          in real time.
         </p>
       </header>
 
       <section className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]">
         <div className="glass-card rounded-3xl border border-border/50 bg-background/70 p-6">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-semibold text-foreground">Run configuration</h2>
+            <h2 className="text-xl font-semibold text-foreground">
+              Run configuration
+            </h2>
             <button
               type="button"
               onClick={running ? stopRun : startRun}
@@ -304,30 +324,45 @@ export default function RendererStressHarness() {
 
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
             <label className="flex flex-col gap-2 text-sm">
-              <span className="font-semibold text-muted-foreground/80">Total requests</span>
+              <span className="font-semibold text-muted-foreground/80">
+                Total requests
+              </span>
               <input
                 type="number"
                 min={1}
                 max={500}
                 value={totalRequests}
-                onChange={(event) => setTotalRequests(parseInt(event.target.value, 10) || DEFAULT_TOTAL)}
+                onChange={(event) =>
+                  setTotalRequests(
+                    parseInt(event.target.value, 10) || DEFAULT_TOTAL,
+                  )
+                }
                 className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-foreground focus:border-primary focus:outline-none"
               />
-              <span className="text-xs text-muted-foreground/70">Caps at 500 to protect local browsers.</span>
+              <span className="text-xs text-muted-foreground/70">
+                Caps at 500 to protect local browsers.
+              </span>
             </label>
 
             <label className="flex flex-col gap-2 text-sm">
-              <span className="font-semibold text-muted-foreground/80">Concurrent workers</span>
+              <span className="font-semibold text-muted-foreground/80">
+                Concurrent workers
+              </span>
               <input
                 type="number"
                 min={1}
                 max={32}
                 value={concurrency}
-                onChange={(event) => setConcurrency(parseInt(event.target.value, 10) || DEFAULT_CONCURRENCY)}
+                onChange={(event) =>
+                  setConcurrency(
+                    parseInt(event.target.value, 10) || DEFAULT_CONCURRENCY,
+                  )
+                }
                 className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-foreground focus:border-primary focus:outline-none"
               />
               <span className="text-xs text-muted-foreground/70">
-                Each worker runs one request at a time. Increase to simulate spikes.
+                Each worker runs one request at a time. Increase to simulate
+                spikes.
               </span>
             </label>
           </div>
@@ -350,24 +385,34 @@ export default function RendererStressHarness() {
               <dt className="text-muted-foreground/70">Total</dt>
               <dd className="text-foreground">{summary.total}</dd>
               <dt className="text-muted-foreground/70">Succeeded</dt>
-              <dd className="text-emerald-400 font-semibold">{summary.success}</dd>
+              <dd className="text-emerald-400 font-semibold">
+                {summary.success}
+              </dd>
               <dt className="text-muted-foreground/70">Failed</dt>
               <dd className="text-red-400 font-semibold">{summary.failure}</dd>
               <dt className="text-muted-foreground/70">Avg latency</dt>
               <dd className="text-foreground">
-                {summary.averageMs !== null ? `${formatter.format(summary.averageMs)} ms` : "—"}
+                {summary.averageMs !== null
+                  ? `${formatter.format(summary.averageMs)} ms`
+                  : "—"}
               </dd>
               <dt className="text-muted-foreground/70">p95 latency</dt>
               <dd className="text-foreground">
-                {summary.p95Ms !== null ? `${formatter.format(summary.p95Ms)} ms` : "—"}
+                {summary.p95Ms !== null
+                  ? `${formatter.format(summary.p95Ms)} ms`
+                  : "—"}
               </dd>
               <dt className="text-muted-foreground/70">Run time</dt>
               <dd className="text-foreground">
-                {summary.duration !== null ? `${formatter.format(summary.duration)} ms` : "—"}
+                {summary.duration !== null
+                  ? `${formatter.format(summary.duration)} ms`
+                  : "—"}
               </dd>
             </dl>
           ) : (
-            <p>No runs yet. Configure the burst and hit start to capture metrics.</p>
+            <p>
+              No runs yet. Configure the burst and hit start to capture metrics.
+            </p>
           )}
 
           <div className="mt-4 border-t border-border/40 pt-4 text-xs text-muted-foreground/70">
@@ -375,10 +420,14 @@ export default function RendererStressHarness() {
               health.ok ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-foreground">Renderer health</span>
+                    <span className="font-semibold text-foreground">
+                      Renderer health
+                    </span>
                     <span
                       className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                        health.status === "ok" ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"
+                        health.status === "ok"
+                          ? "bg-emerald-500/15 text-emerald-300"
+                          : "bg-amber-500/15 text-amber-300"
                       }`}
                     >
                       {health.status}
@@ -389,23 +438,31 @@ export default function RendererStressHarness() {
                       <li key={key} className="flex justify-between gap-4">
                         <span>{key}</span>
                         <span className="font-mono text-muted-foreground/80">
-                          {typeof value === "number" ? formatter.format(value) : String(value)}
+                          {typeof value === "number"
+                            ? formatter.format(value)
+                            : String(value)}
                         </span>
                       </li>
                     ))}
                   </ul>
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
-                    Last updated {new Date(health.fetchedAt).toLocaleTimeString()}
+                    Last updated{" "}
+                    {new Date(health.fetchedAt).toLocaleTimeString()}
                   </p>
                 </div>
               ) : (
                 <div>
-                  <p className="font-semibold text-red-300">Health check failed</p>
+                  <p className="font-semibold text-red-300">
+                    Health check failed
+                  </p>
                   <p className="mt-1 text-xs">{health.error}</p>
                 </div>
               )
             ) : (
-              <p>Use “Refresh renderer health” after a run to inspect queue metrics.</p>
+              <p>
+                Use “Refresh renderer health” after a run to inspect queue
+                metrics.
+              </p>
             )}
           </div>
         </aside>
@@ -413,8 +470,12 @@ export default function RendererStressHarness() {
 
       <section className="glass-card overflow-hidden rounded-3xl border border-border/50 bg-background/70">
         <header className="flex items-center justify-between border-b border-border/40 px-6 py-4">
-          <h2 className="text-lg font-semibold text-foreground">Recent requests</h2>
-          <span className="text-xs text-muted-foreground/60">Showing latest {entries.length} records</span>
+          <h2 className="text-lg font-semibold text-foreground">
+            Recent requests
+          </h2>
+          <span className="text-xs text-muted-foreground/60">
+            Showing latest {entries.length} records
+          </span>
         </header>
         <div className="max-h-[420px] overflow-auto text-sm">
           <table className="w-full table-fixed border-collapse text-xs sm:text-sm">
@@ -431,28 +492,43 @@ export default function RendererStressHarness() {
             <tbody>
               {entries.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground/60">
+                  <td
+                    colSpan={6}
+                    className="px-4 py-6 text-center text-muted-foreground/60"
+                  >
                     No data yet. Start a run to populate telemetry.
                   </td>
                 </tr>
               ) : (
                 [...entries].reverse().map((entry) => (
                   <tr key={entry.key} className="border-t border-border/20">
-                    <td className="px-4 py-2 font-mono text-muted-foreground/80">{entry.id}</td>
-                    <td className="px-4 py-2 text-foreground">{entry.sprite}</td>
-                    <td className="px-4 py-2 font-semibold text-muted-foreground/90">{entry.colour}</td>
-                    <td className="px-4 py-2 text-foreground">{formatter.format(entry.durationMs)} ms</td>
+                    <td className="px-4 py-2 font-mono text-muted-foreground/80">
+                      {entry.id}
+                    </td>
+                    <td className="px-4 py-2 text-foreground">
+                      {entry.sprite}
+                    </td>
+                    <td className="px-4 py-2 font-semibold text-muted-foreground/90">
+                      {entry.colour}
+                    </td>
+                    <td className="px-4 py-2 text-foreground">
+                      {formatter.format(entry.durationMs)} ms
+                    </td>
                     <td className="px-4 py-2">
                       <span
                         className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                          entry.ok ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"
+                          entry.ok
+                            ? "bg-emerald-500/15 text-emerald-300"
+                            : "bg-red-500/15 text-red-300"
                         }`}
                       >
                         {entry.ok ? "Success" : "Error"}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-red-300">
-                      {!entry.ok && entry.error ? entry.error.slice(0, 120) : "—"}
+                      {!entry.ok && entry.error
+                        ? entry.error.slice(0, 120)
+                        : "—"}
                     </td>
                   </tr>
                 ))

@@ -120,21 +120,38 @@
 
   body {
     @apply bg-background text-foreground;
-    background-image: radial-gradient(circle at 20% 20%, oklch(0.96 0.04 310 / 0.45) 0, transparent 55%),
-      radial-gradient(circle at 80% 0%, oklch(0.94 0.03 260 / 0.4) 0, transparent 45%),
-      radial-gradient(circle at 50% 80%, oklch(0.92 0.05 20 / 0.35) 0, transparent 50%);
+    background-image:
+      radial-gradient(
+        circle at 20% 20%,
+        oklch(0.96 0.04 310 / 0.45) 0,
+        transparent 55%
+      ),
+      radial-gradient(
+        circle at 80% 0%,
+        oklch(0.94 0.03 260 / 0.4) 0,
+        transparent 45%
+      ),
+      radial-gradient(
+        circle at 50% 80%,
+        oklch(0.92 0.05 20 / 0.35) 0,
+        transparent 50%
+      );
     background-attachment: fixed;
   }
 }
 
 .glass-card {
   @apply rounded-3xl border border-white/10 bg-black/40 shadow-2xl backdrop-blur-xl transition-all duration-500;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 20px 40px -10px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 20px 40px -10px rgba(0, 0, 0, 0.3);
 }
 
 .glass-card:hover {
   @apply border-white/20 bg-black/50;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 25px 50px -12px rgba(0, 0, 0, 0.4);
   transform: translateY(-2px);
 }
 
@@ -165,12 +182,20 @@
 }
 
 .nav-pill[data-accent="stream"].nav-pill--active {
-  background: linear-gradient(135deg, oklch(0.65 0.22 140), oklch(0.5 0.25 320));
+  background: linear-gradient(
+    135deg,
+    oklch(0.65 0.22 140),
+    oklch(0.5 0.25 320)
+  );
   box-shadow: 0 4px 20px -4px oklch(0.6 0.2 140 / 0.5);
 }
 
 .nav-pill[data-accent="collection"].nav-pill--active {
-  background: linear-gradient(135deg, oklch(0.7 0.15 250), oklch(0.55 0.18 310));
+  background: linear-gradient(
+    135deg,
+    oklch(0.7 0.15 250),
+    oklch(0.55 0.18 310)
+  );
   box-shadow: 0 4px 20px -4px oklch(0.65 0.15 280 / 0.5);
 }
 
@@ -205,7 +230,11 @@
 }
 
 .projects-subnav-pill--active[data-category="artist"] {
-  background: linear-gradient(135deg, oklch(0.55 0.18 300), oklch(0.45 0.15 330));
+  background: linear-gradient(
+    135deg,
+    oklch(0.55 0.18 300),
+    oklch(0.45 0.15 330)
+  );
   box-shadow: 0 4px 16px -4px oklch(0.5 0.15 315 / 0.5);
 }
 
@@ -221,28 +250,73 @@
 
 /* Category Card Gradients */
 .category-card-gradient--warrior-cats {
-  background: radial-gradient(circle at 20% 20%, oklch(0.55 0.12 70 / 0.25), transparent 55%),
-    radial-gradient(circle at 80% 40%, oklch(0.45 0.08 35 / 0.2), transparent 60%);
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      oklch(0.55 0.12 70 / 0.25),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 80% 40%,
+      oklch(0.45 0.08 35 / 0.2),
+      transparent 60%
+    );
 }
 
 .category-card-gradient--gacha {
-  background: radial-gradient(circle at 20% 20%, oklch(0.65 0.15 80 / 0.25), transparent 55%),
-    radial-gradient(circle at 80% 40%, oklch(0.55 0.09 35 / 0.2), transparent 60%);
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      oklch(0.65 0.15 80 / 0.25),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 80% 40%,
+      oklch(0.55 0.09 35 / 0.2),
+      transparent 60%
+    );
 }
 
 .category-card-gradient--artist {
-  background: radial-gradient(circle at 20% 20%, oklch(0.55 0.18 300 / 0.25), transparent 55%),
-    radial-gradient(circle at 80% 40%, oklch(0.45 0.15 330 / 0.2), transparent 60%);
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      oklch(0.55 0.18 300 / 0.25),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 80% 40%,
+      oklch(0.45 0.15 330 / 0.2),
+      transparent 60%
+    );
 }
 
 .category-card-gradient--games {
-  background: radial-gradient(circle at 20% 20%, oklch(0.6 0.15 190 / 0.25), transparent 55%),
-    radial-gradient(circle at 80% 40%, oklch(0.5 0.12 170 / 0.2), transparent 60%);
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      oklch(0.6 0.15 190 / 0.25),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 80% 40%,
+      oklch(0.5 0.12 170 / 0.2),
+      transparent 60%
+    );
 }
 
 .category-card-gradient--tools {
-  background: radial-gradient(circle at 20% 20%, oklch(0.6 0.2 260 / 0.25), transparent 55%),
-    radial-gradient(circle at 80% 40%, oklch(0.5 0.22 290 / 0.2), transparent 60%);
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      oklch(0.6 0.2 260 / 0.25),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 80% 40%,
+      oklch(0.5 0.22 290 / 0.2),
+      transparent 60%
+    );
 }
 
 /* Text Gradients */
@@ -308,20 +382,42 @@
   opacity: 0.7;
 }
 
-.theme-hero>* {
+.theme-hero > * {
   position: relative;
   z-index: 1;
 }
 
 .theme-gatcha::before {
-  background: radial-gradient(circle at 20% 20%, oklch(0.65 0.15 80 / 0.9), transparent 55%),
-    radial-gradient(circle at 80% 40%, oklch(0.55 0.09 35 / 0.9), transparent 60%);
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      oklch(0.65 0.15 80 / 0.9),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 80% 40%,
+      oklch(0.55 0.09 35 / 0.9),
+      transparent 60%
+    );
 }
 
 .theme-stream::before {
-  background: radial-gradient(circle at 30% 30%, oklch(0.7 0.25 140 / 0.8), transparent 55%),
-    radial-gradient(circle at 75% 25%, oklch(0.55 0.3 330 / 0.8), transparent 65%),
-    radial-gradient(circle at 50% 80%, oklch(0.6 0.22 20 / 0.75), transparent 60%);
+  background:
+    radial-gradient(
+      circle at 30% 30%,
+      oklch(0.7 0.25 140 / 0.8),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 75% 25%,
+      oklch(0.55 0.3 330 / 0.8),
+      transparent 65%
+    ),
+    radial-gradient(
+      circle at 50% 80%,
+      oklch(0.6 0.22 20 / 0.75),
+      transparent 60%
+    );
 }
 
 .coin {
@@ -330,8 +426,16 @@
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(209, 213, 219, 0.65) 45%, rgba(107, 114, 128, 0.5));
-  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.6), inset 0 0 6px rgba(17, 24, 39, 0.35), 0 16px 30px rgba(15, 23, 42, 0.28);
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(255, 255, 255, 0.9),
+    rgba(209, 213, 219, 0.65) 45%,
+    rgba(107, 114, 128, 0.5)
+  );
+  box-shadow:
+    inset 0 0 18px rgba(255, 255, 255, 0.6),
+    inset 0 0 6px rgba(17, 24, 39, 0.35),
+    0 16px 30px rgba(15, 23, 42, 0.28);
   transform-style: preserve-3d;
   transition: transform 0.45s ease-out;
 }
@@ -360,13 +464,23 @@
 }
 
 .coin__face--front {
-  background: radial-gradient(circle at 35% 30%, rgba(253, 224, 71, 0.95), rgba(217, 119, 6, 0.75) 55%, rgba(146, 64, 14, 0.6));
+  background: radial-gradient(
+    circle at 35% 30%,
+    rgba(253, 224, 71, 0.95),
+    rgba(217, 119, 6, 0.75) 55%,
+    rgba(146, 64, 14, 0.6)
+  );
   color: rgba(67, 20, 7, 0.92);
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.4);
 }
 
 .coin__face--back {
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.95), rgba(209, 213, 219, 0.75) 55%, rgba(107, 114, 128, 0.55));
+  background: radial-gradient(
+    circle at 30% 25%,
+    rgba(255, 255, 255, 0.95),
+    rgba(209, 213, 219, 0.75) 55%,
+    rgba(107, 114, 128, 0.55)
+  );
   color: rgba(30, 41, 59, 0.85);
   transform: rotateY(180deg);
 }
@@ -406,19 +520,50 @@
 }
 
 .theme-collection::before {
-  background: radial-gradient(circle at 25% 25%, oklch(0.75 0.12 210 / 0.85), transparent 55%),
-    radial-gradient(circle at 70% 30%, oklch(0.7 0.15 310 / 0.75), transparent 60%),
-    radial-gradient(circle at 50% 80%, oklch(0.8 0.1 120 / 0.7), transparent 60%);
+  background:
+    radial-gradient(
+      circle at 25% 25%,
+      oklch(0.75 0.12 210 / 0.85),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 70% 30%,
+      oklch(0.7 0.15 310 / 0.75),
+      transparent 60%
+    ),
+    radial-gradient(
+      circle at 50% 80%,
+      oklch(0.8 0.1 120 / 0.7),
+      transparent 60%
+    );
 }
 
 .theme-personal::before {
-  background: radial-gradient(circle at 30% 30%, oklch(0.35 0.05 300 / 0.9), transparent 55%),
-    radial-gradient(circle at 70% 20%, oklch(0.28 0.04 260 / 0.9), transparent 60%);
+  background:
+    radial-gradient(
+      circle at 30% 30%,
+      oklch(0.35 0.05 300 / 0.9),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 70% 20%,
+      oklch(0.28 0.04 260 / 0.9),
+      transparent 60%
+    );
 }
 
 .theme-dash::before {
-  background: radial-gradient(circle at 25% 25%, oklch(0.6 0.2 155 / 0.85), transparent 55%),
-    radial-gradient(circle at 75% 35%, oklch(0.5 0.15 140 / 0.75), transparent 60%);
+  background:
+    radial-gradient(
+      circle at 25% 25%,
+      oklch(0.6 0.2 155 / 0.85),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 75% 35%,
+      oklch(0.5 0.15 140 / 0.75),
+      transparent 60%
+    );
 }
 
 .flip-container {
@@ -437,7 +582,9 @@
   }
 
   45% {
-    box-shadow: 0 0 30px 0 rgba(255, 212, 160, 0.45), 0 0 14px 0 rgba(255, 140, 90, 0.35);
+    box-shadow:
+      0 0 30px 0 rgba(255, 212, 160, 0.45),
+      0 0 14px 0 rgba(255, 140, 90, 0.35);
     transform: scale(1.02);
   }
 
@@ -508,7 +655,6 @@
     image-rendering: crisp-edges;
     image-rendering: -moz-crisp-edges;
   }
-
 
   .image-render-sharp {
     -ms-interpolation-mode: nearest-neighbor;
@@ -585,7 +731,6 @@
 }
 
 @keyframes float {
-
   0%,
   100% {
     transform: translateY(0);
@@ -597,7 +742,6 @@
 }
 
 @keyframes pulse-glow {
-
   0%,
   100% {
     opacity: 1;
@@ -611,7 +755,6 @@
 }
 
 @keyframes pulse-soft {
-
   0%,
   100% {
     opacity: 1;

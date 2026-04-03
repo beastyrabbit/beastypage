@@ -12,7 +12,9 @@ export async function generateMetadata({ params }: AncestryTreeViewPageProps) {
   };
 }
 
-export default async function AncestryTreeViewPage({ params }: AncestryTreeViewPageProps) {
+export default async function AncestryTreeViewPage({
+  params,
+}: AncestryTreeViewPageProps) {
   const resolved = await params;
   return <AncestryTreeViewClient slug={resolved.slug} />;
 }

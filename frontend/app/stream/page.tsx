@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-import Link from "next/link";
 import { ArrowRight, Bot, PlugZap, Workflow } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { PageHero } from "@/components/common/PageHero";
 
@@ -22,7 +22,8 @@ type CommandRow = {
 const STREAM_FEATURES: StreamFeature[] = [
   {
     title: "Chat control",
-    description: "Manage triggers, cooldowns, and moderation from one dashboard.",
+    description:
+      "Manage triggers, cooldowns, and moderation from one dashboard.",
     icon: <PlugZap className="size-4" />,
     href: "https://beastytwitch.github.io/StreamCommands/",
     external: true,
@@ -66,10 +67,12 @@ const COMMANDS: CommandRow[] = [
 
 export const metadata: Metadata = {
   title: "Stream Tools | BeastyRabbit",
-  description: "Chat control, overlays, and automation experiments built for multi-platform streams.",
+  description:
+    "Chat control, overlays, and automation experiments built for multi-platform streams.",
   openGraph: {
     title: "Stream Tools",
-    description: "Chat control, overlays, and automation experiments built for multi-platform streams.",
+    description:
+      "Chat control, overlays, and automation experiments built for multi-platform streams.",
   },
 };
 
@@ -78,7 +81,14 @@ export default function StreamLanding() {
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-6 py-16">
       <PageHero
         eyebrow="Stream Operations"
-        title={<>Things to do in <span className="text-gradient-stream animate-shimmer bg-[length:200%_auto]">my stream</span></>}
+        title={
+          <>
+            Things to do in{" "}
+            <span className="text-gradient-stream animate-shimmer bg-[length:200%_auto]">
+              my stream
+            </span>
+          </>
+        }
         description="Dashboards, triggers, and experiments that keep Twitch, YouTube, and Kick viewers in sync."
       >
         <Link
@@ -98,11 +108,18 @@ export default function StreamLanding() {
       <section className="grid gap-6 sm:grid-cols-3">
         {STREAM_FEATURES.map((feature, index) => {
           const isActive = Boolean(feature.href && !feature.comingSoon);
-          const wrapperClassName = `transition-all duration-500 ${isActive ? "hover:-translate-y-2 hover:shadow-2xl" : "pointer-events-none opacity-60 grayscale-[0.5]"
-            }`;
+          const wrapperClassName = `transition-all duration-500 ${
+            isActive
+              ? "hover:-translate-y-2 hover:shadow-2xl"
+              : "pointer-events-none opacity-60 grayscale-[0.5]"
+          }`;
           const cardContent = (
             <div className="glass-card group relative overflow-hidden p-6 h-full border-emerald-500/10">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-purple-500/10 opacity-50 transition-opacity duration-500 group-hover:opacity-100" role="presentation" aria-hidden="true" />
+              <div
+                className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-purple-500/10 opacity-50 transition-opacity duration-500 group-hover:opacity-100"
+                role="presentation"
+                aria-hidden="true"
+              />
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:animate-shine" />
 
               <div className="relative flex h-full flex-col gap-4">
@@ -114,8 +131,12 @@ export default function StreamLanding() {
                     </span>
                   ) : null}
                 </span>
-                <h3 className="text-xl font-bold text-foreground group-hover:text-gradient-stream transition-colors">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground group-hover:text-foreground/80 transition-colors">{feature.description}</p>
+                <h3 className="text-xl font-bold text-foreground group-hover:text-gradient-stream transition-colors">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-muted-foreground group-hover:text-foreground/80 transition-colors">
+                  {feature.description}
+                </p>
               </div>
             </div>
           );
@@ -162,7 +183,9 @@ export default function StreamLanding() {
                 <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
                 <div className="w-3 h-3 rounded-full bg-green-500/80" />
               </div>
-              <span className="text-xs text-muted-foreground ml-2">bash — 80x24</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                bash — 80x24
+              </span>
             </div>
             <div className="space-y-3">
               {COMMANDS.map((cmd, i) => (
@@ -185,6 +208,6 @@ export default function StreamLanding() {
           </div>
         </div>
       </section>
-    </main >
+    </main>
   );
 }

@@ -1,20 +1,20 @@
 "use client";
 
-import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { CatdexPayload } from "@/convex/catdex";
-import type { SeasonPayload } from "@/convex/seasons";
-import type { RarityPayload } from "@/convex/rarities";
-import type { Id } from "@/convex/_generated/dataModel";
-import { cn } from "@/lib/utils";
-import { track } from "@/lib/analytics";
-import { CONVEX_HTTP_URL } from "@/lib/convexClient";
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ProgressiveImage from "@/components/common/ProgressiveImage";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
-import ProgressiveImage from "@/components/common/ProgressiveImage";
-import Image from "next/image";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import type { CatdexPayload } from "@/convex/catdex";
+import type { RarityPayload } from "@/convex/rarities";
+import type { SeasonPayload } from "@/convex/seasons";
+import { track } from "@/lib/analytics";
+import { CONVEX_HTTP_URL } from "@/lib/convexClient";
+import { cn } from "@/lib/utils";
 
 type SortKey =
   | "number-asc"
@@ -67,7 +67,6 @@ type MassUploadModalProps = {
   onSubmit: (input: CreateCatInput) => Promise<void>;
 };
 
-
 export default function CatdexPage() {
   const cats = useQuery(api.catdex.list, {});
   const seasons = useQuery(api.seasons.list, {});
@@ -96,7 +95,9 @@ export default function CatdexPage() {
     }
     searchTrackTimerRef.current = window.setTimeout(() => {
       const isRange = /\d+\s*-\s*\d+/.test(search);
-      track("catdex_searched", { query_type: isRange ? "number_range" : "text" });
+      track("catdex_searched", {
+        query_type: isRange ? "number_range" : "text",
+      });
     }, 500);
     return () => {
       if (searchTrackTimerRef.current) {
@@ -123,33 +124,40 @@ export default function CatdexPage() {
     }, MASS_UPLOAD_HOLD_MS);
   }, [clearSubmitHold]);
 
-  const handleSubmitButtonClick = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-    if (submitHoldTriggeredRef.current) {
-      submitHoldTriggeredRef.current = false;
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    setSubmitOpen(true);
-    track("catdex_submit_modal_opened", {});
-  }, []);
+  const handleSubmitButtonClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (submitHoldTriggeredRef.current) {
+        submitHoldTriggeredRef.current = false;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      setSubmitOpen(true);
+      track("catdex_submit_modal_opened", {});
+    },
+    [],
+  );
 
   const handleSubmitButtonPointerDown = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       if (event.button !== undefined && event.button !== 0) return;
       startSubmitHold();
     },
-    [startSubmitHold]
+    [startSubmitHold],
   );
 
   const handleSubmitButtonKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLButtonElement>) => {
       if (event.repeat) return;
-      if (event.key === " " || event.key === "Spacebar" || event.key === "Enter") {
+      if (
+        event.key === " " ||
+        event.key === "Spacebar" ||
+        event.key === "Enter"
+      ) {
         startSubmitHold();
       }
     },
-    [startSubmitHold]
+    [startSubmitHold],
   );
 
   const handleSubmitButtonInputEnd = useCallback(() => {
@@ -175,7 +183,15 @@ export default function CatdexPage() {
   }, [clearSubmitHold]);
 
   const createCatRecord = useCallback(
-    async ({ seasonId, rarityId, catName, owner, cardNumber, defaultFile, customFile }: CreateCatInput) => {
+    async ({
+      seasonId,
+      rarityId,
+      catName,
+      owner,
+      cardNumber,
+      defaultFile,
+      customFile,
+    }: CreateCatInput) => {
       const trimmedName = catName.trim();
       const trimmedOwner = owner.trim();
       if (!trimmedName) throw new Error("Cat name is required.");
@@ -185,33 +201,35 @@ export default function CatdexPage() {
       if (!defaultFile) throw new Error("Default card art is required.");
 
       const defaultUpload = await uploadToStorage(defaultFile);
-      const customUpload = customFile ? await uploadToStorage(customFile) : null;
+      const customUpload = customFile
+        ? await uploadToStorage(customFile)
+        : null;
 
       await createCatMutation({
         twitchUserName: trimmedOwner.toLowerCase(),
         catName: trimmedName.toLowerCase(),
         seasonId: seasonId as Id<"card_season">,
         rarityId: rarityId as Id<"rarity">,
-        ...(cardNumber && cardNumber.trim()
+        ...(cardNumber?.trim()
           ? {
-              cardNumber: cardNumber.trim()
+              cardNumber: cardNumber.trim(),
             }
           : {}),
         defaultCard: {
           storageId: defaultUpload.storageId as Id<"_storage">,
-          fileName: defaultUpload.fileName
+          fileName: defaultUpload.fileName,
         },
         ...(customUpload
           ? {
               customCard: {
                 storageId: customUpload.storageId as Id<"_storage">,
-                fileName: customUpload.fileName
-              }
+                fileName: customUpload.fileName,
+              },
             }
-          : {})
+          : {}),
       });
     },
-    [createCatMutation]
+    [createCatMutation],
   );
 
   useEffect(() => {
@@ -237,20 +255,24 @@ export default function CatdexPage() {
         filteredCats: [] as CatdexPayload[],
         stats: {
           total: 0,
-          customAvailable: false
-        }
+          customAvailable: false,
+        },
       };
     }
 
     const all = cats.slice();
-    const hasCustom = all.some((cat) => Boolean(cat.custom_card || cat.custom_card_storage_id));
+    const hasCustom = all.some((cat) =>
+      Boolean(cat.custom_card || cat.custom_card_storage_id),
+    );
 
     const queryTerms = parseSearchTerms(search);
 
     const subset = all.filter((cat) => {
       if (!cat.approved) return false;
-      if (seasonFilter !== "all" && cat.seasonRaw?.id !== seasonFilter) return false;
-      if (rarityFilter !== "all" && cat.rarityRaw?.id !== rarityFilter) return false;
+      if (seasonFilter !== "all" && cat.seasonRaw?.id !== seasonFilter)
+        return false;
+      if (rarityFilter !== "all" && cat.rarityRaw?.id !== rarityFilter)
+        return false;
       if (queryTerms.length === 0) return true;
       return queryTerms.every((term) => matchesSearchTerm(cat, term));
     });
@@ -261,8 +283,8 @@ export default function CatdexPage() {
       filteredCats: subset,
       stats: {
         total: all.length,
-        customAvailable: hasCustom
-      }
+        customAvailable: hasCustom,
+      },
     };
   }, [cats, search, seasonFilter, rarityFilter, sortKey]);
 
@@ -283,7 +305,7 @@ export default function CatdexPage() {
         rarity: cat.rarityRaw?.rarity_name ?? "unknown",
       });
     },
-    [imageVariant]
+    [imageVariant],
   );
 
   if (isLoading) {
@@ -300,8 +322,12 @@ export default function CatdexPage() {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
-        <p className="text-xs uppercase tracking-widest text-amber-200/90">Catdex</p>
-        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Explore Gacha Cat Cards</h1>
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">
+          Catdex
+        </p>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">
+          Explore Gacha Cat Cards
+        </h1>
         <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-200/80">
           <span className="rounded-full border border-amber-400/40 bg-amber-500/20 px-3 py-1 font-semibold text-amber-100">
             {stats.total.toLocaleString()} cards indexed
@@ -309,7 +335,7 @@ export default function CatdexPage() {
           <span
             className={cn(
               "rounded-full border border-amber-400/30 bg-slate-950/60 px-3 py-1",
-              (pendingCount ?? 0) > 0 ? "text-amber-200" : "text-neutral-300"
+              (pendingCount ?? 0) > 0 ? "text-amber-200" : "text-neutral-300",
             )}
           >
             {(pendingCount ?? 0).toLocaleString()} pending approvals
@@ -333,7 +359,10 @@ export default function CatdexPage() {
             value={seasonFilter}
             onChange={(event) => {
               setSeasonFilter(event.target.value);
-              track("catdex_filtered", { filter_type: "season", value: event.target.value });
+              track("catdex_filtered", {
+                filter_type: "season",
+                value: event.target.value,
+              });
             }}
           >
             <option value="all">All seasons</option>
@@ -348,7 +377,10 @@ export default function CatdexPage() {
             value={rarityFilter}
             onChange={(event) => {
               setRarityFilter(event.target.value);
-              track("catdex_filtered", { filter_type: "rarity", value: event.target.value });
+              track("catdex_filtered", {
+                filter_type: "rarity",
+                value: event.target.value,
+              });
             }}
           >
             <option value="all">All rarities</option>
@@ -364,7 +396,10 @@ export default function CatdexPage() {
             onChange={(event) => {
               const newSortKey = event.target.value as SortKey;
               setSortKey(newSortKey);
-              const [field, direction] = newSortKey.split("-") as [string, "asc" | "desc"];
+              const [field, direction] = newSortKey.split("-") as [
+                string,
+                "asc" | "desc",
+              ];
               track("catdex_sorted", { sort_by: field, direction });
             }}
           >
@@ -387,7 +422,7 @@ export default function CatdexPage() {
                   "rounded-full px-3 py-1",
                   imageVariant === "default"
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
+                    : "bg-muted text-muted-foreground",
                 )}
                 onClick={() => {
                   setImageVariant("default");
@@ -402,7 +437,7 @@ export default function CatdexPage() {
                   "rounded-full px-3 py-1",
                   imageVariant === "custom"
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
+                    : "bg-muted text-muted-foreground",
                 )}
                 onClick={() => {
                   setImageVariant("custom");
@@ -424,7 +459,11 @@ export default function CatdexPage() {
               onContextMenu={handleSubmitButtonInputEnd}
               onKeyDown={handleSubmitButtonKeyDown}
               onKeyUp={(event) => {
-                if (event.key === " " || event.key === "Spacebar" || event.key === "Enter") {
+                if (
+                  event.key === " " ||
+                  event.key === "Spacebar" ||
+                  event.key === "Enter"
+                ) {
                   handleSubmitButtonInputEnd();
                 }
               }}
@@ -433,7 +472,9 @@ export default function CatdexPage() {
             >
               Submit card
             </button>
-            <span className="text-[11px] text-muted-foreground">Hold 5s for mass upload</span>
+            <span className="text-[11px] text-muted-foreground">
+              Hold 5s for mass upload
+            </span>
           </div>
         </div>
       </section>
@@ -446,10 +487,15 @@ export default function CatdexPage() {
         <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredCats.map((cat) => {
             const sources = buildImageSources(cat, imageVariant);
-            const displaySeason = cat.seasonRaw?.season_name ?? cat.season ?? "Unknown Season";
-            const displayRarity = cat.rarityRaw?.rarity_name ?? cat.rarity ?? "Unknown";
+            const displaySeason =
+              cat.seasonRaw?.season_name ?? cat.season ?? "Unknown Season";
+            const displayRarity =
+              cat.rarityRaw?.rarity_name ?? cat.rarity ?? "Unknown";
             const seasonShort = seasonShortLabel(cat, displaySeason);
-            const rarityShort = rarityShortLabel(displayRarity, cat.rarityRaw?.stars ?? cat.rarityStars);
+            const rarityShort = rarityShortLabel(
+              displayRarity,
+              cat.rarityRaw?.stars ?? cat.rarityStars,
+            );
             const numberShort = cat.card_number ? `#${cat.card_number}` : "—";
 
             return (
@@ -457,8 +503,6 @@ export default function CatdexPage() {
                 key={cat.id}
                 className="glass-card group flex cursor-pointer flex-col overflow-hidden transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-2xl"
                 onClick={() => handleCardClick(cat)}
-                role="button"
-                tabIndex={0}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
                   if (event.key === "Enter" || event.key === " ") {
@@ -483,14 +527,18 @@ export default function CatdexPage() {
                 <div className="flex flex-1 flex-col gap-3 p-4">
                   <div>
                     <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-muted-foreground">
-                      <span className="font-semibold text-foreground">{numberShort}</span>
+                      <span className="font-semibold text-foreground">
+                        {numberShort}
+                      </span>
                       <span>{seasonShort}</span>
                       <span>{rarityShort}</span>
                     </div>
                     <h3 className="mt-2 text-lg font-semibold capitalize text-foreground">
                       {cat.cat_name ?? "Unnamed"}
                     </h3>
-                    <p className="text-xs text-muted-foreground">by {cat.twitch_user_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      by {cat.twitch_user_name}
+                    </p>
                   </div>
                 </div>
               </article>
@@ -542,19 +590,39 @@ export default function CatdexPage() {
                   <h2 className="text-2xl font-semibold capitalize">
                     {activeCat.cat_name ?? "Unnamed"}
                   </h2>
-                  <p className="text-sm text-muted-foreground">by {activeCat.twitch_user_name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    by {activeCat.twitch_user_name}
+                  </p>
                 </div>
                 <div className="grid gap-2 text-xs">
-                  <InfoRow label="Number" value={activeCat.card_number ? `#${activeCat.card_number}` : "—"} />
+                  <InfoRow
+                    label="Number"
+                    value={
+                      activeCat.card_number ? `#${activeCat.card_number}` : "—"
+                    }
+                  />
                   <InfoRow
                     label="Season"
-                    value={seasonsById.get(activeCat.seasonRaw?.id ?? "")?.season_name ?? activeCat.season ?? "—"}
+                    value={
+                      seasonsById.get(activeCat.seasonRaw?.id ?? "")
+                        ?.season_name ??
+                      activeCat.season ??
+                      "—"
+                    }
                   />
                   <InfoRow
                     label="Rarity"
-                    value={raritiesById.get(activeCat.rarityRaw?.id ?? "")?.rarity_name ?? activeCat.rarity ?? "—"}
+                    value={
+                      raritiesById.get(activeCat.rarityRaw?.id ?? "")
+                        ?.rarity_name ??
+                      activeCat.rarity ??
+                      "—"
+                    }
                   />
-                  <InfoRow label="Status" value={activeCat.approved ? "Approved" : "Pending approval"} />
+                  <InfoRow
+                    label="Status"
+                    value={activeCat.approved ? "Approved" : "Pending approval"}
+                  />
                 </div>
                 {hasCustomVariant(activeCat) && (
                   <div className="flex items-center gap-2 text-xs">
@@ -565,7 +633,7 @@ export default function CatdexPage() {
                         "rounded-full px-3 py-1",
                         activeVariant === "default"
                           ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
+                          : "bg-muted text-muted-foreground",
                       )}
                       onClick={() => setActiveVariant("default")}
                     >
@@ -577,7 +645,7 @@ export default function CatdexPage() {
                         "rounded-full px-3 py-1",
                         activeVariant === "custom"
                           ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
+                          : "bg-muted text-muted-foreground",
                       )}
                       onClick={() => setActiveVariant("custom")}
                     >
@@ -619,7 +687,7 @@ function matchesSearchTerm(cat: CatdexPayload, term: string): boolean {
     cat.season ?? "",
     cat.rarity ?? "",
     cat.seasonRaw?.season_name ?? "",
-    cat.rarityRaw?.rarity_name ?? ""
+    cat.rarityRaw?.rarity_name ?? "",
   ]
     .join(" ")
     .toLowerCase();
@@ -630,9 +698,13 @@ function matchesSearchTerm(cat: CatdexPayload, term: string): boolean {
 function applySort(sort: SortKey, a: CatdexPayload, b: CatdexPayload): number {
   switch (sort) {
     case "number-asc":
-      return (cardNumberToInt(a) ?? Infinity) - (cardNumberToInt(b) ?? Infinity);
+      return (
+        (cardNumberToInt(a) ?? Infinity) - (cardNumberToInt(b) ?? Infinity)
+      );
     case "number-desc":
-      return (cardNumberToInt(b) ?? -Infinity) - (cardNumberToInt(a) ?? -Infinity);
+      return (
+        (cardNumberToInt(b) ?? -Infinity) - (cardNumberToInt(a) ?? -Infinity)
+      );
     case "name-asc":
       return compareStrings(a.cat_name, b.cat_name);
     case "name-desc":
@@ -641,7 +713,6 @@ function applySort(sort: SortKey, a: CatdexPayload, b: CatdexPayload): number {
       return (a.rarityStars ?? Infinity) - (b.rarityStars ?? Infinity);
     case "rarity-desc":
       return (b.rarityStars ?? -Infinity) - (a.rarityStars ?? -Infinity);
-    case "updated-desc":
     default:
       return (b.updated ?? b.created ?? 0) - (a.updated ?? a.created ?? 0);
   }
@@ -664,27 +735,33 @@ function parseSearchTerms(input: string): string[] {
     .filter(Boolean);
 }
 
-function mapById<T extends { id: string }>(items: T[] | undefined | null): Map<string, T> {
+function mapById<T extends { id: string }>(
+  items: T[] | undefined | null,
+): Map<string, T> {
   if (!items) return new Map();
   return new Map(items.map((item) => [item.id, item] as const));
 }
 
 function buildImageSources(cat: CatdexPayload, variant: ImageVariant) {
   const defaultSrc = absoluteUrl(cat.default_card_url ?? cat.default_card);
-  const defaultThumb = absoluteUrl(cat.default_card_thumb_url ?? cat.default_card_thumb) ?? defaultSrc;
+  const defaultThumb =
+    absoluteUrl(cat.default_card_thumb_url ?? cat.default_card_thumb) ??
+    defaultSrc;
   const customSrc = absoluteUrl(cat.custom_card_url ?? cat.custom_card);
-  const customThumb = absoluteUrl(cat.custom_card_thumb_url ?? cat.custom_card_thumb) ?? customSrc;
+  const customThumb =
+    absoluteUrl(cat.custom_card_thumb_url ?? cat.custom_card_thumb) ??
+    customSrc;
 
   if (variant === "custom" && customSrc) {
     return {
       full: customSrc,
-      thumb: customThumb || defaultThumb
+      thumb: customThumb || defaultThumb,
     };
   }
 
   return {
     full: defaultSrc || customSrc,
-    thumb: defaultThumb || customThumb || defaultSrc || customSrc
+    thumb: defaultThumb || customThumb || defaultSrc || customSrc,
   };
 }
 
@@ -721,13 +798,20 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-async function uploadToStorage(file: File): Promise<{ storageId: string; fileName: string }> {
-  const getUrlResponse = await fetch(`${CONVEX_HTTP_URL}/api/storage/getUploadUrl`, {
-    method: "POST"
-  });
+async function uploadToStorage(
+  file: File,
+): Promise<{ storageId: string; fileName: string }> {
+  const getUrlResponse = await fetch(
+    `${CONVEX_HTTP_URL}/api/storage/getUploadUrl`,
+    {
+      method: "POST",
+    },
+  );
   if (!getUrlResponse.ok) {
     const text = await getUrlResponse.text();
-    throw new Error(`Unable to request upload URL (${getUrlResponse.status}): ${text}`);
+    throw new Error(
+      `Unable to request upload URL (${getUrlResponse.status}): ${text}`,
+    );
   }
   const { uploadUrl } = await getUrlResponse.json();
   if (!uploadUrl) {
@@ -737,9 +821,9 @@ async function uploadToStorage(file: File): Promise<{ storageId: string; fileNam
   const uploadResponse = await fetch(uploadUrl, {
     method: "POST",
     headers: {
-      "Content-Type": file.type || "application/octet-stream"
+      "Content-Type": file.type || "application/octet-stream",
     },
-    body: file
+    body: file,
   });
   if (!uploadResponse.ok) {
     const text = await uploadResponse.text();
@@ -752,7 +836,10 @@ async function uploadToStorage(file: File): Promise<{ storageId: string; fileNam
   return { storageId, fileName: file.name };
 }
 
-function inferEntryDefaults(fileName: string): { name: string; number: string } {
+function inferEntryDefaults(fileName: string): {
+  name: string;
+  number: string;
+} {
   const withoutExt = fileName.replace(/\.[^/.]+$/, "");
   const parts = withoutExt.split(/[_-]+/).filter(Boolean);
   if (!parts.length) return { name: "", number: "" };
@@ -765,13 +852,22 @@ function inferEntryDefaults(fileName: string): { name: string; number: string } 
   }
 
   const formatted = parts
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
+    .map(
+      (segment) =>
+        segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase(),
+    )
     .join(" ");
 
   return { name: formatted, number };
 }
 
-function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModalProps) {
+function SubmitModal({
+  open,
+  onClose,
+  seasons,
+  rarities,
+  onSubmit,
+}: SubmitModalProps) {
   const [seasonId, setSeasonId] = useState<string>("");
   const [rarityId, setRarityId] = useState<string>("");
   const [catName, setCatName] = useState("");
@@ -831,7 +927,7 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
         owner,
         cardNumber,
         defaultFile,
-        customFile
+        customFile,
       });
       const matchedSeason = seasons.find((s) => s.id === seasonId);
       const matchedRarity = rarities.find((r) => r.id === rarityId);
@@ -848,7 +944,8 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
       setDefaultFile(null);
       setCustomFile(null);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to submit the card.";
+      const message =
+        error instanceof Error ? error.message : "Failed to submit the card.";
       setStatus(message);
     } finally {
       setBusy(false);
@@ -872,7 +969,11 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
           event.preventDefault();
           onClose();
         }
-        if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget && !busy) {
+        if (
+          (event.key === "Enter" || event.key === " ") &&
+          event.target === event.currentTarget &&
+          !busy
+        ) {
           event.preventDefault();
           onClose();
         }
@@ -881,8 +982,12 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
       <div className="glass-card w-full max-w-xl overflow-hidden">
         <header className="flex items-center justify-between border-b border-border/40 px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Submit a Cat Card</h2>
-            <p className="text-xs text-muted-foreground">Uploads stay pending until a moderator approves them.</p>
+            <h2 className="text-lg font-semibold text-foreground">
+              Submit a Cat Card
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Uploads stay pending until a moderator approves them.
+            </p>
           </div>
           <button
             type="button"
@@ -923,7 +1028,9 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
             />
           </label>
           <label className="grid gap-1 text-sm">
-            <span className="text-muted-foreground">Twitch username (or display name)</span>
+            <span className="text-muted-foreground">
+              Twitch username (or display name)
+            </span>
             <input
               className="rounded-lg border border-border bg-background px-3 py-2"
               placeholder="e.g., Beastyrabbit"
@@ -951,7 +1058,9 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
             </select>
           </label>
           <label className="grid gap-1 text-sm">
-            <span className="text-muted-foreground">Card number (optional)</span>
+            <span className="text-muted-foreground">
+              Card number (optional)
+            </span>
             <input
               className="rounded-lg border border-border bg-background px-3 py-2"
               placeholder="Enter the official card number"
@@ -973,7 +1082,9 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
               }}
             />
             {defaultFile && (
-              <span className="text-xs text-muted-foreground">Selected: {defaultFile.name}</span>
+              <span className="text-xs text-muted-foreground">
+                Selected: {defaultFile.name}
+              </span>
             )}
           </label>
           <label className="grid gap-1 text-sm">
@@ -989,7 +1100,9 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
               }}
             />
             {customFile && (
-              <span className="text-xs text-muted-foreground">Selected: {customFile.name}</span>
+              <span className="text-xs text-muted-foreground">
+                Selected: {customFile.name}
+              </span>
             )}
           </label>
           <div className="flex flex-col gap-2 pt-2">
@@ -1000,7 +1113,9 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
             >
               {busy ? "Submitting…" : "Submit card"}
             </button>
-            {status && <p className="text-xs text-muted-foreground">{status}</p>}
+            {status && (
+              <p className="text-xs text-muted-foreground">{status}</p>
+            )}
           </div>
         </form>
       </div>
@@ -1008,7 +1123,12 @@ function SubmitModal({ open, onClose, seasons, rarities, onSubmit }: SubmitModal
   );
 }
 
-function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadModalProps) {
+function MassUploadModal({
+  onClose,
+  seasons,
+  rarities,
+  onSubmit,
+}: MassUploadModalProps) {
   const [owner, setOwner] = useState("");
   const [entries, setEntries] = useState<MassUploadEntry[]>([]);
   const [status, setStatus] = useState<string | null>(null);
@@ -1033,12 +1153,20 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
 
   useEffect(() => {
     return () => {
-      entriesRef.current.forEach((entry) => URL.revokeObjectURL(entry.previewUrl));
+      entriesRef.current.forEach((entry) =>
+        URL.revokeObjectURL(entry.previewUrl),
+      );
     };
   }, []);
 
-  const seasonOptions = seasons.map((season) => ({ id: season.id, label: season.season_name }));
-  const rarityOptions = rarities.map((rarity) => ({ id: rarity.id, label: rarity.rarity_name }));
+  const seasonOptions = seasons.map((season) => ({
+    id: season.id,
+    label: season.season_name,
+  }));
+  const rarityOptions = rarities.map((rarity) => ({
+    id: rarity.id,
+    label: rarity.rarity_name,
+  }));
   const defaultSeason = seasonOptions[0]?.id ?? "";
   const defaultRarity = rarityOptions[0]?.id ?? "";
 
@@ -1061,7 +1189,7 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
         rarityId: defaultRarity,
         customFile: null,
         status: "idle" as const,
-        message: undefined
+        message: undefined,
       };
     });
     setEntries((prev) => [...prev, ...newEntries]);
@@ -1069,8 +1197,13 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
     if (defaultInputRef.current) defaultInputRef.current.value = "";
   };
 
-  const updateEntry = (id: string, updater: (entry: MassUploadEntry) => MassUploadEntry) => {
-    setEntries((prev) => prev.map((entry) => (entry.id === id ? updater(entry) : entry)));
+  const updateEntry = (
+    id: string,
+    updater: (entry: MassUploadEntry) => MassUploadEntry,
+  ) => {
+    setEntries((prev) =>
+      prev.map((entry) => (entry.id === id ? updater(entry) : entry)),
+    );
   };
 
   const removeEntry = (id: string) => {
@@ -1115,12 +1248,16 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
         updateEntry(entry.id, (prev) => ({
           ...prev,
           status: "error",
-          message: validationErrors.join(" ")
+          message: validationErrors.join(" "),
         }));
         continue;
       }
 
-      updateEntry(entry.id, (prev) => ({ ...prev, status: "uploading", message: "Uploading…" }));
+      updateEntry(entry.id, (prev) => ({
+        ...prev,
+        status: "uploading",
+        message: "Uploading…",
+      }));
 
       try {
         await onSubmit({
@@ -1130,14 +1267,23 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
           owner,
           cardNumber: entry.cardNumber,
           defaultFile: entry.defaultFile,
-          customFile: entry.customFile
+          customFile: entry.customFile,
         });
         success += 1;
-        updateEntry(entry.id, (prev) => ({ ...prev, status: "success", message: "Uploaded" }));
+        updateEntry(entry.id, (prev) => ({
+          ...prev,
+          status: "success",
+          message: "Uploaded",
+        }));
       } catch (error) {
         failed += 1;
-        const message = error instanceof Error ? error.message : "Upload failed.";
-        updateEntry(entry.id, (prev) => ({ ...prev, status: "error", message }));
+        const message =
+          error instanceof Error ? error.message : "Upload failed.";
+        updateEntry(entry.id, (prev) => ({
+          ...prev,
+          status: "error",
+          message,
+        }));
       }
     }
 
@@ -1177,7 +1323,11 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
           event.preventDefault();
           onClose();
         }
-        if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget && !busy) {
+        if (
+          (event.key === "Enter" || event.key === " ") &&
+          event.target === event.currentTarget &&
+          !busy
+        ) {
           event.preventDefault();
           onClose();
         }
@@ -1186,9 +1336,12 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
       <div className="glass-card w-full max-w-5xl overflow-hidden">
         <header className="flex items-center justify-between border-b border-border/40 px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Mass upload cards</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              Mass upload cards
+            </h2>
             <p className="text-xs text-muted-foreground">
-              Select multiple default images, add details, and we will queue each submission automatically.
+              Select multiple default images, add details, and we will queue
+              each submission automatically.
             </p>
           </div>
           <button
@@ -1213,7 +1366,9 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
               />
             </label>
             <label className="grid gap-1 text-sm">
-              <span className="text-muted-foreground">Official card images</span>
+              <span className="text-muted-foreground">
+                Official card images
+              </span>
               <input
                 ref={defaultInputRef}
                 className="rounded-lg border border-dashed border-border bg-background px-3 py-2"
@@ -1223,7 +1378,8 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
                 onChange={handleFileSelection}
               />
               <small className="text-xs text-muted-foreground">
-                Hold the single submit button for five seconds to open this tool.
+                Hold the single submit button for five seconds to open this
+                tool.
               </small>
             </label>
           </div>
@@ -1249,7 +1405,9 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
                     <div className="flex-1 space-y-3 text-sm">
                       <div className="grid gap-3 sm:grid-cols-2">
                         <label className="grid gap-1">
-                          <span className="text-muted-foreground">Cat name</span>
+                          <span className="text-muted-foreground">
+                            Cat name
+                          </span>
                           <input
                             className="rounded-lg border border-border bg-background px-3 py-2"
                             value={entry.catName}
@@ -1257,21 +1415,29 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
                               updateEntry(entry.id, (prev) => ({
                                 ...prev,
                                 catName: event.target.value,
-                                status: prev.status === "error" ? "idle" : prev.status,
-                                message: prev.status === "error" ? undefined : prev.message
+                                status:
+                                  prev.status === "error"
+                                    ? "idle"
+                                    : prev.status,
+                                message:
+                                  prev.status === "error"
+                                    ? undefined
+                                    : prev.message,
                               }))
                             }
                           />
                         </label>
                         <label className="grid gap-1">
-                          <span className="text-muted-foreground">Card number (optional)</span>
+                          <span className="text-muted-foreground">
+                            Card number (optional)
+                          </span>
                           <input
                             className="rounded-lg border border-border bg-background px-3 py-2"
                             value={entry.cardNumber}
                             onChange={(event) =>
                               updateEntry(entry.id, (prev) => ({
                                 ...prev,
-                                cardNumber: event.target.value
+                                cardNumber: event.target.value,
                               }))
                             }
                           />
@@ -1287,8 +1453,14 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
                               updateEntry(entry.id, (prev) => ({
                                 ...prev,
                                 seasonId: event.target.value,
-                                status: prev.status === "error" ? "idle" : prev.status,
-                                message: prev.status === "error" ? undefined : prev.message
+                                status:
+                                  prev.status === "error"
+                                    ? "idle"
+                                    : prev.status,
+                                message:
+                                  prev.status === "error"
+                                    ? undefined
+                                    : prev.message,
                               }))
                             }
                           >
@@ -1311,8 +1483,14 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
                               updateEntry(entry.id, (prev) => ({
                                 ...prev,
                                 rarityId: event.target.value,
-                                status: prev.status === "error" ? "idle" : prev.status,
-                                message: prev.status === "error" ? undefined : prev.message
+                                status:
+                                  prev.status === "error"
+                                    ? "idle"
+                                    : prev.status,
+                                message:
+                                  prev.status === "error"
+                                    ? undefined
+                                    : prev.message,
                               }))
                             }
                           >
@@ -1328,7 +1506,9 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
                         </label>
                       </div>
                       <label className="grid gap-1">
-                        <span className="text-muted-foreground">Custom art (optional)</span>
+                        <span className="text-muted-foreground">
+                          Custom art (optional)
+                        </span>
                         <input
                           className="rounded-lg border border-dashed border-border bg-background px-3 py-2"
                           type="file"
@@ -1338,13 +1518,19 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
                             updateEntry(entry.id, (prev) => ({
                               ...prev,
                               customFile: file,
-                              status: prev.status === "error" ? "idle" : prev.status,
-                              message: prev.status === "error" ? undefined : prev.message
+                              status:
+                                prev.status === "error" ? "idle" : prev.status,
+                              message:
+                                prev.status === "error"
+                                  ? undefined
+                                  : prev.message,
                             }));
                           }}
                         />
                         {entry.customFile && (
-                          <span className="text-xs text-muted-foreground">Selected: {entry.customFile.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            Selected: {entry.customFile.name}
+                          </span>
                         )}
                       </label>
                       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -1363,7 +1549,7 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
                                 ? "text-red-500"
                                 : entry.status === "success"
                                   ? "text-emerald-500"
-                                  : "text-muted-foreground"
+                                  : "text-muted-foreground",
                             )}
                           >
                             {entry.message}
@@ -1389,7 +1575,9 @@ function MassUploadModal({ onClose, seasons, rarities, onSubmit }: MassUploadMod
             >
               {busy ? "Uploading…" : "Upload all"}
             </button>
-            {status && <p className="text-xs text-muted-foreground">{status}</p>}
+            {status && (
+              <p className="text-xs text-muted-foreground">{status}</p>
+            )}
           </div>
         </form>
       </div>
@@ -1414,12 +1602,19 @@ function CreditBanner() {
 }
 
 function seasonShortLabel(cat: CatdexPayload, fallback: string): string {
-  const fromRaw = (cat.seasonRaw as { short_name?: string | null; season_name?: string | null } | null | undefined)
-    ?.short_name;
-  if (fromRaw && fromRaw.trim()) return fromRaw.trim();
-  if (cat.seasonShort && cat.seasonShort.trim()) return cat.seasonShort.trim();
+  const fromRaw = (
+    cat.seasonRaw as
+      | { short_name?: string | null; season_name?: string | null }
+      | null
+      | undefined
+  )?.short_name;
+  if (fromRaw?.trim()) return fromRaw.trim();
+  if (cat.seasonShort?.trim()) return cat.seasonShort.trim();
   const seasonName =
-    ((cat.seasonRaw as { season_name?: string | null } | null | undefined)?.season_name ?? fallback) || fallback;
+    ((cat.seasonRaw as { season_name?: string | null } | null | undefined)
+      ?.season_name ??
+      fallback) ||
+    fallback;
   return deriveSeasonShort(seasonName);
 }
 
@@ -1441,7 +1636,10 @@ function deriveSeasonShort(seasonName: string | null | undefined): string {
   return trimmed.slice(0, 6).toUpperCase();
 }
 
-function rarityShortLabel(rarity: string | null | undefined, stars: number | null | undefined): string {
+function rarityShortLabel(
+  rarity: string | null | undefined,
+  stars: number | null | undefined,
+): string {
   if (!rarity) return "—";
   const trimmed = rarity.trim();
   if (!trimmed) return "—";

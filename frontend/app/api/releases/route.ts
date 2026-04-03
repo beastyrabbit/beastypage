@@ -12,13 +12,21 @@ export async function GET() {
 
     if (!res.ok) {
       console.error(`GitHub releases API returned ${res.status}`);
-      return NextResponse.json({ error: "Failed to fetch releases" }, { status: 502 });
+      return NextResponse.json(
+        { error: "Failed to fetch releases" },
+        { status: 502 },
+      );
     }
 
     const raw: unknown = await res.json();
     if (!Array.isArray(raw)) {
-      console.error(`GitHub releases API returned non-array response: ${typeof raw}`);
-      return NextResponse.json({ error: "Unexpected response format from GitHub" }, { status: 502 });
+      console.error(
+        `GitHub releases API returned non-array response: ${typeof raw}`,
+      );
+      return NextResponse.json(
+        { error: "Unexpected response format from GitHub" },
+        { status: 502 },
+      );
     }
     const items = raw;
     const releases = items.map((entry: unknown) => {
@@ -37,6 +45,9 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Failed to fetch GitHub releases", error);
-    return NextResponse.json({ error: "Failed to fetch releases" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch releases" },
+      { status: 500 },
+    );
   }
 }

@@ -10,8 +10,7 @@ export const metadata: Metadata = {
     "Transform images with a modular pixel art pipeline. Chain pixelation, dithering, color quantization and more.",
   openGraph: {
     title: "Pixelator | Artist Tools",
-    description:
-      "Transform images with a modular pixel art pipeline.",
+    description: "Transform images with a modular pixel art pipeline.",
   },
 };
 
@@ -21,16 +20,18 @@ export default function PixelatorPage() {
       <PageHero
         eyebrow="Artist Tools"
         title={
-          <>
-            <span className="text-gradient-artist animate-shimmer bg-[length:200%_auto]">
-              Pixelator
-            </span>
-          </>
+          <span className="text-gradient-artist animate-shimmer bg-[length:200%_auto]">
+            Pixelator
+          </span>
         }
         description="Build a processing pipeline to transform images. Chain pixelation, dithering, color quantization, and effects."
       />
 
-      <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+      <Suspense
+        fallback={
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        }
+      >
         <PixelatorClient />
       </Suspense>
     </main>

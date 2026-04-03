@@ -1,5 +1,5 @@
-import ViewerClient from "@/components/streamer/ViewerClient";
 import { Suspense } from "react";
+import ViewerClient from "@/components/streamer/ViewerClient";
 
 export const metadata = {
   title: "Streamer Voting Viewer",
@@ -16,13 +16,22 @@ function firstSearchParam(value: string | string[] | undefined): string | null {
   return null;
 }
 
-export default async function StreamerViewerPage({ searchParams }: StreamerViewerPageProps) {
+export default async function StreamerViewerPage({
+  searchParams,
+}: StreamerViewerPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
-  const viewerKey = firstSearchParam(resolvedSearchParams.viewer)?.trim() ?? null;
+  const viewerKey =
+    firstSearchParam(resolvedSearchParams.viewer)?.trim() ?? null;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-12 md:px-10">
-      <Suspense fallback={<div className="rounded-3xl border border-border/40 bg-background/70 px-6 py-10 text-sm text-muted-foreground">Loading viewer panel…</div>}>
+      <Suspense
+        fallback={
+          <div className="rounded-3xl border border-border/40 bg-background/70 px-6 py-10 text-sm text-muted-foreground">
+            Loading viewer panel…
+          </div>
+        }
+      >
         <ViewerClient viewerKey={viewerKey} />
       </Suspense>
     </main>

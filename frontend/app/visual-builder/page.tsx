@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
-import { VisualBuilderClient, DEFAULT_PARAMS, type VisualBuilderInitialPayload } from "@/components/visual-builder/VisualBuilderClient";
+import {
+  DEFAULT_PARAMS,
+  VisualBuilderClient,
+  type VisualBuilderInitialPayload,
+} from "@/components/visual-builder/VisualBuilderClient";
 import { VisualBuilderLoader } from "@/components/visual-builder/VisualBuilderLoader";
 import { decodeCatShare } from "@/lib/catShare";
 
 export const metadata: Metadata = {
   title: "Visual Cat Builder",
-  description: "Customize and share ClanGen-style cat sprites in the visual builder.",
+  description:
+    "Customize and share ClanGen-style cat sprites in the visual builder.",
 };
 
 type PageProps = {
@@ -21,11 +26,36 @@ type PageProps = {
 export default async function VisualBuilderPage({ searchParams }: PageProps) {
   const resolvedSearch = searchParams ? await searchParams : undefined;
 
-  const rawSlug = typeof resolvedSearch?.slug === "string" ? resolvedSearch.slug : Array.isArray(resolvedSearch?.slug) ? resolvedSearch?.slug[0] : undefined;
-  const rawShare = typeof resolvedSearch?.share === "string" ? resolvedSearch.share : Array.isArray(resolvedSearch?.share) ? resolvedSearch?.share[0] : undefined;
-  const rawCat = typeof resolvedSearch?.cat === "string" ? resolvedSearch.cat : Array.isArray(resolvedSearch?.cat) ? resolvedSearch?.cat[0] : undefined;
-  const rawName = typeof resolvedSearch?.name === "string" ? resolvedSearch.name : Array.isArray(resolvedSearch?.name) ? resolvedSearch?.name[0] : undefined;
-  const rawCreator = typeof resolvedSearch?.creator === "string" ? resolvedSearch.creator : Array.isArray(resolvedSearch?.creator) ? resolvedSearch?.creator[0] : undefined;
+  const rawSlug =
+    typeof resolvedSearch?.slug === "string"
+      ? resolvedSearch.slug
+      : Array.isArray(resolvedSearch?.slug)
+        ? resolvedSearch?.slug[0]
+        : undefined;
+  const rawShare =
+    typeof resolvedSearch?.share === "string"
+      ? resolvedSearch.share
+      : Array.isArray(resolvedSearch?.share)
+        ? resolvedSearch?.share[0]
+        : undefined;
+  const rawCat =
+    typeof resolvedSearch?.cat === "string"
+      ? resolvedSearch.cat
+      : Array.isArray(resolvedSearch?.cat)
+        ? resolvedSearch?.cat[0]
+        : undefined;
+  const rawName =
+    typeof resolvedSearch?.name === "string"
+      ? resolvedSearch.name
+      : Array.isArray(resolvedSearch?.name)
+        ? resolvedSearch?.name[0]
+        : undefined;
+  const rawCreator =
+    typeof resolvedSearch?.creator === "string"
+      ? resolvedSearch.creator
+      : Array.isArray(resolvedSearch?.creator)
+        ? resolvedSearch?.creator[0]
+        : undefined;
 
   const slugParam = rawSlug?.trim();
   const shareValue = (rawShare ?? rawCat)?.trim();
@@ -39,10 +69,19 @@ export default async function VisualBuilderPage({ searchParams }: PageProps) {
   if (shareValue) {
     const decoded = await decodeCatShare(shareValue);
     if (decoded?.params) {
-      const params = { ...DEFAULT_PARAMS, ...(decoded.params as Record<string, unknown>) } as VisualBuilderInitialPayload["params"];
-      const accessories = (decoded.accessorySlots ?? []).filter((value): value is string => !!value && value !== "none");
-      const scars = (decoded.scarSlots ?? []).filter((value): value is string => !!value && value !== "none");
-      const tortie = (decoded.tortieSlots ?? []).filter((entry): entry is NonNullable<typeof entry> => !!entry);
+      const params = {
+        ...DEFAULT_PARAMS,
+        ...(decoded.params as Record<string, unknown>),
+      } as VisualBuilderInitialPayload["params"];
+      const accessories = (decoded.accessorySlots ?? []).filter(
+        (value): value is string => !!value && value !== "none",
+      );
+      const scars = (decoded.scarSlots ?? []).filter(
+        (value): value is string => !!value && value !== "none",
+      );
+      const tortie = (decoded.tortieSlots ?? []).filter(
+        (entry): entry is NonNullable<typeof entry> => !!entry,
+      );
 
       params.accessories = accessories;
       params.accessory = accessories[0] ?? undefined;

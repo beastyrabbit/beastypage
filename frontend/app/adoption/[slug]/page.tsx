@@ -11,7 +11,9 @@ export async function generateMetadata({ params }: AdoptionBatchPageProps) {
   };
 }
 
-export default async function AdoptionBatchPage({ params }: AdoptionBatchPageProps) {
+export default async function AdoptionBatchPage({
+  params,
+}: AdoptionBatchPageProps) {
   const resolved = await params;
   return <AdoptionBatchClient slug={resolved.slug} />;
 }

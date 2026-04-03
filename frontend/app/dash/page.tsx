@@ -1,14 +1,15 @@
-import type { Metadata } from "next";
 import { ConvexHttpClient } from "convex/browser";
-import { api } from "@/convex/_generated/api";
-import type { DashSettings } from "@/lib/dash/types";
-import { getServerConvexUrl } from "@/lib/convexUrl";
-import { parseDashPayload } from "@/utils/dashVariants";
+import type { Metadata } from "next";
 import { DashClient } from "@/components/dash/DashClient";
+import { api } from "@/convex/_generated/api";
+import { getServerConvexUrl } from "@/lib/convexUrl";
+import type { DashSettings } from "@/lib/dash/types";
+import { parseDashPayload } from "@/utils/dashVariants";
 
 export const metadata: Metadata = {
   title: "Dash | BeastyPage",
-  description: "Your customizable dashboard — pin your favourite tools and stay up to date.",
+  description:
+    "Your customizable dashboard — pin your favourite tools and stay up to date.",
 };
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ function firstSearchParam(value: string | string[] | undefined): string | null {
 }
 
 async function loadDashFromSlug(
-  slug: string
+  slug: string,
 ): Promise<{ settings: DashSettings | null; error: string | null }> {
   const convexUrl = getServerConvexUrl();
   if (!convexUrl) {

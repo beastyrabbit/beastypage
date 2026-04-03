@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PageHero } from "@/components/common/PageHero";
 
@@ -15,12 +15,10 @@ type ToolCard = {
 
 export const metadata: Metadata = {
   title: "Games | Projects | BeastyRabbit",
-  description:
-    "Interactive challenges and playful experiments with cats.",
+  description: "Interactive challenges and playful experiments with cats.",
   openGraph: {
     title: "Games | Projects",
-    description:
-      "Interactive challenges and playful experiments with cats.",
+    description: "Interactive challenges and playful experiments with cats.",
   },
 };
 
@@ -80,18 +78,26 @@ export default function GamesCategory() {
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {TOOLS.map((card, index) => {
           const isActive = Boolean(!card.comingSoon && card.href);
-          const baseClasses = "glass-card relative flex h-full flex-col gap-4 p-6 transition-all duration-500 overflow-hidden group";
+          const baseClasses =
+            "glass-card relative flex h-full flex-col gap-4 p-6 transition-all duration-500 overflow-hidden group";
           const wrapperClassName = isActive
             ? `${baseClasses} hover:-translate-y-2 hover:shadow-2xl hover:border-cyan-400/30`
             : `${baseClasses} opacity-70 grayscale-[0.5] hover:opacity-100 hover:grayscale-0 animate-pulse-soft`;
 
           const content = (
             <>
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-teal-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100" role="presentation" aria-hidden="true" />
+              <div
+                className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-teal-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                role="presentation"
+                aria-hidden="true"
+              />
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:animate-shine" />
 
               <div className="flex items-start justify-between">
-                <div className="text-4xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" aria-hidden>
+                <div
+                  className="text-4xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                  aria-hidden
+                >
                   {card.icon}
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -104,8 +110,12 @@ export default function GamesCategory() {
               </div>
 
               <div className="relative z-10">
-                <h3 className="text-xl font-bold text-foreground group-hover:text-gradient-games transition-colors">{card.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors">{card.description}</p>
+                <h3 className="text-xl font-bold text-foreground group-hover:text-gradient-games transition-colors">
+                  {card.title}
+                </h3>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors">
+                  {card.description}
+                </p>
               </div>
 
               {isActive && (

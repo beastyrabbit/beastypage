@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { CollectionEntry } from "@/convex/collection";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
-import { CONVEX_HTTP_URL } from "@/lib/convexClient";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
+import { api } from "@/convex/_generated/api";
+import type { CollectionEntry } from "@/convex/collection";
+import { CONVEX_HTTP_URL } from "@/lib/convexClient";
 
 export default function CollectionPage() {
   const entries = useQuery(api.collection.list, {});
@@ -43,7 +43,7 @@ export default function CollectionPage() {
           entry.artist_name,
           entry.animal,
           entry.link ?? "",
-          formatDate(entry.updated ?? entry.created)
+          formatDate(entry.updated ?? entry.created),
         ]
           .join(" ")
           .toLowerCase();
@@ -68,15 +68,22 @@ export default function CollectionPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 py-12">
       <header className="glass-card relative overflow-hidden px-8 py-12">
-        <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10" aria-hidden />
+        <div
+          className="absolute inset-0 bg-gradient-to-br from-sky-500/10 via-transparent to-purple-500/10"
+          aria-hidden
+        />
         <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/5 to-transparent animate-shimmer" />
         <div className="relative flex flex-col gap-4">
           <div className="section-eyebrow">Collection</div>
           <h1 className="text-4xl font-bold sm:text-5xl md:text-6xl">
-            Community <span className="text-gradient-collection animate-shimmer bg-[length:200%_auto]">Art Collection</span>
+            Community{" "}
+            <span className="text-gradient-collection animate-shimmer bg-[length:200%_auto]">
+              Art Collection
+            </span>
           </h1>
           <p className="max-w-3xl text-sm text-muted-foreground/90 leading-relaxed">
-            Explore the creative works and fan art from the BeastyRabbit community.
+            Explore the creative works and fan art from the BeastyRabbit
+            community.
           </p>
           <div className="flex flex-wrap items-center gap-3 text-xs mt-2">
             <span className="rounded-full bg-sky-500/10 px-3 py-1 font-bold text-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.2)]">
@@ -108,17 +115,16 @@ export default function CollectionPage() {
       ) : (
         <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filteredEntries.map((entry, index) => {
-            const preview = absoluteUrl(entry.preview_img) ?? absoluteUrl(entry.full_img);
+            const preview =
+              absoluteUrl(entry.preview_img) ?? absoluteUrl(entry.full_img);
             const blur = absoluteUrl(entry.blur_img) ?? preview;
-            const full = absoluteUrl(entry.full_img);
+            const _full = absoluteUrl(entry.full_img);
             return (
               <article
                 key={entry.id}
                 className="glass-card group flex cursor-pointer flex-col overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:border-sky-500/30 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
                 style={{ animationDelay: `${index * 50}ms` }}
                 onClick={() => setActiveEntry(entry)}
-                role="button"
-                tabIndex={0}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
                   if (event.key === "Enter" || event.key === " ") {
@@ -132,7 +138,9 @@ export default function CollectionPage() {
                     lowSrc={blur}
                     highSrc={preview}
                     alt={entry.animal ?? "Artwork"}
-                    imgStyle={{ objectPosition: `${entry.focusX}% ${entry.focusY}%` }}
+                    imgStyle={{
+                      objectPosition: `${entry.focusX}% ${entry.focusY}%`,
+                    }}
                     className="transition-transform duration-700 group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
@@ -141,7 +149,9 @@ export default function CollectionPage() {
                   </span>
                 </div>
                 <div className="flex flex-1 flex-col gap-2 p-5">
-                  <h3 className="text-lg font-bold capitalize text-foreground group-hover:text-sky-400 transition-colors">{entry.artist_name}</h3>
+                  <h3 className="text-lg font-bold capitalize text-foreground group-hover:text-sky-400 transition-colors">
+                    {entry.artist_name}
+                  </h3>
                   <div className="mt-auto flex flex-wrap gap-2">
                     {entry.link && (
                       <Link
@@ -163,7 +173,9 @@ export default function CollectionPage() {
       )}
 
       <footer className="rounded-2xl border border-white/5 bg-white/5 p-6 text-xs text-muted-foreground text-center">
-        Committing the export archive keeps deployments deterministic: bring up a fresh Convex instance, run the seed mutation, and these assets are instantly ready for LAN or production environments.
+        Committing the export archive keeps deployments deterministic: bring up
+        a fresh Convex instance, run the seed mutation, and these assets are
+        instantly ready for LAN or production environments.
       </footer>
 
       {activeEntry && (
@@ -181,7 +193,10 @@ export default function CollectionPage() {
               event.preventDefault();
               setActiveEntry(null);
             }
-            if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+            if (
+              (event.key === "Enter" || event.key === " ") &&
+              event.target === event.currentTarget
+            ) {
               event.preventDefault();
               setActiveEntry(null);
             }
@@ -198,20 +213,38 @@ export default function CollectionPage() {
             </button>
             <div className="grid gap-6 p-6 md:grid-cols-[1.4fr,1fr]">
               <ProgressiveImage
-                lowSrc={absoluteUrl(activeEntry.blur_img) ?? absoluteUrl(activeEntry.preview_img) ?? absoluteUrl(activeEntry.full_img)}
-                highSrc={absoluteUrl(activeEntry.full_img) ?? absoluteUrl(activeEntry.preview_img)}
+                lowSrc={
+                  absoluteUrl(activeEntry.blur_img) ??
+                  absoluteUrl(activeEntry.preview_img) ??
+                  absoluteUrl(activeEntry.full_img)
+                }
+                highSrc={
+                  absoluteUrl(activeEntry.full_img) ??
+                  absoluteUrl(activeEntry.preview_img)
+                }
                 alt={activeEntry.animal ?? "Artwork"}
                 className="w-full overflow-hidden rounded-2xl bg-muted shadow-lg"
-                imgStyle={{ objectPosition: `${activeEntry.focusX}% ${activeEntry.focusY}%` }}
+                imgStyle={{
+                  objectPosition: `${activeEntry.focusX}% ${activeEntry.focusY}%`,
+                }}
               />
               <div className="flex flex-col gap-6 py-4">
                 <div>
-                  <h2 className="text-3xl font-bold capitalize text-gradient-collection inline-block">{activeEntry.artist_name}</h2>
+                  <h2 className="text-3xl font-bold capitalize text-gradient-collection inline-block">
+                    {activeEntry.artist_name}
+                  </h2>
                 </div>
                 <dl className="grid gap-3 text-sm">
-                  <InfoRow label="Animal" value={activeEntry.animal ?? "Unknown"} />
+                  <InfoRow
+                    label="Animal"
+                    value={activeEntry.animal ?? "Unknown"}
+                  />
                   {activeEntry.link && (
-                    <InfoRow label="Source" value={normalizeLink(activeEntry.link)} isLink />
+                    <InfoRow
+                      label="Source"
+                      value={normalizeLink(activeEntry.link)}
+                      isLink
+                    />
                   )}
                 </dl>
                 <div className="mt-auto flex flex-wrap gap-3 text-xs">
@@ -260,9 +293,22 @@ function normalizeLink(link: string): string {
   return `https://${link}`;
 }
 
-function InfoRow({ label, value, isLink }: { label: string; value: string; isLink?: boolean }) {
+function InfoRow({
+  label,
+  value,
+  isLink,
+}: {
+  label: string;
+  value: string;
+  isLink?: boolean;
+}) {
   const content = isLink ? (
-    <Link href={normalizeLink(value)} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+    <Link
+      href={normalizeLink(value)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary underline"
+    >
       {value}
     </Link>
   ) : (

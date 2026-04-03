@@ -1,6 +1,6 @@
-import { Suspense } from "react";
 import { Loader2 } from "lucide-react";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { PageHero } from "@/components/common/PageHero";
 import { StreamControlClient } from "@/components/stream-control/StreamControlClient";

@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
+import { type NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { getServerConvexUrl } from "@/lib/convexUrl";
 import { parsePaletteGeneratorPayload } from "@/utils/paletteGeneratorVariants";
@@ -12,12 +12,17 @@ export async function GET(request: NextRequest) {
 
   const convexUrl = getServerConvexUrl();
   if (!convexUrl) {
-    return NextResponse.json({ error: "Convex URL not configured" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Convex URL not configured" },
+      { status: 500 },
+    );
   }
 
   try {
     const convex = new ConvexHttpClient(convexUrl);
-    const record = await convex.query(api.paletteGeneratorSettings.get, { slug });
+    const record = await convex.query(api.paletteGeneratorSettings.get, {
+      slug,
+    });
     if (!record) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -29,14 +34,20 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to fetch palette generator settings", error);
-    return NextResponse.json({ error: "Failed to load settings" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to load settings" },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
   const convexUrl = getServerConvexUrl();
   if (!convexUrl) {
-    return NextResponse.json({ error: "Convex URL not configured" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Convex URL not configured" },
+      { status: 500 },
+    );
   }
 
   let body: unknown;
@@ -59,11 +70,21 @@ export async function POST(request: NextRequest) {
     const convex = new ConvexHttpClient(convexUrl);
     const result = await convex.mutation(api.paletteGeneratorSettings.save, {
       config: sanitizedConfig,
-      slug: typeof payload.slug === "string" && payload.slug.trim() ? payload.slug.trim() : undefined,
+      slug:
+        typeof payload.slug === "string" && payload.slug.trim()
+          ? payload.slug.trim()
+          : undefined,
     });
-    return NextResponse.json({ slug: result.slug, id: result.id, updated: result.updated });
+    return NextResponse.json({
+      slug: result.slug,
+      id: result.id,
+      updated: result.updated,
+    });
   } catch (error) {
     console.error("Failed to save palette generator settings", error);
-    return NextResponse.json({ error: "Failed to save settings" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to save settings" },
+      { status: 500 },
+    );
   }
 }

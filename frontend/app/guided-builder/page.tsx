@@ -1,13 +1,13 @@
-import { Suspense } from "react";
-import type { Metadata } from "next";
 import { Loader2 } from "lucide-react";
-
-import { GuidedBuilderClient } from "@/components/guided-builder/GuidedBuilderClient";
+import type { Metadata } from "next";
+import { Suspense } from "react";
 import { PageHero } from "@/components/common/PageHero";
+import { GuidedBuilderClient } from "@/components/guided-builder/GuidedBuilderClient";
 
 export const metadata: Metadata = {
   title: "Guided Builder Tour",
-  description: "Step-by-step wizard that walks you through building the perfect cat using the V3 renderer.",
+  description:
+    "Step-by-step wizard that walks you through building the perfect cat using the V3 renderer.",
 };
 
 export default function GuidedBuilderPage() {
@@ -22,7 +22,8 @@ export default function GuidedBuilderPage() {
         fallback={
           <div className="flex min-h-[320px] items-center justify-center">
             <div className="glass-card flex items-center gap-2 px-6 py-4 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Loading guided builder…
+              <Loader2 className="size-4 animate-spin" /> Loading guided
+              builder…
             </div>
           </div>
         }

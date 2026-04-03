@@ -1,9 +1,9 @@
-import { Metadata } from 'next';
+import type { Metadata } from "next";
 
-import { RenderLayerDebugger } from '@/components/dev/RenderLayerDebugger';
+import { RenderLayerDebugger } from "@/components/dev/RenderLayerDebugger";
 
 export const metadata: Metadata = {
-  title: 'Render Layer Debugger',
+  title: "Render Layer Debugger",
 };
 
 export default function RenderDebugPage() {

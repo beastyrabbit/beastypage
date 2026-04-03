@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-
-import { PageHero } from "@/components/common/PageHero";
 import { ColorPaletteContent } from "@/components/color-palette/ColorPaletteContent";
+import { PageHero } from "@/components/common/PageHero";
 
 export const metadata: Metadata = {
   title: "Color Palette Creator | Projects | BeastyRabbit",
@@ -25,12 +24,16 @@ function firstSearchParam(value: string | string[] | undefined): string | null {
   return null;
 }
 
-export default async function ColorPaletteCreatorPage({ searchParams }: ColorPaletteCreatorPageProps) {
+export default async function ColorPaletteCreatorPage({
+  searchParams,
+}: ColorPaletteCreatorPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const slug = firstSearchParam(resolvedSearchParams.slug)?.trim() ?? null;
-  const darkForestParam = firstSearchParam(resolvedSearchParams.darkForest)?.trim() ?? null;
+  const darkForestParam =
+    firstSearchParam(resolvedSearchParams.darkForest)?.trim() ?? null;
   const imageUrl = firstSearchParam(resolvedSearchParams.imageUrl) ?? null;
-  const paletteSlug = firstSearchParam(resolvedSearchParams.paletteSlug)?.trim() ?? null;
+  const paletteSlug =
+    firstSearchParam(resolvedSearchParams.paletteSlug)?.trim() ?? null;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
@@ -48,7 +51,11 @@ export default async function ColorPaletteCreatorPage({ searchParams }: ColorPal
         description="Extract dominant colors from any image. Drag crosshairs to pick new colors, hover swatches to highlight matching regions."
       />
 
-      <Suspense fallback={<div className="text-sm text-muted-foreground">Loading...</div>}>
+      <Suspense
+        fallback={
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        }
+      >
         <ColorPaletteContent
           slug={slug}
           darkForestParam={darkForestParam}

@@ -1,15 +1,22 @@
-import Image from "next/image";
 import type { Metadata } from "next";
+import Image from "next/image";
 
 import { DiscordInviteButton } from "@/components/common/DiscordInviteButton";
-import { HeroSocialButtons, PrimarySocialLinks, SecondarySocialLinks } from "@/components/common/SocialLinks";
+import {
+  HeroSocialButtons,
+  PrimarySocialLinks,
+  SecondarySocialLinks,
+} from "@/components/common/SocialLinks";
 
 function getAge(): number {
   const birthDate = new Date(1990, 8, 1); // September 1, 1990 (month is 0-indexed)
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
     age--;
   }
   return age;
@@ -17,10 +24,12 @@ function getAge(): number {
 
 export const metadata: Metadata = {
   title: "BeastyRabbit | Home",
-  description: "Stay connected with BeastyRabbit across socials, goals, and support links.",
+  description:
+    "Stay connected with BeastyRabbit across socials, goals, and support links.",
   openGraph: {
     title: "BeastyRabbit | Home",
-    description: "Stay connected with BeastyRabbit across socials, goals, and support links.",
+    description:
+      "Stay connected with BeastyRabbit across socials, goals, and support links.",
   },
 };
 
@@ -48,7 +57,10 @@ export default function HomePage() {
         <div className="relative z-10 px-8 py-12 text-balance">
           <p className="section-eyebrow">Welcome</p>
           <h1 className="mt-4 text-5xl font-bold leading-tight sm:text-6xl">
-            Hey there, I&apos;m <span className="text-gradient-personal animate-shimmer bg-[length:200%_auto]">Beasty.</span>
+            Hey there, I&apos;m{" "}
+            <span className="text-gradient-personal animate-shimmer bg-[length:200%_auto]">
+              Beasty.
+            </span>
           </h1>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <HeroSocialButtons />
@@ -75,16 +87,26 @@ export default function HomePage() {
           <div className="space-y-4 text-center md:text-left">
             <p className="section-eyebrow">About me</p>
             <p className="text-lg text-foreground/90 leading-relaxed">
-              {age}-year-old self-employed developer from Germany. I&apos;m into next-level tech and gear,
-              old-school games, and weird quirky stuff that probably shouldn&apos;t exist... but does.
-              Casual gamer and full-time art commission junkie. I run Arch Linux as my daily driver
-              and have two cats who offer zero tech support but plenty of chaos.
+              {age}-year-old self-employed developer from Germany. I&apos;m into
+              next-level tech and gear, old-school games, and weird quirky stuff
+              that probably shouldn&apos;t exist... but does. Casual gamer and
+              full-time art commission junkie. I run Arch Linux as my daily
+              driver and have two cats who offer zero tech support but plenty of
+              chaos.
             </p>
             <div className="flex flex-wrap gap-2 pt-2">
-              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">Arch Linux</span>
-              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">Tech & Gadgets</span>
-              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">Retro Games</span>
-              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">Art Collector</span>
+              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">
+                Arch Linux
+              </span>
+              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">
+                Tech & Gadgets
+              </span>
+              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">
+                Retro Games
+              </span>
+              <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-medium text-muted-foreground">
+                Art Collector
+              </span>
             </div>
           </div>
         </div>
