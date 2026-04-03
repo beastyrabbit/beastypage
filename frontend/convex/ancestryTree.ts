@@ -1,5 +1,5 @@
-import { mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
+import { mutation, query } from "./_generated/server.js";
 
 /**
  * Password hashing utilities using Web Crypto PBKDF2
@@ -27,7 +27,7 @@ function generateSalt(): Uint8Array {
  * Convert Uint8Array to base64 string
  */
 function toBase64(bytes: Uint8Array): string {
-  let binary = '';
+  let binary = "";
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
@@ -59,7 +59,11 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 /**
  * Derive a key from password and salt using PBKDF2
  */
-async function deriveKey(password: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {
+async function deriveKey(
+  password: string,
+  salt: Uint8Array,
+  iterations: number,
+): Promise<Uint8Array> {
   const encoder = new TextEncoder();
   const passwordBytes = encoder.encode(password);
 
@@ -68,7 +72,7 @@ async function deriveKey(password: string, salt: Uint8Array, iterations: number)
     passwordBytes,
     "PBKDF2",
     false,
-    ["deriveBits"]
+    ["deriveBits"],
   );
 
   const derivedBits = await crypto.subtle.deriveBits(
@@ -79,7 +83,7 @@ async function deriveKey(password: string, salt: Uint8Array, iterations: number)
       hash: "SHA-256",
     },
     keyMaterial,
-    KEY_LENGTH * 8
+    KEY_LENGTH * 8,
   );
 
   return new Uint8Array(derivedBits);
@@ -114,7 +118,10 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
  * Verify a password against a stored hash
  * Supports both new PBKDF2 format and legacy simple hash format
  */
-async function verifyPassword(provided: string, stored: string): Promise<boolean> {
+async function verifyPassword(
+  provided: string,
+  stored: string,
+): Promise<boolean> {
   // Handle legacy simple hash format (for backwards compatibility)
   if (!stored.startsWith("pbkdf2$")) {
     // Legacy format: "hash-salt" from simpleHash
@@ -134,7 +141,7 @@ async function verifyPassword(provided: string, stored: string): Promise<boolean
   }
 
   const iterations = parseInt(parts[1], 10);
-  if (isNaN(iterations) || iterations < 1) {
+  if (Number.isNaN(iterations) || iterations < 1) {
     return false;
   }
 
@@ -156,10 +163,13 @@ function legacySimpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash;
   }
-  const salt = str.length + (str.charCodeAt(0) || 0) + (str.charCodeAt(str.length - 1) || 0);
+  const salt =
+    str.length +
+    (str.charCodeAt(0) || 0) +
+    (str.charCodeAt(str.length - 1) || 0);
   return `${hash.toString(36)}-${salt.toString(36)}`;
 }
 
@@ -168,7 +178,7 @@ const catValidator = v.object({
   name: v.object({
     prefix: v.string(),
     suffix: v.string(),
-    full: v.string()
+    full: v.string(),
   }),
   gender: v.union(v.literal("M"), v.literal("F")),
   lifeStage: v.string(),
@@ -180,7 +190,7 @@ const catValidator = v.object({
   genetics: v.any(),
   source: v.string(),
   historyProfileId: v.optional(v.string()),
-  generation: v.number()
+  generation: v.number(),
 });
 
 const configValidator = v.object({
@@ -190,12 +200,14 @@ const configValidator = v.object({
   genderRatio: v.number(),
   partnerChance: v.optional(v.number()),
   paletteModes: v.optional(v.array(v.string())),
-  offspringOptions: v.optional(v.object({
-    accessoryChance: v.number(),
-    maxAccessories: v.number(),
-    scarChance: v.number(),
-    maxScars: v.number()
-  }))
+  offspringOptions: v.optional(
+    v.object({
+      accessoryChance: v.number(),
+      maxAccessories: v.number(),
+      scarChance: v.number(),
+      maxScars: v.number(),
+    }),
+  ),
 });
 
 export const save = mutation({
@@ -207,7 +219,7 @@ export const save = mutation({
     cats: v.array(catValidator),
     config: configValidator,
     creatorName: v.optional(v.string()),
-    password: v.optional(v.string())
+    password: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -224,7 +236,10 @@ export const save = mutation({
         if (!args.password) {
           return { success: false, error: "password_required" } as const;
         }
-        const isValid = await verifyPassword(args.password, existing.passwordHash);
+        const isValid = await verifyPassword(
+          args.password,
+          existing.passwordHash,
+        );
         if (!isValid) {
           return { success: false, error: "invalid_password" } as const;
         }
@@ -246,7 +261,7 @@ export const save = mutation({
         foundingFatherId: args.foundingFatherId,
         cats: args.cats,
         config: args.config,
-        updatedAt: now
+        updatedAt: now,
       };
 
       if (args.creatorName !== undefined) {
@@ -259,7 +274,12 @@ export const save = mutation({
       }
 
       await ctx.db.patch(existing._id, patch);
-      return { success: true, id: existing._id, slug: args.slug, isNew: false } as const;
+      return {
+        success: true,
+        id: existing._id,
+        slug: args.slug,
+        isNew: false,
+      } as const;
     }
 
     // Create new tree
@@ -296,7 +316,7 @@ export const save = mutation({
     const id = await ctx.db.insert("ancestry_tree", insertData);
 
     return { success: true, id, slug: args.slug, isNew: true } as const;
-  }
+  },
 });
 
 // Check if a tree exists and whether it has a password
@@ -313,7 +333,7 @@ export const checkSlug = query({
     }
 
     return { exists: true, hasPassword: !!tree.passwordHash };
-  }
+  },
 });
 
 export const getBySlug = query({
@@ -329,12 +349,12 @@ export const getBySlug = query({
     // Return tree data with hasPassword flag, but not the actual hash
     const { passwordHash, ...treeData } = tree;
     return { ...treeData, hasPassword: !!passwordHash };
-  }
+  },
 });
 
 export const list = query({
   args: {
-    limit: v.optional(v.number())
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 20;
@@ -359,10 +379,10 @@ export const list = query({
       previewCats: tree.cats.slice(0, 6).map((c) => ({
         id: c.id,
         name: c.name.full,
-        params: c.params
-      }))
+        params: c.params,
+      })),
     }));
-  }
+  },
 });
 
 export const update = mutation({
@@ -372,7 +392,7 @@ export const update = mutation({
     cats: v.optional(v.array(catValidator)),
     config: v.optional(configValidator),
     creatorName: v.optional(v.string()),
-    password: v.optional(v.string())
+    password: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -389,14 +409,17 @@ export const update = mutation({
       if (!args.password) {
         return { success: false, error: "password_required" } as const;
       }
-      const isValid = await verifyPassword(args.password, existing.passwordHash);
+      const isValid = await verifyPassword(
+        args.password,
+        existing.passwordHash,
+      );
       if (!isValid) {
         return { success: false, error: "invalid_password" } as const;
       }
     }
 
     const updates: Record<string, unknown> = {
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
 
     if (args.name !== undefined) updates.name = args.name;
@@ -406,13 +429,13 @@ export const update = mutation({
 
     await ctx.db.patch(existing._id, updates);
     return { success: true, id: existing._id, slug: args.slug } as const;
-  }
+  },
 });
 
 export const remove = mutation({
   args: {
     slug: v.string(),
-    password: v.optional(v.string())
+    password: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -429,7 +452,10 @@ export const remove = mutation({
       if (!args.password) {
         return { success: false, error: "password_required" } as const;
       }
-      const isValid = await verifyPassword(args.password, existing.passwordHash);
+      const isValid = await verifyPassword(
+        args.password,
+        existing.passwordHash,
+      );
       if (!isValid) {
         return { success: false, error: "invalid_password" } as const;
       }
@@ -437,5 +463,5 @@ export const remove = mutation({
 
     await ctx.db.delete(existing._id);
     return { success: true } as const;
-  }
+  },
 });

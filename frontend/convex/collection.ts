@@ -1,5 +1,5 @@
-import { internalQuery, mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
+import { internalQuery, mutation, query } from "./_generated/server.js";
 
 export const totalCount = query({
   args: {},
@@ -9,8 +9,9 @@ export const totalCount = query({
       count += 1;
     }
     return count;
-  }
+  },
 });
+
 import type { Doc } from "./_generated/dataModel.js";
 import type { QueryCtx } from "./_generated/server.js";
 import { docIdToString } from "./utils.js";
@@ -25,14 +26,14 @@ export const list = query({
     const entries = await ctx.db.query("collection").collect();
     entries.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     return Promise.all(entries.map((doc) => collectionDocToClient(ctx, doc)));
-  }
+  },
 });
 
 export const setFocus = mutation({
   args: {
     id: v.id("collection"),
     focusX: v.number(),
-    focusY: v.number()
+    focusY: v.number(),
   },
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
@@ -46,25 +47,31 @@ export const setFocus = mutation({
     await ctx.db.patch(args.id, {
       focusX,
       focusY,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     });
 
     return { focusX, focusY } as const;
-  }
+  },
 });
 
 export const getDoc = internalQuery({
   args: {
-    id: v.id("collection")
+    id: v.id("collection"),
   },
-  handler: async (ctx, args) => ctx.db.get(args.id)
+  handler: async (ctx, args) => ctx.db.get(args.id),
 });
 
 async function collectionDocToClient(ctx: QueryCtx, doc: CollectionDoc) {
   // Convex Cloud returns proper absolute URLs - no normalization needed
-  const blurUrl = doc.blurImgStorageId ? await ctx.storage.getUrl(doc.blurImgStorageId) : null;
-  const previewUrl = doc.previewImgStorageId ? await ctx.storage.getUrl(doc.previewImgStorageId) : null;
-  const fullUrl = doc.fullImgStorageId ? await ctx.storage.getUrl(doc.fullImgStorageId) : null;
+  const blurUrl = doc.blurImgStorageId
+    ? await ctx.storage.getUrl(doc.blurImgStorageId)
+    : null;
+  const previewUrl = doc.previewImgStorageId
+    ? await ctx.storage.getUrl(doc.previewImgStorageId)
+    : null;
+  const fullUrl = doc.fullImgStorageId
+    ? await ctx.storage.getUrl(doc.fullImgStorageId)
+    : null;
 
   return {
     id: docIdToString(doc._id),
@@ -84,7 +91,7 @@ async function collectionDocToClient(ctx: QueryCtx, doc: CollectionDoc) {
     focusX: clampFocus(doc.focusX ?? 50),
     focusY: clampFocus(doc.focusY ?? 50),
     created: doc.createdAt,
-    updated: doc.updatedAt
+    updated: doc.updatedAt,
   } as const;
 }
 

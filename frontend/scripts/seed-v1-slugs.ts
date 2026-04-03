@@ -123,7 +123,10 @@ function randomDelays(): Partial<Record<ParamTimingKey, number>> {
   return d;
 }
 
-function jitterDelays(base: Record<ParamTimingKey, number>, range: number): Partial<Record<ParamTimingKey, number>> {
+function jitterDelays(
+  base: Record<ParamTimingKey, number>,
+  range: number,
+): Partial<Record<ParamTimingKey, number>> {
   const d: Partial<Record<ParamTimingKey, number>> = {};
   for (const key of PARAM_TIMING_ORDER) {
     d[key] = Math.max(45, base[key] + rand(-range, range));
@@ -131,7 +134,11 @@ function jitterDelays(base: Record<ParamTimingKey, number>, range: number): Part
   return d;
 }
 
-function tweakFew(base: Record<ParamTimingKey, number>, count: number, range: number): Partial<Record<ParamTimingKey, number>> {
+function tweakFew(
+  base: Record<ParamTimingKey, number>,
+  count: number,
+  range: number,
+): Partial<Record<ParamTimingKey, number>> {
   const d: Partial<Record<ParamTimingKey, number>> = { ...base };
   const keys = pickN(PARAM_TIMING_ORDER, count);
   for (const key of keys) {
@@ -140,7 +147,9 @@ function tweakFew(base: Record<ParamTimingKey, number>, count: number, range: nu
   return d;
 }
 
-function randomSubsetLimits(count: number): Partial<Record<ParamTimingKey, boolean>> {
+function randomSubsetLimits(
+  count: number,
+): Partial<Record<ParamTimingKey, boolean>> {
   const limits: Partial<Record<ParamTimingKey, boolean>> = {};
   const keys = pickN(PARAM_TIMING_ORDER, count);
   for (const key of keys) {
@@ -399,10 +408,14 @@ async function main() {
       }
       const json = (await res.json()) as { slug: string };
       const delays = config.timing.delays;
-      const delayValues = Object.values(delays).filter((v): v is number => typeof v === "number");
+      const delayValues = Object.values(delays).filter(
+        (v): v is number => typeof v === "number",
+      );
       const minDelay = delayValues.length ? Math.min(...delayValues) : 0;
       const maxDelay = delayValues.length ? Math.max(...delayValues) : 0;
-      const subsetCount = config.timing.subsetLimits ? Object.keys(config.timing.subsetLimits).length : 0;
+      const subsetCount = config.timing.subsetLimits
+        ? Object.keys(config.timing.subsetLimits).length
+        : 0;
       const hasPause = !!config.timing.pauseDelays;
 
       console.log(
@@ -421,7 +434,8 @@ async function main() {
   const { mkdirSync, writeFileSync } = await import("node:fs");
   const outDir = new URL("../tmp/", import.meta.url).pathname;
   mkdirSync(outDir, { recursive: true });
-  const outPath = new URL("../tmp/test-v1-slugs.json", import.meta.url).pathname;
+  const outPath = new URL("../tmp/test-v1-slugs.json", import.meta.url)
+    .pathname;
   writeFileSync(outPath, JSON.stringify(results, null, 2));
   console.log(`Saved to ${outPath}`);
 }

@@ -155,17 +155,15 @@ export function OBSLobby({
       if (cancelled) return;
       const gs = genSettings;
       // biome-ignore lint/style/noNonNullAssertion: generator is guaranteed available here
-      const firstResult = await generator
-        .generateRandomCat!({
-          accessoryCount: gs.accessoryMax,
-          scarCount: gs.scarMax,
-          tortieCount: gs.tortieMax,
-          exactLayerCounts: gs.exactLayerCounts,
-          experimentalColourMode:
-            gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
-          includeBaseColours: gs.includeBaseColours,
-        })
-        .catch(() => null);
+      const firstResult = await generator.generateRandomCat!({
+        accessoryCount: gs.accessoryMax,
+        scarCount: gs.scarMax,
+        tortieCount: gs.tortieMax,
+        exactLayerCounts: gs.exactLayerCounts,
+        experimentalColourMode:
+          gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
+        includeBaseColours: gs.includeBaseColours,
+      }).catch(() => null);
       if (cancelled || !firstResult) return;
 
       const fixedSprite = firstResult.params.spriteNumber ?? 8;

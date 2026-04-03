@@ -1,11 +1,11 @@
-import { mutation, query } from "./_generated/server.js";
-import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel.js";
+import type { Doc, Id } from "./_generated/dataModel.js";
+import type { MutationCtx, QueryCtx } from "./_generated/server.js";
+import { mutation, query } from "./_generated/server.js";
 import { docIdToString, toId } from "./utils.js";
-import type { Id } from "./_generated/dataModel.js";
 
-const SLUG_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const SLUG_ALPHABET =
+  "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const SLUG_LENGTH = 9;
 
 type AdoptionBatchDoc = Doc<"adoption_batch">;
@@ -54,7 +54,7 @@ export const createBatch = mutation({
         shareToken: v.optional(v.string()),
         catName: v.optional(v.string()),
         creatorName: v.optional(v.string()),
-      })
+      }),
     ),
     title: v.optional(v.string()),
     creatorName: v.optional(v.string()),
@@ -62,7 +62,9 @@ export const createBatch = mutation({
   },
   handler: async (ctx, args) => {
     if (!args.cats.length) {
-      throw new Error("At least one cat is required to create an adoption batch");
+      throw new Error(
+        "At least one cat is required to create an adoption batch",
+      );
     }
 
     const now = Date.now();
@@ -81,7 +83,8 @@ export const createBatch = mutation({
       const encoded = typeof cat.encoded === "string" ? cat.encoded.trim() : "";
       if (encoded) entry.encoded = encoded;
 
-      const shareToken = typeof cat.shareToken === "string" ? cat.shareToken.trim() : "";
+      const shareToken =
+        typeof cat.shareToken === "string" ? cat.shareToken.trim() : "";
       if (shareToken) entry.shareToken = shareToken;
 
       const catName = sanitizeOptionalString(cat.catName);
@@ -115,10 +118,12 @@ export const createBatch = mutation({
     await Promise.all(
       cats
         .map((cat) => cat.profileId)
-        .filter((profileId): profileId is Id<"cat_profile"> => Boolean(profileId))
-        .map((profileId) =>
-          ctx.db.patch(profileId, { adoptionBatchId: id, updatedAt: now })
+        .filter((profileId): profileId is Id<"cat_profile"> =>
+          Boolean(profileId),
         )
+        .map((profileId) =>
+          ctx.db.patch(profileId, { adoptionBatchId: id, updatedAt: now }),
+        ),
     );
 
     return { id: docIdToString(id), slug, shareToken: slug };
@@ -141,7 +146,7 @@ export const getBySlug = query({
     try {
       const asId = await ctx.db.get(toId("adoption_batch", args.slugOrId));
       return asId ? await batchRecordToClient(ctx, asId) : null;
-    } catch (error) {
+    } catch (_error) {
       return null;
     }
   },
@@ -177,20 +182,20 @@ export const updateBatchMeta = mutation({
     const title = sanitizeOptionalString(args.title ?? null);
     const creator = sanitizeOptionalString(args.creatorName ?? null);
 
-    await ctx.db.patch(
-      args.id,
-      {
-        updatedAt: Date.now(),
-        title: title ?? undefined,
-        creatorName: creator ?? undefined,
-      } as Partial<AdoptionBatchDoc>
-    );
+    await ctx.db.patch(args.id, {
+      updatedAt: Date.now(),
+      title: title ?? undefined,
+      creatorName: creator ?? undefined,
+    } as Partial<AdoptionBatchDoc>);
     const updated = await ctx.db.get(args.id);
     return updated ? await batchRecordToClient(ctx, updated) : null;
   },
 });
 
-async function batchRecordToClient(ctx: QueryCtx | MutationCtx, doc: AdoptionBatchDoc) {
+async function batchRecordToClient(
+  ctx: QueryCtx | MutationCtx,
+  doc: AdoptionBatchDoc,
+) {
   return {
     id: docIdToString(doc._id),
     slug: doc.slug ?? docIdToString(doc._id),
@@ -199,19 +204,29 @@ async function batchRecordToClient(ctx: QueryCtx | MutationCtx, doc: AdoptionBat
     settings: doc.settings ?? null,
     cats: await Promise.all(
       (doc.cats ?? []).map(async (cat, index) => {
-      const profileInfo = cat.profileId ? await resolveProfilePreview(ctx, cat.profileId) : null;
-      return {
-        index,
-        label: cat.label,
-        catData: cat.catData,
-        profileId: cat.profileId ? docIdToString(cat.profileId) : profileInfo?.id ?? null,
-        encoded: cat.encoded ?? null,
-        shareToken: cat.shareToken ?? profileInfo?.slug ?? null,
-        catName: cat.catName ?? profileInfo?.catName ?? null,
-        creatorName: cat.creatorName ?? profileInfo?.creatorName ?? null,
-        previews: profileInfo?.previews ?? { tiny: null, preview: null, full: null, spriteSheet: null, updatedAt: null },
-      };
-      })
+        const profileInfo = cat.profileId
+          ? await resolveProfilePreview(ctx, cat.profileId)
+          : null;
+        return {
+          index,
+          label: cat.label,
+          catData: cat.catData,
+          profileId: cat.profileId
+            ? docIdToString(cat.profileId)
+            : (profileInfo?.id ?? null),
+          encoded: cat.encoded ?? null,
+          shareToken: cat.shareToken ?? profileInfo?.slug ?? null,
+          catName: cat.catName ?? profileInfo?.catName ?? null,
+          creatorName: cat.creatorName ?? profileInfo?.creatorName ?? null,
+          previews: profileInfo?.previews ?? {
+            tiny: null,
+            preview: null,
+            full: null,
+            spriteSheet: null,
+            updatedAt: null,
+          },
+        };
+      }),
     ),
     created: doc.createdAt,
     updated: doc.updatedAt,
@@ -222,7 +237,10 @@ async function batchRecordToClient(ctx: QueryCtx | MutationCtx, doc: AdoptionBat
  * Resolve profile preview - returns cached storage URLs when available, null otherwise.
  * The frontend uses /api/preview/{id} for on-demand rendering when no cached URL exists.
  */
-async function resolveProfilePreview(ctx: QueryCtx | MutationCtx, profileId: Id<"cat_profile">) {
+async function resolveProfilePreview(
+  ctx: QueryCtx | MutationCtx,
+  profileId: Id<"cat_profile">,
+) {
   const profile = await ctx.db.get(profileId);
   if (!profile) return null;
 
@@ -240,9 +258,13 @@ async function resolveProfilePreview(ctx: QueryCtx | MutationCtx, profileId: Id<
   const sheetImage = find("spriteSheet");
 
   const tinyUrl = tinyImage ? await safeGetUrl(ctx, tinyImage.storageId) : null;
-  const previewUrl = previewImage ? await safeGetUrl(ctx, previewImage.storageId) : null;
+  const previewUrl = previewImage
+    ? await safeGetUrl(ctx, previewImage.storageId)
+    : null;
   const fullUrl = fullImage ? await safeGetUrl(ctx, fullImage.storageId) : null;
-  const sheetUrl = sheetImage ? await safeGetUrl(ctx, sheetImage.storageId) : null;
+  const sheetUrl = sheetImage
+    ? await safeGetUrl(ctx, sheetImage.storageId)
+    : null;
   const profileIdString = docIdToString(profile._id);
 
   return {
@@ -251,9 +273,15 @@ async function resolveProfilePreview(ctx: QueryCtx | MutationCtx, profileId: Id<
     catName: profile.catName ?? null,
     creatorName: profile.creatorName ?? null,
     previews: {
-      tiny: tinyUrl ? { url: tinyUrl, name: tinyImage?.filename ?? null } : null,
-      preview: previewUrl ? { url: previewUrl, name: previewImage?.filename ?? null } : null,
-      full: fullUrl ? { url: fullUrl, name: fullImage?.filename ?? null } : null,
+      tiny: tinyUrl
+        ? { url: tinyUrl, name: tinyImage?.filename ?? null }
+        : null,
+      preview: previewUrl
+        ? { url: previewUrl, name: previewImage?.filename ?? null }
+        : null,
+      full: fullUrl
+        ? { url: fullUrl, name: fullImage?.filename ?? null }
+        : null,
       spriteSheet: sheetUrl
         ? {
             url: sheetUrl,
@@ -266,7 +294,10 @@ async function resolveProfilePreview(ctx: QueryCtx | MutationCtx, profileId: Id<
   };
 }
 
-async function safeGetUrl(ctx: QueryCtx | MutationCtx, id: Id<"_storage">): Promise<string | null> {
+async function safeGetUrl(
+  ctx: QueryCtx | MutationCtx,
+  id: Id<"_storage">,
+): Promise<string | null> {
   try {
     // Convex Cloud returns proper absolute URLs from storage.getUrl()
     // Return directly without normalization to avoid URL object property access restrictions

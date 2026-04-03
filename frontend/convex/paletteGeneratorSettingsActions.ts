@@ -1,9 +1,9 @@
 "use node";
 
-import { Buffer } from "buffer";
-import { action } from "./_generated/server.js";
+import { Buffer } from "node:buffer";
 import { v } from "convex/values";
 import { api } from "./_generated/api.js";
+import { action } from "./_generated/server.js";
 
 const DATA_URL_REGEX = /^data:([^;]+);base64,([A-Za-z0-9+/=\s]+)$/;
 

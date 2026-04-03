@@ -1,7 +1,8 @@
-import { mutation, query, type MutationCtx } from "./_generated/server.js";
 import { v } from "convex/values";
+import { type MutationCtx, mutation, query } from "./_generated/server.js";
 
-const SLUG_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const SLUG_ALPHABET =
+  "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const SLUG_LENGTH = 7;
 
 function randomSlug() {
@@ -57,6 +58,11 @@ export const get = query({
       .unique();
 
     if (!record) return null;
-    return { slug: record.slug, data: record.data, id: record._id, createdAt: record.createdAt };
+    return {
+      slug: record.slug,
+      data: record.data,
+      id: record._id,
+      createdAt: record.createdAt,
+    };
   },
 });

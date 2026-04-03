@@ -1,5 +1,5 @@
-import { query, mutation } from "./_generated/server.js";
 import { v } from "convex/values";
+import { mutation, query } from "./_generated/server.js";
 
 const DEFAULTS = {
   accessoriesMin: 0,

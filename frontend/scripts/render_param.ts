@@ -1,22 +1,25 @@
 #!/usr/bin/env -S tsx
 
-import { readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { createCanvas, Image } from '@napi-rs/canvas';
+import { createCanvas, Image } from "@napi-rs/canvas";
 
-import catGenerator from '../lib/single-cat/catGeneratorV2.js';
+import catGenerator from "../lib/single-cat/catGeneratorV2.js";
 
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const publicDir = path.join(projectRoot, 'public');
+const projectRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
+const publicDir = path.join(projectRoot, "public");
 
 const resolvePublicPath = (url: string): string => {
   if (/^https?:/i.test(url)) {
     return url;
   }
-  if (url.startsWith('/')) {
+  if (url.startsWith("/")) {
     return path.join(publicDir, url.slice(1));
   }
   if (path.isAbsolute(url)) {
@@ -25,12 +28,13 @@ const resolvePublicPath = (url: string): string => {
   return path.join(publicDir, url);
 };
 
-const redirectLog = (logger: (...args: unknown[]) => void) =>
+const redirectLog =
+  (_logger: (...args: unknown[]) => void) =>
   (...args: unknown[]) => {
     const message = args
-      .map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg)))
-      .join(' ');
-    process.stderr.write(message + '\n');
+      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .join(" ");
+    process.stderr.write(`${message}\n`);
   };
 
 console.log = redirectLog(console.log);
@@ -44,12 +48,12 @@ globalThis.localStorage = {
 } as unknown as Storage;
 
 globalThis.navigator = {
-  userAgent: 'node'
+  userAgent: "node",
 } as Navigator;
 
 class SpriteImage extends Image {
   setSrc(value: string | Buffer | Uint8Array): void {
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       this.src = resolvePublicPath(value);
     } else {
       this.src = value instanceof Buffer ? new Uint8Array(value) : value;
@@ -58,14 +62,14 @@ class SpriteImage extends Image {
 }
 
 // Override the Image constructor to intercept src assignments
-const OriginalImage = Image;
+const _OriginalImage = Image;
 const SpriteImageProxy = new Proxy(SpriteImage, {
   construct(target, args) {
     const instance = Reflect.construct(target, args) as SpriteImage;
     return new Proxy(instance, {
       set(obj, prop, value) {
-        if (prop === 'src') {
-          if (typeof value === 'string') {
+        if (prop === "src") {
+          if (typeof value === "string") {
             obj.src = resolvePublicPath(value);
           } else {
             obj.src = value instanceof Buffer ? new Uint8Array(value) : value;
@@ -73,9 +77,9 @@ const SpriteImageProxy = new Proxy(SpriteImage, {
           return true;
         }
         return Reflect.set(obj, prop, value);
-      }
+      },
     });
-  }
+  },
 });
 
 (globalThis as { Image: unknown }).Image = SpriteImageProxy;
@@ -105,8 +109,10 @@ class NodeOffscreenCanvas {
   }
 
   getContext(type: string): CanvasRenderingContext2D | null {
-    if (type === '2d') {
-      return this.canvas.getContext('2d') as unknown as CanvasRenderingContext2D;
+    if (type === "2d") {
+      return this.canvas.getContext(
+        "2d",
+      ) as unknown as CanvasRenderingContext2D;
     }
     return null;
   }
@@ -115,43 +121,59 @@ class NodeOffscreenCanvas {
     return this.canvas as unknown as ImageBitmap;
   }
 
-  toBuffer(mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/avif' | 'image/gif' = 'image/png') {
-    if (mimeType === 'image/png') {
-      return this.canvas.toBuffer('image/png');
+  toBuffer(
+    mimeType:
+      | "image/png"
+      | "image/jpeg"
+      | "image/webp"
+      | "image/avif"
+      | "image/gif" = "image/png",
+  ) {
+    if (mimeType === "image/png") {
+      return this.canvas.toBuffer("image/png");
     }
-    if (mimeType === 'image/avif') {
-      return this.canvas.toBuffer('image/avif');
+    if (mimeType === "image/avif") {
+      return this.canvas.toBuffer("image/avif");
     }
-    if (mimeType === 'image/gif') {
-      return this.canvas.toBuffer('image/gif');
+    if (mimeType === "image/gif") {
+      return this.canvas.toBuffer("image/gif");
     }
-    return this.canvas.toBuffer(mimeType as 'image/jpeg' | 'image/webp');
+    return this.canvas.toBuffer(mimeType as "image/jpeg" | "image/webp");
   }
 
-  toDataURL(mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif' | 'image/avif' = 'image/png') {
-    if (mimeType === 'image/png') {
-      return this.canvas.toDataURL('image/png');
+  toDataURL(
+    mimeType:
+      | "image/png"
+      | "image/jpeg"
+      | "image/webp"
+      | "image/gif"
+      | "image/avif" = "image/png",
+  ) {
+    if (mimeType === "image/png") {
+      return this.canvas.toDataURL("image/png");
     }
-    if (mimeType === 'image/avif') {
-      return this.canvas.toDataURL('image/avif');
+    if (mimeType === "image/avif") {
+      return this.canvas.toDataURL("image/avif");
     }
-    if (mimeType === 'image/gif') {
-      return this.canvas.toDataURL('image/gif');
+    if (mimeType === "image/gif") {
+      return this.canvas.toDataURL("image/gif");
     }
-    return this.canvas.toDataURL(mimeType as 'image/jpeg' | 'image/webp');
+    return this.canvas.toDataURL(mimeType as "image/jpeg" | "image/webp");
   }
 }
 
-globalThis.OffscreenCanvas = NodeOffscreenCanvas as unknown as typeof OffscreenCanvas;
+globalThis.OffscreenCanvas =
+  NodeOffscreenCanvas as unknown as typeof OffscreenCanvas;
 
-const createNodeCanvas = (width = 50, height = 50) => createCanvas(width, height);
+const createNodeCanvas = (width = 50, height = 50) =>
+  createCanvas(width, height);
 
 globalThis.document = {
   createElement(tag: string) {
-    if (tag === 'canvas') {
+    if (tag === "canvas") {
       return createNodeCanvas(50, 50);
     }
-    if (tag === 'img') {
+    if (tag === "img") {
       return new SpriteImage();
     }
     throw new Error(`Unsupported element requested: ${tag}`);
@@ -160,17 +182,25 @@ globalThis.document = {
 
 const originalFetch = globalThis.fetch;
 
-const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-  if (url.startsWith('/sprite-data/')) {
+const customFetch = async (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> => {
+  const url =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url;
+  if (url.startsWith("/sprite-data/")) {
     const filePath = resolvePublicPath(url);
     const data = await readFile(filePath);
     return new Response(data, {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     });
   }
-  if (url.startsWith('file://')) {
+  if (url.startsWith("file://")) {
     const filePath = new URL(url);
     const data = await readFile(filePath);
     return new Response(data, { status: 200 });
@@ -184,12 +214,12 @@ await catGenerator.initialize();
 
 const inputPath = process.argv[2];
 if (!inputPath) {
-  console.error('Usage: tsx render_param.ts <params.json>');
+  console.error("Usage: tsx render_param.ts <params.json>");
   process.exit(1);
 }
 
-const params = JSON.parse(readFileSync(inputPath, 'utf-8'));
-const result = await catGenerator.render(params, { outputFormat: 'canvas' });
+const params = JSON.parse(readFileSync(inputPath, "utf-8"));
+const result = await catGenerator.render(params, { outputFormat: "canvas" });
 const canvas: any = result.canvas;
-const buffer: Buffer = canvas.toBuffer('image/png');
-process.stdout.write(buffer.toString('base64'));
+const buffer: Buffer = canvas.toBuffer("image/png");
+process.stdout.write(buffer.toString("base64"));

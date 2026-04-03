@@ -1,6 +1,6 @@
-import { mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel.js";
+import { mutation, query } from "./_generated/server.js";
 
 const INITIAL_RATING = 1500;
 const K_FACTOR = 24;
@@ -8,7 +8,12 @@ const MINIMUM_POOL_SIZE = 16;
 const RECENT_VOTE_SAMPLE = 40;
 
 function stableStringify(value: unknown): string {
-  if (value === null || typeof value === "number" || typeof value === "boolean" || typeof value === "string") {
+  if (
+    value === null ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "string"
+  ) {
     return JSON.stringify(value);
   }
   if (Array.isArray(value)) {
@@ -44,7 +49,10 @@ function sanitizeCat(doc: Doc<"perfect_cats">) {
 }
 
 function pairKey(a: Id<"perfect_cats">, b: Id<"perfect_cats">): string {
-  const [first, second] = [a as unknown as string, b as unknown as string].sort();
+  const [first, second] = [
+    a as unknown as string,
+    b as unknown as string,
+  ].sort();
   return `${first}__${second}`;
 }
 
@@ -216,8 +224,10 @@ export const submitVote = mutation({
       throw new Error("One of the cats no longer exists");
     }
 
-    const expectedWinner = 1 / (1 + 10 ** ((loser.rating - winner.rating) / 400));
-    const expectedLoser = 1 / (1 + 10 ** ((winner.rating - loser.rating) / 400));
+    const expectedWinner =
+      1 / (1 + 10 ** ((loser.rating - winner.rating) / 400));
+    const expectedLoser =
+      1 / (1 + 10 ** ((winner.rating - loser.rating) / 400));
 
     const winnerRating = winner.rating + K_FACTOR * (1 - expectedWinner);
     const loserRating = loser.rating + K_FACTOR * (0 - expectedLoser);

@@ -60,7 +60,7 @@ if (process.env.NEXT_SHOW_CONFIG_LOGS === "1") {
   console.log("[next.config] __dirname=", __dirname);
   console.log(
     "[next.config] next package exists=",
-    fs.existsSync(path.join(projectRoot, "node_modules/next/package.json"))
+    fs.existsSync(path.join(projectRoot, "node_modules/next/package.json")),
   );
 }
 
