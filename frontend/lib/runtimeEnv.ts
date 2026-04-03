@@ -5,19 +5,13 @@ export type RuntimeConfig = {
 };
 
 export function getRuntimeConfig(): RuntimeConfig {
-  const win =
-    typeof window !== "undefined"
-      ? (window as unknown as Record<string, unknown>)
-      : undefined;
-  if (win?.[CONFIG_KEY]) {
-    return win[CONFIG_KEY] as RuntimeConfig;
+  if (typeof window !== "undefined") {
+    const cfg = (window as unknown as Record<string, unknown>)[CONFIG_KEY];
+    if (cfg) return cfg as RuntimeConfig;
   }
-  const g =
-    typeof globalThis !== "undefined"
-      ? (globalThis as unknown as Record<string, unknown>)
-      : undefined;
-  if (g?.[CONFIG_KEY]) {
-    return g[CONFIG_KEY] as RuntimeConfig;
+  if (typeof globalThis !== "undefined") {
+    const cfg = (globalThis as unknown as Record<string, unknown>)[CONFIG_KEY];
+    if (cfg) return cfg as RuntimeConfig;
   }
   return {};
 }

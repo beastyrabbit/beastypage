@@ -333,22 +333,15 @@ function normalizeStoredPayload(payload: unknown): CatSharePayload | null {
   const p = payload as Record<string, unknown>;
   if (p.v !== SHARE_VERSION) return null;
   const slots = (p.slots ?? {}) as Record<string, unknown>;
-  const counts = (p.counts ?? {}) as Record<string, unknown>;
+  const counts = sanitizeCounts(
+    p.counts as Partial<CatShareCounts> | undefined,
+  );
   return {
     params: sanitizeParams((p.params as Record<string, unknown>) || {}),
-    accessorySlots: sanitizeStringArray(
-      slots.accessories,
-      counts.accessories as number | undefined,
-    ),
-    scarSlots: sanitizeStringArray(
-      slots.scars,
-      counts.scars as number | undefined,
-    ),
-    tortieSlots: sanitizeTortieArray(
-      slots.tortie,
-      counts.tortie as number | undefined,
-    ),
-    counts: sanitizeCounts(p.counts as Partial<CatShareCounts> | undefined),
+    accessorySlots: sanitizeStringArray(slots.accessories, counts.accessories),
+    scarSlots: sanitizeStringArray(slots.scars, counts.scars),
+    tortieSlots: sanitizeTortieArray(slots.tortie, counts.tortie),
+    counts,
   };
 }
 

@@ -79,4 +79,7 @@ function scheduleSync(reason: string) {
     watcher.close();
     process.exit(0);
   });
-})();
+})().catch((err) => {
+  console.error("[palette-watch] fatal startup error", err);
+  process.exit(1);
+});
