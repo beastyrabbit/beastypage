@@ -38,17 +38,17 @@ export function PalettesStep(props: WizardStepProps) {
           Colour Palettes
         </h2>
         <p className="text-base leading-relaxed text-muted-foreground">
-          Colour palettes define the pool of colours for your cat. We
-          recommend <strong>3 palettes</strong> (most people pick 3). Each
-          palette adds its set of colours to the random selection pool.
+          Colour palettes define the pool of colours for your cat. We recommend{" "}
+          <strong>3 palettes</strong> (most people pick 3). Each palette adds
+          its set of colours to the random selection pool.
         </p>
       </section>
 
       {showWarning && (
         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-3 text-sm text-amber-200">
           You&apos;ve selected <strong>{paletteCount}</strong> palettes. We
-          recommend no more than 5 &mdash; too many dilutes the colour
-          cohesion of each cat.
+          recommend no more than 5 &mdash; too many dilutes the colour cohesion
+          of each cat.
         </div>
       )}
 

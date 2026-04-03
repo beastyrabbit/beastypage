@@ -1,16 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useQuery } from "convex/react";
+import { ArrowUpRight, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { ArrowUpRight, Loader2 } from "lucide-react";
-import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
+import { useMemo, useState } from "react";
 import ArrowBackIcon from "@/components/ui/arrow-back-icon";
+import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import XIcon from "@/components/ui/x-icon";
-import { encodeCatShare } from "@/lib/catShare";
+import { api } from "@/convex/_generated/api";
 import type { TortieLayer } from "@/lib/cat-v3/types";
+import { encodeCatShare } from "@/lib/catShare";
 
 interface CatSharePayload {
   params: Record<string, unknown>;
@@ -61,30 +61,46 @@ function getPreviewUrl(
     tiny?: { url: string | null } | null;
     preview?: { url: string | null } | null;
     full?: { url: string | null } | null;
-  }
+  },
 ): string | null {
-  const cached = previews?.preview?.url ?? previews?.full?.url ?? previews?.tiny?.url ?? null;
+  const cached =
+    previews?.preview?.url ??
+    previews?.full?.url ??
+    previews?.tiny?.url ??
+    null;
   if (cached) return cached;
   // Use encoded cat data for on-demand rendering
-  if (encodedCatData) return `/api/preview/_?cat=${encodeURIComponent(encodedCatData)}`;
+  if (encodedCatData)
+    return `/api/preview/_?cat=${encodeURIComponent(encodedCatData)}`;
   // Fallback to profile ID lookup
   if (profileId) return `/api/preview/${profileId}`;
   return null;
 }
 
-function formatTimestamp(created?: number): string |
- null {
+function formatTimestamp(created?: number): string | null {
   if (!created) return null;
   const date = new Date(created);
   return date.toLocaleString();
 }
 
 export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
-  const record = useQuery(api.adoption.getBySlug, { slugOrId: slug }) as AdoptionBatchRecord | null | undefined;
-  const [focusedPreview, setFocusedPreview] = useState<{ label: string; url: string } | null>(null);
+  const record = useQuery(api.adoption.getBySlug, { slugOrId: slug }) as
+    | AdoptionBatchRecord
+    | null
+    | undefined;
+  const [focusedPreview, setFocusedPreview] = useState<{
+    label: string;
+    url: string;
+  } | null>(null);
 
   const enrichedCats = useMemo(() => {
-    if (!record?.cats?.length) return [] as (AdoptionCatRecord & { encodedFinal: string | null; viewerUrl: string | null; previewUrl: string | null; fullUrl: string | null })[];
+    if (!record?.cats?.length)
+      return [] as (AdoptionCatRecord & {
+        encodedFinal: string | null;
+        viewerUrl: string | null;
+        previewUrl: string | null;
+        fullUrl: string | null;
+      })[];
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     return record.cats.map((cat) => {
       let encoded = cat.encoded ?? null;
@@ -97,12 +113,20 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
         }
       }
       const viewerUrl = cat.shareToken
-        ? origin ? `${origin}/view/${cat.shareToken}` : `/view/${cat.shareToken}`
+        ? origin
+          ? `${origin}/view/${cat.shareToken}`
+          : `/view/${cat.shareToken}`
         : encoded
-          ? origin ? `${origin}/view?cat=${encoded}` : `/view?cat=${encoded}`
+          ? origin
+            ? `${origin}/view?cat=${encoded}`
+            : `/view?cat=${encoded}`
           : null;
 
-      const previewUrl = getPreviewUrl(cat.profileId ?? null, encoded, cat.previews ?? undefined);
+      const previewUrl = getPreviewUrl(
+        cat.profileId ?? null,
+        encoded,
+        cat.previews ?? undefined,
+      );
       const fullUrl = previewUrl; // Use same URL for full (on-demand renders at fixed size anyway)
 
       return {
@@ -118,7 +142,9 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
   const shareUrl = useMemo(() => {
     if (!record?.slug) return null;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    return origin ? `${origin}/adoption/${record.slug}` : `/adoption/${record.slug}`;
+    return origin
+      ? `${origin}/adoption/${record.slug}`
+      : `/adoption/${record.slug}`;
   }, [record]);
 
   const formattedDate = formatTimestamp(record?.created);
@@ -139,7 +165,10 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-4 px-6 py-16 text-center text-muted-foreground">
         <TriangleAlertIcon size={32} className="text-red-300" />
         <p className="text-base">That adoption batch could not be found.</p>
-        <Link href="/" className="inline-flex items-center gap-2 text-sm text-primary">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm text-primary"
+        >
           <ArrowBackIcon size={16} /> Return home
         </Link>
       </div>
@@ -149,12 +178,19 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
-        <Link href="/" className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-amber-200/80 transition hover:text-amber-100">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-amber-200/80 transition hover:text-amber-100"
+        >
           <ArrowBackIcon size={12} /> Back to hub
         </Link>
-        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">{batchTitle}</h1>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">
+          {batchTitle}
+        </h1>
         <p className="mt-3 max-w-2xl text-sm text-neutral-200/85 sm:text-base">
-          {batchCreator ? `Created by ${batchCreator}` : "Generated in the adoption wizard"}
+          {batchCreator
+            ? `Created by ${batchCreator}`
+            : "Generated in the adoption wizard"}
           {formattedDate ? ` • ${formattedDate}` : null}
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-200/80">
@@ -181,7 +217,8 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {enrichedCats.map((cat) => {
               const displayName = cat.catName?.trim() || cat.label;
-              const creator = cat.creatorName?.trim() || batchCreator || "Creator unknown";
+              const creator =
+                cat.creatorName?.trim() || batchCreator || "Creator unknown";
               const previewSrc = cat.previewUrl ?? cat.fullUrl;
               const fullSrc = cat.fullUrl ?? cat.previewUrl ?? null;
               return (
@@ -198,7 +235,11 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
                     }}
                     className="relative aspect-square w-full overflow-hidden rounded-xl border border-border/30 bg-background transition hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={!fullSrc}
-                    aria-label={fullSrc ? `Open preview for ${displayName}` : "Preview unavailable"}
+                    aria-label={
+                      fullSrc
+                        ? `Open preview for ${displayName}`
+                        : "Preview unavailable"
+                    }
                   >
                     {previewSrc ? (
                       <Image
@@ -220,7 +261,9 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
                   </button>
 
                   <div className="flex flex-col gap-2 text-center">
-                    <h2 className="text-base font-semibold text-foreground">{displayName}</h2>
+                    <h2 className="text-base font-semibold text-foreground">
+                      {displayName}
+                    </h2>
                     <p className="text-xs text-muted-foreground">{creator}</p>
                   </div>
 
@@ -233,7 +276,9 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
                         View cat <ArrowUpRight className="size-4" />
                       </Link>
                     ) : (
-                      <p className="text-xs italic text-muted-foreground/70 text-center">Viewer link unavailable.</p>
+                      <p className="text-xs italic text-muted-foreground/70 text-center">
+                        Viewer link unavailable.
+                      </p>
                     )}
                   </div>
                 </article>
@@ -257,7 +302,10 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
               event.preventDefault();
               setFocusedPreview(null);
             }
-            if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+            if (
+              (event.key === "Enter" || event.key === " ") &&
+              event.target === event.currentTarget
+            ) {
               event.preventDefault();
               setFocusedPreview(null);
             }
@@ -273,7 +321,9 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
               <XIcon size={16} />
             </button>
             <div className="flex flex-col items-center gap-6">
-              <h2 className="text-xl font-semibold text-foreground">{focusedPreview.label}</h2>
+              <h2 className="text-xl font-semibold text-foreground">
+                {focusedPreview.label}
+              </h2>
               <div className="w-full overflow-hidden rounded-2xl border border-border/40 bg-background/80">
                 <Image
                   src={focusedPreview.url}

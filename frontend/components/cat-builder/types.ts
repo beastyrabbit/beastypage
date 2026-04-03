@@ -1,4 +1,9 @@
-import type { CatParams, RandomGenerationOptions, BatchRenderResponse, SlotSelections } from '@/lib/cat-v3/types';
+import type {
+  BatchRenderResponse,
+  CatParams,
+  RandomGenerationOptions,
+  SlotSelections,
+} from "@/lib/cat-v3/types";
 
 export interface SpriteMapperApi {
   loaded: boolean;
@@ -11,7 +16,10 @@ export interface SpriteMapperApi {
   getEyeColours(): string[];
   getSkinColours(): string[];
   getWhitePatches(): string[];
-  getWhitePatchColourOptions(mode?: string, experimentalMode?: unknown): string[];
+  getWhitePatchColourOptions(
+    mode?: string,
+    experimentalMode?: unknown,
+  ): string[];
   getWhiteTints(): string[];
   getPoints(): string[];
   getVitiligo(): string[];
@@ -22,7 +30,9 @@ export interface SpriteMapperApi {
   getCollars(): string[];
   getAccessories?(): string[];
   getScarsByCategory(category: number): string[];
-  getExperimentalColourDefinition?(name: string): { multiply?: number[] } | null;
+  getExperimentalColourDefinition?(
+    name: string,
+  ): { multiply?: number[] } | null;
   getColourDefinition?(name: string): { multiply?: number[] } | null;
   isExperimentalColour?(name: string): boolean;
 }
@@ -42,8 +52,13 @@ export interface CatGeneratorApi {
   buildCatURL?(params: Partial<CatParams> | CatParams): string;
   generateVariantSheet?(
     baseParams: Partial<CatParams> | CatParams,
-    variants: { id: string; params: Partial<CatParams>; label?: string; group?: string }[],
-    options?: unknown
+    variants: {
+      id: string;
+      params: Partial<CatParams>;
+      label?: string;
+      group?: string;
+    }[],
+    options?: unknown,
   ): Promise<BatchRenderResponse>;
 }
 

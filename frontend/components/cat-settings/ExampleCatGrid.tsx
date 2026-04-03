@@ -2,7 +2,10 @@
 
 import { useCallback, useRef, useState } from "react";
 import type { SingleCatPortableSettings } from "@/lib/portable-settings";
-import { computeLayerCount, resolveAfterlife } from "@/utils/catSettingsHelpers";
+import {
+  computeLayerCount,
+  resolveAfterlife,
+} from "@/utils/catSettingsHelpers";
 import type { ExtendedMode } from "@/utils/singleCatVariants";
 
 // ---------------------------------------------------------------------------
@@ -47,8 +50,7 @@ export function ExampleCatGrid({ settings }: ExampleCatGridProps) {
       const extModes = settings.extendedModes.filter(
         (m): m is ExtendedMode => m !== "base",
       );
-      const experimentalColourMode =
-        extModes.length > 0 ? extModes : undefined;
+      const experimentalColourMode = extModes.length > 0 ? extModes : undefined;
 
       for (let i = 0; i < CAT_COUNT; i++) {
         if (abortRef.current) break;

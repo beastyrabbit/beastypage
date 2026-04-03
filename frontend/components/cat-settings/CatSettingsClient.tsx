@@ -1,21 +1,25 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
+import { useCallback, useMemo, useState } from "react";
 import { LayerCountModeSelector } from "@/components/common/LayerCountModeSelector";
-import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
-import {
-  encodePortableSettings,
-  decodePortableSettings,
-} from "@/lib/portable-settings";
-import type { SingleCatPortableSettings } from "@/lib/portable-settings";
-import type { AfterlifeOption, ExtendedMode, LayerRange } from "@/utils/singleCatVariants";
-import { DEFAULT_SINGLE_CAT_SETTINGS } from "@/utils/singleCatVariants";
-import { PaletteGroupPicker } from "./PaletteGroupPicker";
-import { ExampleCatGrid } from "./ExampleCatGrid";
+import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import CopyIcon from "@/components/ui/copy-icon";
+import type { SingleCatPortableSettings } from "@/lib/portable-settings";
+import {
+  decodePortableSettings,
+  encodePortableSettings,
+} from "@/lib/portable-settings";
+import { cn } from "@/lib/utils";
+import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
+import type {
+  AfterlifeOption,
+  ExtendedMode,
+  LayerRange,
+} from "@/utils/singleCatVariants";
+import { DEFAULT_SINGLE_CAT_SETTINGS } from "@/utils/singleCatVariants";
+import { ExampleCatGrid } from "./ExampleCatGrid";
+import { PaletteGroupPicker } from "./PaletteGroupPicker";
 
 // ---------------------------------------------------------------------------
 // Defaults (from the DEFAULT_SINGLE_CAT_SETTINGS)
@@ -42,19 +46,29 @@ interface CatSettingsClientProps {
 
 export function CatSettingsClient({
   initialSettings,
-  initialCode,
+  initialCode: _initialCode,
 }: CatSettingsClientProps) {
   const router = useRouter();
 
   // Settings state
   const init = initialSettings ?? DEFAULTS;
-  const [accessoryRange, setAccessoryRange] = useState<LayerRange>(init.accessoryRange);
+  const [accessoryRange, setAccessoryRange] = useState<LayerRange>(
+    init.accessoryRange,
+  );
   const [scarRange, setScarRange] = useState<LayerRange>(init.scarRange);
   const [tortieRange, setTortieRange] = useState<LayerRange>(init.tortieRange);
-  const [exactLayerCounts, setExactLayerCounts] = useState(init.exactLayerCounts);
-  const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(init.afterlifeMode);
-  const [includeBaseColours, setIncludeBaseColours] = useState(init.includeBaseColours);
-  const [extendedModes, setExtendedModes] = useState<ExtendedMode[]>(init.extendedModes);
+  const [exactLayerCounts, setExactLayerCounts] = useState(
+    init.exactLayerCounts,
+  );
+  const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(
+    init.afterlifeMode,
+  );
+  const [includeBaseColours, setIncludeBaseColours] = useState(
+    init.includeBaseColours,
+  );
+  const [extendedModes, setExtendedModes] = useState<ExtendedMode[]>(
+    init.extendedModes,
+  );
 
   // Code input state
   const [codeInput, setCodeInput] = useState("");
@@ -73,7 +87,15 @@ export function CatSettingsClient({
       includeBaseColours,
       extendedModes,
     }),
-    [accessoryRange, scarRange, tortieRange, exactLayerCounts, afterlifeMode, includeBaseColours, extendedModes],
+    [
+      accessoryRange,
+      scarRange,
+      tortieRange,
+      exactLayerCounts,
+      afterlifeMode,
+      includeBaseColours,
+      extendedModes,
+    ],
   );
 
   const liveCode = useMemo(
@@ -113,7 +135,9 @@ export function CatSettingsClient({
     }
     const decoded = decodePortableSettings(trimmed);
     if (!decoded) {
-      setCodeError("Invalid code — must be 6 words like \"word-word-word-word-word-word\"");
+      setCodeError(
+        'Invalid code — must be 6 words like "word-word-word-word-word-word"',
+      );
       return;
     }
     setCodeError(null);
@@ -230,10 +254,29 @@ export function CatSettingsClient({
           Layer Counts
         </h2>
         <div className="space-y-5">
-          <LayerRangeSelector label="Accessories" value={accessoryRange} onChange={setAccessoryRange} compact />
-          <LayerRangeSelector label="Scars" value={scarRange} onChange={setScarRange} compact />
-          <LayerRangeSelector label="Tortie Layers" value={tortieRange} onChange={setTortieRange} compact />
-          <LayerCountModeSelector value={exactLayerCounts} onChange={setExactLayerCounts} compact />
+          <LayerRangeSelector
+            label="Accessories"
+            value={accessoryRange}
+            onChange={setAccessoryRange}
+            compact
+          />
+          <LayerRangeSelector
+            label="Scars"
+            value={scarRange}
+            onChange={setScarRange}
+            compact
+          />
+          <LayerRangeSelector
+            label="Tortie Layers"
+            value={tortieRange}
+            onChange={setTortieRange}
+            compact
+          />
+          <LayerCountModeSelector
+            value={exactLayerCounts}
+            onChange={setExactLayerCounts}
+            compact
+          />
         </div>
 
         <div className="my-5 border-t border-border/30" />
@@ -269,7 +312,9 @@ export function CatSettingsClient({
             className="size-4 rounded border-border accent-primary"
           />
           <span className="text-sm text-foreground">Classic colours</span>
-          <span className="text-xs text-muted-foreground">(19 base ClanGen colours)</span>
+          <span className="text-xs text-muted-foreground">
+            (19 base ClanGen colours)
+          </span>
         </label>
 
         <PaletteGroupPicker

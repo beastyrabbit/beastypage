@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
-import Link from "next/link";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Loader2, LogIn, LogOut, Settings, User } from "lucide-react";
-import { signIn, signOut } from "@/lib/shooAuth";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/convex/_generated/api";
+import { signIn, signOut } from "@/lib/shooAuth";
 import { cn } from "@/lib/utils";
 
 /**
@@ -44,7 +44,10 @@ export function UserAuthButton() {
   useEffect(() => {
     if (!dropdownOpen) return;
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setDropdownOpen(false);
       }
     }
@@ -74,7 +77,7 @@ export function UserAuthButton() {
         className={cn(
           "inline-flex items-center gap-1.5 rounded-lg border border-border/50",
           "px-3 py-1.5 text-xs font-semibold text-muted-foreground",
-          "transition hover:bg-foreground hover:text-background"
+          "transition hover:bg-foreground hover:text-background",
         )}
       >
         <LogIn className="size-3.5" />
@@ -92,7 +95,7 @@ export function UserAuthButton() {
         className={cn(
           "flex size-8 items-center justify-center rounded-full",
           "border border-border/50 overflow-hidden",
-          "transition hover:ring-2 hover:ring-primary/30"
+          "transition hover:ring-2 hover:ring-primary/30",
         )}
         aria-label="User menu"
       >
@@ -110,7 +113,7 @@ export function UserAuthButton() {
           className={cn(
             "absolute right-0 top-full z-50 mt-2 w-40",
             "rounded-lg border border-border/40 bg-background/95 backdrop-blur",
-            "shadow-lg"
+            "shadow-lg",
           )}
         >
           <Link
@@ -118,7 +121,7 @@ export function UserAuthButton() {
             onClick={() => setDropdownOpen(false)}
             className={cn(
               "flex w-full items-center gap-2 rounded-t-lg px-3 py-2",
-              "text-sm text-foreground transition hover:bg-foreground/10"
+              "text-sm text-foreground transition hover:bg-foreground/10",
             )}
           >
             <Settings className="size-3.5" />
@@ -131,7 +134,7 @@ export function UserAuthButton() {
             }}
             className={cn(
               "flex w-full items-center gap-2 rounded-b-lg px-3 py-2",
-              "text-sm text-muted-foreground transition hover:bg-foreground/10"
+              "text-sm text-muted-foreground transition hover:bg-foreground/10",
             )}
           >
             <LogOut className="size-3.5" />

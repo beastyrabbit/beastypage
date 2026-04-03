@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
 import { X } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { TOOL_REGISTRY } from "@/lib/dash/registry.generated";
 import type { ToolCategory, ToolWidgetMeta } from "@/lib/dash/types";
 
@@ -12,7 +12,12 @@ const CATEGORY_LABELS: Record<ToolCategory, string> = {
   games: "Games",
 };
 
-const CATEGORY_ORDER: ToolCategory[] = ["gacha", "warrior-cats", "artist", "games"];
+const CATEGORY_ORDER: ToolCategory[] = [
+  "gacha",
+  "warrior-cats",
+  "artist",
+  "games",
+];
 
 interface AddWidgetModalProps {
   open: boolean;
@@ -21,7 +26,12 @@ interface AddWidgetModalProps {
   placedIds: Set<string>;
 }
 
-export function AddWidgetModal({ open, onClose, onSelect, placedIds }: AddWidgetModalProps) {
+export function AddWidgetModal({
+  open,
+  onClose,
+  onSelect,
+  placedIds,
+}: AddWidgetModalProps) {
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -56,7 +66,10 @@ export function AddWidgetModal({ open, onClose, onSelect, placedIds }: AddWidget
           e.preventDefault();
           onClose();
         }
-        if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+        if (
+          (e.key === "Enter" || e.key === " ") &&
+          e.target === e.currentTarget
+        ) {
           e.preventDefault();
           onClose();
         }
@@ -71,7 +84,9 @@ export function AddWidgetModal({ open, onClose, onSelect, placedIds }: AddWidget
           <X className="size-4" />
         </button>
 
-        <h2 className="mb-5 text-sm font-semibold text-foreground">Add a Tool</h2>
+        <h2 className="mb-5 text-sm font-semibold text-foreground">
+          Add a Tool
+        </h2>
 
         {CATEGORY_ORDER.map((cat) => {
           const tools = grouped.get(cat);
@@ -101,8 +116,12 @@ export function AddWidgetModal({ open, onClose, onSelect, placedIds }: AddWidget
                     >
                       <span className="text-xl">{tool.icon}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-foreground">{tool.title}</div>
-                        <div className="text-xs text-muted-foreground truncate">{tool.description}</div>
+                        <div className="font-medium text-foreground">
+                          {tool.title}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {tool.description}
+                        </div>
                       </div>
                       {placed && (
                         <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">

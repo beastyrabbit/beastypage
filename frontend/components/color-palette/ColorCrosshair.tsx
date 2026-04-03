@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface ColorCrosshairProps {
   x: number;
@@ -121,7 +121,13 @@ export function ColorCrosshair({
           const px = x0 + dx;
           const py = y0 + dy;
 
-          if (px >= 0 && px < canvas.width && py >= 0 && py < canvas.height && imageData) {
+          if (
+            px >= 0 &&
+            px < canvas.width &&
+            py >= 0 &&
+            py < canvas.height &&
+            imageData
+          ) {
             // Calculate index into the clipped imageData
             const dataX = px - clipX0;
             const dataY = py - clipY0;
@@ -139,7 +145,7 @@ export function ColorCrosshair({
 
       setLoupePixels(pixels);
     },
-    [imageElement]
+    [imageElement],
   );
 
   const handleMouseDown = useCallback(
@@ -160,7 +166,7 @@ export function ColorCrosshair({
       };
       // Don't extract loupe yet - wait for actual movement
     },
-    [x, y, containerRef, imageDimensions]
+    [x, y, containerRef, imageDimensions],
   );
 
   const handleTouchStart = useCallback(
@@ -182,7 +188,7 @@ export function ColorCrosshair({
       };
       // Don't extract loupe yet - wait for actual movement
     },
-    [x, y, containerRef, imageDimensions]
+    [x, y, containerRef, imageDimensions],
   );
 
   const handleClick = useCallback(
@@ -193,7 +199,7 @@ export function ColorCrosshair({
         onSelect(index);
       }
     },
-    [index, onSelect]
+    [index, onSelect],
   );
 
   useEffect(() => {
@@ -265,7 +271,16 @@ export function ColorCrosshair({
       window.removeEventListener("touchmove", handleTouchMove);
       window.removeEventListener("touchend", handleEnd);
     };
-  }, [isDragging, containerRef, index, onMove, extractLoupePixels, onDragEnd, onDragStart, imageDimensions]);
+  }, [
+    isDragging,
+    containerRef,
+    index,
+    onMove,
+    extractLoupePixels,
+    onDragEnd,
+    onDragStart,
+    imageDimensions,
+  ]);
 
   const centerIndex = Math.floor(LOUPE_SIZE / 2);
 
@@ -313,7 +328,8 @@ export function ColorCrosshair({
           {loupePixels.length > 0
             ? loupePixels.map((row, rowIndex) =>
                 row.map((pixelColor, colIndex) => {
-                  const isCenter = rowIndex === centerIndex && colIndex === centerIndex;
+                  const isCenter =
+                    rowIndex === centerIndex && colIndex === centerIndex;
                   return (
                     <div
                       key={`${rowIndex}-${colIndex}`}
@@ -329,7 +345,7 @@ export function ColorCrosshair({
                       }}
                     />
                   );
-                })
+                }),
               )
             : null}
         </div>
@@ -345,38 +361,38 @@ export function ColorCrosshair({
           opacity: showLoupe ? 0 : 1,
         }}
       >
-          {/* Outer glow ring */}
-          <div
-            className={`absolute inset-0 rounded-full transition-all duration-200 ${
-              isHighlighted || isSelected ? "animate-pulse" : ""
-            }`}
-            style={{
-              boxShadow: `
+        {/* Outer glow ring */}
+        <div
+          className={`absolute inset-0 rounded-full transition-all duration-200 ${
+            isHighlighted || isSelected ? "animate-pulse" : ""
+          }`}
+          style={{
+            boxShadow: `
                 0 0 0 ${isSelected ? 4 : 2}px ${ringColor}${isHighlighted || isSelected ? "cc" : "80"},
                 ${isHighlighted || isSelected ? `0 0 20px ${ringColor}80` : "none"}
               `,
-            }}
-          />
+          }}
+        />
 
-          {/* White border */}
-          <div
-            className="absolute inset-0 rounded-full bg-white shadow-lg"
-            style={{
-              boxShadow: `
+        {/* White border */}
+        <div
+          className="absolute inset-0 rounded-full bg-white shadow-lg"
+          style={{
+            boxShadow: `
                 0 2px 8px rgba(0,0,0,0.3),
                 0 4px 16px rgba(0,0,0,0.2)
               `,
-            }}
-          />
+          }}
+        />
 
-          {/* Color fill */}
-          <div
-            className="absolute rounded-full"
-            style={{
-              inset: 3 * scale,
-              backgroundColor: color,
-            }}
-          />
+        {/* Color fill */}
+        <div
+          className="absolute rounded-full"
+          style={{
+            inset: 3 * scale,
+            backgroundColor: color,
+          }}
+        />
       </div>
     </button>
   );

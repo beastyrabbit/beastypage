@@ -1,42 +1,61 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Save, Loader2, Trees, Dices, ArrowUpDown, ArrowLeftRight } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ArrowUpDown,
+  Dices,
+  Loader2,
+  Save,
+  Trees,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import ArrowBackIcon from "@/components/ui/arrow-back-icon";
-import HistoryCircleIcon from "@/components/ui/history-circle-icon";
-import GearIcon from "@/components/ui/gear-icon";
-import RefreshIcon from "@/components/ui/refresh-icon";
-import PaintIcon from "@/components/ui/paint-icon";
 import ExpandIcon from "@/components/ui/expand-icon";
+import GearIcon from "@/components/ui/gear-icon";
+import HistoryCircleIcon from "@/components/ui/history-circle-icon";
+import PaintIcon from "@/components/ui/paint-icon";
+import RefreshIcon from "@/components/ui/refresh-icon";
+import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
-
+import { generateWarriorName } from "@/lib/ancestry-tree/nameGenerator";
+import {
+  AncestryTreeManager,
+  type MutationPool,
+} from "@/lib/ancestry-tree/treeManager";
 import type {
   AncestryTreeCat,
-  SerializedAncestryTree,
-  TreeGenerationConfig,
+  CatName,
   FoundingCoupleInput,
   OffspringOptions,
-  CatName,
   PaletteMode,
+  SerializedAncestryTree,
+  TreeGenerationConfig,
 } from "@/lib/ancestry-tree/types";
-import { DEFAULT_TREE_CONFIG, DEFAULT_OFFSPRING_OPTIONS } from "@/lib/ancestry-tree/types";
-import { AncestryTreeManager, type MutationPool } from "@/lib/ancestry-tree/treeManager";
-import { useTreeWorker, type TreeProgress } from "@/lib/ancestry-tree/useTreeWorker";
-import { generateRandomParamsV3, ensureSpriteMapper } from "@/lib/cat-v3/randomGenerator";
-import { generateWarriorName } from "@/lib/ancestry-tree/nameGenerator";
+import {
+  DEFAULT_OFFSPRING_OPTIONS,
+  DEFAULT_TREE_CONFIG,
+} from "@/lib/ancestry-tree/types";
+import { useTreeWorker } from "@/lib/ancestry-tree/useTreeWorker";
+import {
+  ensureSpriteMapper,
+  generateRandomParamsV3,
+} from "@/lib/cat-v3/randomGenerator";
 import type { CatParams } from "@/lib/cat-v3/types";
-
-import { FamilyChartTree, type TreeOrientation, type FamilyChartTreeRef, type RelativeType } from "./FamilyChartTree";
+import type { PaletteId } from "@/lib/palettes";
 import { CatSidebar } from "./CatSidebar";
+import {
+  FamilyChartTree,
+  type FamilyChartTreeRef,
+  type RelativeType,
+  type TreeOrientation,
+} from "./FamilyChartTree";
 import { FoundingCoupleSelector } from "./FoundingCoupleSelector";
-import { SaveTreeDialog } from "./SaveTreeDialog";
 import { FoundingParentCard } from "./FoundingParentCard";
 import { OffspringOptionsPanel } from "./OffspringOptionsPanel";
-import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
-import type { PaletteId } from "@/lib/palettes";
+import { SaveTreeDialog } from "./SaveTreeDialog";
 import { SliderWithInput } from "./SliderWithInput";
 import "./family-chart-custom.css";
 
@@ -56,10 +75,15 @@ interface ParentPreview {
  * Estimate the number of cats that will be generated.
  * Accounts for: children, outsider partners (~89% of partners), and multiple partners (20% get 2).
  */
-function estimateCatCount(depth: number, avgChildren: number, partnerChance: number): number {
-  const MULTIPLE_PARTNERS_CHANCE = 0.20;
+function estimateCatCount(
+  depth: number,
+  avgChildren: number,
+  partnerChance: number,
+): number {
+  const MULTIPLE_PARTNERS_CHANCE = 0.2;
   const OUTSIDER_CHANCE = 0.89; // 89% chance partner is a newly generated outsider
-  const avgPartnersPerChild = 1 * (1 - MULTIPLE_PARTNERS_CHANCE) + 2 * MULTIPLE_PARTNERS_CHANCE; // 1.2
+  const avgPartnersPerChild =
+    1 * (1 - MULTIPLE_PARTNERS_CHANCE) + 2 * MULTIPLE_PARTNERS_CHANCE; // 1.2
 
   let total = 2; // founding couple
   let couples = 1;
@@ -70,8 +94,11 @@ function estimateCatCount(depth: number, avgChildren: number, partnerChance: num
 
     // Each child has partnerChance to find a partner, averaging 1.2 partners each
     // ~89% of partners are outsiders (new cats added to the tree)
-    const expectedPartnerRelationships = children * partnerChance * avgPartnersPerChild;
-    const outsiderPartners = Math.round(expectedPartnerRelationships * OUTSIDER_CHANCE);
+    const expectedPartnerRelationships =
+      children * partnerChance * avgPartnersPerChild;
+    const outsiderPartners = Math.round(
+      expectedPartnerRelationships * OUTSIDER_CHANCE,
+    );
     total += outsiderPartners;
 
     // Number of couples for next generation
@@ -81,33 +108,51 @@ function estimateCatCount(depth: number, avgChildren: number, partnerChance: num
   return total;
 }
 
-export function AncestryTreeClient({ initialTree, initialHasPassword }: AncestryTreeClientProps) {
+export function AncestryTreeClient({
+  initialTree,
+  initialHasPassword,
+}: AncestryTreeClientProps) {
   const router = useRouter();
-  const [viewMode, setViewMode] = useState<ViewMode>(initialTree ? "tree" : "config");
-  const [tree, setTree] = useState<SerializedAncestryTree | null>(initialTree ?? null);
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    initialTree ? "tree" : "config",
+  );
+  const [tree, setTree] = useState<SerializedAncestryTree | null>(
+    initialTree ?? null,
+  );
   const [config, setConfig] = useState<TreeGenerationConfig>(
-    initialTree?.config ?? DEFAULT_TREE_CONFIG
+    initialTree?.config ?? DEFAULT_TREE_CONFIG,
   );
   const [selectedCat, setSelectedCat] = useState<AncestryTreeCat | null>(null);
   const [hasPassword, setHasPassword] = useState(initialHasPassword ?? false);
 
   // Use Web Worker for tree generation
-  const { generateTree: generateTreeWorker, progress: workerProgress, isGenerating: isWorkerGenerating, cancel: cancelWorker } = useTreeWorker();
+  const {
+    generateTree: generateTreeWorker,
+    progress: workerProgress,
+    isGenerating: isWorkerGenerating,
+    cancel: cancelWorker,
+  } = useTreeWorker();
   const [isGenerating, setIsGenerating] = useState(false);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [isSpriteMapperReady, setIsSpriteMapperReady] = useState(false);
-  const [spriteMapperError, setSpriteMapperError] = useState<string | null>(null);
+  const [spriteMapperError, setSpriteMapperError] = useState<string | null>(
+    null,
+  );
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<TreeOrientation>("vertical");
-  const [currentMainId, setCurrentMainId] = useState<string | null>(null);
+  const [_currentMainId, setCurrentMainId] = useState<string | null>(null);
   const [isEditingRelations, setIsEditingRelations] = useState(false);
   const [chartRedrawKey, setChartRedrawKey] = useState(0);
   const familyChartRef = useRef<FamilyChartTreeRef>(null);
 
   // Parent preview state for config screen
-  const [motherPreview, setMotherPreview] = useState<ParentPreview | null>(null);
-  const [fatherPreview, setFatherPreview] = useState<ParentPreview | null>(null);
+  const [motherPreview, setMotherPreview] = useState<ParentPreview | null>(
+    null,
+  );
+  const [fatherPreview, setFatherPreview] = useState<ParentPreview | null>(
+    null,
+  );
   const [isRerollingMother, setIsRerollingMother] = useState(false);
   const [isRerollingFather, setIsRerollingFather] = useState(false);
 
@@ -131,7 +176,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
       try {
         const mapper = await ensureSpriteMapper();
         mutationPoolRef.current = {
-          pelts: mapper.getPeltNames().filter((p: string) => p !== "Tortie" && p !== "Calico"),
+          pelts: mapper
+            .getPeltNames()
+            .filter((p: string) => p !== "Tortie" && p !== "Calico"),
           colours: mapper.getColourOptions(),
           eyeColours: mapper.getEyeColours(),
           skinColours: mapper.getSkinColours(),
@@ -145,7 +192,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         setSpriteMapperError(null);
       } catch (error) {
         console.error("Failed to initialize sprite mapper:", error);
-        setSpriteMapperError("Failed to load sprite data. Please refresh the page.");
+        setSpriteMapperError(
+          "Failed to load sprite data. Please refresh the page.",
+        );
       }
     }
     initSpriteMapper();
@@ -155,12 +204,18 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
     setConfig(newConfig);
   }, []);
 
-  const handleOffspringOptionsChange = useCallback((options: OffspringOptions) => {
-    setConfig((prev) => ({ ...prev, offspringOptions: options }));
-  }, []);
+  const handleOffspringOptionsChange = useCallback(
+    (options: OffspringOptions) => {
+      setConfig((prev) => ({ ...prev, offspringOptions: options }));
+    },
+    [],
+  );
 
   const generateTreeFromCouple = useCallback(
-    async (input: FoundingCoupleInput, method: "random" | "history" = "random") => {
+    async (
+      input: FoundingCoupleInput,
+      method: "random" | "history" = "random",
+    ) => {
       setIsGenerating(true);
       setGenerationError(null);
       try {
@@ -168,21 +223,22 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         const serialized = await generateTreeWorker(
           config,
           input,
-          mutationPoolRef.current
+          mutationPoolRef.current,
         );
         setTree(serialized);
         setViewMode("tree");
         track("ancestry_tree_created", { method });
       } catch (error) {
         console.error("Failed to generate tree:", error);
-        const message = error instanceof Error ? error.message : "Failed to generate tree";
+        const message =
+          error instanceof Error ? error.message : "Failed to generate tree";
         setGenerationError(message);
         track("ancestry_tree_generation_failed", { method, message });
       } finally {
         setIsGenerating(false);
       }
     },
-    [config, generateTreeWorker]
+    [config, generateTreeWorker],
   );
 
   // Generate base tree (founding couple only, no descendants)
@@ -205,7 +261,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         setIsGenerating(false);
       }
     },
-    [config]
+    [config],
   );
 
   // Generate base tree from preview parents
@@ -222,7 +278,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
     const modes = config.paletteModes;
     // Treat empty array or undefined as no special modes - fall back to 'off'
     if (!modes || modes.length === 0) {
-      return 'off';
+      return "off";
     }
     return modes[Math.floor(Math.random() * modes.length)];
   }, [config.paletteModes]);
@@ -269,11 +325,21 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
     try {
       // Each parent gets a random palette from enabled modes
       const [motherParams, fatherParams] = await Promise.all([
-        generateRandomParamsV3({ experimentalColourMode: getRandomPaletteMode() }),
-        generateRandomParamsV3({ experimentalColourMode: getRandomPaletteMode() }),
+        generateRandomParamsV3({
+          experimentalColourMode: getRandomPaletteMode(),
+        }),
+        generateRandomParamsV3({
+          experimentalColourMode: getRandomPaletteMode(),
+        }),
       ]);
-      setMotherPreview({ params: motherParams, name: generateWarriorName("warrior") });
-      setFatherPreview({ params: fatherParams, name: generateWarriorName("warrior") });
+      setMotherPreview({
+        params: motherParams,
+        name: generateWarriorName("warrior"),
+      });
+      setFatherPreview({
+        params: fatherParams,
+        name: generateWarriorName("warrior"),
+      });
     } catch (error) {
       console.error("Failed to generate random couple:", error);
     } finally {
@@ -301,15 +367,19 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
       track("ancestry_parents_selected", { source: "history" });
       await generateTreeFromCouple(input, "history");
     },
-    [generateTreeFromCouple]
+    [generateTreeFromCouple],
   );
 
   const handleRegenerate = useCallback(async () => {
     if (!tree || !isSpriteMapperReady) return;
 
     // Extract founding couple from current tree
-    const foundingMother = tree.cats.find((c) => c.id === tree.foundingMotherId);
-    const foundingFather = tree.cats.find((c) => c.id === tree.foundingFatherId);
+    const foundingMother = tree.cats.find(
+      (c) => c.id === tree.foundingMotherId,
+    );
+    const foundingFather = tree.cats.find(
+      (c) => c.id === tree.foundingFatherId,
+    );
 
     if (!foundingMother || !foundingFather) {
       console.error("Founding couple not found in tree");
@@ -335,7 +405,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
       const serialized = await generateTreeWorker(
         config,
         foundingCouple,
-        mutationPoolRef.current
+        mutationPoolRef.current,
       );
       setTree(serialized);
     } catch (error) {
@@ -349,18 +419,21 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
     setSelectedCat(cat);
   }, []);
 
-  const handleSelectCatFromPopup = useCallback((cat: AncestryTreeCat) => {
+  const _handleSelectCatFromPopup = useCallback((cat: AncestryTreeCat) => {
     setSelectedCat(cat);
   }, []);
 
-  const handleReplacePartner = useCallback(
+  const _handleReplacePartner = useCallback(
     async (cat: AncestryTreeCat) => {
       if (!tree || !isSpriteMapperReady) return;
 
       setIsGenerating(true);
       try {
         const newPartnerParams = await generateRandomParamsV3();
-        const manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
+        const manager = AncestryTreeManager.deserialize(
+          tree,
+          mutationPoolRef.current,
+        );
         manager.replacePartner(cat.id, newPartnerParams);
 
         const serialized = manager.serialize();
@@ -372,7 +445,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         setIsGenerating(false);
       }
     },
-    [tree, isSpriteMapperReady]
+    [tree, isSpriteMapperReady],
   );
 
   // Assign a random partner to a cat without one
@@ -383,7 +456,10 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
       setIsGenerating(true);
       try {
         const newPartnerParams = await generateRandomParamsV3();
-        const manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
+        const manager = AncestryTreeManager.deserialize(
+          tree,
+          mutationPoolRef.current,
+        );
 
         // Assign partner without generating children
         manager.assignPartner(cat.id, newPartnerParams, undefined, false);
@@ -402,19 +478,28 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         setIsGenerating(false);
       }
     },
-    [tree, isSpriteMapperReady]
+    [tree, isSpriteMapperReady],
   );
 
   // Add a child to a couple with a specific partner
   const handleAddChildWithPartner = useCallback(
-    async (cat: AncestryTreeCat, partnerId: string, forcedGender?: "M" | "F") => {
+    async (
+      cat: AncestryTreeCat,
+      partnerId: string,
+      forcedGender?: "M" | "F",
+    ) => {
       if (!tree || !isSpriteMapperReady) return;
 
       setIsGenerating(true);
       let manager: AncestryTreeManager | null = null;
-      let originalConfig: ReturnType<AncestryTreeManager["getTree"]>["config"] | null = null;
+      let originalConfig:
+        | ReturnType<AncestryTreeManager["getTree"]>["config"]
+        | null = null;
       try {
-        manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
+        manager = AncestryTreeManager.deserialize(
+          tree,
+          mutationPoolRef.current,
+        );
 
         // Get fresh cat data from the deserialized tree (not from potentially stale state)
         const currentCat = manager.getCat(cat.id);
@@ -433,7 +518,12 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         const fatherId = currentCat.gender === "M" ? currentCat.id : partnerId;
 
         // Generate one child with optional forced gender
-        manager.generateOffspring(motherId, fatherId, currentCat.generation + 1, forcedGender);
+        manager.generateOffspring(
+          motherId,
+          fatherId,
+          currentCat.generation + 1,
+          forcedGender,
+        );
 
         const serialized = manager.serialize();
         setTree(serialized);
@@ -444,7 +534,10 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
           setSelectedCat(updatedCat);
         }
 
-        track("ancestry_offspring_generated", { count: 1, generation: currentCat.generation + 1 });
+        track("ancestry_offspring_generated", {
+          count: 1,
+          generation: currentCat.generation + 1,
+        });
       } catch (error) {
         console.error("Failed to add child:", error);
       } finally {
@@ -455,7 +548,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         setIsGenerating(false);
       }
     },
-    [tree, isSpriteMapperReady]
+    [tree, isSpriteMapperReady],
   );
 
   // Handle mainId changes from the chart
@@ -496,13 +589,16 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
 
   // Handle adding a parent (father or mother) to a cat
   const handleAddParent = useCallback(
-    async (cat: AncestryTreeCat, parentType: 'father' | 'mother') => {
+    async (cat: AncestryTreeCat, parentType: "father" | "mother") => {
       if (!tree || !isSpriteMapperReady) return;
 
       setIsGenerating(true);
       try {
         const newParentParams = await generateRandomParamsV3();
-        const manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
+        const manager = AncestryTreeManager.deserialize(
+          tree,
+          mutationPoolRef.current,
+        );
 
         manager.addParent(cat.id, newParentParams, parentType);
 
@@ -520,12 +616,16 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         setIsGenerating(false);
       }
     },
-    [tree, isSpriteMapperReady]
+    [tree, isSpriteMapperReady],
   );
 
   // Handle add relative from graph placeholder click
   const handleAddRelativeFromGraph = useCallback(
-    async (type: RelativeType, parentCat: AncestryTreeCat, otherParentId?: string) => {
+    async (
+      type: RelativeType,
+      parentCat: AncestryTreeCat,
+      otherParentId?: string,
+    ) => {
       // Stop edit mode after adding
       setIsEditingRelations(false);
 
@@ -544,7 +644,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
 
         if (otherParentId && tree) {
           // Check if otherParentId exists in the tree
-          const partnerExists = tree.cats.some(c => c.id === otherParentId);
+          const partnerExists = tree.cats.some((c) => c.id === otherParentId);
           if (partnerExists) {
             validPartnerId = otherParentId;
           }
@@ -552,7 +652,11 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
 
         if (validPartnerId) {
           // Specific spouse indicated - add child with that spouse
-          await handleAddChildWithPartner(parentCat, validPartnerId, forcedGender);
+          await handleAddChildWithPartner(
+            parentCat,
+            validPartnerId,
+            forcedGender,
+          );
         } else {
           // No specific spouse - create new spouse first, then add child
           if (!tree || !isSpriteMapperReady) return;
@@ -560,22 +664,38 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
           setIsGenerating(true);
           try {
             const newPartnerParams = await generateRandomParamsV3();
-            const manager = AncestryTreeManager.deserialize(tree, mutationPoolRef.current);
+            const manager = AncestryTreeManager.deserialize(
+              tree,
+              mutationPoolRef.current,
+            );
 
             // First, assign a partner (without generating offspring)
-            manager.assignPartner(parentCat.id, newPartnerParams, undefined, false);
+            manager.assignPartner(
+              parentCat.id,
+              newPartnerParams,
+              undefined,
+              false,
+            );
 
             // Then generate a child with the correct gender
             const currentCat = manager.getCat(parentCat.id);
             if (currentCat && currentCat.partnerIds.length > 0) {
-              const newPartnerId = currentCat.partnerIds[currentCat.partnerIds.length - 1];
-              const motherId = currentCat.gender === "F" ? currentCat.id : newPartnerId;
-              const fatherId = currentCat.gender === "M" ? currentCat.id : newPartnerId;
+              const newPartnerId =
+                currentCat.partnerIds[currentCat.partnerIds.length - 1];
+              const motherId =
+                currentCat.gender === "F" ? currentCat.id : newPartnerId;
+              const fatherId =
+                currentCat.gender === "M" ? currentCat.id : newPartnerId;
 
               // Temporarily set config to generate exactly 1 child
               const originalConfig = { ...manager.getTree().config };
               manager.setConfig({ minChildren: 1, maxChildren: 1 });
-              manager.generateOffspring(motherId, fatherId, currentCat.generation + 1, forcedGender);
+              manager.generateOffspring(
+                motherId,
+                fatherId,
+                currentCat.generation + 1,
+                forcedGender,
+              );
               manager.setConfig(originalConfig);
             }
 
@@ -583,7 +703,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
             setTree(serialized);
 
             // Update selectedCat with fresh data
-            const updatedCat = serialized.cats.find((c) => c.id === parentCat.id);
+            const updatedCat = serialized.cats.find(
+              (c) => c.id === parentCat.id,
+            );
             if (updatedCat) {
               setSelectedCat(updatedCat);
             }
@@ -595,7 +717,13 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         }
       }
     },
-    [handleAssignRandomPartner, handleAddChildWithPartner, handleAddParent, tree, isSpriteMapperReady]
+    [
+      handleAssignRandomPartner,
+      handleAddChildWithPartner,
+      handleAddParent,
+      tree,
+      isSpriteMapperReady,
+    ],
   );
 
   // Handle pose change for a cat
@@ -607,7 +735,7 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
       const updatedCats = tree.cats.map((c) =>
         c.id === cat.id
           ? { ...c, params: { ...c.params, spriteNumber: newSpriteNumber } }
-          : c
+          : c,
       );
 
       setTree({ ...tree, cats: updatedCats });
@@ -622,11 +750,20 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
 
       track("ancestry_cat_edited", { edit_type: "pose_change" });
     },
-    [tree, selectedCat]
+    [tree, selectedCat],
   );
 
   const handleSaveTree = useCallback(
-    async (name: string, creatorName: string, password?: string): Promise<{ success: boolean; error?: string; slug?: string; isNew?: boolean }> => {
+    async (
+      name: string,
+      creatorName: string,
+      password?: string,
+    ): Promise<{
+      success: boolean;
+      error?: string;
+      slug?: string;
+      isNew?: boolean;
+    }> => {
       if (!tree) return { success: false, error: "No tree to save" };
 
       const updatedTree = { ...tree, name, creatorName };
@@ -665,10 +802,13 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         return { success: true, slug: result.slug, isNew: result.isNew };
       } catch (error) {
         console.error("Failed to save tree:", error);
-        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
       }
     },
-    [tree, saveTreeMutation, router]
+    [tree, saveTreeMutation, router],
   );
 
   const handleBackToConfig = useCallback(() => {
@@ -686,7 +826,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         ) : null}
         {spriteMapperError ? (
           <div className="flex flex-col items-center justify-center gap-4 py-20">
-            <div className="text-red-400 text-lg font-medium">Failed to load sprite data</div>
+            <div className="text-red-400 text-lg font-medium">
+              Failed to load sprite data
+            </div>
             <p className="text-muted-foreground text-sm">{spriteMapperError}</p>
             <button
               type="button"
@@ -699,7 +841,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
         ) : !isSpriteMapperReady ? (
           <div className="flex items-center justify-center gap-3 py-20">
             <Loader2 className="size-8 animate-spin text-amber-500" />
-            <span className="text-muted-foreground">Loading sprite data...</span>
+            <span className="text-muted-foreground">
+              Loading sprite data...
+            </span>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -721,7 +865,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                     onReroll={handleRerollMother}
                     isLoading={isRerollingMother}
                   />
-                  <div className="flex items-center text-4xl text-pink-500">♥</div>
+                  <div className="flex items-center text-4xl text-pink-500">
+                    ♥
+                  </div>
                   <FoundingParentCard
                     gender="M"
                     params={fatherPreview?.params ?? null}
@@ -735,7 +881,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                   <button
                     type="button"
                     onClick={handleGenerateRandomCouple}
-                    disabled={isGenerating || isRerollingMother || isRerollingFather}
+                    disabled={
+                      isGenerating || isRerollingMother || isRerollingFather
+                    }
                     className="flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
                   >
                     <Dices className="size-4" />
@@ -758,7 +906,8 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                 <div className="glass-card p-6 text-center space-y-4">
                   <Loader2 className="size-8 animate-spin mx-auto text-amber-500" />
                   <p className="text-lg font-medium">
-                    Generating Generation {workerProgress.generation} of {workerProgress.total}
+                    Generating Generation {workerProgress.generation} of{" "}
+                    {workerProgress.total}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {workerProgress.catCount.toLocaleString()} cats created...
@@ -766,7 +915,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                   <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-amber-500 transition-all duration-300"
-                      style={{ width: `${(workerProgress.generation / workerProgress.total) * 100}%` }}
+                      style={{
+                        width: `${(workerProgress.generation / workerProgress.total) * 100}%`,
+                      }}
                     />
                   </div>
                   <button
@@ -781,26 +932,47 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                 <div className="space-y-3">
                   {/* Tree Size Estimate */}
                   {(() => {
-                    const avgChildren = (config.minChildren + config.maxChildren) / 2;
-                    const estimated = estimateCatCount(config.depth, avgChildren, config.partnerChance ?? 1);
+                    const avgChildren =
+                      (config.minChildren + config.maxChildren) / 2;
+                    const estimated = estimateCatCount(
+                      config.depth,
+                      avgChildren,
+                      config.partnerChance ?? 1,
+                    );
                     const isLarge = estimated > 1000;
                     const isHuge = estimated > 5000;
                     const isTooLarge = estimated > 5000;
                     return (
                       <>
-                        <div className={`text-center text-sm ${isHuge ? "text-red-400" : isLarge ? "text-amber-400" : "text-muted-foreground"}`}>
+                        <div
+                          className={`text-center text-sm ${isHuge ? "text-red-400" : isLarge ? "text-amber-400" : "text-muted-foreground"}`}
+                        >
                           {isHuge ? (
-                            <span>🚫 ~{estimated.toLocaleString()} cats — too large to render, will not load</span>
+                            <span>
+                              🚫 ~{estimated.toLocaleString()} cats — too large
+                              to render, will not load
+                            </span>
                           ) : isLarge ? (
-                            <span>⚠️ ~{estimated.toLocaleString()} cats — may not load properly</span>
+                            <span>
+                              ⚠️ ~{estimated.toLocaleString()} cats — may not
+                              load properly
+                            </span>
                           ) : (
-                            <span>~{estimated.toLocaleString()} cats estimated</span>
+                            <span>
+                              ~{estimated.toLocaleString()} cats estimated
+                            </span>
                           )}
                         </div>
                         <button
                           type="button"
                           onClick={handleGenerateFromPreview}
-                          disabled={!motherPreview || !fatherPreview || isGenerating || isWorkerGenerating || isTooLarge}
+                          disabled={
+                            !motherPreview ||
+                            !fatherPreview ||
+                            isGenerating ||
+                            isWorkerGenerating ||
+                            isTooLarge
+                          }
                           className="w-full flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-6 py-5 text-lg font-semibold text-white transition-all hover:from-amber-500 hover:to-orange-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                         >
                           {isGenerating || isWorkerGenerating ? (
@@ -808,7 +980,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                           ) : (
                             <Trees className="size-6" />
                           )}
-                          {isTooLarge ? "Tree Too Large" : "Generate Ancestry Tree"}
+                          {isTooLarge
+                            ? "Tree Too Large"
+                            : "Generate Ancestry Tree"}
                         </button>
                       </>
                     );
@@ -816,7 +990,12 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                   <button
                     type="button"
                     onClick={handleGenerateBaseFromPreview}
-                    disabled={!motherPreview || !fatherPreview || isGenerating || isWorkerGenerating}
+                    disabled={
+                      !motherPreview ||
+                      !fatherPreview ||
+                      isGenerating ||
+                      isWorkerGenerating
+                    }
                     className="w-full flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-sm font-medium transition-colors hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Generate Base Tree (Parents Only)
@@ -838,7 +1017,9 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                   <SliderWithInput
                     label="Generations"
                     value={config.depth}
-                    onChange={(val) => handleConfigChange({ ...config, depth: val })}
+                    onChange={(val) =>
+                      handleConfigChange({ ...config, depth: val })
+                    }
                     min={1}
                     max={30}
                     description="Higher values create larger trees exponentially"
@@ -846,8 +1027,15 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label htmlFor="maleRatio" className="text-sm text-muted-foreground">Male Ratio</label>
-                      <span className="text-sm font-medium tabular-nums">{Math.round(config.genderRatio * 100)}%</span>
+                      <label
+                        htmlFor="maleRatio"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Male Ratio
+                      </label>
+                      <span className="text-sm font-medium tabular-nums">
+                        {Math.round(config.genderRatio * 100)}%
+                      </span>
                     </div>
                     <input
                       id="maleRatio"
@@ -896,8 +1084,15 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label htmlFor="partnerChance" className="text-sm text-muted-foreground">Partner Chance</label>
-                      <span className="text-sm font-medium tabular-nums">{Math.round((config.partnerChance ?? 1) * 100)}%</span>
+                      <label
+                        htmlFor="partnerChance"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Partner Chance
+                      </label>
+                      <span className="text-sm font-medium tabular-nums">
+                        {Math.round((config.partnerChance ?? 1) * 100)}%
+                      </span>
                     </div>
                     <input
                       id="partnerChance"
@@ -927,25 +1122,40 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
                   Color Palettes
                 </h3>
                 <PaletteMultiSelect
-                  selected={new Set((config.paletteModes ?? ['off']).filter((m): m is PaletteId => m !== 'off'))}
+                  selected={
+                    new Set(
+                      (config.paletteModes ?? ["off"]).filter(
+                        (m): m is PaletteId => m !== "off",
+                      ),
+                    )
+                  }
                   onChange={(newSet) => {
-                    const modes = config.paletteModes ?? ['off'];
-                    const hasClassic = modes.includes('off');
-                    const newModes: PaletteMode[] = hasClassic ? ['off', ...Array.from(newSet) as PaletteMode[]] : [...Array.from(newSet) as PaletteMode[]];
-                    if (newModes.length === 0) newModes.push('off');
+                    const modes = config.paletteModes ?? ["off"];
+                    const hasClassic = modes.includes("off");
+                    const newModes: PaletteMode[] = hasClassic
+                      ? ["off", ...(Array.from(newSet) as PaletteMode[])]
+                      : [...(Array.from(newSet) as PaletteMode[])];
+                    if (newModes.length === 0) newModes.push("off");
                     handleConfigChange({ ...config, paletteModes: newModes });
                   }}
-                  includeClassic={(config.paletteModes ?? ['off']).includes('off')}
+                  includeClassic={(config.paletteModes ?? ["off"]).includes(
+                    "off",
+                  )}
                   onClassicChange={(include) => {
-                    const modes = config.paletteModes ?? ['off'];
-                    const otherModes = modes.filter((m) => m !== 'off') as PaletteMode[];
-                    const newModes: PaletteMode[] = include ? ['off', ...otherModes] : otherModes;
-                    if (newModes.length === 0) newModes.push('off');
+                    const modes = config.paletteModes ?? ["off"];
+                    const otherModes = modes.filter(
+                      (m) => m !== "off",
+                    ) as PaletteMode[];
+                    const newModes: PaletteMode[] = include
+                      ? ["off", ...otherModes]
+                      : otherModes;
+                    if (newModes.length === 0) newModes.push("off");
                     handleConfigChange({ ...config, paletteModes: newModes });
                   }}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Select multiple palettes - each cat picks randomly from enabled options.
+                  Select multiple palettes - each cat picks randomly from
+                  enabled options.
                 </p>
               </div>
 
@@ -1036,7 +1246,10 @@ export function AncestryTreeClient({ initialTree, initialHasPassword }: Ancestry
             disabled={isGenerating}
             className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-sm font-medium transition-colors hover:bg-white/20 disabled:opacity-50"
           >
-            <RefreshIcon size={16} className={isGenerating ? "animate-spin" : ""} />
+            <RefreshIcon
+              size={16}
+              className={isGenerating ? "animate-spin" : ""}
+            />
             Regenerate
           </button>
           <button

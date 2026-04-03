@@ -15,7 +15,9 @@ export function useSpriteMapperOptions() {
       try {
         setLoading(true);
         const [{ default: spriteMapper }] = await Promise.all([
-          import("@/lib/single-cat/spriteMapper") as Promise<{ default: SpriteMapperApi }>,
+          import("@/lib/single-cat/spriteMapper") as Promise<{
+            default: SpriteMapperApi;
+          }>,
         ]);
         if (cancelled) return;
 
@@ -26,7 +28,9 @@ export function useSpriteMapperOptions() {
 
         setMapper(spriteMapper);
 
-        const spriteNumbers = spriteMapper.getSprites().filter((value) => !FORBIDDEN_SPRITES.has(value));
+        const spriteNumbers = spriteMapper
+          .getSprites()
+          .filter((value) => !FORBIDDEN_SPRITES.has(value));
         const builderOptions: BuilderOptions = {
           sprites: spriteNumbers,
           pelts: spriteMapper.getPeltNames(),
@@ -36,7 +40,10 @@ export function useSpriteMapperOptions() {
           eyeColours: spriteMapper.getEyeColours(),
           skinColours: spriteMapper.getSkinColours(),
           tints: spriteMapper.getTints(),
-          whiteTints: ["none", ...spriteMapper.getWhiteTints().filter((entry) => entry !== "none")],
+          whiteTints: [
+            "none",
+            ...spriteMapper.getWhiteTints().filter((entry) => entry !== "none"),
+          ],
           tortieMasks: spriteMapper.getTortieMasks(),
           plantAccessories: spriteMapper.getPlantAccessories(),
           wildAccessories: spriteMapper.getWildAccessories(),
@@ -73,7 +80,9 @@ export function useCatGenerator() {
     let cancelled = false;
     (async () => {
       try {
-        const { default: catGenerator } = (await import("@/lib/single-cat/catGeneratorV3")) as {
+        const { default: catGenerator } = (await import(
+          "@/lib/single-cat/catGeneratorV3"
+        )) as {
           default: CatGeneratorApi;
         };
         if (cancelled) return;
