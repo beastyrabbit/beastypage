@@ -14,24 +14,72 @@ export interface PatternStripe {
 
 export interface PatternDefinition {
   type:
-    | 'tartan' | 'gingham' | 'houndstooth' | 'pinstripe' | 'chevron'
-    | 'polkadot' | 'argyle' | 'buffalo' | 'checkerboard' | 'windowpane'
-    | 'diagonal' | 'basketweave' | 'flag'
+    | "tartan"
+    | "gingham"
+    | "houndstooth"
+    | "pinstripe"
+    | "chevron"
+    | "polkadot"
+    | "argyle"
+    | "buffalo"
+    | "checkerboard"
+    | "windowpane"
+    | "diagonal"
+    | "basketweave"
+    | "flag"
     // SVG emblem flags
-    | 'flag_canada' | 'flag_switzerland' | 'flag_uk' | 'flag_turkey' | 'flag_israel'
-    | 'flag_scotland' | 'flag_jamaica' | 'flag_china' | 'flag_australia'
+    | "flag_canada"
+    | "flag_switzerland"
+    | "flag_uk"
+    | "flag_turkey"
+    | "flag_israel"
+    | "flag_scotland"
+    | "flag_jamaica"
+    | "flag_china"
+    | "flag_australia"
     // Phase 1: World patterns
-    | 'seigaiha' | 'asanoha' | 'shippo' | 'islamic_star' | 'fleur_de_lis'
-    | 'paisley' | 'greek_key' | 'art_deco_fan' | 'uroko' | 'eight_point_star'
+    | "seigaiha"
+    | "asanoha"
+    | "shippo"
+    | "islamic_star"
+    | "fleur_de_lis"
+    | "paisley"
+    | "greek_key"
+    | "art_deco_fan"
+    | "uroko"
+    | "eight_point_star"
     // Phase 2: East Asian + African + Indian
-    | 'kikko' | 'sayagata' | 'chinese_lattice' | 'chinese_coin' | 'ruyi_cloud'
-    | 'dancheong' | 'batik_kawung' | 'batik_parang' | 'karakusa' | 'kolam'
-    | 'kente' | 'mudcloth' | 'adinkra' | 'shweshwe'
+    | "kikko"
+    | "sayagata"
+    | "chinese_lattice"
+    | "chinese_coin"
+    | "ruyi_cloud"
+    | "dancheong"
+    | "batik_kawung"
+    | "batik_parang"
+    | "karakusa"
+    | "kolam"
+    | "kente"
+    | "mudcloth"
+    | "adinkra"
+    | "shweshwe"
     // Phase 2b: Japanese + famous + medieval + continental
-    | 'same_komon' | 'kanoko' | 'hishi' | 'tachiwaki' | 'bishamon_kikko'
-    | 'quatrefoil' | 'herringbone' | 'trellis' | 'damask' | 'camouflage'
-    | 'chainmail' | 'four_point_star_motif' | 'celtic_knot'
-    | 'nordic_snowflake' | 'nordic_diamond' | 'native_step';
+    | "same_komon"
+    | "kanoko"
+    | "hishi"
+    | "tachiwaki"
+    | "bishamon_kikko"
+    | "quatrefoil"
+    | "herringbone"
+    | "trellis"
+    | "damask"
+    | "camouflage"
+    | "chainmail"
+    | "four_point_star_motif"
+    | "celtic_knot"
+    | "nordic_snowflake"
+    | "nordic_diamond"
+    | "native_step";
   tileSize: number;
   background: [number, number, number];
   foreground?: [number, number, number];
@@ -49,93 +97,99 @@ export interface PaletteColorDef {
  * Full color definition with baseColour for spriteMapper compatibility
  */
 export interface FullPaletteColorDef extends PaletteColorDef {
-  baseColour: 'WHITE';
+  baseColour: "WHITE";
 }
 
 export type PaletteId =
-  | 'mood'
-  | 'bold'
-  | 'darker'
-  | 'blackout'
-  | 'mononoke'
-  | 'howl'
-  | 'demonslayer'
-  | 'titanic'
-  | 'deathnote'
-  | 'slime'
-  | 'ghostintheshell'
-  | 'mushishi'
-  | 'chisweethome'
-  | 'fma'
+  | "mood"
+  | "bold"
+  | "darker"
+  | "blackout"
+  | "mononoke"
+  | "howl"
+  | "demonslayer"
+  | "titanic"
+  | "deathnote"
+  | "slime"
+  | "ghostintheshell"
+  | "mushishi"
+  | "chisweethome"
+  | "fma"
   // Pure/monochromatic palettes
-  | 'ocean-depths'
-  | 'midnight-velvet'
-  | 'arctic-waters'
-  | 'emerald-forest'
-  | 'jade-mist'
-  | 'electric-grass'
-  | 'golden-hour'
-  | 'ember-glow'
-  | 'crimson-flame'
-  | 'rose-garden'
-  | 'neon-blossom'
-  | 'royal-amethyst'
-  | 'twilight-haze'
-  | 'espresso-bean'
-  | 'desert-sand'
-  | 'storm-cloud'
-  | 'coral-reef'
-  | 'tropical-lagoon'
-  | 'midnight-wine'
-  | 'peach-sorbet'
-  | 'greyscale'
-  | 'cold-steel'
-  | 'ink-wash'
+  | "ocean-depths"
+  | "midnight-velvet"
+  | "arctic-waters"
+  | "emerald-forest"
+  | "jade-mist"
+  | "electric-grass"
+  | "golden-hour"
+  | "ember-glow"
+  | "crimson-flame"
+  | "rose-garden"
+  | "neon-blossom"
+  | "royal-amethyst"
+  | "twilight-haze"
+  | "espresso-bean"
+  | "desert-sand"
+  | "storm-cloud"
+  | "coral-reef"
+  | "tropical-lagoon"
+  | "midnight-wine"
+  | "peach-sorbet"
+  | "greyscale"
+  | "cold-steel"
+  | "ink-wash"
   // Textile-inspired palettes
-  | 'royal-stewart'
-  | 'black-watch'
-  | 'country-tweed'
-  | 'savile-row'
-  | 'bavarian-tracht'
-  | 'oktoberfest'
+  | "royal-stewart"
+  | "black-watch"
+  | "country-tweed"
+  | "savile-row"
+  | "bavarian-tracht"
+  | "oktoberfest"
   // Pattern palettes
-  | 'tartan-patterns'
-  | 'gingham-patterns'
-  | 'houndstooth-patterns'
-  | 'pinstripe-patterns'
-  | 'chevron-patterns'
-  | 'polkadot-patterns'
-  | 'argyle-patterns'
-  | 'buffalo-patterns'
-  | 'checkerboard-patterns'
-  | 'windowpane-patterns'
-  | 'diagonal-patterns'
-  | 'basketweave-patterns'
-  | 'flag-patterns'
-  | 'scottish-clans'
-  | 'japanese-patterns'
-  | 'middle-eastern-rugs'
+  | "tartan-patterns"
+  | "gingham-patterns"
+  | "houndstooth-patterns"
+  | "pinstripe-patterns"
+  | "chevron-patterns"
+  | "polkadot-patterns"
+  | "argyle-patterns"
+  | "buffalo-patterns"
+  | "checkerboard-patterns"
+  | "windowpane-patterns"
+  | "diagonal-patterns"
+  | "basketweave-patterns"
+  | "flag-patterns"
+  | "scottish-clans"
+  | "japanese-patterns"
+  | "middle-eastern-rugs"
   // Phase 1: New cultural palettes
-  | 'european-ornate'
-  | 'art-deco-patterns'
-  | 'indian-patterns'
+  | "european-ornate"
+  | "art-deco-patterns"
+  | "indian-patterns"
   // Phase 2: Cultural palettes
-  | 'chinese-patterns'
-  | 'african-patterns'
-  | 'indonesian-patterns'
-  | 'korean-patterns'
+  | "chinese-patterns"
+  | "african-patterns"
+  | "indonesian-patterns"
+  | "korean-patterns"
   // Phase 2b: New palettes
-  | 'scandinavian-patterns'
-  | 'medieval-patterns'
-  | 'american-patterns'
-  | 'famous-patterns';
+  | "scandinavian-patterns"
+  | "medieval-patterns"
+  | "american-patterns"
+  | "famous-patterns";
 
 /**
  * PaletteMode is 'off' (classic/original colours) or a specific palette ID
  */
-export type PaletteMode = 'off' | PaletteId;
+export type PaletteMode = "off" | PaletteId;
 
-export type PaletteGroup = 'solid' | 'anime' | 'textile' | 'ornate' | 'heritage' | 'flags';
+export type PaletteGroup =
+  | "solid"
+  | "anime"
+  | "textile"
+  | "ornate"
+  | "heritage"
+  | "flags";
 
 export interface PaletteCategory {
   id: PaletteId;
@@ -150,7 +204,7 @@ export interface PaletteCategory {
  */
 export function toFullColorDef(def: PaletteColorDef): FullPaletteColorDef {
   return {
-    baseColour: 'WHITE',
+    baseColour: "WHITE",
     ...def,
   };
 }

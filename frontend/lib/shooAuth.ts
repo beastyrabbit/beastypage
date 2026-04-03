@@ -2,7 +2,10 @@
 
 import { createShooConvexAuth } from "@shoojs/react";
 
-const SHOO_OPTIONS = { callbackPath: "/auth/callback", requestPii: true } as const;
+const SHOO_OPTIONS = {
+  callbackPath: "/auth/callback",
+  requestPii: true,
+} as const;
 
 let _shoo: ReturnType<typeof createShooConvexAuth> | null = null;
 
@@ -22,6 +25,7 @@ export function useAuth() {
         null as string | null,
     };
   }
+  // biome-ignore lint/correctness/useHookAtTopLevel: intentional — early return guards server-side rendering
   return getShoo().useAuth();
 }
 

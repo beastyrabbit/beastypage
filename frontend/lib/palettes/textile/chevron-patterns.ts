@@ -1,55 +1,145 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const chevronPatternsPalette: PaletteCategory = {
-  id: 'chevron-patterns',
-  label: 'Chevron Patterns',
+  id: "chevron-patterns",
+  label: "Chevron Patterns",
   description:
-    'V-shaped zigzag herringbone weaves at 3 widths — fine, medium, and bold',
+    "V-shaped zigzag herringbone weaves at 3 widths — fine, medium, and bold",
   colors: {
     CV_NAVY_FINE: {
-      pattern: { type: 'chevron', tileSize: 50, background: [20, 25, 60], foreground: [180, 185, 200], spacing: 3 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [20, 25, 60],
+        foreground: [180, 185, 200],
+        spacing: 3,
+      },
     },
     CV_NAVY_MED: {
-      pattern: { type: 'chevron', tileSize: 50, background: [20, 25, 60], foreground: [180, 185, 200], spacing: 6 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [20, 25, 60],
+        foreground: [180, 185, 200],
+        spacing: 6,
+      },
     },
     CV_NAVY_BOLD: {
-      pattern: { type: 'chevron', tileSize: 50, background: [20, 25, 60], foreground: [180, 185, 200], spacing: 12 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [20, 25, 60],
+        foreground: [180, 185, 200],
+        spacing: 12,
+      },
     },
     CV_GREY_FINE: {
-      pattern: { type: 'chevron', tileSize: 50, background: [70, 70, 75], foreground: [200, 200, 205], spacing: 3 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [70, 70, 75],
+        foreground: [200, 200, 205],
+        spacing: 3,
+      },
     },
     CV_GREY_MED: {
-      pattern: { type: 'chevron', tileSize: 50, background: [70, 70, 75], foreground: [200, 200, 205], spacing: 6 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [70, 70, 75],
+        foreground: [200, 200, 205],
+        spacing: 6,
+      },
     },
     CV_GREY_BOLD: {
-      pattern: { type: 'chevron', tileSize: 50, background: [70, 70, 75], foreground: [200, 200, 205], spacing: 12 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [70, 70, 75],
+        foreground: [200, 200, 205],
+        spacing: 12,
+      },
     },
     CV_TEAL_FINE: {
-      pattern: { type: 'chevron', tileSize: 50, background: [15, 80, 85], foreground: [180, 230, 225], spacing: 3 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [15, 80, 85],
+        foreground: [180, 230, 225],
+        spacing: 3,
+      },
     },
     CV_TEAL_MED: {
-      pattern: { type: 'chevron', tileSize: 50, background: [15, 80, 85], foreground: [180, 230, 225], spacing: 6 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [15, 80, 85],
+        foreground: [180, 230, 225],
+        spacing: 6,
+      },
     },
     CV_TEAL_BOLD: {
-      pattern: { type: 'chevron', tileSize: 50, background: [15, 80, 85], foreground: [180, 230, 225], spacing: 12 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [15, 80, 85],
+        foreground: [180, 230, 225],
+        spacing: 12,
+      },
     },
     CV_RUST_FINE: {
-      pattern: { type: 'chevron', tileSize: 50, background: [140, 55, 20], foreground: [230, 195, 150], spacing: 3 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [140, 55, 20],
+        foreground: [230, 195, 150],
+        spacing: 3,
+      },
     },
     CV_RUST_MED: {
-      pattern: { type: 'chevron', tileSize: 50, background: [140, 55, 20], foreground: [230, 195, 150], spacing: 6 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [140, 55, 20],
+        foreground: [230, 195, 150],
+        spacing: 6,
+      },
     },
     CV_RUST_BOLD: {
-      pattern: { type: 'chevron', tileSize: 50, background: [140, 55, 20], foreground: [230, 195, 150], spacing: 12 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [140, 55, 20],
+        foreground: [230, 195, 150],
+        spacing: 12,
+      },
     },
     CV_WINE_FINE: {
-      pattern: { type: 'chevron', tileSize: 50, background: [90, 15, 40], foreground: [210, 170, 185], spacing: 3 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [90, 15, 40],
+        foreground: [210, 170, 185],
+        spacing: 3,
+      },
     },
     CV_WINE_MED: {
-      pattern: { type: 'chevron', tileSize: 50, background: [90, 15, 40], foreground: [210, 170, 185], spacing: 6 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [90, 15, 40],
+        foreground: [210, 170, 185],
+        spacing: 6,
+      },
     },
     CV_WINE_BOLD: {
-      pattern: { type: 'chevron', tileSize: 50, background: [90, 15, 40], foreground: [210, 170, 185], spacing: 12 },
+      pattern: {
+        type: "chevron",
+        tileSize: 50,
+        background: [90, 15, 40],
+        foreground: [210, 170, 185],
+        spacing: 12,
+      },
     },
   },
 };

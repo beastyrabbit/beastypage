@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const stormCloudPalette: PaletteCategory = {
-  id: 'storm-cloud',
-  label: 'Storm Cloud',
-  description: 'Gray — cool blue-slate shadows through true iron to warm silver-taupe highlights',
+  id: "storm-cloud",
+  label: "Storm Cloud",
+  description:
+    "Gray — cool blue-slate shadows through true iron to warm silver-taupe highlights",
   colors: {
     SC_DEEPSLATE: { multiply: [10, 12, 18] },
     SC_THUNDERHEAD: { multiply: [18, 20, 28] },

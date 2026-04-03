@@ -1,6 +1,10 @@
-import type { AfterlifeOption, ExtendedMode, LayerRange } from "@/utils/singleCatVariants";
-import type { SingleCatPortableSettings } from "./types";
+import type {
+  AfterlifeOption,
+  ExtendedMode,
+  LayerRange,
+} from "@/utils/singleCatVariants";
 import { PORTABLE_PALETTE_REGISTRY } from "./registry";
+import type { SingleCatPortableSettings } from "./types";
 import { WORDLIST_V2 } from "./wordlist-v2";
 
 // ---------------------------------------------------------------------------
@@ -12,10 +16,20 @@ import { WORDLIST_V2 } from "./wordlist-v2";
  * Index into this array is stored in 4 bits.
  */
 const RANGE_TABLE: readonly [number, number][] = [
-  [0, 0], [0, 1], [0, 2], [0, 3], [0, 4],
-  [1, 1], [1, 2], [1, 3], [1, 4],
-  [2, 2], [2, 3], [2, 4],
-  [3, 3], [3, 4],
+  [0, 0],
+  [0, 1],
+  [0, 2],
+  [0, 3],
+  [0, 4],
+  [1, 1],
+  [1, 2],
+  [1, 3],
+  [1, 4],
+  [2, 2],
+  [2, 3],
+  [2, 4],
+  [3, 3],
+  [3, 4],
   [4, 4],
 ];
 
@@ -31,7 +45,12 @@ function getRangeIndex(): Map<string, number> {
 }
 
 const AFTERLIFE_TABLE: readonly AfterlifeOption[] = [
-  "off", "dark10", "star10", "both10", "darkForce", "starForce",
+  "off",
+  "dark10",
+  "star10",
+  "both10",
+  "darkForce",
+  "starForce",
 ];
 const AFTERLIFE_INDEX = new Map<string, number>(
   AFTERLIFE_TABLE.map((v, i) => [v, i]),
@@ -45,7 +64,8 @@ let _wordIndex: Map<string, number> | null = null;
 function getWordIndex(): Map<string, number> {
   if (!_wordIndex) {
     _wordIndex = new Map();
-    for (let i = 0; i < WORDLIST_V2.length; i++) _wordIndex.set(WORDLIST_V2[i], i);
+    for (let i = 0; i < WORDLIST_V2.length; i++)
+      _wordIndex.set(WORDLIST_V2[i], i);
   }
   return _wordIndex;
 }
@@ -79,9 +99,7 @@ function decodeRange(index: number): LayerRange {
 // ---------------------------------------------------------------------------
 
 /** Encode palette selections into [low27, high47] pair. */
-function encodePaletteMask(
-  modes: readonly ExtendedMode[],
-): [number, number] {
+function encodePaletteMask(modes: readonly ExtendedMode[]): [number, number] {
   let low = 0;
   let high = 0;
   const modeSet = new Set(modes);
@@ -102,12 +120,12 @@ function decodePaletteMask(low: number, high: number): ExtendedMode[] {
   const len = Math.min(PORTABLE_PALETTE_REGISTRY.length, 74);
 
   for (let i = 0; i < Math.min(len, 27); i++) {
-    if (Math.floor(low / (2 ** i)) % 2 === 1) {
+    if (Math.floor(low / 2 ** i) % 2 === 1) {
       modes.push(PORTABLE_PALETTE_REGISTRY[i]);
     }
   }
   for (let i = 27; i < len; i++) {
-    if (Math.floor(high / (2 ** (i - 27))) % 2 === 1) {
+    if (Math.floor(high / 2 ** (i - 27)) % 2 === 1) {
       modes.push(PORTABLE_PALETTE_REGISTRY[i]);
     }
   }
@@ -129,7 +147,7 @@ function decodePaletteMask(low: number, high: number): ExtendedMode[] {
 //   bit  20     includeBase           (1)
 //   bits 21-94  palette bitmask       (74) one bit per palette
 //   bit  95     reserved mode bit     (1) 1 => exactLayerCounts = false
-  //                                     (inverted so legacy codes with 0 default to true)
+//                                     (inverted so legacy codes with 0 default to true)
 //   ─────────────────────────────────────
 //   total                             96 bits
 //
@@ -148,12 +166,12 @@ const W = 65536; // 2^16
 const W2 = W * W; // 2^32 = 4294967296
 
 // Bit-position multipliers for the lower half
-const POW4  = 16;               // 2^4
-const POW8  = 256;              // 2^8
-const POW12 = 4096;             // 2^12
-const POW16 = 65536;            // 2^16
-const POW20 = 1048576;          // 2^20
-const POW21 = 2097152;          // 2^21
+const POW4 = 16; // 2^4
+const POW8 = 256; // 2^8
+const POW12 = 4096; // 2^12
+const POW16 = 65536; // 2^16
+const POW20 = 1048576; // 2^20
+const POW21 = 2097152; // 2^21
 
 function pack(
   settings: SingleCatPortableSettings,
@@ -169,7 +187,7 @@ function pack(
 
   // Lower half: bits 0-47 (version + ranges + afterlife + base + paletteLow)
   const lower =
-    1 +                          // version = 1
+    1 + // version = 1
     accIdx * POW4 +
     scarIdx * POW8 +
     tortieIdx * POW12 +
@@ -178,7 +196,7 @@ function pack(
     paletteLow * POW21;
 
   // Upper half: bits 48-95 (paletteHigh + reserved mode bit)
-  const upper = paletteHigh + reservedModeBit * (2 ** 47);
+  const upper = paletteHigh + reservedModeBit * 2 ** 47;
 
   // Split into 6 x 16-bit words via division + modulo
   return [
@@ -192,8 +210,12 @@ function pack(
 }
 
 function unpack(
-  w0: number, w1: number, w2: number,
-  w3: number, w4: number, w5: number,
+  w0: number,
+  w1: number,
+  w2: number,
+  w3: number,
+  w4: number,
+  w5: number,
 ): SingleCatPortableSettings | null {
   // Reconstruct the two halves
   const lower = w0 + w1 * W + w2 * W2;
@@ -218,8 +240,8 @@ function unpack(
   const includeBase = Math.floor(lower / POW20) % 2 === 1;
 
   const paletteLow = Math.floor(lower / POW21); // bits 21-47 = 27 bits
-  const reservedModeBit = Math.floor(upper / (2 ** 47)) % 2;
-  const paletteHigh = upper % (2 ** 47);        // bits 48-94 = 47 bits
+  const reservedModeBit = Math.floor(upper / 2 ** 47) % 2;
+  const paletteHigh = upper % 2 ** 47; // bits 48-94 = 47 bits
 
   return {
     accessoryRange: decodeRange(accIdx),
@@ -249,8 +271,12 @@ export function encodePortableSettings(
 ): string {
   const [w0, w1, w2, w3, w4, w5] = pack(settings);
   return [
-    WORDLIST_V2[w0], WORDLIST_V2[w1], WORDLIST_V2[w2],
-    WORDLIST_V2[w3], WORDLIST_V2[w4], WORDLIST_V2[w5],
+    WORDLIST_V2[w0],
+    WORDLIST_V2[w1],
+    WORDLIST_V2[w2],
+    WORDLIST_V2[w3],
+    WORDLIST_V2[w4],
+    WORDLIST_V2[w5],
   ].join("-");
 }
 
@@ -265,7 +291,10 @@ export function encodePortableSettings(
 export function decodePortableSettings(
   code: string,
 ): SingleCatPortableSettings | null {
-  const normalized = code.trim().toLowerCase().replace(/[\s-]+/g, " ");
+  const normalized = code
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, " ");
   const words = normalized.split(" ");
 
   if (words.length !== 6) return null;
@@ -278,8 +307,12 @@ export function decodePortableSettings(
     indices.push(i);
   }
   return unpack(
-    indices[0], indices[1], indices[2],
-    indices[3], indices[4], indices[5],
+    indices[0],
+    indices[1],
+    indices[2],
+    indices[3],
+    indices[4],
+    indices[5],
   );
 }
 

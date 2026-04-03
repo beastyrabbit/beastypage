@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const royalStewartPalette: PaletteCategory = {
-  id: 'royal-stewart',
-  label: 'Royal Stewart',
-  description: 'Scottish tartan — bold reds, hunter greens, navy checks and gold thread',
+  id: "royal-stewart",
+  label: "Royal Stewart",
+  description:
+    "Scottish tartan — bold reds, hunter greens, navy checks and gold thread",
   colors: {
     RS_TARTANBLACK: { multiply: [12, 10, 10] },
     RS_DEEPCRIMSON: { multiply: [110, 8, 18] },

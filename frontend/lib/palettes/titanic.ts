@@ -1,9 +1,9 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const titanicPalette: PaletteCategory = {
-  id: 'titanic',
-  label: 'Titanic',
-  description: 'Atlantic ocean depths, golden opulence, and starlit romance',
+  id: "titanic",
+  label: "Titanic",
+  description: "Atlantic ocean depths, golden opulence, and starlit romance",
   colors: {
     TITANIC_OCEAN: { multiply: [52, 76, 101] },
     TITANIC_GOLD: { multiply: [233, 186, 36] },

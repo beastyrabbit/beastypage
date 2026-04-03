@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const roseGardenPalette: PaletteCategory = {
-  id: 'rose-garden',
-  label: 'Rose Garden',
-  description: 'Pink — deep wine-magenta shadows through vivid rose to warm peach-petal light',
+  id: "rose-garden",
+  label: "Rose Garden",
+  description:
+    "Pink — deep wine-magenta shadows through vivid rose to warm peach-petal light",
   colors: {
     RG_DEEPWINE: { multiply: [35, 6, 22] },
     RG_ROSEWOOD: { multiply: [50, 10, 30] },

@@ -1,9 +1,10 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const slimePalette: PaletteCategory = {
-  id: 'slime',
-  label: 'Reincarnated as a Slime',
-  description: "Rimuru's Tempest nation of monsters, spirits, and magical creatures",
+  id: "slime",
+  label: "Reincarnated as a Slime",
+  description:
+    "Rimuru's Tempest nation of monsters, spirits, and magical creatures",
   colors: {
     SLIME_RIMURU: { multiply: [147, 185, 232] },
     SLIME_TEMPEST: { multiply: [58, 113, 164] },
