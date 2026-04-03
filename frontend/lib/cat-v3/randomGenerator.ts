@@ -1,11 +1,19 @@
-import type { CatParams, RandomGenerationOptions, RandomGenerationResult, SlotSelections } from './types';
-import { materializeStringSlots, materializeTortieSlots } from './slotMaterializer';
-import config from './random-config.json';
+import config from "./random-config.json";
+import {
+  materializeStringSlots,
+  materializeTortieSlots,
+} from "./slotMaterializer";
+import type {
+  CatParams,
+  RandomGenerationOptions,
+  RandomGenerationResult,
+  SlotSelections,
+} from "./types";
 
-type CountCategory = 'tortie' | 'accessories' | 'scars';
-type CountStrategy = 'weighted' | 'uniform';
+type CountCategory = "tortie" | "accessories" | "scars";
+type CountStrategy = "weighted" | "uniform";
 
-export type { RandomGenerationOptions } from './types';
+export type { RandomGenerationOptions } from "./types";
 
 interface CountConfig {
   weights?: Record<string, number>;
@@ -47,7 +55,10 @@ interface SpriteMapperApi {
   getVitiligo(): string[];
   getTortieMasks(): string[];
   getWhitePatches(): string[];
-  getWhitePatchColourOptions(mode?: string, experimentalMode?: unknown): string[];
+  getWhitePatchColourOptions(
+    mode?: string,
+    experimentalMode?: unknown,
+  ): string[];
 }
 
 let spriteMapperInstance: SpriteMapperApi | null = null;
@@ -59,7 +70,9 @@ export async function ensureSpriteMapper() {
   }
   if (!spriteMapperReady) {
     spriteMapperReady = (async () => {
-      const mod = (await import('@/lib/single-cat/spriteMapper')) as { default: SpriteMapperApi };
+      const mod = (await import("@/lib/single-cat/spriteMapper")) as {
+        default: SpriteMapperApi;
+      };
       const mapper = mod.default;
       if (!mapper.loaded) {
         await mapper.init();
@@ -79,16 +92,24 @@ function roll(probability: number | undefined): boolean {
 
 function pickOne<T>(items: T[]): T {
   if (!items.length) {
-    throw new Error('Attempted to pick from an empty list');
+    throw new Error("Attempted to pick from an empty list");
   }
   const index = Math.floor(Math.random() * items.length);
   return items[index];
 }
 
-function weightedPick(values: Record<string, number>, fallback: () => number): number {
+function weightedPick(
+  values: Record<string, number>,
+  fallback: () => number,
+): number {
   const entries = Object.entries(values ?? {})
     .map(([key, weight]) => ({ value: Number(key), weight: Number(weight) }))
-    .filter((entry) => Number.isFinite(entry.value) && Number.isFinite(entry.weight) && entry.weight > 0);
+    .filter(
+      (entry) =>
+        Number.isFinite(entry.value) &&
+        Number.isFinite(entry.weight) &&
+        entry.weight > 0,
+    );
 
   if (!entries.length) {
     return fallback();
@@ -108,18 +129,22 @@ function weightedPick(values: Record<string, number>, fallback: () => number): n
 
 function resolveCountsMode(
   category: CountCategory,
-  override?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>
+  override?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>,
 ): CountStrategy {
   if (!override) {
-    return 'weighted';
+    return "weighted";
   }
-  if (typeof override === 'string') {
+  if (typeof override === "string") {
     return override;
   }
-  return override[category] ?? 'weighted';
+  return override[category] ?? "weighted";
 }
 
-function resolveCount(category: CountCategory, mode: CountStrategy, cfg: CountConfig): number {
+function resolveCount(
+  _category: CountCategory,
+  mode: CountStrategy,
+  cfg: CountConfig,
+): number {
   const min = cfg.min ?? 0;
   const max = cfg.max ?? min;
   const clampRange = (value: number) => Math.min(Math.max(value, min), max);
@@ -128,7 +153,7 @@ function resolveCount(category: CountCategory, mode: CountStrategy, cfg: CountCo
     return min;
   }
 
-  if (mode === 'uniform') {
+  if (mode === "uniform") {
     const range = [];
     for (let i = min; i <= max; i += 1) {
       range.push(i);
@@ -136,13 +161,15 @@ function resolveCount(category: CountCategory, mode: CountStrategy, cfg: CountCo
     return pickOne(range);
   }
 
-  return clampRange(weightedPick(cfg.weights ?? {}, () => {
-    const range = [];
-    for (let i = min; i <= max; i += 1) {
-      range.push(i);
-    }
-    return pickOne(range);
-  }));
+  return clampRange(
+    weightedPick(cfg.weights ?? {}, () => {
+      const range = [];
+      for (let i = min; i <= max; i += 1) {
+        range.push(i);
+      }
+      return pickOne(range);
+    }),
+  );
 }
 
 function ensureArray<T>(value: T | T[] | undefined): T[] {
@@ -150,7 +177,9 @@ function ensureArray<T>(value: T | T[] | undefined): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
-function normalizeExperimentalModes(mode: RandomGenerationOptions['experimentalColourMode']): string[] {
+function normalizeExperimentalModes(
+  mode: RandomGenerationOptions["experimentalColourMode"],
+): string[] {
   const normalized = new Set<string>();
 
   const visit = (value: string | string[] | undefined): void => {
@@ -161,7 +190,7 @@ function normalizeExperimentalModes(mode: RandomGenerationOptions['experimentalC
     }
 
     const entry = String(value).trim().toLowerCase();
-    if (!entry || entry === 'off') return;
+    if (!entry || entry === "off") return;
     normalized.add(entry);
   };
 
@@ -171,7 +200,7 @@ function normalizeExperimentalModes(mode: RandomGenerationOptions['experimentalC
 
 function buildColourPools(
   spriteMapper: SpriteMapperApi,
-  experimentalMode: RandomGenerationOptions['experimentalColourMode'],
+  experimentalMode: RandomGenerationOptions["experimentalColourMode"],
   includeBaseColours: boolean,
 ): string[][] {
   const pools: string[][] = [];
@@ -208,17 +237,17 @@ function flattenPools(pools: readonly string[][]): string[] {
 function pickColourFromPools(pools: readonly string[][]): string {
   const availablePools = pools.filter((pool) => pool.length > 0);
   if (!availablePools.length) {
-    throw new Error('Attempted to pick from an empty colour pool');
+    throw new Error("Attempted to pick from an empty colour pool");
   }
   return pickOne(pickOne([...availablePools]));
 }
 
 function hasOverride(
   category: CountCategory,
-  override?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>
+  override?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>,
 ): boolean {
   if (!override) return false;
-  if (typeof override === 'string') return true;
+  if (typeof override === "string") return true;
   return override[category] !== undefined;
 }
 
@@ -226,7 +255,7 @@ function determineSlotCount(
   category: CountCategory,
   cfg: CountConfig,
   defaults: Record<string, number> | undefined,
-  options: RandomGenerationOptions
+  options: RandomGenerationOptions,
 ): number {
   if (options.slotOverrides && options.slotOverrides[category] !== undefined) {
     return Math.max(0, Math.trunc(options.slotOverrides[category]!));
@@ -238,8 +267,14 @@ function determineSlotCount(
   return Math.max(0, Math.trunc(defaults?.[category] ?? 1));
 }
 
-function hasExplicitSlotControl(category: CountCategory, options: RandomGenerationOptions): boolean {
-  return options.slotOverrides?.[category] !== undefined || hasOverride(category, options.countsMode);
+function hasExplicitSlotControl(
+  category: CountCategory,
+  options: RandomGenerationOptions,
+): boolean {
+  return (
+    options.slotOverrides?.[category] !== undefined ||
+    hasOverride(category, options.countsMode)
+  );
 }
 
 export async function generateRandomParamsV3Detailed(
@@ -248,16 +283,18 @@ export async function generateRandomParamsV3Detailed(
   const spriteMapper = await ensureSpriteMapper();
 
   const spriteInclude = ensureArray(RANDOM_CONFIG.spritePool.include);
-  const spriteExcludeDefault = ensureArray(RANDOM_CONFIG.spritePool.excludeDefault);
+  const spriteExcludeDefault = ensureArray(
+    RANDOM_CONFIG.spritePool.excludeDefault,
+  );
   const spritePool = options.ignoreForbiddenSprites
     ? spriteInclude.filter((value) => !spriteExcludeDefault.includes(value))
     : spriteInclude;
   if (!spritePool.length) {
-    throw new Error('Sprite pool is empty; check random-config.json');
+    throw new Error("Sprite pool is empty; check random-config.json");
   }
   const spriteNumber = pickOne(spritePool);
 
-  const experimentalMode = options.experimentalColourMode ?? 'off';
+  const experimentalMode = options.experimentalColourMode ?? "off";
   const colourPools = buildColourPools(
     spriteMapper,
     experimentalMode,
@@ -265,11 +302,13 @@ export async function generateRandomParamsV3Detailed(
   );
   const colours = flattenPools(colourPools);
   if (!colours.length) {
-    throw new Error('Colour pool is empty; check palette configuration');
+    throw new Error("Colour pool is empty; check palette configuration");
   }
   const pickColour = () => pickColourFromPools(colourPools);
 
-  const pelts = spriteMapper.getPeltNames().filter((p: string) => p !== 'Tortie' && p !== 'Calico');
+  const pelts = spriteMapper
+    .getPeltNames()
+    .filter((p: string) => p !== "Tortie" && p !== "Calico");
   const tints = spriteMapper.getTints();
   const eyeColours = spriteMapper.getEyeColours();
   const skinColours = spriteMapper.getSkinColours();
@@ -297,8 +336,13 @@ export async function generateRandomParamsV3Detailed(
 
   const exactLayerCounts = options.exactLayerCounts === true;
   const tortieConfig = RANDOM_CONFIG.counts.tortie;
-  const tortieSlotCount = determineSlotCount('tortie', tortieConfig, RANDOM_CONFIG.defaultSlots, options);
-  const usesExplicitTortieCount = hasExplicitSlotControl('tortie', options);
+  const tortieSlotCount = determineSlotCount(
+    "tortie",
+    tortieConfig,
+    RANDOM_CONFIG.defaultSlots,
+    options,
+  );
+  const usesExplicitTortieCount = hasExplicitSlotControl("tortie", options);
   if (exactLayerCounts || usesExplicitTortieCount) {
     params.isTortie = tortieSlotCount > 0;
   } else {
@@ -306,7 +350,7 @@ export async function generateRandomParamsV3Detailed(
   }
 
   if (roll(RANDOM_CONFIG.probabilities.heterochromia)) {
-    const heteroPool = ['', ...eyeColours];
+    const heteroPool = ["", ...eyeColours];
     const selected = pickOne(heteroPool);
     if (selected) {
       params.eyeColour2 = selected;
@@ -314,12 +358,16 @@ export async function generateRandomParamsV3Detailed(
   }
 
   if (params.isTortie) {
-    const slotCount = (exactLayerCounts || usesExplicitTortieCount)
-      ? tortieSlotCount
-      : Math.max(1, tortieSlotCount);
+    const slotCount =
+      exactLayerCounts || usesExplicitTortieCount
+        ? tortieSlotCount
+        : Math.max(1, tortieSlotCount);
     const masks = spriteMapper.getTortieMasks();
     const uniqueMasks = tortieConfig.unique !== false;
-    const layerProbability = RANDOM_CONFIG.probabilities.tortieLayer ?? RANDOM_CONFIG.probabilities.isTortie ?? 0.5;
+    const layerProbability =
+      RANDOM_CONFIG.probabilities.tortieLayer ??
+      RANDOM_CONFIG.probabilities.isTortie ??
+      0.5;
     const tortieResult = materializeTortieSlots({
       slotCount,
       masks,
@@ -330,7 +378,12 @@ export async function generateRandomParamsV3Detailed(
       shouldFillSlot: (slotIndex) => slotIndex === 0 || roll(layerProbability),
     });
 
-    if (!exactLayerCounts && !usesExplicitTortieCount && tortieResult.selectedValues.length === 0 && masks.length > 0) {
+    if (
+      !exactLayerCounts &&
+      !usesExplicitTortieCount &&
+      tortieResult.selectedValues.length === 0 &&
+      masks.length > 0
+    ) {
       const fallback = materializeTortieSlots({
         slotCount: 1,
         masks,
@@ -364,17 +417,21 @@ export async function generateRandomParamsV3Detailed(
       }
     }
 
-    const tintMode = options.whitePatchColourMode ?? RANDOM_CONFIG.whitePatches.tintMode ?? 'default';
+    const tintMode =
+      options.whitePatchColourMode ??
+      RANDOM_CONFIG.whitePatches.tintMode ??
+      "default";
     const tintOptions = spriteMapper.getWhitePatchColourOptions(
       tintMode,
-      params.isTortie ? experimentalMode : null
+      params.isTortie ? experimentalMode : null,
     );
-    const filteredTints = RANDOM_CONFIG.whitePatches.allowNoneTint === false
-      ? tintOptions.filter((value: string) => value !== 'none')
-      : tintOptions;
+    const filteredTints =
+      RANDOM_CONFIG.whitePatches.allowNoneTint === false
+        ? tintOptions.filter((value: string) => value !== "none")
+        : tintOptions;
     if (filteredTints.length > 0) {
       const candidate = pickOne(filteredTints);
-      if (candidate && candidate !== 'none') {
+      if (candidate && candidate !== "none") {
         params.whitePatchesTint = candidate;
       }
     }
@@ -389,16 +446,24 @@ export async function generateRandomParamsV3Detailed(
   }
 
   const accessoryConfig = RANDOM_CONFIG.counts.accessories;
-  const accessorySlots = determineSlotCount('accessories', accessoryConfig, RANDOM_CONFIG.defaultSlots, options);
+  const accessorySlots = determineSlotCount(
+    "accessories",
+    accessoryConfig,
+    RANDOM_CONFIG.defaultSlots,
+    options,
+  );
   if (accessorySlots > 0 && accessories.length > 0) {
     const uniqueAccessories = accessoryConfig.unique !== false;
-    const accessoryProbability = RANDOM_CONFIG.probabilities.accessorySlot ?? RANDOM_CONFIG.probabilities.accessory ?? 0.5;
+    const accessoryProbability =
+      RANDOM_CONFIG.probabilities.accessorySlot ??
+      RANDOM_CONFIG.probabilities.accessory ??
+      0.5;
     const accessoryResult = materializeStringSlots({
       slotCount: accessorySlots,
       availableChoices: accessories,
       unique: uniqueAccessories,
       exactCount: exactLayerCounts,
-      placeholder: 'none',
+      placeholder: "none",
       shouldFillSlot: () => roll(accessoryProbability),
     });
     slotSelections.accessories = accessoryResult.slotSelections as string[];
@@ -409,16 +474,24 @@ export async function generateRandomParamsV3Detailed(
   }
 
   const scarsConfig = RANDOM_CONFIG.counts.scars;
-  const scarSlots = determineSlotCount('scars', scarsConfig, RANDOM_CONFIG.defaultSlots, options);
+  const scarSlots = determineSlotCount(
+    "scars",
+    scarsConfig,
+    RANDOM_CONFIG.defaultSlots,
+    options,
+  );
   if (scarSlots > 0 && scars.length > 0) {
     const uniqueScars = scarsConfig.unique !== false;
-    const scarProbability = RANDOM_CONFIG.probabilities.scarSlot ?? RANDOM_CONFIG.probabilities.scar ?? 0.5;
+    const scarProbability =
+      RANDOM_CONFIG.probabilities.scarSlot ??
+      RANDOM_CONFIG.probabilities.scar ??
+      0.5;
     const scarResult = materializeStringSlots({
       slotCount: scarSlots,
       availableChoices: scars,
       unique: uniqueScars,
       exactCount: exactLayerCounts,
-      placeholder: 'none',
+      placeholder: "none",
       shouldFillSlot: () => roll(scarProbability),
     });
     slotSelections.scars = scarResult.slotSelections as string[];
@@ -431,7 +504,9 @@ export async function generateRandomParamsV3Detailed(
   return { params, slotSelections };
 }
 
-export async function generateRandomParamsV3(options: RandomGenerationOptions = {}): Promise<CatParams> {
+export async function generateRandomParamsV3(
+  options: RandomGenerationOptions = {},
+): Promise<CatParams> {
   const result = await generateRandomParamsV3Detailed(options);
   return result.params;
 }

@@ -5,9 +5,22 @@
  * @napi-rs/canvas instead of HTMLImageElement / DOM canvas for pixel access.
  */
 
-import { createCanvas, loadImage, type Image } from '@napi-rs/canvas';
-import type { ExtractedColor, KMeansOptions, PixelData, Centroid, RGB } from './types';
-import { rgbToHex, rgbToHsl, isBlackOrWhite, colorDistance, adjustBrightness, adjustHue } from './color-utils';
+import { createCanvas, type Image, loadImage } from "@napi-rs/canvas";
+import {
+  adjustBrightness,
+  adjustHue,
+  colorDistance,
+  isBlackOrWhite,
+  rgbToHex,
+  rgbToHsl,
+} from "./color-utils";
+import type {
+  Centroid,
+  ExtractedColor,
+  KMeansOptions,
+  PixelData,
+  RGB,
+} from "./types";
 
 const MAX_DIMENSION = 1200;
 
@@ -39,7 +52,7 @@ export async function getImagePixelsServer(buffer: Buffer): Promise<{
   }
 
   const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
   ctx.drawImage(img as Image, 0, 0, width, height);
 
   const imageData = ctx.getImageData(0, 0, width, height);
@@ -79,7 +92,11 @@ function samplePixels(
       const b = data[i + 2];
       const a = data[i + 3];
       if (a < 128) continue;
-      if (opts.filterBlackWhite && isBlackOrWhite({ r, g, b }, opts.blackWhiteThreshold)) continue;
+      if (
+        opts.filterBlackWhite &&
+        isBlackOrWhite({ r, g, b }, opts.blackWhiteThreshold)
+      )
+        continue;
       pixels.push({ r, g, b, x, y });
     }
   }
@@ -94,7 +111,9 @@ function initializeCentroids(pixels: PixelData[], k: number): Centroid[] {
   for (let i = 1; i < k; i++) {
     const distances = pixels.map((p) => {
       const minDist = Math.min(
-        ...centroids.map((c) => colorDistance({ r: p.r, g: p.g, b: p.b }, { r: c.r, g: c.g, b: c.b })),
+        ...centroids.map((c) =>
+          colorDistance({ r: p.r, g: p.g, b: p.b }, { r: c.r, g: c.g, b: c.b }),
+        ),
       );
       return minDist * minDist;
     });
@@ -108,13 +127,19 @@ function initializeCentroids(pixels: PixelData[], k: number): Centroid[] {
       }
     }
     if (centroids.length === i) {
-      centroids.push({ ...pixels[Math.floor(Math.random() * pixels.length)], count: 0 });
+      centroids.push({
+        ...pixels[Math.floor(Math.random() * pixels.length)],
+        count: 0,
+      });
     }
   }
   return centroids;
 }
 
-function assignPixels(pixels: PixelData[], centroids: Centroid[]): Map<number, PixelData[]> {
+function assignPixels(
+  pixels: PixelData[],
+  centroids: Centroid[],
+): Map<number, PixelData[]> {
   const clusters = new Map<number, PixelData[]>();
   for (let i = 0; i < centroids.length; i++) clusters.set(i, []);
   for (const pixel of pixels) {
@@ -130,16 +155,23 @@ function assignPixels(pixels: PixelData[], centroids: Centroid[]): Map<number, P
         closest = i;
       }
     }
-    clusters.get(closest)!.push(pixel);
+    clusters.get(closest)?.push(pixel);
   }
   return clusters;
 }
 
-function updateCentroids(clusters: Map<number, PixelData[]>, prev: Centroid[]): Centroid[] {
+function updateCentroids(
+  clusters: Map<number, PixelData[]>,
+  prev: Centroid[],
+): Centroid[] {
   const result: Centroid[] = [];
   clusters.forEach((pixels, idx) => {
     if (pixels.length === 0) {
-      result.push(prev[idx] ? { ...prev[idx], count: 0 } : { r: 128, g: 128, b: 128, x: 0, y: 0, count: 0 });
+      result.push(
+        prev[idx]
+          ? { ...prev[idx], count: 0 }
+          : { r: 128, g: 128, b: 128, x: 0, y: 0, count: 0 },
+      );
       return;
     }
     const count = pixels.length;
@@ -155,9 +187,18 @@ function updateCentroids(clusters: Map<number, PixelData[]>, prev: Centroid[]): 
   return result;
 }
 
-function hasConverged(old: Centroid[], next: Centroid[], threshold = 1): boolean {
+function hasConverged(
+  old: Centroid[],
+  next: Centroid[],
+  threshold = 1,
+): boolean {
   for (let i = 0; i < old.length; i++) {
-    if (colorDistance({ r: old[i].r, g: old[i].g, b: old[i].b }, { r: next[i].r, g: next[i].g, b: next[i].b }) > threshold) {
+    if (
+      colorDistance(
+        { r: old[i].r, g: old[i].g, b: old[i].b },
+        { r: next[i].r, g: next[i].g, b: next[i].b },
+      ) > threshold
+    ) {
       return false;
     }
   }
@@ -169,19 +210,33 @@ interface KMeansCluster {
   readonly members: readonly PixelData[];
 }
 
-function kMeans(pixels: PixelData[], k: number, maxIter: number): { clusters: readonly KMeansCluster[] } {
+function kMeans(
+  pixels: PixelData[],
+  k: number,
+  maxIter: number,
+): { clusters: readonly KMeansCluster[] } {
   let centroids = initializeCentroids(pixels, k);
   for (let i = 0; i < maxIter; i++) {
     const assigned = assignPixels(pixels, centroids);
     const next = updateCentroids(assigned, centroids);
     if (hasConverged(centroids, next)) {
-      return { clusters: next.map((c, idx) => ({ centroid: c, members: assigned.get(idx) ?? [] })) };
+      return {
+        clusters: next.map((c, idx) => ({
+          centroid: c,
+          members: assigned.get(idx) ?? [],
+        })),
+      };
     }
     centroids = next;
   }
   const final = assignPixels(pixels, centroids);
   const finalCentroids = updateCentroids(final, centroids);
-  return { clusters: finalCentroids.map((c, idx) => ({ centroid: c, members: final.get(idx) ?? [] })) };
+  return {
+    clusters: finalCentroids.map((c, idx) => ({
+      centroid: c,
+      members: final.get(idx) ?? [],
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +245,7 @@ function kMeans(pixels: PixelData[], k: number, maxIter: number): { clusters: re
 
 function colorBrightness(color: RGB): number {
   return Math.sqrt(
-    0.299 * (color.r ** 2) + 0.587 * (color.g ** 2) + 0.114 * (color.b ** 2),
+    0.299 * color.r ** 2 + 0.587 * color.g ** 2 + 0.114 * color.b ** 2,
   );
 }
 
@@ -207,7 +262,7 @@ export async function extractColorsServer(
   const pixels = samplePixels(data, width, height, opts);
 
   const uniqueCount = countUniqueColors(pixels);
-  if (uniqueCount < 2) throw new Error('Not enough unique colors in image');
+  if (uniqueCount < 2) throw new Error("Not enough unique colors in image");
 
   const effectiveK = Math.min(opts.k, uniqueCount);
   const { clusters } = kMeans(pixels, effectiveK, opts.maxIterations);
@@ -215,7 +270,11 @@ export async function extractColorsServer(
 
   return clusters
     .map(({ centroid: c }) => {
-      const rgb = { r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) };
+      const rgb = {
+        r: Math.round(c.r),
+        g: Math.round(c.g),
+        b: Math.round(c.b),
+      };
       return {
         hex: rgbToHex(rgb),
         rgb,
@@ -247,7 +306,11 @@ export async function extractFamilyColorsServer(
     const totalPixels = pixels.length;
 
     const allColors = clusters.map(({ centroid: c }) => {
-      const rgb = { r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b) };
+      const rgb = {
+        r: Math.round(c.r),
+        g: Math.round(c.g),
+        b: Math.round(c.b),
+      };
       return {
         hex: rgbToHex(rgb),
         rgb,
@@ -290,33 +353,38 @@ export function generatePaletteImage(
   swatchWidth = 60,
   swatchHeight = 60,
 ): string {
-  if (colors.length === 0) throw new Error('Cannot generate palette image with zero colors');
+  if (colors.length === 0)
+    throw new Error("Cannot generate palette image with zero colors");
   const width = swatchWidth * colors.length;
   const height = swatchHeight;
   const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
 
   for (let i = 0; i < colors.length; i++) {
     ctx.fillStyle = colors[i].hex;
     ctx.fillRect(i * swatchWidth, 0, swatchWidth, height);
   }
 
-  return canvas.toDataURL('image/png');
+  return canvas.toDataURL("image/png");
 }
 
 // Threshold for considering a color as near-black or near-white
 const BLACK_WHITE_THRESHOLD = 15;
 
 function isNearBlack(rgb: RGB): boolean {
-  return rgb.r <= BLACK_WHITE_THRESHOLD &&
-         rgb.g <= BLACK_WHITE_THRESHOLD &&
-         rgb.b <= BLACK_WHITE_THRESHOLD;
+  return (
+    rgb.r <= BLACK_WHITE_THRESHOLD &&
+    rgb.g <= BLACK_WHITE_THRESHOLD &&
+    rgb.b <= BLACK_WHITE_THRESHOLD
+  );
 }
 
 function isNearWhite(rgb: RGB): boolean {
-  return rgb.r >= 255 - BLACK_WHITE_THRESHOLD &&
-         rgb.g >= 255 - BLACK_WHITE_THRESHOLD &&
-         rgb.b >= 255 - BLACK_WHITE_THRESHOLD;
+  return (
+    rgb.r >= 255 - BLACK_WHITE_THRESHOLD &&
+    rgb.g >= 255 - BLACK_WHITE_THRESHOLD &&
+    rgb.b >= 255 - BLACK_WHITE_THRESHOLD
+  );
 }
 
 function filterColors(
@@ -352,7 +420,7 @@ export function generatePaletteGridImage(
   const filteredFamily = familyColors ? filterColors(familyColors, seen) : [];
 
   if (filteredTop.length === 0 && filteredFamily.length === 0) {
-    throw new Error('Cannot generate palette grid with zero colors');
+    throw new Error("Cannot generate palette grid with zero colors");
   }
 
   const SECTION_SIZE = 1000;
@@ -364,7 +432,7 @@ export function generatePaletteGridImage(
   const totalSections = topSections + familySections;
 
   const canvas = createCanvas(SECTION_SIZE, SECTION_SIZE * totalSections);
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext("2d");
 
   let yOffset = 0;
 
@@ -376,7 +444,12 @@ export function generatePaletteGridImage(
       .reverse()
       .forEach((color, index) => {
         ctx.fillStyle = color.hex;
-        ctx.fillRect(0, yOffset + index * colorHeight, SECTION_SIZE, colorHeight);
+        ctx.fillRect(
+          0,
+          yOffset + index * colorHeight,
+          SECTION_SIZE,
+          colorHeight,
+        );
       });
     yOffset += SECTION_SIZE;
 
@@ -425,5 +498,5 @@ export function generatePaletteGridImage(
   if (filteredTop.length > 0) drawGroupSections(filteredTop);
   if (filteredFamily.length > 0) drawGroupSections(filteredFamily);
 
-  return canvas.toDataURL('image/png');
+  return canvas.toDataURL("image/png");
 }

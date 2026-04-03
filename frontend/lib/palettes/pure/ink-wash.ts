@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const inkWashPalette: PaletteCategory = {
-  id: 'ink-wash',
-  label: 'Ink Wash',
-  description: 'Sumi-e grey — warm sepia-black ink diluted across rice paper to pale tea stain',
+  id: "ink-wash",
+  label: "Ink Wash",
+  description:
+    "Sumi-e grey — warm sepia-black ink diluted across rice paper to pale tea stain",
   colors: {
     IW_SUMI: { multiply: [12, 10, 8] },
     IW_BOKUJU: { multiply: [22, 18, 15] },

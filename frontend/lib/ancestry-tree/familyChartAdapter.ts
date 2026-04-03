@@ -1,14 +1,14 @@
-import type { AncestryTreeCat, SerializedAncestryTree } from './types';
-import { encodeCatShare } from '@/lib/catShare';
+import { encodeCatShare } from "@/lib/catShare";
+import type { AncestryTreeCat, SerializedAncestryTree } from "./types";
 
 export interface FamilyChartDatum {
   id: string;
   data: {
     id: string;
-    'first name': string;
-    'last name': string;
-    'full name': string;
-    gender: 'M' | 'F';
+    "first name": string;
+    "last name": string;
+    "full name": string;
+    gender: "M" | "F";
     generation: number;
     lifeStage: string;
     avatar?: string;
@@ -37,7 +37,7 @@ function buildPreviewUrl(cat: AncestryTreeCat): string {
 }
 
 export function convertToFamilyChartFormat(
-  tree: SerializedAncestryTree
+  tree: SerializedAncestryTree,
 ): FamilyChartDatum[] {
   const data: FamilyChartDatum[] = [];
 
@@ -51,9 +51,9 @@ export function convertToFamilyChartFormat(
       id: cat.id,
       data: {
         id: cat.id,
-        'first name': cat.name.prefix,
-        'last name': cat.name.suffix,
-        'full name': cat.name.full,
+        "first name": cat.name.prefix,
+        "last name": cat.name.suffix,
+        "full name": cat.name.full,
         gender: cat.gender,
         generation: cat.generation,
         lifeStage: cat.lifeStage,
@@ -84,7 +84,7 @@ export function getFoundingCoupleIds(tree: SerializedAncestryTree): {
 }
 
 export function getCatsByGeneration(
-  tree: SerializedAncestryTree
+  tree: SerializedAncestryTree,
 ): Map<number, AncestryTreeCat[]> {
   const byGeneration = new Map<number, AncestryTreeCat[]>();
 
@@ -93,7 +93,7 @@ export function getCatsByGeneration(
     if (!byGeneration.has(gen)) {
       byGeneration.set(gen, []);
     }
-    byGeneration.get(gen)!.push(cat);
+    byGeneration.get(gen)?.push(cat);
   }
 
   return byGeneration;
@@ -101,14 +101,14 @@ export function getCatsByGeneration(
 
 export function findCatById(
   tree: SerializedAncestryTree,
-  id: string
+  id: string,
 ): AncestryTreeCat | undefined {
   return tree.cats.find((cat) => cat.id === id);
 }
 
 export function getDescendants(
   tree: SerializedAncestryTree,
-  catId: string
+  catId: string,
 ): AncestryTreeCat[] {
   const cat = findCatById(tree, catId);
   if (!cat) return [];
@@ -125,7 +125,9 @@ export function getDescendants(
     const child = findCatById(tree, childId);
     if (child) {
       descendants.push(child);
-      const childChildren = Array.isArray(child.childrenIds) ? child.childrenIds : [];
+      const childChildren = Array.isArray(child.childrenIds)
+        ? child.childrenIds
+        : [];
       for (const grandchildId of childChildren) {
         if (!visited.has(grandchildId)) {
           queue.push(grandchildId);
@@ -139,7 +141,7 @@ export function getDescendants(
 
 export function getAncestors(
   tree: SerializedAncestryTree,
-  catId: string
+  catId: string,
 ): AncestryTreeCat[] {
   const cat = findCatById(tree, catId);
   if (!cat) return [];
@@ -178,16 +180,15 @@ export function getAncestors(
 
 export function getSiblings(
   tree: SerializedAncestryTree,
-  catId: string
+  catId: string,
 ): AncestryTreeCat[] {
   const cat = findCatById(tree, catId);
-  if (!cat || !cat.motherId || !cat.fatherId) return [];
+  if (!cat?.motherId || !cat.fatherId) return [];
 
   return tree.cats.filter(
     (c) =>
       c.id !== catId &&
       c.motherId === cat.motherId &&
-      c.fatherId === cat.fatherId
+      c.fatherId === cat.fatherId,
   );
 }
-

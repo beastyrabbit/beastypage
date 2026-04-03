@@ -1,4 +1,4 @@
-import type { TortieLayer as SharedTortieLayer, CatParams } from '@/lib/cat-v3/types';
+import type { TortieLayer as SharedTortieLayer } from "@/lib/cat-v3/types";
 
 const SHARE_VERSION = 1;
 
@@ -6,7 +6,8 @@ function toBase64(str: string): string {
   if (typeof btoa === "function") {
     return btoa(str);
   }
-  const nodeBuffer = (globalThis as unknown as { Buffer?: typeof Buffer }).Buffer;
+  const nodeBuffer = (globalThis as unknown as { Buffer?: typeof Buffer })
+    .Buffer;
   if (nodeBuffer) {
     return nodeBuffer.from(str, "utf-8").toString("base64");
   }
@@ -17,7 +18,8 @@ function fromBase64(str: string): string {
   if (typeof atob === "function") {
     return atob(str);
   }
-  const nodeBuffer = (globalThis as unknown as { Buffer?: typeof Buffer }).Buffer;
+  const nodeBuffer = (globalThis as unknown as { Buffer?: typeof Buffer })
+    .Buffer;
   if (nodeBuffer) {
     return nodeBuffer.from(str, "base64").toString("utf-8");
   }
@@ -54,7 +56,14 @@ const PARAM_KEYS = [
 
 type ParamKey = (typeof PARAM_KEYS)[number];
 
-const BOOLEAN_KEYS: Set<ParamKey> = new Set(["isTortie", "shading", "reverse", "darkForest", "darkMode", "dead"]);
+const BOOLEAN_KEYS: Set<ParamKey> = new Set([
+  "isTortie",
+  "shading",
+  "reverse",
+  "darkForest",
+  "darkMode",
+  "dead",
+]);
 const NUMBER_KEYS: Set<ParamKey> = new Set(["spriteNumber"]);
 
 function cleanString(value: unknown): string | undefined {
@@ -84,7 +93,10 @@ export type TortieLayer = {
   colour: string;
 };
 
-function sanitizeTortieArray(values: unknown, fallbackLength = 0): (TortieLayer | null)[] {
+function sanitizeTortieArray(
+  values: unknown,
+  fallbackLength = 0,
+): (TortieLayer | null)[] {
   if (!Array.isArray(values)) {
     return new Array(fallbackLength).fill(null);
   }
@@ -115,15 +127,19 @@ export type CatShareCounts = {
   tortie: number;
 };
 
-type CatShareParams = Record<string, unknown>;
-
 type SanitizedParams = Record<string, unknown>;
 
 function sanitizeCounts(counts?: Partial<CatShareCounts>): CatShareCounts {
   return {
-    accessories: Number.isFinite(counts?.accessories) ? Math.max(0, Math.trunc(counts!.accessories!)) : 0,
-    scars: Number.isFinite(counts?.scars) ? Math.max(0, Math.trunc(counts!.scars!)) : 0,
-    tortie: Number.isFinite(counts?.tortie) ? Math.max(0, Math.trunc(counts!.tortie!)) : 0,
+    accessories: Number.isFinite(counts?.accessories)
+      ? Math.max(0, Math.trunc(counts?.accessories ?? 0))
+      : 0,
+    scars: Number.isFinite(counts?.scars)
+      ? Math.max(0, Math.trunc(counts?.scars ?? 0))
+      : 0,
+    tortie: Number.isFinite(counts?.tortie)
+      ? Math.max(0, Math.trunc(counts?.tortie ?? 0))
+      : 0,
   };
 }
 
@@ -168,7 +184,11 @@ function sanitizeParams(params: Record<string, unknown> = {}): SanitizedParams {
     }
   }
 
-  if (!clean.accessory && Array.isArray(clean.accessories) && clean.accessories.length > 0) {
+  if (
+    !clean.accessory &&
+    Array.isArray(clean.accessories) &&
+    clean.accessories.length > 0
+  ) {
     clean.accessory = clean.accessories[0];
   }
   if (!clean.scar && Array.isArray(clean.scars) && clean.scars.length > 0) {
@@ -176,7 +196,11 @@ function sanitizeParams(params: Record<string, unknown> = {}): SanitizedParams {
   }
 
   if (clean.isTortie) {
-    if (!clean.tortieMask && Array.isArray(clean.tortie) && clean.tortie.length > 0) {
+    if (
+      !clean.tortieMask &&
+      Array.isArray(clean.tortie) &&
+      clean.tortie.length > 0
+    ) {
       const primary = clean.tortie[0] as TortieLayer | undefined;
       clean.tortieMask = primary?.mask || undefined;
       clean.tortiePattern = primary?.pattern || undefined;
@@ -214,12 +238,17 @@ type EncodePayload = {
   params: Record<string, unknown>;
   accessorySlots?: (string | null)[];
   scarSlots?: (string | null)[];
-  tortieSlots?: (SharedTortieLayer | TortieLayer | Record<string, unknown> | null)[];
+  tortieSlots?: (
+    | SharedTortieLayer
+    | TortieLayer
+    | Record<string, unknown>
+    | null
+  )[];
   counts?: Partial<CatShareCounts>;
 };
 
 export function prepareCatShare(data: EncodePayload): CatShareStoredPayload {
-  if (!data || !data.params) {
+  if (!data?.params) {
     throw new Error("encodeCatShare: params are required");
   }
 
@@ -252,7 +281,10 @@ type CreateCatShareOptions = {
   slug?: string;
 };
 
-export async function createCatShare(data: EncodePayload, options?: CreateCatShareOptions): Promise<CreateCatShareResult | null> {
+export async function createCatShare(
+  data: EncodePayload,
+  options?: CreateCatShareOptions,
+): Promise<CreateCatShareResult | null> {
   if (typeof fetch !== "function") {
     console.warn("createCatShare: fetch is unavailable in this environment");
     return null;
@@ -276,7 +308,10 @@ export async function createCatShare(data: EncodePayload, options?: CreateCatSha
       throw new Error(`createCatShare: unexpected status ${response.status}`);
     }
 
-    const json = (await response.json()) as { slug?: string; id?: string | null };
+    const json = (await response.json()) as {
+      slug?: string;
+      id?: string | null;
+    };
     const slug = json?.slug;
     if (!slug) {
       throw new Error("createCatShare: response missing slug");
@@ -298,9 +333,15 @@ function normalizeStoredPayload(payload: any): CatSharePayload | null {
   if (payload.v !== SHARE_VERSION) return null;
   return {
     params: sanitizeParams(payload.params || {}),
-    accessorySlots: sanitizeStringArray(payload.slots?.accessories, payload.counts?.accessories),
+    accessorySlots: sanitizeStringArray(
+      payload.slots?.accessories,
+      payload.counts?.accessories,
+    ),
     scarSlots: sanitizeStringArray(payload.slots?.scars, payload.counts?.scars),
-    tortieSlots: sanitizeTortieArray(payload.slots?.tortie, payload.counts?.tortie),
+    tortieSlots: sanitizeTortieArray(
+      payload.slots?.tortie,
+      payload.counts?.tortie,
+    ),
     counts: sanitizeCounts(payload.counts),
   };
 }
@@ -338,7 +379,9 @@ function resolveApiBase(): string {
     process.env.NEXT_PUBLIC_HUB_URL,
     process.env.NEXT_PUBLIC_BASE_URL,
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
-    process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : undefined,
+    process.env.NEXT_PUBLIC_VERCEL_URL
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : undefined,
     "http://localhost:3000",
   ];
 
@@ -354,7 +397,9 @@ function resolveApiBase(): string {
 async function fetchShareBySlug(slug: string): Promise<CatSharePayload | null> {
   try {
     const base = resolveApiBase();
-    const url = base ? `${base}/api/cat-share?slug=${encodeURIComponent(slug)}` : `/api/cat-share?slug=${encodeURIComponent(slug)}`;
+    const url = base
+      ? `${base}/api/cat-share?slug=${encodeURIComponent(slug)}`
+      : `/api/cat-share?slug=${encodeURIComponent(slug)}`;
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
       return null;
@@ -367,7 +412,9 @@ async function fetchShareBySlug(slug: string): Promise<CatSharePayload | null> {
   }
 }
 
-export async function decodeCatShare(value: string | null | undefined): Promise<CatSharePayload | null> {
+export async function decodeCatShare(
+  value: string | null | undefined,
+): Promise<CatSharePayload | null> {
   if (!value) return null;
   if (isLikelySlug(value)) {
     return fetchShareBySlug(value);
@@ -375,7 +422,9 @@ export async function decodeCatShare(value: string | null | undefined): Promise<
   return decodeLegacyCatShare(value);
 }
 
-export async function resolveCatShareValue(value: string | null | undefined): Promise<CatSharePayload | null> {
+export async function resolveCatShareValue(
+  value: string | null | undefined,
+): Promise<CatSharePayload | null> {
   return decodeCatShare(value);
 }
 

@@ -3,15 +3,14 @@
  * Runs tree generation off the main thread to prevent browser freezing.
  */
 
-import type { MutationPool } from './treeManager';
+import type { MutationPool } from "./treeManager";
+// Re-import tree manager here - workers have their own context
+import { AncestryTreeManager } from "./treeManager";
 import type {
   FoundingCoupleInput,
   SerializedAncestryTree,
   TreeGenerationConfig,
-} from './types';
-
-// Re-import tree manager here - workers have their own context
-import { AncestryTreeManager } from './treeManager';
+} from "./types";
 
 export interface TreeWorkerRequest {
   config: TreeGenerationConfig;
@@ -20,26 +19,29 @@ export interface TreeWorkerRequest {
 }
 
 export interface TreeProgressMessage {
-  type: 'progress';
+  type: "progress";
   generation: number;
   total: number;
   catCount: number;
 }
 
 export interface TreeCompleteMessage {
-  type: 'complete';
+  type: "complete";
   tree: SerializedAncestryTree;
 }
 
 export interface TreeErrorMessage {
-  type: 'error';
+  type: "error";
   error: string;
 }
 
-export type TreeWorkerResponse = TreeProgressMessage | TreeCompleteMessage | TreeErrorMessage;
+export type TreeWorkerResponse =
+  | TreeProgressMessage
+  | TreeCompleteMessage
+  | TreeErrorMessage;
 
 export interface TreeCancelMessage {
-  type: 'cancel';
+  type: "cancel";
 }
 
 export type TreeWorkerMessage = TreeWorkerRequest | TreeCancelMessage;
@@ -50,19 +52,20 @@ let cancelled = false;
 // Worker entry point
 self.onmessage = (event: MessageEvent<TreeWorkerMessage>) => {
   // Handle cancellation message
-  if ('type' in event.data && event.data.type === 'cancel') {
+  if ("type" in event.data && event.data.type === "cancel") {
     cancelled = true;
     return;
   }
 
-  const { config, foundingCouple, mutationPool } = event.data as TreeWorkerRequest;
+  const { config, foundingCouple, mutationPool } =
+    event.data as TreeWorkerRequest;
   cancelled = false;
 
   try {
     // Create manager with mutation pool
     const manager = new AncestryTreeManager(mutationPool);
     manager.setConfig(config);
-    manager.setName('Unnamed Tree');
+    manager.setName("Unnamed Tree");
 
     // Initialize founding couple
     manager.initializeFoundingCouple(foundingCouple);
@@ -75,8 +78,8 @@ self.onmessage = (event: MessageEvent<TreeWorkerMessage>) => {
       // Check for cancellation between generations
       if (cancelled) {
         const errorMessage: TreeErrorMessage = {
-          type: 'error',
-          error: 'Cancelled',
+          type: "error",
+          error: "Cancelled",
         };
         self.postMessage(errorMessage);
         return;
@@ -86,7 +89,7 @@ self.onmessage = (event: MessageEvent<TreeWorkerMessage>) => {
 
       // Report progress
       const progressMessage: TreeProgressMessage = {
-        type: 'progress',
+        type: "progress",
         generation: gen,
         total: config.depth,
         catCount: manager.getAllCats().length,
@@ -97,8 +100,8 @@ self.onmessage = (event: MessageEvent<TreeWorkerMessage>) => {
     // Final cancellation check before sending result
     if (cancelled) {
       const errorMessage: TreeErrorMessage = {
-        type: 'error',
-        error: 'Cancelled',
+        type: "error",
+        error: "Cancelled",
       };
       self.postMessage(errorMessage);
       return;
@@ -106,18 +109,18 @@ self.onmessage = (event: MessageEvent<TreeWorkerMessage>) => {
 
     // Return completed tree
     const completeMessage: TreeCompleteMessage = {
-      type: 'complete',
+      type: "complete",
       tree: manager.serialize(),
     };
     self.postMessage(completeMessage);
   } catch (error) {
     const errorMessage: TreeErrorMessage = {
-      type: 'error',
-      error: error instanceof Error ? error.message : 'Unknown error during tree generation',
+      type: "error",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unknown error during tree generation",
     };
     self.postMessage(errorMessage);
   }
 };
-
-// TypeScript needs this for the worker context
-export {};

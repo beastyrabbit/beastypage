@@ -1,17 +1,17 @@
 "use client";
 
-import { useCallback, useRef, useState, useEffect } from 'react';
-import type { MutationPool } from './treeManager';
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { MutationPool } from "./treeManager";
+import type {
+  TreeProgressMessage,
+  TreeWorkerRequest,
+  TreeWorkerResponse,
+} from "./treeWorker";
 import type {
   FoundingCoupleInput,
   SerializedAncestryTree,
   TreeGenerationConfig,
-} from './types';
-import type {
-  TreeWorkerRequest,
-  TreeWorkerResponse,
-  TreeProgressMessage,
-} from './treeWorker';
+} from "./types";
 
 export interface TreeProgress {
   generation: number;
@@ -23,7 +23,7 @@ interface UseTreeWorkerReturn {
   generateTree: (
     config: TreeGenerationConfig,
     foundingCouple: FoundingCoupleInput,
-    mutationPool: MutationPool
+    mutationPool: MutationPool,
   ) => Promise<SerializedAncestryTree>;
   progress: TreeProgress | null;
   isGenerating: boolean;
@@ -38,12 +38,12 @@ export function useTreeWorker(): UseTreeWorkerReturn {
 
   const cancel = useCallback(() => {
     if (rejectRef.current) {
-      rejectRef.current(new Error('Cancelled'));
+      rejectRef.current(new Error("Cancelled"));
       rejectRef.current = null;
     }
     if (workerRef.current) {
       // Send cooperative cancel signal before terminating
-      workerRef.current.postMessage({ type: 'cancel' });
+      workerRef.current.postMessage({ type: "cancel" });
       workerRef.current.terminate();
       workerRef.current = null;
     }
@@ -55,7 +55,7 @@ export function useTreeWorker(): UseTreeWorkerReturn {
   useEffect(() => {
     return () => {
       if (workerRef.current) {
-        workerRef.current.postMessage({ type: 'cancel' });
+        workerRef.current.postMessage({ type: "cancel" });
         workerRef.current.terminate();
         workerRef.current = null;
       }
@@ -67,12 +67,12 @@ export function useTreeWorker(): UseTreeWorkerReturn {
     (
       config: TreeGenerationConfig,
       foundingCouple: FoundingCoupleInput,
-      mutationPool: MutationPool
+      mutationPool: MutationPool,
     ): Promise<SerializedAncestryTree> => {
       return new Promise((resolve, reject) => {
         // Reject any previous pending promise before starting a new run
         if (rejectRef.current) {
-          rejectRef.current(new Error('Superseded by new generation request'));
+          rejectRef.current(new Error("Superseded by new generation request"));
         }
 
         // Cancel any existing worker
@@ -87,31 +87,30 @@ export function useTreeWorker(): UseTreeWorkerReturn {
         setProgress(null);
 
         // Create new worker
-        const worker = new Worker(
-          new URL('./treeWorker.ts', import.meta.url),
-          { type: 'module' }
-        );
+        const worker = new Worker(new URL("./treeWorker.ts", import.meta.url), {
+          type: "module",
+        });
 
         workerRef.current = worker;
 
         worker.onmessage = (event: MessageEvent<TreeWorkerResponse>) => {
           const data = event.data;
 
-          if (data.type === 'progress') {
+          if (data.type === "progress") {
             const progressData = data as TreeProgressMessage;
             setProgress({
               generation: progressData.generation,
               total: progressData.total,
               catCount: progressData.catCount,
             });
-          } else if (data.type === 'complete') {
+          } else if (data.type === "complete") {
             setIsGenerating(false);
             setProgress(null);
             worker.terminate();
             workerRef.current = null;
             rejectRef.current = null;
             resolve(data.tree);
-          } else if (data.type === 'error') {
+          } else if (data.type === "error") {
             setIsGenerating(false);
             setProgress(null);
             worker.terminate();
@@ -139,7 +138,7 @@ export function useTreeWorker(): UseTreeWorkerReturn {
         worker.postMessage(request);
       });
     },
-    []
+    [],
   );
 
   return { generateTree, progress, isGenerating, cancel };

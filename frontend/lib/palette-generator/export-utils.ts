@@ -1,7 +1,10 @@
 import { hexToRgb } from "@/lib/color-extraction/color-utils";
-import { generateACO, type PaletteColor } from "@/lib/color-extraction/palette-formats";
+import {
+  generateACO,
+  type PaletteColor,
+} from "@/lib/color-extraction/palette-formats";
 import { formatColor } from "./format-color";
-import type { GeneratedPalette, DisplayFormat, ExportFormat } from "./types";
+import type { DisplayFormat, ExportFormat, GeneratedPalette } from "./types";
 
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -30,13 +33,15 @@ export function exportPalettePNG(
 
   const maxColors = Math.max(...palettes.map((p) => p.colors.length));
   const canvasW = PAD * 2 + maxColors * SWATCH_W + (maxColors - 1) * GAP;
-  const canvasH = PAD * 2 + palettes.length * SWATCH_H + (palettes.length - 1) * GAP;
+  const canvasH =
+    PAD * 2 + palettes.length * SWATCH_H + (palettes.length - 1) * GAP;
 
   const canvas = document.createElement("canvas");
   canvas.width = canvasW;
   canvas.height = canvasH;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas 2D context unavailable — cannot export PNG");
+  if (!ctx)
+    throw new Error("Canvas 2D context unavailable — cannot export PNG");
 
   ctx.fillStyle = "#111111";
   ctx.fillRect(0, 0, canvasW, canvasH);
@@ -74,7 +79,10 @@ export function exportPaletteACO(
     }
   }
   const buffer = generateACO(colors);
-  triggerDownload(new Blob([buffer], { type: "application/octet-stream" }), filename);
+  triggerDownload(
+    new Blob([buffer], { type: "application/octet-stream" }),
+    filename,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +100,9 @@ export function exportPaletteJSON(
     source: p.source,
     timestamp: p.timestamp,
   }));
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
   triggerDownload(blob, filename);
 }
 
@@ -164,12 +174,16 @@ export function buildClipboardText(
   format: DisplayFormat,
 ): string {
   if (palettes.length === 1) {
-    return palettes[0].colors.map((hex) => formatColor(hex, format).clipboard).join("\n");
+    return palettes[0].colors
+      .map((hex) => formatColor(hex, format).clipboard)
+      .join("\n");
   }
   return palettes
     .map((p, i) => {
       const header = `Palette ${i + 1} (${p.mode}, #${p.seed.toUpperCase()})`;
-      const values = p.colors.map((hex) => formatColor(hex, format).clipboard).join("\n");
+      const values = p.colors
+        .map((hex) => formatColor(hex, format).clipboard)
+        .join("\n");
       return `${header}\n${values}`;
     })
     .join("\n\n");

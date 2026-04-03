@@ -1,12 +1,12 @@
-import type { CatParams } from '@/lib/cat-v3/types';
-import type { PaletteMode } from '@/lib/palettes';
+import type { CatParams } from "@/lib/cat-v3/types";
+import type { PaletteMode } from "@/lib/palettes";
 
 export type { PaletteMode };
 
 export type CatId = string;
-export type Gender = 'M' | 'F';
-export type LifeStage = 'kit' | 'apprentice' | 'warrior' | 'leader' | 'elder';
-export type CatSource = 'history' | 'generated' | 'edited';
+export type Gender = "M" | "F";
+export type LifeStage = "kit" | "apprentice" | "warrior" | "leader" | "elder";
+export type CatSource = "history" | "generated" | "edited";
 
 export interface CatName {
   prefix: string;
@@ -24,9 +24,9 @@ export interface TortieGenetics {
   // Whether tortie gene is present
   hasTortieGene: boolean;
   // Inherited tortie layer data (patterns, masks, colors)
-  patterns: string[];  // Pelt patterns for tortie patches
-  masks: string[];     // Tortie mask shapes
-  colours: string[];   // Tortie patch colors
+  patterns: string[]; // Pelt patterns for tortie patches
+  masks: string[]; // Tortie mask shapes
+  colours: string[]; // Tortie patch colors
 }
 
 export interface CatGenetics {
@@ -57,10 +57,10 @@ export interface AncestryTreeCat {
 }
 
 export interface OffspringOptions {
-  accessoryChance: number;  // 0, 0.25, 0.5, 0.75, 1.0
-  scarChance: number;       // 0, 0.25, 0.5, 0.75, 1.0
-  maxAccessories: number;   // 1-4
-  maxScars: number;         // 1-4
+  accessoryChance: number; // 0, 0.25, 0.5, 0.75, 1.0
+  scarChance: number; // 0, 0.25, 0.5, 0.75, 1.0
+  maxAccessories: number; // 1-4
+  maxScars: number; // 1-4
 }
 
 export const DEFAULT_OFFSPRING_OPTIONS: OffspringOptions = {
@@ -75,9 +75,9 @@ export interface TreeGenerationConfig {
   maxChildren: number;
   depth: number;
   genderRatio: number;
-  partnerChance: number;  // 0-1, chance for a female to get a partner and have children
+  partnerChance: number; // 0-1, chance for a female to get a partner and have children
   offspringOptions?: OffspringOptions;
-  paletteModes?: PaletteMode[];  // Multiple palettes can be enabled
+  paletteModes?: PaletteMode[]; // Multiple palettes can be enabled
 }
 
 export const DEFAULT_TREE_CONFIG: TreeGenerationConfig = {
@@ -85,9 +85,9 @@ export const DEFAULT_TREE_CONFIG: TreeGenerationConfig = {
   maxChildren: 5,
   depth: 3,
   genderRatio: 0.5,
-  partnerChance: 1.0,  // 100% of females get partners by default
+  partnerChance: 1.0, // 100% of females get partners by default
   offspringOptions: DEFAULT_OFFSPRING_OPTIONS,
-  paletteModes: ['off'],  // Classic only by default
+  paletteModes: ["off"], // Classic only by default
 };
 
 /**
@@ -97,7 +97,7 @@ export function createDefaultTreeConfig(): TreeGenerationConfig {
   return {
     ...DEFAULT_TREE_CONFIG,
     offspringOptions: { ...DEFAULT_OFFSPRING_OPTIONS },
-    paletteModes: [...(DEFAULT_TREE_CONFIG.paletteModes ?? ['off'])],
+    paletteModes: [...(DEFAULT_TREE_CONFIG.paletteModes ?? ["off"])],
   };
 }
 

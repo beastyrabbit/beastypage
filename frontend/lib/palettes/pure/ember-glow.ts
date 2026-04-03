@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const emberGlowPalette: PaletteCategory = {
-  id: 'ember-glow',
-  label: 'Ember Glow',
-  description: 'Orange — deep maroon coals through blazing tangerine to warm peach afterglow',
+  id: "ember-glow",
+  label: "Ember Glow",
+  description:
+    "Orange — deep maroon coals through blazing tangerine to warm peach afterglow",
   colors: {
     EM_DEADCOAL: { multiply: [32, 10, 8] },
     EM_SMOLDER: { multiply: [48, 15, 10] },
