@@ -32,6 +32,42 @@ function validateUsername(raw: string): string {
   return trimmed;
 }
 
+/** Derive a unique username from auth identity claims, or return undefined if none is available. */
+async function deriveUniqueUsername(
+  ctx: MutationCtx,
+  identity: { nickname?: string; name?: string; email?: string },
+): Promise<string | undefined> {
+  const raw =
+    identity.nickname ??
+    identity.name ??
+    (identity.email ? identity.email.split("@")[0] : undefined);
+  if (!raw) return undefined;
+
+  const sanitized = raw
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .replace(/^[-_]+|[-_]+$/g, "")
+    .slice(0, 30);
+  if (sanitized.length === 0) return undefined;
+
+  // Try the sanitized name first, then fall back to suffixed variants
+  const taken = await ctx.db
+    .query("users")
+    .withIndex("byUsername", (q) => q.eq("username", sanitized))
+    .unique();
+  if (!taken) return sanitized;
+
+  for (let i = 0; i < 5; i++) {
+    const suffix = crypto.randomUUID().slice(0, 4);
+    const candidate = `${sanitized.slice(0, 25)}-${suffix}`;
+    const exists = await ctx.db
+      .query("users")
+      .withIndex("byUsername", (q) => q.eq("username", candidate))
+      .unique();
+    if (!exists) return candidate;
+  }
+  return undefined;
+}
+
 /**
  * Get the currently authenticated user's record.
  * Returns null if not authenticated or no user doc exists yet.
@@ -70,8 +106,12 @@ export const getOrCreateUser = mutation({
       return existing;
     }
 
+    // Derive an initial username from Clerk identity claims
+    const username = await deriveUniqueUsername(ctx, identity);
+
     const id = await ctx.db.insert("users", {
       tokenIdentifier: identity.tokenIdentifier,
+      ...(username !== undefined && { username }),
       showProfilePic: true,
       apiKey: crypto.randomUUID(),
       createdAt: Date.now(),
@@ -87,7 +127,6 @@ export const getOrCreateUser = mutation({
 export const updateProfile = mutation({
   args: {
     username: v.optional(v.string()),
-    showProfilePic: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -115,9 +154,6 @@ export const updateProfile = mutation({
     await ctx.db.patch(user._id, {
       updatedAt: Date.now(),
       ...(validatedUsername !== undefined && { username: validatedUsername }),
-      ...(args.showProfilePic !== undefined && {
-        showProfilePic: args.showProfilePic,
-      }),
     });
     return await ctx.db.get(user._id);
   },

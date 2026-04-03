@@ -29,11 +29,11 @@ import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { PaletteId } from "@/lib/palettes";
+import { useClerk } from "@clerk/nextjs";
 import {
   decodePortableSettings,
   encodePortableSettings,
 } from "@/lib/portable-settings";
-import { signIn } from "@/lib/shooAuth";
 import { cn } from "@/lib/utils";
 import {
   AFTERLIFE_OPTIONS,
@@ -58,6 +58,7 @@ const LOBBY_MODE_DEFAULTS = {
 } as const;
 
 export function StreamControlClient() {
+  const clerk = useClerk();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const viewer = useQuery(api.users.viewer);
   const session = useQuery(
@@ -474,7 +475,7 @@ export function StreamControlClient() {
         </p>
         <button
           type="button"
-          onClick={() => signIn()}
+          onClick={() => clerk.openSignIn()}
           className={cn(
             "inline-flex items-center gap-2 rounded-lg border border-border/50",
             "px-5 py-2.5 text-sm font-semibold text-muted-foreground",

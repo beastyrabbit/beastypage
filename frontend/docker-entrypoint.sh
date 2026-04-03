@@ -10,6 +10,7 @@ CONVEX_PLACEHOLDER_URL="https://placeholder.convex.cloud"
 CONVEX_PLACEHOLDER_HOST="placeholder.convex.cloud"
 POSTHOG_PLACEHOLDER_KEY="phc_PLACEHOLDER_KEY"
 POSTHOG_PLACEHOLDER_HOST="https://placeholder.posthog.com"
+CLERK_PLACEHOLDER_KEY="pk_placeholder_CLERK_KEY"
 
 # Helper function to replace placeholders in all Next.js build artifacts
 replace_in_files() {
@@ -57,6 +58,14 @@ fi
 if [ -n "$NEXT_PUBLIC_POSTHOG_HOST" ]; then
   echo "  - NEXT_PUBLIC_POSTHOG_HOST"
   replace_in_files "$POSTHOG_PLACEHOLDER_HOST" "$NEXT_PUBLIC_POSTHOG_HOST"
+fi
+
+# Clerk publishable key injection
+if [ -n "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" ]; then
+  echo "  - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+  replace_in_files "$CLERK_PLACEHOLDER_KEY" "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+else
+  echo "  - WARNING: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY not set (auth will fail)"
 fi
 
 echo "Environment injection complete"
