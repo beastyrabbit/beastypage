@@ -23,8 +23,9 @@ async function runSync(reason: string) {
     const proc = spawn("tsx", [syncScript], {
       stdio: ["ignore", "inherit", "inherit"],
     });
-    const exitCode = await new Promise<number>((resolve) => {
+    const exitCode = await new Promise<number>((resolve, reject) => {
       proc.on("close", (code) => resolve(code ?? 1));
+      proc.on("error", (err) => reject(err));
     });
     if (exitCode !== 0) {
       console.error(`[palette-watch] sync failed after ${reason} (exit ${exitCode})`);

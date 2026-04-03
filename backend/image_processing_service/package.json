@@ -1,6 +1,5 @@
 {
   "name": "image_processing_service",
-  "module": "src/index.ts",
   "type": "module",
   "private": true,
   "scripts": {
@@ -13,7 +12,7 @@
     "typescript": "^6.0.2",
     "vitest": "^4.1.2"
   },
-"dependencies": {
+  "dependencies": {
     "@hono/node-server": "^1.19.9",
     "@hono/zod-validator": "^0.7.6",
     "hono": "^4.11.7",

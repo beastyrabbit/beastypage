@@ -1,8 +1,8 @@
 // Scans app/**/widget.ts files and generates the tool registry.
 // Run: tsx scripts/generate-registry.ts
-import { resolve, relative, dirname } from "path";
-import { fileURLToPath } from "url";
-import { writeFileSync } from "fs";
+import { resolve, relative, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { writeFileSync } from "node:fs";
 import { globSync } from "glob";
 import type { ToolWidgetMeta } from "../lib/dash/types";
 

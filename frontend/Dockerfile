@@ -2,14 +2,14 @@
 
 # Stage 1: Install dependencies
 FROM node:22-alpine AS deps
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Build application
 FROM node:22-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -30,7 +30,8 @@ ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
 ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
 
 # Build Next.js with standalone output
-# Note: convex codegen runs via pre-commit hook, types are in git
+# Note: convex codegen runs via the "prepare" script during pnpm install;
+# generated types are committed to git, so codegen is not needed during Docker build
 RUN pnpm run build
 
 # Stage 3: Production image (Node-based for standalone compatibility)
