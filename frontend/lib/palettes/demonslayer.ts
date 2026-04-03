@@ -1,9 +1,10 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const demonslayerPalette: PaletteCategory = {
-  id: 'demonslayer',
-  label: 'Demon Slayer',
-  description: 'Breathing techniques, nichirin blades, and the Demon Slayer Corps',
+  id: "demonslayer",
+  label: "Demon Slayer",
+  description:
+    "Breathing techniques, nichirin blades, and the Demon Slayer Corps",
   colors: {
     DS_HINOKAMI: { multiply: [238, 28, 37] },
     DS_TANJIRO: { multiply: [124, 58, 67] },

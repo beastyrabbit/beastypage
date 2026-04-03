@@ -375,7 +375,7 @@ type AnalyticsEventMap = {
  */
 export function track<K extends keyof AnalyticsEventMap>(
   event: K,
-  properties: AnalyticsEventMap[K]
+  properties: AnalyticsEventMap[K],
 ): void {
   try {
     if (typeof posthog?.capture === "function") {

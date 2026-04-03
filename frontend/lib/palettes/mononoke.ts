@@ -1,9 +1,10 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const mononokePalette: PaletteCategory = {
-  id: 'mononoke',
-  label: 'Princess Mononoke',
-  description: "Ancient forest spirits, iron town fire, and the Great Forest Spirit's realm",
+  id: "mononoke",
+  label: "Princess Mononoke",
+  description:
+    "Ancient forest spirits, iron town fire, and the Great Forest Spirit's realm",
   colors: {
     MONONOKE_DEEPBLUE: { multiply: [3, 50, 78] },
     MONONOKE_SANRED: { multiply: [199, 65, 72] },
@@ -12,7 +13,10 @@ export const mononokePalette: PaletteCategory = {
     MONONOKE_ASHITAKA: { multiply: [143, 84, 40] },
     MONONOKE_FORESTDARK: { multiply: [23, 59, 83] },
     MONONOKE_CURSE: { multiply: [203, 68, 75] },
-    MONONOKE_SPIRIT: { multiply: [240, 240, 245], screen: [255, 255, 255, 0.15] },
+    MONONOKE_SPIRIT: {
+      multiply: [240, 240, 245],
+      screen: [255, 255, 255, 0.15],
+    },
     MONONOKE_YELLOWGREEN: { multiply: [175, 192, 72] },
     MONONOKE_CREAM: { multiply: [252, 236, 196] },
     MONONOKE_OLIVEDRAB: { multiply: [124, 152, 43] },

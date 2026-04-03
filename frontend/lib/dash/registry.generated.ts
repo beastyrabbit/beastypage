@@ -3,149 +3,166 @@ import type { ToolWidgetMeta } from "./types";
 
 export const TOOL_REGISTRY: ToolWidgetMeta[] = [
   {
-    "id": "adoption-generator",
-    "title": "Adoption Generator",
-    "description": "Roll whole litters, trim each round, and finish with your top ten cats.",
-    "icon": "🐾",
-    "href": "/adoption-generator",
-    "category": "gacha"
+    id: "adoption-generator",
+    title: "Adoption Generator",
+    description:
+      "Roll whole litters, trim each round, and finish with your top ten cats.",
+    icon: "🐾",
+    href: "/adoption-generator",
+    category: "gacha",
   },
   {
-    "id": "ancestry-tree",
-    "title": "Ancestry Tree",
-    "description": "Create interactive family trees with trait inheritance across generations.",
-    "icon": "🌳",
-    "href": "/projects/warrior-cats/ancestry-tree",
-    "category": "warrior-cats"
+    id: "ancestry-tree",
+    title: "Ancestry Tree",
+    description:
+      "Create interactive family trees with trait inheritance across generations.",
+    icon: "🌳",
+    href: "/projects/warrior-cats/ancestry-tree",
+    category: "warrior-cats",
   },
   {
-    "id": "cat-color-palettes",
-    "title": "Cat Color Palettes",
-    "description": "Browse all experimental color palettes for cat generation including anime-inspired themes.",
-    "icon": "🐱",
-    "href": "/cat-color-palettes",
-    "category": "artist"
+    id: "cat-color-palettes",
+    title: "Cat Color Palettes",
+    description:
+      "Browse all experimental color palettes for cat generation including anime-inspired themes.",
+    icon: "🐱",
+    href: "/cat-color-palettes",
+    category: "artist",
   },
   {
-    "id": "cat-settings",
-    "title": "Cat Settings",
-    "description": "Configure and share cat generation presets with a 6-word code.",
-    "icon": "⚙️",
-    "href": "/single-cat-plus/settings",
-    "category": "gacha"
+    id: "cat-settings",
+    title: "Cat Settings",
+    description:
+      "Configure and share cat generation presets with a 6-word code.",
+    icon: "⚙️",
+    href: "/single-cat-plus/settings",
+    category: "gacha",
   },
   {
-    "id": "catdex",
-    "title": "Catdex",
-    "description": "Browse, search, and filter every cat in a Pokedex-style archive.",
-    "icon": "📖",
-    "href": "/catdex",
-    "category": "gacha"
+    id: "catdex",
+    title: "Catdex",
+    description:
+      "Browse, search, and filter every cat in a Pokedex-style archive.",
+    icon: "📖",
+    href: "/catdex",
+    category: "gacha",
   },
   {
-    "id": "coinflip",
-    "title": "Coinflip Challenge",
-    "description": "Head-to-head luck arena. Wager cats, call the flip, and earn bragging rights.",
-    "icon": "🪙",
-    "href": "/coinflip",
-    "category": "games"
+    id: "coinflip",
+    title: "Coinflip Challenge",
+    description:
+      "Head-to-head luck arena. Wager cats, call the flip, and earn bragging rights.",
+    icon: "🪙",
+    href: "/coinflip",
+    category: "games",
   },
   {
-    "id": "color-palette-creator",
-    "title": "Color Palette Creator",
-    "description": "Extract dominant colors from images. Drag crosshairs to pick colors, hover to highlight regions.",
-    "icon": "🎨",
-    "href": "/color-palette-creator",
-    "category": "artist"
+    id: "color-palette-creator",
+    title: "Color Palette Creator",
+    description:
+      "Extract dominant colors from images. Drag crosshairs to pick colors, hover to highlight regions.",
+    icon: "🎨",
+    href: "/color-palette-creator",
+    category: "artist",
   },
   {
-    "id": "guided-builder",
-    "title": "Guided Builder Tour",
-    "description": "Step-by-step wizard with a growing sidebar tree and timeline tracking.",
-    "icon": "🧭",
-    "href": "/guided-builder",
-    "category": "warrior-cats"
+    id: "guided-builder",
+    title: "Guided Builder Tour",
+    description:
+      "Step-by-step wizard with a growing sidebar tree and timeline tracking.",
+    icon: "🧭",
+    href: "/guided-builder",
+    category: "warrior-cats",
   },
   {
-    "id": "history",
-    "title": "CatGen History",
-    "description": "Browse every stored roll, names, and sprites in a lightweight history viewer.",
-    "icon": "🗂️",
-    "href": "/history",
-    "category": "gacha"
+    id: "history",
+    title: "CatGen History",
+    description:
+      "Browse every stored roll, names, and sprites in a lightweight history viewer.",
+    icon: "🗂️",
+    href: "/history",
+    category: "gacha",
   },
   {
-    "id": "palette-generator",
-    "title": "Palette Generator",
-    "description": "Generate harmonious color palettes instantly. Build a collection and export in multiple formats.",
-    "icon": "✨",
-    "href": "/palette-generator",
-    "category": "artist"
+    id: "palette-generator",
+    title: "Palette Generator",
+    description:
+      "Generate harmonious color palettes instantly. Build a collection and export in multiple formats.",
+    icon: "✨",
+    href: "/palette-generator",
+    category: "artist",
   },
   {
-    "id": "perfect-cat-finder",
-    "title": "Perfect Cat Finder",
-    "description": "Head-to-head comparisons that evolve toward your favourite cat.",
-    "icon": "⚖️",
-    "href": "/perfect-cat-finder",
-    "category": "games"
+    id: "perfect-cat-finder",
+    title: "Perfect Cat Finder",
+    description:
+      "Head-to-head comparisons that evolve toward your favourite cat.",
+    icon: "⚖️",
+    href: "/perfect-cat-finder",
+    category: "games",
   },
   {
-    "id": "pixelator",
-    "title": "Pixelator",
-    "description": "Transform images with a modular pixel art pipeline. Chain pixelation, dithering, quantization, and effects.",
-    "icon": "🔲",
-    "href": "/pixelator",
-    "category": "artist"
+    id: "pixelator",
+    title: "Pixelator",
+    description:
+      "Transform images with a modular pixel art pipeline. Chain pixelation, dithering, quantization, and effects.",
+    icon: "🔲",
+    href: "/pixelator",
+    category: "artist",
   },
   {
-    "id": "single-cat-calm",
-    "title": "Single Cat (Less Spin)",
-    "description": "Calm typewriter-style reveal where traits appear one by one.",
-    "icon": "🎯",
-    "href": "/single-cat-plus?mode=calm",
-    "category": "gacha"
+    id: "single-cat-calm",
+    title: "Single Cat (Less Spin)",
+    description: "Calm typewriter-style reveal where traits appear one by one.",
+    icon: "🎯",
+    href: "/single-cat-plus?mode=calm",
+    category: "gacha",
   },
   {
-    "id": "single-cat-generator",
-    "title": "Single Cat Generator",
-    "description": "Airport flip-board chaos with rapid spins before the final reveal.",
-    "icon": "✨",
-    "href": "/single-cat-plus?mode=flashy&accessories=1-1&scars=1-1&torties=1-1&afterlife=off",
-    "category": "gacha"
+    id: "single-cat-generator",
+    title: "Single Cat Generator",
+    description:
+      "Airport flip-board chaos with rapid spins before the final reveal.",
+    icon: "✨",
+    href: "/single-cat-plus?mode=flashy&accessories=1-1&scars=1-1&torties=1-1&afterlife=off",
+    category: "gacha",
   },
   {
-    "id": "single-cat-plus",
-    "title": "Single Cat Plus",
-    "description": "Generate, spin, and export pixel cats with layered accessories and tortie coats.",
-    "icon": "💫",
-    "href": "/single-cat-plus",
-    "category": "gacha"
+    id: "single-cat-plus",
+    title: "Single Cat Plus",
+    description:
+      "Generate, spin, and export pixel cats with layered accessories and tortie coats.",
+    icon: "💫",
+    href: "/single-cat-plus",
+    category: "gacha",
   },
   {
-    "id": "streamer-voting",
-    "title": "Streamer Voting Build",
-    "description": "Live session controls for audience voting and shareable builds.",
-    "icon": "📺",
-    "href": "/streamer-voting",
-    "category": "warrior-cats"
+    id: "streamer-voting",
+    title: "Streamer Voting Build",
+    description:
+      "Live session controls for audience voting and shareable builds.",
+    icon: "📺",
+    href: "/streamer-voting",
+    category: "warrior-cats",
   },
   {
-    "id": "visual-builder",
-    "title": "Visual Cat Builder",
-    "description": "Trait-by-trait sprite previews with instant updates while you build.",
-    "icon": "🎨",
-    "href": "/visual-builder",
-    "category": "warrior-cats"
+    id: "visual-builder",
+    title: "Visual Cat Builder",
+    description:
+      "Trait-by-trait sprite previews with instant updates while you build.",
+    icon: "🎨",
+    href: "/visual-builder",
+    category: "warrior-cats",
   },
   {
-    "id": "wheel",
-    "title": "Classic Wheel",
-    "description": "Weighted wheel with animated reveals and celebratory effects.",
-    "icon": "🎡",
-    "href": "/wheel",
-    "category": "gacha"
-  }
+    id: "wheel",
+    title: "Classic Wheel",
+    description:
+      "Weighted wheel with animated reveals and celebratory effects.",
+    icon: "🎡",
+    href: "/wheel",
+    category: "gacha",
+  },
 ];
 
 export const TOOL_MAP = new Map<string, ToolWidgetMeta>(

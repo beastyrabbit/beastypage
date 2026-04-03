@@ -1,9 +1,10 @@
-import type { PaletteCategory } from './types';
+import type { PaletteCategory } from "./types";
 
 export const mushishiPalette: PaletteCategory = {
-  id: 'mushishi',
-  label: 'Mushishi',
-  description: 'Muted forest greens, misty blues, and ethereal watercolor tones',
+  id: "mushishi",
+  label: "Mushishi",
+  description:
+    "Muted forest greens, misty blues, and ethereal watercolor tones",
   colors: {
     MUSHISHI_MUSHI: { multiply: [122, 158, 126] },
     MUSHISHI_GINKO: { multiply: [143, 191, 159] },

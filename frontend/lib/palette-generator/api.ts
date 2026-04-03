@@ -16,7 +16,10 @@ export async function fetchPaletteFromAPI(
   const url = `https://www.thecolorapi.com/scheme?hex=${seed}&mode=${encodeURIComponent(safeMode)}&count=${count}`;
   const started = performance.now();
 
-  function buildPalette(colors: string[], source: "colorapi" | "fallback"): GeneratedPalette {
+  function buildPalette(
+    colors: string[],
+    source: "colorapi" | "fallback",
+  ): GeneratedPalette {
     return {
       id: crypto.randomUUID(),
       seed,
@@ -36,13 +39,19 @@ export async function fetchPaletteFromAPI(
     const colors: string[] = Array.isArray(data.colors)
       ? data.colors
           .map((entry) => entry.hex?.value)
-          .filter((value): value is string => typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value))
+          .filter(
+            (value): value is string =>
+              typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value),
+          )
       : [];
     if (!colors.length) throw new Error("No colors returned");
 
     return buildPalette(colors.slice(0, count), "colorapi");
   } catch (error) {
-    console.error("[PaletteGenerator] API fetch failed, using fallback palette", error);
+    console.error(
+      "[PaletteGenerator] API fetch failed, using fallback palette",
+      error,
+    );
     const fallback =
       FALLBACK_PALETTES[Math.floor(Math.random() * FALLBACK_PALETTES.length)];
     return buildPalette(fallback.slice(0, count), "fallback");
