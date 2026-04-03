@@ -30,8 +30,7 @@
         "noControlCharactersInRegex": "warn"
       },
       "style": {
-        "noNonNullAssertion": "warn",
-        "noDescendingSpecificity": "warn"
+        "noNonNullAssertion": "warn"
       },
       "complexity": {
         "noBannedTypes": "warn"
