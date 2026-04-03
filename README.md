@@ -15,14 +15,15 @@ A pixel cat gacha platform featuring generators, wheels, and collection tools bu
 
 - **Frontend**: Next.js 16, React 19, TailwindCSS
 - **Backend**: Convex (serverless database), FastAPI renderer service
-- **Package Manager**: Bun
+- **Package Manager**: pnpm
 - **Deployment**: Kubernetes via FluxCD, Docker containers
 
 ## Quick Start
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) (v1.0+)
+- [Node.js](https://nodejs.org/) (v22+)
+- [pnpm](https://pnpm.io/) (v9+)
 - [Convex](https://convex.dev) account (for database)
 - Python 3.11+ with [uv](https://github.com/astral-sh/uv) (for renderer service)
 
@@ -30,8 +31,8 @@ A pixel cat gacha platform featuring generators, wheels, and collection tools bu
 
 ```bash
 cd frontend
-bun install
-bun run dev
+pnpm install
+pnpm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -71,7 +72,7 @@ beastypage/
 ├── frontend/               # Next.js application
 │   ├── convex/             # Convex functions and schema
 │   ├── app/                # Next.js app router pages
-│   └── Dockerfile          # Multi-stage build (Bun → Node)
+│   └── Dockerfile          # Multi-stage build (pnpm → Node)
 ├── backend/
 │   ├── renderer_service/   # FastAPI cat renderer
 │   │   └── Dockerfile      # Python/uv build

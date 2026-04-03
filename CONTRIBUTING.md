@@ -6,7 +6,8 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) v1.0 or higher
+- [Node.js](https://nodejs.org/) v22 or higher
+- [pnpm](https://pnpm.io/) v9 or higher
 - [Git](https://git-scm.com/)
 - A [Convex](https://convex.dev) account (for database features)
 
@@ -21,11 +22,11 @@ Thank you for your interest in contributing! This document provides guidelines f
 3. Install dependencies:
    ```bash
    cd frontend
-   bun install
+   pnpm install
    ```
 4. Start the development server:
    ```bash
-   bun run dev
+   pnpm run dev
    ```
 
 ## How to Contribute
@@ -55,8 +56,8 @@ Thank you for your interest in contributing! This document provides guidelines f
 2. Make your changes following the code style guidelines
 3. Run linting and type checks:
    ```bash
-   bun run lint
-   bun run typecheck
+   pnpm run lint
+   pnpm run typecheck
    ```
 4. Commit with a descriptive message (see commit conventions below)
 5. Push and open a PR against `main`
@@ -79,10 +80,10 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ### Linting
 
-ESLint is configured for the project. Run before committing:
+Biome is configured for linting and formatting. Run before committing:
 
 ```bash
-bun run lint
+pnpm run lint
 ```
 
 ### TypeScript
@@ -90,7 +91,7 @@ bun run lint
 Ensure no type errors:
 
 ```bash
-bun run typecheck
+pnpm run typecheck
 ```
 
 ## Commit Message Conventions

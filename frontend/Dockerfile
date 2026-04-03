@@ -1,13 +1,15 @@
 # syntax=docker/dockerfile:1.6
 
 # Stage 1: Install dependencies
-FROM oven/bun:1.3-alpine AS deps
+FROM node:22-alpine AS deps
+RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --ignore-scripts
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Build application
-FROM oven/bun:1.3-alpine AS builder
+FROM node:22-alpine AS builder
+RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -29,10 +31,10 @@ ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
 
 # Build Next.js with standalone output
 # Note: convex codegen runs via pre-commit hook, types are in git
-RUN bun run build
+RUN pnpm run build
 
 # Stage 3: Production image (Node-based for standalone compatibility)
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

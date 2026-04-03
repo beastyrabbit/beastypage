@@ -1,4 +1,5 @@
 import { watch } from "node:fs";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const paletteDir = path.resolve(__dirname, "../lib/palettes");
 const syncScript = path.resolve(__dirname, "./sync-renderer-palettes.ts");
 
-let syncTimer: Timer | null = null;
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
 let syncInFlight = false;
 let syncQueued = false;
 
@@ -19,11 +20,12 @@ async function runSync(reason: string) {
   syncInFlight = true;
   const startedAt = Date.now();
   try {
-    const proc = Bun.spawn(["bun", syncScript], {
-      stdout: "inherit",
-      stderr: "inherit",
+    const proc = spawn("tsx", [syncScript], {
+      stdio: ["ignore", "inherit", "inherit"],
     });
-    const exitCode = await proc.exited;
+    const exitCode = await new Promise<number>((resolve) => {
+      proc.on("close", (code) => resolve(code ?? 1));
+    });
     if (exitCode !== 0) {
       console.error(`[palette-watch] sync failed after ${reason} (exit ${exitCode})`);
     } else {
