@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PageHero } from "@/components/common/PageHero";
 
@@ -64,8 +64,7 @@ const LEGACY_MODE_CARDS: LegacyCard[] = [
   {
     title: "Single Cat (Less Spin)",
     icon: "🎯",
-    description:
-      "Calm typewriter-style reveal where traits appear one by one.",
+    description: "Calm typewriter-style reveal where traits appear one by one.",
     href: "/single-cat-plus?mode=calm",
   },
   {
@@ -161,7 +160,14 @@ export default function GachaLanding() {
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <PageHero
         eyebrow="Cat Gacha Platform"
-        title={<>Gold-standard <span className="text-gradient-gatcha animate-shimmer bg-[length:200%_auto]">gacha experience</span></>}
+        title={
+          <>
+            Gold-standard{" "}
+            <span className="text-gradient-gatcha animate-shimmer bg-[length:200%_auto]">
+              gacha experience
+            </span>
+          </>
+        }
         description="Pick any generator — from classic wheels to modern builders — and keep every rollout in one place."
       >
         <Link
@@ -181,18 +187,26 @@ export default function GachaLanding() {
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {LEGACY_MODE_CARDS.map((card, index) => {
           const isActive = Boolean(!card.comingSoon && card.href);
-          const baseClasses = "glass-card relative flex h-full flex-col gap-4 p-6 transition-all duration-500 overflow-hidden group";
+          const baseClasses =
+            "glass-card relative flex h-full flex-col gap-4 p-6 transition-all duration-500 overflow-hidden group";
           const wrapperClassName = isActive
             ? `${baseClasses} hover:-translate-y-2 hover:shadow-2xl hover:border-amber-400/30`
             : `${baseClasses} opacity-70 grayscale-[0.5] hover:opacity-100 hover:grayscale-0 animate-pulse-soft`;
 
           const content = (
             <>
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100" role="presentation" aria-hidden="true" />
+              <div
+                className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                role="presentation"
+                aria-hidden="true"
+              />
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:animate-shine" />
 
               <div className="flex items-start justify-between">
-                <div className="text-4xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" aria-hidden>
+                <div
+                  className="text-4xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                  aria-hidden
+                >
                   {card.icon}
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -210,8 +224,12 @@ export default function GachaLanding() {
               </div>
 
               <div className="relative z-10">
-                <h3 className="text-xl font-bold text-foreground group-hover:text-gradient-gatcha transition-colors">{card.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors">{card.description}</p>
+                <h3 className="text-xl font-bold text-foreground group-hover:text-gradient-gatcha transition-colors">
+                  {card.title}
+                </h3>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors">
+                  {card.description}
+                </p>
               </div>
 
               {isActive && (
@@ -249,19 +267,26 @@ export default function GachaLanding() {
 
       <section className="glass-card space-y-4 px-8 py-10">
         <div className="section-eyebrow">Origin story</div>
-        <h2 className="text-3xl font-semibold text-foreground">The Story Behind This Project</h2>
+        <h2 className="text-3xl font-semibold text-foreground">
+          The Story Behind This Project
+        </h2>
         <div className="space-y-3 text-sm text-muted-foreground">
           <p>
-            This page started as a “what if” conversation about letting the generator decide a commission topic. It snowballed into a full gacha
-            commission service, and I had way too much fun building out this hub to support it.
+            This page started as a “what if” conversation about letting the
+            generator decide a commission topic. It snowballed into a full gacha
+            commission service, and I had way too much fun building out this hub
+            to support it.
           </p>
           <p>
-            What you see above is a creative playground for cat generation and chance. Every experiment or stream idea gets a tile in the grid so we can
-            keep iterating, testing, and porting the legacy tools into the new stack.
+            What you see above is a creative playground for cat generation and
+            chance. Every experiment or stream idea gets a tile in the grid so
+            we can keep iterating, testing, and porting the legacy tools into
+            the new stack.
           </p>
           <p>
-            I&apos;m not tied to the commission revenue or stream—you won&apos;t see a kickback in any of this. It&apos;s a passion build for the community and for the joy
-            of making something delightful.
+            I&apos;m not tied to the commission revenue or stream—you won&apos;t
+            see a kickback in any of this. It&apos;s a passion build for the
+            community and for the joy of making something delightful.
           </p>
         </div>
       </section>
@@ -284,26 +309,48 @@ export default function GachaLanding() {
       </section>
 
       <section className="glass-card space-y-4 px-8 py-8 text-sm text-muted-foreground">
-        <h2 className="text-base font-semibold text-foreground">Licenses & Credits</h2>
+        <h2 className="text-base font-semibold text-foreground">
+          Licenses & Credits
+        </h2>
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-foreground">ClanGen Sprites</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            ClanGen Sprites
+          </h3>
           <p>
             Cat sprites originate from ClanGen, licensed under{" "}
-            <Link href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-2 hover:underline">
+            <Link
+              href="https://creativecommons.org/licenses/by-nc/4.0/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-2 hover:underline"
+            >
               CC BY-NC 4.0
             </Link>
-            . Credit ClanGen when you use these sprites and keep them non-commercial.
+            . Credit ClanGen when you use these sprites and keep them
+            non-commercial.
           </p>
         </div>
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-foreground">Pixel Cat Maker</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            Pixel Cat Maker
+          </h3>
           <p>
             Built on top of the{" "}
-            <Link href="https://github.com/cgen-tools/pixel-cat-maker" target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-2 hover:underline">
+            <Link
+              href="https://github.com/cgen-tools/pixel-cat-maker"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-2 hover:underline"
+            >
               Pixel Cat Maker
             </Link>{" "}
             project (v0.12.2). Related work:{" "}
-            <Link href="https://clangensim.pages.dev" target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-2 hover:underline">
+            <Link
+              href="https://clangensim.pages.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-2 hover:underline"
+            >
               ClanGen Browser Simulator
             </Link>
             .

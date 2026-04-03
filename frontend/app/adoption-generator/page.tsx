@@ -4,10 +4,12 @@ import { PageHero } from "@/components/common/PageHero";
 
 export const metadata: Metadata = {
   title: "Adoption Generator | BeastyRabbit",
-  description: "Roll full litters, trim every reveal, and save the finalists with a shareable link.",
+  description:
+    "Roll full litters, trim every reveal, and save the finalists with a shareable link.",
   openGraph: {
     title: "Adoption Generator",
-    description: "Roll full litters, trim every reveal, and save the finalists with a shareable link.",
+    description:
+      "Roll full litters, trim every reveal, and save the finalists with a shareable link.",
   },
 };
 

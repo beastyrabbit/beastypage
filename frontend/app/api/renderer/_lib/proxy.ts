@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from "next/server";
 
-export const RENDERER_BASE = (process.env.RENDERER_INTERNAL_URL ?? 'http://127.0.0.1:8001').replace(/\/$/, '');
+export const RENDERER_BASE = (
+  process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001"
+).replace(/\/$/, "");
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -13,47 +15,50 @@ interface ProxyOptions {
 }
 
 function buildTargetUrl(path: string): string {
-  const suffix = path.startsWith('/') ? path : `/${path}`;
+  const suffix = path.startsWith("/") ? path : `/${path}`;
   return `${RENDERER_BASE}${suffix}`;
 }
 
 function selectHeaders(request: NextRequest): Headers {
   const headers = new Headers();
-  const contentType = request.headers.get('content-type');
-  if (contentType) headers.set('content-type', contentType);
+  const contentType = request.headers.get("content-type");
+  if (contentType) headers.set("content-type", contentType);
 
-  const authorization = request.headers.get('authorization');
-  if (authorization) headers.set('authorization', authorization);
+  const authorization = request.headers.get("authorization");
+  if (authorization) headers.set("authorization", authorization);
 
-  const requestId = request.headers.get('x-request-id');
-  if (requestId) headers.set('x-request-id', requestId);
+  const requestId = request.headers.get("x-request-id");
+  if (requestId) headers.set("x-request-id", requestId);
 
-  const traceId = request.headers.get('x-trace-id');
-  if (traceId) headers.set('x-trace-id', traceId);
+  const traceId = request.headers.get("x-trace-id");
+  if (traceId) headers.set("x-trace-id", traceId);
 
-  headers.set('accept', request.headers.get('accept') || 'application/json');
+  headers.set("accept", request.headers.get("accept") || "application/json");
 
-  const userAgent = request.headers.get('user-agent');
-  headers.set('user-agent', userAgent || 'gatcha-web/renderer-proxy');
+  const userAgent = request.headers.get("user-agent");
+  headers.set("user-agent", userAgent || "gatcha-web/renderer-proxy");
   return headers;
 }
 
 function classifyError(error: unknown): { status: number; message: string } {
-  if (error instanceof DOMException && error.name === 'AbortError') {
-    return { status: 504, message: 'Renderer request timed out' };
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return { status: 504, message: "Renderer request timed out" };
   }
-  return { status: 502, message: 'Renderer service unavailable' };
+  return { status: 502, message: "Renderer service unavailable" };
 }
 
 function ensureJson(contentType: string | null): string | null {
-  if (!contentType) return 'Missing Content-Type header';
-  if (!contentType.toLowerCase().includes('application/json')) {
-    return 'Renderer API expects application/json payloads';
+  if (!contentType) return "Missing Content-Type header";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return "Renderer API expects application/json payloads";
   }
   return null;
 }
 
-function streamWithFinalizer(body: ReadableStream<Uint8Array>, finalize: () => void) {
+function streamWithFinalizer(
+  body: ReadableStream<Uint8Array>,
+  finalize: () => void,
+) {
   const reader = body.getReader();
   let done = false;
 
@@ -90,9 +95,9 @@ function streamWithFinalizer(body: ReadableStream<Uint8Array>, finalize: () => v
 
 export async function proxyRendererJson(
   request: NextRequest,
-  { timeoutMs = DEFAULT_TIMEOUT_MS, validate, path }: ProxyOptions
+  { timeoutMs = DEFAULT_TIMEOUT_MS, validate, path }: ProxyOptions,
 ): Promise<NextResponse> {
-  const contentTypeError = ensureJson(request.headers.get('content-type'));
+  const contentTypeError = ensureJson(request.headers.get("content-type"));
   if (contentTypeError) {
     return NextResponse.json({ error: contentTypeError }, { status: 415 });
   }
@@ -100,14 +105,20 @@ export async function proxyRendererJson(
   const clone = request.clone();
   const rawBody = await clone.text();
   if (!rawBody) {
-    return NextResponse.json({ error: 'Request body must not be empty' }, { status: 400 });
+    return NextResponse.json(
+      { error: "Request body must not be empty" },
+      { status: 400 },
+    );
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawBody);
-  } catch (error) {
-    return NextResponse.json({ error: 'Request body is not valid JSON' }, { status: 400 });
+  } catch (_error) {
+    return NextResponse.json(
+      { error: "Request body is not valid JSON" },
+      { status: 400 },
+    );
   }
 
   if (validate) {
@@ -123,7 +134,7 @@ export async function proxyRendererJson(
 
   try {
     const upstream = await fetch(buildTargetUrl(path), {
-      method: 'POST',
+      method: "POST",
       headers: selectHeaders(request),
       body: rawBody,
       signal: controller.signal,
@@ -133,13 +144,13 @@ export async function proxyRendererJson(
       clear();
       const text = await upstream.text();
       return NextResponse.json(
-        { error: text || 'Renderer returned no data' },
-        { status: upstream.status || 500 }
+        { error: text || "Renderer returned no data" },
+        { status: upstream.status || 500 },
       );
     }
 
     const headers = new Headers(upstream.headers);
-    headers.set('cache-control', 'no-store');
+    headers.set("cache-control", "no-store");
 
     const proxiedBody = streamWithFinalizer(upstream.body, clear);
 
@@ -149,7 +160,10 @@ export async function proxyRendererJson(
     });
   } catch (error) {
     clear();
-    console.error(`[renderer-proxy] upstream request failed for ${path}`, error);
+    console.error(
+      `[renderer-proxy] upstream request failed for ${path}`,
+      error,
+    );
     const { status, message } = classifyError(error);
     return NextResponse.json({ error: message }, { status });
   }

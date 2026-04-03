@@ -11,13 +11,15 @@ export default function OBSOverlayLayout({
   return (
     <div
       className="fixed left-0 top-0 z-[9999] overflow-hidden"
-      style={{
-        width: "1920px",
-        height: "1080px",
-        "--cam-zone-width": "640px",
-        "--content-width": "1280px",
-        "--accent-color": "#f59e0b",
-      } as React.CSSProperties}
+      style={
+        {
+          width: "1920px",
+          height: "1080px",
+          "--cam-zone-width": "640px",
+          "--content-width": "1280px",
+          "--accent-color": "#f59e0b",
+        } as React.CSSProperties
+      }
     >
       {children}
     </div>

@@ -1,16 +1,17 @@
-import { Suspense } from "react";
-import type { Metadata } from "next";
 import { Loader2 } from "lucide-react";
-
-import { HistoryClient } from "@/components/single-cat/HistoryClient";
+import type { Metadata } from "next";
+import { Suspense } from "react";
 import { PageHero } from "@/components/common/PageHero";
+import { HistoryClient } from "@/components/single-cat/HistoryClient";
 
 export const metadata: Metadata = {
   title: "CatGen History | BeastyRabbit",
-  description: "Browse every saved roll, revisit timeline moments, and jump back into any build instantly.",
+  description:
+    "Browse every saved roll, revisit timeline moments, and jump back into any build instantly.",
   openGraph: {
     title: "CatGen History",
-    description: "Browse every saved roll, revisit timeline moments, and jump back into any build instantly.",
+    description:
+      "Browse every saved roll, revisit timeline moments, and jump back into any build instantly.",
   },
 };
 

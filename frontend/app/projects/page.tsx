@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PageHero } from "@/components/common/PageHero";
 import { CategoryCard } from "@/components/projects/CategoryCard";
@@ -43,9 +43,7 @@ const CATEGORY_TOOLS = {
     { title: "Game of Life", icon: "🧬" },
     { title: "Perfect Cat", icon: "⚖️" },
   ],
-  tools: [
-    { title: "Discord Bot", icon: "🤖" },
-  ],
+  tools: [{ title: "Discord Bot", icon: "🤖" }],
 };
 
 const CTA_LINKS = [
@@ -108,19 +106,25 @@ export default function ProjectsHub() {
       {/* Origin Story */}
       <section className="glass-card space-y-4 px-8 py-10">
         <div className="section-eyebrow">Origin story</div>
-        <h2 className="text-3xl font-semibold text-foreground">The Story Behind This Project</h2>
+        <h2 className="text-3xl font-semibold text-foreground">
+          The Story Behind This Project
+        </h2>
         <div className="space-y-3 text-sm text-muted-foreground">
           <p>
-            This page started as a &quot;what if&quot; conversation about letting the generator decide a commission topic. It snowballed into a full gacha
-            commission service, and I had way too much fun building out this hub to support it.
+            This page started as a &quot;what if&quot; conversation about
+            letting the generator decide a commission topic. It snowballed into
+            a full gacha commission service, and I had way too much fun building
+            out this hub to support it.
           </p>
           <p>
-            What you see here is a creative playground for cat generation and chance. Every experiment or stream idea gets a tile so we can
-            keep iterating, testing, and porting the legacy tools into the new stack.
+            What you see here is a creative playground for cat generation and
+            chance. Every experiment or stream idea gets a tile so we can keep
+            iterating, testing, and porting the legacy tools into the new stack.
           </p>
           <p>
-            I&apos;m not tied to the commission revenue or stream—you won&apos;t see a kickback in any of this. It&apos;s a passion build for the community and for the joy
-            of making something delightful.
+            I&apos;m not tied to the commission revenue or stream—you won&apos;t
+            see a kickback in any of this. It&apos;s a passion build for the
+            community and for the joy of making something delightful.
           </p>
         </div>
       </section>
@@ -145,26 +149,48 @@ export default function ProjectsHub() {
 
       {/* Licenses */}
       <section className="glass-card space-y-4 px-8 py-8 text-sm text-muted-foreground">
-        <h2 className="text-base font-semibold text-foreground">Licenses & Credits</h2>
+        <h2 className="text-base font-semibold text-foreground">
+          Licenses & Credits
+        </h2>
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-foreground">ClanGen Sprites</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            ClanGen Sprites
+          </h3>
           <p>
             Cat sprites originate from ClanGen, licensed under{" "}
-            <Link href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-2 hover:underline">
+            <Link
+              href="https://creativecommons.org/licenses/by-nc/4.0/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-2 hover:underline"
+            >
               CC BY-NC 4.0
             </Link>
-            . Credit ClanGen when you use these sprites and keep them non-commercial.
+            . Credit ClanGen when you use these sprites and keep them
+            non-commercial.
           </p>
         </div>
         <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-foreground">Pixel Cat Maker</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            Pixel Cat Maker
+          </h3>
           <p>
             Built on top of the{" "}
-            <Link href="https://github.com/cgen-tools/pixel-cat-maker" target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-2 hover:underline">
+            <Link
+              href="https://github.com/cgen-tools/pixel-cat-maker"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-2 hover:underline"
+            >
               Pixel Cat Maker
             </Link>{" "}
             project (v0.12.2). Related work:{" "}
-            <Link href="https://clangensim.pages.dev" target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-2 hover:underline">
+            <Link
+              href="https://clangensim.pages.dev"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline-offset-2 hover:underline"
+            >
               ClanGen Browser Simulator
             </Link>
             .

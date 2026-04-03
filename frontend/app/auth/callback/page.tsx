@@ -13,7 +13,7 @@ const ShooCallbackClient = dynamic(
         <p className="text-sm text-muted-foreground">Signing in...</p>
       </div>
     ),
-  }
+  },
 );
 
 export default function ShooCallbackPage() {

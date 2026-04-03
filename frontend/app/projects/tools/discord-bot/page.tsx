@@ -1,7 +1,6 @@
-import type { ReactNode } from "react";
-import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PageHero } from "@/components/common/PageHero";
 
@@ -111,8 +110,12 @@ export default function DiscordBotPage() {
       {/* Commands */}
       <section id="commands" className="flex flex-col gap-6">
         <div className="flex flex-col gap-1">
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-muted-foreground/80">Commands</p>
-          <h2 className="text-3xl font-semibold text-foreground">What it can do</h2>
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-muted-foreground/80">
+            Commands
+          </p>
+          <h2 className="text-3xl font-semibold text-foreground">
+            What it can do
+          </h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {COMMANDS.map((cmd, index) => (
@@ -121,10 +124,17 @@ export default function DiscordBotPage() {
               className="glass-card group relative flex flex-col gap-3 overflow-hidden p-6 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:border-violet-400/30 animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards"
               style={{ animationDelay: `${index * 60}ms` }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-violet-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100" role="presentation" aria-hidden="true" />
+              <div
+                className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-violet-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                role="presentation"
+                aria-hidden="true"
+              />
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:animate-shine" />
 
-              <div className="text-3xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" aria-hidden>
+              <div
+                className="text-3xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                aria-hidden
+              >
                 {cmd.icon}
               </div>
               <div className="relative z-10">
@@ -143,8 +153,12 @@ export default function DiscordBotPage() {
       {/* How it works */}
       <section className="glass-card space-y-6 px-8 py-10">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-muted-foreground/80">How it works</p>
-          <h2 className="mt-1 text-3xl font-semibold text-foreground">Three steps to pixel cats</h2>
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-muted-foreground/80">
+            How it works
+          </p>
+          <h2 className="mt-1 text-3xl font-semibold text-foreground">
+            Three steps to pixel cats
+          </h2>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
           {STEPS.map((item) => (
@@ -152,8 +166,12 @@ export default function DiscordBotPage() {
               <span className="inline-flex size-10 items-center justify-center rounded-full bg-primary/15 text-lg font-bold text-primary">
                 {item.step}
               </span>
-              <h3 className="text-base font-semibold text-foreground">{item.title}</h3>
-              <p className="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+              <h3 className="text-base font-semibold text-foreground">
+                {item.title}
+              </h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {item.description}
+              </p>
             </div>
           ))}
         </div>
@@ -162,14 +180,25 @@ export default function DiscordBotPage() {
       {/* Config deep-dive */}
       <section className="glass-card space-y-6 px-8 py-10">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-muted-foreground/80">Customization</p>
-          <h2 className="mt-1 text-3xl font-semibold text-foreground">Make it yours with /config</h2>
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-muted-foreground/80">
+            Customization
+          </p>
+          <h2 className="mt-1 text-3xl font-semibold text-foreground">
+            Make it yours with /config
+          </h2>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CONFIG_FEATURES.map((feat) => (
-            <div key={feat.label} className="flex flex-col gap-1 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <span className="text-sm font-semibold text-foreground">{feat.label}</span>
-              <span className="text-xs text-muted-foreground">{feat.detail}</span>
+            <div
+              key={feat.label}
+              className="flex flex-col gap-1 rounded-2xl border border-white/10 bg-white/5 p-4"
+            >
+              <span className="text-sm font-semibold text-foreground">
+                {feat.label}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {feat.detail}
+              </span>
             </div>
           ))}
         </div>
@@ -177,9 +206,12 @@ export default function DiscordBotPage() {
 
       {/* Bottom CTA */}
       <section className="flex flex-col items-center gap-5 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-slate-950 to-slate-950 px-8 py-12 text-center shadow-[0_0_40px_rgba(245,158,11,0.1)]">
-        <h2 className="text-3xl font-semibold text-white">Ready to generate?</h2>
+        <h2 className="text-3xl font-semibold text-white">
+          Ready to generate?
+        </h2>
         <p className="max-w-md text-sm text-neutral-200/85">
-          Add the bot to your server and start creating unique pixel cats in seconds. No permissions needed.
+          Add the bot to your server and start creating unique pixel cats in
+          seconds. No permissions needed.
         </p>
         <Link
           href={INVITE_URL}

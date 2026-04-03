@@ -3,7 +3,8 @@ import CollectionPageClient from "./CollectionPageClient";
 
 export const metadata: Metadata = {
   title: "Art Collection",
-  description: "Explore community artwork and artist links from the BeastyRabbit collection.",
+  description:
+    "Explore community artwork and artist links from the BeastyRabbit collection.",
 };
 
 export default function CollectionPage() {

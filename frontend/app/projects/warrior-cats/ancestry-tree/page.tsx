@@ -1,9 +1,8 @@
+import { ArrowLeft, History } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, History } from "lucide-react";
-
-import { PageHero } from "@/components/common/PageHero";
 import { AncestryTreeClient } from "@/components/ancestry-tree";
+import { PageHero } from "@/components/common/PageHero";
 
 export const metadata: Metadata = {
   title: "Ancestry Tree | Warrior Cats | BeastyRabbit",
