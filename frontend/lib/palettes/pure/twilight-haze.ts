@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const twilightHazePalette: PaletteCategory = {
-  id: 'twilight-haze',
-  label: 'Twilight Haze',
-  description: 'Violet / Lavender — deep indigo dusk through soft wisteria to warm pink-tinged lilac',
+  id: "twilight-haze",
+  label: "Twilight Haze",
+  description:
+    "Violet / Lavender — deep indigo dusk through soft wisteria to warm pink-tinged lilac",
   colors: {
     TH_INDIGODEEP: { multiply: [22, 8, 38] },
     TH_DEEPVIOLET: { multiply: [32, 12, 52] },

@@ -1,9 +1,10 @@
-import type { PaletteCategory } from '../types';
+import type { PaletteCategory } from "../types";
 
 export const jadeMistPalette: PaletteCategory = {
-  id: 'jade-mist',
-  label: 'Jade Mist',
-  description: 'Mint / Seafoam — deep blue-green jade through ethereal mint to warm sage',
+  id: "jade-mist",
+  label: "Jade Mist",
+  description:
+    "Mint / Seafoam — deep blue-green jade through ethereal mint to warm sage",
   colors: {
     JM_JADEDEPTH: { multiply: [6, 28, 28] },
     JM_DEEPJADE: { multiply: [10, 42, 38] },
