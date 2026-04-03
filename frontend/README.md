@@ -4,28 +4,28 @@ Next.js app that powers the Catdex, history tools, and collection gallery.
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) 1.1+
-- [Convex CLI](https://docs.convex.dev/quickstart) (the repo uses `bunx convex …` in the examples below)
-- Node.js 20+ for local tooling (already covered by Bun images when using Docker)
+- [Node.js](https://nodejs.org/) 22+
+- [pnpm](https://pnpm.io/) 10+
+- [Convex CLI](https://docs.convex.dev/quickstart)
 
 ## Local Setup
 
 ```bash
 cd frontend
-bun install
-bun run prepare   # runs `convex codegen`
+pnpm install
+pnpm run prepare   # runs `convex codegen`
 ```
 
 In one terminal start the Convex dev server:
 
 ```bash
-bun run convex:dev
+pnpm run convex:dev
 ```
 
 In another terminal start the web+renderer stack:
 
 ```bash
-bun run dev
+pnpm run dev
 ```
 
 The site runs at http://localhost:3000, the renderer service at http://localhost:8001, and Convex at http://localhost:3210.
@@ -34,10 +34,10 @@ The site runs at http://localhost:3000, the renderer service at http://localhost
 
 | Command | Description |
 | ------- | ----------- |
-| `bun run dev` | Next.js app + renderer service (via `concurrently`). |
-| `bun run convex:dev` | Runs Convex dev server locally. |
-| `bun run lint` | ESLint with Next.js config. |
-| `bun run build` | Production build (Next.js + Convex bundling). |
+| `pnpm run dev` | Next.js app + renderer service (via `concurrently`). |
+| `pnpm run convex:dev` | Runs Convex dev server locally. |
+| `pnpm run lint` | Lint check. |
+| `pnpm run build` | Production build (Next.js + Convex bundling). |
 
 ## Progressive Media Loading
 

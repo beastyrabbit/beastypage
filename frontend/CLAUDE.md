@@ -15,7 +15,8 @@ A pixel cat gacha platform featuring:
 - **Framework**: Next.js 16 (App Router)
 - **UI**: React 19, TailwindCSS, Radix UI primitives
 - **Database**: Convex (serverless)
-- **Package Manager**: Bun
+- **Package Manager**: pnpm
+- **Linter/Formatter**: Biome
 - **Analytics**: PostHog (optional)
 
 ## Directory Structure
@@ -45,26 +46,24 @@ frontend/
 ## Development Commands
 
 ```bash
-# Use Bun for all package management
-bun install              # Install dependencies
-bun run dev              # Start dev server (port via portless)
-bun run build            # Production build
-bun run lint             # ESLint check
-bun run typecheck        # TypeScript check
+pnpm install             # Install dependencies
+pnpm run dev             # Start dev server (port via portless)
+pnpm run build           # Production build
+pnpm run lint            # Lint check
+pnpm run typecheck       # TypeScript check
 
 # Convex
-bunx convex dev          # Start Convex dev server
-bunx convex deploy       # Deploy to production
+pnpm exec convex dev     # Start Convex dev server
+pnpm exec convex deploy  # Deploy to production
 ```
 
 ## Key Conventions
 
-### Bun Over Node.js
+### pnpm
 
-- Use `bun <file>` instead of `node <file>`
-- Use `bun test` for testing
-- Use `bun install` (not npm/yarn/pnpm)
-- Bun auto-loads `.env` files (no dotenv needed)
+- Use `pnpm install` for dependency management
+- Use `pnpm exec tsx <file>` to run TypeScript scripts
+- Use `pnpm run test` (vitest) for testing
 
 ### Component Patterns
 
@@ -101,8 +100,8 @@ Optional:
 ## Testing
 
 ```bash
-bun test                 # Run tests
-bun test --watch         # Watch mode
+pnpm run test            # Run tests (vitest)
+pnpm run test -- --watch # Watch mode
 ```
 
 ### Palette System

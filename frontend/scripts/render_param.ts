@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env -S tsx
 
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -44,7 +44,7 @@ globalThis.localStorage = {
 } as unknown as Storage;
 
 globalThis.navigator = {
-  userAgent: 'bun'
+  userAgent: 'node'
 } as Navigator;
 
 class SpriteImage extends Image {
@@ -184,7 +184,7 @@ await catGenerator.initialize();
 
 const inputPath = process.argv[2];
 if (!inputPath) {
-  console.error('Usage: bun render_param.ts <params.json>');
+  console.error('Usage: tsx render_param.ts <params.json>');
   process.exit(1);
 }
 

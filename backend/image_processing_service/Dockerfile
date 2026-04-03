@@ -1,9 +1,10 @@
 FROM node:22-slim AS builder
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 WORKDIR /app
 
-COPY package.json bun.lock ./
-RUN npm install --omit=dev
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
 
 COPY tsconfig.json ./
 COPY src/ src/

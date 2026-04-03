@@ -77,15 +77,15 @@ When the queue approaches capacity or the circuit opens, FastAPI logs (`renderer
 
 ### During frontend development
 
-The Next.js app proxies to the renderer via Bun:
+The Next.js app proxies to the renderer:
 
 ```sh
 cd frontend
-bun run backend:test-server   # starts uvicorn on the configured port (8001 by default)
-bun run dev                   # launches Next.js + renderer concurrently
+pnpm run backend:test-server   # starts uvicorn on the configured port (8001 by default)
+pnpm run dev                   # launches Next.js + renderer concurrently
 ```
 
-Vitest spins the renderer automatically when `bun run test` is executed (set `CG3_SKIP_RENDERER_BOOT=1` to reuse an
+Vitest spins the renderer automatically when `pnpm run test` is executed (set `CG3_SKIP_RENDERER_BOOT=1` to reuse an
 already running instance).
 
 ## Testing
@@ -94,9 +94,9 @@ already running instance).
 # Backend unit tests
 uv run --directory backend/renderer_service pytest
 
-# Frontend parity smoke test (requires Bun)
+# Frontend parity smoke test
 cd frontend
-bun run test
+pnpm run test
 ```
 
 ## Deployment

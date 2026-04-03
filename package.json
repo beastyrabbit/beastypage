@@ -4,11 +4,11 @@
   "scripts": {
     "dev": "concurrently -n frontend,convex,renderer,palettes -c blue,magenta,green,cyan \"pnpm dev:frontend\" \"pnpm dev:convex\" \"pnpm dev:renderer\" \"pnpm dev:palettes\"",
     "dev:all": "concurrently -n frontend,convex,renderer,bot,palettes -c blue,magenta,green,yellow,cyan \"pnpm dev:frontend\" \"pnpm dev:convex\" \"pnpm dev:renderer\" \"pnpm dev:bot\" \"pnpm dev:palettes\"",
-    "dev:frontend": "cd frontend && bun run dev",
-    "dev:convex": "cd frontend && bunx convex dev",
+    "dev:frontend": "cd frontend && pnpm run dev",
+    "dev:convex": "cd frontend && pnpm exec convex dev",
     "dev:renderer": "cd backend/renderer_service && portless renderer sh -c '.venv/bin/python -m uvicorn renderer_service.app.main:app --reload --host $HOST --port $PORT'",
     "dev:bot": "cd backend/discord-bot && ./node_modules/.bin/tsx src/index.ts",
-    "dev:palettes": "cd frontend && bun scripts/watch-renderer-palettes.ts"
+    "dev:palettes": "cd frontend && pnpm exec tsx scripts/watch-renderer-palettes.ts"
   },
   "dependencies": {
     "sharp": "^0.34.5"

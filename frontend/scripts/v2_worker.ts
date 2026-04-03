@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env -S tsx
 
 import { createInterface } from 'node:readline';
 import { readFile } from 'node:fs/promises';
@@ -52,7 +52,7 @@ globalThis.localStorage = {
 } as unknown as Storage;
 
 globalThis.navigator = {
-  userAgent: 'bun',
+  userAgent: 'node',
 } as Navigator;
 
 class NodeOffscreenCanvas {
@@ -161,7 +161,7 @@ globalThis.document = {
   },
 } as unknown as Document;
 
-// Bun already provides fetch/Response/Blob/atob/btoa. Override fetch for local assets.
+// Node 22+ provides fetch/Response/Blob/atob/btoa. Override fetch for local assets.
 const originalFetch = globalThis.fetch;
 const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;

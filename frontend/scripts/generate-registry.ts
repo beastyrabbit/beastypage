@@ -1,13 +1,16 @@
 // Scans app/**/widget.ts files and generates the tool registry.
-// Run: bun scripts/generate-registry.ts
-import { resolve, relative } from "path";
+// Run: tsx scripts/generate-registry.ts
+import { resolve, relative, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { writeFileSync } from "node:fs";
+import { globSync } from "glob";
 import type { ToolWidgetMeta } from "../lib/dash/types";
 
-const ROOT = resolve(import.meta.dir, "..");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(__dirname, "..");
 const OUT = resolve(ROOT, "lib/dash/registry.generated.ts");
 
-const glob = new Bun.Glob("app/**/widget.ts");
-const paths = [...glob.scanSync({ cwd: ROOT, absolute: true })].sort();
+const paths = globSync("app/**/widget.ts", { cwd: ROOT, absolute: true }).sort();
 
 interface WidgetModule {
   default: ToolWidgetMeta;
@@ -57,5 +60,5 @@ const lines = [
   "",
 ];
 
-await Bun.write(OUT, lines.join("\n"));
+writeFileSync(OUT, lines.join("\n"));
 console.log(`Wrote ${entries.length} tools to ${relative(ROOT, OUT)}`);

@@ -10,7 +10,7 @@ Frontend and renderer service for BeastyPage with Docker/Kubernetes deploy flow.
 - Ensure `lefthook` is installed before development.
 
 ## Ports
-- Dev frontend: `http://frontend.localhost:1355` (portless, via `bun run dev` in `frontend/`)
+- Dev frontend: `http://frontend.localhost:1355` (portless, via `pnpm run dev` in `frontend/`)
 - Renderer service: `8001`
 - Image processing: `8002`
 

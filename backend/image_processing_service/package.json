@@ -1,18 +1,16 @@
 {
   "name": "image_processing_service",
-  "module": "src/index.ts",
   "type": "module",
   "private": true,
   "scripts": {
     "dev": "node --watch --experimental-strip-types src/index.ts",
     "start": "node --experimental-strip-types src/index.ts",
-    "typecheck": "bunx tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest"
   },
   "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.9",

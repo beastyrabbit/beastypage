@@ -1,7 +1,7 @@
 /**
  * Seed script: creates ~100 v1 timing presets via the single-cat-settings API.
  *
- * Usage:  bun frontend/scripts/seed-v1-slugs.ts
+ * Usage:  tsx frontend/scripts/seed-v1-slugs.ts
  *
  * Requires the Next.js dev server running on localhost:3000.
  * Output: frontend/tmp/test-v1-slugs.json
@@ -418,9 +418,15 @@ async function main() {
 
   console.log(`\nDone: ${success} created, ${fail} failed.`);
 
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const outDir = new URL("../tmp/", import.meta.url).pathname;
+  mkdirSync(outDir, { recursive: true });
   const outPath = new URL("../tmp/test-v1-slugs.json", import.meta.url).pathname;
-  await Bun.write(outPath, JSON.stringify(results, null, 2));
+  writeFileSync(outPath, JSON.stringify(results, null, 2));
   console.log(`Saved to ${outPath}`);
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error("Seed script failed:", err);
+  process.exit(1);
+});
