@@ -1,14 +1,14 @@
 "use client";
 
+import confetti from "canvas-confetti";
+import { useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Wheel } from "spin-wheel";
-import confetti from "canvas-confetti";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
-import { cn } from "@/lib/utils";
-import { track } from "@/lib/analytics";
-import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { track } from "@/lib/analytics";
+import { cn } from "@/lib/utils";
 
 type Prize = {
   name: string;
@@ -66,7 +66,11 @@ function selectPrize(forcedIndex?: number): Selection {
 export function ClassicWheelClient() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wheelRef = useRef<Wheel | null>(null);
-  const selectedRef = useRef<{ prize: Prize; forced: boolean; randomBucket?: number } | null>(null);
+  const selectedRef = useRef<{
+    prize: Prize;
+    forced: boolean;
+    randomBucket?: number;
+  } | null>(null);
   const rafIdsRef = useRef<Set<number>>(new Set());
   const timeoutIdsRef = useRef<Set<number>>(new Set());
   const intervalIdsRef = useRef<Set<number>>(new Set());
@@ -85,7 +89,7 @@ export function ClassicWheelClient() {
     if (stats?.prizes) {
       for (const entry of stats.prizes) {
         map.set(entry.prizeName, {
-          count: entry.count
+          count: entry.count,
         });
       }
     }
@@ -95,7 +99,7 @@ export function ClassicWheelClient() {
         name: prize.name,
         chance: prize.chance,
         color: prize.color,
-        count: entry?.count ?? 0
+        count: entry?.count ?? 0,
       };
     });
   }, [stats]);
@@ -123,7 +127,7 @@ export function ClassicWheelClient() {
 
       const radius = Math.max(
         120,
-        Math.floor(containerRef.current.clientWidth / 2) - 16
+        Math.floor(containerRef.current.clientWidth / 2) - 16,
       );
 
       const wheel = new Wheel(containerRef.current, {
@@ -158,10 +162,13 @@ export function ClassicWheelClient() {
       if (!wheelRef.current || !containerRef.current) return;
       const radius = Math.max(
         120,
-        Math.floor(containerRef.current.clientWidth / 2) - 16
+        Math.floor(containerRef.current.clientWidth / 2) - 16,
       );
       wheelRef.current.radius = radius;
-      wheelRef.current.itemLabelFontSizeMax = Math.min(30, Math.floor(radius / 14));
+      wheelRef.current.itemLabelFontSizeMax = Math.min(
+        30,
+        Math.floor(radius / 14),
+      );
       wheelRef.current.resize();
     });
 
@@ -173,19 +180,16 @@ export function ClassicWheelClient() {
       wheelRef.current?.remove();
       wheelRef.current = null;
     };
-  }, [wheelItems, clearTimers]);
+  }, [clearTimers]);
 
-  const registerTimeout = useCallback(
-    (fn: () => void, delay: number) => {
-      const id = window.setTimeout(() => {
-        timeoutIdsRef.current.delete(id);
-        fn();
-      }, delay);
-      timeoutIdsRef.current.add(id);
-      return id;
-    },
-    []
-  );
+  const registerTimeout = useCallback((fn: () => void, delay: number) => {
+    const id = window.setTimeout(() => {
+      timeoutIdsRef.current.delete(id);
+      fn();
+    }, delay);
+    timeoutIdsRef.current.add(id);
+    return id;
+  }, []);
 
   const registerInterval = useCallback((fn: () => void, delay: number) => {
     const id = window.setInterval(() => {
@@ -213,9 +217,20 @@ export function ClassicWheelClient() {
         intervalIdsRef.current.delete(intervalId);
         return;
       }
-      const particleCount = Math.max(12, Math.floor(40 * (timeLeft / duration)));
-      confetti({ ...defaults, particleCount, origin: { x: 0.25, y: Math.random() - 0.2 } });
-      confetti({ ...defaults, particleCount, origin: { x: 0.75, y: Math.random() - 0.2 } });
+      const particleCount = Math.max(
+        12,
+        Math.floor(40 * (timeLeft / duration)),
+      );
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: 0.25, y: Math.random() - 0.2 },
+      });
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: 0.75, y: Math.random() - 0.2 },
+      });
     }, 250);
   }, [registerInterval]);
 
@@ -297,7 +312,12 @@ export function ClassicWheelClient() {
         });
       }
     },
-    [clearTimers, triggerDivinaraConfetti, triggerHoloNovaConfetti, triggerSingularityConfetti]
+    [
+      clearTimers,
+      triggerDivinaraConfetti,
+      triggerHoloNovaConfetti,
+      triggerSingularityConfetti,
+    ],
   );
 
   const handleSpin = useCallback(
@@ -308,7 +328,7 @@ export function ClassicWheelClient() {
       selectedRef.current = {
         prize: selection.prize,
         forced: typeof forcedIndex === "number",
-        randomBucket: selection.random
+        randomBucket: selection.random,
       };
       setWasForced(typeof forcedIndex === "number");
       setIsSpinning(true);
@@ -324,7 +344,7 @@ export function ClassicWheelClient() {
           void logSpin({
             prizeName: stored.prize.name,
             forced: false,
-            randomBucket: stored.randomBucket
+            randomBucket: stored.randomBucket,
           }).catch((error) => {
             console.error("Failed to log wheel spin", error);
           });
@@ -339,9 +359,15 @@ export function ClassicWheelClient() {
         });
       };
 
-      wheelRef.current.spinToItem(selection.index, duration, false, revolutions, 1);
+      wheelRef.current.spinToItem(
+        selection.index,
+        duration,
+        false,
+        revolutions,
+        1,
+      );
     },
-    [isSpinning, logSpin, triggerCelebration]
+    [isSpinning, logSpin, triggerCelebration],
   );
 
   const closeModal = useCallback(() => {
@@ -354,7 +380,6 @@ export function ClassicWheelClient() {
 
   return (
     <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-14 text-foreground lg:px-8">
-
       <div className="flex flex-col items-center gap-8">
         <div className="relative w-full max-w-3xl">
           <div className="pointer-events-none absolute left-1/2 top-2 z-20 -translate-x-1/2 -translate-y-full">
@@ -377,7 +402,7 @@ export function ClassicWheelClient() {
               "inline-flex items-center gap-2 rounded-full border border-amber-400/60 bg-gradient-to-br from-amber-300/50 via-amber-200/30 to-amber-400/70 px-6 py-3 text-sm font-semibold text-[#1a1206] shadow-[0_10px_30px_rgba(253,230,138,0.35)] transition",
               isSpinning
                 ? "cursor-not-allowed opacity-60"
-                : "hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_18px_40px_rgba(253,230,138,0.45)] hover:from-amber-300/70 hover:to-amber-400/90"
+                : "hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_18px_40px_rgba(253,230,138,0.45)] hover:from-amber-300/70 hover:to-amber-400/90",
             )}
           >
             <SparklesIcon size={16} />
@@ -393,7 +418,9 @@ export function ClassicWheelClient() {
         </div>
 
         <div className="glass-card w-full max-w-3xl rounded-3xl border border-border/40 bg-background/70 p-6">
-          <h2 className="text-lg font-semibold text-foreground">Wheel summary</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Wheel summary
+          </h2>
           <div className="mt-4 overflow-hidden rounded-2xl border border-border/30 bg-background/80">
             <table className="w-full text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted-foreground/70">
@@ -405,17 +432,28 @@ export function ClassicWheelClient() {
               </thead>
               <tbody>
                 {prizeStats.map((entry) => {
-                  const percent = totalSpins ? ((entry.count / totalSpins) * 100).toFixed(1) : "0.0";
+                  const percent = totalSpins
+                    ? ((entry.count / totalSpins) * 100).toFixed(1)
+                    : "0.0";
                   return (
-                    <tr key={entry.name} className="border-b border-border/10 last:border-b-0">
-                      <td className="px-4 py-2 font-medium" style={{ color: entry.color }}>
+                    <tr
+                      key={entry.name}
+                      className="border-b border-border/10 last:border-b-0"
+                    >
+                      <td
+                        className="px-4 py-2 font-medium"
+                        style={{ color: entry.color }}
+                      >
                         {entry.name}
                       </td>
                       <td className="px-4 py-2 text-right font-mono text-xs text-muted-foreground">
                         {entry.chance}%
                       </td>
                       <td className="px-4 py-2 text-right font-mono text-xs text-muted-foreground">
-                        {entry.count} <span className="text-[10px] text-muted-foreground/70">({percent}%)</span>
+                        {entry.count}{" "}
+                        <span className="text-[10px] text-muted-foreground/70">
+                          ({percent}%)
+                        </span>
                       </td>
                     </tr>
                   );
@@ -438,7 +476,7 @@ export function ClassicWheelClient() {
                   className={cn(
                     "flex items-center justify-between rounded-xl border border-border/40 bg-background/80 px-3 py-2 text-left transition",
                     "hover:border-amber-400/60 hover:text-foreground",
-                    isSpinning ? "cursor-not-allowed opacity-50" : ""
+                    isSpinning ? "cursor-not-allowed opacity-50" : "",
                   )}
                 >
                   <span>{prize.name}</span>
@@ -464,9 +502,14 @@ export function ClassicWheelClient() {
               <SparklesIcon size={28} color={winningPrize.color} />
             </div>
             {wasForced && (
-              <p className="mt-4 text-xs uppercase tracking-wide text-orange-300/80">Cheated spin</p>
+              <p className="mt-4 text-xs uppercase tracking-wide text-orange-300/80">
+                Cheated spin
+              </p>
             )}
-            <p className="mt-4 text-3xl font-semibold tracking-wide" style={{ color: winningPrize.color }}>
+            <p
+              className="mt-4 text-3xl font-semibold tracking-wide"
+              style={{ color: winningPrize.color }}
+            >
               {winningPrize.name}
             </p>
             <button

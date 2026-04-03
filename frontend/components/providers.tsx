@@ -1,10 +1,10 @@
 "use client";
 
 import { ConvexProviderWithAuth } from "convex/react";
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
+import { PosthogProvider } from "@/components/posthog-provider";
 import convex from "@/lib/convexClient";
 import { useAuth } from "@/lib/shooAuth";
-import { PosthogProvider } from "@/components/posthog-provider";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (

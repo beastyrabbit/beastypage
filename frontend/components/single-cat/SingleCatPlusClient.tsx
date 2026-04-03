@@ -1,21 +1,13 @@
 "use client";
 
+import { useMutation } from "convex/react";
+import { ArrowUpRight, Download, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { cn } from "@/lib/utils";
-import { track } from "@/lib/analytics";
-import {
-  ArrowUpRight,
-  Download,
-  Loader2,
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CatGeneratorApi } from "@/components/cat-builder/types";
+import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
+import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import CopyIcon from "@/components/ui/copy-icon";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import PaintIcon from "@/components/ui/paint-icon";
@@ -23,64 +15,58 @@ import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
-import type { Id } from "@/convex/_generated/dataModel";
-import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { track } from "@/lib/analytics";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
-import type { BatchRenderResponse, CatParams } from "@/lib/cat-v3/types";
-import type { CatGeneratorApi } from "@/components/cat-builder/types";
-import {
-  ABSOLUTE_MIN_STEP_MS,
-  MIN_SAFE_STEP_MS,
-  PARAM_TIMING_ORDER,
-  PARAM_TIMING_LABELS,
-  PARAM_TIMING_PRESETS,
-  PARAM_DEFAULT_STEP_COUNTS,
-  DEFAULT_TIMING_CONFIG,
-  type ParamTimingKey,
-  type SpinTimingConfig,
-  type TimingPresetSet,
-  clampDelay,
-  computeTimingTotals,
-  computeDefaultTotal,
-  getDelayForKey,
-  getPresetValues,
-  isParamTimingKey,
-  stepCountsToMetrics,
-} from "../../utils/spinTiming";
-import { useVariants } from "../../utils/variants";
-import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
-import {
-  DEFAULT_SINGLE_CAT_SETTINGS,
-  parseSingleCatPayload,
-  singleCatSettingsEqual,
-  migrateSingleCatTiming,
-  type SingleCatSettings,
-  type AfterlifeOption,
-  type ExtendedMode,
-  type LayerRange,
-} from "../../utils/singleCatVariants";
-import { VariantBar } from "../common/VariantBar";
-import { LayerCountModeSelector } from "../common/LayerCountModeSelector";
+import type { CatParams } from "@/lib/cat-v3/types";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
-// @ts-ignore -- legacy JS module without types.
-import { encodeCatShare, createCatShare } from "@/lib/catShare";
-import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
-import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
+import { createCatShare, encodeCatShare } from "@/lib/catShare";
 import type { PaletteId } from "@/lib/palettes";
-import {
-  MAX_LAYER_VALUE,
-  clampLayerValue,
-  computeLayerCount,
-  resolveAfterlife,
-  AFTERLIFE_OPTIONS,
-} from "@/utils/catSettingsHelpers";
+import type { SingleCatPortableSettings } from "@/lib/portable-settings";
 import {
   decodePortableSettings,
   encodePortableSettings,
 } from "@/lib/portable-settings";
-import type { SingleCatPortableSettings } from "@/lib/portable-settings";
+import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
+import { cn } from "@/lib/utils";
+import {
+  AFTERLIFE_OPTIONS,
+  computeLayerCount,
+  resolveAfterlife,
+} from "@/utils/catSettingsHelpers";
+import {
+  type AfterlifeOption,
+  DEFAULT_SINGLE_CAT_SETTINGS,
+  type ExtendedMode,
+  type LayerRange,
+  migrateSingleCatTiming,
+  type SingleCatSettings,
+  singleCatSettingsEqual,
+} from "../../utils/singleCatVariants";
+import {
+  ABSOLUTE_MIN_STEP_MS,
+  clampDelay,
+  computeDefaultTotal,
+  computeTimingTotals,
+  DEFAULT_TIMING_CONFIG,
+  getDelayForKey,
+  getPresetValues,
+  isParamTimingKey,
+  MIN_SAFE_STEP_MS,
+  PARAM_DEFAULT_STEP_COUNTS,
+  PARAM_TIMING_LABELS,
+  PARAM_TIMING_ORDER,
+  PARAM_TIMING_PRESETS,
+  type ParamTimingKey,
+  type SpinTimingConfig,
+  stepCountsToMetrics,
+  type TimingPresetSet,
+} from "../../utils/spinTiming";
+import { useVariants } from "../../utils/variants";
+import { LayerCountModeSelector } from "../common/LayerCountModeSelector";
+import { VariantBar } from "../common/VariantBar";
 
 export type { AfterlifeOption } from "../../utils/singleCatVariants";
 
@@ -196,21 +182,39 @@ interface ParameterOptions {
   reverse: boolean[];
 }
 
-function countOptions(list: unknown[] | undefined, { includeNone = false }: { includeNone?: boolean } = {}) {
+function countOptions(
+  list: unknown[] | undefined,
+  { includeNone = false }: { includeNone?: boolean } = {},
+) {
   if (!Array.isArray(list)) return 0;
   const normalized = list
-    .filter((value) => value !== undefined && value !== null && (includeNone || value !== "none"))
-    .map((value) => (typeof value === "string" || typeof value === "number" ? String(value) : JSON.stringify(value)));
+    .filter(
+      (value) =>
+        value !== undefined &&
+        value !== null &&
+        (includeNone || value !== "none"),
+    )
+    .map((value) =>
+      typeof value === "string" || typeof value === "number"
+        ? String(value)
+        : JSON.stringify(value),
+    );
   return new Set(normalized).size;
 }
 
-function deriveOptionCounts(options: ParameterOptions | null): Record<ParamTimingKey, number> {
+function deriveOptionCounts(
+  options: ParameterOptions | null,
+): Record<ParamTimingKey, number> {
   const counts: Record<ParamTimingKey, number> = Object.fromEntries(
-    PARAM_TIMING_ORDER.map((key) => [key, PARAM_DEFAULT_STEP_COUNTS[key] ?? 0])
+    PARAM_TIMING_ORDER.map((key) => [key, PARAM_DEFAULT_STEP_COUNTS[key] ?? 0]),
   ) as Record<ParamTimingKey, number>;
   if (!options) return counts;
 
-  const assign = (key: ParamTimingKey, list: unknown[] | undefined, opts?: { includeNone?: boolean }) => {
+  const assign = (
+    key: ParamTimingKey,
+    list: unknown[] | undefined,
+    opts?: { includeNone?: boolean },
+  ) => {
     const total = countOptions(list, opts ?? {});
     if (total > 0) counts[key] = total;
   };
@@ -242,14 +246,17 @@ function logTimingReport(
   context: string,
   profile: SpinTimingConfig,
   optionCounts: Record<ParamTimingKey, number>,
-  estimatedTotals: { perKey: Partial<Record<ParamTimingKey, number>>; total: number },
+  estimatedTotals: {
+    perKey: Partial<Record<ParamTimingKey, number>>;
+    total: number;
+  },
   actualDurations: Partial<Record<ParamTimingKey, number>>,
-  actualTotalMs: number
+  actualTotalMs: number,
 ) {
   const estimatedSeconds = (estimatedTotals.total / 1000).toFixed(2);
   const actualSeconds = (actualTotalMs / 1000).toFixed(2);
   const groupLabel = `[timing] ${context} → est ${estimatedSeconds}s vs actual ${actualSeconds}s`;
-  const openedGroup = typeof console.group === "function" ? true : false;
+  const openedGroup = typeof console.group === "function";
   if (openedGroup) {
     console.group(groupLabel);
   } else if (typeof console.groupCollapsed === "function") {
@@ -265,11 +272,14 @@ function logTimingReport(
       const actual = actualDurations[key] ?? 0;
       const label = PARAM_TIMING_LABELS[key] ?? key;
       console.log(
-        `${label}: options=${options}, delay=${delay}ms, est=${(estimated / 1000).toFixed(2)}s, actual=${(actual / 1000).toFixed(2)}s`
+        `${label}: options=${options}, delay=${delay}ms, est=${(estimated / 1000).toFixed(2)}s, actual=${(actual / 1000).toFixed(2)}s`,
       );
     });
   } finally {
-    if ((openedGroup || typeof console.groupCollapsed === "function") && typeof console.groupEnd === "function") {
+    if (
+      (openedGroup || typeof console.groupCollapsed === "function") &&
+      typeof console.groupEnd === "function"
+    ) {
       console.groupEnd();
     }
   }
@@ -337,7 +347,7 @@ function computeStepDurations(
   sequence: { delay: number }[],
   baseDelay: number,
   allowFast: boolean,
-  minimum: number = MIN_FRAME_DURATION
+  minimum: number = MIN_FRAME_DURATION,
 ): number[] {
   if (sequence.length === 0) {
     return [];
@@ -345,7 +355,10 @@ function computeStepDurations(
   const safeBase = clampDelay(baseDelay, allowFast);
   return sequence.map((step) => {
     const scaled = safeBase * Math.max(step.delay, 1);
-    return Math.max(scaled, allowFast ? ABSOLUTE_MIN_STEP_MS : Math.max(MIN_SAFE_STEP_MS, minimum));
+    return Math.max(
+      scaled,
+      allowFast ? ABSOLUTE_MIN_STEP_MS : Math.max(MIN_SAFE_STEP_MS, minimum),
+    );
   });
 }
 
@@ -374,7 +387,12 @@ function invokeMapperArray(
   fn: ((...args: unknown[]) => unknown) | undefined,
   ...args: unknown[]
 ): string[] {
-  const result = invokeMapper(mapper, fn as ((...args: unknown[]) => unknown), [], ...args);
+  const result = invokeMapper(
+    mapper,
+    fn as (...args: unknown[]) => unknown,
+    [],
+    ...args,
+  );
   return Array.isArray(result) ? [...result] : [];
 }
 
@@ -411,13 +429,13 @@ function mixProfiles(
   a: (typeof SPEED_PRESETS)[keyof typeof SPEED_PRESETS],
   b: (typeof SPEED_PRESETS)[keyof typeof SPEED_PRESETS],
   t: number,
-  targetDuration: number
+  targetDuration: number,
 ) {
   const paramPause = interpolate(a.paramPause, b.paramPause, t);
   const calmParamPause = interpolate(a.calmParamPause, b.calmParamPause, t);
   const baseFrameDuration = Math.max(
     interpolate(a.baseFrameDuration, b.baseFrameDuration, t),
-    MIN_FRAME_DURATION
+    MIN_FRAME_DURATION,
   );
   return {
     paramPause,
@@ -431,13 +449,16 @@ function mixProfiles(
 function scaleProfile(
   preset: (typeof SPEED_PRESETS)[keyof typeof SPEED_PRESETS],
   ratio: number,
-  targetDuration: number
+  targetDuration: number,
 ) {
   const scale = Math.max(ratio, 0.05);
   return {
     paramPause: Math.max(preset.paramPause * scale, 60),
     calmParamPause: Math.max(preset.calmParamPause * scale, 60),
-    baseFrameDuration: Math.max(preset.baseFrameDuration * scale, MIN_FRAME_DURATION),
+    baseFrameDuration: Math.max(
+      preset.baseFrameDuration * scale,
+      MIN_FRAME_DURATION,
+    ),
     targetSpinDuration: targetDuration,
     flipSpeed: Math.max(preset.baseFrameDuration * scale, MIN_FRAME_DURATION),
   };
@@ -454,14 +475,16 @@ function getSpeedSettings(durationMs: number) {
   if (duration <= SPEED_PRESETS.normal.targetSpinDuration) {
     const t =
       (duration - SPEED_PRESETS.fast.targetSpinDuration) /
-      (SPEED_PRESETS.normal.targetSpinDuration - SPEED_PRESETS.fast.targetSpinDuration);
+      (SPEED_PRESETS.normal.targetSpinDuration -
+        SPEED_PRESETS.fast.targetSpinDuration);
     return mixProfiles(SPEED_PRESETS.fast, SPEED_PRESETS.normal, t, duration);
   }
 
   if (duration <= SPEED_PRESETS.slow.targetSpinDuration) {
     const t =
       (duration - SPEED_PRESETS.normal.targetSpinDuration) /
-      (SPEED_PRESETS.slow.targetSpinDuration - SPEED_PRESETS.normal.targetSpinDuration);
+      (SPEED_PRESETS.slow.targetSpinDuration -
+        SPEED_PRESETS.normal.targetSpinDuration);
     return mixProfiles(SPEED_PRESETS.normal, SPEED_PRESETS.slow, t, duration);
   }
 
@@ -530,7 +553,12 @@ function wait(ms: number) {
 }
 
 function formatValue(value: unknown): string {
-  if (value === undefined || value === null || value === "" || value === "none") {
+  if (
+    value === undefined ||
+    value === null ||
+    value === "" ||
+    value === "none"
+  ) {
     return "None";
   }
   const str = String(value)
@@ -570,7 +598,7 @@ function cloneParams<T>(params: T): T {
 function cloneSourceCanvas(
   source: HTMLCanvasElement | OffscreenCanvas,
   width = DISPLAY_SIZE,
-  height = DISPLAY_SIZE
+  height = DISPLAY_SIZE,
 ): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -597,26 +625,34 @@ async function preRenderVariationFrames(
   generator: CatGeneratorApi,
   baseParams: Partial<CatParams>,
   paramId: ParamId,
-  variationOptions: VariationOption[]
+  variationOptions: VariationOption[],
 ): Promise<VariationFrame[]> {
-  const descriptors: VariantDescriptor[] = variationOptions.map((option, index) => {
-    const previewParams = cloneParams(baseParams);
-    applyParamValue(previewParams, paramId, option.raw);
-    return {
-      id: `param-${paramId}-${index}`,
-      option,
-      params: previewParams,
-    };
-  });
+  const descriptors: VariantDescriptor[] = variationOptions.map(
+    (option, index) => {
+      const previewParams = cloneParams(baseParams);
+      applyParamValue(previewParams, paramId, option.raw);
+      return {
+        id: `param-${paramId}-${index}`,
+        option,
+        params: previewParams,
+      };
+    },
+  );
 
-  return renderVariantFrames(generator, baseParams, descriptors, { priority: "high" });
+  return renderVariantFrames(generator, baseParams, descriptors, {
+    priority: "high",
+  });
 }
 
 async function renderVariantFrames(
   generator: CatGeneratorApi,
   baseParams: Partial<CatParams>,
   descriptors: VariantDescriptor[],
-  options?: { layerId?: string; baseCanvas?: HTMLCanvasElement; priority?: FetchPriority }
+  options?: {
+    layerId?: string;
+    baseCanvas?: HTMLCanvasElement;
+    priority?: FetchPriority;
+  },
 ): Promise<VariationFrame[]> {
   if (descriptors.length === 0) {
     return [];
@@ -626,21 +662,30 @@ async function renderVariantFrames(
     try {
       const sheet = await generator.generateVariantSheet(
         baseParams,
-        descriptors.map(({ id, params, label, group }) => ({ id, params, label, group })),
+        descriptors.map(({ id, params, label, group }) => ({
+          id,
+          params,
+          label,
+          group,
+        })),
         {
           includeSources: false,
           includeBase: false,
-        }
+        },
       );
       if (sheet.frames.length >= descriptors.length) {
         const sheetCanvas = await decodeImageFromDataUrl(sheet.sheetDataUrl);
         await waitForIdle();
-        const frameMap = new Map(sheet.frames.map((frame) => [frame.id, frame]));
+        const frameMap = new Map(
+          sheet.frames.map((frame) => [frame.id, frame]),
+        );
 
         return descriptors.map((descriptor) => {
           const meta = frameMap.get(descriptor.id);
           if (!meta) {
-            throw new Error(`Missing frame metadata for variant ${descriptor.id}`);
+            throw new Error(
+              `Missing frame metadata for variant ${descriptor.id}`,
+            );
           }
           const canvas = document.createElement("canvas");
           canvas.width = DISPLAY_SIZE;
@@ -662,7 +707,7 @@ async function renderVariantFrames(
             0,
             0,
             DISPLAY_SIZE,
-            DISPLAY_SIZE
+            DISPLAY_SIZE,
           );
           return {
             option: descriptor.option,
@@ -671,7 +716,10 @@ async function renderVariantFrames(
         });
       }
     } catch (error) {
-      console.warn("generateVariantSheet failed, falling back to sequential renders", error);
+      console.warn(
+        "generateVariantSheet failed, falling back to sequential renders",
+        error,
+      );
     }
   }
 
@@ -680,14 +728,26 @@ async function renderVariantFrames(
     const result = await generator.generateCat(descriptor.params);
     let canvas: HTMLCanvasElement;
     if (options?.layerId && options.baseCanvas) {
-      canvas = cloneSourceCanvas(options.baseCanvas, DISPLAY_SIZE, DISPLAY_SIZE);
+      canvas = cloneSourceCanvas(
+        options.baseCanvas,
+        DISPLAY_SIZE,
+        DISPLAY_SIZE,
+      );
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(result.canvas as CanvasImageSource, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+        ctx.drawImage(
+          result.canvas as CanvasImageSource,
+          0,
+          0,
+          DISPLAY_SIZE,
+          DISPLAY_SIZE,
+        );
       }
     } else {
-      canvas = cloneSourceCanvas(result.canvas as HTMLCanvasElement | OffscreenCanvas);
+      canvas = cloneSourceCanvas(
+        result.canvas as HTMLCanvasElement | OffscreenCanvas,
+      );
     }
     frames.push({
       option: descriptor.option,
@@ -698,7 +758,7 @@ async function renderVariantFrames(
 }
 
 function buildFlipSequence(
-  frames: VariationFrame[]
+  frames: VariationFrame[],
 ): { frame: VariationFrame; delay: number; isFinal: boolean }[] {
   if (frames.length === 0) {
     return [];
@@ -706,7 +766,8 @@ function buildFlipSequence(
 
   const targetFrame = frames[frames.length - 1];
   const cycleFrames = frames.slice();
-  const sequence: { frame: VariationFrame; delay: number; isFinal: boolean }[] = [];
+  const sequence: { frame: VariationFrame; delay: number; isFinal: boolean }[] =
+    [];
 
   // Two fast cycles preserving sampled order (legacy behaviour).
   for (let cycle = 0; cycle < 2; cycle += 1) {
@@ -732,7 +793,7 @@ function buildFlipSequence(
  */
 function compositeCountFrame(
   catCanvas: HTMLCanvasElement,
-  count: number
+  count: number,
 ): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = DISPLAY_SIZE;
@@ -749,7 +810,7 @@ function compositeCountFrame(
       Math.floor(DISPLAY_SIZE / 2),
       Math.floor(DISPLAY_SIZE / 2),
       1,
-      1
+      1,
     ).data;
     if (px[3] > 20) {
       numberColour = `rgba(${px[0]}, ${px[1]}, ${px[2]}, 0.5)`;
@@ -775,13 +836,18 @@ function buildLayerOptionStrings(
   allValuesInput: string[] | null | undefined,
   target: string | null | undefined,
   includeNone = true,
-  options?: { spinny?: boolean; limit?: number }
+  options?: { spinny?: boolean; limit?: number },
 ): VariationOption[] {
   const spinnyMode = options?.spinny ?? false;
   const allValues = Array.isArray(allValuesInput) ? allValuesInput : [];
   const normalizedTarget = target && target !== "" ? target : "none";
-  const baseLimit = spinnyMode ? MAX_SPINNY_LAYER_VARIATIONS : MAX_LAYER_VARIATIONS;
-  const variationLimit = Math.max(1, Math.min(baseLimit, options?.limit ?? baseLimit));
+  const baseLimit = spinnyMode
+    ? MAX_SPINNY_LAYER_VARIATIONS
+    : MAX_LAYER_VARIATIONS;
+  const variationLimit = Math.max(
+    1,
+    Math.min(baseLimit, options?.limit ?? baseLimit),
+  );
   const results: string[] = [];
 
   if (includeNone) {
@@ -796,17 +862,29 @@ function buildLayerOptionStrings(
     }
   }
 
-  const nonTargetValues = Array.from(dedup).filter((value) => value !== normalizedTarget && value !== "none");
+  const nonTargetValues = Array.from(dedup).filter(
+    (value) => value !== normalizedTarget && value !== "none",
+  );
   const remainingSlots = Math.max(0, variationLimit - results.length - 1);
 
   if (remainingSlots > 0) {
-    const step = Math.max(1, Math.floor(nonTargetValues.length / remainingSlots));
-    for (let index = 0; index < nonTargetValues.length && results.length < variationLimit - 1; index += step) {
+    const step = Math.max(
+      1,
+      Math.floor(nonTargetValues.length / remainingSlots),
+    );
+    for (
+      let index = 0;
+      index < nonTargetValues.length && results.length < variationLimit - 1;
+      index += step
+    ) {
       results.push(nonTargetValues[index]);
     }
 
     let fallbackIndex = 0;
-    while (results.length < variationLimit - 1 && fallbackIndex < nonTargetValues.length) {
+    while (
+      results.length < variationLimit - 1 &&
+      fallbackIndex < nonTargetValues.length
+    ) {
       const candidate = nonTargetValues[fallbackIndex++];
       if (!results.includes(candidate)) {
         results.push(candidate);
@@ -814,7 +892,9 @@ function buildLayerOptionStrings(
     }
   }
 
-  const hasTarget = results.includes(normalizedTarget) || (!includeNone && normalizedTarget === "none");
+  const hasTarget =
+    results.includes(normalizedTarget) ||
+    (!includeNone && normalizedTarget === "none");
   if (!hasTarget) {
     results.push(normalizedTarget);
   } else {
@@ -843,7 +923,10 @@ function formatTortieLayer(layer: TortieSlot | null): string {
     .join(" • ");
 }
 
-function getParameterRawValue(paramId: ParamId, params: Partial<CatParams>): unknown {
+function getParameterRawValue(
+  paramId: ParamId,
+  params: Partial<CatParams>,
+): unknown {
   switch (paramId) {
     case "sprite":
       return params.spriteNumber;
@@ -907,7 +990,11 @@ function formatOptionDisplay(paramId: ParamId, raw: unknown): string {
   return formatValue(raw);
 }
 
-function applyParamValue(params: Partial<CatParams>, paramId: ParamId, value: unknown) {
+function applyParamValue(
+  params: Partial<CatParams>,
+  paramId: ParamId,
+  value: unknown,
+) {
   switch (paramId) {
     case "colour":
       params.colour = value as string;
@@ -952,13 +1039,15 @@ function applyParamValue(params: Partial<CatParams>, paramId: ParamId, value: un
       params.points = value === "None" ? undefined : (value as string);
       break;
     case "whitePatchesTint":
-      params.whitePatchesTint = value === "None" ? undefined : (value as string);
+      params.whitePatchesTint =
+        value === "None" ? undefined : (value as string);
       break;
     case "vitiligo":
       params.vitiligo = value === "None" ? undefined : (value as string);
       break;
     case "accessory": {
-      const accessoryValue = typeof value === "string" && value !== "none" ? value : undefined;
+      const accessoryValue =
+        typeof value === "string" && value !== "none" ? value : undefined;
       params.accessory = accessoryValue;
       if (accessoryValue) {
         params.accessories = [accessoryValue];
@@ -968,7 +1057,8 @@ function applyParamValue(params: Partial<CatParams>, paramId: ParamId, value: un
       break;
     }
     case "scar": {
-      const scarValue = typeof value === "string" && value !== "none" ? value : undefined;
+      const scarValue =
+        typeof value === "string" && value !== "none" ? value : undefined;
       params.scar = scarValue;
       if (scarValue) {
         params.scars = [scarValue];
@@ -993,7 +1083,10 @@ function applyParamValue(params: Partial<CatParams>, paramId: ParamId, value: un
   }
 }
 
-function getParameterValueForDisplay(paramId: ParamId, params: Partial<CatParams>): string {
+function getParameterValueForDisplay(
+  paramId: ParamId,
+  params: Partial<CatParams>,
+): string {
   switch (paramId) {
     case "colour":
       return formatValue(params.colour);
@@ -1031,7 +1124,10 @@ function getParameterValueForDisplay(paramId: ParamId, params: Partial<CatParams
     case "reverse":
       return params.reverse ? "Yes" : "No";
     case "sprite":
-      return SPRITE_NAMES[Number(params.spriteNumber)] ?? `Sprite ${params.spriteNumber}`;
+      return (
+        SPRITE_NAMES[Number(params.spriteNumber)] ??
+        `Sprite ${params.spriteNumber}`
+      );
     default:
       return "";
   }
@@ -1042,7 +1138,7 @@ function getParameterValueForDisplay(paramId: ParamId, params: Partial<CatParams
 
 // resolveAfterlife imported from @/utils/catSettingsHelpers
 
-function randomFrom<T>(list: T[]): T {
+function _randomFrom<T>(list: T[]): T {
   return list[Math.floor(Math.random() * list.length)];
 }
 
@@ -1058,15 +1154,21 @@ function buildSharePayload(state: CatState) {
 
 function sanitizeForBuilder(
   baseParams: Partial<CatParams>,
-  overrides?: { accessory?: string | null; scar?: string | null; tortie?: TortieSlot | null }
+  overrides?: {
+    accessory?: string | null;
+    scar?: string | null;
+    tortie?: TortieSlot | null;
+  },
 ): Partial<CatParams> {
   const next = cloneParams(baseParams ?? {});
 
-  const accessoryValue = overrides?.accessory ?? (Array.isArray(next.accessories) && next.accessories.length > 0
-    ? (next.accessories[0] as string)
-    : typeof next.accessory === "string"
-      ? (next.accessory as string)
-      : null);
+  const accessoryValue =
+    overrides?.accessory ??
+    (Array.isArray(next.accessories) && next.accessories.length > 0
+      ? (next.accessories[0] as string)
+      : typeof next.accessory === "string"
+        ? (next.accessory as string)
+        : null);
 
   if (accessoryValue) {
     next.accessory = accessoryValue;
@@ -1076,11 +1178,13 @@ function sanitizeForBuilder(
     next.accessories = [];
   }
 
-  const scarValue = overrides?.scar ?? (Array.isArray(next.scars) && next.scars.length > 0
-    ? (next.scars[0] as string)
-    : typeof next.scar === "string"
-      ? (next.scar as string)
-      : null);
+  const scarValue =
+    overrides?.scar ??
+    (Array.isArray(next.scars) && next.scars.length > 0
+      ? (next.scars[0] as string)
+      : typeof next.scar === "string"
+        ? (next.scar as string)
+        : null);
 
   if (scarValue) {
     next.scar = scarValue;
@@ -1090,9 +1194,11 @@ function sanitizeForBuilder(
     next.scars = [];
   }
 
-  const tortieValue = overrides?.tortie ?? (Array.isArray(next.tortie) && next.tortie.length > 0
-    ? (next.tortie[0] as TortieSlot)
-    : null);
+  const tortieValue =
+    overrides?.tortie ??
+    (Array.isArray(next.tortie) && next.tortie.length > 0
+      ? (next.tortie[0] as TortieSlot)
+      : null);
 
   if (tortieValue) {
     next.tortie = [tortieValue];
@@ -1116,7 +1222,7 @@ async function copyCanvasToClipboard(
   successMessage: string,
   fallbackFilename: string,
   onSuccess: (message: string) => void,
-  onError: (message: string) => void
+  onError: (message: string) => void,
 ) {
   try {
     const blob = await new Promise<Blob>((resolve, reject) => {
@@ -1148,11 +1254,10 @@ async function copyCanvasToClipboard(
   }
 }
 
-
 async function buildParameterOptions(
   mapper: SpriteMapperApi,
   includeBaseColours: boolean,
-  extendedModes: ExtendedMode[]
+  extendedModes: ExtendedMode[],
 ): Promise<ParameterOptions> {
   if (!mapper.loaded) {
     await mapper.init();
@@ -1160,9 +1265,15 @@ async function buildParameterOptions(
 
   const colourModes = extendedModes.length === 0 ? "off" : extendedModes;
 
-  const baseColours: string[] = includeBaseColours ? invokeMapperArray(mapper, mapper.getColours) : [];
+  const baseColours: string[] = includeBaseColours
+    ? invokeMapperArray(mapper, mapper.getColours)
+    : [];
 
-  const experimental = invokeMapperArray(mapper, mapper.getExperimentalColoursByMode, colourModes);
+  const experimental = invokeMapperArray(
+    mapper,
+    mapper.getExperimentalColoursByMode,
+    colourModes,
+  );
 
   const colourSet = new Set<string>();
   for (const colour of baseColours) colourSet.add(colour);
@@ -1173,7 +1284,7 @@ async function buildParameterOptions(
     mapper,
     mapper.getWhitePatchColourOptions,
     "default",
-    colourModes === "off" ? null : colourModes
+    colourModes === "off" ? null : colourModes,
   );
   if (whitePatchTints.length === 0) {
     whitePatchTints.push("none");
@@ -1218,14 +1329,14 @@ function sampleValues(
   id: ParamId,
   finalRawValue: unknown,
   finalDisplay: string,
-  limit = 8
+  limit = 8,
 ): VariationOption[] {
   if (!options || !(id in options)) {
     return [{ raw: finalRawValue, display: finalDisplay }];
   }
 
   const rawList = ((options as Record<ParamId, unknown[]>)[id] ?? []).filter(
-    (entry) => entry !== undefined && entry !== null
+    (entry) => entry !== undefined && entry !== null,
   );
 
   const dedup = new Map<string, VariationOption>();
@@ -1247,15 +1358,26 @@ function sampleValues(
 
   const finalKey = optionKey(finalOption);
   const normalized = Array.from(dedup.values());
-  const nonTarget = normalized.filter((option) => optionKey(option) !== finalKey);
+  const nonTarget = normalized.filter(
+    (option) => optionKey(option) !== finalKey,
+  );
 
-  const effectiveLimit = Number.isFinite(limit) ? Math.max(1, limit) : normalized.length + 1;
-  const maxNonTarget = Math.max(0, Math.min(effectiveLimit - 1, nonTarget.length));
+  const effectiveLimit = Number.isFinite(limit)
+    ? Math.max(1, limit)
+    : normalized.length + 1;
+  const maxNonTarget = Math.max(
+    0,
+    Math.min(effectiveLimit - 1, nonTarget.length),
+  );
 
   const sampled: VariationOption[] = [];
   if (maxNonTarget > 0) {
     const step = Math.max(1, Math.floor(nonTarget.length / maxNonTarget));
-    for (let index = 0; index < nonTarget.length && sampled.length < maxNonTarget; index += step) {
+    for (
+      let index = 0;
+      index < nonTarget.length && sampled.length < maxNonTarget;
+      index += step
+    ) {
       sampled.push(nonTarget[index]);
     }
     let fallbackIndex = 0;
@@ -1270,7 +1392,9 @@ function sampleValues(
   if (sampled.length === 0) {
     sampled.push(finalOption);
   } else {
-    const hasFinalAlready = sampled.some((option) => optionKey(option) === finalKey);
+    const hasFinalAlready = sampled.some(
+      (option) => optionKey(option) === finalKey,
+    );
     if (!hasFinalAlready) {
       if (sampled.length >= effectiveLimit) {
         sampled[sampled.length - 1] = finalOption;
@@ -1327,7 +1451,15 @@ function SettingsCodeSection({
         includeBaseColours,
         extendedModes: Array.from(extendedModes),
       }),
-    [accessoryRange, scarRange, tortieRange, exactLayerCounts, afterlifeMode, includeBaseColours, extendedModes],
+    [
+      accessoryRange,
+      scarRange,
+      tortieRange,
+      exactLayerCounts,
+      afterlifeMode,
+      includeBaseColours,
+      extendedModes,
+    ],
   );
 
   const handleCopy = useCallback(async () => {
@@ -1504,11 +1636,21 @@ export function SingleCatPlusClient({
   ]);
 
   const [mode, setMode] = useState<"flashy" | "calm">(initialSettings.mode);
-  const [accessoryRange, setAccessoryRange] = useState<LayerRange>(initialSettings.accessoryRange);
-  const [scarRange, setScarRange] = useState<LayerRange>(initialSettings.scarRange);
-  const [tortieRange, setTortieRange] = useState<LayerRange>(initialSettings.tortieRange);
-  const [exactLayerCounts, setExactLayerCounts] = useState(initialSettings.exactLayerCounts);
-  const [timingConfig, setTimingConfig] = useState<SpinTimingConfig>(initialSettings.timing);
+  const [accessoryRange, setAccessoryRange] = useState<LayerRange>(
+    initialSettings.accessoryRange,
+  );
+  const [scarRange, setScarRange] = useState<LayerRange>(
+    initialSettings.scarRange,
+  );
+  const [tortieRange, setTortieRange] = useState<LayerRange>(
+    initialSettings.tortieRange,
+  );
+  const [exactLayerCounts, setExactLayerCounts] = useState(
+    initialSettings.exactLayerCounts,
+  );
+  const [timingConfig, setTimingConfig] = useState<SpinTimingConfig>(
+    initialSettings.timing,
+  );
 
   // Page variant management
   const variants = useVariants<SingleCatSettings>({
@@ -1517,22 +1659,27 @@ export function SingleCatPlusClient({
     migrate: migrateSingleCatTiming,
   });
   const [timingModalOpen, setTimingModalOpen] = useState(false);
-  const [lastTimingSnapshot, setLastTimingSnapshot] = useState<TimingSnapshot | null>(null);
-  const [speedMultiplier, setSpeedMultiplier] = useState(initialSettings.speedMultiplier);
+  const [lastTimingSnapshot, setLastTimingSnapshot] =
+    useState<TimingSnapshot | null>(null);
+  const [speedMultiplier, setSpeedMultiplier] = useState(
+    initialSettings.speedMultiplier,
+  );
   const speedMultiplierRef = useRef(1.0);
   const subsetLimits = useMemo(
-    () => timingConfig.subsetLimits ?? (DEFAULT_TIMING_CONFIG.subsetLimits ?? {}),
-    [timingConfig.subsetLimits]
+    () => timingConfig.subsetLimits ?? DEFAULT_TIMING_CONFIG.subsetLimits ?? {},
+    [timingConfig.subsetLimits],
   );
-  const defaultFlashyPauseMs = DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ?? 520;
+  const defaultFlashyPauseMs =
+    DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ?? 520;
   const defaultCalmPauseMs = DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ?? 420;
-  const flashyPauseMs = timingConfig.pauseDelays?.flashyMs ?? defaultFlashyPauseMs;
+  const flashyPauseMs =
+    timingConfig.pauseDelays?.flashyMs ?? defaultFlashyPauseMs;
   const calmPauseMs = timingConfig.pauseDelays?.calmMs ?? defaultCalmPauseMs;
   const flashyPauseSeconds = flashyPauseMs / 1000;
   const calmPauseSeconds = calmPauseMs / 1000;
   const activeTimingRef = useRef<SpinTimingConfig>(DEFAULT_TIMING_CONFIG);
   const timingConfigRef = useRef<SpinTimingConfig>(timingConfig);
-  
+
   // Sync activeTimingRef and timingConfigRef when timingConfig changes for live updates
   useEffect(() => {
     const timingProfile: SpinTimingConfig = {
@@ -1544,22 +1691,31 @@ export function SingleCatPlusClient({
     activeTimingRef.current = timingProfile;
     timingConfigRef.current = timingConfig;
   }, [timingConfig]);
-  
+
   // Sync speedMultiplierRef when speedMultiplier changes
   useEffect(() => {
     speedMultiplierRef.current = speedMultiplier;
   }, [speedMultiplier]);
-  const optionCountsRef = useRef<Record<ParamTimingKey, number>>(Object.fromEntries(
-    PARAM_TIMING_ORDER.map((key) => [key, PARAM_DEFAULT_STEP_COUNTS[key] ?? 0])
-  ) as Record<ParamTimingKey, number>);
-  const actualDurationsRef = useRef<Partial<Record<ParamTimingKey, number>>>({});
+  const optionCountsRef = useRef<Record<ParamTimingKey, number>>(
+    Object.fromEntries(
+      PARAM_TIMING_ORDER.map((key) => [
+        key,
+        PARAM_DEFAULT_STEP_COUNTS[key] ?? 0,
+      ]),
+    ) as Record<ParamTimingKey, number>,
+  );
+  const actualDurationsRef = useRef<Partial<Record<ParamTimingKey, number>>>(
+    {},
+  );
   const totalActualRef = useRef(0);
   const modeRef = useRef(mode);
-  const [optionCounts, setOptionCounts] = useState<Record<ParamTimingKey, number>>(optionCountsRef.current);
+  const [optionCounts, setOptionCounts] = useState<
+    Record<ParamTimingKey, number>
+  >(optionCountsRef.current);
   useEffect(() => {
     optionCountsRef.current = optionCounts;
   }, [optionCounts]);
-  
+
   // Helper function to get delay with speed multiplier applied
   // Uses refs to always get the latest timing config and speed multiplier
   const getDelayWithMultiplier = useCallback((key: ParamTimingKey): number => {
@@ -1573,31 +1729,46 @@ export function SingleCatPlusClient({
     totalActualRef.current = 0;
   }, []);
 
-  const addActualDuration = useCallback((key: ParamTimingKey | null, deltaMs: number) => {
-    if (!Number.isFinite(deltaMs) || deltaMs <= 0) return;
-    totalActualRef.current += deltaMs;
-    if (!key) return;
-    actualDurationsRef.current = {
-      ...actualDurationsRef.current,
-      [key]: (actualDurationsRef.current[key] ?? 0) + deltaMs,
-    };
-  }, []);
-  const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(initialSettings.afterlifeMode);
-  const [includeBaseColours, setIncludeBaseColours] = useState(initialSettings.includeBaseColours);
-  const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(() => new Set(initialSettings.extendedModes));
+  const addActualDuration = useCallback(
+    (key: ParamTimingKey | null, deltaMs: number) => {
+      if (!Number.isFinite(deltaMs) || deltaMs <= 0) return;
+      totalActualRef.current += deltaMs;
+      if (!key) return;
+      actualDurationsRef.current = {
+        ...actualDurationsRef.current,
+        [key]: (actualDurationsRef.current[key] ?? 0) + deltaMs,
+      };
+    },
+    [],
+  );
+  const [afterlifeMode, setAfterlifeMode] = useState<AfterlifeOption>(
+    initialSettings.afterlifeMode,
+  );
+  const [includeBaseColours, setIncludeBaseColours] = useState(
+    initialSettings.includeBaseColours,
+  );
+  const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(
+    () => new Set(initialSettings.extendedModes),
+  );
 
   const [rollerLabel, setRollerLabel] = useState<string | null>(null);
-  const [rollerActiveValue, setRollerActiveValue] = useState<string | null>(null);
+  const [rollerActiveValue, setRollerActiveValue] = useState<string | null>(
+    null,
+  );
   const [rollerHighlight, setRollerHighlight] = useState(false);
   const [paramRows, setParamRows] = useState<ParamRow[]>([]);
   const [activeParamId, setActiveParamId] = useState<ParamId | null>(null);
-  const [layerRows, setLayerRows] = useState<Record<LayerGroup, LayerRowState[]>>({
+  const [layerRows, setLayerRows] = useState<
+    Record<LayerGroup, LayerRowState[]>
+  >({
     accessories: [],
     scars: [],
     torties: [],
   });
   const [rollSummary, setRollSummary] = useState<string | null>(null);
-  const [spriteVariations, setSpriteVariations] = useState<SpriteVariation[]>([]);
+  const [spriteVariations, setSpriteVariations] = useState<SpriteVariation[]>(
+    [],
+  );
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [hasTint, setHasTint] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -1605,7 +1776,9 @@ export function SingleCatPlusClient({
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
   const defaultCreatorName = useDefaultCreatorName();
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
-  const [creatorNameDraft, setCreatorNameDraft] = useState(initialSettings.creatorName);
+  const [creatorNameDraft, setCreatorNameDraft] = useState(
+    initialSettings.creatorName,
+  );
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaDirty, setMetaDirty] = useState(false);
 
@@ -1632,13 +1805,19 @@ export function SingleCatPlusClient({
   const createMapper = useMutation(api.mapper.create);
   const updateMapperMeta = useMutation(api.mapper.updateMeta);
 
-  const extendedModesArray = useMemo(() => Array.from(extendedModes), [extendedModes]);
+  const extendedModesArray = useMemo(
+    () => Array.from(extendedModes),
+    [extendedModes],
+  );
 
-  const resetMetaDrafts = useCallback((catName?: string | null, creatorName?: string | null) => {
-    setCatNameDraft(catName ?? "");
-    setCreatorNameDraft(creatorName || defaultCreatorName);
-    setMetaDirty(false);
-  }, [defaultCreatorName]);
+  const resetMetaDrafts = useCallback(
+    (catName?: string | null, creatorName?: string | null) => {
+      setCatNameDraft(catName ?? "");
+      setCreatorNameDraft(creatorName || defaultCreatorName);
+      setMetaDirty(false);
+    },
+    [defaultCreatorName],
+  );
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -1655,40 +1834,62 @@ export function SingleCatPlusClient({
   // Variant snapshot / apply / dirty detection
   // ---------------------------------------------------------------------------
 
-  const snapshotConfig = useMemo((): SingleCatSettings => ({
-    v: 2,
-    mode,
-    timing: timingConfig,
-    speedMultiplier,
-    accessoryRange,
-    scarRange,
-    tortieRange,
-    exactLayerCounts,
-    afterlifeMode,
-    extendedModes: [...extendedModes].sort(),
-    includeBaseColours,
-    catName: catNameDraft,
-    creatorName: creatorNameDraft,
-  }), [mode, timingConfig, speedMultiplier, accessoryRange, scarRange, tortieRange, exactLayerCounts, afterlifeMode, extendedModes, includeBaseColours, catNameDraft, creatorNameDraft]);
+  const snapshotConfig = useMemo(
+    (): SingleCatSettings => ({
+      v: 2,
+      mode,
+      timing: timingConfig,
+      speedMultiplier,
+      accessoryRange,
+      scarRange,
+      tortieRange,
+      exactLayerCounts,
+      afterlifeMode,
+      extendedModes: [...extendedModes].sort(),
+      includeBaseColours,
+      catName: catNameDraft,
+      creatorName: creatorNameDraft,
+    }),
+    [
+      mode,
+      timingConfig,
+      speedMultiplier,
+      accessoryRange,
+      scarRange,
+      tortieRange,
+      exactLayerCounts,
+      afterlifeMode,
+      extendedModes,
+      includeBaseColours,
+      catNameDraft,
+      creatorNameDraft,
+    ],
+  );
 
-  const applyVariantConfig = useCallback((settings: SingleCatSettings) => {
-    setMode(settings.mode);
-    setTimingConfig(settings.timing);
-    setSpeedMultiplier(settings.speedMultiplier);
-    setAccessoryRange(settings.accessoryRange);
-    setScarRange(settings.scarRange);
-    setTortieRange(settings.tortieRange);
-    setExactLayerCounts(settings.exactLayerCounts ?? true);
-    setAfterlifeMode(settings.afterlifeMode);
-    setExtendedModes(new Set(settings.extendedModes));
-    setIncludeBaseColours(settings.includeBaseColours);
-    setCatNameDraft(settings.catName);
-    setCreatorNameDraft(settings.creatorName || defaultCreatorName);
-  }, [defaultCreatorName]);
+  const applyVariantConfig = useCallback(
+    (settings: SingleCatSettings) => {
+      setMode(settings.mode);
+      setTimingConfig(settings.timing);
+      setSpeedMultiplier(settings.speedMultiplier);
+      setAccessoryRange(settings.accessoryRange);
+      setScarRange(settings.scarRange);
+      setTortieRange(settings.tortieRange);
+      setExactLayerCounts(settings.exactLayerCounts ?? true);
+      setAfterlifeMode(settings.afterlifeMode);
+      setExtendedModes(new Set(settings.extendedModes));
+      setIncludeBaseColours(settings.includeBaseColours);
+      setCatNameDraft(settings.catName);
+      setCreatorNameDraft(settings.creatorName || defaultCreatorName);
+    },
+    [defaultCreatorName],
+  );
 
   const variantDirty = useMemo(() => {
     if (!variants.activeVariant) return false;
-    return !singleCatSettingsEqual(snapshotConfig, variants.activeVariant.settings);
+    return !singleCatSettingsEqual(
+      snapshotConfig,
+      variants.activeVariant.settings,
+    );
   }, [snapshotConfig, variants.activeVariant]);
 
   // Apply active variant settings after hydration from localStorage
@@ -1701,7 +1902,12 @@ export function SingleCatPlusClient({
     if (!variants.activeVariant) return;
     variantRestoredRef.current = true;
     applyVariantConfig(variants.activeVariant.settings);
-  }, [variantSlug, initialCodeSettings, variants.activeVariant, applyVariantConfig]);
+  }, [
+    variantSlug,
+    initialCodeSettings,
+    variants.activeVariant,
+    applyVariantConfig,
+  ]);
 
   // Warn before unload when dirty
   useEffect(() => {
@@ -1718,10 +1924,17 @@ export function SingleCatPlusClient({
   }, [mode]);
 
   const adjustedOptionCounts = useMemo(() => {
-    const adjusted: Record<ParamTimingKey, number> = {} as Record<ParamTimingKey, number>;
+    const adjusted: Record<ParamTimingKey, number> = {} as Record<
+      ParamTimingKey,
+      number
+    >;
     PARAM_TIMING_ORDER.forEach((key) => {
-      const baseCount = optionCounts[key] ?? PARAM_DEFAULT_STEP_COUNTS[key] ?? 0;
-      const limited = subsetLimits[key] && baseCount > SUBSET_LIMIT ? SUBSET_LIMIT : baseCount;
+      const baseCount =
+        optionCounts[key] ?? PARAM_DEFAULT_STEP_COUNTS[key] ?? 0;
+      const limited =
+        subsetLimits[key] && baseCount > SUBSET_LIMIT
+          ? SUBSET_LIMIT
+          : baseCount;
       adjusted[key] = limited;
     });
     return adjusted;
@@ -1734,15 +1947,17 @@ export function SingleCatPlusClient({
 
   const effectiveTotalMs = useMemo(
     () => estimatedTotals.total || computeDefaultTotal(timingConfig),
-    [estimatedTotals.total, timingConfig]
+    [estimatedTotals.total, timingConfig],
   );
 
   const readSpinState = useCallback(() => {
     const durationMs = Math.max(1000, effectiveTotalMs);
     const baseSpeed = getSpeedSettings(durationMs);
     const currentConfig = timingConfigRef.current;
-    const currentFlashyPause = currentConfig.pauseDelays?.flashyMs ?? defaultFlashyPauseMs;
-    const currentCalmPause = currentConfig.pauseDelays?.calmMs ?? defaultCalmPauseMs;
+    const currentFlashyPause =
+      currentConfig.pauseDelays?.flashyMs ?? defaultFlashyPauseMs;
+    const currentCalmPause =
+      currentConfig.pauseDelays?.calmMs ?? defaultCalmPauseMs;
     return {
       mode: modeRef.current,
       spinny: modeRef.current === "flashy",
@@ -1754,15 +1969,15 @@ export function SingleCatPlusClient({
     };
   }, [defaultCalmPauseMs, defaultFlashyPauseMs, effectiveTotalMs]);
 
-
-  const clearMirror = useCallback(() => { }, []);
+  const clearMirror = useCallback(() => {}, []);
 
   const activeGlobalPreset = useMemo(() => {
     for (const presetKey of GLOBAL_PRESETS) {
       const matches = PARAM_TIMING_ORDER.every((param) => {
         const target = PARAM_TIMING_PRESETS[param]?.[presetKey];
         if (typeof target !== "number") return false;
-        const current = timingConfig.delays[param] ?? getPresetValues(param).normal;
+        const current =
+          timingConfig.delays[param] ?? getPresetValues(param).normal;
         return current === target;
       });
       if (matches) return presetKey;
@@ -1784,7 +1999,7 @@ export function SingleCatPlusClient({
         delays: nextDelays,
       });
     },
-    [setTimingConfig, timingConfig]
+    [timingConfig],
   );
 
   const handleTimingStepChange = useCallback(
@@ -1801,7 +2016,7 @@ export function SingleCatPlusClient({
         },
       });
     },
-    [setTimingConfig, timingConfig]
+    [timingConfig],
   );
 
   const handlePauseChange = useCallback(
@@ -1812,19 +2027,27 @@ export function SingleCatPlusClient({
       setTimingConfig({
         ...timingConfig,
         pauseDelays: {
-          flashyMs: timingConfig.pauseDelays?.flashyMs ?? DEFAULT_TIMING_CONFIG.pauseDelays!.flashyMs,
-          calmMs: timingConfig.pauseDelays?.calmMs ?? DEFAULT_TIMING_CONFIG.pauseDelays!.calmMs,
+          flashyMs:
+            timingConfig.pauseDelays?.flashyMs ??
+            DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ??
+            1000,
+          calmMs:
+            timingConfig.pauseDelays?.calmMs ??
+            DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ??
+            1000,
           [kind]: nextMs,
         },
       });
     },
-    [setTimingConfig, timingConfig]
+    [timingConfig],
   );
 
   const toggleSubsetLimit = useCallback(
     (key: ParamTimingKey) => {
       const current = Boolean(subsetLimits[key]);
-      const nextLimits: Partial<Record<ParamTimingKey, boolean>> = { ...subsetLimits };
+      const nextLimits: Partial<Record<ParamTimingKey, boolean>> = {
+        ...subsetLimits,
+      };
       if (current) {
         delete nextLimits[key];
       } else {
@@ -1835,7 +2058,7 @@ export function SingleCatPlusClient({
         subsetLimits: nextLimits,
       });
     },
-    [setTimingConfig, subsetLimits, timingConfig]
+    [subsetLimits, timingConfig],
   );
 
   const handleResetTimings = useCallback(() => {
@@ -1845,13 +2068,13 @@ export function SingleCatPlusClient({
       delays: { ...DEFAULT_TIMING_CONFIG.delays },
       subsetLimits: { ...DEFAULT_TIMING_CONFIG.subsetLimits },
       pauseDelays: {
-        flashyMs: DEFAULT_TIMING_CONFIG.pauseDelays!.flashyMs,
-        calmMs: DEFAULT_TIMING_CONFIG.pauseDelays!.calmMs,
+        flashyMs: DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ?? 1000,
+        calmMs: DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ?? 1000,
       },
     });
-  }, [setTimingConfig, timingConfig]);
+  }, [timingConfig]);
 
-  const copyText = useCallback(
+  const _copyText = useCallback(
     async (text: string, successMessage: string) => {
       try {
         if (navigator.clipboard?.writeText) {
@@ -1864,7 +2087,7 @@ export function SingleCatPlusClient({
       }
       window.prompt("Copy to clipboard", text);
     },
-    [showToast]
+    [showToast],
   );
 
   useEffect(() => {
@@ -1892,7 +2115,11 @@ export function SingleCatPlusClient({
   const settleRoller = useCallback(
     async (
       token: number,
-      options?: { keepLabel?: boolean; keepValue?: boolean; skipHighlight?: boolean }
+      options?: {
+        keepLabel?: boolean;
+        keepValue?: boolean;
+        skipHighlight?: boolean;
+      },
     ) => {
       if (!options?.skipHighlight) {
         setRollerHighlight(true);
@@ -1911,7 +2138,7 @@ export function SingleCatPlusClient({
         setRollerLabel(null);
       }
     },
-    []
+    [],
   );
 
   const playFlip = useCallback(async (draw: () => void, duration: number) => {
@@ -1923,19 +2150,33 @@ export function SingleCatPlusClient({
     (
       accessoriesInput: string[] | null | undefined,
       scarsInput: string[] | null | undefined,
-      tortiesInput: (TortieSlot | null)[] | null | undefined
+      tortiesInput: (TortieSlot | null)[] | null | undefined,
     ) => {
-      const accessories = Array.isArray(accessoriesInput) ? accessoriesInput : [];
+      const accessories = Array.isArray(accessoriesInput)
+        ? accessoriesInput
+        : [];
       const scars = Array.isArray(scarsInput) ? scarsInput : [];
       const torties = Array.isArray(tortiesInput) ? tortiesInput : [];
 
       setLayerRows({
-        accessories: accessories.map((_, idx) => ({ label: `Accessory ${idx + 1}`, value: "—", status: "idle" })),
-        scars: scars.map((_, idx) => ({ label: `Scar ${idx + 1}`, value: "—", status: "idle" })),
-        torties: torties.map((_, idx) => ({ label: `Tortie ${idx + 1}`, value: "—", status: "idle" })),
+        accessories: accessories.map((_, idx) => ({
+          label: `Accessory ${idx + 1}`,
+          value: "—",
+          status: "idle",
+        })),
+        scars: scars.map((_, idx) => ({
+          label: `Scar ${idx + 1}`,
+          value: "—",
+          status: "idle",
+        })),
+        torties: torties.map((_, idx) => ({
+          label: `Tortie ${idx + 1}`,
+          value: "—",
+          status: "idle",
+        })),
       });
     },
-    []
+    [],
   );
 
   const updateLayerRow = useCallback(
@@ -1946,19 +2187,24 @@ export function SingleCatPlusClient({
           return prev;
         }
         const nextGroup = groupRows.map((row, idx) =>
-          idx === index ? { ...row, ...updates } : row
+          idx === index ? { ...row, ...updates } : row,
         );
         return { ...prev, [group]: nextGroup };
       });
     },
-    []
+    [],
   );
 
-  const updateParamRow = useCallback((rowIndex: number, updates: Partial<ParamRow>) => {
-    setParamRows((prev) =>
-      prev.map((row, idx) => (idx === rowIndex ? { ...row, ...updates } : row))
-    );
-  }, []);
+  const updateParamRow = useCallback(
+    (rowIndex: number, updates: Partial<ParamRow>) => {
+      setParamRows((prev) =>
+        prev.map((row, idx) =>
+          idx === rowIndex ? { ...row, ...updates } : row,
+        ),
+      );
+    },
+    [],
+  );
 
   const drawPlaceholder = useCallback(() => {
     const canvas = canvasRef.current;
@@ -1975,36 +2221,45 @@ export function SingleCatPlusClient({
     ctx.fillText("Roll a cat to begin", DISPLAY_SIZE / 2, DISPLAY_SIZE / 2);
   }, []);
 
-  const drawCanvas = useCallback((source?: HTMLCanvasElement | OffscreenCanvas) => {
-    if (!source) return;
-    const target = canvasRef.current;
-    if (!target) return;
-    const ctx = target.getContext("2d");
-    if (!ctx) return;
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
-    try {
-      ctx.drawImage(source as HTMLCanvasElement, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
-    } catch (error) {
-      console.warn("drawImage failed, creating fallback canvas", error);
-      const fallback = document.createElement("canvas");
-      const fallbackWidth =
-        "width" in source && typeof source.width === "number"
-          ? source.width
-          : DISPLAY_SIZE;
-      const fallbackHeight =
-        "height" in source && typeof source.height === "number"
-          ? source.height
-          : DISPLAY_SIZE;
-      fallback.width = fallbackWidth;
-      fallback.height = fallbackHeight;
-      const fallbackCtx = fallback.getContext("2d");
-      if (fallbackCtx) {
-        fallbackCtx.drawImage(source as HTMLCanvasElement, 0, 0);
-        ctx.drawImage(fallback, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+  const drawCanvas = useCallback(
+    (source?: HTMLCanvasElement | OffscreenCanvas) => {
+      if (!source) return;
+      const target = canvasRef.current;
+      if (!target) return;
+      const ctx = target.getContext("2d");
+      if (!ctx) return;
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+      try {
+        ctx.drawImage(
+          source as HTMLCanvasElement,
+          0,
+          0,
+          DISPLAY_SIZE,
+          DISPLAY_SIZE,
+        );
+      } catch (error) {
+        console.warn("drawImage failed, creating fallback canvas", error);
+        const fallback = document.createElement("canvas");
+        const fallbackWidth =
+          "width" in source && typeof source.width === "number"
+            ? source.width
+            : DISPLAY_SIZE;
+        const fallbackHeight =
+          "height" in source && typeof source.height === "number"
+            ? source.height
+            : DISPLAY_SIZE;
+        fallback.width = fallbackWidth;
+        fallback.height = fallbackHeight;
+        const fallbackCtx = fallback.getContext("2d");
+        if (fallbackCtx) {
+          fallbackCtx.drawImage(source as HTMLCanvasElement, 0, 0);
+          ctx.drawImage(fallback, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
+        }
       }
-    }
-  }, []);
+    },
+    [],
+  );
 
   const renderCat = useCallback(
     async (params: Partial<CatParams>) => {
@@ -2013,24 +2268,29 @@ export function SingleCatPlusClient({
       const result = await generator.generateCat(params);
       drawCanvas(result.canvas as HTMLCanvasElement);
     },
-    [drawCanvas]
+    [drawCanvas],
   );
-
 
   const spinAccessorySlots = useCallback(
     async (
       rowIndex: number,
       targetSlotsInput: string[] | null | undefined,
-      context: { accessories: string[]; scars: string[]; torties: (TortieSlot | null)[] },
+      context: {
+        accessories: string[];
+        scars: string[];
+        torties: (TortieSlot | null)[];
+      },
       progressiveParams: Partial<CatParams>,
       mapper: SpriteMapperApi,
       pauseDuration: number,
-      currentToken: number
+      currentToken: number,
     ) => {
       const generator = generatorRef.current;
       if (!generator || !mapper) return;
 
-      const targetSlots = Array.isArray(targetSlotsInput) ? targetSlotsInput : [];
+      const targetSlots = Array.isArray(targetSlotsInput)
+        ? targetSlotsInput
+        : [];
 
       clearMirror();
       setRollerLabel("Accessories");
@@ -2043,8 +2303,14 @@ export function SingleCatPlusClient({
         const spinState = readSpinState();
         if (spinState.spinny) {
           const frontResult = await generator.generateCat(progressiveParams);
-          const drawStep = () => drawCanvas(frontResult.canvas as HTMLCanvasElement | OffscreenCanvas);
-          await playFlip(drawStep, Math.max(getBaseFrameDuration(spinState.speed), 90));
+          const drawStep = () =>
+            drawCanvas(
+              frontResult.canvas as HTMLCanvasElement | OffscreenCanvas,
+            );
+          await playFlip(
+            drawStep,
+            Math.max(getBaseFrameDuration(spinState.speed), 90),
+          );
           if (generationIdRef.current !== currentToken) return;
           await settleRoller(currentToken);
         } else {
@@ -2073,40 +2339,54 @@ export function SingleCatPlusClient({
         if (spinState.spinny) {
           updateLayerRow("accessories", i, { status: "active", value: "—" });
 
-          const variationOptions = buildLayerOptionStrings(allAccessories, target, true, {
-            spinny: true,
-            limit: subsetLimits.accessory ? SUBSET_LIMIT : undefined,
-          });
+          const variationOptions = buildLayerOptionStrings(
+            allAccessories,
+            target,
+            true,
+            {
+              spinny: true,
+              limit: subsetLimits.accessory ? SUBSET_LIMIT : undefined,
+            },
+          );
           if (!baseCanvas) {
             const basePreview = cloneParams(progressiveParams);
             basePreview.accessories = [];
             basePreview.accessory = undefined;
             const baseResult = await generator.generateCat(basePreview);
-            baseCanvas = cloneSourceCanvas(baseResult.canvas as HTMLCanvasElement | OffscreenCanvas);
+            baseCanvas = cloneSourceCanvas(
+              baseResult.canvas as HTMLCanvasElement | OffscreenCanvas,
+            );
           }
 
-          const descriptors: VariantDescriptor[] = variationOptions.map((option, variantIndex) => {
-            const preview = cloneParams(progressiveParams);
-            const accessoriesList = committed.slice();
-            if (typeof option.raw === "string" && option.raw !== "none") {
-              accessoriesList.push(option.raw);
-            }
-            preview.accessories = accessoriesList;
-            preview.accessory = accessoriesList[0];
-            return {
-              id: `accessory-${i}-${variantIndex}`,
-              option,
-              params: preview,
-              label: option.display,
-              group: `accessory-${i + 1}`,
-            };
-          });
+          const descriptors: VariantDescriptor[] = variationOptions.map(
+            (option, variantIndex) => {
+              const preview = cloneParams(progressiveParams);
+              const accessoriesList = committed.slice();
+              if (typeof option.raw === "string" && option.raw !== "none") {
+                accessoriesList.push(option.raw);
+              }
+              preview.accessories = accessoriesList;
+              preview.accessory = accessoriesList[0];
+              return {
+                id: `accessory-${i}-${variantIndex}`,
+                option,
+                params: preview,
+                label: option.display,
+                group: `accessory-${i + 1}`,
+              };
+            },
+          );
 
-          const frames = await renderVariantFrames(generator, progressiveParams, descriptors, {
-            layerId: "accessories",
-            baseCanvas: baseCanvas ?? undefined,
-            priority: "high",
-          });
+          const frames = await renderVariantFrames(
+            generator,
+            progressiveParams,
+            descriptors,
+            {
+              layerId: "accessories",
+              baseCanvas: baseCanvas ?? undefined,
+              priority: "high",
+            },
+          );
           if (frames.length === 0) {
             continue;
           }
@@ -2116,13 +2396,17 @@ export function SingleCatPlusClient({
           for (let idx = 0; idx < sequence.length; idx += 1) {
             const step = sequence[idx];
             if (generationIdRef.current !== currentToken) return;
-            
+
             // Recalculate delay on each step to get live updates
             const accessoryDelay = getDelayWithMultiplier("accessory");
             const currentConfig = timingConfigRef.current;
-            const stepDurations = computeStepDurations(sequence.slice(idx), accessoryDelay, currentConfig.allowFastFlips);
+            const stepDurations = computeStepDurations(
+              sequence.slice(idx),
+              accessoryDelay,
+              currentConfig.allowFastFlips,
+            );
             const stepDuration = stepDurations[0] ?? accessoryDelay;
-            
+
             const frameDisplay = step.frame.option.display;
             setRollerActiveValue(frameDisplay);
             updateLayerRow("accessories", i, {
@@ -2156,8 +2440,14 @@ export function SingleCatPlusClient({
           await renderCat(progressiveParams);
           await wait(pauseDuration);
         } else {
-          const formatted = typeof target === "string" && target !== "none" ? formatValue(target) : "None";
-          updateLayerRow("accessories", i, { value: formatted, status: "revealed" });
+          const formatted =
+            typeof target === "string" && target !== "none"
+              ? formatValue(target)
+              : "None";
+          updateLayerRow("accessories", i, {
+            value: formatted,
+            status: "revealed",
+          });
           summary.push(formatted);
           if (typeof target === "string" && target !== "none") {
             committed.push(target);
@@ -2195,23 +2485,29 @@ export function SingleCatPlusClient({
       updateLayerRow,
       updateParamRow,
       readSpinState,
-    ]
+    ],
   );
 
   const spinScarSlots = useCallback(
     async (
       rowIndex: number,
       targetSlotsInput: string[] | null | undefined,
-      context: { accessories: string[]; scars: string[]; torties: (TortieSlot | null)[] },
+      context: {
+        accessories: string[];
+        scars: string[];
+        torties: (TortieSlot | null)[];
+      },
       progressiveParams: Partial<CatParams>,
       mapper: SpriteMapperApi,
       pauseDuration: number,
-      currentToken: number
+      currentToken: number,
     ) => {
       const generator = generatorRef.current;
       if (!generator || !mapper) return;
 
-      const targetSlots = Array.isArray(targetSlotsInput) ? targetSlotsInput : [];
+      const targetSlots = Array.isArray(targetSlotsInput)
+        ? targetSlotsInput
+        : [];
 
       clearMirror();
       setRollerLabel("Scars");
@@ -2224,8 +2520,14 @@ export function SingleCatPlusClient({
         const spinState = readSpinState();
         if (spinState.spinny) {
           const frontResult = await generator.generateCat(progressiveParams);
-          const drawStep = () => drawCanvas(frontResult.canvas as HTMLCanvasElement | OffscreenCanvas);
-          await playFlip(drawStep, Math.max(getBaseFrameDuration(spinState.speed), 90));
+          const drawStep = () =>
+            drawCanvas(
+              frontResult.canvas as HTMLCanvasElement | OffscreenCanvas,
+            );
+          await playFlip(
+            drawStep,
+            Math.max(getBaseFrameDuration(spinState.speed), 90),
+          );
           if (generationIdRef.current !== currentToken) return;
           await settleRoller(currentToken);
         } else {
@@ -2254,40 +2556,54 @@ export function SingleCatPlusClient({
         if (spinState.spinny) {
           updateLayerRow("scars", i, { status: "active", value: "—" });
 
-          const variationOptions = buildLayerOptionStrings(allScars, target, true, {
-            spinny: true,
-            limit: subsetLimits.scar ? SUBSET_LIMIT : undefined,
-          });
+          const variationOptions = buildLayerOptionStrings(
+            allScars,
+            target,
+            true,
+            {
+              spinny: true,
+              limit: subsetLimits.scar ? SUBSET_LIMIT : undefined,
+            },
+          );
           if (!baseCanvas) {
             const basePreview = cloneParams(progressiveParams);
             basePreview.scars = [];
             basePreview.scar = undefined;
             const baseResult = await generator.generateCat(basePreview);
-            baseCanvas = cloneSourceCanvas(baseResult.canvas as HTMLCanvasElement | OffscreenCanvas);
+            baseCanvas = cloneSourceCanvas(
+              baseResult.canvas as HTMLCanvasElement | OffscreenCanvas,
+            );
           }
 
-          const descriptors: VariantDescriptor[] = variationOptions.map((option, variantIndex) => {
-            const preview = cloneParams(progressiveParams);
-            const scarsList = committed.slice();
-            if (typeof option.raw === "string" && option.raw !== "none") {
-              scarsList.push(option.raw);
-            }
-            preview.scars = scarsList;
-            preview.scar = scarsList[0];
-            return {
-              id: `scar-${i}-${variantIndex}`,
-              option,
-              params: preview,
-              label: option.display,
-              group: `scar-${i + 1}`,
-            };
-          });
+          const descriptors: VariantDescriptor[] = variationOptions.map(
+            (option, variantIndex) => {
+              const preview = cloneParams(progressiveParams);
+              const scarsList = committed.slice();
+              if (typeof option.raw === "string" && option.raw !== "none") {
+                scarsList.push(option.raw);
+              }
+              preview.scars = scarsList;
+              preview.scar = scarsList[0];
+              return {
+                id: `scar-${i}-${variantIndex}`,
+                option,
+                params: preview,
+                label: option.display,
+                group: `scar-${i + 1}`,
+              };
+            },
+          );
 
-          const frames = await renderVariantFrames(generator, progressiveParams, descriptors, {
-            layerId: "scarsPrimary",
-            baseCanvas: baseCanvas ?? undefined,
-            priority: "high",
-          });
+          const frames = await renderVariantFrames(
+            generator,
+            progressiveParams,
+            descriptors,
+            {
+              layerId: "scarsPrimary",
+              baseCanvas: baseCanvas ?? undefined,
+              priority: "high",
+            },
+          );
           if (frames.length === 0) {
             continue;
           }
@@ -2297,13 +2613,17 @@ export function SingleCatPlusClient({
           for (let idx = 0; idx < sequence.length; idx += 1) {
             const step = sequence[idx];
             if (generationIdRef.current !== currentToken) return;
-            
+
             // Recalculate delay on each step to get live updates
             const scarDelay = getDelayWithMultiplier("scar");
             const currentConfig = timingConfigRef.current;
-            const stepDurations = computeStepDurations(sequence.slice(idx), scarDelay, currentConfig.allowFastFlips);
+            const stepDurations = computeStepDurations(
+              sequence.slice(idx),
+              scarDelay,
+              currentConfig.allowFastFlips,
+            );
             const stepDuration = stepDurations[0] ?? scarDelay;
-            
+
             const frameDisplay = step.frame.option.display;
             setRollerActiveValue(frameDisplay);
             updateLayerRow("scars", i, {
@@ -2337,7 +2657,10 @@ export function SingleCatPlusClient({
           await renderCat(progressiveParams);
           await wait(pauseDuration);
         } else {
-          const formatted = typeof target === "string" && target !== "none" ? formatValue(target) : "None";
+          const formatted =
+            typeof target === "string" && target !== "none"
+              ? formatValue(target)
+              : "None";
           updateLayerRow("scars", i, { value: formatted, status: "revealed" });
           summary.push(formatted);
           if (typeof target === "string" && target !== "none") {
@@ -2376,23 +2699,29 @@ export function SingleCatPlusClient({
       updateLayerRow,
       updateParamRow,
       readSpinState,
-    ]
+    ],
   );
 
   const spinTortieSlots = useCallback(
     async (
       rowIndex: number,
       targetSlotsInput: (TortieSlot | null)[] | null | undefined,
-      context: { accessories: string[]; scars: string[]; torties: (TortieSlot | null)[] },
+      context: {
+        accessories: string[];
+        scars: string[];
+        torties: (TortieSlot | null)[];
+      },
       progressiveParams: Partial<CatParams>,
       mapper: SpriteMapperApi,
       pauseDuration: number,
-      currentToken: number
+      currentToken: number,
     ) => {
       const generator = generatorRef.current;
       if (!generator || !mapper) return;
 
-      const targetSlots = Array.isArray(targetSlotsInput) ? targetSlotsInput : [];
+      const targetSlots = Array.isArray(targetSlotsInput)
+        ? targetSlotsInput
+        : [];
 
       clearMirror();
       setRollerLabel("Tortie Layers");
@@ -2405,8 +2734,14 @@ export function SingleCatPlusClient({
         const spinState = readSpinState();
         if (spinState.spinny) {
           const frontResult = await generator.generateCat(progressiveParams);
-          const drawStep = () => drawCanvas(frontResult.canvas as HTMLCanvasElement | OffscreenCanvas);
-          await playFlip(drawStep, Math.max(getBaseFrameDuration(spinState.speed), 90));
+          const drawStep = () =>
+            drawCanvas(
+              frontResult.canvas as HTMLCanvasElement | OffscreenCanvas,
+            );
+          await playFlip(
+            drawStep,
+            Math.max(getBaseFrameDuration(spinState.speed), 90),
+          );
           if (generationIdRef.current !== currentToken) return;
           await settleRoller(currentToken);
         } else {
@@ -2423,7 +2758,9 @@ export function SingleCatPlusClient({
 
       const masks = invokeMapperArray(mapper, mapper.getTortieMasks);
       const patterns = invokeMapperArray(mapper, mapper.getPeltNames);
-      const colours = parameterOptionsRef.current?.colour ?? invokeMapperArray(mapper, mapper.getColours);
+      const colours =
+        parameterOptionsRef.current?.colour ??
+        invokeMapperArray(mapper, mapper.getColours);
 
       const committed: TortieSlot[] = [];
       const summary: string[] = [];
@@ -2448,33 +2785,49 @@ export function SingleCatPlusClient({
           const availableColours = colours.filter((c) => c !== target.colour);
           const startColour =
             availableColours.length > 0
-              ? availableColours[Math.floor(Math.random() * availableColours.length)]
+              ? availableColours[
+                  Math.floor(Math.random() * availableColours.length)
+                ]
               : target.colour;
 
           // Pick a different random colour for mask/pattern stages (not the final colour)
           const maskPatternColours = colours.filter((c) => c !== target.colour);
           const maskPatternColour =
             maskPatternColours.length > 0
-              ? maskPatternColours[Math.floor(Math.random() * maskPatternColours.length)]
+              ? maskPatternColours[
+                  Math.floor(Math.random() * maskPatternColours.length)
+                ]
               : target.colour;
 
           let working: TortieSlot = { ...target, colour: startColour };
           updateLayerRow("torties", i, { value: "—", status: "active" });
 
-          const stageConfigs: Array<{ kind: "mask" | "pattern" | "colour"; label: string; source: string[] }> = [
+          const stageConfigs: Array<{
+            kind: "mask" | "pattern" | "colour";
+            label: string;
+            source: string[];
+          }> = [
             { kind: "mask", label: "Mask", source: masks },
             { kind: "pattern", label: "Pelt", source: patterns },
             { kind: "colour", label: "Colour", source: colours },
           ];
 
           const baseSpinState = readSpinState();
-          const phaseTargetDuration =
-            baseSpinState.speed.targetSpinDuration / Math.max(stageConfigs.length, 1);
+          const _phaseTargetDuration =
+            baseSpinState.speed.targetSpinDuration /
+            Math.max(stageConfigs.length, 1);
 
           for (const stage of stageConfigs) {
             const stageKey: ParamTimingKey =
-              stage.kind === "mask" ? "tortieMask" : stage.kind === "pattern" ? "tortiePattern" : "tortieColour";
-            const stageStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+              stage.kind === "mask"
+                ? "tortieMask"
+                : stage.kind === "pattern"
+                  ? "tortiePattern"
+                  : "tortieColour";
+            const stageStart =
+              typeof performance !== "undefined"
+                ? performance.now()
+                : Date.now();
             setRollerLabel(`Tortie Layer ${i + 1} – ${stage.label}`);
             const stageTargetValue =
               stage.kind === "mask"
@@ -2482,34 +2835,56 @@ export function SingleCatPlusClient({
                 : stage.kind === "pattern"
                   ? working.pattern
                   : target.colour;
-            const options = buildLayerOptionStrings(stage.source, stageTargetValue, false, {
-              spinny: true,
-              limit: subsetLimits[stageKey] ? SUBSET_LIMIT : undefined,
-            });
-            const descriptors: VariantDescriptor[] = options.map((option, variantIndex) => {
-              const preview = cloneParams(progressiveParams);
-              const candidateLayer: TortieSlot = {
-                mask: stage.kind === "mask" ? (option.raw as string) : working.mask,
-                pattern: stage.kind === "pattern" ? (option.raw as string) : working.pattern,
-                colour: stage.kind === "colour" ? (option.raw as string) : (stage.kind === "mask" || stage.kind === "pattern" ? maskPatternColour : working.colour),
-              };
-              const tortieList = committed.map((layer) => ({ ...layer }));
-              tortieList.push(candidateLayer);
-              preview.tortie = tortieList;
-              preview.isTortie = true;
-              preview.tortieMask = candidateLayer.mask;
-              preview.tortiePattern = candidateLayer.pattern;
-              preview.tortieColour = candidateLayer.colour;
-              return {
-                id: `tortie-${i}-${stage.kind}-${variantIndex}`,
-                option,
-                params: preview,
-                label: option.display,
-                group: `tortie-${i + 1}-${stage.kind}`,
-              };
-            });
+            const options = buildLayerOptionStrings(
+              stage.source,
+              stageTargetValue,
+              false,
+              {
+                spinny: true,
+                limit: subsetLimits[stageKey] ? SUBSET_LIMIT : undefined,
+              },
+            );
+            const descriptors: VariantDescriptor[] = options.map(
+              (option, variantIndex) => {
+                const preview = cloneParams(progressiveParams);
+                const candidateLayer: TortieSlot = {
+                  mask:
+                    stage.kind === "mask"
+                      ? (option.raw as string)
+                      : working.mask,
+                  pattern:
+                    stage.kind === "pattern"
+                      ? (option.raw as string)
+                      : working.pattern,
+                  colour:
+                    stage.kind === "colour"
+                      ? (option.raw as string)
+                      : stage.kind === "mask" || stage.kind === "pattern"
+                        ? maskPatternColour
+                        : working.colour,
+                };
+                const tortieList = committed.map((layer) => ({ ...layer }));
+                tortieList.push(candidateLayer);
+                preview.tortie = tortieList;
+                preview.isTortie = true;
+                preview.tortieMask = candidateLayer.mask;
+                preview.tortiePattern = candidateLayer.pattern;
+                preview.tortieColour = candidateLayer.colour;
+                return {
+                  id: `tortie-${i}-${stage.kind}-${variantIndex}`,
+                  option,
+                  params: preview,
+                  label: option.display,
+                  group: `tortie-${i + 1}-${stage.kind}`,
+                };
+              },
+            );
 
-            const frames = await renderVariantFrames(generator, progressiveParams, descriptors);
+            const frames = await renderVariantFrames(
+              generator,
+              progressiveParams,
+              descriptors,
+            );
             if (frames.length === 0) {
               continue;
             }
@@ -2519,17 +2894,32 @@ export function SingleCatPlusClient({
             for (let idx = 0; idx < sequence.length; idx += 1) {
               const step = sequence[idx];
               if (generationIdRef.current !== currentToken) return;
-              
+
               // Recalculate delay on each step to get live updates
               const stageDelay = getDelayWithMultiplier(stageKey);
               const currentConfig = timingConfigRef.current;
-              const stageDurations = computeStepDurations(sequence.slice(idx), stageDelay, currentConfig.allowFastFlips);
+              const stageDurations = computeStepDurations(
+                sequence.slice(idx),
+                stageDelay,
+                currentConfig.allowFastFlips,
+              );
               const stepDuration = stageDurations[0] ?? stageDelay;
-              
+
               const candidateLayer: TortieSlot = {
-                mask: stage.kind === "mask" ? (step.frame.option.raw as string) : working.mask,
-                pattern: stage.kind === "pattern" ? (step.frame.option.raw as string) : working.pattern,
-                colour: stage.kind === "colour" ? (step.frame.option.raw as string) : (stage.kind === "mask" || stage.kind === "pattern" ? maskPatternColour : working.colour),
+                mask:
+                  stage.kind === "mask"
+                    ? (step.frame.option.raw as string)
+                    : working.mask,
+                pattern:
+                  stage.kind === "pattern"
+                    ? (step.frame.option.raw as string)
+                    : working.pattern,
+                colour:
+                  stage.kind === "colour"
+                    ? (step.frame.option.raw as string)
+                    : stage.kind === "mask" || stage.kind === "pattern"
+                      ? maskPatternColour
+                      : working.colour,
               };
 
               const drawStep = () => drawCanvas(step.frame.canvas);
@@ -2543,13 +2933,19 @@ export function SingleCatPlusClient({
 
             const finalStageValue = frames[frames.length - 1]?.option.raw;
             if (typeof finalStageValue === "string") {
-              if (stage.kind === "mask") working = { ...working, mask: finalStageValue };
-              if (stage.kind === "pattern") working = { ...working, pattern: finalStageValue };
-              if (stage.kind === "colour") working = { ...working, colour: finalStageValue };
+              if (stage.kind === "mask")
+                working = { ...working, mask: finalStageValue };
+              if (stage.kind === "pattern")
+                working = { ...working, pattern: finalStageValue };
+              if (stage.kind === "colour")
+                working = { ...working, colour: finalStageValue };
             }
 
             await wait(pauseDuration);
-            const stageEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+            const stageEnd =
+              typeof performance !== "undefined"
+                ? performance.now()
+                : Date.now();
             addActualDuration(stageKey, stageEnd - stageStart);
           }
 
@@ -2604,7 +3000,7 @@ export function SingleCatPlusClient({
       updateLayerRow,
       updateParamRow,
       readSpinState,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -2613,10 +3009,11 @@ export function SingleCatPlusClient({
     (async () => {
       try {
         if (!generatorRef.current || !mapperRef.current) {
-          const [{ default: catGenerator }, { default: spriteMapper }] = await Promise.all([
-            import("@/lib/single-cat/catGeneratorV3"),
-            import("@/lib/single-cat/spriteMapper"),
-          ]);
+          const [{ default: catGenerator }, { default: spriteMapper }] =
+            await Promise.all([
+              import("@/lib/single-cat/catGeneratorV3"),
+              import("@/lib/single-cat/spriteMapper"),
+            ]);
           if (cancelled) return;
           generatorRef.current = catGenerator as CatGeneratorApi;
           mapperRef.current = spriteMapper as unknown as SpriteMapperApi;
@@ -2631,7 +3028,7 @@ export function SingleCatPlusClient({
           parameterOptionsRef.current = await buildParameterOptions(
             mapperRef.current,
             includeBaseColours,
-            extendedModesArray
+            extendedModesArray,
           );
           const counts = deriveOptionCounts(parameterOptionsRef.current);
           optionCountsRef.current = counts;
@@ -2658,13 +3055,13 @@ export function SingleCatPlusClient({
 
   useEffect(() => {
     const mapper = mapperRef.current;
-    if (!mapper || !mapper.loaded) return;
+    if (!mapper?.loaded) return;
     let cancelled = false;
     (async () => {
       const options = await buildParameterOptions(
         mapper,
         includeBaseColours,
-        extendedModesArray
+        extendedModesArray,
       );
       if (!cancelled) {
         parameterOptionsRef.current = options;
@@ -2688,7 +3085,7 @@ export function SingleCatPlusClient({
     };
   }, []);
 
-  const handleToggleExtended = useCallback((modeToToggle: ExtendedMode) => {
+  const _handleToggleExtended = useCallback((modeToToggle: ExtendedMode) => {
     if (modeToToggle === "base") {
       setIncludeBaseColours((prev) => !prev);
       return;
@@ -2704,23 +3101,24 @@ export function SingleCatPlusClient({
     });
   }, []);
 
-  const ensureMapperReady = useCallback(async (): Promise<SpriteMapperApi | null> => {
-    if (!mapperRef.current) return null;
-    if (!mapperRef.current.loaded && mapperRef.current.init) {
-      await mapperRef.current.init();
-    }
-    if (!parameterOptionsRef.current) {
-      parameterOptionsRef.current = await buildParameterOptions(
-        mapperRef.current,
-        includeBaseColours,
-        extendedModesArray
-      );
-      const counts = deriveOptionCounts(parameterOptionsRef.current);
-      optionCountsRef.current = counts;
-      setOptionCounts(counts);
-    }
-    return mapperRef.current;
-  }, [includeBaseColours, extendedModesArray]);
+  const ensureMapperReady =
+    useCallback(async (): Promise<SpriteMapperApi | null> => {
+      if (!mapperRef.current) return null;
+      if (!mapperRef.current.loaded && mapperRef.current.init) {
+        await mapperRef.current.init();
+      }
+      if (!parameterOptionsRef.current) {
+        parameterOptionsRef.current = await buildParameterOptions(
+          mapperRef.current,
+          includeBaseColours,
+          extendedModesArray,
+        );
+        const counts = deriveOptionCounts(parameterOptionsRef.current);
+        optionCountsRef.current = counts;
+        setOptionCounts(counts);
+      }
+      return mapperRef.current;
+    }, [includeBaseColours, extendedModesArray]);
 
   // -------------------------------------------------------------------
   // Layer count spinner — reveals accessory/scar/tortie counts visually
@@ -2738,14 +3136,22 @@ export function SingleCatPlusClient({
         experimentalColourMode: string | string[];
         includeBaseColours: boolean;
       },
-      token: number
+      token: number,
     ) => {
       if (!generator.generateRandomCat) return;
 
       const groups = [
-        { label: "Accessories", key: "accessory" as const, ...layers.accessories },
+        {
+          label: "Accessories",
+          key: "accessory" as const,
+          ...layers.accessories,
+        },
         { label: "Scars", key: "scar" as const, ...layers.scars },
-        { label: "Tortie Layers", key: "tortieMask" as const, ...layers.torties },
+        {
+          label: "Tortie Layers",
+          key: "tortieMask" as const,
+          ...layers.torties,
+        },
       ];
 
       for (const group of groups) {
@@ -2759,7 +3165,12 @@ export function SingleCatPlusClient({
         setRollerActiveValue(`${minCount}–${maxCount}`);
         setParamRows((prev) => [
           ...prev,
-          { id: group.key, label: group.label, value: "?", status: "active" as const },
+          {
+            id: group.key,
+            label: group.label,
+            value: "?",
+            status: "active" as const,
+          },
         ]);
         await wait(800); // let the viewer read what's being rolled
 
@@ -2809,7 +3220,7 @@ export function SingleCatPlusClient({
           try {
             const result = await generator.generateCat(previewParams);
             const catCanvas = cloneSourceCanvas(
-              result.canvas as HTMLCanvasElement | OffscreenCanvas
+              result.canvas as HTMLCanvasElement | OffscreenCanvas,
             );
             const composited = compositeCountFrame(catCanvas, n);
             frames.push({
@@ -2840,7 +3251,7 @@ export function SingleCatPlusClient({
           const stepDurations = computeStepDurations(
             sequence.slice(idx),
             baseDelay,
-            false // never fast-flip the count reveal
+            false, // never fast-flip the count reveal
           );
           const stepDuration = stepDurations[0] ?? baseDelay;
 
@@ -2858,9 +3269,13 @@ export function SingleCatPlusClient({
         setParamRows((prev) =>
           prev.map((row) =>
             row.id === group.key
-              ? { ...row, value: String(group.count), status: "revealed" as const }
-              : row
-          )
+              ? {
+                  ...row,
+                  value: String(group.count),
+                  status: "revealed" as const,
+                }
+              : row,
+          ),
         );
         await settleRoller(token);
         await wait(600); // hold the result so viewer can see it
@@ -2872,7 +3287,14 @@ export function SingleCatPlusClient({
       setParamRows([]); // clear count rows before main param spin
       clearMirror();
     },
-    [drawCanvas, clearMirror, playFlip, settleRoller, getDelayWithMultiplier, readSpinState]
+    [
+      drawCanvas,
+      clearMirror,
+      playFlip,
+      settleRoller,
+      getDelayWithMultiplier,
+      readSpinState,
+    ],
   );
 
   const generateCatPlus = useCallback(async () => {
@@ -2912,7 +3334,8 @@ export function SingleCatPlusClient({
       const accessoryCount = computeLayerCount(accessoryRange);
       const scarCount = computeLayerCount(scarRange);
       const tortieCount = computeLayerCount(tortieRange);
-      const experimentalMode = extendedModesArray.length === 0 ? "off" : extendedModesArray;
+      const experimentalMode =
+        extendedModesArray.length === 0 ? "off" : extendedModesArray;
 
       if (!generator.generateRandomCat) {
         throw new Error("Random cat generation not available");
@@ -2938,26 +3361,31 @@ export function SingleCatPlusClient({
 
       const accessorySlots =
         randomResult.slotSelections?.accessories ??
-        (params.accessories ?? []).filter((entry): entry is string => typeof entry === "string");
+        (params.accessories ?? []).filter(
+          (entry): entry is string => typeof entry === "string",
+        );
       const scarSlots =
         randomResult.slotSelections?.scars ??
-        (params.scars ?? []).filter((entry): entry is string => typeof entry === "string");
+        (params.scars ?? []).filter(
+          (entry): entry is string => typeof entry === "string",
+        );
       const tortieSlots: (TortieSlot | null)[] =
         randomResult.slotSelections?.tortie?.map((slot) =>
           slot?.mask && slot?.pattern && slot?.colour
             ? { mask: slot.mask, pattern: slot.pattern, colour: slot.colour }
-            : null
+            : null,
         ) ??
         (params.tortie ?? []).map((slot) =>
           slot?.mask && slot?.pattern && slot?.colour
             ? { mask: slot.mask, pattern: slot.pattern, colour: slot.colour }
-            : null
+            : null,
         );
       const tortieLayers = tortieSlots.filter(Boolean) as TortieSlot[];
 
       resetLayerRows(accessorySlots, scarSlots, tortieSlots);
 
-      const { darkForest: enableDarkForest, dead: enableDead } = resolveAfterlife(afterlifeMode);
+      const { darkForest: enableDarkForest, dead: enableDead } =
+        resolveAfterlife(afterlifeMode);
       params.darkForest = enableDarkForest;
       params.darkMode = enableDarkForest;
       params.dead = enableDead;
@@ -2969,18 +3397,28 @@ export function SingleCatPlusClient({
       };
 
       setRollSummary(
-        `Rolled → Accessories: ${countsResult.accessories} • Scars: ${countsResult.scars} • Tortie layers: ${countsResult.tortie}`
+        `Rolled → Accessories: ${countsResult.accessories} • Scars: ${countsResult.scars} • Tortie layers: ${countsResult.tortie}`,
       );
       setHasTint(Boolean(enableDarkForest || enableDead));
       setSpriteGalleryOpen(false);
 
       const uniqueAccessories = Array.from(
-        new Set(accessorySlots.filter((entry): entry is string => typeof entry === "string" && entry !== "none"))
+        new Set(
+          accessorySlots.filter(
+            (entry): entry is string =>
+              typeof entry === "string" && entry !== "none",
+          ),
+        ),
       );
       const uniqueScars = Array.from(
-        new Set(scarSlots.filter((entry): entry is string => typeof entry === "string" && entry !== "none"))
+        new Set(
+          scarSlots.filter(
+            (entry): entry is string =>
+              typeof entry === "string" && entry !== "none",
+          ),
+        ),
       );
-      const tortieChoices = tortieLayers.length ? tortieLayers : [];
+      const _tortieChoices = tortieLayers.length ? tortieLayers : [];
 
       const progressiveParams: Partial<CatParams> = {
         spriteNumber: DEFAULT_SPRITE_NUMBER,
@@ -3022,21 +3460,28 @@ export function SingleCatPlusClient({
             experimentalColourMode: experimentalMode,
             includeBaseColours,
           },
-          token
+          token,
         );
         if (generationIdRef.current !== token) return;
       }
 
       for (const definition of PARAM_SEQUENCE) {
-        if (definition.id === "tortieMask" || definition.id === "tortiePattern" || definition.id === "tortieColour") {
+        if (
+          definition.id === "tortieMask" ||
+          definition.id === "tortiePattern" ||
+          definition.id === "tortieColour"
+        ) {
           continue;
         }
         if (generationIdRef.current !== token) return;
         if (definition.requiresTortie && !params.isTortie) continue;
 
         const paramKeyCandidate = definition.id;
-        const paramKey = isParamTimingKey(paramKeyCandidate) ? paramKeyCandidate : null;
-        const paramStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const paramKey = isParamTimingKey(paramKeyCandidate)
+          ? paramKeyCandidate
+          : null;
+        const paramStart =
+          typeof performance !== "undefined" ? performance.now() : Date.now();
 
         const rawTargetValue = getParameterRawValue(definition.id, params);
         const displayValue = getParameterValueForDisplay(definition.id, params);
@@ -3058,19 +3503,25 @@ export function SingleCatPlusClient({
 
         const spinState = readSpinState();
         const currentSpeedSetting = spinState.speed;
-        const basePause = modeRef.current === "calm"
-          ? currentSpeedSetting.calmParamPause
-          : currentSpeedSetting.paramPause;
+        const basePause =
+          modeRef.current === "calm"
+            ? currentSpeedSetting.calmParamPause
+            : currentSpeedSetting.paramPause;
         const pauseDuration = Math.max(
           PARAM_REVEAL_PAUSE,
-          basePause / speedMultiplierRef.current
+          basePause / speedMultiplierRef.current,
         );
         const isInstantParam = INSTANT_PARAMS.includes(definition.id);
         const isTortieToggle = definition.id === "tortie";
-        const shouldAnimate = spinState.spinny && !!rollerOptions && !isInstantParam && !isTortieToggle;
+        const shouldAnimate =
+          spinState.spinny &&
+          !!rollerOptions &&
+          !isInstantParam &&
+          !isTortieToggle;
 
         if (definition.id === "accessory") {
-          const accessoryStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+          const accessoryStart =
+            typeof performance !== "undefined" ? performance.now() : Date.now();
           await spinAccessorySlots(
             rowIndex,
             accessorySlots,
@@ -3078,9 +3529,10 @@ export function SingleCatPlusClient({
             progressiveParams,
             mapper,
             pauseDuration,
-            token
+            token,
           );
-          const accessoryEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+          const accessoryEnd =
+            typeof performance !== "undefined" ? performance.now() : Date.now();
           addActualDuration("accessory", accessoryEnd - accessoryStart);
           if (rowIndex >= 0) {
             setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
@@ -3090,7 +3542,8 @@ export function SingleCatPlusClient({
         }
 
         if (definition.id === "scar") {
-          const scarStart = typeof performance !== "undefined" ? performance.now() : Date.now();
+          const scarStart =
+            typeof performance !== "undefined" ? performance.now() : Date.now();
           await spinScarSlots(
             rowIndex,
             scarSlots,
@@ -3098,9 +3551,10 @@ export function SingleCatPlusClient({
             progressiveParams,
             mapper,
             pauseDuration,
-            token
+            token,
           );
-          const scarEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+          const scarEnd =
+            typeof performance !== "undefined" ? performance.now() : Date.now();
           addActualDuration("scar", scarEnd - scarStart);
           if (rowIndex >= 0) {
             setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
@@ -3113,47 +3567,60 @@ export function SingleCatPlusClient({
           clearMirror();
           setRollerLabel(definition.label);
           setRollerActiveValue("—");
-          await wait(Math.max(getBaseFrameDuration(currentSpeedSetting) * 0.25, PRE_SPIN_DELAY));
+          await wait(
+            Math.max(
+              getBaseFrameDuration(currentSpeedSetting) * 0.25,
+              PRE_SPIN_DELAY,
+            ),
+          );
 
-          const subsetEnabled = paramKey ? Boolean(subsetLimits[paramKey]) : false;
+          const subsetEnabled = paramKey
+            ? Boolean(subsetLimits[paramKey])
+            : false;
           const variationOptions = sampleValues(
             rollerOptions,
             definition.id,
             rawTargetValue,
             displayValue,
-            subsetEnabled ? SUBSET_LIMIT : MAX_SPINNY_VARIATIONS
+            subsetEnabled ? SUBSET_LIMIT : MAX_SPINNY_VARIATIONS,
           );
 
           const frames = await preRenderVariationFrames(
             generator,
             progressiveParams,
             definition.id,
-            variationOptions
+            variationOptions,
           );
           const sequence = buildFlipSequence(frames);
 
           for (let idx = 0; idx < sequence.length; idx += 1) {
             const step = sequence[idx];
             if (generationIdRef.current !== token) return;
-            
+
             // Recalculate delay on each step to get live updates
             const currentConfig = timingConfigRef.current;
-            const configuredDelay = paramKey ? getDelayWithMultiplier(paramKey) : MIN_SAFE_STEP_MS;
-            const stepDurations = computeStepDurations(sequence.slice(idx), configuredDelay, currentConfig.allowFastFlips);
+            const configuredDelay = paramKey
+              ? getDelayWithMultiplier(paramKey)
+              : MIN_SAFE_STEP_MS;
+            const stepDurations = computeStepDurations(
+              sequence.slice(idx),
+              configuredDelay,
+              currentConfig.allowFastFlips,
+            );
             const stepDuration = stepDurations[0] ?? configuredDelay;
-            
+
             const frameDisplay = step.frame.option.display;
             setRollerActiveValue(frameDisplay);
             setParamRows((prev) =>
               prev.map((row) =>
                 row.id === definition.id
                   ? {
-                    ...row,
-                    value: step.isFinal ? frameDisplay : row.value,
-                    status: step.isFinal ? "revealed" : "active",
-                  }
-                  : row
-              )
+                      ...row,
+                      value: step.isFinal ? frameDisplay : row.value,
+                      status: step.isFinal ? "revealed" : "active",
+                    }
+                  : row,
+              ),
             );
             const drawStep = () => {
               drawCanvas(step.frame.canvas);
@@ -3169,13 +3636,21 @@ export function SingleCatPlusClient({
           if (finalFrame) {
             drawCanvas(finalFrame.canvas);
           }
-          applyParamValue(progressiveParams, definition.id, finalFrame.option.raw);
+          applyParamValue(
+            progressiveParams,
+            definition.id,
+            finalFrame.option.raw,
+          );
           setParamRows((prev) =>
             prev.map((row) =>
               row.id === definition.id
-                ? { ...row, value: finalFrame.option.display, status: "revealed" }
-                : row
-            )
+                ? {
+                    ...row,
+                    value: finalFrame.option.display,
+                    status: "revealed",
+                  }
+                : row,
+            ),
           );
           if (generationIdRef.current !== token) return;
           await settleRoller(token);
@@ -3187,8 +3662,8 @@ export function SingleCatPlusClient({
             prev.map((row) =>
               row.id === definition.id
                 ? { ...row, value: displayValue, status: "revealed" }
-                : row
-            )
+                : row,
+            ),
           );
           applyParamValue(progressiveParams, definition.id, rawTargetValue);
           await renderCat(progressiveParams);
@@ -3206,12 +3681,13 @@ export function SingleCatPlusClient({
             progressiveParams,
             mapper,
             pauseDuration,
-            token
+            token,
           );
         }
 
         await wait(pauseDuration);
-        const paramEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const paramEnd =
+          typeof performance !== "undefined" ? performance.now() : Date.now();
         addActualDuration(paramKey, paramEnd - paramStart);
       }
 
@@ -3224,7 +3700,8 @@ export function SingleCatPlusClient({
 
       const builderPrimaryAccessory = uniqueAccessories[0] ?? null;
       const builderPrimaryScar = uniqueScars[0] ?? null;
-      const builderPrimaryTortie = tortieLayers.length > 0 ? tortieLayers[0] : null;
+      const builderPrimaryTortie =
+        tortieLayers.length > 0 ? tortieLayers[0] : null;
       const builderParams = sanitizeForBuilder(params, {
         accessory: builderPrimaryAccessory,
         scar: builderPrimaryScar,
@@ -3245,7 +3722,13 @@ export function SingleCatPlusClient({
         const previewCtx = previewCanvas.getContext("2d");
         if (previewCtx) {
           previewCtx.imageSmoothingEnabled = false;
-          previewCtx.drawImage(result.canvas as HTMLCanvasElement, 0, 0, 120, 120);
+          previewCtx.drawImage(
+            result.canvas as HTMLCanvasElement,
+            0,
+            0,
+            120,
+            120,
+          );
         }
         spritePreview.push({
           spriteNumber,
@@ -3284,7 +3767,7 @@ export function SingleCatPlusClient({
         adjustedOptionCounts,
         estimatedTotals,
         actualDurationsRef.current,
-        totalActualRef.current
+        totalActualRef.current,
       );
       setLastTimingSnapshot({
         counts: { ...adjustedOptionCounts },
@@ -3292,7 +3775,8 @@ export function SingleCatPlusClient({
         estimatedTotal: estimatedTotals.total,
         actual: { ...actualDurationsRef.current },
         actualTotal: totalActualRef.current,
-        timestamp: typeof performance !== "undefined" ? performance.now() : Date.now(),
+        timestamp:
+          typeof performance !== "undefined" ? performance.now() : Date.now(),
       });
       setIsGenerating(false);
       track("single_cat_generated", {
@@ -3331,7 +3815,10 @@ export function SingleCatPlusClient({
           shareSlug = shareRecord.slug;
         }
         if (shareSlug && catStateRef.current) {
-          catStateRef.current = { ...catStateRef.current, catShareSlug: shareSlug };
+          catStateRef.current = {
+            ...catStateRef.current,
+            catShareSlug: shareSlug,
+          };
         }
 
         let legacyEncoded: string | null = state.legacyEncoded ?? null;
@@ -3357,30 +3844,50 @@ export function SingleCatPlusClient({
           });
           if (generationIdRef.current !== persistToken) return;
           if (result && catStateRef.current) {
-            const shareToken = (result as { shareToken?: string }).shareToken ?? result.slug ?? result.id;
-            const origin = typeof window !== "undefined" ? window.location.origin : "";
-            const url = origin ? `${origin}/view/${shareToken}` : `/view/${shareToken}`;
+            const shareToken =
+              (result as { shareToken?: string }).shareToken ??
+              result.slug ??
+              result.id;
+            const origin =
+              typeof window !== "undefined" ? window.location.origin : "";
+            const url = origin
+              ? `${origin}/view/${shareToken}`
+              : `/view/${shareToken}`;
             catStateRef.current = {
               ...catStateRef.current,
               profileId: result.id,
               mapperSlug: shareToken,
               legacyEncoded,
               shareUrl: url,
-              catShareSlug: shareSlug ?? catStateRef.current.catShareSlug ?? null,
+              catShareSlug:
+                shareSlug ?? catStateRef.current.catShareSlug ?? null,
             };
             setShareLink(url);
           }
         } catch (err) {
           console.warn("Failed to persist mapper record", err);
-          const origin = typeof window !== "undefined" ? window.location.origin : "";
+          const origin =
+            typeof window !== "undefined" ? window.location.origin : "";
           if (catStateRef.current) {
             if (shareSlug) {
-              const fallbackUrl = origin ? `${origin}/visual-builder?share=${shareSlug}` : `/visual-builder?share=${shareSlug}`;
-              catStateRef.current = { ...catStateRef.current, catShareSlug: shareSlug, shareUrl: fallbackUrl };
+              const fallbackUrl = origin
+                ? `${origin}/visual-builder?share=${shareSlug}`
+                : `/visual-builder?share=${shareSlug}`;
+              catStateRef.current = {
+                ...catStateRef.current,
+                catShareSlug: shareSlug,
+                shareUrl: fallbackUrl,
+              };
               setShareLink(fallbackUrl);
             } else if (legacyEncoded) {
-              const fallbackUrl = origin ? `${origin}/view?cat=${legacyEncoded}` : `/view?cat=${legacyEncoded}`;
-              catStateRef.current = { ...catStateRef.current, legacyEncoded, shareUrl: fallbackUrl };
+              const fallbackUrl = origin
+                ? `${origin}/view?cat=${legacyEncoded}`
+                : `/view?cat=${legacyEncoded}`;
+              catStateRef.current = {
+                ...catStateRef.current,
+                legacyEncoded,
+                shareUrl: fallbackUrl,
+              };
               setShareLink(fallbackUrl);
             }
           }
@@ -3429,10 +3936,7 @@ export function SingleCatPlusClient({
     addActualDuration,
     estimatedTotals,
     adjustedOptionCounts,
-    setLastTimingSnapshot,
   ]);
-
-
 
   const handleDownload = useCallback(() => {
     const canvas = canvasRef.current;
@@ -3470,7 +3974,13 @@ export function SingleCatPlusClient({
       const ctx = exportCanvas.getContext("2d");
       if (ctx) {
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(result.canvas as HTMLCanvasElement, 0, 0, FULL_EXPORT_SIZE, FULL_EXPORT_SIZE);
+        ctx.drawImage(
+          result.canvas as HTMLCanvasElement,
+          0,
+          0,
+          FULL_EXPORT_SIZE,
+          FULL_EXPORT_SIZE,
+        );
       }
       await copyCanvasToClipboard(
         exportCanvas,
@@ -3479,10 +3989,10 @@ export function SingleCatPlusClient({
           : `Copied cat (${FULL_EXPORT_SIZE}×${FULL_EXPORT_SIZE})!`,
         options?.noTint ? "cat-no-tint" : "cat",
         showToast,
-        (message) => setError(message)
+        (message) => setError(message),
       );
     },
-    [showToast]
+    [showToast],
   );
 
   const handleCopySprite = useCallback(
@@ -3506,13 +4016,15 @@ export function SingleCatPlusClient({
         size === 120
           ? `Copied ${spriteName} (120×120)!`
           : `Copied ${spriteName} (${FULL_EXPORT_SIZE}×${FULL_EXPORT_SIZE})!`,
-        size === 120 ? `${spriteName.toLowerCase()}-120` : `${spriteName.toLowerCase()}-700`,
+        size === 120
+          ? `${spriteName.toLowerCase()}-120`
+          : `${spriteName.toLowerCase()}-700`,
         showToast,
-        (message) => setError(message)
+        (message) => setError(message),
       );
       track("single_cat_exported", { format: `copy-${size}px` });
     },
-    [showToast]
+    [showToast],
   );
 
   const buildShareUrl = useCallback(async () => {
@@ -3525,7 +4037,9 @@ export function SingleCatPlusClient({
 
     const slugCandidate = state.mapperSlug ?? state.profileId ?? null;
     if (slugCandidate) {
-      const url = origin ? `${origin}/view/${slugCandidate}` : `/view/${slugCandidate}`;
+      const url = origin
+        ? `${origin}/view/${slugCandidate}`
+        : `/view/${slugCandidate}`;
       catStateRef.current = { ...state, shareUrl: url };
       setShareLink(url);
       return url;
@@ -3548,8 +4062,13 @@ export function SingleCatPlusClient({
         creatorName: state.creatorName ?? undefined,
       });
       if (result) {
-        const shareToken = (result as { shareToken?: string }).shareToken ?? result.slug ?? result.id;
-        const url = origin ? `${origin}/view/${shareToken}` : `/view/${shareToken}`;
+        const shareToken =
+          (result as { shareToken?: string }).shareToken ??
+          result.slug ??
+          result.id;
+        const url = origin
+          ? `${origin}/view/${shareToken}`
+          : `/view/${shareToken}`;
         catStateRef.current = {
           ...state,
           profileId: result.id,
@@ -3576,19 +4095,25 @@ export function SingleCatPlusClient({
       if (shareRecord?.slug) {
         shareSlug = shareRecord.slug;
         if (catStateRef.current) {
-          catStateRef.current = { ...catStateRef.current, catShareSlug: shareSlug };
+          catStateRef.current = {
+            ...catStateRef.current,
+            catShareSlug: shareSlug,
+          };
         }
       }
     }
 
     if (shareSlug) {
-      const url = origin ? `${origin}/visual-builder?share=${shareSlug}` : `/visual-builder?share=${shareSlug}`;
+      const url = origin
+        ? `${origin}/visual-builder?share=${shareSlug}`
+        : `/visual-builder?share=${shareSlug}`;
       if (catStateRef.current) {
         catStateRef.current = {
           ...catStateRef.current,
           catShareSlug: shareSlug,
           shareUrl: url,
-          legacyEncoded: catStateRef.current.legacyEncoded ?? legacyEncoded ?? null,
+          legacyEncoded:
+            catStateRef.current.legacyEncoded ?? legacyEncoded ?? null,
         };
       }
       setShareLink(url);
@@ -3596,7 +4121,9 @@ export function SingleCatPlusClient({
     }
 
     if (legacyEncoded) {
-      const url = origin ? `${origin}/view?cat=${legacyEncoded}` : `/view?cat=${legacyEncoded}`;
+      const url = origin
+        ? `${origin}/view?cat=${legacyEncoded}`
+        : `/view?cat=${legacyEncoded}`;
       catStateRef.current = { ...state, legacyEncoded, shareUrl: url };
       setShareLink(url);
       return url;
@@ -3604,7 +4131,7 @@ export function SingleCatPlusClient({
 
     setError("Unable to build share link right now.");
     return null;
-  }, [createMapper, setError]);
+  }, [createMapper]);
 
   const handleCopyShareLink = useCallback(async () => {
     const url = await buildShareUrl();
@@ -3649,7 +4176,11 @@ export function SingleCatPlusClient({
           catName: result.catName ?? null,
           creatorName: result.creatorName ?? null,
           profileId: result.id ?? catStateRef.current.profileId,
-          mapperSlug: ((result as { shareToken?: string }).shareToken ?? result.slug ?? result.id) ?? catStateRef.current.mapperSlug,
+          mapperSlug:
+            (result as { shareToken?: string }).shareToken ??
+            result.slug ??
+            result.id ??
+            catStateRef.current.mapperSlug,
         };
         resetMetaDrafts(result.catName, result.creatorName);
       } else {
@@ -3663,7 +4194,13 @@ export function SingleCatPlusClient({
     } finally {
       setMetaSaving(false);
     }
-  }, [catNameDraft, creatorNameDraft, updateMapperMeta, resetMetaDrafts, showToast, setError]);
+  }, [
+    catNameDraft,
+    creatorNameDraft,
+    updateMapperMeta,
+    resetMetaDrafts,
+    showToast,
+  ]);
 
   const handleCanvasClick = useCallback(
     (event: React.MouseEvent<HTMLCanvasElement>) => {
@@ -3672,7 +4209,7 @@ export function SingleCatPlusClient({
         exportCat({ noTint: true }).catch((err) => console.error(err));
       }
     },
-    [exportCat]
+    [exportCat],
   );
 
   const currentState = catStateRef.current;
@@ -3689,8 +4226,11 @@ export function SingleCatPlusClient({
   const trimmedCatDraft = catNameDraft.trim();
   const trimmedCreatorDraft = creatorNameDraft.trim();
   const historyReady = Boolean(currentState?.profileId);
-  const metaChanged = trimmedCatDraft !== existingCatName || trimmedCreatorDraft !== existingCreatorName;
-  const saveHistoryDisabled = !historyReady || metaSaving || (!metaDirty && !metaChanged);
+  const metaChanged =
+    trimmedCatDraft !== existingCatName ||
+    trimmedCreatorDraft !== existingCreatorName;
+  const saveHistoryDisabled =
+    !historyReady || metaSaving || (!metaDirty && !metaChanged);
   const viewerSlug = currentState?.mapperSlug ?? null;
 
   const generationDisabled = initializing || !!initialError;
@@ -3738,21 +4278,23 @@ export function SingleCatPlusClient({
                   "overflow-hidden transition-all duration-300",
                   rollerExpanded
                     ? "mt-3 max-h-40 opacity-100"
-                    : "max-h-0 opacity-0"
+                    : "max-h-0 opacity-0",
                 )}
               >
                 <div
                   className={cn(
                     "relative h-24 overflow-hidden rounded-xl bg-gradient-to-b from-background/40 via-background/20 to-background/5 transition",
-                    rollerHighlight && "roller-flash ring-2 ring-primary/30"
+                    rollerHighlight && "roller-flash ring-2 ring-primary/30",
                   )}
                 >
                   <div
                     className={cn(
                       "flex h-full items-center justify-center font-semibold transition",
-                      rollerActiveValue ? "text-primary" : "text-muted-foreground/40",
+                      rollerActiveValue
+                        ? "text-primary"
+                        : "text-muted-foreground/40",
                       rollerHighlight && "text-primary",
-                      rollerValueClass
+                      rollerValueClass,
                     )}
                   >
                     {rollerActiveValue ?? "—"}
@@ -3769,7 +4311,11 @@ export function SingleCatPlusClient({
                 disabled={generationDisabled || isGenerating}
               >
                 <RefreshIcon size={16} />
-                {initializing ? "Loading" : isGenerating ? "Rolling..." : "Generate Cat"}
+                {initializing
+                  ? "Loading"
+                  : isGenerating
+                    ? "Rolling..."
+                    : "Generate Cat"}
               </button>
               <button
                 type="button"
@@ -3811,7 +4357,9 @@ export function SingleCatPlusClient({
 
             <div className="rounded-2xl border border-border/40 bg-background/60 p-4">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-foreground">Parameter Reveal</h3>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Parameter Reveal
+                </h3>
                 <div className="flex min-h-[1.5rem] items-center gap-2 text-xs text-muted-foreground">
                   {rollerActiveValue ? (
                     <>
@@ -3821,23 +4369,30 @@ export function SingleCatPlusClient({
                       </span>
                     </>
                   ) : (
-                    <span className="font-mono text-muted-foreground/60">Ready</span>
+                    <span className="font-mono text-muted-foreground/60">
+                      Ready
+                    </span>
                   )}
                 </div>
               </div>
               <div className="mt-3 space-y-2">
                 {paramRows.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Roll a cat to reveal traits one by one.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Roll a cat to reveal traits one by one.
+                  </p>
                 )}
                 {paramRows.map((row) => (
                   <div
                     key={row.id}
-                    className={`flex items-center justify-between rounded-xl border border-border/30 px-3 py-2 text-sm transition ${row.status === "active" || activeParamId === row.id
+                    className={`flex items-center justify-between rounded-xl border border-border/30 px-3 py-2 text-sm transition ${
+                      row.status === "active" || activeParamId === row.id
                         ? "bg-primary/10 text-foreground"
                         : "bg-background/70 text-muted-foreground"
-                      }`}
+                    }`}
                   >
-                    <span className="font-medium text-foreground/90">{row.label}</span>
+                    <span className="font-medium text-foreground/90">
+                      {row.label}
+                    </span>
                     <span className="font-mono text-xs uppercase tracking-wide text-foreground">
                       {row.value}
                     </span>
@@ -3847,47 +4402,57 @@ export function SingleCatPlusClient({
             </div>
 
             <div className="rounded-2xl border border-border/40 bg-background/60 p-4 text-sm text-muted-foreground">
-              <h3 className="mb-3 text-sm font-semibold text-foreground">Layered Details</h3>
+              <h3 className="mb-3 text-sm font-semibold text-foreground">
+                Layered Details
+              </h3>
               <div className="grid gap-3 md:grid-cols-3">
-                {(Object.keys(layerGroupLabels) as LayerGroup[]).map((group) => {
-                  const rows = layerRows[group];
-                  return (
-                    <div key={group} className="space-y-2">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-                        {layerGroupLabels[group]}
-                      </p>
-                      {rows.length ? (
-                        <ul className="space-y-2">
-                          {rows.map((row) => (
-                            <li
-                              key={`${group}-${row.label}`}
-                              className={cn(
-                                "rounded-xl border px-3 py-2 transition",
-                                row.status === "active"
-                                  ? "border-primary/60 bg-primary/10 text-primary"
-                                  : row.status === "revealed"
-                                    ? "border-border/40 text-foreground"
-                                    : "border-border/20 text-muted-foreground"
-                              )}
-                            >
-                              <span className="block text-[0.65rem] uppercase tracking-wide text-muted-foreground/70">
-                                {row.label}
-                              </span>
-                              <span className="block font-mono text-sm text-foreground">{row.value}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-xs text-muted-foreground/60">None rolled</p>
-                      )}
-                    </div>
-                  );
-                })}
+                {(Object.keys(layerGroupLabels) as LayerGroup[]).map(
+                  (group) => {
+                    const rows = layerRows[group];
+                    return (
+                      <div key={group} className="space-y-2">
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                          {layerGroupLabels[group]}
+                        </p>
+                        {rows.length ? (
+                          <ul className="space-y-2">
+                            {rows.map((row) => (
+                              <li
+                                key={`${group}-${row.label}`}
+                                className={cn(
+                                  "rounded-xl border px-3 py-2 transition",
+                                  row.status === "active"
+                                    ? "border-primary/60 bg-primary/10 text-primary"
+                                    : row.status === "revealed"
+                                      ? "border-border/40 text-foreground"
+                                      : "border-border/20 text-muted-foreground",
+                                )}
+                              >
+                                <span className="block text-[0.65rem] uppercase tracking-wide text-muted-foreground/70">
+                                  {row.label}
+                                </span>
+                                <span className="block font-mono text-sm text-foreground">
+                                  {row.value}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/60">
+                            None rolled
+                          </p>
+                        )}
+                      </div>
+                    );
+                  },
+                )}
               </div>
             </div>
 
             <div className="rounded-2xl border border-border/40 bg-background/60 p-4">
-              <h3 className="text-sm font-semibold text-foreground">Links & Actions</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                Links & Actions
+              </h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -3907,7 +4472,9 @@ export function SingleCatPlusClient({
                 </button>
               </div>
               <div className="mt-4 grid gap-3 rounded-xl border border-border/40 bg-background/50 p-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">History Entry</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                  History Entry
+                </p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="flex flex-col gap-1 text-xs uppercase tracking-wide text-muted-foreground/70">
                     <span>Cat Name</span>
@@ -3963,7 +4530,8 @@ export function SingleCatPlusClient({
               </div>
               {shareLink && (
                 <p className="mt-3 truncate text-xs text-muted-foreground">
-                  Latest share: <span className="text-foreground">{shareLink}</span>
+                  Latest share:{" "}
+                  <span className="text-foreground">{shareLink}</span>
                 </p>
               )}
             </div>
@@ -3973,7 +4541,9 @@ export function SingleCatPlusClient({
             <h3 className="text-sm font-semibold text-foreground">Controls</h3>
             <div className="mt-4 space-y-6 text-sm text-muted-foreground">
               <div className="space-y-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Generation Mode</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                  Generation Mode
+                </p>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -3981,10 +4551,11 @@ export function SingleCatPlusClient({
                       setMode("flashy");
                       track("single_cat_mode_changed", { mode: "flashy" });
                     }}
-                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${mode === "flashy"
+                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                      mode === "flashy"
                         ? "border-primary/60 bg-primary/15 text-foreground"
                         : "border-border/60 bg-background/70"
-                      }`}
+                    }`}
                   >
                     Flashy
                   </button>
@@ -3994,16 +4565,19 @@ export function SingleCatPlusClient({
                       setMode("calm");
                       track("single_cat_mode_changed", { mode: "calm" });
                     }}
-                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${mode === "calm"
+                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                      mode === "calm"
                         ? "border-primary/60 bg-primary/15 text-foreground"
                         : "border-border/60 bg-background/70"
-                      }`}
+                    }`}
                   >
                     Calm
                   </button>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Timing</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                    Timing
+                  </p>
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <button
@@ -4015,7 +4589,11 @@ export function SingleCatPlusClient({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSpeedMultiplier((prev) => Math.max(0.25, Math.min(4.0, prev - 0.25)))}
+                        onClick={() =>
+                          setSpeedMultiplier((prev) =>
+                            Math.max(0.25, Math.min(4.0, prev - 0.25)),
+                          )
+                        }
                         className="inline-flex items-center justify-center rounded-full border border-border/60 px-2.5 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Slow down (decrease speed multiplier)"
                         disabled={speedMultiplier <= 0.25}
@@ -4024,7 +4602,11 @@ export function SingleCatPlusClient({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSpeedMultiplier((prev) => Math.max(0.25, Math.min(4.0, prev + 0.25)))}
+                        onClick={() =>
+                          setSpeedMultiplier((prev) =>
+                            Math.max(0.25, Math.min(4.0, prev + 0.25)),
+                          )
+                        }
                         className="inline-flex items-center justify-center rounded-full border border-border/60 px-2.5 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Speed up (increase speed multiplier)"
                         disabled={speedMultiplier >= 4.0}
@@ -4034,11 +4616,13 @@ export function SingleCatPlusClient({
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground/70">
-                        Estimated total: {formatMs(effectiveTotalMs / speedMultiplier)}
+                        Estimated total:{" "}
+                        {formatMs(effectiveTotalMs / speedMultiplier)}
                       </span>
                       {speedMultiplier !== 1.0 && (
                         <span className="text-muted-foreground/70">
-                          {speedMultiplier > 1 ? "×" : "÷"} {Math.abs(speedMultiplier).toFixed(2)}
+                          {speedMultiplier > 1 ? "×" : "÷"}{" "}
+                          {Math.abs(speedMultiplier).toFixed(2)}
                         </span>
                       )}
                     </div>
@@ -4047,24 +4631,48 @@ export function SingleCatPlusClient({
               </div>
 
               <div className="space-y-4">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Layer Counts</p>
-                <LayerRangeSelector label="Accessories" value={accessoryRange} onChange={setAccessoryRange} />
-                <LayerRangeSelector label="Scars" value={scarRange} onChange={setScarRange} />
-                <LayerRangeSelector label="Tortie Layers" value={tortieRange} onChange={setTortieRange} />
-                <LayerCountModeSelector value={exactLayerCounts} onChange={setExactLayerCounts} />
+                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                  Layer Counts
+                </p>
+                <LayerRangeSelector
+                  label="Accessories"
+                  value={accessoryRange}
+                  onChange={setAccessoryRange}
+                />
+                <LayerRangeSelector
+                  label="Scars"
+                  value={scarRange}
+                  onChange={setScarRange}
+                />
+                <LayerRangeSelector
+                  label="Tortie Layers"
+                  value={tortieRange}
+                  onChange={setTortieRange}
+                />
+                <LayerCountModeSelector
+                  value={exactLayerCounts}
+                  onChange={setExactLayerCounts}
+                />
               </div>
 
               <div className="space-y-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">Afterlife Effects</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+                  Afterlife Effects
+                </p>
                 <label className="flex flex-col gap-1 text-xs">
                   <span>Dark Forest / StarClan chance</span>
                   <select
                     value={afterlifeMode}
-                    onChange={(event) => setAfterlifeMode(event.target.value as AfterlifeOption)}
+                    onChange={(event) =>
+                      setAfterlifeMode(event.target.value as AfterlifeOption)
+                    }
                     className="rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
                   >
                     {AFTERLIFE_OPTIONS.map((option) => (
-                      <option key={`afterlife-${option.value}`} value={option.value}>
+                      <option
+                        key={`afterlife-${option.value}`}
+                        value={option.value}
+                      >
                         {option.label}
                       </option>
                     ))}
@@ -4087,7 +4695,9 @@ export function SingleCatPlusClient({
                 </p>
                 <PaletteMultiSelect
                   selected={extendedModes as Set<PaletteId>}
-                  onChange={(newSet) => setExtendedModes(newSet as Set<ExtendedMode>)}
+                  onChange={(newSet) =>
+                    setExtendedModes(newSet as Set<ExtendedMode>)
+                  }
                   includeClassic={includeBaseColours}
                   onClassicChange={setIncludeBaseColours}
                 />
@@ -4131,7 +4741,9 @@ export function SingleCatPlusClient({
       <div className="glass-card px-6 py-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Sprite Tools</h3>
+            <h3 className="text-sm font-semibold text-foreground">
+              Sprite Tools
+            </h3>
             <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
               {spriteToolsSubtitle}
             </p>
@@ -4148,7 +4760,9 @@ export function SingleCatPlusClient({
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={() => handleCopySprite(currentSpriteNumber, FULL_EXPORT_SIZE)}
+              onClick={() =>
+                handleCopySprite(currentSpriteNumber, FULL_EXPORT_SIZE)
+              }
               disabled={!canCopySprite}
             >
               Copy 700×700
@@ -4193,9 +4807,12 @@ export function SingleCatPlusClient({
             </button>
             <div className="flex flex-col gap-6">
               <div>
-                <h2 className="text-xl font-semibold text-foreground">Sprite Gallery</h2>
+                <h2 className="text-xl font-semibold text-foreground">
+                  Sprite Gallery
+                </h2>
                 <p className="text-sm text-muted-foreground">
-                  Browse every sprite rendered for this cat and copy quick exports.
+                  Browse every sprite rendered for this cat and copy quick
+                  exports.
                 </p>
               </div>
               {spriteVariations.length === 0 ? (
@@ -4210,8 +4827,12 @@ export function SingleCatPlusClient({
                       className="rounded-2xl border border-border/40 bg-background/70 p-4"
                     >
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-foreground">{variation.name}</p>
-                        <span className="text-xs text-muted-foreground">#{variation.spriteNumber}</span>
+                        <p className="text-sm font-semibold text-foreground">
+                          {variation.name}
+                        </p>
+                        <span className="text-xs text-muted-foreground">
+                          #{variation.spriteNumber}
+                        </span>
                       </div>
                       <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
                         <Image
@@ -4227,14 +4848,21 @@ export function SingleCatPlusClient({
                         <button
                           type="button"
                           className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                          onClick={() => handleCopySprite(variation.spriteNumber, 120)}
+                          onClick={() =>
+                            handleCopySprite(variation.spriteNumber, 120)
+                          }
                         >
                           Copy 120×120
                         </button>
                         <button
                           type="button"
                           className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                          onClick={() => handleCopySprite(variation.spriteNumber, FULL_EXPORT_SIZE)}
+                          onClick={() =>
+                            handleCopySprite(
+                              variation.spriteNumber,
+                              FULL_EXPORT_SIZE,
+                            )
+                          }
                         >
                           Copy 700×700
                         </button>
@@ -4277,9 +4905,12 @@ export function SingleCatPlusClient({
             <div className="max-h-[80vh] overflow-y-auto px-6 pb-8 pt-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-foreground">Spin Timing</h2>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Spin Timing
+                  </h2>
                   <p className="text-sm text-muted-foreground">
-                    Tune per-parameter delays for flashy rolls. Estimated totals update instantly; actuals are logged after each roll.
+                    Tune per-parameter delays for flashy rolls. Estimated totals
+                    update instantly; actuals are logged after each roll.
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2 text-xs text-muted-foreground/80">
@@ -4296,7 +4927,12 @@ export function SingleCatPlusClient({
 
               <div className="mt-5 flex flex-wrap items-center gap-2">
                 {GLOBAL_PRESETS.map((preset) => {
-                  const label = preset === "slow" ? "Slow" : preset === "fast" ? "Fast" : "Normal";
+                  const label =
+                    preset === "slow"
+                      ? "Slow"
+                      : preset === "fast"
+                        ? "Fast"
+                        : "Normal";
                   const active = activeGlobalPreset === preset;
                   return (
                     <button
@@ -4307,7 +4943,7 @@ export function SingleCatPlusClient({
                         "rounded-full border px-4 py-1.5 text-xs font-semibold transition",
                         active
                           ? "border-primary/60 bg-primary/20 text-foreground"
-                          : "border-border/60 bg-background/70 text-muted-foreground"
+                          : "border-border/60 bg-background/70 text-muted-foreground",
                       )}
                     >
                       {label}
@@ -4333,7 +4969,12 @@ export function SingleCatPlusClient({
                       max={10}
                       step={0.1}
                       value={flashyPauseSeconds}
-                      onChange={(event) => handlePauseChange("flashyMs", Number.parseFloat(event.target.value))}
+                      onChange={(event) =>
+                        handlePauseChange(
+                          "flashyMs",
+                          Number.parseFloat(event.target.value),
+                        )
+                      }
                       className="h-2 flex-1 rounded-full bg-border/60 accent-primary"
                     />
                     <span className="w-12 text-right font-mono text-sm text-foreground">
@@ -4350,7 +4991,12 @@ export function SingleCatPlusClient({
                       max={10}
                       step={0.1}
                       value={calmPauseSeconds}
-                      onChange={(event) => handlePauseChange("calmMs", Number.parseFloat(event.target.value))}
+                      onChange={(event) =>
+                        handlePauseChange(
+                          "calmMs",
+                          Number.parseFloat(event.target.value),
+                        )
+                      }
                       className="h-2 flex-1 rounded-full bg-border/60 accent-primary"
                     />
                     <span className="w-12 text-right font-mono text-sm text-foreground">
@@ -4362,10 +5008,16 @@ export function SingleCatPlusClient({
 
               <div className="mt-4 grid gap-2 text-xs text-muted-foreground/80 sm:grid-cols-2">
                 <span className="rounded-xl border border-border/40 bg-background/70 px-3 py-2">
-                  Flashy pause: <strong className="ml-1 font-mono text-foreground">{formatMs(flashyPauseMs)}</strong>
+                  Flashy pause:{" "}
+                  <strong className="ml-1 font-mono text-foreground">
+                    {formatMs(flashyPauseMs)}
+                  </strong>
                 </span>
                 <span className="rounded-xl border border-border/40 bg-background/70 px-3 py-2">
-                  Calm pause: <strong className="ml-1 font-mono text-foreground">{formatMs(calmPauseMs)}</strong>
+                  Calm pause:{" "}
+                  <strong className="ml-1 font-mono text-foreground">
+                    {formatMs(calmPauseMs)}
+                  </strong>
                 </span>
               </div>
 
@@ -4383,12 +5035,16 @@ export function SingleCatPlusClient({
                   const delayInputValue = Number.isFinite(storedDelay)
                     ? (storedDelay as number)
                     : getPresetValues(key).normal;
-                  const rawOptions = optionCounts[key] ?? PARAM_DEFAULT_STEP_COUNTS[key] ?? 0;
+                  const rawOptions =
+                    optionCounts[key] ?? PARAM_DEFAULT_STEP_COUNTS[key] ?? 0;
                   const subsetEligible = rawOptions > SUBSET_LIMIT;
                   const subsetEnabled = Boolean(subsetLimits[key]);
-                  const effectiveOptions = adjustedOptionCounts[key] ?? rawOptions;
+                  const effectiveOptions =
+                    adjustedOptionCounts[key] ?? rawOptions;
                   const delayForEstimate = delayInputValue;
-                  const estimatedDuration = estimatedTotals.perKey[key] ?? delayForEstimate * effectiveOptions;
+                  const estimatedDuration =
+                    estimatedTotals.perKey[key] ??
+                    delayForEstimate * effectiveOptions;
                   const actualDuration = lastTimingSnapshot?.actual?.[key] ?? 0;
                   const hasActual = actualDuration > 0;
                   return (
@@ -4397,7 +5053,9 @@ export function SingleCatPlusClient({
                       className="grid grid-cols-[minmax(0,1.6fr)_100px_80px_110px_110px] items-center gap-3 border-b border-border/30 px-4 py-3 last:border-b-0"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-foreground">{label}</p>
+                        <p className="text-sm font-semibold text-foreground">
+                          {label}
+                        </p>
                         {subsetEligible ? (
                           <button
                             type="button"
@@ -4406,7 +5064,7 @@ export function SingleCatPlusClient({
                               "rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide transition",
                               subsetEnabled
                                 ? "border-primary/60 bg-primary/20 text-foreground"
-                                : "border-border/60 bg-background/70 text-muted-foreground"
+                                : "border-border/60 bg-background/70 text-muted-foreground",
                             )}
                           >
                             {subsetEnabled ? "Subset 20" : "All"}
@@ -4428,9 +5086,13 @@ export function SingleCatPlusClient({
                         />
                       </div>
                       <div className="text-right font-mono text-sm text-foreground">
-                        {subsetEnabled && subsetEligible ? `${effectiveOptions}/${rawOptions}` : effectiveOptions}
+                        {subsetEnabled && subsetEligible
+                          ? `${effectiveOptions}/${rawOptions}`
+                          : effectiveOptions}
                       </div>
-                      <div className="text-right font-mono text-sm text-muted-foreground">{formatMs(estimatedDuration)}</div>
+                      <div className="text-right font-mono text-sm text-muted-foreground">
+                        {formatMs(estimatedDuration)}
+                      </div>
                       <div className="text-right font-mono text-sm text-muted-foreground">
                         {hasActual ? formatMs(actualDuration) : "—"}
                       </div>
@@ -4440,7 +5102,8 @@ export function SingleCatPlusClient({
               </div>
 
               <p className="mt-4 text-xs text-muted-foreground/70">
-                Minimum delay is {MIN_SAFE_STEP_MS}ms. Console logs include a full breakdown after each roll.
+                Minimum delay is {MIN_SAFE_STEP_MS}ms. Console logs include a
+                full breakdown after each roll.
               </p>
             </div>
           </div>

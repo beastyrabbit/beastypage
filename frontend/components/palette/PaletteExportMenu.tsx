@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { cn } from "@/lib/utils";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
 import type { ExportFormat } from "@/lib/palette-generator/types";
 
@@ -17,7 +16,10 @@ const EXPORT_FORMATS: { key: ExportFormat; label: string; desc: string }[] = [
   { key: "css", label: "CSS", desc: "CSS custom properties" },
 ];
 
-export function PaletteExportMenu({ onExport, label = "Export" }: PaletteExportMenuProps) {
+export function PaletteExportMenu({
+  onExport,
+  label = "Export",
+}: PaletteExportMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

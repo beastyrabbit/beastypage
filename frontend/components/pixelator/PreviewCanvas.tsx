@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useId, useRef, useState } from "react";
 import Image from "next/image";
+import { useCallback, useId, useRef, useState } from "react";
 
 interface ImageDimensions {
   w: number;
@@ -53,7 +53,9 @@ export function PreviewCanvas({
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2">
               <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <span className="text-sm font-medium text-white">Processing...</span>
+              <span className="text-sm font-medium text-white">
+                Processing...
+              </span>
             </div>
           </div>
         )}
@@ -68,7 +70,11 @@ export function PreviewCanvas({
           style={{ imageRendering: "pixelated" }}
           onLoad={handleImgLoad}
         />
-        <GridOverlay showGrid={showGrid} gridSize={gridSize} imgDims={imgDims} />
+        <GridOverlay
+          showGrid={showGrid}
+          gridSize={gridSize}
+          imgDims={imgDims}
+        />
       </div>
 
       {/* Controls bar */}
@@ -109,7 +115,11 @@ interface GridOverlayProps {
   imgDims: ImageDimensions | null;
 }
 
-function GridOverlay({ showGrid, gridSize, imgDims }: GridOverlayProps): React.ReactNode {
+function GridOverlay({
+  showGrid,
+  gridSize,
+  imgDims,
+}: GridOverlayProps): React.ReactNode {
   const patternId = useId();
 
   if (!showGrid || !gridSize || !imgDims) return null;

@@ -1,10 +1,10 @@
 "use client";
 
+import { useDroppable } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { useDroppable } from "@dnd-kit/core";
 import type { PipelineStep } from "@/lib/pixelator/types";
 import { PipelineStepCard } from "./PipelineStepCard";
 
@@ -19,7 +19,7 @@ export function PipelineBuilder({
   steps,
   onUpdateStep,
   onRemoveStep,
-  onReorderSteps,
+  onReorderSteps: _onReorderSteps,
 }: PipelineBuilderProps) {
   const { setNodeRef, isOver } = useDroppable({ id: "pipeline-droppable" });
 
@@ -41,7 +41,10 @@ export function PipelineBuilder({
           </p>
         </div>
       ) : (
-        <SortableContext items={steps.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext
+          items={steps.map((s) => s.id)}
+          strategy={verticalListSortingStrategy}
+        >
           <div className="flex flex-col gap-3">
             {steps.map((step, index) => (
               <PipelineStepCard

@@ -1,12 +1,17 @@
+import { Gamepad2, PawPrint, Wrench } from "lucide-react";
 import Link from "next/link";
-import { PawPrint, Gamepad2, Wrench } from "lucide-react";
+import type {
+  ProjectCategory,
+  ProjectCategoryConfig,
+} from "@/components/site-nav-config";
 import ArrowNarrowRightIcon from "@/components/ui/arrow-narrow-right-icon";
-import SparklesIcon from "@/components/ui/sparkles-icon";
 import PaintIcon from "@/components/ui/paint-icon";
+import SparklesIcon from "@/components/ui/sparkles-icon";
 
-import type { ProjectCategory, ProjectCategoryConfig } from "@/components/site-nav-config";
-
-const CATEGORY_ICONS: Record<ProjectCategory, React.ComponentType<{ className?: string; size?: number }>> = {
+const CATEGORY_ICONS: Record<
+  ProjectCategory,
+  React.ComponentType<{ className?: string; size?: number }>
+> = {
   "warrior-cats": PawPrint,
   gacha: SparklesIcon,
   artist: PaintIcon,
@@ -26,7 +31,12 @@ type CategoryCardProps = {
   index: number;
 };
 
-export function CategoryCard({ category, toolPreviews, toolCount, index }: CategoryCardProps) {
+export function CategoryCard({
+  category,
+  toolPreviews,
+  toolCount,
+  index,
+}: CategoryCardProps) {
   const Icon = CATEGORY_ICONS[category.key];
 
   return (
@@ -50,10 +60,15 @@ export function CategoryCard({ category, toolPreviews, toolCount, index }: Categ
       <div className="relative z-10 flex items-start justify-between">
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-white/10 p-3 transition-colors group-hover:bg-white/15">
-            <Icon size={24} className="text-foreground/80 group-hover:text-foreground" />
+            <Icon
+              size={24}
+              className="text-foreground/80 group-hover:text-foreground"
+            />
           </div>
           <div>
-            <h3 className={`text-xl font-bold text-foreground group-hover:text-gradient-${category.key} transition-colors`}>
+            <h3
+              className={`text-xl font-bold text-foreground group-hover:text-gradient-${category.key} transition-colors`}
+            >
               {category.label}
             </h3>
             <span className="text-xs font-medium text-muted-foreground">

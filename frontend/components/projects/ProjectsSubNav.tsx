@@ -1,15 +1,20 @@
 "use client";
 
+import { Gamepad2, PawPrint, Wrench } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PawPrint, Gamepad2, Wrench } from "lucide-react";
-import SparklesIcon from "@/components/ui/sparkles-icon";
+import {
+  PROJECT_CATEGORIES,
+  type ProjectCategory,
+} from "@/components/site-nav-config";
 import PaintIcon from "@/components/ui/paint-icon";
-
+import SparklesIcon from "@/components/ui/sparkles-icon";
 import { cn } from "@/lib/utils";
-import { PROJECT_CATEGORIES, type ProjectCategory } from "@/components/site-nav-config";
 
-const CATEGORY_ICONS: Record<ProjectCategory, React.ComponentType<{ className?: string; size?: number }>> = {
+const CATEGORY_ICONS: Record<
+  ProjectCategory,
+  React.ComponentType<{ className?: string; size?: number }>
+> = {
   "warrior-cats": PawPrint,
   gacha: SparklesIcon,
   artist: PaintIcon,
@@ -41,7 +46,7 @@ export function ProjectsSubNav() {
                   "projects-subnav-pill flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-300",
                   isActive
                     ? "projects-subnav-pill--active"
-                    : "border border-white/5 bg-white/5 text-muted-foreground hover:border-white/10 hover:bg-white/10 hover:text-foreground"
+                    : "border border-white/5 bg-white/5 text-muted-foreground hover:border-white/10 hover:bg-white/10 hover:text-foreground",
                 )}
               >
                 <Icon size={16} />
