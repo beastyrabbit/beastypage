@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { Loader2, ImageIcon, Shuffle } from "lucide-react";
+import { ImageIcon, Loader2, Shuffle } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { toast } from "sonner";
 import ArrowBigUpDashIcon from "@/components/ui/arrow-big-up-dash-icon";
 import LinkAnimatedIcon from "@/components/ui/link-icon";
-import { toast } from "sonner";
 
 import {
   fetchRandomWikimediaImage,
@@ -18,7 +18,12 @@ interface ImageUploaderProps {
   error: string | null;
 }
 
-const VALID_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+const VALID_IMAGE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export function ImageUploader({
@@ -28,7 +33,9 @@ export function ImageUploader({
 }: ImageUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [urlInput, setUrlInput] = useState("");
-  const [loadingCategory, setLoadingCategory] = useState<ImageCategory | null>(null);
+  const [loadingCategory, setLoadingCategory] = useState<ImageCategory | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleRandomImage = useCallback(
@@ -39,13 +46,13 @@ export function ImageUploader({
         onImageLoad(url);
       } catch (err) {
         toast.error(
-          err instanceof Error ? err.message : "Failed to fetch random image"
+          err instanceof Error ? err.message : "Failed to fetch random image",
         );
       } finally {
         setLoadingCategory(null);
       }
     },
-    [onImageLoad]
+    [onImageLoad],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -80,7 +87,7 @@ export function ImageUploader({
         onImageLoad(file);
       }
     },
-    [onImageLoad]
+    [onImageLoad],
   );
 
   const handleFileSelect = useCallback(
@@ -99,7 +106,7 @@ export function ImageUploader({
         onImageLoad(file);
       }
     },
-    [onImageLoad]
+    [onImageLoad],
   );
 
   const handleUrlSubmit = useCallback(
@@ -109,7 +116,7 @@ export function ImageUploader({
         onImageLoad(urlInput.trim());
       }
     },
-    [urlInput, onImageLoad]
+    [urlInput, onImageLoad],
   );
 
   const handleClick = useCallback(() => {
@@ -154,7 +161,9 @@ export function ImageUploader({
             </div>
             <div className="text-center">
               <p className="text-lg font-semibold text-foreground">
-                {isDragging ? "Drop your image here" : "Drop an image or click to upload"}
+                {isDragging
+                  ? "Drop your image here"
+                  : "Drop an image or click to upload"}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 PNG, JPEG, WebP, GIF (max 10MB)
@@ -175,7 +184,10 @@ export function ImageUploader({
 
       {/* URL input */}
       <div className="glass-card p-6">
-        <form onSubmit={handleUrlSubmit} className="flex flex-col gap-4 sm:flex-row">
+        <form
+          onSubmit={handleUrlSubmit}
+          className="flex flex-col gap-4 sm:flex-row"
+        >
           <div className="flex flex-1 items-center gap-3 rounded-xl border border-border/50 bg-background/50 px-4 py-3">
             <LinkAnimatedIcon size={20} className="text-muted-foreground" />
             <input
@@ -196,7 +208,8 @@ export function ImageUploader({
           </button>
         </form>
         <p className="mt-3 text-xs text-muted-foreground">
-          Note: Some URLs may be blocked due to CORS. Try downloading the image first if loading fails.
+          Note: Some URLs may be blocked due to CORS. Try downloading the image
+          first if loading fails.
         </p>
       </div>
 

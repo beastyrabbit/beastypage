@@ -1,13 +1,13 @@
 "use client";
 
+import { Cloud, PawPrint, Twitch } from "lucide-react";
 import Link from "next/link";
-import { Twitch, Cloud, PawPrint } from "lucide-react";
-import TwitterXIcon from "@/components/ui/twitter-x-icon";
+import type { ComponentType } from "react";
+import CoffeeIcon from "@/components/ui/coffee-icon";
 import GithubIcon from "@/components/ui/github-icon";
 import HomeIcon from "@/components/ui/home-icon";
-import CoffeeIcon from "@/components/ui/coffee-icon";
+import TwitterXIcon from "@/components/ui/twitter-x-icon";
 import YoutubeIcon from "@/components/ui/youtube-icon";
-import type { ComponentType } from "react";
 
 type LinkCard = {
   href: string;
@@ -73,7 +73,11 @@ const HERO_BUTTON_CLASS =
   "inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]";
 
 /** Hero quick-links (Twitch + Twitter pills) used on the home and personal pages */
-export function HeroSocialButtons({ twitterLabel = "X" }: { twitterLabel?: string }) {
+export function HeroSocialButtons({
+  twitterLabel = "X",
+}: {
+  twitterLabel?: string;
+}) {
   return (
     <>
       <Link
@@ -110,7 +114,10 @@ export function PrimarySocialLinks() {
           style={{ animationDelay: `${index * 50}ms` }}
         >
           <div className="p-3 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors">
-            <Icon size={28} className="text-amber-200 group-hover:text-amber-100 transition-colors" />
+            <Icon
+              size={28}
+              className="text-amber-200 group-hover:text-amber-100 transition-colors"
+            />
           </div>
           <span className="text-xl font-bold text-foreground group-hover:text-primary transition-colors">
             {label}
@@ -155,7 +162,10 @@ export function AllSocialLinks() {
           style={{ animationDelay: `${index * 50}ms` }}
         >
           <div className="p-3 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors">
-            <Icon size={24} className="text-amber-200 group-hover:text-amber-100 transition-colors" />
+            <Icon
+              size={24}
+              className="text-amber-200 group-hover:text-amber-100 transition-colors"
+            />
           </div>
           <span className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
             {label}

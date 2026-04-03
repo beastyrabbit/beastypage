@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import DownChevron from '@/components/ui/down-chevron';
-import CheckedIcon from '@/components/ui/checked-icon';
-import MagnifierIcon from '@/components/ui/magnifier-icon';
-import PaintIcon from '@/components/ui/paint-icon';
-import { usePaletteOptions } from './usePaletteOptions';
-import type { PaletteMode } from '@/lib/palettes';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import CheckedIcon from "@/components/ui/checked-icon";
+import DownChevron from "@/components/ui/down-chevron";
+import MagnifierIcon from "@/components/ui/magnifier-icon";
+import PaintIcon from "@/components/ui/paint-icon";
+import type { PaletteMode } from "@/lib/palettes";
+import { usePaletteOptions } from "./usePaletteOptions";
 
 interface PaletteSingleSelectProps {
   value: PaletteMode;
@@ -35,13 +35,17 @@ export function PaletteSingleSelect({
   value,
   onChange,
   showSearch = true,
-  className = '',
+  className = "",
   label,
 }: PaletteSingleSelectProps) {
   const additionalOptions = usePaletteOptions();
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [search, setSearch] = useState("");
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
 
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -51,13 +55,13 @@ export function PaletteSingleSelect({
   const allOptions = useMemo(() => {
     return [
       {
-        id: 'off' as PaletteMode,
-        label: 'Classic',
-        description: 'Original 19 ClanGen base colors',
+        id: "off" as PaletteMode,
+        label: "Classic",
+        description: "Original 19 ClanGen base colors",
         colorCount: 19,
         previewColors: [] as Array<[number, number, number]>,
       },
-      ...additionalOptions.map(opt => ({
+      ...additionalOptions.map((opt) => ({
         ...opt,
         id: opt.id as PaletteMode,
       })),
@@ -71,13 +75,13 @@ export function PaletteSingleSelect({
     return allOptions.filter(
       (opt) =>
         opt.label.toLowerCase().includes(lower) ||
-        opt.description?.toLowerCase().includes(lower)
+        opt.description?.toLowerCase().includes(lower),
     );
   }, [allOptions, search]);
 
   // Get currently selected option
   const selectedOption = useMemo(() => {
-    return allOptions.find(opt => opt.id === value) ?? allOptions[0];
+    return allOptions.find((opt) => opt.id === value) ?? allOptions[0];
   }, [allOptions, value]);
 
   // Calculate dropdown position when opening
@@ -89,9 +93,10 @@ export function PaletteSingleSelect({
       const dropdownHeight = 360;
 
       // Position above if not enough space below
-      const top = spaceBelow < dropdownHeight && rect.top > dropdownHeight
-        ? rect.top - dropdownHeight - 4
-        : rect.bottom + 4;
+      const top =
+        spaceBelow < dropdownHeight && rect.top > dropdownHeight
+          ? rect.top - dropdownHeight - 4
+          : rect.bottom + 4;
 
       setDropdownPosition({
         top,
@@ -114,39 +119,41 @@ export function PaletteSingleSelect({
         !dropdownRef.current.contains(target)
       ) {
         setIsOpen(false);
-        setSearch('');
+        setSearch("");
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Close on escape key
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && isOpen) {
+      if (event.key === "Escape" && isOpen) {
         setIsOpen(false);
-        setSearch('');
+        setSearch("");
       }
     }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
   const selectOption = useCallback(
     (id: PaletteMode) => {
       onChange(id);
       setIsOpen(false);
-      setSearch('');
+      setSearch("");
     },
-    [onChange]
+    [onChange],
   );
 
   return (
     <>
       {/* Label if provided */}
       {label && (
-        <span className="mr-2 text-sm font-semibold text-neutral-300">{label}</span>
+        <span className="mr-2 text-sm font-semibold text-neutral-300">
+          {label}
+        </span>
       )}
 
       {/* Trigger button */}
@@ -158,14 +165,16 @@ export function PaletteSingleSelect({
       >
         <div className="flex items-center gap-2">
           <PaintIcon size={16} className="text-slate-400" />
-          <span className="font-medium text-slate-100">{selectedOption.label}</span>
+          <span className="font-medium text-slate-100">
+            {selectedOption.label}
+          </span>
           {selectedOption.previewColors.length > 0 && (
             <ColorSwatch colors={selectedOption.previewColors} />
           )}
         </div>
         <DownChevron
           size={16}
-          className={`shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`shrink-0 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -187,7 +196,10 @@ export function PaletteSingleSelect({
             {showSearch && (
               <div className="border-b border-slate-700/30 p-2">
                 <div className="relative">
-                  <MagnifierIcon size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <MagnifierIcon
+                    size={16}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500"
+                  />
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -210,21 +222,23 @@ export function PaletteSingleSelect({
                     type="button"
                     onClick={() => selectOption(opt.id)}
                     className={`flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-slate-800 ${
-                      isSelected ? 'bg-amber-500/10' : ''
+                      isSelected ? "bg-amber-500/10" : ""
                     }`}
                   >
                     <div
                       className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
                         isSelected
-                          ? 'border-amber-400 bg-amber-500 text-slate-900'
-                          : 'border-slate-600 bg-slate-800'
+                          ? "border-amber-400 bg-amber-500 text-slate-900"
+                          : "border-slate-600 bg-slate-800"
                       }`}
                     >
                       {isSelected && <CheckedIcon size={12} />}
                     </div>
                     <div className="flex-1 overflow-hidden">
                       <div className="flex items-center gap-2">
-                        <span className={`truncate text-sm font-medium ${isSelected ? 'text-amber-100' : 'text-slate-100'}`}>
+                        <span
+                          className={`truncate text-sm font-medium ${isSelected ? "text-amber-100" : "text-slate-100"}`}
+                        >
                           {opt.label}
                         </span>
                         <span className="shrink-0 text-xs text-slate-500">
@@ -251,7 +265,7 @@ export function PaletteSingleSelect({
               )}
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </>
   );

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { MAX_LAYER_VALUE, clampLayerValue } from "@/utils/catSettingsHelpers";
+import { clampLayerValue, MAX_LAYER_VALUE } from "@/utils/catSettingsHelpers";
 import type { LayerRange } from "@/utils/singleCatVariants";
 
 // ---------------------------------------------------------------------------
@@ -27,7 +27,11 @@ function LayerRangeSelectorRow({
   onSelect,
 }: LayerRangeSelectorRowProps) {
   return (
-    <div className="flex items-center gap-2" role="radiogroup" aria-label={`${label} ${type}`}>
+    <div
+      className="flex items-center gap-2"
+      role="radiogroup"
+      aria-label={`${label} ${type}`}
+    >
       <span className="w-10 text-[10px] uppercase tracking-wide text-muted-foreground/70">
         {type === "min" ? "Min" : "Max"}
       </span>
@@ -46,7 +50,9 @@ function LayerRangeSelectorRow({
               className={cn(
                 "h-8 flex-1 rounded-md text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                 isDisabled && "cursor-not-allowed opacity-40",
-                !isActive && !isDisabled && "bg-background text-muted-foreground hover:bg-primary/10",
+                !isActive &&
+                  !isDisabled &&
+                  "bg-background text-muted-foreground hover:bg-primary/10",
                 isActive && "bg-primary text-primary-foreground shadow-inner",
               )}
             >
@@ -71,9 +77,18 @@ interface LayerRangeSelectorProps {
   compact?: boolean;
 }
 
-export function LayerRangeSelector({ label, value, onChange, compact }: LayerRangeSelectorProps) {
-  const summary = value.min === value.max ? `${value.min}` : `${value.min} – ${value.max}`;
-  const options = useMemo(() => Array.from({ length: MAX_LAYER_VALUE + 1 }, (_, index) => index), []);
+export function LayerRangeSelector({
+  label,
+  value,
+  onChange,
+  compact,
+}: LayerRangeSelectorProps) {
+  const summary =
+    value.min === value.max ? `${value.min}` : `${value.min} – ${value.max}`;
+  const options = useMemo(
+    () => Array.from({ length: MAX_LAYER_VALUE + 1 }, (_, index) => index),
+    [],
+  );
 
   const handleMinSelect = (nextMin: number) => {
     const clampedMin = clampLayerValue(nextMin);

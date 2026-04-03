@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Sun, Filter } from "lucide-react";
-import GearIcon from "@/components/ui/gear-icon";
+import { Filter, Sun } from "lucide-react";
+import { useCallback, useState } from "react";
 import DownChevron from "@/components/ui/down-chevron";
-import RefreshIcon from "@/components/ui/refresh-icon";
+import GearIcon from "@/components/ui/gear-icon";
 import PaintIcon from "@/components/ui/paint-icon";
 import PenIcon from "@/components/ui/pen-icon";
+import RefreshIcon from "@/components/ui/refresh-icon";
 
 interface PaletteSettingsProps {
   brightnessFactors: number[];
@@ -63,14 +63,16 @@ export function PaletteSettings({
     return JSON.stringify(hueShifts) === JSON.stringify(values);
   };
 
-  const isCustomBrightness = !BRIGHTNESS_PRESETS.some(p => isBrightnessPreset(p.values));
-  const isCustomHue = !HUE_PRESETS.some(p => isHuePreset(p.values));
+  const isCustomBrightness = !BRIGHTNESS_PRESETS.some((p) =>
+    isBrightnessPreset(p.values),
+  );
+  const isCustomHue = !HUE_PRESETS.some((p) => isHuePreset(p.values));
 
   const handleCustomBrightnessSubmit = useCallback(() => {
     const values = customBrightnessInput
-      .split(/[,\/\s]+/)
-      .map(v => parseFloat(v.trim()))
-      .filter(v => !isNaN(v) && v > 0 && v <= 5);
+      .split(/[,/\s]+/)
+      .map((v) => parseFloat(v.trim()))
+      .filter((v) => !Number.isNaN(v) && v > 0 && v <= 5);
 
     if (values.length > 0) {
       onBrightnessFactorsChange(values.sort((a, b) => a - b));
@@ -80,9 +82,9 @@ export function PaletteSettings({
 
   const handleCustomHueSubmit = useCallback(() => {
     const values = customHueInput
-      .split(/[,\/\s]+/)
-      .map(v => parseFloat(v.trim()))
-      .filter(v => !isNaN(v) && v >= -180 && v <= 360);
+      .split(/[,/\s]+/)
+      .map((v) => parseFloat(v.trim()))
+      .filter((v) => !Number.isNaN(v) && v >= -180 && v <= 360);
 
     if (values.length > 0) {
       onHueShiftsChange(values.sort((a, b) => a - b));
@@ -129,7 +131,9 @@ export function PaletteSettings({
       {/* Collapsible content */}
       <div
         className={`grid transition-all duration-200 ease-out ${
-          isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          isExpanded
+            ? "grid-rows-[1fr] opacity-100"
+            : "grid-rows-[0fr] opacity-0"
         }`}
       >
         <div className="overflow-hidden">
@@ -279,7 +283,9 @@ export function PaletteSettings({
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70">
                 <span>Current:</span>
                 <code className="rounded bg-muted/50 px-1.5 py-0.5 font-mono">
-                  {hueShifts.map((s) => `${s >= 0 ? "+" : ""}${s}°`).join(" → ")}
+                  {hueShifts
+                    .map((s) => `${s >= 0 ? "+" : ""}${s}°`)
+                    .join(" → ")}
                 </code>
               </div>
             </div>
@@ -288,7 +294,9 @@ export function PaletteSettings({
             <div className="flex items-center justify-between rounded-lg bg-muted/30 px-3 py-2">
               <div className="flex items-center gap-2">
                 <Filter className="size-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium">Filter Black & White</span>
+                <span className="text-xs font-medium">
+                  Filter Black & White
+                </span>
               </div>
               <label className="relative inline-flex cursor-pointer items-center">
                 <input

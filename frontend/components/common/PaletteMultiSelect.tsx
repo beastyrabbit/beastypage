@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import DownChevron from '@/components/ui/down-chevron';
-import XIcon from '@/components/ui/x-icon';
-import CheckedIcon from '@/components/ui/checked-icon';
-import MagnifierIcon from '@/components/ui/magnifier-icon';
-import PaintIcon from '@/components/ui/paint-icon';
-import { usePaletteOptions, type PaletteOption } from './usePaletteOptions';
-import type { PaletteId } from '@/lib/palettes';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import CheckedIcon from "@/components/ui/checked-icon";
+import DownChevron from "@/components/ui/down-chevron";
+import MagnifierIcon from "@/components/ui/magnifier-icon";
+import PaintIcon from "@/components/ui/paint-icon";
+import XIcon from "@/components/ui/x-icon";
+import type { PaletteId } from "@/lib/palettes";
+import { usePaletteOptions } from "./usePaletteOptions";
 
 interface PaletteMultiSelectProps {
   selected: Set<PaletteId>;
@@ -40,13 +40,17 @@ export function PaletteMultiSelect({
   includeClassic = true,
   onClassicChange,
   showSearch = true,
-  className = '',
+  className = "",
   compact = false,
 }: PaletteMultiSelectProps) {
   const options = usePaletteOptions();
   const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [search, setSearch] = useState("");
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
 
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -59,7 +63,7 @@ export function PaletteMultiSelect({
     return options.filter(
       (opt) =>
         opt.label.toLowerCase().includes(lower) ||
-        opt.description?.toLowerCase().includes(lower)
+        opt.description?.toLowerCase().includes(lower),
     );
   }, [options, search]);
 
@@ -92,11 +96,11 @@ export function PaletteMultiSelect({
         !dropdownRef.current.contains(target)
       ) {
         setIsOpen(false);
-        setSearch('');
+        setSearch("");
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const toggleOption = useCallback(
@@ -109,7 +113,7 @@ export function PaletteMultiSelect({
       }
       onChange(newSelected);
     },
-    [selected, onChange]
+    [selected, onChange],
   );
 
   const toggleAll = useCallback(() => {
@@ -130,20 +134,20 @@ export function PaletteMultiSelect({
       newSelected.delete(id);
       onChange(newSelected);
     },
-    [selected, onChange]
+    [selected, onChange],
   );
 
   // Generate display text
   const displayText = useMemo(() => {
     const parts: string[] = [];
-    if (includeClassic) parts.push('Classic');
+    if (includeClassic) parts.push("Classic");
     if (allSelected && selectedCount > 0) {
       parts.push(`All Additional (${selectedCount})`);
     } else if (selectedCount > 0) {
-      parts.push(`${selectedCount} palette${selectedCount === 1 ? '' : 's'}`);
+      parts.push(`${selectedCount} palette${selectedCount === 1 ? "" : "s"}`);
     }
-    if (parts.length === 0) return 'None selected';
-    return parts.join(' + ');
+    if (parts.length === 0) return "None selected";
+    return parts.join(" + ");
   }, [includeClassic, selectedCount, allSelected]);
 
   return (
@@ -183,8 +187,11 @@ export function PaletteMultiSelect({
                             tabIndex={0}
                             onClick={(e) => removeOption(id, e)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                removeOption(id, e as unknown as React.MouseEvent);
+                              if (e.key === "Enter" || e.key === " ") {
+                                removeOption(
+                                  id,
+                                  e as unknown as React.MouseEvent,
+                                );
                               }
                             }}
                             className="cursor-pointer rounded-full hover:bg-primary/30"
@@ -202,14 +209,16 @@ export function PaletteMultiSelect({
                 </>
               )}
               {!includeClassic && selected.size === 0 && (
-                <span className="text-muted-foreground">Select palettes...</span>
+                <span className="text-muted-foreground">
+                  Select palettes...
+                </span>
               )}
             </>
           )}
         </div>
         <DownChevron
           size={16}
-          className={`shrink-0 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -231,7 +240,10 @@ export function PaletteMultiSelect({
             {showSearch && (
               <div className="border-b border-border/30 p-2">
                 <div className="relative">
-                  <MagnifierIcon size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <MagnifierIcon
+                    size={16}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -256,8 +268,8 @@ export function PaletteMultiSelect({
                   <div
                     className={`flex size-4 shrink-0 items-center justify-center rounded border ${
                       includeClassic
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-background'
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background"
                     }`}
                   >
                     {includeClassic && <CheckedIcon size={12} />}
@@ -272,7 +284,9 @@ export function PaletteMultiSelect({
               )}
 
               {/* Divider */}
-              {onClassicChange && <div className="my-1 border-t border-border/30" />}
+              {onClassicChange && (
+                <div className="my-1 border-t border-border/30" />
+              )}
 
               {/* Select All option */}
               <button
@@ -283,10 +297,10 @@ export function PaletteMultiSelect({
                 <div
                   className={`flex size-4 shrink-0 items-center justify-center rounded border ${
                     allSelected
-                      ? 'border-primary bg-primary text-primary-foreground'
+                      ? "border-primary bg-primary text-primary-foreground"
                       : selectedCount > 0
-                        ? 'border-primary/50 bg-primary/20'
-                        : 'border-border bg-background'
+                        ? "border-primary/50 bg-primary/20"
+                        : "border-border bg-background"
                   }`}
                 >
                   {allSelected && <CheckedIcon size={12} />}
@@ -295,7 +309,9 @@ export function PaletteMultiSelect({
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="text-sm font-semibold">All Additional Palettes</div>
+                  <div className="text-sm font-semibold">
+                    All Additional Palettes
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {options.length} themed color palettes
                   </div>
@@ -318,15 +334,17 @@ export function PaletteMultiSelect({
                     <div
                       className={`flex size-4 shrink-0 items-center justify-center rounded border ${
                         isSelected
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-background'
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-background"
                       }`}
                     >
                       {isSelected && <CheckedIcon size={12} />}
                     </div>
                     <div className="flex-1 overflow-hidden">
                       <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-medium">{opt.label}</span>
+                        <span className="truncate text-sm font-medium">
+                          {opt.label}
+                        </span>
                         <span className="shrink-0 text-xs text-muted-foreground">
                           ({opt.colorCount})
                         </span>
@@ -349,7 +367,7 @@ export function PaletteMultiSelect({
               )}
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </>
   );

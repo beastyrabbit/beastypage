@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
+import { cn } from "@/lib/utils";
 import type { AfterlifeOption, ExtendedMode } from "@/utils/singleCatVariants";
 import { WizardExampleCats } from "../WizardExampleCats";
 import type { WizardStepProps } from "./types";
@@ -65,9 +65,17 @@ const VARIANTS = [
   { label: "Dark Forest", darkForest: true, dead: false },
 ] as const;
 
-function AfterlifeComparison({ settings }: { settings: WizardStepProps["settings"] }) {
+function AfterlifeComparison({
+  settings,
+}: {
+  settings: WizardStepProps["settings"];
+}) {
   const { generator, ready } = useCatGenerator();
-  const [cats, setCats] = useState<(ComparisonCat | null)[]>([null, null, null]);
+  const [cats, setCats] = useState<(ComparisonCat | null)[]>([
+    null,
+    null,
+    null,
+  ]);
   const [isGenerating, setIsGenerating] = useState(false);
   const generatedRef = useRef(false);
 
@@ -103,7 +111,9 @@ function AfterlifeComparison({ settings }: { settings: WizardStepProps["settings
         const canvas = result.canvas;
         const imageDataUrl =
           result.imageDataUrl ??
-          ("toDataURL" in canvas ? (canvas as HTMLCanvasElement).toDataURL("image/png") : "");
+          ("toDataURL" in canvas
+            ? (canvas as HTMLCanvasElement).toDataURL("image/png")
+            : "");
         setCats((prev) => {
           const next = [...prev];
           next[i] = { label: variant.label, imageDataUrl };

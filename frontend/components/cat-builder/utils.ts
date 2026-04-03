@@ -3,19 +3,23 @@ import type { SpriteMapperApi } from "./types";
 export function formatName(value: unknown): string {
   if (value === null || value === undefined) return "None";
   if (typeof value === "number") return `#${value}`;
-  return String(value)
-    .replace(/[_-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase()) || "None";
+  return (
+    String(value)
+      .replace(/[_-]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase()) || "None"
+  );
 }
 
 export function cloneParams<T extends object>(params: T): T {
   return structuredClone(params) as T;
 }
 
-export function canvasToDataUrl(canvas: HTMLCanvasElement | OffscreenCanvas): string {
+export function canvasToDataUrl(
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+): string {
   try {
     if ("toDataURL" in canvas && typeof canvas.toDataURL === "function") {
       return canvas.toDataURL("image/png");
@@ -48,7 +52,10 @@ const BASE_COLOUR_SWATCHES: Record<string, string> = {
   CHOCOLATE: "#2f1b11",
 };
 
-export function getColourSwatch(name: string, mapper: SpriteMapperApi | null): string {
+export function getColourSwatch(
+  name: string,
+  mapper: SpriteMapperApi | null,
+): string {
   const fallback = "#94a3b8";
   if (!name) return fallback;
   const direct = BASE_COLOUR_SWATCHES[name.toUpperCase()];

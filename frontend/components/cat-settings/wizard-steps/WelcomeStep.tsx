@@ -20,8 +20,8 @@ export function WelcomeStep({ onNext, hasInitialCode }: WizardStepProps) {
           you can customise exactly how your cat looks.
         </p>
         <p className="text-sm text-muted-foreground/70">
-          At the end you&apos;ll get a settings code to copy and submit with your
-          order. You can always come back and tweak it later.
+          At the end you&apos;ll get a settings code to copy and submit with
+          your order. You can always come back and tweak it later.
         </p>
       </section>
 

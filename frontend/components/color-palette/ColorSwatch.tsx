@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback } from "react";
-import CopyIcon from "@/components/ui/copy-icon";
-import CheckedIcon from "@/components/ui/checked-icon";
 import { toast } from "sonner";
-
+import CheckedIcon from "@/components/ui/checked-icon";
+import CopyIcon from "@/components/ui/copy-icon";
+import {
+  getContrastColor,
+  hslToCss,
+  rgbToCss,
+} from "@/lib/color-extraction/color-utils";
 import type { ExtractedColor } from "@/lib/color-extraction/types";
-import { getContrastColor, rgbToCss, hslToCss } from "@/lib/color-extraction/color-utils";
 
 interface ColorSwatchProps {
   color: ExtractedColor;
@@ -25,22 +28,21 @@ export function ColorSwatch({
 }: ColorSwatchProps) {
   const textColor = getContrastColor(color.rgb);
 
-  const copyToClipboard = useCallback(
-    async (text: string, format: string) => {
-      try {
-        await navigator.clipboard.writeText(text);
-        toast.success(`Copied ${format}: ${text}`);
-      } catch {
-        toast.error("Failed to copy to clipboard");
-      }
-    },
-    []
-  );
+  const copyToClipboard = useCallback(async (text: string, format: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`Copied ${format}: ${text}`);
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
+  }, []);
 
   return (
     <div
       className={`group relative cursor-pointer overflow-hidden rounded-xl transition-all duration-200 hover:scale-105 hover:shadow-lg ${
-        isSelected ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
+        isSelected
+          ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+          : ""
       }`}
       onMouseEnter={() => onHover(index)}
       onMouseLeave={() => onHover(null)}
@@ -61,10 +63,7 @@ export function ColorSwatch({
         >
           {index + 1}
         </span>
-        <span
-          className="text-xs font-medium"
-          style={{ color: textColor }}
-        >
+        <span className="text-xs font-medium" style={{ color: textColor }}>
           {color.prevalence}%
         </span>
       </div>
@@ -79,7 +78,9 @@ export function ColorSwatch({
           }}
           className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-xs transition-colors hover:bg-primary/10"
         >
-          <span className="font-mono font-semibold">{color.hex.toUpperCase()}</span>
+          <span className="font-mono font-semibold">
+            {color.hex.toUpperCase()}
+          </span>
           <CopyIcon size={12} className="opacity-50 group-hover:opacity-100" />
         </button>
 

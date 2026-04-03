@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import XIcon from "@/components/ui/x-icon";
-import MagnifierIcon from "@/components/ui/magnifier-icon";
-import Image from "next/image";
 import { useQuery } from "convex/react";
+import Image from "next/image";
+import { useMemo, useState } from "react";
+import MagnifierIcon from "@/components/ui/magnifier-icon";
+import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { encodeCatShare } from "@/lib/catShare";
@@ -19,30 +19,45 @@ interface HistoryCat {
 
 interface FoundingCoupleSelectorProps {
   onSelect: (params: {
-    mother: { params: CatParams; historyProfileId?: string; name?: { prefix: string; suffix: string; full: string } };
-    father: { params: CatParams; historyProfileId?: string; name?: { prefix: string; suffix: string; full: string } };
+    mother: {
+      params: CatParams;
+      historyProfileId?: string;
+      name?: { prefix: string; suffix: string; full: string };
+    };
+    father: {
+      params: CatParams;
+      historyProfileId?: string;
+      name?: { prefix: string; suffix: string; full: string };
+    };
   }) => void;
   onClose: () => void;
 }
 
 function getPreviewUrl(catData: Record<string, unknown>): string {
-  const params = (catData?.params ?? catData?.finalParams ?? catData) as Record<string, unknown>;
-  const tortieSlots = params?.tortie as Array<Record<string, unknown> | null> | undefined;
+  const params = (catData?.params ?? catData?.finalParams ?? catData) as Record<
+    string,
+    unknown
+  >;
+  const tortieSlots = params?.tortie as
+    | Array<Record<string, unknown> | null>
+    | undefined;
   const encoded = encodeCatShare({
     params,
     accessorySlots: (params?.accessories as string[]) ?? [],
     scarSlots: (params?.scars as string[]) ?? [],
     tortieSlots: tortieSlots ?? [],
     counts: {
-      accessories: ((params?.accessories as string[])?.length ?? 0),
-      scars: ((params?.scars as string[])?.length ?? 0),
-      tortie: (tortieSlots?.length ?? 0),
+      accessories: (params?.accessories as string[])?.length ?? 0,
+      scars: (params?.scars as string[])?.length ?? 0,
+      tortie: tortieSlots?.length ?? 0,
     },
   });
   return `/api/preview/_?cat=${encodeURIComponent(encoded)}`;
 }
 
-function parseCatName(catName: string | null | undefined): { prefix: string; suffix: string; full: string } | undefined {
+function parseCatName(
+  catName: string | null | undefined,
+): { prefix: string; suffix: string; full: string } | undefined {
   if (!catName) return undefined;
   const trimmed = catName.trim();
   if (!trimmed || trimmed.toLowerCase() === "unnamed cat") return undefined;
@@ -68,7 +83,10 @@ function parseCatName(catName: string | null | undefined): { prefix: string; suf
   return { prefix: trimmed, suffix: "", full: trimmed };
 }
 
-export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSelectorProps) {
+export function FoundingCoupleSelector({
+  onSelect,
+  onClose,
+}: FoundingCoupleSelectorProps) {
   const [selectedMother, setSelectedMother] = useState<HistoryCat | null>(null);
   const [selectedFather, setSelectedFather] = useState<HistoryCat | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -91,7 +109,9 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
           id: profile.id,
           catName: profile.catName || null,
           creatorName: profile.creatorName || null,
-          previewUrl: getPreviewUrl(profile.cat_data as Record<string, unknown>),
+          previewUrl: getPreviewUrl(
+            profile.cat_data as Record<string, unknown>,
+          ),
           catData: profile.cat_data as Record<string, unknown>,
         });
       }
@@ -112,7 +132,7 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
     return allCats.filter(
       (c) =>
         c.catName?.toLowerCase().includes(term) ||
-        c.creatorName?.toLowerCase().includes(term)
+        c.creatorName?.toLowerCase().includes(term),
     );
   }, [allCats, searchTerm]);
 
@@ -134,8 +154,12 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
     const motherData = selectedMother.catData;
     const fatherData = selectedFather.catData;
 
-    const motherParams = (motherData?.params ?? motherData?.finalParams ?? motherData) as CatParams;
-    const fatherParams = (fatherData?.params ?? fatherData?.finalParams ?? fatherData) as CatParams;
+    const motherParams = (motherData?.params ??
+      motherData?.finalParams ??
+      motherData) as CatParams;
+    const fatherParams = (fatherData?.params ??
+      fatherData?.finalParams ??
+      fatherData) as CatParams;
 
     onSelect({
       mother: {
@@ -166,7 +190,10 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
           event.preventDefault();
           onClose();
         }
-        if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+        if (
+          (event.key === "Enter" || event.key === " ") &&
+          event.target === event.currentTarget
+        ) {
           event.preventDefault();
           onClose();
         }
@@ -198,7 +225,9 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
                   className="pixelated rounded"
                   unoptimized
                 />
-                <span className="text-sm">{selectedMother.catName ?? "Unnamed"}</span>
+                <span className="text-sm">
+                  {selectedMother.catName ?? "Unnamed"}
+                </span>
                 <button
                   type="button"
                   onClick={() => setSelectedMother(null)}
@@ -208,7 +237,9 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
                 </button>
               </div>
             ) : (
-              <span className="text-xs text-muted-foreground">Click a cat below</span>
+              <span className="text-xs text-muted-foreground">
+                Click a cat below
+              </span>
             )}
           </div>
           <div className="flex flex-1 flex-col items-center gap-2 rounded-lg bg-blue-500/10 p-3">
@@ -223,7 +254,9 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
                   className="pixelated rounded"
                   unoptimized
                 />
-                <span className="text-sm">{selectedFather.catName ?? "Unnamed"}</span>
+                <span className="text-sm">
+                  {selectedFather.catName ?? "Unnamed"}
+                </span>
                 <button
                   type="button"
                   onClick={() => setSelectedFather(null)}
@@ -233,7 +266,9 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
                 </button>
               </div>
             ) : (
-              <span className="text-xs text-muted-foreground">Click a cat below</span>
+              <span className="text-xs text-muted-foreground">
+                Click a cat below
+              </span>
             )}
           </div>
         </div>
@@ -241,7 +276,10 @@ export function FoundingCoupleSelector({ onSelect, onClose }: FoundingCoupleSele
         {/* Search bar */}
         <div className="p-4 border-b border-white/10">
           <div className="relative">
-            <MagnifierIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <MagnifierIcon
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
             <input
               type="text"
               value={searchTerm}

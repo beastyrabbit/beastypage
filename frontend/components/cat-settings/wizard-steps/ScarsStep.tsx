@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
-import { useSpriteMapperOptions, useCatGenerator } from "@/components/cat-builder/hooks";
+import {
+  useCatGenerator,
+  useSpriteMapperOptions,
+} from "@/components/cat-builder/hooks";
 import { formatName } from "@/components/cat-builder/utils";
+import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import { WizardExampleCats } from "../WizardExampleCats";
 import { ForceInitialRollInfo } from "./ForceInitialRollInfo";
 import type { WizardStepProps } from "./types";
@@ -106,11 +109,13 @@ export function ScarsStep(props: WizardStepProps) {
     if (!ready || !generator || !options || generatedRef.current) return;
     generatedRef.current = true;
 
-    const all = Array.from(new Set([
-      ...options.scarBattle,
-      ...options.scarMissing,
-      ...options.scarEnvironmental,
-    ]));
+    const all = Array.from(
+      new Set([
+        ...options.scarBattle,
+        ...options.scarMissing,
+        ...options.scarEnvironmental,
+      ]),
+    );
     const shuffled = pickRandom(all, all.length);
     poolRef.current = shuffled;
 
@@ -133,7 +138,9 @@ export function ScarsStep(props: WizardStepProps) {
   const [expanded, setExpanded] = useState(false);
   const handleShowMore = useCallback(async () => {
     if (!generator || isRendering) return;
-    const remaining = poolRef.current.filter((n) => !shownNamesRef.current.has(n));
+    const remaining = poolRef.current.filter(
+      (n) => !shownNamesRef.current.has(n),
+    );
     if (remaining.length === 0) return;
 
     remaining.forEach((n) => shownNamesRef.current.add(n));
@@ -153,11 +160,14 @@ export function ScarsStep(props: WizardStepProps) {
     <div className="space-y-6">
       {/* Explanation */}
       <section className="space-y-2 rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
-        <h2 className="text-2xl font-bold text-foreground sm:text-3xl">Scars</h2>
+        <h2 className="text-2xl font-bold text-foreground sm:text-3xl">
+          Scars
+        </h2>
         <p className="text-base leading-relaxed text-muted-foreground">
-          Scars tell your cat&apos;s story &mdash; <strong>{poolRef.current.length || 53}</strong> scars
-          across battle, missing parts, and environmental categories. You
-          control how many scars each cat can have.
+          Scars tell your cat&apos;s story &mdash;{" "}
+          <strong>{poolRef.current.length || 53}</strong> scars across battle,
+          missing parts, and environmental categories. You control how many
+          scars each cat can have.
         </p>
       </section>
 
@@ -175,7 +185,11 @@ export function ScarsStep(props: WizardStepProps) {
           onChange={setScarRange}
           compact
         />
-        <ForceInitialRollInfo range={settings.scarRange} layerName="scar" exactLayerCounts={settings.exactLayerCounts} />
+        <ForceInitialRollInfo
+          range={settings.scarRange}
+          layerName="scar"
+          exactLayerCounts={settings.exactLayerCounts}
+        />
       </section>
 
       {/* Scar gallery — below the selector */}
@@ -183,7 +197,10 @@ export function ScarsStep(props: WizardStepProps) {
         <h3 className="mb-4 text-[10px] uppercase tracking-widest text-muted-foreground/70">
           Example Scars
           {isRendering && expanded && (
-            <span className="text-amber-200/70"> &mdash; loading previews...</span>
+            <span className="text-amber-200/70">
+              {" "}
+              &mdash; loading previews...
+            </span>
           )}
         </h3>
         {/* 3 rows of 4 cols = ~420px, then scroll */}
@@ -194,11 +211,16 @@ export function ScarsStep(props: WizardStepProps) {
             ))}
             {isRendering &&
               gallery.length < INITIAL_COUNT &&
-              Array.from({ length: INITIAL_COUNT - gallery.length }).map((_, i) => (
-                <div key={`ph-${i}`} className="flex aspect-square items-center justify-center rounded-xl border border-border/30 bg-background/50">
-                  <div className="size-5 animate-pulse rounded-full bg-muted-foreground/20" />
-                </div>
-              ))}
+              Array.from({ length: INITIAL_COUNT - gallery.length }).map(
+                (_, i) => (
+                  <div
+                    key={`ph-${i}`}
+                    className="flex aspect-square items-center justify-center rounded-xl border border-border/30 bg-background/50"
+                  >
+                    <div className="size-5 animate-pulse rounded-full bg-muted-foreground/20" />
+                  </div>
+                ),
+              )}
           </div>
         </div>
         {!expanded && remainingCount > 0 && (

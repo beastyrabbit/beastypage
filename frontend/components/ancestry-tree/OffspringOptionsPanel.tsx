@@ -19,7 +19,10 @@ const CHANCE_OPTIONS = [
 
 const MAX_COUNT_OPTIONS = [1, 2, 3, 4];
 
-export function OffspringOptionsPanel({ options, onChange }: OffspringOptionsPanelProps) {
+export function OffspringOptionsPanel({
+  options,
+  onChange,
+}: OffspringOptionsPanelProps) {
   const handleAccessoryChanceChange = (value: number) => {
     onChange({ ...options, accessoryChance: value });
   };

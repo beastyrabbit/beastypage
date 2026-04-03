@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useEffect, useRef, useId } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 interface SliderWithInputProps {
   label: string;
@@ -39,14 +39,17 @@ export function SliderWithInput({
     }
   }, [value, isEditing]);
 
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-  }, []);
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setInputValue(e.target.value);
+    },
+    [],
+  );
 
   const handleInputBlur = useCallback(() => {
     setIsEditing(false);
     const parsed = parseFloat(inputValue);
-    if (!isNaN(parsed)) {
+    if (!Number.isNaN(parsed)) {
       // Clamp and snap to step
       const clamped = Math.max(min, Math.min(max, parsed));
       const snapped = Math.round(clamped / step) * step;
@@ -75,15 +78,24 @@ export function SliderWithInput({
     }
   }, []);
 
-  const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = parseFloat(e.target.value);
-    onChange(newValue);
-  }, [onChange]);
+  const handleSliderChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = parseFloat(e.target.value);
+      onChange(newValue);
+    },
+    [onChange],
+  );
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label id={labelId} htmlFor={inputId} className="text-sm text-muted-foreground">{label}</label>
+        <label
+          id={labelId}
+          htmlFor={inputId}
+          className="text-sm text-muted-foreground"
+        >
+          {label}
+        </label>
         <div className="flex items-center gap-1">
           <input
             id={inputId}
@@ -98,7 +110,9 @@ export function SliderWithInput({
             aria-labelledby={labelId}
             className="w-14 rounded-md border border-white/20 bg-white/5 px-2 py-1 text-right text-sm font-medium tabular-nums transition-colors focus:border-amber-500 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
           />
-          {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
+          {suffix && (
+            <span className="text-sm text-muted-foreground">{suffix}</span>
+          )}
         </div>
       </div>
       <input

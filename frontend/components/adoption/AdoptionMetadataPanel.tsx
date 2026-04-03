@@ -1,7 +1,7 @@
 "use client";
 
-import { ChangeEvent, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { type ChangeEvent, useState } from "react";
 
 export type AdoptionMetadata = {
   title: string;
@@ -23,7 +23,14 @@ export function AdoptionMetadataPanel(props: AdoptionMetadataPanelProps) {
   return <AdoptionMetadataPanelInner key={resetKey} {...props} />;
 }
 
-function AdoptionMetadataPanelInner({ savedValue, onSave, busy, error, message, canSave }: AdoptionMetadataPanelProps) {
+function AdoptionMetadataPanelInner({
+  savedValue,
+  onSave,
+  busy,
+  error,
+  message,
+  canSave,
+}: AdoptionMetadataPanelProps) {
   const [title, setTitle] = useState(() => savedValue.title);
   const [creator, setCreator] = useState(() => savedValue.creator);
 
@@ -42,7 +49,9 @@ function AdoptionMetadataPanelInner({ savedValue, onSave, busy, error, message, 
           <input
             type="text"
             value={title}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => setTitle(event.target.value)}
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              setTitle(event.target.value)
+            }
             placeholder="Optional title"
             className="rounded-xl border border-border/40 bg-background px-4 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
           />
@@ -52,7 +61,9 @@ function AdoptionMetadataPanelInner({ savedValue, onSave, busy, error, message, 
           <input
             type="text"
             value={creator}
-            onChange={(event: ChangeEvent<HTMLInputElement>) => setCreator(event.target.value)}
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              setCreator(event.target.value)
+            }
             placeholder="Name of roller"
             className="rounded-xl border border-border/40 bg-background px-4 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
           />
@@ -68,7 +79,9 @@ function AdoptionMetadataPanelInner({ savedValue, onSave, busy, error, message, 
           {busy ? <Loader2 className="size-3 animate-spin" /> : null}
           Save to history
         </button>
-        {showMessage ? <span className="text-emerald-300">{showMessage}</span> : null}
+        {showMessage ? (
+          <span className="text-emerald-300">{showMessage}</span>
+        ) : null}
         {error ? <span className="text-red-300">{error}</span> : null}
       </div>
     </div>

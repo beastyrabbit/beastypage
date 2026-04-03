@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
-import Image from "next/image";
 import { Dna, GitBranch, SkipForward, Square } from "lucide-react";
+import Image from "next/image";
+import { useMemo } from "react";
 import XIcon from "@/components/ui/x-icon";
-import { cn } from "@/lib/utils";
 import type { AncestryTreeCat } from "@/lib/ancestry-tree/types";
 import { getCatPreviewUrl, MAX_SPRITE_POSE } from "@/lib/ancestry-tree/utils";
+import { cn } from "@/lib/utils";
 
 interface CatSidebarProps {
   cat: AncestryTreeCat | null;
@@ -35,13 +35,16 @@ export function CatSidebar({
   const genderIcon = cat.gender === "F" ? "♀" : "♂";
   const genderColor = cat.gender === "F" ? "text-pink-400" : "text-blue-400";
 
-  const lifeStageLabel = {
-    kit: "Kit",
-    apprentice: "Apprentice",
-    warrior: "Warrior",
-    leader: "Leader",
-    elder: "Elder",
-  }[cat.lifeStage] ?? cat.lifeStage ?? "Unknown";
+  const lifeStageLabel =
+    {
+      kit: "Kit",
+      apprentice: "Apprentice",
+      warrior: "Warrior",
+      leader: "Leader",
+      elder: "Elder",
+    }[cat.lifeStage] ??
+    cat.lifeStage ??
+    "Unknown";
 
   return (
     <>
@@ -51,7 +54,7 @@ export function CatSidebar({
           "fixed top-0 right-0 h-full w-80 max-w-full bg-background/95 backdrop-blur-xl border-l border-white/10 z-50",
           "transform transition-transform duration-300 ease-out",
           "flex flex-col shadow-2xl",
-          isOpen ? "translate-x-0" : "translate-x-full"
+          isOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
         {/* Header */}
@@ -95,7 +98,8 @@ export function CatSidebar({
                 type="button"
                 onClick={() => {
                   const currentPose = cat.params.spriteNumber ?? 0;
-                  const nextPose = currentPose >= MAX_SPRITE_POSE ? 0 : currentPose + 1;
+                  const nextPose =
+                    currentPose >= MAX_SPRITE_POSE ? 0 : currentPose + 1;
                   onChangePose(cat, nextPose);
                 }}
                 className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-white/20"
@@ -120,7 +124,7 @@ export function CatSidebar({
                   "flex items-center justify-center gap-2 w-full rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-colors",
                   isEditingRelations
                     ? "bg-red-600 hover:bg-red-700"
-                    : "bg-indigo-600 hover:bg-indigo-700"
+                    : "bg-indigo-600 hover:bg-indigo-700",
                 )}
               >
                 {isEditingRelations ? (
@@ -151,10 +155,18 @@ export function CatSidebar({
 
             {/* Legend */}
             <div className="flex gap-3 text-[10px] text-muted-foreground border-b border-white/10 pb-2">
-              <span><span className="text-emerald-400">●</span> Active</span>
-              <span><span className="text-amber-400/60">●</span> Carried</span>
-              <span><span className="text-blue-400">D</span> Dominant</span>
-              <span><span className="text-purple-400">R</span> Recessive</span>
+              <span>
+                <span className="text-emerald-400">●</span> Active
+              </span>
+              <span>
+                <span className="text-amber-400/60">●</span> Carried
+              </span>
+              <span>
+                <span className="text-blue-400">D</span> Dominant
+              </span>
+              <span>
+                <span className="text-purple-400">R</span> Recessive
+              </span>
             </div>
 
             {/* Pelt */}
@@ -191,7 +203,8 @@ export function CatSidebar({
             />
 
             {/* White Patches */}
-            {(cat.genetics.whitePatches.allele1 || cat.genetics.whitePatches.allele2) && (
+            {(cat.genetics.whitePatches.allele1 ||
+              cat.genetics.whitePatches.allele2) && (
               <GeneticTraitDisplay
                 label="White"
                 allele1={cat.genetics.whitePatches.allele1 ?? "none"}
@@ -204,34 +217,54 @@ export function CatSidebar({
             <div className="pt-2 border-t border-white/10">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Tortie Gene</span>
-                <span className={cat.genetics.isTortie.expressed ? "text-pink-400" : "text-muted-foreground"}>
-                  {cat.genetics.isTortie.expressed ? "Expressed" :
-                   (cat.genetics.isTortie.allele1 || cat.genetics.isTortie.allele2) ? "Carried" : "None"}
+                <span
+                  className={
+                    cat.genetics.isTortie.expressed
+                      ? "text-pink-400"
+                      : "text-muted-foreground"
+                  }
+                >
+                  {cat.genetics.isTortie.expressed
+                    ? "Expressed"
+                    : cat.genetics.isTortie.allele1 ||
+                        cat.genetics.isTortie.allele2
+                      ? "Carried"
+                      : "None"}
                 </span>
               </div>
-              {cat.gender === "M" && (cat.genetics.isTortie.allele1 || cat.genetics.isTortie.allele2) && (
-                <p className="text-[10px] text-muted-foreground mt-1">
-                  Sex-linked: Males rarely express tortie (0.3%)
-                </p>
-              )}
+              {cat.gender === "M" &&
+                (cat.genetics.isTortie.allele1 ||
+                  cat.genetics.isTortie.allele2) && (
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Sex-linked: Males rarely express tortie (0.3%)
+                  </p>
+                )}
             </div>
 
             {/* Tortie Details */}
-            {cat.genetics.isTortie.expressed && cat.params.tortie && cat.params.tortie.length > 0 && (
-              <div className="pt-2 border-t border-white/10 space-y-2">
-                <div className="text-xs text-muted-foreground">Tortie Layers ({cat.params.tortie.filter(Boolean).length})</div>
-                {cat.params.tortie.filter(Boolean).map((layer, idx) => (
-                  <div key={idx} className="text-xs bg-white/5 rounded px-2 py-1">
-                    <span className="text-pink-300">Layer {idx + 1}:</span>{" "}
-                    <span className="text-amber-300">{layer!.pattern}</span> +{" "}
-                    <span className="text-emerald-300">{layer!.colour}</span>{" "}
-                    <span className="text-muted-foreground">({layer!.mask})</span>
+            {cat.genetics.isTortie.expressed &&
+              cat.params.tortie &&
+              cat.params.tortie.length > 0 && (
+                <div className="pt-2 border-t border-white/10 space-y-2">
+                  <div className="text-xs text-muted-foreground">
+                    Tortie Layers ({cat.params.tortie.filter(Boolean).length})
                   </div>
-                ))}
-              </div>
-            )}
+                  {cat.params.tortie.filter(Boolean).map((layer, idx) => (
+                    <div
+                      key={idx}
+                      className="text-xs bg-white/5 rounded px-2 py-1"
+                    >
+                      <span className="text-pink-300">Layer {idx + 1}:</span>{" "}
+                      <span className="text-amber-300">{layer?.pattern}</span> +{" "}
+                      <span className="text-emerald-300">{layer?.colour}</span>{" "}
+                      <span className="text-muted-foreground">
+                        ({layer?.mask})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
           </div>
-
         </div>
       </div>
     </>
@@ -240,17 +273,24 @@ export function CatSidebar({
 
 // Dominant pelts (patterns) vs recessive (solid colors)
 const DOMINANT_PELTS = new Set([
-  'Tabby', 'Mackerel', 'Classic', 'Ticked', 'Spotted', 'Rosette', 'Sokoke',
-  'Marbled', 'Bengal', 'Speckled', 'Agouti',
+  "Tabby",
+  "Mackerel",
+  "Classic",
+  "Ticked",
+  "Spotted",
+  "Rosette",
+  "Sokoke",
+  "Marbled",
+  "Bengal",
+  "Speckled",
+  "Agouti",
 ]);
 
-const RECESSIVE_PELTS = new Set([
-  'SingleColour', 'Single', 'Solid',
-]);
+const RECESSIVE_PELTS = new Set(["SingleColour", "Single", "Solid"]);
 
-function getPeltDominance(allele: string): 'D' | 'R' | null {
-  if (DOMINANT_PELTS.has(allele)) return 'D';
-  if (RECESSIVE_PELTS.has(allele)) return 'R';
+function getPeltDominance(allele: string): "D" | "R" | null {
+  if (DOMINANT_PELTS.has(allele)) return "D";
+  if (RECESSIVE_PELTS.has(allele)) return "R";
   return null;
 }
 
@@ -266,7 +306,7 @@ function GeneticTraitDisplay({
   allele1: string;
   allele2: string;
   expressed: string;
-  getDominance?: (allele: string) => 'D' | 'R' | null;
+  getDominance?: (allele: string) => "D" | "R" | null;
 }) {
   const isHeterozygous = allele1 !== allele2;
   const dom1 = getDominance?.(allele1);
@@ -280,14 +320,46 @@ function GeneticTraitDisplay({
       </div>
       {isHeterozygous && (
         <div className="flex gap-2 text-[10px] pl-2">
-          <span className={allele1 === expressed ? "text-emerald-400/80" : "text-amber-400/60"}>
+          <span
+            className={
+              allele1 === expressed
+                ? "text-emerald-400/80"
+                : "text-amber-400/60"
+            }
+          >
             {allele1}
-            {dom1 && <span className={dom1 === 'D' ? "text-blue-400 ml-0.5" : "text-purple-400 ml-0.5"}>{dom1}</span>}
+            {dom1 && (
+              <span
+                className={
+                  dom1 === "D"
+                    ? "text-blue-400 ml-0.5"
+                    : "text-purple-400 ml-0.5"
+                }
+              >
+                {dom1}
+              </span>
+            )}
           </span>
           <span className="text-muted-foreground">×</span>
-          <span className={allele2 === expressed ? "text-emerald-400/80" : "text-amber-400/60"}>
+          <span
+            className={
+              allele2 === expressed
+                ? "text-emerald-400/80"
+                : "text-amber-400/60"
+            }
+          >
             {allele2}
-            {dom2 && <span className={dom2 === 'D' ? "text-blue-400 ml-0.5" : "text-purple-400 ml-0.5"}>{dom2}</span>}
+            {dom2 && (
+              <span
+                className={
+                  dom2 === "D"
+                    ? "text-blue-400 ml-0.5"
+                    : "text-purple-400 ml-0.5"
+                }
+              >
+                {dom2}
+              </span>
+            )}
           </span>
         </div>
       )}

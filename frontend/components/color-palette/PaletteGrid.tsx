@@ -1,21 +1,20 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
 import { Sun } from "lucide-react";
+import { useCallback, useMemo } from "react";
+import { toast } from "sonner";
 import CopyIcon from "@/components/ui/copy-icon";
 import PaintIcon from "@/components/ui/paint-icon";
-import { toast } from "sonner";
 import { track } from "@/lib/analytics";
-
-import type { ExtractedColor } from "@/lib/color-extraction/types";
+import { generateColorDisplayName } from "@/lib/color-extraction/color-names";
 import {
   adjustBrightness,
   adjustHue,
-  rgbToHex,
   getContrastColor,
   hexToRgb,
+  rgbToHex,
 } from "@/lib/color-extraction/color-utils";
-import { generateColorDisplayName } from "@/lib/color-extraction/color-names";
+import type { ExtractedColor } from "@/lib/color-extraction/types";
 
 interface PaletteGridProps {
   colors: ExtractedColor[];
@@ -25,7 +24,10 @@ interface PaletteGridProps {
   type: "dominant" | "accent";
   selectedIndex: number | null;
   highlightedIndex: number | null;
-  onColorHover: (index: number | null, rgb?: { r: number; g: number; b: number }) => void;
+  onColorHover: (
+    index: number | null,
+    rgb?: { r: number; g: number; b: number },
+  ) => void;
   onColorSelect: (index: number) => void;
 }
 
@@ -62,7 +64,7 @@ export function PaletteGrid({
           hex: rgbToHex(adjusted),
           factor,
         };
-      })
+      }),
     );
   }, [colors, brightnessFactors]);
 
@@ -75,7 +77,7 @@ export function PaletteGrid({
           hex: rgbToHex(adjusted),
           shift,
         };
-      })
+      }),
     );
   }, [colors, hueShifts]);
 
@@ -113,13 +115,16 @@ export function PaletteGrid({
               onMouseEnter={() => onColorHover(index, color.rgb)}
               onMouseLeave={() => onColorHover(null)}
               className={`group relative aspect-square rounded-xl shadow-md transition-all duration-200 ${
-                isSelected ? "ring-2 ring-offset-2 ring-offset-background z-10" : "hover:scale-105"
+                isSelected
+                  ? "ring-2 ring-offset-2 ring-offset-background z-10"
+                  : "hover:scale-105"
               }`}
               style={{
                 backgroundColor: color.hex,
-                boxShadow: isSelected || isHighlighted
-                  ? `0 0 0 3px ${ringColor}, 0 4px 12px rgba(0,0,0,0.2)`
-                  : "0 2px 8px rgba(0,0,0,0.15)",
+                boxShadow:
+                  isSelected || isHighlighted
+                    ? `0 0 0 3px ${ringColor}, 0 4px 12px rgba(0,0,0,0.2)`
+                    : "0 2px 8px rgba(0,0,0,0.15)",
               }}
               title={`${generateColorDisplayName(index, color.name || "Loading...", type)} - ${color.hex}\nClick to select, right-click to copy`}
               onContextMenu={(e) => {
@@ -148,10 +153,7 @@ export function PaletteGrid({
 
               {/* Copy icon on hover */}
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-xl">
-                <CopyIcon
-                  size={16}
-                  color={getContrastColor(color.rgb)}
-                />
+                <CopyIcon size={16} color={getContrastColor(color.rgb)} />
               </div>
 
               {/* Selection indicator */}
@@ -184,37 +186,34 @@ export function PaletteGrid({
                   isRowSelected
                     ? "bg-primary/10"
                     : isRowHighlighted
-                    ? "bg-primary/5"
-                    : ""
+                      ? "bg-primary/5"
+                      : ""
                 }`}
                 style={{
                   gridTemplateColumns: `repeat(${brightnessFactors.length}, 1fr)`,
                   boxShadow: isRowSelected
                     ? `inset 0 0 0 1px ${ringColor}40`
                     : isRowHighlighted
-                    ? `inset 0 0 0 1px ${ringColor}20`
-                    : "none",
+                      ? `inset 0 0 0 1px ${ringColor}20`
+                      : "none",
                 }}
               >
                 {row.map((cell) => {
                   const cellRgb = hexToRgb(cell.hex);
                   return (
-                  <button
-                    key={`${cell.hex}-${cell.factor}`}
-                    onClick={() => copyToClipboard(cell.hex)}
-                    onMouseEnter={() => onColorHover(rowIndex, cellRgb)}
-                    onMouseLeave={() => onColorHover(null)}
-                    className="group relative aspect-[2/1] rounded transition-transform hover:scale-105 hover:z-10"
-                    style={{ backgroundColor: cell.hex }}
-                    title={`${generateColorDisplayName(rowIndex, colors[rowIndex].name || "Loading...", type, { brightnessMultiplier: cell.factor })} - ${cell.hex}\nClick to copy`}
-                  >
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
-                      <CopyIcon
-                        size={12}
-                        color={getContrastColor(cellRgb)}
-                      />
-                    </div>
-                  </button>
+                    <button
+                      key={`${cell.hex}-${cell.factor}`}
+                      onClick={() => copyToClipboard(cell.hex)}
+                      onMouseEnter={() => onColorHover(rowIndex, cellRgb)}
+                      onMouseLeave={() => onColorHover(null)}
+                      className="group relative aspect-[2/1] rounded transition-transform hover:scale-105 hover:z-10"
+                      style={{ backgroundColor: cell.hex }}
+                      title={`${generateColorDisplayName(rowIndex, colors[rowIndex].name || "Loading...", type, { brightnessMultiplier: cell.factor })} - ${cell.hex}\nClick to copy`}
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+                        <CopyIcon size={12} color={getContrastColor(cellRgb)} />
+                      </div>
+                    </button>
                   );
                 })}
               </div>
@@ -253,37 +252,34 @@ export function PaletteGrid({
                   isRowSelected
                     ? "bg-primary/10"
                     : isRowHighlighted
-                    ? "bg-primary/5"
-                    : ""
+                      ? "bg-primary/5"
+                      : ""
                 }`}
                 style={{
                   gridTemplateColumns: `repeat(${hueShifts.length}, 1fr)`,
                   boxShadow: isRowSelected
                     ? `inset 0 0 0 1px ${ringColor}40`
                     : isRowHighlighted
-                    ? `inset 0 0 0 1px ${ringColor}20`
-                    : "none",
+                      ? `inset 0 0 0 1px ${ringColor}20`
+                      : "none",
                 }}
               >
                 {row.map((cell) => {
                   const cellRgb = hexToRgb(cell.hex);
                   return (
-                  <button
-                    key={`${cell.hex}-${cell.shift}`}
-                    onClick={() => copyToClipboard(cell.hex)}
-                    onMouseEnter={() => onColorHover(rowIndex, cellRgb)}
-                    onMouseLeave={() => onColorHover(null)}
-                    className="group relative aspect-[2/1] rounded transition-transform hover:scale-105 hover:z-10"
-                    style={{ backgroundColor: cell.hex }}
-                    title={`${generateColorDisplayName(rowIndex, colors[rowIndex].name || "Loading...", type, { hueShift: cell.shift })} - ${cell.hex}\nClick to copy`}
-                  >
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
-                      <CopyIcon
-                        size={12}
-                        color={getContrastColor(cellRgb)}
-                      />
-                    </div>
-                  </button>
+                    <button
+                      key={`${cell.hex}-${cell.shift}`}
+                      onClick={() => copyToClipboard(cell.hex)}
+                      onMouseEnter={() => onColorHover(rowIndex, cellRgb)}
+                      onMouseLeave={() => onColorHover(null)}
+                      className="group relative aspect-[2/1] rounded transition-transform hover:scale-105 hover:z-10"
+                      style={{ backgroundColor: cell.hex }}
+                      title={`${generateColorDisplayName(rowIndex, colors[rowIndex].name || "Loading...", type, { hueShift: cell.shift })} - ${cell.hex}\nClick to copy`}
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+                        <CopyIcon size={12} color={getContrastColor(cellRgb)} />
+                      </div>
+                    </button>
                   );
                 })}
               </div>
@@ -298,7 +294,8 @@ export function PaletteGrid({
         >
           {hueShifts.map((shift) => (
             <span key={`shift-${shift}`} className="text-center">
-              {shift >= 0 ? "+" : ""}{shift}°
+              {shift >= 0 ? "+" : ""}
+              {shift}°
             </span>
           ))}
         </div>
