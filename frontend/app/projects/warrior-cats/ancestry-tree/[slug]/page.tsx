@@ -1,20 +1,25 @@
+import { ConvexHttpClient } from "convex/browser";
+import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { ConvexHttpClient } from "convex/browser";
-import { api } from "@/convex/_generated/api";
-import { getServerConvexUrl } from "@/lib/convexUrl";
-
-import { PageHero } from "@/components/common/PageHero";
 import { AncestryTreeClient } from "@/components/ancestry-tree";
-import type { SerializedAncestryTree, AncestryTreeCat, PaletteMode } from "@/lib/ancestry-tree/types";
+import { PageHero } from "@/components/common/PageHero";
+import { api } from "@/convex/_generated/api";
+import type {
+  AncestryTreeCat,
+  PaletteMode,
+  SerializedAncestryTree,
+} from "@/lib/ancestry-tree/types";
+import { getServerConvexUrl } from "@/lib/convexUrl";
 
 type PageParams = {
   params: Promise<{ slug: string }>;
 };
 
-export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageParams): Promise<Metadata> {
   const { slug } = await params;
   const convexUrl = getServerConvexUrl();
   if (!convexUrl) {
@@ -103,11 +108,9 @@ export default async function ViewAncestryTreePage({ params }: PageParams) {
       <PageHero
         eyebrow="Ancestry Tree"
         title={
-          <>
-            <span className="text-gradient-warrior-cats animate-shimmer bg-[length:200%_auto]">
-              {tree.name}
-            </span>
-          </>
+          <span className="text-gradient-warrior-cats animate-shimmer bg-[length:200%_auto]">
+            {tree.name}
+          </span>
         }
         description={
           tree.creatorName
@@ -116,7 +119,10 @@ export default async function ViewAncestryTreePage({ params }: PageParams) {
         }
       />
 
-      <AncestryTreeClient initialTree={tree} initialHasPassword={treeData.hasPassword} />
+      <AncestryTreeClient
+        initialTree={tree}
+        initialHasPassword={treeData.hasPassword}
+      />
     </main>
   );
 }

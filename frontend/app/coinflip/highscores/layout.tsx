@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   description: "View top coinflip streaks and historical score records.",
 };
 
-export default function CoinflipHighscoresLayout({ children }: { children: React.ReactNode }) {
+export default function CoinflipHighscoresLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return children;
 }

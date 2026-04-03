@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useQuery } from "convex/react";
+import { ArrowUpRight, Loader2, Trees } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { ArrowUpRight, Loader2, Trees } from "lucide-react";
-import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ArrowBackIcon from "@/components/ui/arrow-back-icon";
 import LockIcon from "@/components/ui/lock-icon";
+import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import XIcon from "@/components/ui/x-icon";
+import { api } from "@/convex/_generated/api";
 import { encodeCatShare } from "@/lib/catShare";
 
 interface TreeCat {
@@ -47,16 +47,18 @@ type AncestryTreeViewClientProps = {
 };
 
 function getPreviewUrlFromParams(params: Record<string, unknown>): string {
-  const tortieSlots = params?.tortie as Array<Record<string, unknown> | null> | undefined;
+  const tortieSlots = params?.tortie as
+    | Array<Record<string, unknown> | null>
+    | undefined;
   const encoded = encodeCatShare({
     params,
     accessorySlots: (params?.accessories as string[]) ?? [],
     scarSlots: (params?.scars as string[]) ?? [],
     tortieSlots: tortieSlots ?? [],
     counts: {
-      accessories: ((params?.accessories as string[])?.length ?? 0),
-      scars: ((params?.scars as string[])?.length ?? 0),
-      tortie: (tortieSlots?.length ?? 0),
+      accessories: (params?.accessories as string[])?.length ?? 0,
+      scars: (params?.scars as string[])?.length ?? 0,
+      tortie: tortieSlots?.length ?? 0,
     },
   });
   return `/api/preview/_?cat=${encodeURIComponent(encoded)}`;
@@ -69,8 +71,14 @@ function formatTimestamp(created?: number): string | null {
 }
 
 export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
-  const record = useQuery(api.ancestryTree.getBySlug, { slug }) as AncestryTreeRecord | null | undefined;
-  const [focusedPreview, setFocusedPreview] = useState<{ label: string; url: string } | null>(null);
+  const record = useQuery(api.ancestryTree.getBySlug, { slug }) as
+    | AncestryTreeRecord
+    | null
+    | undefined;
+  const [focusedPreview, setFocusedPreview] = useState<{
+    label: string;
+    url: string;
+  } | null>(null);
   const [groupByGeneration, setGroupByGeneration] = useState(true);
 
   // Close modal on Escape key
@@ -130,7 +138,10 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-4 px-6 py-16 text-center text-muted-foreground">
         <TriangleAlertIcon size={32} className="text-red-300" />
         <p className="text-base">That ancestry tree could not be found.</p>
-        <Link href="/history" className="inline-flex items-center gap-2 text-sm text-primary">
+        <Link
+          href="/history"
+          className="inline-flex items-center gap-2 text-sm text-primary"
+        >
           <ArrowBackIcon size={16} /> Back to History
         </Link>
       </div>
@@ -140,12 +151,17 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-green-500/30 bg-gradient-to-br from-green-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(34,197,94,0.15)]">
-        <Link href="/history" className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-green-200/80 transition hover:text-green-100">
+        <Link
+          href="/history"
+          className="inline-flex items-center gap-2 text-xs uppercase tracking-wide text-green-200/80 transition hover:text-green-100"
+        >
           <ArrowBackIcon size={12} /> Back to History
         </Link>
         <div className="mt-3 flex items-center gap-3">
           <Trees className="size-8 text-green-400" />
-          <h1 className="text-4xl font-semibold text-white sm:text-5xl">{treeName}</h1>
+          <h1 className="text-4xl font-semibold text-white sm:text-5xl">
+            {treeName}
+          </h1>
           {record.hasPassword && (
             <span title="Password protected">
               <LockIcon size={20} className="text-amber-400" />
@@ -153,7 +169,9 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
           )}
         </div>
         <p className="mt-3 max-w-2xl text-sm text-neutral-200/85 sm:text-base">
-          {treeCreator ? `Created by ${treeCreator}` : "Generated in the ancestry tree builder"}
+          {treeCreator
+            ? `Created by ${treeCreator}`
+            : "Generated in the ancestry tree builder"}
           {formattedDate ? ` • ${formattedDate}` : null}
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-neutral-200/80">
@@ -198,14 +216,18 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
               <div key={generation} className="flex flex-col gap-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Generation {generation + 1}
-                  <span className="ml-2 font-normal text-muted-foreground/60">({cats.length} cats)</span>
+                  <span className="ml-2 font-normal text-muted-foreground/60">
+                    ({cats.length} cats)
+                  </span>
                 </h3>
                 <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                   {cats.map((cat) => (
                     <CatCard
                       key={cat.id}
                       cat={cat}
-                      onPreview={(label, url) => setFocusedPreview({ label, url })}
+                      onPreview={(label, url) =>
+                        setFocusedPreview({ label, url })
+                      }
                     />
                   ))}
                 </div>
@@ -239,7 +261,10 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
               event.preventDefault();
               closePreview();
             }
-            if ((event.key === "Enter" || event.key === " ") && event.target === event.currentTarget) {
+            if (
+              (event.key === "Enter" || event.key === " ") &&
+              event.target === event.currentTarget
+            ) {
               event.preventDefault();
               closePreview();
             }
@@ -255,7 +280,9 @@ export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
               <XIcon size={16} />
             </button>
             <div className="flex flex-col items-center gap-6">
-              <h2 className="text-xl font-semibold text-foreground">{focusedPreview.label}</h2>
+              <h2 className="text-xl font-semibold text-foreground">
+                {focusedPreview.label}
+              </h2>
               <div className="w-full overflow-hidden rounded-2xl border border-border/40 bg-background/80">
                 <Image
                   src={focusedPreview.url}
@@ -307,7 +334,9 @@ function CatCard({ cat, onPreview }: CatCardProps) {
         />
       </button>
       <div className="flex items-center justify-between gap-2 text-center">
-        <span className="truncate text-sm font-medium text-foreground">{displayName}</span>
+        <span className="truncate text-sm font-medium text-foreground">
+          {displayName}
+        </span>
         <span className={`text-sm ${genderColor}`}>{genderIcon}</span>
       </div>
     </article>

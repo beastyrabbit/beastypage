@@ -1,6 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
-const RENDERER_BASE = (process.env.RENDERER_INTERNAL_URL ?? 'http://127.0.0.1:8001').replace(/\/$/, '');
+const RENDERER_BASE = (
+  process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001"
+).replace(/\/$/, "");
 
 export async function GET() {
   try {
@@ -10,18 +12,18 @@ export async function GET() {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: 'Failed to fetch palettes from renderer' },
-        { status: response.status }
+        { error: "Failed to fetch palettes from renderer" },
+        { status: response.status },
       );
     }
 
     const palettes = await response.json();
     return NextResponse.json(palettes);
   } catch (error) {
-    console.error('Failed to fetch palettes:', error);
+    console.error("Failed to fetch palettes:", error);
     return NextResponse.json(
-      { error: 'Renderer service unavailable' },
-      { status: 502 }
+      { error: "Renderer service unavailable" },
+      { status: 502 },
     );
   }
 }

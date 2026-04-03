@@ -14,6 +14,33 @@
       "correctness": {
         "noUnusedImports": "warn",
         "useExhaustiveDependencies": "warn"
+      },
+      "a11y": {
+        "useButtonType": "warn",
+        "useSemanticElements": "warn",
+        "noSvgWithoutTitle": "warn",
+        "noStaticElementInteractions": "warn",
+        "noLabelWithoutControl": "warn"
+      },
+      "suspicious": {
+        "noExplicitAny": "warn",
+        "noArrayIndexKey": "warn",
+        "useIterableCallbackReturn": "warn",
+        "noImplicitAnyLet": "warn",
+        "noControlCharactersInRegex": "warn"
+      },
+      "style": {
+        "noNonNullAssertion": "warn",
+        "noDescendingSpecificity": "warn"
+      },
+      "complexity": {
+        "noBannedTypes": "warn"
+      },
+      "performance": {
+        "noImgElement": "warn"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "warn"
       }
     }
   },
@@ -22,16 +49,25 @@
     "indentStyle": "space",
     "indentWidth": 2
   },
+  "css": {
+    "linter": {
+      "enabled": false
+    },
+    "formatter": {
+      "enabled": false
+    }
+  },
   "files": {
     "includes": [
       "**",
-      "!!.next",
-      "!!out",
-      "!!build",
-      "!!convex/_generated",
-      "!!lib/single-cat",
-      "!!lib/streamer/steps.js",
-      "!!node_modules"
+      "!.next",
+      "!out",
+      "!build",
+      "!convex/_generated",
+      "!lib/single-cat",
+      "!lib/streamer/steps.js",
+      "!node_modules",
+      "!**/*.css"
     ]
   }
 }

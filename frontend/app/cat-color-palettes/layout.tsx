@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   description: "Generate and compare cat color palettes from uploaded images.",
 };
 
-export default function CatColorPalettesLayout({ children }: { children: React.ReactNode }) {
+export default function CatColorPalettesLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return children;
 }

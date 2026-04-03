@@ -53,7 +53,11 @@ export function createOpenAPIProxyHandler(
       try {
         spec = await upstream.json();
       } catch (parseError) {
-        console.error("%s upstream returned non-JSON body", logPrefix, parseError);
+        console.error(
+          "%s upstream returned non-JSON body",
+          logPrefix,
+          parseError,
+        );
         return NextResponse.json(
           { error: `${config.serviceName} returned invalid OpenAPI spec` },
           { status: 502 },

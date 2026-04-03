@@ -1,31 +1,35 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { useCallback, useMemo, useState } from "react";
+import ProgressiveImage from "@/components/common/ProgressiveImage";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { CollectionEntry } from "@/convex/collection";
-import ProgressiveImage from "@/components/common/ProgressiveImage";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
 
 export default function CollectionFocusTestingPage() {
   const entries = useQuery(api.collection.list, {});
   const setFocus = useMutation(api.collection.setFocus);
-  const [drafts, setDrafts] = useState<Record<string, { focusX: number; focusY: number }>>({});
+  const [drafts, setDrafts] = useState<
+    Record<string, { focusX: number; focusY: number }>
+  >({});
   const [status, setStatus] = useState<string | null>(null);
 
   const sortedEntries = useMemo(() => {
     if (!entries) return [] as CollectionEntry[];
-    return [...entries].sort((a, b) => a.artist_name.localeCompare(b.artist_name));
+    return [...entries].sort((a, b) =>
+      a.artist_name.localeCompare(b.artist_name),
+    );
   }, [entries]);
 
   const getDraft = useCallback(
     (entry: CollectionEntry) =>
       drafts[entry.id] ?? {
         focusX: clamp(entry.focusX),
-        focusY: clamp(entry.focusY)
+        focusY: clamp(entry.focusY),
       },
-    [drafts]
+    [drafts],
   );
 
   const handleFocusChange = useCallback(
@@ -33,31 +37,39 @@ export default function CollectionFocusTestingPage() {
       setDrafts((prev) => {
         const existing = prev[entry.id] ?? {
           focusX: clamp(entry.focusX),
-          focusY: clamp(entry.focusY)
+          focusY: clamp(entry.focusY),
         };
         const next = {
           focusX: axis === "focusX" ? clamp(value) : existing.focusX,
-          focusY: axis === "focusY" ? clamp(value) : existing.focusY
+          focusY: axis === "focusY" ? clamp(value) : existing.focusY,
         };
         return { ...prev, [entry.id]: next };
       });
     },
-    []
+    [],
   );
 
   const commitFocus = useCallback(
-    async (entry: CollectionEntry, override?: { focusX: number; focusY: number }) => {
+    async (
+      entry: CollectionEntry,
+      override?: { focusX: number; focusY: number },
+    ) => {
       const draft = override ?? getDraft(entry);
       try {
-        await setFocus({ id: entry.id as Id<"collection">, focusX: draft.focusX, focusY: draft.focusY });
+        await setFocus({
+          id: entry.id as Id<"collection">,
+          focusX: draft.focusX,
+          focusY: draft.focusY,
+        });
         setStatus(`Saved focus for ${entry.artist_name}.`);
         setTimeout(() => setStatus(null), 2500);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Unable to save focus.";
+        const message =
+          error instanceof Error ? error.message : "Unable to save focus.";
         setStatus(message);
       }
     },
-    [getDraft, setFocus]
+    [getDraft, setFocus],
   );
 
   if (!entries) {
@@ -72,9 +84,12 @@ export default function CollectionFocusTestingPage() {
     <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-12">
       <header className="flex flex-col gap-2">
         <div className="section-eyebrow">Testing</div>
-        <h1 className="text-3xl font-semibold text-foreground">Collection Focus Editor</h1>
+        <h1 className="text-3xl font-semibold text-foreground">
+          Collection Focus Editor
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Adjust the vertical and horizontal focus for each artwork preview. Values are percentages where 0% = top/left and 100% = bottom/right.
+          Adjust the vertical and horizontal focus for each artwork preview.
+          Values are percentages where 0% = top/left and 100% = bottom/right.
         </p>
         {status && <span className="text-xs text-primary">{status}</span>}
       </header>
@@ -82,14 +97,20 @@ export default function CollectionFocusTestingPage() {
       <section className="grid gap-6">
         {sortedEntries.map((entry) => {
           const draft = getDraft(entry);
-          const preview = absoluteUrl(entry.preview_img) ?? absoluteUrl(entry.full_img);
+          const preview =
+            absoluteUrl(entry.preview_img) ?? absoluteUrl(entry.full_img);
           const blur = absoluteUrl(entry.blur_img) ?? preview;
-          const focusStyle = { objectPosition: `${draft.focusX}% ${draft.focusY}%` } as const;
+          const focusStyle = {
+            objectPosition: `${draft.focusX}% ${draft.focusY}%`,
+          } as const;
 
           const commit = () => void commitFocus(entry, getDraft(entry));
 
           return (
-            <article key={entry.id} className="rounded-2xl border border-border bg-background/70 p-6 shadow-sm">
+            <article
+              key={entry.id}
+              className="rounded-2xl border border-border bg-background/70 p-6 shadow-sm"
+            >
               <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                 <div className="relative aspect-video overflow-hidden rounded-xl bg-muted">
                   {preview ? (
@@ -110,30 +131,50 @@ export default function CollectionFocusTestingPage() {
                 </div>
                 <div className="flex flex-col gap-4 text-sm">
                   <div>
-                    <h2 className="text-lg font-semibold text-foreground">{entry.artist_name}</h2>
-                    <p className="text-xs text-muted-foreground">{entry.link}</p>
+                    <h2 className="text-lg font-semibold text-foreground">
+                      {entry.artist_name}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      {entry.link}
+                    </p>
                   </div>
                   <div className="grid gap-3">
                     <label className="grid gap-1">
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Horizontal ({draft.focusX}%)</span>
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Horizontal ({draft.focusX}%)
+                      </span>
                       <input
                         type="range"
                         min={0}
                         max={100}
                         value={draft.focusX}
-                        onChange={(event) => handleFocusChange(entry, "focusX", Number(event.target.value))}
+                        onChange={(event) =>
+                          handleFocusChange(
+                            entry,
+                            "focusX",
+                            Number(event.target.value),
+                          )
+                        }
                         onMouseUp={commit}
                         onTouchEnd={commit}
                       />
                     </label>
                     <label className="grid gap-1">
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vertical ({draft.focusY}%)</span>
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Vertical ({draft.focusY}%)
+                      </span>
                       <input
                         type="range"
                         min={0}
                         max={100}
                         value={draft.focusY}
-                        onChange={(event) => handleFocusChange(entry, "focusY", Number(event.target.value))}
+                        onChange={(event) =>
+                          handleFocusChange(
+                            entry,
+                            "focusY",
+                            Number(event.target.value),
+                          )
+                        }
                         onMouseUp={commit}
                         onTouchEnd={commit}
                       />

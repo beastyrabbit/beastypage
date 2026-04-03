@@ -1,5 +1,5 @@
-import { promises as fs } from "fs";
-import path from "path";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 
 const MIME_MAP: Record<string, string> = {
   png: "image/png",
@@ -9,15 +9,20 @@ const MIME_MAP: Record<string, string> = {
   gif: "image/gif",
   bmp: "image/bmp",
   svg: "image/svg+xml",
-  avif: "image/avif"
+  avif: "image/avif",
 };
 
-export async function serveExportedImage(root: string, segments: string[]): Promise<Response> {
+export async function serveExportedImage(
+  root: string,
+  segments: string[],
+): Promise<Response> {
   if (!Array.isArray(segments) || segments.length === 0) {
     return new Response("Not Found", { status: 404 });
   }
 
-  const safeSegments = segments.filter(Boolean).map((segment) => segment.replace(/\\/g, "/"));
+  const safeSegments = segments
+    .filter(Boolean)
+    .map((segment) => segment.replace(/\\/g, "/"));
   const joined = path.join(root, ...safeSegments);
   const normalized = path.normalize(joined);
 
@@ -33,8 +38,8 @@ export async function serveExportedImage(root: string, segments: string[]): Prom
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=604800, immutable"
-      }
+        "Cache-Control": "public, max-age=604800, immutable",
+      },
     });
   } catch (error: unknown) {
     if ((error as NodeJS.ErrnoException)?.code === "ENOENT") {

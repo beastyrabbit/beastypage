@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { ScoreRecord } from "@/convex/coinflipper";
-import { cn } from "@/lib/utils";
-import { track } from "@/lib/analytics";
 import { Trophy } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
-import Link from "next/link";
+import { api } from "@/convex/_generated/api";
+import type { ScoreRecord } from "@/convex/coinflipper";
+import { track } from "@/lib/analytics";
+import { cn } from "@/lib/utils";
 
 const FLIP_DURATION_MS = 1200;
 const MAX_NAME_LENGTH = 12;
@@ -23,7 +23,7 @@ type LeaderboardRow = LeaderboardEntry & { placeholder?: boolean };
 
 const FACE_LABELS: Record<FlipSide, string> = {
   heads: "Heads",
-  tails: "Tails"
+  tails: "Tails",
 };
 
 export default function CoinflipPage() {
@@ -42,7 +42,10 @@ export default function CoinflipPage() {
   const [flipSeed, setFlipSeed] = useState(0);
 
   const displayLeaderboard = useMemo<LeaderboardRow[]>(() => {
-    const rows = (rawLeaderboard ?? []).map((entry) => ({ ...entry, placeholder: false }));
+    const rows = (rawLeaderboard ?? []).map((entry) => ({
+      ...entry,
+      placeholder: false,
+    }));
     const desiredLength = 10;
     for (let index = rows.length; index < desiredLength; index += 1) {
       rows.push({
@@ -50,7 +53,7 @@ export default function CoinflipPage() {
         name: "Dummy",
         score: 0,
         createdAt: 0,
-        placeholder: true
+        placeholder: true,
       });
     }
     return rows;
@@ -117,7 +120,7 @@ export default function CoinflipPage() {
         flipTimerRef.current = null;
       }, FLIP_DURATION_MS);
     },
-    [currentScore, gameState, resetRun]
+    [currentScore, gameState, resetRun],
   );
 
   const handleSubmitScore = useCallback(
@@ -138,15 +141,19 @@ export default function CoinflipPage() {
         setSubmitError(null);
         await submitScore({ name, score: currentScore });
         setScoreSubmitted(true);
-        track("coinflip_score_submitted", { score: currentScore, name_length: name.length });
+        track("coinflip_score_submitted", {
+          score: currentScore,
+          name_length: name.length,
+        });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to submit score.";
+        const message =
+          error instanceof Error ? error.message : "Failed to submit score.";
         setSubmitError(message);
       } finally {
         setIsSubmitting(false);
       }
     },
-    [currentScore, isSubmitting, nameInput, submitScore]
+    [currentScore, isSubmitting, nameInput, submitScore],
   );
 
   const statusMessage = useMemo(() => {
@@ -170,8 +177,12 @@ export default function CoinflipPage() {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
-        <p className="text-xs uppercase tracking-widest text-amber-200/90">Coinflip Challenge</p>
-        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">Predict the flip, stack the streak</h1>
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">
+          Coinflip Challenge
+        </p>
+        <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">
+          Predict the flip, stack the streak
+        </h1>
       </section>
 
       <section className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
@@ -187,10 +198,16 @@ export default function CoinflipPage() {
           </div>
 
           <div className="relative mx-auto flex h-48 w-48 items-center justify-center">
-            <CoinDisplay face={displayFace} animate={gameState === "flipping"} seed={flipSeed} />
+            <CoinDisplay
+              face={displayFace}
+              animate={gameState === "flipping"}
+              seed={flipSeed}
+            />
           </div>
 
-          <p className="text-center text-sm text-muted-foreground">{statusMessage}</p>
+          <p className="text-center text-sm text-muted-foreground">
+            {statusMessage}
+          </p>
 
           <div className="flex flex-wrap justify-center gap-3">
             <button
@@ -199,7 +216,7 @@ export default function CoinflipPage() {
                 "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition",
                 gameState === "flipping"
                   ? "cursor-not-allowed bg-muted text-muted-foreground"
-                  : "bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 text-amber-950 shadow-lg shadow-amber-500/30 hover:from-amber-200 hover:via-amber-300 hover:to-amber-400"
+                  : "bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 text-amber-950 shadow-lg shadow-amber-500/30 hover:from-amber-200 hover:via-amber-300 hover:to-amber-400",
               )}
               disabled={gameState === "flipping"}
               onClick={() => startFlip("heads")}
@@ -212,7 +229,7 @@ export default function CoinflipPage() {
                 "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition",
                 gameState === "flipping"
                   ? "cursor-not-allowed bg-muted text-muted-foreground"
-                  : "bg-foreground text-background hover:bg-foreground/90"
+                  : "bg-foreground text-background hover:bg-foreground/90",
               )}
               disabled={gameState === "flipping"}
               onClick={() => startFlip("tails")}
@@ -231,13 +248,22 @@ export default function CoinflipPage() {
           </div>
 
           {gameState === "lost" && currentScore > 0 && (
-            <form className="glass-card flex flex-col gap-3 border border-primary/30 bg-primary/5 p-4" onSubmit={handleSubmitScore}>
+            <form
+              className="glass-card flex flex-col gap-3 border border-primary/30 bg-primary/5 p-4"
+              onSubmit={handleSubmitScore}
+            >
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-primary">Submit your streak</span>
-                {scoreSubmitted && <span className="text-xs uppercase text-primary">Saved!</span>}
+                <span className="text-sm font-semibold text-primary">
+                  Submit your streak
+                </span>
+                {scoreSubmitted && (
+                  <span className="text-xs uppercase text-primary">Saved!</span>
+                )}
               </div>
               <label className="flex flex-col gap-2 text-sm">
-                <span className="text-muted-foreground">Name (max {MAX_NAME_LENGTH} characters)</span>
+                <span className="text-muted-foreground">
+                  Name (max {MAX_NAME_LENGTH} characters)
+                </span>
                 <input
                   className="rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none"
                   value={nameInput}
@@ -250,18 +276,24 @@ export default function CoinflipPage() {
                   disabled={isSubmitting || scoreSubmitted}
                 />
               </label>
-              {submitError && <p className="text-xs text-destructive">{submitError}</p>}
+              {submitError && (
+                <p className="text-xs text-destructive">{submitError}</p>
+              )}
               <button
                 type="submit"
                 className={cn(
                   "inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition",
                   scoreSubmitted
                     ? "cursor-default bg-muted text-muted-foreground"
-                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90",
                 )}
                 disabled={isSubmitting || scoreSubmitted}
               >
-                {isSubmitting ? "Saving…" : scoreSubmitted ? "Score submitted" : "Submit score"}
+                {isSubmitting
+                  ? "Saving…"
+                  : scoreSubmitted
+                    ? "Score submitted"
+                    : "Submit score"}
               </button>
             </form>
           )}
@@ -314,7 +346,11 @@ type LeaderboardProps = {
 
 function LeaderboardTable({ entries }: LeaderboardProps) {
   if (!entries.length) {
-    return <p className="text-sm text-muted-foreground">No streaks yet. Be the first!</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        No streaks yet. Be the first!
+      </p>
+    );
   }
 
   return (
@@ -326,14 +362,16 @@ function LeaderboardTable({ entries }: LeaderboardProps) {
             "flex items-center justify-between rounded-xl border px-4 py-3",
             entry.placeholder
               ? "border-dashed border-border/60 bg-muted/40 text-muted-foreground"
-              : "border-border bg-background/80"
+              : "border-border bg-background/80",
           )}
         >
           <div className="flex items-center gap-3">
             <span
               className={cn(
                 "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold",
-                entry.placeholder ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"
+                entry.placeholder
+                  ? "bg-muted text-muted-foreground"
+                  : "bg-primary/10 text-primary",
               )}
             >
               #{index + 1}
@@ -341,7 +379,7 @@ function LeaderboardTable({ entries }: LeaderboardProps) {
             <span
               className={cn(
                 "font-medium",
-                entry.placeholder ? "text-muted-foreground" : "text-foreground"
+                entry.placeholder ? "text-muted-foreground" : "text-foreground",
               )}
             >
               {entry.name}
@@ -350,7 +388,7 @@ function LeaderboardTable({ entries }: LeaderboardProps) {
           <span
             className={cn(
               "text-lg font-semibold",
-              entry.placeholder ? "text-muted-foreground" : "text-foreground"
+              entry.placeholder ? "text-muted-foreground" : "text-foreground",
             )}
           >
             {entry.score}

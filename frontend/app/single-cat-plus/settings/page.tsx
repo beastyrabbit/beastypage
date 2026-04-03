@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { PageHero } from "@/components/common/PageHero";
 import { CatSettingsClient } from "@/components/cat-settings/CatSettingsClient";
-import { decodePortableSettings } from "@/lib/portable-settings";
+import { PageHero } from "@/components/common/PageHero";
 import type { SingleCatPortableSettings } from "@/lib/portable-settings";
+import { decodePortableSettings } from "@/lib/portable-settings";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {

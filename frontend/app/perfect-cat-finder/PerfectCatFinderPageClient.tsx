@@ -1,23 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
-import Image from "next/image";
 import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import type { CatRenderParams } from "@/lib/cat-v3/types";
-import { renderCatV3 } from "@/lib/cat-v3/api";
+import { ClipboardCopy, Loader2, Trophy } from "lucide-react";
+import Image from "next/image";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
-import { Loader2, Trophy, ClipboardCopy } from "lucide-react";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import XIcon from "@/components/ui/x-icon";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { track } from "@/lib/analytics";
+import { renderCatV3 } from "@/lib/cat-v3/api";
+import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { createCatShare, encodeCatShare } from "@/lib/catShare";
 
 const PALETTE_MODES = [
-  "off", "mood", "bold", "darker", "blackout",
-  "mononoke", "howl", "demonslayer", "titanic", "deathnote",
-  "slime", "ghostintheshell", "mushishi", "chisweethome", "fma"
+  "off",
+  "mood",
+  "bold",
+  "darker",
+  "blackout",
+  "mononoke",
+  "howl",
+  "demonslayer",
+  "titanic",
+  "deathnote",
+  "slime",
+  "ghostintheshell",
+  "mushishi",
+  "chisweethome",
+  "fma",
 ] as const;
 const NEW_CAT_PROBABILITY = 0.4;
 
@@ -57,7 +69,9 @@ function useClientToken(key: string): string | null {
     const storageKey = `pcf:${key}`;
     let existing = window.localStorage.getItem(storageKey);
     if (!existing) {
-      existing = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
+      existing =
+        window.crypto?.randomUUID?.() ??
+        `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
       window.localStorage.setItem(storageKey, existing);
     }
     return existing;
@@ -106,13 +120,15 @@ function usePreviewCache() {
       const key = cat.id as unknown as string;
       return previews[key] ?? { url: null, loading: true };
     },
-    [previews]
+    [previews],
   );
 
   return { ensurePreview, getPreview };
 }
 
-async function buildRandomCat(generator: Awaited<ReturnType<typeof useCatGenerator>>["generator"]): Promise<CatRenderParams> {
+async function buildRandomCat(
+  generator: Awaited<ReturnType<typeof useCatGenerator>>["generator"],
+): Promise<CatRenderParams> {
   if (!generator) {
     throw new Error("Generator unavailable");
   }
@@ -135,7 +151,9 @@ async function buildRandomCat(generator: Awaited<ReturnType<typeof useCatGenerat
     },
   });
 
-  const spriteNumber = Number.isFinite(randomParams.spriteNumber) ? randomParams.spriteNumber : 0;
+  const spriteNumber = Number.isFinite(randomParams.spriteNumber)
+    ? randomParams.spriteNumber
+    : 0;
   const { spriteNumber: _ignored, ...rest } = randomParams;
 
   return {
@@ -163,7 +181,9 @@ function CatCard({
 }) {
   return (
     <div className="glass-card flex h-full flex-col gap-4 rounded-3xl border border-border/60 bg-background/70 p-6 shadow-inner">
-      <div className="text-xs uppercase tracking-[0.35em] text-muted-foreground">Pick your favourite</div>
+      <div className="text-xs uppercase tracking-[0.35em] text-muted-foreground">
+        Pick your favourite
+      </div>
       <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-background/80">
         <button
           type="button"
@@ -185,10 +205,15 @@ function CatCard({
             style={{ imageRendering: "pixelated" }}
           />
         ) : (
-          <span className="text-xs text-muted-foreground">Preview unavailable</span>
+          <span className="text-xs text-muted-foreground">
+            Preview unavailable
+          </span>
         )}
       </div>
-      <div className="text-xs text-muted-foreground/80">Rating {formatRating(cat.rating)} · {cat.wins} wins · {cat.losses} losses</div>
+      <div className="text-xs text-muted-foreground/80">
+        Rating {formatRating(cat.rating)} · {cat.wins} wins · {cat.losses}{" "}
+        losses
+      </div>
       <button
         type="button"
         disabled={disabled}
@@ -233,7 +258,11 @@ export default function PerfectCatFinderPage() {
   const seedCats = useCallback(
     async (count: number): Promise<SeedResult> => {
       if (!ready || !generator || count <= 0) {
-        return { requested: Math.max(0, count), generated: 0, failed: Math.max(0, count) };
+        return {
+          requested: Math.max(0, count),
+          generated: 0,
+          failed: Math.max(0, count),
+        };
       }
       const payload: { params: CatRenderParams }[] = [];
       let failed = 0;
@@ -255,7 +284,7 @@ export default function PerfectCatFinderPage() {
         failed,
       };
     },
-    [generator, ready, registerCats]
+    [generator, ready, registerCats],
   );
 
   const loadMatchup = useCallback(async () => {
@@ -263,7 +292,9 @@ export default function PerfectCatFinderPage() {
     setLoading(true);
     setError(null);
     try {
-      let response = (await requestMatchup({ clientId })) as unknown as MatchupResponse;
+      let response = (await requestMatchup({
+        clientId,
+      })) as unknown as MatchupResponse;
       let seeded = false;
 
       if (response.needsSeed > 0 && ready && generator) {
@@ -296,7 +327,9 @@ export default function PerfectCatFinderPage() {
       }
 
       if (seeded) {
-        response = (await requestMatchup({ clientId })) as unknown as MatchupResponse;
+        response = (await requestMatchup({
+          clientId,
+        })) as unknown as MatchupResponse;
       }
 
       if (response.cats.length >= 2) {
@@ -314,7 +347,8 @@ export default function PerfectCatFinderPage() {
       }
     } catch (err) {
       console.error("Failed to load matchup", err);
-      const message = err instanceof Error ? err.message : "Failed to load matchup";
+      const message =
+        err instanceof Error ? err.message : "Failed to load matchup";
       setError(message);
       track("perfect_cat_matchup_load_failed", { message });
     } finally {
@@ -350,7 +384,7 @@ export default function PerfectCatFinderPage() {
       }
       await loadMatchup();
     },
-    [clientId, loadMatchup, matchup, submitVote]
+    [clientId, loadMatchup, matchup, submitVote],
   );
 
   const handleCopySprite = useCallback(
@@ -363,8 +397,13 @@ export default function PerfectCatFinderPage() {
         }
         const response = await fetch(preview.url);
         const blob = await response.blob();
-        if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
-          await navigator.clipboard.write([new ClipboardItem({ [blob.type || "image/png"]: blob })]);
+        if (
+          typeof ClipboardItem !== "undefined" &&
+          navigator.clipboard?.write
+        ) {
+          await navigator.clipboard.write([
+            new ClipboardItem({ [blob.type || "image/png"]: blob }),
+          ]);
           showMessage("Sprite copied to clipboard");
           track("perfect_cat_copied", {});
         } else {
@@ -382,7 +421,7 @@ export default function PerfectCatFinderPage() {
         setError("Failed to copy sprite. Please try again.");
       }
     },
-    [ensurePreview, getPreview, showMessage]
+    [ensurePreview, getPreview, showMessage],
   );
 
   const handleOpenInBuilder = useCallback(async (cat: MatchupCat) => {
@@ -392,9 +431,15 @@ export default function PerfectCatFinderPage() {
         spriteNumber: cat.params.spriteNumber,
       } as Record<string, unknown>;
 
-      const accessories = Array.isArray(coreParams.accessories) ? (coreParams.accessories as string[]) : [];
-      const scars = Array.isArray(coreParams.scars) ? (coreParams.scars as string[]) : [];
-      const tortie = Array.isArray(coreParams.tortie) ? (coreParams.tortie as Record<string, unknown>[]) : [];
+      const accessories = Array.isArray(coreParams.accessories)
+        ? (coreParams.accessories as string[])
+        : [];
+      const scars = Array.isArray(coreParams.scars)
+        ? (coreParams.scars as string[])
+        : [];
+      const tortie = Array.isArray(coreParams.tortie)
+        ? (coreParams.tortie as Record<string, unknown>[])
+        : [];
 
       const shareSeed = {
         params: coreParams,
@@ -431,29 +476,37 @@ export default function PerfectCatFinderPage() {
       console.error("Failed to open cat in builder", shareError);
       setError("Could not open the cat in the visual builder.");
     }
-  }, [setError]);
+  }, []);
 
   const leaderboardEntries: LeaderboardEntry[] = useMemo(
     () => (leaderboard as LeaderboardEntry[] | undefined) ?? [],
-    [leaderboard]
+    [leaderboard],
   );
 
   useEffect(() => {
     leaderboardEntries.forEach((entry) => void ensurePreview(entry));
   }, [leaderboardEntries, ensurePreview]);
 
-  useEffect(() => () => {
-    if (messageTimeoutRef.current) {
-      window.clearTimeout(messageTimeoutRef.current);
-    }
-  }, []);
+  useEffect(
+    () => () => {
+      if (messageTimeoutRef.current) {
+        window.clearTimeout(messageTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
-  const isReady = useMemo(() => matchup.length === 2 && !loading, [matchup.length, loading]);
+  const isReady = useMemo(
+    () => matchup.length === 2 && !loading,
+    [matchup.length, loading],
+  );
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
-        <p className="text-xs uppercase tracking-widest text-amber-200/90">Pick the better sprite. Crowdsource the perfect cat</p>
+        <p className="text-xs uppercase tracking-widest text-amber-200/90">
+          Pick the better sprite. Crowdsource the perfect cat
+        </p>
         <h1 className="mt-3 text-4xl font-semibold text-white sm:text-5xl">
           SpriteMash
         </h1>
@@ -492,7 +545,9 @@ export default function PerfectCatFinderPage() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-primary">
             <Trophy className="size-5" />
-            <h2 className="text-2xl font-semibold text-foreground">Community leaderboard</h2>
+            <h2 className="text-2xl font-semibold text-foreground">
+              Community leaderboard
+            </h2>
           </div>
           <span className="inline-flex items-center gap-2 rounded-full border border-border/40 px-3 py-1 text-xs font-semibold text-muted-foreground">
             Pool size {poolSize}
@@ -512,7 +567,10 @@ export default function PerfectCatFinderPage() {
             <tbody>
               {leaderboardEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-sm text-muted-foreground/70">
+                  <td
+                    colSpan={5}
+                    className="px-4 py-6 text-center text-sm text-muted-foreground/70"
+                  >
                     No votes yet — be the first to crown a favourite.
                   </td>
                 </tr>
@@ -520,15 +578,22 @@ export default function PerfectCatFinderPage() {
                 leaderboardEntries.map((entry, index) => {
                   const preview = getPreview(entry);
                   return (
-                    <tr key={String(entry.id)} className="border-t border-border/30">
-                      <td className="px-4 py-3 text-muted-foreground/70">{index + 1}</td>
+                    <tr
+                      key={String(entry.id)}
+                      className="border-t border-border/30"
+                    >
+                      <td className="px-4 py-3 text-muted-foreground/70">
+                        {index + 1}
+                      </td>
                       <td className="px-4 py-3">
                         <button
                           type="button"
                           onClick={() => {
                             setSelectedCat(entry);
                             void ensurePreview(entry);
-                            track("perfect_cat_inspected", { from: "leaderboard" });
+                            track("perfect_cat_inspected", {
+                              from: "leaderboard",
+                            });
                           }}
                           className="group flex items-center justify-center rounded-xl border border-border/50 bg-background/80 p-1 transition hover:border-primary/50"
                         >
@@ -545,13 +610,21 @@ export default function PerfectCatFinderPage() {
                               style={{ imageRendering: "pixelated" }}
                             />
                           ) : (
-                            <span className="text-[10px] text-muted-foreground">No preview</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              No preview
+                            </span>
                           )}
                         </button>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-foreground">{formatRating(entry.rating)}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{entry.wins} – {entry.losses}</td>
-                      <td className="px-4 py-3 text-muted-foreground/70">{entry.appearances}</td>
+                      <td className="px-4 py-3 font-semibold text-foreground">
+                        {formatRating(entry.rating)}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {entry.wins} – {entry.losses}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground/70">
+                        {entry.appearances}
+                      </td>
                     </tr>
                   );
                 })
@@ -577,15 +650,23 @@ export default function PerfectCatFinderPage() {
               <XIcon size={16} />
             </button>
             <div className="flex flex-col gap-4">
-              <div className="text-sm uppercase tracking-[0.3em] text-muted-foreground">Top contender</div>
+              <div className="text-sm uppercase tracking-[0.3em] text-muted-foreground">
+                Top contender
+              </div>
               <div className="flex items-center justify-center rounded-3xl border border-border/60 bg-background/80 p-4">
                 {(() => {
                   const preview = getPreview(selectedCat);
                   if (preview.loading) {
-                    return <Loader2 className="size-8 animate-spin text-primary" />;
+                    return (
+                      <Loader2 className="size-8 animate-spin text-primary" />
+                    );
                   }
                   if (!preview.url) {
-                    return <span className="text-sm text-muted-foreground">Preview unavailable</span>;
+                    return (
+                      <span className="text-sm text-muted-foreground">
+                        Preview unavailable
+                      </span>
+                    );
                   }
                   return (
                     <Image
@@ -601,8 +682,12 @@ export default function PerfectCatFinderPage() {
                 })()}
               </div>
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">Rating {formatRating(selectedCat.rating)}</span>
-                <span>{selectedCat.wins} – {selectedCat.losses}</span>
+                <span className="font-semibold text-foreground">
+                  Rating {formatRating(selectedCat.rating)}
+                </span>
+                <span>
+                  {selectedCat.wins} – {selectedCat.losses}
+                </span>
                 <span>{selectedCat.appearances} votes</span>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -615,7 +700,9 @@ export default function PerfectCatFinderPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { void handleOpenInBuilder(selectedCat); }}
+                  onClick={() => {
+                    void handleOpenInBuilder(selectedCat);
+                  }}
                   className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
                 >
                   <ExternalLinkIcon size={16} /> Open in visual builder
