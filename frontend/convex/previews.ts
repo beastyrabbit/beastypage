@@ -140,6 +140,7 @@ async function applyMapperPreviewUpdate(
 
   await ctx.runMutation(
     api.mapper.applyPreviewUpdates,
+    // biome-ignore lint/suspicious/noExplicitAny: Convex mutation arg types don't align with the constructed payload
     updatesForMutation as any,
   );
 }

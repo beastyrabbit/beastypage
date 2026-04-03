@@ -440,7 +440,9 @@ function compileMetricRows(
   const values = new Set<string>();
   for (const sim of sims) {
     const counts = sim.metrics[key] ?? {};
-    Object.keys(counts).forEach((value) => values.add(value));
+    Object.keys(counts).forEach((value) => {
+      values.add(value);
+    });
   }
 
   const rows: MetricRow[] = [];

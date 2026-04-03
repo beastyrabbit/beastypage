@@ -297,15 +297,27 @@ function inheritTortieData(
   const combinedColours = new Set<string>();
 
   if (motherData) {
-    motherData.patterns.forEach((p) => combinedPatterns.add(p));
-    motherData.masks.forEach((m) => combinedMasks.add(m));
-    motherData.colours.forEach((c) => combinedColours.add(c));
+    motherData.patterns.forEach((p) => {
+      combinedPatterns.add(p);
+    });
+    motherData.masks.forEach((m) => {
+      combinedMasks.add(m);
+    });
+    motherData.colours.forEach((c) => {
+      combinedColours.add(c);
+    });
   }
 
   if (fatherData) {
-    fatherData.patterns.forEach((p) => combinedPatterns.add(p));
-    fatherData.masks.forEach((m) => combinedMasks.add(m));
-    fatherData.colours.forEach((c) => combinedColours.add(c));
+    fatherData.patterns.forEach((p) => {
+      combinedPatterns.add(p);
+    });
+    fatherData.masks.forEach((m) => {
+      combinedMasks.add(m);
+    });
+    fatherData.colours.forEach((c) => {
+      combinedColours.add(c);
+    });
   }
 
   // Apply mutations - chance to add new patterns/masks/colours

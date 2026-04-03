@@ -397,6 +397,7 @@ export function PixelatorClient() {
 
               {state.resultDataUrl && (
                 <button
+                  type="button"
                   onClick={handleExport}
                   className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground transition-all hover:-translate-y-0.5 hover:border-primary/30"
                 >
@@ -473,6 +474,7 @@ function ModeToggle({ current, onChange }: ModeToggleProps): React.ReactNode {
     <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
       {MODE_OPTIONS.map(({ mode, label, activeClass }) => (
         <button
+          type="button"
           key={mode}
           onClick={() => onChange(mode)}
           className={`rounded-md px-4 py-1.5 text-sm font-semibold transition-all ${

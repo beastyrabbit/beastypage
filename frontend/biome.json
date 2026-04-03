@@ -63,6 +63,7 @@
       "!out",
       "!build",
       "!convex/_generated",
+      "!convex/*.d.ts",
       "!lib/single-cat",
       "!lib/streamer/steps.js",
       "!node_modules",

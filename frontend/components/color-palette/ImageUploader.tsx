@@ -225,6 +225,7 @@ export function ImageUploader({
           <div className="flex flex-wrap gap-3">
             {IMAGE_CATEGORIES.map((category) => (
               <button
+                type="button"
                 key={category.id}
                 onClick={() => handleRandomImage(category.id)}
                 disabled={isLoading || loadingCategory !== null}

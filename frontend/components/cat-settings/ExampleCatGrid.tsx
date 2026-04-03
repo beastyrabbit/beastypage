@@ -122,7 +122,7 @@ export function ExampleCatGrid({ settings }: ExampleCatGridProps) {
               className="flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-border/30 bg-background/50"
             >
               {cat ? (
-                // eslint-disable-next-line @next/next/no-img-element
+                // biome-ignore lint/performance/noImgElement: renders base64/dynamic src
                 <img
                   src={cat.imageDataUrl}
                   alt={`Example cat ${i + 1}`}

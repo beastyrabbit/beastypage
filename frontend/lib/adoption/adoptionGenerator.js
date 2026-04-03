@@ -191,7 +191,9 @@ export class AdoptionGenerator {
       this.includeBaseColours = includeBase ?? true;
       this.selectedExtendedModes.clear();
       if (Array.isArray(selectedModes)) {
-        selectedModes.forEach((mode) => this.selectedExtendedModes.add(mode));
+        selectedModes.forEach((mode) => {
+          this.selectedExtendedModes.add(mode);
+        });
       }
       this.onPaletteChange();
     });
@@ -392,15 +394,17 @@ export class AdoptionGenerator {
     this.pendingRemovals = 1;
     this.awaitingRemoval = true;
     this.catGrid.classList.add("removal-mode");
-    this.catPlans.forEach((plan) => plan.card.classList.add("removal-enabled"));
+    this.catPlans.forEach((plan) => {
+      plan.card.classList.add("removal-enabled");
+    });
     this.stageStatusEl.textContent = `Remove one cat after ${stage.label}.`;
     this.removalTip.textContent = "Hover a cat and click ✕ to remove it.";
     await this.waitForRemoval();
     this.awaitingRemoval = false;
     this.catGrid.classList.remove("removal-mode");
-    this.catPlans.forEach((plan) =>
-      plan.card.classList.remove("removal-enabled"),
-    );
+    this.catPlans.forEach((plan) => {
+      plan.card.classList.remove("removal-enabled");
+    });
   }
 
   async waitForRemoval() {
@@ -1405,8 +1409,12 @@ export class AdoptionGenerator {
         ? spriteMapper.getColours()
         : [];
     const combined = new Set();
-    base.forEach((colour) => combined.add(colour));
-    experimental.forEach((colour) => combined.add(colour));
+    base.forEach((colour) => {
+      combined.add(colour);
+    });
+    experimental.forEach((colour) => {
+      combined.add(colour);
+    });
     return Array.from(combined);
   }
 

@@ -80,6 +80,7 @@ export function ColorVariations({ color }: ColorVariationsProps) {
           <div className="flex flex-wrap gap-2">
             {brightnessVariations.map((variation) => (
               <button
+                type="button"
                 key={`brightness-${variation.label}`}
                 onClick={() => copyToClipboard(variation.hex)}
                 className="group flex flex-col items-center gap-1.5 rounded-lg p-2 transition-all hover:bg-primary/10"
@@ -113,6 +114,7 @@ export function ColorVariations({ color }: ColorVariationsProps) {
           <div className="flex flex-wrap gap-2">
             {hueVariations.map((variation) => (
               <button
+                type="button"
                 key={`hue-${variation.label}`}
                 onClick={() => copyToClipboard(variation.hex)}
                 className="group flex flex-col items-center gap-1.5 rounded-lg p-2 transition-all hover:bg-primary/10"

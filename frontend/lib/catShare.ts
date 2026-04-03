@@ -328,21 +328,27 @@ export async function createCatShare(
   }
 }
 
-function normalizeStoredPayload(payload: any): CatSharePayload | null {
+function normalizeStoredPayload(payload: unknown): CatSharePayload | null {
   if (!payload || typeof payload !== "object") return null;
-  if (payload.v !== SHARE_VERSION) return null;
+  const p = payload as Record<string, unknown>;
+  if (p.v !== SHARE_VERSION) return null;
+  const slots = (p.slots ?? {}) as Record<string, unknown>;
+  const counts = (p.counts ?? {}) as Record<string, unknown>;
   return {
-    params: sanitizeParams(payload.params || {}),
+    params: sanitizeParams((p.params as Record<string, unknown>) || {}),
     accessorySlots: sanitizeStringArray(
-      payload.slots?.accessories,
-      payload.counts?.accessories,
+      slots.accessories,
+      counts.accessories as number | undefined,
     ),
-    scarSlots: sanitizeStringArray(payload.slots?.scars, payload.counts?.scars),
+    scarSlots: sanitizeStringArray(
+      slots.scars,
+      counts.scars as number | undefined,
+    ),
     tortieSlots: sanitizeTortieArray(
-      payload.slots?.tortie,
-      payload.counts?.tortie,
+      slots.tortie,
+      counts.tortie as number | undefined,
     ),
-    counts: sanitizeCounts(payload.counts),
+    counts: sanitizeCounts(p.counts as Partial<CatShareCounts> | undefined),
   };
 }
 

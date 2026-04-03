@@ -22,11 +22,15 @@ export function PaletteSliders({
     <div className="flex flex-wrap items-center gap-6">
       {/* Top Colors slider */}
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <label
+          htmlFor="top-color-count"
+          className="flex items-center gap-2 text-xs font-medium text-muted-foreground"
+        >
           <SparklesIcon size={14} />
           Top Colors: {topColorCount}
         </label>
         <input
+          id="top-color-count"
           type="range"
           min={1}
           max={20}
@@ -39,11 +43,15 @@ export function PaletteSliders({
 
       {/* Family Colors slider */}
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <label
+          htmlFor="family-color-count"
+          className="flex items-center gap-2 text-xs font-medium text-muted-foreground"
+        >
           <PaintIcon size={14} />
           Family Colors: {familyColorCount}
         </label>
         <input
+          id="family-color-count"
           type="range"
           min={1}
           max={20}

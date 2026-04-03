@@ -72,6 +72,7 @@ export function ColorSwatch({
       <div className="space-y-1.5 bg-background/90 p-3 backdrop-blur-sm">
         {/* HEX */}
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             copyToClipboard(color.hex, "HEX");
@@ -86,6 +87,7 @@ export function ColorSwatch({
 
         {/* RGB */}
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             copyToClipboard(rgbToCss(color.rgb), "RGB");
@@ -100,6 +102,7 @@ export function ColorSwatch({
 
         {/* HSL */}
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             copyToClipboard(hslToCss(color.hsl), "HSL");

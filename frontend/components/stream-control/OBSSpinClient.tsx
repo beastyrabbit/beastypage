@@ -1745,24 +1745,30 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   }, [rollerActiveValue]);
 
   // OBS: stub out Convex mutations not needed for overlay
-  const createMapper = async (
-    ..._args: unknown[]
-  ): Promise<{
-    id: string;
-    slug: string;
-    catName?: string;
-    creatorName?: string;
-    shareToken?: string;
-  } | null> => null;
-  const updateMapperMeta = async (
-    ..._args: unknown[]
-  ): Promise<{
-    id: string;
-    slug: string;
-    catName?: string;
-    creatorName?: string;
-    shareToken?: string;
-  } | null> => null;
+  const createMapper = useCallback(
+    async (
+      ..._args: unknown[]
+    ): Promise<{
+      id: string;
+      slug: string;
+      catName?: string;
+      creatorName?: string;
+      shareToken?: string;
+    } | null> => null,
+    [],
+  );
+  const updateMapperMeta = useCallback(
+    async (
+      ..._args: unknown[]
+    ): Promise<{
+      id: string;
+      slug: string;
+      catName?: string;
+      creatorName?: string;
+      shareToken?: string;
+    } | null> => null,
+    [],
+  );
 
   const extendedModesArray = useMemo(
     () => Array.from(extendedModes),
@@ -3372,7 +3378,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       const override = overrideParamsRef.current;
       overrideParamsRef.current = null; // consume once
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // biome-ignore lint/suspicious/noExplicitAny: dynamic random generation result with varying shape
       let randomResult: any;
       if (override?.params) {
         randomResult = {
@@ -3414,6 +3420,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           (entry): entry is string => typeof entry === "string",
         );
       const tortieSlots: (TortieSlot | null)[] =
+        // biome-ignore lint/suspicious/noExplicitAny: slot shape from dynamic random result
         randomResult.slotSelections?.tortie?.map((slot: any) =>
           slot?.mask && slot?.pattern && slot?.colour
             ? { mask: slot.mask, pattern: slot.pattern, colour: slot.colour }
@@ -4706,7 +4713,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
                 }}
               >
                 {countdownPreview && (
-                  // eslint-disable-next-line @next/next/no-img-element
+                  // biome-ignore lint/performance/noImgElement: renders base64/dynamic src
                   <img
                     src={countdownPreview}
                     alt=""

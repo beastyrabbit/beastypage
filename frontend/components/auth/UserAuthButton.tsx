@@ -73,6 +73,7 @@ export function UserAuthButton() {
   if (!isAuthenticated) {
     return (
       <button
+        type="button"
         onClick={() => signIn()}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-lg border border-border/50",
@@ -91,6 +92,7 @@ export function UserAuthButton() {
   return (
     <div ref={dropdownRef} className="relative">
       <button
+        type="button"
         onClick={() => setDropdownOpen((prev) => !prev)}
         className={cn(
           "flex size-8 items-center justify-center rounded-full",
@@ -128,6 +130,7 @@ export function UserAuthButton() {
             Profile
           </Link>
           <button
+            type="button"
             onClick={() => {
               setDropdownOpen(false);
               signOut();

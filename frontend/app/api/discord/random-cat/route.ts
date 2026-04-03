@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Generate random params
-  let params;
+  let params: Awaited<ReturnType<typeof generateRandomParamsServer>>;
   try {
     params = await generateRandomParamsServer(overrides);
   } catch (error) {

@@ -473,6 +473,7 @@ export function StreamControlClient() {
           Sign in to use the stream control center.
         </p>
         <button
+          type="button"
           onClick={() => signIn()}
           className={cn(
             "inline-flex items-center gap-2 rounded-lg border border-border/50",
@@ -531,6 +532,7 @@ export function StreamControlClient() {
               <div className="inline-flex gap-1 rounded-full border border-border/30 bg-muted/30 p-1">
                 {(["flashy", "calm"] as const).map((mode) => (
                   <button
+                    type="button"
                     key={mode}
                     onClick={() => updateSettings({ mode })}
                     className={cn(
@@ -615,6 +617,7 @@ export function StreamControlClient() {
                 <div className="flex items-center gap-0.5 rounded-md border border-border/30 p-0.5">
                   {(["cycle", "all"] as const).map((m) => (
                     <button
+                      type="button"
                       key={m}
                       onClick={() => {
                         setPaletteDisplayMode(m);
@@ -669,6 +672,7 @@ export function StreamControlClient() {
               </h3>
               {obsUrl && (
                 <button
+                  type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(obsUrl);
                     toast.success("OBS URL copied!");
@@ -715,6 +719,7 @@ export function StreamControlClient() {
             <div className="flex flex-wrap items-center gap-2">
               {/* Spin */}
               <button
+                type="button"
                 onClick={handleSpin}
                 disabled={spinning || !generatorReady}
                 className={cn(
@@ -753,6 +758,7 @@ export function StreamControlClient() {
               <div className="flex items-center gap-1 rounded-lg border border-border/50 px-1.5 py-1">
                 <Zap className="size-3.5 text-muted-foreground" />
                 <button
+                  type="button"
                   onClick={() =>
                     updateSettings({
                       speedMultiplier: Math.max(
@@ -772,6 +778,7 @@ export function StreamControlClient() {
                   x
                 </span>
                 <button
+                  type="button"
                   onClick={() =>
                     updateSettings({
                       speedMultiplier: Math.min(
@@ -788,6 +795,7 @@ export function StreamControlClient() {
 
               {/* Lobby */}
               <button
+                type="button"
                 onClick={() => showLobbyMut().catch(console.error)}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-3 py-2",
@@ -801,6 +809,7 @@ export function StreamControlClient() {
 
               {/* Test Mode */}
               <button
+                type="button"
                 onClick={() => toggleTestModeMut().catch(console.error)}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2",
@@ -816,6 +825,7 @@ export function StreamControlClient() {
 
               {/* Clear */}
               <button
+                type="button"
                 onClick={() => clearOverlayMut().catch(console.error)}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-3 py-2",
@@ -843,6 +853,7 @@ export function StreamControlClient() {
               const defaults = LOBBY_MODE_DEFAULTS[m];
               return (
                 <button
+                  type="button"
                   key={m}
                   onClick={() => {
                     setLobbyMode(m);
@@ -917,6 +928,7 @@ export function StreamControlClient() {
 
           {/* Clear cats */}
           <button
+            type="button"
             onClick={() => syncLobbySettings({ lobbyClearSeq: Date.now() })}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-3 py-1.5",
@@ -1158,6 +1170,7 @@ function SettingsCode({
           {liveCode}
         </code>
         <button
+          type="button"
           onClick={handleCopy}
           className={cn(
             "shrink-0 rounded-md border px-2 py-1.5 text-[10px] font-medium transition",
@@ -1181,6 +1194,7 @@ function SettingsCode({
           className="min-w-0 flex-1 rounded-lg border border-border/40 bg-background/60 px-2.5 py-1.5 font-mono text-xs outline-none placeholder:text-muted-foreground/40 focus:border-primary/40"
         />
         <button
+          type="button"
           onClick={handleApply}
           className="shrink-0 rounded-md border border-border/50 px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground transition hover:text-foreground"
         >
@@ -1216,6 +1230,7 @@ function LobbyControl({
     <div className="flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5">
       <span className="text-xs text-muted-foreground">{label}:</span>
       <button
+        type="button"
         onClick={() => onChange(Math.max(min, +(value - step).toFixed(2)))}
         className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
       >
@@ -1225,6 +1240,7 @@ function LobbyControl({
         {format(value)}
       </span>
       <button
+        type="button"
         onClick={() => onChange(Math.min(max, +(value + step).toFixed(2)))}
         className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
       >

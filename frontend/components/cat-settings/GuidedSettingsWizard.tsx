@@ -211,7 +211,12 @@ export function GuidedSettingsWizard({
                   )}
                 >
                   {i < activeStepIndex ? (
-                    <svg className="size-3.5" viewBox="0 0 12 12" fill="none">
+                    <svg
+                      aria-hidden="true"
+                      className="size-3.5"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                    >
                       <path
                         d="M3 6l2 2 4-4"
                         stroke="currentColor"

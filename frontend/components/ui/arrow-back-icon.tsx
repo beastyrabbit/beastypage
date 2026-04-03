@@ -36,6 +36,7 @@ const ArrowBackIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
         className={`inline-flex cursor-pointer items-center justify-center ${className}`}
       >
         <svg
+          aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           width={size}
           height={size}

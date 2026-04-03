@@ -421,6 +421,7 @@ export function PaletteExport({
         <div className="flex">
           {/* Main download button */}
           <button
+            type="button"
             onClick={handleExport}
             disabled={isProcessing || !hasColors}
             className="flex h-10 items-center gap-2 rounded-l-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -440,6 +441,7 @@ export function PaletteExport({
 
           {/* Dropdown toggle */}
           <button
+            type="button"
             onClick={toggleDropdown}
             disabled={isProcessing || !hasColors}
             className="flex h-10 items-center justify-center rounded-r-lg border-l border-primary-foreground/20 bg-primary px-2 text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -466,6 +468,7 @@ export function PaletteExport({
           >
             {EXPORT_FORMATS.map((format) => (
               <button
+                type="button"
                 key={format.id}
                 onClick={() => handleFormatSelect(format)}
                 className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"

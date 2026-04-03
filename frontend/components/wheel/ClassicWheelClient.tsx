@@ -109,9 +109,15 @@ export function ClassicWheelClient() {
   const wheelItems = DEFAULT_ITEMS;
 
   const clearTimers = useCallback(() => {
-    rafIdsRef.current.forEach((id) => cancelAnimationFrame(id));
-    timeoutIdsRef.current.forEach((id) => clearTimeout(id));
-    intervalIdsRef.current.forEach((id) => clearInterval(id));
+    rafIdsRef.current.forEach((id) => {
+      cancelAnimationFrame(id);
+    });
+    timeoutIdsRef.current.forEach((id) => {
+      clearTimeout(id);
+    });
+    intervalIdsRef.current.forEach((id) => {
+      clearInterval(id);
+    });
     rafIdsRef.current.clear();
     timeoutIdsRef.current.clear();
     intervalIdsRef.current.clear();

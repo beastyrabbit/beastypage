@@ -36,7 +36,7 @@ export function CatRendererComparison() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ensureCanvas = (canvas: HTMLCanvasElement | null) => {
+  const ensureCanvas = useCallback((canvas: HTMLCanvasElement | null) => {
     if (!canvas) return null;
     if (canvas.width !== CANVAS_SIZE) {
       canvas.width = CANVAS_SIZE;
@@ -46,7 +46,7 @@ export function CatRendererComparison() {
     if (!ctx) return null;
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     return ctx;
-  };
+  }, []);
 
   const drawComparison = useCallback(
     async (inputParams: Record<string, unknown>) => {

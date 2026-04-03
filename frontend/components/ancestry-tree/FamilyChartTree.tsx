@@ -4,6 +4,7 @@ import type { TreeDatum } from "family-chart";
 import * as f3 from "family-chart";
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -114,7 +115,7 @@ export const FamilyChartTree = forwardRef<
   const rootId = tree.foundingMotherId;
 
   // Helper function to safely get the main datum
-  const safeGetMainDatum = (): ReturnType<
+  const safeGetMainDatum = useCallback((): ReturnType<
     ReturnType<typeof f3.createChart>["getMainDatum"]
   > | null => {
     if (!chartRef.current) return null;
@@ -124,7 +125,7 @@ export const FamilyChartTree = forwardRef<
       // getMainDatum() throws "Main datum not found" when no main datum exists
       return null;
     }
-  };
+  }, []);
 
   // Expose methods via ref
   useImperativeHandle(

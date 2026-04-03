@@ -529,7 +529,7 @@ function FlyingCatSprite({
 
   return (
     <div ref={ref} className="absolute bottom-0" style={{ opacity: 0 }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {/* biome-ignore lint/performance/noImgElement: renders base64/dynamic src */}
       <img
         ref={imgRef}
         src={cat.frames[0]}
