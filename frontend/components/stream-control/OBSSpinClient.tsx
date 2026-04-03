@@ -1320,7 +1320,14 @@ export function OBSSpinClient({
   const initialSettings = useMemo<SingleCatSettings>(() => {
     let base: SingleCatSettings;
     if (initialVariantSettings) {
-      base = initialVariantSettings;
+      base = {
+        ...DEFAULT_SINGLE_CAT_SETTINGS,
+        ...initialVariantSettings,
+        accessoryRange: initialVariantSettings.accessoryRange ?? DEFAULT_SINGLE_CAT_SETTINGS.accessoryRange,
+        scarRange: initialVariantSettings.scarRange ?? DEFAULT_SINGLE_CAT_SETTINGS.scarRange,
+        tortieRange: initialVariantSettings.tortieRange ?? DEFAULT_SINGLE_CAT_SETTINGS.tortieRange,
+        timing: initialVariantSettings.timing ?? DEFAULT_SINGLE_CAT_SETTINGS.timing,
+      };
     } else {
       base = {
         ...DEFAULT_SINGLE_CAT_SETTINGS,
