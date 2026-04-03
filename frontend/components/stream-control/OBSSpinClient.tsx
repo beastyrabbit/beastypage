@@ -1463,14 +1463,14 @@ export function OBSSpinClient({
   // OBS: Re-sync settings when the Convex session updates (control page changed them)
   useEffect(() => {
     if (!sessionSettings) return;
-    setMode(sessionSettings.mode);
-    setAccessoryRange(sessionSettings.accessoryRange);
-    setScarRange(sessionSettings.scarRange);
-    setTortieRange(sessionSettings.tortieRange);
-    setExactLayerCounts(sessionSettings.exactLayerCounts);
-    setAfterlifeMode(sessionSettings.afterlifeMode);
-    setIncludeBaseColours(sessionSettings.includeBaseColours);
-    setExtendedModes(new Set(sessionSettings.extendedModes));
+    setMode(sessionSettings.mode ?? DEFAULT_SINGLE_CAT_SETTINGS.mode);
+    setAccessoryRange(sessionSettings.accessoryRange ?? DEFAULT_SINGLE_CAT_SETTINGS.accessoryRange);
+    setScarRange(sessionSettings.scarRange ?? DEFAULT_SINGLE_CAT_SETTINGS.scarRange);
+    setTortieRange(sessionSettings.tortieRange ?? DEFAULT_SINGLE_CAT_SETTINGS.tortieRange);
+    setExactLayerCounts(sessionSettings.exactLayerCounts ?? DEFAULT_SINGLE_CAT_SETTINGS.exactLayerCounts);
+    setAfterlifeMode(sessionSettings.afterlifeMode ?? DEFAULT_SINGLE_CAT_SETTINGS.afterlifeMode);
+    setIncludeBaseColours(sessionSettings.includeBaseColours ?? DEFAULT_SINGLE_CAT_SETTINGS.includeBaseColours);
+    setExtendedModes(new Set(sessionSettings.extendedModes ?? DEFAULT_SINGLE_CAT_SETTINGS.extendedModes));
     if (sessionSettings.speedMultiplier !== undefined) {
       setSpeedMultiplier(sessionSettings.speedMultiplier);
     }
