@@ -1,25 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useMutation, useQuery } from "convex/react";
 import { Vote } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCatGenerator } from "@/components/cat-builder/hooks";
+import OptionPreview from "@/components/streamer/OptionPreview";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import UsersIcon from "@/components/ui/users-icon";
-import { useMutation, useQuery } from "convex/react";
-import { track } from "@/lib/analytics";
-
 import { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
-import { cloneParams, createStreamSteps, getDefaultStreamParams } from "@/lib/streamer/steps";
+import { track } from "@/lib/analytics";
 import type { StreamerParams, StreamStep } from "@/lib/streamer/steps";
-import { cn } from "@/lib/utils";
-import { useCatGenerator } from "@/components/cat-builder/hooks";
+import {
+  cloneParams,
+  createStreamSteps,
+  ensureSpriteDataLoaded,
+  getDefaultStreamParams,
+} from "@/lib/streamer/steps";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
-import OptionPreview from "@/components/streamer/OptionPreview";
-import { ensureSpriteDataLoaded } from "@/lib/streamer/steps";
+import { cn } from "@/lib/utils";
 
 type SessionRecord = typeof api.streamSessions.get._returnType;
-type ParticipantRecord = (typeof api.streamParticipants.list._returnType)[number];
+type ParticipantRecord =
+  (typeof api.streamParticipants.list._returnType)[number];
 
 type StreamParams = StreamerParams;
 type StepOption = ReturnType<StreamStep["getOptions"]>[number];
@@ -46,7 +50,10 @@ const COLOUR_MODE_LABELS: Record<string, string> = {
 };
 
 function generateViewerSessionId() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -118,14 +125,19 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
       existingFingerprint = generateViewerSessionId();
       storage.setItem(baseKey, existingFingerprint);
     }
-    const timer = window.setTimeout(() => setFingerprint(existingFingerprint), 0);
+    const timer = window.setTimeout(
+      () => setFingerprint(existingFingerprint),
+      0,
+    );
     return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const storage = window.sessionStorage ?? window.localStorage;
-    const key = viewerKey ? `${VIEWER_SESSION_PREFIX}:${viewerKey}` : VIEWER_SESSION_PREFIX;
+    const key = viewerKey
+      ? `${VIEWER_SESSION_PREFIX}:${viewerKey}`
+      : VIEWER_SESSION_PREFIX;
     const existing = storage.getItem(key);
     if (existing) {
       const timer = window.setTimeout(() => setViewerSession(existing), 0);
@@ -155,7 +167,8 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     return { viewerKey, limit: 1 } as const;
   }, [viewerKey]);
 
-  const sessionMatches = useQuery(api.streamSessions.list, sessionLookupArgs) ?? [];
+  const sessionMatches =
+    useQuery(api.streamSessions.list, sessionLookupArgs) ?? [];
   const sessionId = sessionMatches[0]?.id ?? null;
 
   const sessionArgs = useMemo(() => {
@@ -163,7 +176,10 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     return { id: toId("stream_sessions", sessionId) } as const;
   }, [sessionId]);
 
-  const session = useQuery(api.streamSessions.get, sessionArgs) as SessionRecord;
+  const session = useQuery(
+    api.streamSessions.get,
+    sessionArgs,
+  ) as SessionRecord;
 
   const votesArgs = useMemo(() => {
     if (!sessionId) return "skip" as const;
@@ -186,13 +202,22 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     } as const;
   }, [sessionId, viewerSession]);
 
-  const rawParticipantList = useQuery(api.streamParticipants.list, participantArgs);
-  const participantList = useMemo(() => rawParticipantList ?? [], [rawParticipantList]);
+  const rawParticipantList = useQuery(
+    api.streamParticipants.list,
+    participantArgs,
+  );
+  const participantList = useMemo(
+    () => rawParticipantList ?? [],
+    [rawParticipantList],
+  );
   const participant = participantList[0] as ParticipantRecord | undefined;
 
   useEffect(() => {
     if (!participant?.display_name) return;
-    const timer = window.setTimeout(() => setDisplayName(participant.display_name), 0);
+    const timer = window.setTimeout(
+      () => setDisplayName(participant.display_name),
+      0,
+    );
     return () => window.clearTimeout(timer);
   }, [participant?.display_name]);
 
@@ -203,13 +228,14 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   const params = useMemo(
     () =>
       cloneParams<StreamParams>(
-        (session?.params as StreamParams | undefined) ?? getDefaultStreamParams()
+        (session?.params as StreamParams | undefined) ??
+          getDefaultStreamParams(),
       ),
-    [session?.params]
+    [session?.params],
   );
   const steps = useMemo<StreamStep[]>(
     () => (mapperReady ? createStreamSteps({ params }) : []),
-    [params, mapperReady]
+    [params, mapperReady],
   );
   const currentStep = useMemo(() => {
     if (!steps.length) return null;
@@ -218,8 +244,11 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   }, [steps, currentStepId]);
 
   const stepState = useMemo(
-    () => ({ params, history: Array.isArray(session?.step_history) ? session.step_history : [] }),
-    [params, session]
+    () => ({
+      params,
+      history: Array.isArray(session?.step_history) ? session.step_history : [],
+    }),
+    [params, session],
   );
 
   const options: StepOption[] = useMemo(() => {
@@ -248,39 +277,56 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   }, [params]);
 
   const { displayOptions, activeTieFilter } = useMemo(() => {
-    if (tieFilter && tieFilter.size) {
+    if (tieFilter?.size) {
       const filtered = options.filter((option) => tieFilter.has(option.key));
       if (filtered.length) {
         return { displayOptions: filtered, activeTieFilter: tieFilter };
       }
     }
-    return { displayOptions: options, activeTieFilter: null as Set<string> | null };
+    return {
+      displayOptions: options,
+      activeTieFilter: null as Set<string> | null,
+    };
   }, [options, tieFilter]);
 
   const participantVote = useMemo(() => {
     if (!participant) return null;
-    return votes.find((vote) => vote.option_meta?.participantId === participant.id) ?? null;
+    return (
+      votes.find(
+        (vote) => vote.option_meta?.participantId === participant.id,
+      ) ?? null
+    );
   }, [votes, participant]);
 
   const totalVotes = votes.length;
 
   const votingStatus = useMemo(() => {
-    if (!session) return { code: "loading", reason: "Loading session…" } as const;
+    if (!session)
+      return { code: "loading", reason: "Loading session…" } as const;
     const status = (session.status ?? "draft").toLowerCase();
     if (status === "completed") {
       return { code: "finished", reason: "Voting has finished." } as const;
     }
     if (status !== "live") {
-      return { code: "waiting", reason: "Waiting for the streamer to go live." } as const;
+      return {
+        code: "waiting",
+        reason: "Waiting for the streamer to go live.",
+      } as const;
     }
     if (session.params?._votesOpen !== true) {
       return { code: "closed", reason: "Voting is closed." } as const;
     }
     if (!participant) {
-      return { code: "needs_name", reason: "Enter your name to join the vote." } as const;
+      return {
+        code: "needs_name",
+        reason: "Enter your name to join the vote.",
+      } as const;
     }
     if ((participant.status ?? "active").toLowerCase() !== "active") {
-      return { code: "blocked", reason: "You have been removed from this session." } as const;
+      return {
+        code: "blocked",
+        reason: "You have been removed from this session.",
+      } as const;
     }
     return { code: "ready", reason: "" } as const;
   }, [session, participant]);
@@ -297,7 +343,9 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
       const sessionToken = buildViewerSessionId(cleaned);
       if (typeof window !== "undefined") {
         const storage = window.sessionStorage ?? window.localStorage;
-        const key = viewerKey ? `${VIEWER_SESSION_PREFIX}:${viewerKey}` : VIEWER_SESSION_PREFIX;
+        const key = viewerKey
+          ? `${VIEWER_SESSION_PREFIX}:${viewerKey}`
+          : VIEWER_SESSION_PREFIX;
         storage.setItem(key, sessionToken);
       }
       setViewerSession(sessionToken);
@@ -313,16 +361,23 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
         setStatusMessage("Checked in! You can vote when polls are open.");
         track("stream_viewer_joined", {});
       } catch (error) {
-        const message = extractErrorMessage(error) ?? "Unable to join right now.";
+        const message =
+          extractErrorMessage(error) ?? "Unable to join right now.";
         setNameError(message);
       }
     },
-    [sessionId, viewerKey, displayName, registerParticipant, fingerprint]
+    [sessionId, viewerKey, displayName, registerParticipant, fingerprint],
   );
 
   const handleVote = useCallback(
     async (option: StepOption) => {
-      if (!participant || !sessionId || !currentStep || votingStatus.code !== "ready") return;
+      if (
+        !participant ||
+        !sessionId ||
+        !currentStep ||
+        votingStatus.code !== "ready"
+      )
+        return;
       try {
         await createVote({
           sessionId: toId("stream_sessions", sessionId),
@@ -338,34 +393,43 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
         track("stream_vote_cast", { is_streamer: false });
       } catch (error) {
         console.error("Vote failed", error);
-        const message = extractErrorMessage(error) ?? "Unable to record your vote. Try again.";
+        const message =
+          extractErrorMessage(error) ??
+          "Unable to record your vote. Try again.";
         setStatusMessage(message);
       }
     },
-    [participant, sessionId, currentStep, votingStatus.code, createVote]
+    [participant, sessionId, currentStep, votingStatus.code, createVote],
   );
 
   const [optionSearch, setOptionSearch] = useState("");
   const filteredOptions = useMemo(() => {
     const term = optionSearch.trim().toLowerCase();
     if (!term) return displayOptions;
-    return displayOptions.filter((option) => option.label.toLowerCase().includes(term));
+    return displayOptions.filter((option) =>
+      option.label.toLowerCase().includes(term),
+    );
   }, [displayOptions, optionSearch]);
 
   useEffect(() => {
     const id = window.setTimeout(() => setOptionSearch(""), 0);
     return () => window.clearTimeout(id);
-  }, [currentStep?.id, session?.params?._votesOpen, session?.status]);
+  }, []);
 
   const sessionParams = session?.params as StreamParams | undefined;
   const finalShareUrl = sessionParams?._finalShareUrl ?? null;
   const finalCatName = sessionParams?._finalName ?? null;
   const finalCreatorName = sessionParams?._finalCreator ?? null;
-  const finalDisplayLabel = finalCatName ? `“${finalCatName}”` : "The final cat";
+  const finalDisplayLabel = finalCatName
+    ? `“${finalCatName}”`
+    : "The final cat";
   const finalDisplayCreator = finalCreatorName ? ` by ${finalCreatorName}` : "";
   const signupsOpen = sessionParams?._signupsOpen !== false;
   const votesOpen = sessionParams?._votesOpen === true;
-  const currentPaletteMode = typeof sessionParams?._paletteMode === "string" ? sessionParams._paletteMode : "classic";
+  const currentPaletteMode =
+    typeof sessionParams?._paletteMode === "string"
+      ? sessionParams._paletteMode
+      : "classic";
 
   if (!viewerKey) {
     return (
@@ -378,7 +442,8 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   if (!sessionId) {
     return (
       <div className="rounded-2xl border border-border/60 bg-background/80 p-6 text-center text-sm text-muted-foreground">
-        Waiting for the streamer to go live. Refresh this page when the session starts.
+        Waiting for the streamer to go live. Refresh this page when the session
+        starts.
       </div>
     );
   }
@@ -389,7 +454,9 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
         <div className="flex items-center justify-between">
           <div>
             <p className="section-eyebrow">Viewer panel</p>
-            <h1 className="text-2xl font-semibold text-foreground">Cast your vote</h1>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Cast your vote
+            </h1>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span
@@ -397,20 +464,22 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
                 "inline-flex items-center gap-1 rounded-full border px-3 py-1 font-semibold",
                 signupsOpen
                   ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
-                  : "border-amber-400/40 bg-amber-400/10 text-amber-100"
+                  : "border-amber-400/40 bg-amber-400/10 text-amber-100",
               )}
             >
-              <UsersIcon size={12} /> {signupsOpen ? "Sign ups open" : "Sign ups closed"}
+              <UsersIcon size={12} />{" "}
+              {signupsOpen ? "Sign ups open" : "Sign ups closed"}
             </span>
             <span
               className={cn(
                 "inline-flex items-center gap-1 rounded-full border px-3 py-1 font-semibold",
                 votesOpen
                   ? "border-primary/60 bg-primary/10 text-primary"
-                  : "border-slate-500/50 bg-slate-500/10 text-slate-200"
+                  : "border-slate-500/50 bg-slate-500/10 text-slate-200",
               )}
             >
-              <Vote className="size-3" /> {votesOpen ? "Voting open" : "Voting closed"}
+              <Vote className="size-3" />{" "}
+              {votesOpen ? "Voting open" : "Voting closed"}
             </span>
           </div>
         </div>
@@ -426,14 +495,33 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
             Voting finished!
             {finalShareUrl ? (
               <span className="ml-2 inline-flex flex-wrap items-center gap-2">
-                <span className="font-medium">{finalDisplayLabel}{finalDisplayCreator}</span>
-                <Link href={finalShareUrl} target="_blank" className="underline decoration-primary/60 underline-offset-4 transition hover:decoration-primary">View</Link>
+                <span className="font-medium">
+                  {finalDisplayLabel}
+                  {finalDisplayCreator}
+                </span>
+                <Link
+                  href={finalShareUrl}
+                  target="_blank"
+                  className="underline decoration-primary/60 underline-offset-4 transition hover:decoration-primary"
+                >
+                  View
+                </Link>
                 <span className="text-primary/70">or</span>
-                <Link href="/history" className="underline decoration-primary/60 underline-offset-4 transition hover:decoration-primary">history</Link>
+                <Link
+                  href="/history"
+                  className="underline decoration-primary/60 underline-offset-4 transition hover:decoration-primary"
+                >
+                  history
+                </Link>
               </span>
             ) : (
               <span className="ml-2 inline-flex">
-                <Link href="/history" className="underline decoration-primary/60 underline-offset-4 transition hover:decoration-primary">Browse history</Link>
+                <Link
+                  href="/history"
+                  className="underline decoration-primary/60 underline-offset-4 transition hover:decoration-primary"
+                >
+                  Browse history
+                </Link>
               </span>
             )}
           </div>
@@ -441,7 +529,11 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
 
         {participant && participant.status?.toLowerCase() === "active" ? (
           <div className="rounded-xl border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
-            Checked in as <span className="font-semibold text-emerald-50">{participant.display_name || "Viewer"}</span>.
+            Checked in as{" "}
+            <span className="font-semibold text-emerald-50">
+              {participant.display_name || "Viewer"}
+            </span>
+            .
           </div>
         ) : (
           <form onSubmit={handleNameSubmit} className="space-y-2">
@@ -469,9 +561,13 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
                 <UsersIcon size={16} /> Check in
               </button>
             </div>
-            {nameError && <p className="text-xs text-destructive">{nameError}</p>}
+            {nameError && (
+              <p className="text-xs text-destructive">{nameError}</p>
+            )}
             {!signupsOpen && (
-              <p className="text-xs text-muted-foreground">Sign ups are closed for this session.</p>
+              <p className="text-xs text-muted-foreground">
+                Sign ups are closed for this session.
+              </p>
             )}
           </form>
         )}
@@ -486,10 +582,16 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
       <section className="glass-card space-y-4 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">{currentStep?.title}</h2>
-            <p className="text-sm text-muted-foreground">{currentStep?.description}</p>
+            <h2 className="text-lg font-semibold text-foreground">
+              {currentStep?.title}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {currentStep?.description}
+            </p>
           </div>
-          <div className="text-xs text-muted-foreground">{totalVotes} vote{totalVotes === 1 ? "" : "s"}</div>
+          <div className="text-xs text-muted-foreground">
+            {totalVotes} vote{totalVotes === 1 ? "" : "s"}
+          </div>
         </div>
 
         {currentStep?.id === "colour" && (
@@ -536,27 +638,34 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
           )}
           {filteredOptions.map((option) => {
             const disabledByHost = disabledOptions.has(option.key);
-            const allowedByTie = !activeTieFilter || activeTieFilter.has(option.key);
+            const allowedByTie =
+              !activeTieFilter || activeTieFilter.has(option.key);
             const disabled = disabledByHost || !allowedByTie;
             const isSelected = participantVote?.option_key === option.key;
             const votesForOption = voteCounts.get(option.key) ?? 0;
-            const viewerActive = participant && participant.status?.toLowerCase() === "active";
+            const viewerActive =
+              participant && participant.status?.toLowerCase() === "active";
             const readyToVote = viewerActive && votingStatus.code === "ready";
             const existingVoteValid =
-              participantVote && displayOptions.some((opt) => opt.key === participantVote.option_key);
+              participantVote &&
+              displayOptions.some(
+                (opt) => opt.key === participantVote.option_key,
+              );
             const showYourVote = Boolean(existingVoteValid && isSelected);
             return (
               <button
                 key={option.key}
                 type="button"
-                disabled={disabled || !readyToVote || Boolean(existingVoteValid)}
+                disabled={
+                  disabled || !readyToVote || Boolean(existingVoteValid)
+                }
                 onClick={() => handleVote(option)}
                 className={cn(
                   "group relative flex h-full flex-col items-center justify-center gap-4 rounded-3xl border px-4 py-6 text-center transition sm:px-6",
                   disabled || !readyToVote
                     ? "border-border/40 bg-background/40 text-muted-foreground"
                     : "border-border/60 bg-background/70 hover:border-primary/40",
-                  isSelected && "border-primary/60 bg-primary/10"
+                  isSelected && "border-primary/60 bg-primary/10",
                 )}
               >
                 <div className="relative rounded-xl">
@@ -570,7 +679,9 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
                     size={250}
                   />
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end gap-2 rounded-[inherit] bg-black/65 px-4 py-4 text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
-                    <div className="text-sm font-semibold uppercase tracking-wide">{option.label}</div>
+                    <div className="text-sm font-semibold uppercase tracking-wide">
+                      {option.label}
+                    </div>
                     <div className="text-xs">
                       {votesForOption} vote{votesForOption === 1 ? "" : "s"}
                       {showYourVote ? " · Your vote" : ""}
@@ -583,7 +694,8 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
                   )}
                 </div>
                 <span className="sr-only">
-                  {option.label} — {votesForOption} vote{votesForOption === 1 ? "" : "s"}
+                  {option.label} — {votesForOption} vote
+                  {votesForOption === 1 ? "" : "s"}
                   {showYourVote ? " (your vote)" : ""}
                 </span>
               </button>
@@ -595,19 +707,28 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
       <section className="glass-card space-y-4 p-6">
         <h3 className="text-lg font-semibold text-foreground">Timeline</h3>
         <div className="grid gap-2 text-sm">
-          {Array.isArray(session?.step_history) && session.step_history.length > 0 ? (
+          {Array.isArray(session?.step_history) &&
+          session.step_history.length > 0 ? (
             session.step_history.map((entry, index) => (
               <div
                 key={`${entry.step_id ?? "step"}-${entry.option_key ?? "option"}-${entry.title ?? "untitled"}-${entry.label ?? "choice"}`}
                 className="rounded-xl border border-border/50 bg-background/70 px-3 py-2"
               >
-                <div className="text-xs text-muted-foreground">Step {index + 1}</div>
-                <div className="font-semibold text-foreground">{entry.title}</div>
-                <div className="text-xs text-muted-foreground">{entry.label}</div>
+                <div className="text-xs text-muted-foreground">
+                  Step {index + 1}
+                </div>
+                <div className="font-semibold text-foreground">
+                  {entry.title}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {entry.label}
+                </div>
               </div>
             ))
           ) : (
-            <p className="text-muted-foreground">The streamer hasn&apos;t locked any steps yet.</p>
+            <p className="text-muted-foreground">
+              The streamer hasn&apos;t locked any steps yet.
+            </p>
           )}
         </div>
       </section>

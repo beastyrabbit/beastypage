@@ -16,7 +16,13 @@ const CATEGORY_ORDER = ["pixelate", "dither", "color", "effect"];
 // Draggable tile
 // ---------------------------------------------------------------------------
 
-function OperationTile({ type, label }: { type: OperationType; label: string }) {
+function OperationTile({
+  type,
+  label,
+}: {
+  type: OperationType;
+  label: string;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `toolbox-${type}`,
     data: { operationType: type },
@@ -40,7 +46,11 @@ function OperationTile({ type, label }: { type: OperationType; label: string }) 
 // Drag overlay (shown while dragging)
 // ---------------------------------------------------------------------------
 
-export function ToolboxDragOverlay({ operationType }: { operationType: OperationType }) {
+export function ToolboxDragOverlay({
+  operationType,
+}: {
+  operationType: OperationType;
+}) {
   const def = OPERATIONS.find((o) => o.type === operationType);
   if (!def) return null;
 

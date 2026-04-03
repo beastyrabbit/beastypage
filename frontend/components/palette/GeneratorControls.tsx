@@ -1,8 +1,12 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { MODE_OPTIONS, DISPLAY_FORMATS, type DisplayFormat } from "@/lib/palette-generator/types";
 import SparklesIcon from "@/components/ui/sparkles-icon";
+import {
+  DISPLAY_FORMATS,
+  type DisplayFormat,
+  MODE_OPTIONS,
+} from "@/lib/palette-generator/types";
+import { cn } from "@/lib/utils";
 
 interface GeneratorControlsProps {
   paletteSize: number;
@@ -24,14 +28,17 @@ export function GeneratorControls({
   onGenerate,
   generatingMode,
 }: GeneratorControlsProps) {
-  const percent = ((paletteSize - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) * 100;
+  const percent =
+    ((paletteSize - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) * 100;
 
   return (
     <div className="glass-card sticky top-4 z-20 space-y-4 p-5">
       {/* Row 1: Mode generate buttons */}
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground/80">Generate by Mode</span>
+          <span className="text-xs uppercase tracking-wide text-muted-foreground/80">
+            Generate by Mode
+          </span>
           <div className="inline-flex items-center gap-1 rounded-full border border-border/30 bg-muted/30 p-1">
             {DISPLAY_FORMATS.map((fmt) => (
               <button
@@ -61,7 +68,8 @@ export function GeneratorControls({
             } else if (isDisabled) {
               stateClasses = "border-border/30 text-muted-foreground/50";
             } else {
-              stateClasses = "border-primary/40 bg-primary/5 text-primary hover:border-primary/60 hover:bg-primary/15";
+              stateClasses =
+                "border-primary/40 bg-primary/5 text-primary hover:border-primary/60 hover:bg-primary/15";
             }
 
             return (
@@ -76,8 +84,20 @@ export function GeneratorControls({
                 )}
               >
                 {isLoading ? (
-                  <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" strokeDashoffset="10" />
+                  <svg
+                    className="size-3 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeDasharray="32"
+                      strokeDashoffset="10"
+                    />
                   </svg>
                 ) : (
                   <SparklesIcon size={12} />
@@ -92,7 +112,9 @@ export function GeneratorControls({
       {/* Row 2: Palette size — single slider */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground/80">Palette size</span>
+          <span className="text-xs uppercase tracking-wide text-muted-foreground/80">
+            Palette size
+          </span>
           <span className="font-mono text-sm font-medium text-foreground">
             {paletteSize} {paletteSize === 1 ? "color" : "colors"}
           </span>

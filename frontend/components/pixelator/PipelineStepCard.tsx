@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, GripVertical, X } from "lucide-react";
+import { useState } from "react";
 import {
-  OPERATIONS,
   BLEND_MODES,
-  type PipelineStep,
   type BlendMode,
+  OPERATIONS,
+  type PipelineStep,
 } from "@/lib/pixelator/types";
 
 interface PipelineStepCardProps {
@@ -55,7 +55,6 @@ export function PipelineStepCard({
     })),
   ];
 
-
   return (
     <div
       ref={setNodeRef}
@@ -79,7 +78,11 @@ export function PipelineStepCard({
           onClick={() => setExpanded(!expanded)}
           className="text-muted-foreground hover:text-foreground"
         >
-          {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+          {expanded ? (
+            <ChevronDown className="size-4" />
+          ) : (
+            <ChevronRight className="size-4" />
+          )}
         </button>
 
         <span className="text-xs font-bold text-muted-foreground">
@@ -90,7 +93,10 @@ export function PipelineStepCard({
           {step.label}
         </span>
 
-        <label htmlFor={`${idPrefix}-enabled`} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <label
+          htmlFor={`${idPrefix}-enabled`}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+        >
           <input
             id={`${idPrefix}-enabled`}
             type="checkbox"
@@ -115,13 +121,18 @@ export function PipelineStepCard({
         <div className="flex flex-col gap-3 border-t border-border/50 px-3 pb-3 pt-3">
           {/* Input source */}
           <div className="flex items-center gap-2">
-            <label htmlFor={`${idPrefix}-input-source`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+            <label
+              htmlFor={`${idPrefix}-input-source`}
+              className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
+            >
               Input
             </label>
             <select
               id={`${idPrefix}-input-source`}
               value={step.inputSource}
-              onChange={(e) => onUpdate(step.id, { inputSource: e.target.value })}
+              onChange={(e) =>
+                onUpdate(step.id, { inputSource: e.target.value })
+              }
               className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
             >
               {inputOptions.map((opt) => (
@@ -135,7 +146,10 @@ export function PipelineStepCard({
           {/* Algorithm params */}
           {def?.params.map((param) => (
             <div key={param.key} className="flex items-center gap-2">
-              <label htmlFor={`${idPrefix}-param-${param.key}`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+              <label
+                htmlFor={`${idPrefix}-param-${param.key}`}
+                className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
+              >
                 {param.label}
               </label>
               {param.type === "number" ? (
@@ -183,7 +197,10 @@ export function PipelineStepCard({
           {/* Blend settings */}
           <div className="flex flex-col gap-2 border-t border-border/30 pt-2">
             <div className="flex items-center gap-2">
-              <label htmlFor={`${idPrefix}-blend-enabled`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+              <label
+                htmlFor={`${idPrefix}-blend-enabled`}
+                className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
+              >
                 Blend
               </label>
               <select
@@ -212,7 +229,10 @@ export function PipelineStepCard({
             {step.blendWith && (
               <>
                 <div className="flex items-center gap-2">
-                  <label htmlFor={`${idPrefix}-blend-source`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                  <label
+                    htmlFor={`${idPrefix}-blend-source`}
+                    className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
+                  >
                     Source
                   </label>
                   <select
@@ -220,7 +240,10 @@ export function PipelineStepCard({
                     value={step.blendWith.stepId}
                     onChange={(e) =>
                       onUpdate(step.id, {
-                        blendWith: { ...step.blendWith!, stepId: e.target.value },
+                        blendWith: {
+                          ...step.blendWith!,
+                          stepId: e.target.value,
+                        },
                       })
                     }
                     className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
@@ -233,7 +256,10 @@ export function PipelineStepCard({
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label htmlFor={`${idPrefix}-blend-mode`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                  <label
+                    htmlFor={`${idPrefix}-blend-mode`}
+                    className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
+                  >
                     Mode
                   </label>
                   <select
@@ -257,7 +283,10 @@ export function PipelineStepCard({
                   </select>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label htmlFor={`${idPrefix}-blend-opacity`} className="w-16 shrink-0 text-xs font-medium text-muted-foreground">
+                  <label
+                    htmlFor={`${idPrefix}-blend-opacity`}
+                    className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
+                  >
                     Opacity
                   </label>
                   <input

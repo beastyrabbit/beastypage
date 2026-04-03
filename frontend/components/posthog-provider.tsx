@@ -1,7 +1,7 @@
 "use client";
 
 import posthog from "posthog-js";
-import { ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect } from "react";
 
 const KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "/bubu";
