@@ -21,6 +21,7 @@ import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { api } from "@/convex/_generated/api";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import type { CatParams } from "@/lib/cat-v3/types";
+import { decodePortableSettings } from "@/lib/portable-settings";
 import {
   computeLayerCount,
   resolveAfterlife,
@@ -4731,6 +4732,29 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       rawSession,
     ],
   );
+  const brbPortableSettings = useMemo(() => {
+    const rawCode = rawSession?.brbSettingsCode;
+    if (typeof rawCode !== "string" || !rawCode.trim()) {
+      return null;
+    }
+    return decodePortableSettings(rawCode);
+  }, [rawSession]);
+  const brbLobbySettings = useMemo(
+    () =>
+      brbPortableSettings
+        ? {
+            ...lobbySettings,
+            accessoryRange: brbPortableSettings.accessoryRange,
+            scarRange: brbPortableSettings.scarRange,
+            tortieRange: brbPortableSettings.tortieRange,
+            exactLayerCounts: brbPortableSettings.exactLayerCounts,
+            afterlifeMode: brbPortableSettings.afterlifeMode,
+            includeBaseColours: brbPortableSettings.includeBaseColours,
+            extendedModes: brbPortableSettings.extendedModes,
+          }
+        : lobbySettings,
+    [brbPortableSettings, lobbySettings],
+  );
 
   const showCountdownLayer = obsPhase === "countdown";
 
@@ -5008,7 +5032,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     return (
       <div className="relative" style={{ width: "1920px", height: "1080px" }}>
         <OBSLobby
-          settings={lobbySettings}
+          settings={brbLobbySettings}
           generator={generatorRef.current}
           hideSettings
         />

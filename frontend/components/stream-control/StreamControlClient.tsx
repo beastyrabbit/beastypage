@@ -53,10 +53,27 @@ const LOBBY_MODE_DEFAULTS = {
   matrix: { cats: 8, move: 1, swap: 1 },
   dvd: { cats: 3, move: 0.5, swap: 1 },
 } as const;
+const FULL_EXPORT_SIZE = 700;
 
 /** Format a multiplier value like 1 -> "1x", 0.25 -> "0.25x", 2.50 -> "2.5x" */
 function formatMultiplier(v: number): string {
   return `${v.toFixed(2).replace(/\.?0+$/, "")}x`;
+}
+
+function normalizePortableCode(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function encodePortableCodeFromSettings(settings: SingleCatSettings): string {
+  return encodePortableSettings({
+    accessoryRange: settings.accessoryRange,
+    scarRange: settings.scarRange,
+    tortieRange: settings.tortieRange,
+    exactLayerCounts: settings.exactLayerCounts,
+    afterlifeMode: settings.afterlifeMode,
+    includeBaseColours: settings.includeBaseColours,
+    extendedModes: settings.extendedModes,
+  });
 }
 
 export function StreamControlClient() {
@@ -124,37 +141,62 @@ export function StreamControlClient() {
     "cycle",
   );
   const [autoClearSeconds, setAutoClearSeconds] = useState(30);
+  const [brbSettingsCode, setBrbSettingsCode] = useState("");
+  const [brbSettingsDraft, setBrbSettingsDraft] = useState("");
+
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const lobbyModeRef = useRef(lobbyMode);
+  lobbyModeRef.current = lobbyMode;
+  const lobbyCatCountRef = useRef(lobbyCatCount);
+  lobbyCatCountRef.current = lobbyCatCount;
+  const lobbyMoveSpeedRef = useRef(lobbyMoveSpeed);
+  lobbyMoveSpeedRef.current = lobbyMoveSpeed;
+  const lobbySwapSpeedRef = useRef(lobbySwapSpeed);
+  lobbySwapSpeedRef.current = lobbySwapSpeed;
+  const lobbyCatMinSizeRef = useRef(lobbyCatMinSize);
+  lobbyCatMinSizeRef.current = lobbyCatMinSize;
+  const lobbyCatMaxSizeRef = useRef(lobbyCatMaxSize);
+  lobbyCatMaxSizeRef.current = lobbyCatMaxSize;
+  const paletteDisplayModeRef = useRef(paletteDisplayMode);
+  paletteDisplayModeRef.current = paletteDisplayMode;
+  const autoClearSecondsRef = useRef(autoClearSeconds);
+  autoClearSecondsRef.current = autoClearSeconds;
+  const brbSettingsCodeRef = useRef(brbSettingsCode);
+  brbSettingsCodeRef.current = brbSettingsCode;
+
+  const buildSessionSettings = useCallback(
+    (
+      baseSettings: SingleCatSettings,
+      overrides: Record<string, unknown> = {},
+    ) => ({
+      ...baseSettings,
+      lobbyMode: lobbyModeRef.current,
+      lobbyCatCount: lobbyCatCountRef.current,
+      lobbyMoveSpeed: lobbyMoveSpeedRef.current,
+      lobbySwapSpeed: lobbySwapSpeedRef.current,
+      lobbyCatMinSize: lobbyCatMinSizeRef.current,
+      lobbyCatMaxSize: lobbyCatMaxSizeRef.current,
+      paletteDisplayMode: paletteDisplayModeRef.current,
+      autoClearSeconds: autoClearSecondsRef.current,
+      brbSettingsCode: brbSettingsCodeRef.current,
+      ...overrides,
+    }),
+    [],
+  );
 
   // Instant sync for lobby settings — no debounce
   const syncLobbySettings = useCallback(
     (updates: Record<string, unknown>) => {
-      const merged = {
-        ...settings,
-        lobbyMode,
-        lobbyCatCount,
-        lobbyMoveSpeed,
-        lobbySwapSpeed,
-        lobbyCatMinSize,
-        lobbyCatMaxSize,
-        paletteDisplayMode,
-        autoClearSeconds,
-        ...updates,
-      };
-      if (session) updateSettingsMut({ settings: merged }).catch(() => {});
+      const merged = buildSessionSettings(settingsRef.current, updates);
+      if (sessionRef.current) {
+        updateSettingsMut({ settings: merged }).catch(() => {});
+      }
     },
-    [
-      settings,
-      lobbyMode,
-      lobbyCatCount,
-      lobbyMoveSpeed,
-      lobbySwapSpeed,
-      lobbyCatMinSize,
-      lobbyCatMaxSize,
-      paletteDisplayMode,
-      autoClearSeconds,
-      session,
-      updateSettingsMut,
-    ],
+    [buildSessionSettings, updateSettingsMut],
   );
 
   // Seed from session settings on first load
@@ -175,6 +217,11 @@ export function StreamControlClient() {
           setPaletteDisplayMode(s.paletteDisplayMode as "cycle" | "all");
         if (s.autoClearSeconds != null)
           setAutoClearSeconds(s.autoClearSeconds as number);
+        if (typeof s.brbSettingsCode === "string") {
+          const normalized = normalizePortableCode(s.brbSettingsCode);
+          setBrbSettingsCode(normalized);
+          setBrbSettingsDraft(normalized);
+        }
         if (s.lobbyClearSeq != null)
           clearSeqRef.current = s.lobbyClearSeq as number;
         if (typeof s.creatorName === "string" && s.creatorName) {
@@ -214,29 +261,6 @@ export function StreamControlClient() {
     return () => observer.disconnect();
   }, []);
 
-  // Sync settings to Convex (debounced) — includes lobby fields so they aren't overwritten
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
-  const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const sessionRef = useRef(session);
-  sessionRef.current = session;
-  const lobbyModeRef = useRef(lobbyMode);
-  lobbyModeRef.current = lobbyMode;
-  const lobbyCatCountRef = useRef(lobbyCatCount);
-  lobbyCatCountRef.current = lobbyCatCount;
-  const lobbyMoveSpeedRef = useRef(lobbyMoveSpeed);
-  lobbyMoveSpeedRef.current = lobbyMoveSpeed;
-  const lobbySwapSpeedRef = useRef(lobbySwapSpeed);
-  lobbySwapSpeedRef.current = lobbySwapSpeed;
-  const lobbyCatMinSizeRef = useRef(lobbyCatMinSize);
-  lobbyCatMinSizeRef.current = lobbyCatMinSize;
-  const lobbyCatMaxSizeRef = useRef(lobbyCatMaxSize);
-  lobbyCatMaxSizeRef.current = lobbyCatMaxSize;
-  const paletteDisplayModeRef = useRef(paletteDisplayMode);
-  paletteDisplayModeRef.current = paletteDisplayMode;
-  const autoClearSecondsRef = useRef(autoClearSeconds);
-  autoClearSecondsRef.current = autoClearSeconds;
-
   const updateSettings = useCallback(
     (next: Partial<SingleCatSettings>) => {
       setSettings((prev) => {
@@ -244,25 +268,14 @@ export function StreamControlClient() {
         clearTimeout(syncTimer.current);
         syncTimer.current = setTimeout(() => {
           if (sessionRef.current) {
-            // Read lobby values from refs to avoid stale closures
-            const full = {
-              ...merged,
-              lobbyMode: lobbyModeRef.current,
-              lobbyCatCount: lobbyCatCountRef.current,
-              lobbyMoveSpeed: lobbyMoveSpeedRef.current,
-              lobbySwapSpeed: lobbySwapSpeedRef.current,
-              lobbyCatMinSize: lobbyCatMinSizeRef.current,
-              lobbyCatMaxSize: lobbyCatMaxSizeRef.current,
-              paletteDisplayMode: paletteDisplayModeRef.current,
-              autoClearSeconds: autoClearSecondsRef.current,
-            };
+            const full = buildSessionSettings(merged);
             updateSettingsMut({ settings: full }).catch(() => {});
           }
         }, 500);
         return merged;
       });
     },
-    [updateSettingsMut],
+    [buildSessionSettings, updateSettingsMut],
   );
 
   // Spin handler
@@ -295,10 +308,9 @@ export function StreamControlClient() {
 
       // Flush settings (including creatorName) to Convex so OBS has them before spinning
       clearTimeout(syncTimer.current);
-      const settingsWithCreator = {
-        ...settings,
+      const settingsWithCreator = buildSessionSettings(settings, {
         creatorName: creatorNameDraft,
-      };
+      });
       await updateSettingsMut({ settings: settingsWithCreator });
 
       await triggerSpinMut({
@@ -346,6 +358,7 @@ export function StreamControlClient() {
       setSpinning(false);
     }
   }, [
+    buildSessionSettings,
     generator,
     spinning,
     settings,
@@ -394,8 +407,36 @@ export function StreamControlClient() {
     [variants, updateSettings],
   );
 
-  // Export handlers — copy / download the last generated cat
-  const FULL_EXPORT_SIZE = 700;
+  const saveBrbSettingsCode = useCallback(
+    async (rawCode: string) => {
+      const normalized = normalizePortableCode(rawCode);
+      if (normalized && !decodePortableSettings(normalized)) {
+        toast.error("Invalid BRB settings code");
+        return false;
+      }
+
+      setBrbSettingsCode(normalized);
+      setBrbSettingsDraft(normalized);
+      brbSettingsCodeRef.current = normalized;
+
+      if (sessionRef.current) {
+        try {
+          await updateSettingsMut({
+            settings: buildSessionSettings(settingsRef.current, {
+              brbSettingsCode: normalized,
+            }),
+          });
+        } catch {
+          toast.error("Failed to save BRB preset");
+          return false;
+        }
+      }
+
+      toast.success(normalized ? "BRB preset saved" : "BRB preset cleared");
+      return true;
+    },
+    [buildSessionSettings, updateSettingsMut],
+  );
 
   const copyCanvasToClipboard = useCallback(
     async (
@@ -1019,6 +1060,14 @@ export function StreamControlClient() {
         </div>
       </section>
 
+      <BrbPresetSection
+        settings={settings}
+        savedCode={brbSettingsCode}
+        draftCode={brbSettingsDraft}
+        onDraftChange={setBrbSettingsDraft}
+        onSave={saveBrbSettingsCode}
+      />
+
       {/* Links & Actions */}
       <section className="rounded-2xl border border-border/40 bg-background/80 p-5 backdrop-blur">
         <h3 className="text-sm font-semibold text-foreground">
@@ -1179,6 +1228,152 @@ export function StreamControlClient() {
 }
 
 // ---------------------------------------------------------------------------
+// BRB Preset — store a portable settings code used only for BRB mode
+// ---------------------------------------------------------------------------
+
+function BrbPresetSection({
+  settings,
+  savedCode,
+  draftCode,
+  onDraftChange,
+  onSave,
+}: {
+  settings: SingleCatSettings;
+  savedCode: string;
+  draftCode: string;
+  onDraftChange: (value: string) => void;
+  onSave: (value: string) => Promise<boolean>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const currentCode = useMemo(
+    () => encodePortableCodeFromSettings(settings),
+    [settings],
+  );
+  const hasSavedPreset = savedCode.length > 0;
+  const presetValid = hasSavedPreset ? Boolean(decodePortableSettings(savedCode)) : true;
+
+  const runSave = async (value: string) => {
+    setSaving(true);
+    try {
+      await onSave(value);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCopyCurrent = async () => {
+    try {
+      await navigator.clipboard.writeText(currentCode);
+      toast.success("Current settings code copied");
+    } catch {
+      toast.error("Failed to copy settings code");
+    }
+  };
+
+  return (
+    <section className="rounded-2xl border border-border/40 bg-background/80 backdrop-blur">
+      <div className="flex items-center justify-between border-b border-border/30 px-5 py-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">BRB Preset</h3>
+          <p className="text-xs text-muted-foreground">
+            Save an optional 6-word code. The BRB button uses this preset without
+            changing your live stream settings.
+          </p>
+        </div>
+        <span
+          className={cn(
+            "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
+            hasSavedPreset && presetValid
+              ? "border-emerald-500/30 text-emerald-400"
+              : "border-border/40 text-muted-foreground",
+          )}
+        >
+          {hasSavedPreset && presetValid ? "Preset Ready" : "Uses Live Settings"}
+        </span>
+      </div>
+
+      <div className="space-y-4 p-5">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            type="text"
+            value={draftCode}
+            onChange={(e) => onDraftChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !saving) {
+                void runSave(draftCode);
+              }
+            }}
+            placeholder="Paste BRB settings code…"
+            className="min-w-0 flex-1 rounded-lg border border-border/40 bg-background/60 px-3 py-2 font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-primary/40"
+          />
+          <button
+            type="button"
+            onClick={() => void runSave(draftCode)}
+            disabled={saving}
+            className={cn(
+              "inline-flex items-center justify-center rounded-lg border border-border/50 px-3 py-2 text-xs font-medium transition",
+              "text-muted-foreground hover:text-foreground disabled:opacity-50",
+            )}
+          >
+            {saving ? "Saving…" : "Save Preset"}
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void runSave(currentCode)}
+            disabled={saving}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+              "text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background disabled:opacity-50",
+            )}
+          >
+            Use Current Settings
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCopyCurrent()}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+              "text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background",
+            )}
+          >
+            <Copy className="size-4" /> Copy Current Code
+          </button>
+          <button
+            type="button"
+            onClick={() => void runSave("")}
+            disabled={saving || !hasSavedPreset}
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2",
+              "text-xs font-medium text-muted-foreground transition hover:border-red-500/40 hover:bg-red-500/5 hover:text-red-400 disabled:opacity-50",
+            )}
+          >
+            Clear Preset
+          </button>
+        </div>
+
+        {hasSavedPreset ? (
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">
+              Saved BRB code
+            </p>
+            <code className="block rounded-lg border border-border/40 bg-background/60 px-3 py-2 font-mono text-xs text-foreground">
+              {savedCode}
+            </code>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No preset saved. BRB will use whatever settings are currently active.
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Settings Code — encode/decode portable 6-word settings codes
 // ---------------------------------------------------------------------------
 
@@ -1193,16 +1388,7 @@ function SettingsCode({
   const [copyFeedback, setCopyFeedback] = useState(false);
 
   const liveCode = useMemo(
-    () =>
-      encodePortableSettings({
-        accessoryRange: settings.accessoryRange,
-        scarRange: settings.scarRange,
-        tortieRange: settings.tortieRange,
-        exactLayerCounts: settings.exactLayerCounts,
-        afterlifeMode: settings.afterlifeMode,
-        includeBaseColours: settings.includeBaseColours,
-        extendedModes: settings.extendedModes,
-      }),
+    () => encodePortableCodeFromSettings(settings),
     [settings],
   );
 
