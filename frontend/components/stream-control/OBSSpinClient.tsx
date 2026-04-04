@@ -1196,7 +1196,7 @@ function toClassicWheelSelection(
   }
   return {
     prize: prize ?? fallbackPrize,
-    index: wheelSpin.prizeIndex,
+    index: prize ? wheelSpin.prizeIndex : CLASSIC_WHEEL_PRIZES.length - 1,
     random: wheelSpin.randomBucket,
   };
 }
