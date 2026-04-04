@@ -352,6 +352,7 @@ export default defineSchema({
           v.literal("clear"),
           v.literal("test"),
           v.literal("lobby"),
+          v.literal("brb"),
         ),
         seq: v.number(),
         params: v.optional(v.any()),

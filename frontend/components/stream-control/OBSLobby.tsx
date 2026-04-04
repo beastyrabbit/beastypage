@@ -40,12 +40,14 @@ export interface LobbySettings {
   includeBaseColours: boolean;
   extendedModes: string[];
   exactLayerCounts?: boolean;
-  lobbyMode?: string;
+  lobbyMode?: "fruit-ninja" | "matrix" | "dvd";
   lobbyCatCount?: number;
   lobbyMoveSpeed?: number;
   lobbySwapSpeed?: number;
   lobbyClearSeq?: number;
   paletteDisplayMode?: "cycle" | "all";
+  lobbyCatMinSize?: number;
+  lobbyCatMaxSize?: number;
 }
 
 interface FlyingCat {
@@ -56,7 +58,7 @@ interface FlyingCat {
   duration: number;
   peakY: number;
   rotation: number;
-  size: number; // 1.0 to 2.0
+  size: number; // lobbyCatMinSize..lobbyCatMaxSize (default 1–2)
   mode: "fruit-ninja" | "matrix" | "dvd"; // locked at spawn time
 }
 
@@ -67,14 +69,13 @@ interface FlyingCat {
 export function OBSLobby({
   settings,
   generator,
+  hideSettings = false,
 }: {
   settings: LobbySettings;
   generator: CatGeneratorApi | null;
+  hideSettings?: boolean;
 }) {
-  const lobbyMode = (settings.lobbyMode ?? "fruit-ninja") as
-    | "fruit-ninja"
-    | "matrix"
-    | "dvd";
+  const lobbyMode = settings.lobbyMode ?? "fruit-ninja";
   const maxCats = settings.lobbyCatCount ?? 4;
   const moveSpeed = settings.lobbyMoveSpeed ?? 1.0;
   const swapSpeed = settings.lobbySwapSpeed ?? 1.0;
@@ -102,6 +103,12 @@ export function OBSLobby({
   maxCatsRef.current = maxCats;
   const moveSpeedRef = useRef(moveSpeed);
   moveSpeedRef.current = moveSpeed;
+  const catMinSize = settings.lobbyCatMinSize ?? 1;
+  const catMaxSize = settings.lobbyCatMaxSize ?? 2;
+  const catMinSizeRef = useRef(catMinSize);
+  catMinSizeRef.current = catMinSize;
+  const catMaxSizeRef = useRef(catMaxSize);
+  catMaxSizeRef.current = catMaxSize;
 
   // Generation-relevant settings — only these should restart the spawn loop
   const genSettings = useMemo(
@@ -207,14 +214,17 @@ export function OBSLobby({
       const curMode = lobbyModeRef.current;
       const curMaxCats = maxCatsRef.current;
       const curMoveSpeed = moveSpeedRef.current;
+      const curMinSize = catMinSizeRef.current;
+      const curMaxSize = catMaxSizeRef.current;
 
       setFlyingCats((prev) => {
         const alive = prev.filter((c) => Date.now() - c.startTime < c.duration);
         if (alive.length >= curMaxCats) return alive;
         const baseDuration =
           curMode === "dvd"
-            ? 999999
+            ? 30000
             : (10000 + Math.random() * 20000) / curMoveSpeed;
+        const sizeRange = Math.max(0, curMaxSize - curMinSize);
         return [
           ...alive,
           {
@@ -225,7 +235,7 @@ export function OBSLobby({
             duration: baseDuration,
             peakY: 250 + Math.random() * 500,
             rotation: -60 + Math.random() * 120,
-            size: 1 + Math.random(),
+            size: curMinSize + Math.random() * sizeRange,
             mode: curMode,
           },
         ];
@@ -300,121 +310,124 @@ export function OBSLobby({
         transition: "opacity 5s ease-in",
       }}
     >
-      {/* Settings display — stays in the left 2/3 */}
-      <div
-        className="absolute"
-        style={{
-          left: "40px",
-          top: "40px",
-          width: "900px",
-          background: "rgba(0,0,0,0.85)",
-          borderRadius: "20px",
-          border: "1px solid rgba(245, 158, 11, 0.2)",
-          boxShadow: "0 0 40px rgba(245, 158, 11, 0.05)",
-          padding: "28px 32px",
-        }}
-      >
-        <div className="mb-5 flex items-center gap-3">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-          <span className="text-xs font-bold uppercase tracking-[0.4em] text-amber-500/60">
-            Spin Settings
-          </span>
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-        </div>
-        <div className="grid grid-cols-3 gap-2.5">
-          {chips.map((chip) => (
-            <div
-              key={chip.label}
-              className="flex flex-col items-center rounded-xl border border-zinc-800 bg-zinc-900/50 px-3 py-2.5"
-            >
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-                {chip.label}
-              </span>
-              <span className="mt-1 text-base font-bold capitalize text-white">
-                {chip.value}
-              </span>
-            </div>
-          ))}
-        </div>
+      {/* Settings display — stays in the left 2/3 (hidden in BRB mode) */}
+      {!hideSettings && (
+        <div
+          className="absolute"
+          style={{
+            left: "40px",
+            top: "40px",
+            width: "900px",
+            background: "rgba(0,0,0,0.85)",
+            borderRadius: "20px",
+            border: "1px solid rgba(245, 158, 11, 0.2)",
+            boxShadow: "0 0 40px rgba(245, 158, 11, 0.05)",
+            padding: "28px 32px",
+          }}
+        >
+          <div className="mb-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+            <span className="text-xs font-bold uppercase tracking-[0.4em] text-amber-500/60">
+              Spin Settings
+            </span>
+            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+          </div>
+          <div className="grid grid-cols-3 gap-2.5">
+            {chips.map((chip) => (
+              <div
+                key={chip.label}
+                className="flex flex-col items-center rounded-xl border border-zinc-800 bg-zinc-900/50 px-3 py-2.5"
+              >
+                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+                  {chip.label}
+                </span>
+                <span className="mt-1 text-base font-bold capitalize text-white">
+                  {chip.value}
+                </span>
+              </div>
+            ))}
+          </div>
 
-        {/* Settings Code */}
-        <div className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-2">
-          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
-            Code
-          </span>
-          <code className="font-mono text-sm font-semibold tracking-wide text-amber-500/80">
-            {settingsCode}
-          </code>
-        </div>
+          {/* Settings Code */}
+          <div className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-4 py-2">
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+              Code
+            </span>
+            <code className="font-mono text-sm font-semibold tracking-wide text-amber-500/80">
+              {settingsCode}
+            </code>
+          </div>
 
-        {/* Palettes — cycle (carousel) or all (expanded) */}
-        {selectedPalettes.length > 0 && (
-          <div className="mt-5 border-t border-zinc-800 pt-4">
-            {paletteDisplayMode === "all" ? (
-              // Under 10: show fixed list. 10+: infinite scrolling marquee.
-              selectedPalettes.length < 10 ? (
-                <div className="space-y-2.5">
-                  {selectedPalettes.map((palette) => (
-                    <div key={palette.id}>
-                      <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-amber-500/70">
-                        {palette.label}
-                      </span>
-                      <div className="flex flex-wrap gap-0.5">
-                        {Object.entries(palette.colors)
-                          .slice(0, 24)
-                          .map(([name, def]) => (
-                            <div
-                              key={name}
-                              style={swatchStyle(def, 22)}
-                              title={name.replace(/_/g, " ")}
-                            />
-                          ))}
+          {/* Palettes — cycle (carousel) or all (expanded) */}
+          {selectedPalettes.length > 0 && (
+            <div className="mt-5 border-t border-zinc-800 pt-4">
+              {paletteDisplayMode === "all" ? (
+                // Under 10: show fixed list. 10+: infinite scrolling marquee.
+                selectedPalettes.length < 10 ? (
+                  <div className="space-y-2.5">
+                    {selectedPalettes.map((palette) => (
+                      <div key={palette.id}>
+                        <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-amber-500/70">
+                          {palette.label}
+                        </span>
+                        <div className="flex flex-wrap gap-0.5">
+                          {Object.entries(palette.colors)
+                            .slice(0, 24)
+                            .map(([name, def]) => (
+                              <div
+                                key={name}
+                                style={swatchStyle(def, 22)}
+                                title={name.replace(/_/g, " ")}
+                              />
+                            ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <PaletteMarquee palettes={selectedPalettes} />
-              )
-            ) : (
-              // Cycle through palettes one at a time (carousel)
-              <>
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-500/70">
-                    {currentPalette?.label ?? "Palettes"}
-                  </span>
-                  <div className="flex gap-1">
-                    {selectedPalettes.map((p, i) => (
-                      <div
-                        key={p.id}
-                        className="rounded-full transition-all"
-                        style={{
-                          width: i === paletteIdx ? "16px" : "6px",
-                          height: "6px",
-                          background: i === paletteIdx ? "#f59e0b" : "#3f3f46",
-                        }}
-                      />
                     ))}
                   </div>
-                </div>
-                {currentPalette && (
-                  <div className="flex flex-wrap gap-1">
-                    {Object.entries(currentPalette.colors)
-                      .slice(0, 32)
-                      .map(([name, def]) => (
+                ) : (
+                  <PaletteMarquee palettes={selectedPalettes} />
+                )
+              ) : (
+                // Cycle through palettes one at a time (carousel)
+                <>
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-500/70">
+                      {currentPalette?.label ?? "Palettes"}
+                    </span>
+                    <div className="flex gap-1">
+                      {selectedPalettes.map((p, i) => (
                         <div
-                          key={name}
-                          style={swatchStyle(def, 28)}
-                          title={name.replace(/_/g, " ")}
+                          key={p.id}
+                          className="rounded-full transition-all"
+                          style={{
+                            width: i === paletteIdx ? "16px" : "6px",
+                            height: "6px",
+                            background:
+                              i === paletteIdx ? "#f59e0b" : "#3f3f46",
+                          }}
                         />
                       ))}
+                    </div>
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
+                  {currentPalette && (
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(currentPalette.colors)
+                        .slice(0, 32)
+                        .map(([name, def]) => (
+                          <div
+                            key={name}
+                            style={swatchStyle(def, 28)}
+                            title={name.replace(/_/g, " ")}
+                          />
+                        ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Flying cats — full screen, above everything */}
       <div className="absolute inset-0 z-50 overflow-hidden">
@@ -494,8 +507,10 @@ function FlyingCatSprite({
         ref.current.style.transform = `scale(${0.9 * cat.size})`;
         ref.current.style.opacity = String(Math.max(0, Math.min(1, opacity)));
       } else if (mode === "dvd") {
-        // Bounce around — never expires. Bounds account for sprite size so
-        // the image bounces off the corners, not the top-left origin.
+        // Bounce around — expires after duration with 2s fade-out.
+        // Bounds account for sprite size so the image bounces off the
+        // corners, not the top-left origin.
+        if (t >= 1) return;
         const spriteW = Math.round(120 * cat.size);
         const spriteH = Math.round(120 * cat.size);
         const d = dvdRef.current;
@@ -505,11 +520,14 @@ function FlyingCatSprite({
         if (d.py <= 0 || d.py >= 1080 - spriteH) d.vy *= -1;
         d.px = Math.max(0, Math.min(1920 - spriteW, d.px));
         d.py = Math.max(0, Math.min(1080 - spriteH, d.py));
+        // Fade out in the last 2 seconds
+        const fadeStart = 1 - 2000 / cat.duration;
+        const dvdOpacity = t > fadeStart ? (1 - t) / (1 - fadeStart) : 1;
         ref.current.style.left = `${d.px}px`;
         ref.current.style.top = `${d.py}px`;
         ref.current.style.bottom = "auto";
         ref.current.style.transform = `scale(${0.85 * cat.size})`;
-        ref.current.style.opacity = "1";
+        ref.current.style.opacity = String(Math.max(0, dvdOpacity));
       } else {
         // Fruit ninja — arc from bottom
         if (t >= 1) return;
