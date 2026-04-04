@@ -109,6 +109,7 @@ export function StreamControlClient() {
   } | null>(null);
   const [hasTint, setHasTint] = useState(false);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const clearSeqRef = useRef(0);
 
   // Lobby animation settings
   const [lobbyMode, setLobbyMode] = useState<"fruit-ninja" | "matrix" | "dvd">(
@@ -1004,7 +1005,7 @@ export function StreamControlClient() {
         <div className="border-t border-border/30 px-5 py-2.5">
           <button
             type="button"
-            onClick={() => syncLobbySettings({ lobbyClearSeq: Date.now() })}
+            onClick={() => syncLobbySettings({ lobbyClearSeq: ++clearSeqRef.current })}
             className={cn(
               "inline-flex items-center gap-1.5 text-xs text-muted-foreground/50 transition",
               "hover:text-red-400",
