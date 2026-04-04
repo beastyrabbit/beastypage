@@ -48,6 +48,7 @@ export interface LobbySettings {
   paletteDisplayMode?: "cycle" | "all";
   lobbyCatMinSize?: number;
   lobbyCatMaxSize?: number;
+  lobbyAutoClearSeconds?: number;
 }
 
 interface FlyingCat {
@@ -105,10 +106,13 @@ export function OBSLobby({
   moveSpeedRef.current = moveSpeed;
   const catMinSize = settings.lobbyCatMinSize ?? 1;
   const catMaxSize = settings.lobbyCatMaxSize ?? 2;
+  const lobbyAutoClearSeconds = settings.lobbyAutoClearSeconds ?? 20;
   const catMinSizeRef = useRef(catMinSize);
   catMinSizeRef.current = catMinSize;
   const catMaxSizeRef = useRef(catMaxSize);
   catMaxSizeRef.current = catMaxSize;
+  const lobbyAutoClearSecondsRef = useRef(lobbyAutoClearSeconds);
+  lobbyAutoClearSecondsRef.current = lobbyAutoClearSeconds;
 
   // Generation-relevant settings — only these should restart the spawn loop
   const genSettings = useMemo(
@@ -220,10 +224,7 @@ export function OBSLobby({
       setFlyingCats((prev) => {
         const alive = prev.filter((c) => Date.now() - c.startTime < c.duration);
         if (alive.length >= curMaxCats) return alive;
-        const baseDuration =
-          curMode === "dvd"
-            ? 30000
-            : (10000 + Math.random() * 20000) / curMoveSpeed;
+        const baseDuration = lobbyAutoClearSecondsRef.current * 1000;
         const sizeRange = Math.max(0, curMaxSize - curMinSize);
         return [
           ...alive,

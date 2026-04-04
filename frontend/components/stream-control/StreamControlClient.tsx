@@ -33,6 +33,10 @@ import {
 } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
 import {
+  pickClassicWheelPrize,
+  type StreamWheelSpin,
+} from "@/lib/wheel/classicWheel";
+import {
   AFTERLIFE_OPTIONS,
   computeLayerCount,
 } from "@/utils/catSettingsHelpers";
@@ -54,6 +58,20 @@ const LOBBY_MODE_DEFAULTS = {
   dvd: { cats: 3, move: 0.5, swap: 1 },
 } as const;
 const FULL_EXPORT_SIZE = 700;
+
+function toWheelSpinPayload(
+  selection: ReturnType<typeof pickClassicWheelPrize>,
+  forced: boolean,
+): StreamWheelSpin {
+  return {
+    prizeName: selection.prize.name,
+    prizeIndex: selection.index,
+    color: selection.prize.color,
+    chance: selection.prize.chance,
+    randomBucket: selection.random,
+    forced,
+  };
+}
 
 /** Format a multiplier value like 1 -> "1x", 0.25 -> "0.25x", 2.50 -> "2.5x" */
 function formatMultiplier(v: number): string {
@@ -88,10 +106,12 @@ export function StreamControlClient() {
   const ensureSession = useMutation(api.catStream.ensureSession);
   const updateSettingsMut = useMutation(api.catStream.updateSettings);
   const triggerSpinMut = useMutation(api.catStream.triggerSpin);
+  const triggerWheelMut = useMutation(api.catStream.triggerWheel);
   const showLobbyMut = useMutation(api.catStream.showLobby);
   const showBrbMut = useMutation(api.catStream.showBrb);
   const clearOverlayMut = useMutation(api.catStream.clearOverlay);
   const toggleTestModeMut = useMutation(api.catStream.toggleTestMode);
+  const logWheelSpinMut = useMutation(api.wheel.logSpin);
   const createMapper = useMutation(api.mapper.create);
   const updateMapperMeta = useMutation(api.mapper.updateMeta);
 
@@ -109,6 +129,7 @@ export function StreamControlClient() {
   );
   const [countdownSeconds, setCountdownSeconds] = useState(10);
   const [spinning, setSpinning] = useState(false);
+  const [wheelSpinning, setWheelSpinning] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   // Cat profile state — for "Links & Actions" / history entry
@@ -123,6 +144,11 @@ export function StreamControlClient() {
   const lastResultRef = useRef<{
     canvas: HTMLCanvasElement | OffscreenCanvas;
     params: Record<string, unknown>;
+    slots?: {
+      accessories?: string[];
+      scars?: string[];
+      tortie?: unknown[];
+    };
   } | null>(null);
   const [hasTint, setHasTint] = useState(false);
   const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -140,7 +166,9 @@ export function StreamControlClient() {
   const [paletteDisplayMode, setPaletteDisplayMode] = useState<"cycle" | "all">(
     "cycle",
   );
-  const [autoClearSeconds, setAutoClearSeconds] = useState(30);
+  const [lobbyAutoClearSeconds, setLobbyAutoClearSeconds] = useState(20);
+  const [resultAutoClearEnabled, setResultAutoClearEnabled] = useState(true);
+  const [resultAutoClearSeconds, setResultAutoClearSeconds] = useState(30);
   const [brbSettingsCode, setBrbSettingsCode] = useState("");
   const [brbSettingsDraft, setBrbSettingsDraft] = useState("");
 
@@ -161,10 +189,14 @@ export function StreamControlClient() {
   lobbyCatMinSizeRef.current = lobbyCatMinSize;
   const lobbyCatMaxSizeRef = useRef(lobbyCatMaxSize);
   lobbyCatMaxSizeRef.current = lobbyCatMaxSize;
+  const lobbyAutoClearSecondsRef = useRef(lobbyAutoClearSeconds);
+  lobbyAutoClearSecondsRef.current = lobbyAutoClearSeconds;
   const paletteDisplayModeRef = useRef(paletteDisplayMode);
   paletteDisplayModeRef.current = paletteDisplayMode;
-  const autoClearSecondsRef = useRef(autoClearSeconds);
-  autoClearSecondsRef.current = autoClearSeconds;
+  const resultAutoClearEnabledRef = useRef(resultAutoClearEnabled);
+  resultAutoClearEnabledRef.current = resultAutoClearEnabled;
+  const resultAutoClearSecondsRef = useRef(resultAutoClearSeconds);
+  resultAutoClearSecondsRef.current = resultAutoClearSeconds;
   const brbSettingsCodeRef = useRef(brbSettingsCode);
   brbSettingsCodeRef.current = brbSettingsCode;
 
@@ -180,20 +212,24 @@ export function StreamControlClient() {
       lobbySwapSpeed: lobbySwapSpeedRef.current,
       lobbyCatMinSize: lobbyCatMinSizeRef.current,
       lobbyCatMaxSize: lobbyCatMaxSizeRef.current,
+      lobbyAutoClearSeconds: lobbyAutoClearSecondsRef.current,
       paletteDisplayMode: paletteDisplayModeRef.current,
-      autoClearSeconds: autoClearSecondsRef.current,
+      resultAutoClearEnabled: resultAutoClearEnabledRef.current,
+      resultAutoClearSeconds: resultAutoClearSecondsRef.current,
       brbSettingsCode: brbSettingsCodeRef.current,
       ...overrides,
     }),
     [],
   );
 
-  // Instant sync for lobby settings — no debounce
-  const syncLobbySettings = useCallback(
+  // Instant sync for session settings (lobby + result auto-clear) — no debounce
+  const syncSessionSettings = useCallback(
     (updates: Record<string, unknown>) => {
       const merged = buildSessionSettings(settingsRef.current, updates);
       if (sessionRef.current) {
-        updateSettingsMut({ settings: merged }).catch(() => {});
+        updateSettingsMut({ settings: merged }).catch((err) => {
+          console.error("[StreamControl] Failed to sync settings to Convex", err);
+        });
       }
     },
     [buildSessionSettings, updateSettingsMut],
@@ -213,10 +249,31 @@ export function StreamControlClient() {
           setLobbyCatMinSize(s.lobbyCatMinSize as number);
         if (s.lobbyCatMaxSize != null)
           setLobbyCatMaxSize(s.lobbyCatMaxSize as number);
+        if (
+          typeof s.lobbyAutoClearSeconds === "number" &&
+          s.lobbyAutoClearSeconds > 0
+        ) {
+          setLobbyAutoClearSeconds(s.lobbyAutoClearSeconds as number);
+        }
         if (s.paletteDisplayMode)
           setPaletteDisplayMode(s.paletteDisplayMode as "cycle" | "all");
-        if (s.autoClearSeconds != null)
-          setAutoClearSeconds(s.autoClearSeconds as number);
+        const savedResultAutoClearSeconds =
+          typeof s.resultAutoClearSeconds === "number" &&
+          s.resultAutoClearSeconds > 0
+            ? s.resultAutoClearSeconds
+            : typeof s.autoClearSeconds === "number" && s.autoClearSeconds > 0
+              ? s.autoClearSeconds
+              : 30;
+        setResultAutoClearSeconds(savedResultAutoClearSeconds);
+        if (typeof s.resultAutoClearEnabled === "boolean") {
+          setResultAutoClearEnabled(s.resultAutoClearEnabled);
+        } else if (typeof s.autoClearEnabled === "boolean") {
+          setResultAutoClearEnabled(s.autoClearEnabled);
+        } else {
+          setResultAutoClearEnabled(
+            (s.autoClearSeconds as number | undefined) !== 0,
+          );
+        }
         if (typeof s.brbSettingsCode === "string") {
           const normalized = normalizePortableCode(s.brbSettingsCode);
           setBrbSettingsCode(normalized);
@@ -269,7 +326,9 @@ export function StreamControlClient() {
         syncTimer.current = setTimeout(() => {
           if (sessionRef.current) {
             const full = buildSessionSettings(merged);
-            updateSettingsMut({ settings: full }).catch(() => {});
+            updateSettingsMut({ settings: full }).catch((err) => {
+              console.error("[StreamControl] Failed to sync settings to Convex", err);
+            });
           }
         }, 500);
         return merged;
@@ -280,7 +339,7 @@ export function StreamControlClient() {
 
   // Spin handler
   const handleSpin = useCallback(async () => {
-    if (!generator || spinning) return;
+    if (!generator || spinning || wheelSpinning) return;
     setSpinning(true);
     try {
       if (!generator.generateRandomCat) {
@@ -302,10 +361,10 @@ export function StreamControlClient() {
       lastResultRef.current = {
         canvas: result.canvas,
         params: result.params as unknown as Record<string, unknown>,
+        slots: result.slotSelections,
       };
       const p = result.params as unknown as Record<string, unknown>;
       setHasTint(Boolean(p.darkForest || p.darkMode || p.dead));
-
       // Flush settings (including creatorName) to Convex so OBS has them before spinning
       clearTimeout(syncTimer.current);
       const settingsWithCreator = buildSessionSettings(settings, {
@@ -361,12 +420,71 @@ export function StreamControlClient() {
     buildSessionSettings,
     generator,
     spinning,
+    wheelSpinning,
     settings,
     countdownSeconds,
     creatorNameDraft,
     triggerSpinMut,
     createMapper,
     updateSettingsMut,
+  ]);
+
+  const handleWheelSpin = useCallback(async () => {
+    if (spinning || wheelSpinning) return;
+
+    const command = session?.currentCommand as
+      | {
+          params?: unknown;
+          slots?: unknown;
+        }
+      | undefined;
+    const params =
+      lastResultRef.current?.params ??
+      (command?.params as Record<string, unknown> | undefined);
+    const slots =
+      lastResultRef.current?.slots ??
+      (command?.slots as
+        | {
+            accessories?: string[];
+            scars?: string[];
+            tortie?: unknown[];
+          }
+        | undefined);
+
+    if (!params) {
+      toast.error("Spin a cat before spinning the wheel.");
+      return;
+    }
+
+    setWheelSpinning(true);
+    try {
+      const wheelSpin = toWheelSpinPayload(pickClassicWheelPrize(), false);
+      await triggerWheelMut({
+        params,
+        slots,
+        wheelSpin,
+      });
+      void logWheelSpinMut({
+        prizeName: wheelSpin.prizeName,
+        forced: wheelSpin.forced,
+        randomBucket: wheelSpin.randomBucket,
+      }).catch((error) => {
+        console.error("Failed to log manual stream wheel spin", error);
+      });
+      toast.success("Wheel triggered!");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to trigger wheel",
+      );
+    } finally {
+      setWheelSpinning(false);
+    }
+  }, [
+    session?.currentCommand,
+    spinning,
+    triggerWheelMut,
+    wheelSpinning,
+    logWheelSpinMut,
   ]);
 
   // Save meta (cat name / creator name) to existing profile
@@ -563,6 +681,16 @@ export function StreamControlClient() {
   const obsUrl = apiKey
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/single-cat-stream/obs?key=${apiKey}`
     : null;
+  const fallbackCommand =
+    (session?.currentCommand as
+      | {
+          params?: unknown;
+        }
+      | undefined) ?? undefined;
+  const hasWheelSource = Boolean(
+    lastResultRef.current?.params ?? fallbackCommand?.params,
+  );
+  const commandBusy = spinning || wheelSpinning;
 
   return (
     <div className="space-y-6">
@@ -693,7 +821,7 @@ export function StreamControlClient() {
                       key={m}
                       onClick={() => {
                         setPaletteDisplayMode(m);
-                        syncLobbySettings({ paletteDisplayMode: m });
+                        syncSessionSettings({ paletteDisplayMode: m });
                       }}
                       className={cn(
                         "rounded px-2 py-0.5 text-[10px] font-semibold transition",
@@ -790,7 +918,7 @@ export function StreamControlClient() {
               <button
                 type="button"
                 onClick={handleSpin}
-                disabled={spinning || !generatorReady}
+                disabled={commandBusy || !generatorReady}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-xl bg-amber-600 px-6 py-3",
                   "text-sm font-bold text-white shadow-lg shadow-amber-900/20 transition",
@@ -803,6 +931,23 @@ export function StreamControlClient() {
                   <Play className="size-4" />
                 )}
                 {spinning ? "Spinning…" : "Spin!"}
+              </button>
+              <button
+                type="button"
+                onClick={handleWheelSpin}
+                disabled={commandBusy || !hasWheelSource}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3",
+                  "text-sm font-semibold text-amber-100 transition",
+                  "hover:border-amber-400/50 hover:bg-amber-500/15 disabled:opacity-50",
+                )}
+              >
+                {wheelSpinning ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Sparkles className="size-4" />
+                )}
+                {wheelSpinning ? "Wheel…" : "Spin Wheel"}
               </button>
 
               <div className="flex flex-1 items-center gap-4">
@@ -825,6 +970,31 @@ export function StreamControlClient() {
                   onChange={(v) => updateSettings({ speedMultiplier: v })}
                 />
               </div>
+            </div>
+
+            <div className="mb-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+              <ToggleControl
+                label="Roll Auto-Clear"
+                description=""
+                checked={resultAutoClearEnabled}
+                onChange={(checked) => {
+                  setResultAutoClearEnabled(checked);
+                  syncSessionSettings({ resultAutoClearEnabled: checked });
+                }}
+              />
+              <SliderControl
+                label="Clear After Roll"
+                value={resultAutoClearSeconds}
+                min={5}
+                max={120}
+                step={5}
+                format={(v) => `${v}s`}
+                disabled={!resultAutoClearEnabled}
+                onChange={(v) => {
+                  setResultAutoClearSeconds(v);
+                  syncSessionSettings({ resultAutoClearSeconds: v });
+                }}
+              />
             </div>
 
             {/* Scene buttons */}
@@ -939,7 +1109,7 @@ export function StreamControlClient() {
                     setLobbyCatCount(defaults.cats);
                     setLobbyMoveSpeed(defaults.move);
                     setLobbySwapSpeed(defaults.swap);
-                    syncLobbySettings({
+                    syncSessionSettings({
                       lobbyMode: key,
                       lobbyCatCount: defaults.cats,
                       lobbyMoveSpeed: defaults.move,
@@ -971,7 +1141,7 @@ export function StreamControlClient() {
             format={(v) => String(v)}
             onChange={(v) => {
               setLobbyCatCount(v);
-              syncLobbySettings({ lobbyCatCount: v });
+              syncSessionSettings({ lobbyCatCount: v });
             }}
           />
           <SliderControl
@@ -983,7 +1153,7 @@ export function StreamControlClient() {
             format={formatMultiplier}
             onChange={(v) => {
               setLobbyMoveSpeed(v);
-              syncLobbySettings({ lobbyMoveSpeed: v });
+              syncSessionSettings({ lobbyMoveSpeed: v });
             }}
           />
           <SliderControl
@@ -995,7 +1165,7 @@ export function StreamControlClient() {
             format={formatMultiplier}
             onChange={(v) => {
               setLobbySwapSpeed(v);
-              syncLobbySettings({ lobbySwapSpeed: v });
+              syncSessionSettings({ lobbySwapSpeed: v });
             }}
           />
           <SliderControl
@@ -1008,7 +1178,7 @@ export function StreamControlClient() {
             onChange={(v) => {
               setLobbyCatMinSize(v);
               if (v > lobbyCatMaxSize) setLobbyCatMaxSize(v);
-              syncLobbySettings({
+              syncSessionSettings({
                 lobbyCatMinSize: v,
                 lobbyCatMaxSize: Math.max(v, lobbyCatMaxSize),
               });
@@ -1024,22 +1194,22 @@ export function StreamControlClient() {
             onChange={(v) => {
               setLobbyCatMaxSize(v);
               if (v < lobbyCatMinSize) setLobbyCatMinSize(v);
-              syncLobbySettings({
+              syncSessionSettings({
                 lobbyCatMaxSize: v,
                 lobbyCatMinSize: Math.min(v, lobbyCatMinSize),
               });
             }}
           />
           <SliderControl
-            label="Auto-Clear"
-            value={autoClearSeconds}
-            min={0}
+            label="Auto-Clear Delay"
+            value={lobbyAutoClearSeconds}
+            min={5}
             max={120}
             step={5}
-            format={(v) => (v === 0 ? "Off" : `${v}s`)}
+            format={(v) => `${v}s`}
             onChange={(v) => {
-              setAutoClearSeconds(v);
-              syncLobbySettings({ autoClearSeconds: v });
+              setLobbyAutoClearSeconds(v);
+              syncSessionSettings({ lobbyAutoClearSeconds: v });
             }}
           />
         </div>
@@ -1048,7 +1218,9 @@ export function StreamControlClient() {
         <div className="border-t border-border/30 px-5 py-2.5">
           <button
             type="button"
-            onClick={() => syncLobbySettings({ lobbyClearSeq: ++clearSeqRef.current })}
+            onClick={() =>
+              syncSessionSettings({ lobbyClearSeq: ++clearSeqRef.current })
+            }
             className={cn(
               "inline-flex items-center gap-1.5 text-xs text-muted-foreground/50 transition",
               "hover:text-red-400",
@@ -1479,6 +1651,7 @@ function SliderControl({
   max,
   step,
   format,
+  disabled = false,
   onChange,
 }: {
   label: string;
@@ -1487,12 +1660,20 @@ function SliderControl({
   max: number;
   step: number;
   format: (v: number) => string;
+  disabled?: boolean;
   onChange: (v: number) => void;
 }) {
   return (
     <label className="block">
       <div className="mb-1 flex items-baseline justify-between gap-2">
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span
+          className={cn(
+            "text-xs text-muted-foreground",
+            disabled && "text-muted-foreground/50",
+          )}
+        >
+          {label}
+        </span>
         <span className="tabular-nums text-sm font-semibold text-foreground">
           {format(value)}
         </span>
@@ -1503,9 +1684,61 @@ function SliderControl({
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border/40 accent-amber-500 [&::-webkit-slider-thumb]:size-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:shadow [&::-webkit-slider-thumb]:shadow-amber-900/30"
+        className={cn(
+          "h-1.5 w-full appearance-none rounded-full bg-border/40 accent-amber-500",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          "[&::-webkit-slider-thumb]:size-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full",
+          "[&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:shadow [&::-webkit-slider-thumb]:shadow-amber-900/30",
+          !disabled && "cursor-pointer",
+        )}
       />
     </label>
+  );
+}
+
+function ToggleControl({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/40 bg-background/40 px-3 py-2">
+      <div className="min-w-0">
+        <div className="text-xs font-semibold text-foreground">{label}</div>
+        {description ? (
+          <div className="text-[11px] text-muted-foreground">{description}</div>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        className={cn(
+          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition",
+          checked
+            ? "border-amber-500/60 bg-amber-500/20"
+            : "border-border/50 bg-muted/40",
+        )}
+      >
+        <span
+          className={cn(
+            "block size-4 rounded-full transition-transform",
+            checked
+              ? "translate-x-5 bg-amber-400"
+              : "translate-x-1 bg-zinc-300",
+          )}
+        />
+      </button>
+    </div>
   );
 }

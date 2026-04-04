@@ -1,6 +1,15 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
+export const wheelSpinValidator = v.object({
+  prizeName: v.string(),
+  prizeIndex: v.number(),
+  color: v.string(),
+  chance: v.number(),
+  randomBucket: v.optional(v.number()),
+  forced: v.boolean(),
+});
+
 export default defineSchema({
   card_season: defineTable({
     seasonName: v.string(),
@@ -348,6 +357,7 @@ export default defineSchema({
       v.object({
         type: v.union(
           v.literal("spin"),
+          v.literal("wheel"),
           v.literal("countdown"),
           v.literal("clear"),
           v.literal("test"),
@@ -357,6 +367,7 @@ export default defineSchema({
         seq: v.number(),
         params: v.optional(v.any()),
         slots: v.optional(v.any()),
+        wheelSpin: v.optional(wheelSpinValidator),
         countdownSeconds: v.optional(v.number()),
         timestamp: v.number(),
       }),

@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * OBSSpinClient — copied from SingleCatPlusClient.tsx
+ * OBSSpinClient — forked from SingleCatPlusClient.tsx
  *
- * ALL spin logic (generateCatPlus, flip sequences, timing, layer count spinner)
- * is kept byte-for-byte identical. Only the component shell changed:
- * - Props: accepts apiKey instead of page-level settings
- * - Settings: read from Convex session instead of local state/variants
+ * Core spin logic (generateCatPlus, flip sequences, timing) originated from
+ * that component but has diverged. Key differences:
+ * - Props: accepts apiKey, reads settings from Convex session
  * - JSX: OBS overlay layout instead of full page UI
  * - Trigger: Convex subscription instead of button click
+ * - Adds wheel reward overlay system (spin/settle/banner)
+ * - Auto-clear timer moved to shared scheduleAutoClear helper
  */
 
 import { useQuery } from "convex/react";
@@ -16,6 +17,12 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlapDisplay, Presets } from "react-split-flap-effect";
 import { cn } from "@/lib/utils";
+import {
+  CLASSIC_WHEEL_PRIZES,
+  type ClassicWheelSelection,
+  type StreamWheelSpin,
+  WHEEL_SPIN_DURATION_MS,
+} from "@/lib/wheel/classicWheel";
 import "react-split-flap-effect/extras/themes.css";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { api } from "@/convex/_generated/api";
@@ -53,6 +60,7 @@ import {
   stepCountsToMetrics,
   type TimingPresetSet,
 } from "../../utils/spinTiming";
+import { OBSClassicWheel, type OBSClassicWheelHandle } from "./OBSClassicWheel";
 import { type LobbySettings, OBSLobby } from "./OBSLobby";
 
 // OBS stubs — functions referenced by the spin logic but not needed for overlay
@@ -165,6 +173,11 @@ interface CatState {
   catName?: string | null;
   creatorName?: string | null;
   catShareSlug?: string | null;
+}
+
+interface WheelRewardState {
+  status: "hidden" | "spinning" | "settled";
+  prize: StreamWheelSpin | null;
 }
 
 interface ParameterOptions {
@@ -1140,10 +1153,53 @@ function getParameterValueForDisplay(
   }
 }
 
-// clampLayerValue, computeLayerCount imported from @/utils/catSettingsHelpers
-// LayerRangeSelector imported from @/components/common/LayerRangeSelector
+function parseStreamWheelSpin(value: unknown): StreamWheelSpin | null {
+  if (!value || typeof value !== "object") {
+    console.error("[OBSSpinClient] Invalid wheelSpin data — not an object", value);
+    return null;
+  }
+  const spin = value as Partial<StreamWheelSpin>;
+  if (
+    typeof spin.prizeName !== "string" ||
+    typeof spin.prizeIndex !== "number" ||
+    typeof spin.color !== "string" ||
+    typeof spin.chance !== "number" ||
+    typeof spin.forced !== "boolean"
+  ) {
+    console.error("[OBSSpinClient] Invalid wheelSpin data — missing or wrong fields", value);
+    return null;
+  }
+  return {
+    prizeName: spin.prizeName,
+    prizeIndex: spin.prizeIndex,
+    color: spin.color,
+    chance: spin.chance,
+    randomBucket:
+      typeof spin.randomBucket === "number" ? spin.randomBucket : undefined,
+    forced: spin.forced,
+  };
+}
 
-// resolveAfterlife imported from @/utils/catSettingsHelpers
+function toClassicWheelSelection(
+  wheelSpin: StreamWheelSpin,
+): ClassicWheelSelection {
+  const fallbackPrize = {
+    name: wheelSpin.prizeName,
+    chance: wheelSpin.chance,
+    color: wheelSpin.color,
+  };
+  const prize = CLASSIC_WHEEL_PRIZES[wheelSpin.prizeIndex];
+  if (!prize) {
+    console.warn(
+      `[OBSSpinClient] Prize index ${wheelSpin.prizeIndex} out of range (max ${CLASSIC_WHEEL_PRIZES.length - 1}), using fallback`,
+    );
+  }
+  return {
+    prize: prize ?? fallbackPrize,
+    index: prize ? wheelSpin.prizeIndex : CLASSIC_WHEEL_PRIZES.length - 1,
+    random: wheelSpin.randomBucket,
+  };
+}
 
 function _randomFrom<T>(list: T[]): T {
   return list[Math.floor(Math.random() * list.length)];
@@ -1425,7 +1481,12 @@ function sampleValues(
 export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   // Convex subscription — get session data by API key
   const session = useQuery(api.catStream.getSessionByApiKey, { apiKey });
-  const sessionSettings = session?.settings as SingleCatSettings | undefined;
+  const sessionSettingsRecord = session?.settings as
+    | Record<string, unknown>
+    | undefined;
+  const sessionSettings = sessionSettingsRecord as
+    | SingleCatSettings
+    | undefined;
 
   // Derive settings from session (or defaults)
   const defaultMode = sessionSettings?.mode ?? "flashy";
@@ -1441,6 +1502,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   const initialVariantLoadError = null as string | null;
   const initialCodeSettings = null as SingleCatPortableSettings | null;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const wheelRef = useRef<OBSClassicWheelHandle | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const mapperRef = useRef<SpriteMapperApi | null>(null);
   const parameterOptionsRef = useRef<ParameterOptions | null>(null);
@@ -1699,6 +1761,11 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   const [_rollerHighlight, setRollerHighlight] = useState(false);
   const [paramRows, setParamRows] = useState<ParamRow[]>([]);
   const [_activeParamId, setActiveParamId] = useState<ParamId | null>(null);
+  const [wheelReward, setWheelReward] = useState<WheelRewardState>({
+    status: "hidden",
+    prize: null,
+  });
+  const [wheelBannerVisible, setWheelBannerVisible] = useState(false);
   const [layerRows, setLayerRows] = useState<
     Record<LayerGroup, LayerRowState[]>
   >({
@@ -2270,7 +2337,8 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       const tint = document.createElement("canvas");
       tint.width = DISPLAY_SIZE;
       tint.height = DISPLAY_SIZE;
-      const tCtx = tint.getContext("2d")!;
+      const tCtx = tint.getContext("2d");
+      if (!tCtx) return;
       tCtx.imageSmoothingEnabled = false;
       tCtx.drawImage(src, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
       tCtx.globalCompositeOperation = "source-in";
@@ -2295,6 +2363,208 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       drawCanvas(result.canvas as HTMLCanvasElement);
     },
     [drawCanvas],
+  );
+
+  const resetWheelOverlay = useCallback(() => {
+    wheelRef.current?.reset();
+    setWheelReward({ status: "hidden", prize: null });
+    setWheelBannerVisible(false);
+  }, []);
+
+  const scheduleAutoClear = useCallback((token: number) => {
+    if (!resultAutoClearEnabledRef.current) return;
+    const autoClearMs = resultAutoClearSecondsRef.current * 1000;
+    if (autoClearMs <= 0) return;
+    if (autoClearTimerRef.current) {
+      clearTimeout(autoClearTimerRef.current);
+    }
+    autoClearTimerRef.current = setTimeout(() => {
+      if (generationIdRef.current === token) {
+        setObsPhase("fading");
+      }
+    }, autoClearMs);
+  }, []);
+
+  const showStaticCatState = useCallback(
+    async (
+      state: Pick<
+        CatState,
+        "params" | "accessorySlots" | "scarSlots" | "tortieSlots" | "counts"
+      > &
+        Partial<CatState>,
+    ) => {
+      const params = cloneParams(state.params ?? {});
+      const accessorySlots = Array.isArray(state.accessorySlots)
+        ? state.accessorySlots.filter(
+            (entry): entry is string => typeof entry === "string",
+          )
+        : [];
+      const scarSlots = Array.isArray(state.scarSlots)
+        ? state.scarSlots.filter(
+            (entry): entry is string => typeof entry === "string",
+          )
+        : [];
+      const tortieSlots = Array.isArray(state.tortieSlots)
+        ? state.tortieSlots.map((slot) =>
+            slot?.mask && slot?.pattern && slot?.colour ? { ...slot } : null,
+          )
+        : [];
+
+      setParamRows(
+        PARAM_SEQUENCE.filter((def) => !LAYER_PARAM_IDS.has(def.id)).map(
+          (def) => ({
+            id: def.id,
+            label: def.label,
+            value: getParameterValueForDisplay(def.id, params),
+            status: "revealed" as const,
+          }),
+        ),
+      );
+
+      setLayerRows({
+        accessories: accessorySlots.map((slot, idx) => ({
+          label: `Accessory ${idx + 1}`,
+          value: slot === "none" ? "None" : formatValue(slot),
+          status: "revealed" as const,
+        })),
+        scars: scarSlots.map((slot, idx) => ({
+          label: `Scar ${idx + 1}`,
+          value: slot === "none" ? "None" : formatValue(slot),
+          status: "revealed" as const,
+        })),
+        torties: tortieSlots.map((slot, idx) => ({
+          label: `Tortie ${idx + 1}`,
+          value: formatTortieLayer(slot),
+          status: "revealed" as const,
+        })),
+      });
+
+      setRollerLabel(null);
+      setRollerActiveValue(null);
+      setFlashParamId(null);
+      setFlashLayerKey(null);
+      setActiveParamId(null);
+      setHasTint(Boolean(params.darkForest || params.darkMode || params.dead));
+
+      catStateRef.current = {
+        ...catStateRef.current,
+        ...state,
+        params,
+        accessorySlots,
+        scarSlots,
+        tortieSlots,
+        counts: { ...state.counts },
+      };
+
+      await renderCat(params);
+    },
+    [renderCat],
+  );
+
+  const primeOverlayFromCommand = useCallback(
+    async (paramsInput: unknown, slotsInput?: unknown) => {
+      const params = cloneParams((paramsInput ?? {}) as Partial<CatParams>);
+      const slotRecord =
+        slotsInput && typeof slotsInput === "object"
+          ? (slotsInput as {
+              accessories?: unknown[];
+              scars?: unknown[];
+              tortie?: unknown[];
+            })
+          : undefined;
+
+      const accessorySlots = Array.isArray(slotRecord?.accessories)
+        ? slotRecord.accessories.filter(
+            (entry): entry is string => typeof entry === "string",
+          )
+        : Array.isArray(params.accessories)
+          ? params.accessories.filter(
+              (entry): entry is string => typeof entry === "string",
+            )
+          : [];
+      const scarSlots = Array.isArray(slotRecord?.scars)
+        ? slotRecord.scars.filter(
+            (entry): entry is string => typeof entry === "string",
+          )
+        : Array.isArray(params.scars)
+          ? params.scars.filter(
+              (entry): entry is string => typeof entry === "string",
+            )
+          : [];
+      const tortieSlots = Array.isArray(slotRecord?.tortie)
+        ? slotRecord.tortie.map((slot) =>
+            slot &&
+            typeof slot === "object" &&
+            "mask" in slot &&
+            "pattern" in slot &&
+            "colour" in slot
+              ? {
+                  mask: String((slot as TortieSlot).mask),
+                  pattern: String((slot as TortieSlot).pattern),
+                  colour: String((slot as TortieSlot).colour),
+                }
+              : null,
+          )
+        : Array.isArray(params.tortie)
+          ? params.tortie.map((slot) =>
+              slot?.mask && slot?.pattern && slot?.colour
+                ? {
+                    mask: String(slot.mask),
+                    pattern: String(slot.pattern),
+                    colour: String(slot.colour),
+                  }
+                : null,
+            )
+          : [];
+
+      await showStaticCatState({
+        params,
+        accessorySlots,
+        scarSlots,
+        tortieSlots,
+        counts: {
+          accessories: accessorySlots.filter((slot) => slot !== "none").length,
+          scars: scarSlots.filter((slot) => slot !== "none").length,
+          tortie: tortieSlots.filter(Boolean).length,
+        },
+      });
+    },
+    [showStaticCatState],
+  );
+
+  const runWheelReveal = useCallback(
+    async (wheelSpin: StreamWheelSpin, token: number) => {
+      if (autoClearTimerRef.current) {
+        clearTimeout(autoClearTimerRef.current);
+      }
+
+      setWheelBannerVisible(false);
+      setWheelReward({ status: "spinning", prize: wheelSpin });
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        if (generationIdRef.current !== token) return;
+        if (wheelRef.current) break;
+        await wait(50);
+      }
+
+      if (generationIdRef.current !== token) return;
+
+      const wheelSelection = toClassicWheelSelection(wheelSpin);
+      if (wheelRef.current) {
+        wheelRef.current.reset();
+        await wait(80);
+        if (generationIdRef.current !== token) return;
+        await wheelRef.current.spinTo(wheelSelection);
+      } else {
+        console.warn("[OBSSpinClient] Wheel ref not available after 1s polling — falling back to timed delay");
+        await wait(WHEEL_SPIN_DURATION_MS);
+      }
+
+      if (generationIdRef.current !== token) return;
+      setWheelReward({ status: "settled", prize: wheelSpin });
+      setWheelBannerVisible(true);
+    },
+    [],
   );
 
   const spinAccessorySlots = useCallback(
@@ -3362,6 +3632,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     setActiveParamId(null);
     setHasTint(false);
     setSpinDone(false);
+    resetWheelOverlay();
     if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
     clearMirror();
     drawPlaceholder();
@@ -3380,7 +3651,6 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       // OBS: Use override params from the control page if available
       const override = overrideParamsRef.current;
       overrideParamsRef.current = null; // consume once
-
       // biome-ignore lint/suspicious/noExplicitAny: dynamic random generation result with varying shape
       let randomResult: any;
       if (override?.params) {
@@ -3859,6 +4129,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       });
       setIsGenerating(false);
       setSpinDone(true);
+      scheduleAutoClear(token);
 
       // Gold fireworks celebration
       (async () => {
@@ -3910,17 +4181,6 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           console.warn("Confetti celebration failed", err);
         }
       })();
-
-      // Auto-clear timer
-      const autoClearMs = autoClearSecondsRef.current * 1000;
-      if (autoClearMs > 0) {
-        if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
-        autoClearTimerRef.current = setTimeout(() => {
-          if (generationIdRef.current === token) {
-            setObsPhase("fading");
-          }
-        }, autoClearMs);
-      }
 
       track("single_cat_generated", {
         mode: modeRef.current,
@@ -4074,6 +4334,8 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     readSpinState,
     createMapper,
     resetMetaDrafts,
+    resetWheelOverlay,
+    scheduleAutoClear,
     getDelayWithMultiplier,
     exactLayerCounts,
     timingConfig.allowFastFlips,
@@ -4410,14 +4672,15 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   }, []);
 
   // =======================================================================
-  // OBS: Command dispatch — spin, countdown, clear, lobby, brb, test
+  // OBS: Command dispatch — spin, wheel, countdown, clear, lobby, brb, test
   // =======================================================================
   const lastSeqRef = useRef<number | null>(null);
   const initializedSeqRef = useRef(false);
   /** When set, generateCatPlus uses these params instead of generating random ones */
-  const overrideParamsRef = useRef<{ params: unknown; slots?: unknown } | null>(
-    null,
-  );
+  const overrideParamsRef = useRef<{
+    params: unknown;
+    slots?: unknown;
+  } | null>(null);
   const [obsPhase, setObsPhase] = useState<
     "idle" | "lobby" | "brb" | "active" | "countdown" | "fading"
   >("idle");
@@ -4425,11 +4688,24 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   const [countdownPreview, setCountdownPreview] = useState<string | null>(null);
   const [spinDone, setSpinDone] = useState(false);
   const autoClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const resolvedAutoClear =
-    ((sessionSettings as Record<string, unknown> | undefined)
-      ?.autoClearSeconds as number | undefined) ?? 30;
-  const autoClearSecondsRef = useRef(resolvedAutoClear);
-  autoClearSecondsRef.current = resolvedAutoClear;
+  const resolvedResultAutoClear =
+    typeof sessionSettingsRecord?.resultAutoClearSeconds === "number" &&
+    sessionSettingsRecord.resultAutoClearSeconds > 0
+      ? sessionSettingsRecord.resultAutoClearSeconds
+      : typeof sessionSettingsRecord?.autoClearSeconds === "number" &&
+          sessionSettingsRecord.autoClearSeconds > 0
+        ? sessionSettingsRecord.autoClearSeconds
+        : 30;
+  const resolvedResultAutoClearEnabled =
+    typeof sessionSettingsRecord?.resultAutoClearEnabled === "boolean"
+      ? sessionSettingsRecord.resultAutoClearEnabled
+      : typeof sessionSettingsRecord?.autoClearEnabled === "boolean"
+        ? sessionSettingsRecord.autoClearEnabled
+        : resolvedResultAutoClear > 0;
+  const resultAutoClearEnabledRef = useRef(resolvedResultAutoClearEnabled);
+  resultAutoClearEnabledRef.current = resolvedResultAutoClearEnabled;
+  const resultAutoClearSecondsRef = useRef(resolvedResultAutoClear);
+  resultAutoClearSecondsRef.current = resolvedResultAutoClear;
   const [spinVisible, setSpinVisible] = useState(false);
   const [spinBoardVisible, setSpinBoardVisible] = useState(false);
   const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -4448,7 +4724,57 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     setRollerLabel(null);
     setRollerActiveValue(null);
     setSpinDone(false);
-  }, []);
+    resetWheelOverlay();
+  }, [resetWheelOverlay]);
+
+  const handleWheelCommand = useCallback(
+    async (wheelSpin: StreamWheelSpin, params?: unknown, slots?: unknown) => {
+      if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
+      if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
+      if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
+
+      const token = ++generationIdRef.current;
+      setSpinDone(false);
+      setRollerLabel(null);
+      setRollerActiveValue(null);
+      setFlashParamId(null);
+      setFlashLayerKey(null);
+      setActiveParamId(null);
+      setCountdownPreview(null);
+      setCountdownValue(0);
+      setSpinBoardVisible(false);
+      setObsPhase("active");
+
+      const currentState = catStateRef.current;
+      if (currentState) {
+        if (obsPhase !== "active") {
+          await showStaticCatState(currentState);
+        }
+      } else if (params) {
+        await primeOverlayFromCommand(params, slots);
+      } else {
+        console.warn("[OBSSpinClient] Wheel command received but no cat state or params available");
+        resetWheelOverlay();
+        drawPlaceholder();
+        return;
+      }
+
+      if (generationIdRef.current !== token) return;
+      await runWheelReveal(wheelSpin, token);
+      if (generationIdRef.current !== token) return;
+      setSpinDone(true);
+      scheduleAutoClear(token);
+    },
+    [
+      drawPlaceholder,
+      obsPhase,
+      primeOverlayFromCommand,
+      resetWheelOverlay,
+      runWheelReveal,
+      scheduleAutoClear,
+      showStaticCatState,
+    ],
+  );
 
   // Visibility transitions for active and fading phases
   useEffect(() => {
@@ -4637,6 +4963,20 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           }
         }
         break;
+      case "wheel": {
+        const wheelSpin = parseStreamWheelSpin(
+          (cmd as Record<string, unknown>).wheelSpin,
+        );
+        if (!wheelSpin) {
+          break;
+        }
+        handleWheelCommand(wheelSpin, cmd.params, cmd.slots).catch((err) => {
+          console.error("[OBSSpinClient] Wheel command failed", err);
+          resetCommandState();
+          drawPlaceholder();
+        });
+        break;
+      }
       case "clear":
         resetCommandState();
         if (
@@ -4665,6 +5005,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   }, [
     session?.currentCommand,
     generationDisabled,
+    handleWheelCommand,
     generateCatPlus,
     drawPlaceholder,
     resetCommandState,
@@ -4757,6 +5098,14 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   );
 
   const showCountdownLayer = obsPhase === "countdown";
+  const showWheelOverlay = wheelReward.status !== "hidden";
+  const wheelOverlayOpacity = wheelReward.status === "spinning" ? 1 : 0;
+  const catCanvasOpacity = wheelReward.status === "spinning" ? 0.14 : 1;
+  const wheelPrizeName =
+    wheelReward.status === "spinning"
+      ? "???"
+      : (wheelReward.prize?.prizeName ?? "");
+  const wheelPrizeColor = wheelReward.prize?.color ?? "#f59e0b";
 
   // Test mode — layout guide for OBS positioning
   if (session?.testMode) {
@@ -5263,10 +5612,34 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         .obs-row-flash { animation: obs-row-flash 350ms ease-out; }
       `}</style>
 
+      {showWheelOverlay && (
+        <div
+          className="absolute z-20 flex items-center justify-center"
+          style={{
+            left: "0px",
+            top: "0px",
+            width: "750px",
+            height: "780px",
+            opacity: wheelOverlayOpacity,
+            transition: "opacity 360ms ease",
+            pointerEvents: "none",
+          }}
+        >
+          <OBSClassicWheel ref={wheelRef} size={640} className="opacity-95" />
+        </div>
+      )}
+
       {/* ═══ Cat canvas — absolute, never moves ═══ */}
       <div
-        className="absolute flex items-center justify-center"
-        style={{ left: "0px", top: "0px", width: "750px", height: "780px" }}
+        className="absolute z-10 flex items-center justify-center"
+        style={{
+          left: "0px",
+          top: "0px",
+          width: "750px",
+          height: "780px",
+          opacity: catCanvasOpacity,
+          transition: "opacity 360ms ease",
+        }}
       >
         <canvas
           ref={canvasRef}
@@ -5279,6 +5652,46 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           }}
         />
       </div>
+
+      {wheelReward.prize && (
+        <div
+          className="absolute z-20 flex items-center justify-center"
+          style={{
+            left: "0px",
+            top: "560px",
+            width: "750px",
+            opacity: wheelBannerVisible ? 1 : 0,
+            transform: wheelBannerVisible
+              ? "translateY(0)"
+              : "translateY(10px)",
+            transition: "opacity 280ms ease, transform 280ms ease",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            className="flex min-w-[320px] items-center justify-center gap-3 rounded-2xl border px-5 py-3"
+            style={{
+              background: "rgba(12, 10, 6, 0.92)",
+              borderColor: "rgba(245, 158, 11, 0.28)",
+              boxShadow:
+                "0 14px 40px rgba(0,0,0,0.45), 0 0 30px rgba(245,158,11,0.08)",
+            }}
+          >
+            <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-400">
+              Wheel Reward
+            </span>
+            <span
+              className="text-2xl font-black tracking-[0.08em]"
+              style={{
+                color: wheelPrizeColor,
+                textShadow: "0 0 18px rgba(0,0,0,0.55)",
+              }}
+            >
+              {wheelPrizeName}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ═══ LAYER DETAILS — full width bottom bar, always visible at fixed size ═══ */}
       <div
@@ -5515,6 +5928,42 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
               </div>
             );
           })}
+          {showWheelOverlay && (
+            <div
+              className="mt-2 flex items-center border-t pt-3 transition-all duration-200"
+              style={{
+                marginInline: "24px",
+                paddingInline: "0px",
+                borderColor: "rgba(245, 158, 11, 0.12)",
+              }}
+            >
+              <span
+                className={cn(
+                  "w-[130px] shrink-0 text-sm font-bold uppercase tracking-wide",
+                  wheelReward.status === "spinning"
+                    ? "text-amber-400"
+                    : "text-zinc-400",
+                )}
+              >
+                Wheel Reward
+              </span>
+              <div className="flex-1 overflow-hidden">
+                <span
+                  className={cn(
+                    "block truncate font-mono text-xl font-bold text-white",
+                  )}
+                  style={{
+                    color:
+                      wheelReward.status === "settled"
+                        ? wheelPrizeColor
+                        : undefined,
+                  }}
+                >
+                  {wheelPrizeName}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
