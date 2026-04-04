@@ -30,6 +30,9 @@ export const CLASSIC_WHEEL_PRIZES: ClassicWheelPrize[] = [
   { name: "Singularity", chance: 1, color: "#d4af37" },
 ];
 
+/** Duration (ms) passed to `spinToItem` — also used as the fallback wait when the wheel ref is unavailable. */
+export const WHEEL_SPIN_DURATION_MS = 4200;
+
 export const CLASSIC_WHEEL_ITEMS = CLASSIC_WHEEL_PRIZES.map((prize) => ({
   label: prize.name,
   weight: prize.chance,

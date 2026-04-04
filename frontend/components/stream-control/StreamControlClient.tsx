@@ -432,13 +432,12 @@ export function StreamControlClient() {
   const handleWheelSpin = useCallback(async () => {
     if (spinning || wheelSpinning) return;
 
-    const command =
-      (session?.currentCommand as
-        | {
-            params?: unknown;
-            slots?: unknown;
-          }
-        | undefined) ?? undefined;
+    const command = session?.currentCommand as
+      | {
+          params?: unknown;
+          slots?: unknown;
+        }
+      | undefined;
     const params =
       lastResultRef.current?.params ??
       (command?.params as Record<string, unknown> | undefined);

@@ -11,6 +11,7 @@ import { Wheel } from "spin-wheel";
 import {
   CLASSIC_WHEEL_ITEMS,
   type ClassicWheelSelection,
+  WHEEL_SPIN_DURATION_MS,
 } from "@/lib/wheel/classicWheel";
 import { cn } from "@/lib/utils";
 
@@ -106,7 +107,7 @@ export const OBSClassicWheel = forwardRef<
 
         return new Promise<void>((resolve) => {
           resolveSpinRef.current = resolve;
-          wheelRef.current?.spinToItem(selection.index, 4200, false, 6, 1);
+          wheelRef.current?.spinToItem(selection.index, WHEEL_SPIN_DURATION_MS, false, 6, 1);
           // Safety timeout in case onRest never fires
           setTimeout(() => {
             if (resolveSpinRef.current === resolve) {

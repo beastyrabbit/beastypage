@@ -21,6 +21,7 @@ import {
   CLASSIC_WHEEL_PRIZES,
   type ClassicWheelSelection,
   type StreamWheelSpin,
+  WHEEL_SPIN_DURATION_MS,
 } from "@/lib/wheel/classicWheel";
 import "react-split-flap-effect/extras/themes.css";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
@@ -2556,7 +2557,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         await wheelRef.current.spinTo(wheelSelection);
       } else {
         console.warn("[OBSSpinClient] Wheel ref not available after 1s polling — falling back to timed delay");
-        await wait(4200);
+        await wait(WHEEL_SPIN_DURATION_MS);
       }
 
       if (generationIdRef.current !== token) return;
