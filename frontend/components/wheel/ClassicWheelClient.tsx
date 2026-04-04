@@ -9,65 +9,18 @@ import SparklesIcon from "@/components/ui/sparkles-icon";
 import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
-
-type Prize = {
-  name: string;
-  chance: number;
-  color: string;
-};
-
-const PRIZES: Prize[] = [
-  { name: "Moondust", chance: 40, color: "#8b8b7a" },
-  { name: "Starborn", chance: 25, color: "#6b8e4e" },
-  { name: "Lunara", chance: 15, color: "#9b7c5d" },
-  { name: "Celestara", chance: 10, color: "#7a8ca5" },
-  { name: "Divinara", chance: 6, color: "#c97743" },
-  { name: "Holo Nova", chance: 3, color: "#f4e4c1" },
-  { name: "Singularity", chance: 1, color: "#d4af37" },
-];
-
-type Selection = {
-  prize: Prize;
-  index: number;
-  random?: number;
-};
-
-const DEFAULT_ITEMS = PRIZES.map((prize) => ({
-  label: prize.name,
-  weight: prize.chance,
-  backgroundColor: prize.color,
-  labelColor: "#ffffff",
-}));
-
-function getSecureRandomInt100() {
-  const array = new Uint8Array(1);
-  let value = 0;
-  do {
-    crypto.getRandomValues(array);
-    value = array[0];
-  } while (value >= 200);
-  return value % 100;
-}
-
-function selectPrize(forcedIndex?: number): Selection {
-  if (typeof forcedIndex === "number") {
-    return { prize: PRIZES[forcedIndex], index: forcedIndex };
-  }
-  const random = getSecureRandomInt100();
-  if (random < 40) return { prize: PRIZES[0], index: 0, random };
-  if (random < 65) return { prize: PRIZES[1], index: 1, random };
-  if (random < 80) return { prize: PRIZES[2], index: 2, random };
-  if (random < 90) return { prize: PRIZES[3], index: 3, random };
-  if (random < 96) return { prize: PRIZES[4], index: 4, random };
-  if (random < 99) return { prize: PRIZES[5], index: 5, random };
-  return { prize: PRIZES[6], index: 6, random };
-}
+import {
+  CLASSIC_WHEEL_ITEMS,
+  CLASSIC_WHEEL_PRIZES,
+  pickClassicWheelPrize,
+  type ClassicWheelPrize,
+} from "@/lib/wheel/classicWheel";
 
 export function ClassicWheelClient() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wheelRef = useRef<Wheel | null>(null);
   const selectedRef = useRef<{
-    prize: Prize;
+    prize: ClassicWheelPrize;
     forced: boolean;
     randomBucket?: number;
   } | null>(null);
@@ -77,7 +30,9 @@ export function ClassicWheelClient() {
 
   const [isSpinning, setIsSpinning] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [winningPrize, setWinningPrize] = useState<Prize | null>(null);
+  const [winningPrize, setWinningPrize] = useState<ClassicWheelPrize | null>(
+    null,
+  );
   const [wasForced, setWasForced] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
 
@@ -93,7 +48,7 @@ export function ClassicWheelClient() {
         });
       }
     }
-    return PRIZES.map((prize) => {
+    return CLASSIC_WHEEL_PRIZES.map((prize) => {
       const entry = map.get(prize.name);
       return {
         name: prize.name,
@@ -106,7 +61,7 @@ export function ClassicWheelClient() {
 
   const totalSpins = stats?.totalSpins ?? 0;
 
-  const wheelItems = DEFAULT_ITEMS;
+  const wheelItems = CLASSIC_WHEEL_ITEMS;
 
   const clearTimers = useCallback(() => {
     rafIdsRef.current.forEach((id) => {
@@ -301,7 +256,7 @@ export function ClassicWheelClient() {
   }, [registerTimeout]);
 
   const triggerCelebration = useCallback(
-    (prize: Prize) => {
+    (prize: ClassicWheelPrize) => {
       clearTimers();
       if (prize.name === "Singularity") {
         triggerSingularityConfetti();
@@ -330,7 +285,7 @@ export function ClassicWheelClient() {
     (forcedIndex?: number) => {
       if (!wheelRef.current || isSpinning) return;
 
-      const selection = selectPrize(forcedIndex);
+      const selection = pickClassicWheelPrize(forcedIndex);
       selectedRef.current = {
         prize: selection.prize,
         forced: typeof forcedIndex === "number",
@@ -473,7 +428,7 @@ export function ClassicWheelClient() {
           <div className="glass-card w-full max-w-3xl flex flex-col gap-3 rounded-3xl border border-border/50 bg-background/70 p-4 text-sm text-muted-foreground">
             <h3 className="font-semibold text-foreground">Force a prize</h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              {PRIZES.map((prize, index) => (
+              {CLASSIC_WHEEL_PRIZES.map((prize, index) => (
                 <button
                   key={prize.name}
                   type="button"
