@@ -52,7 +52,7 @@ import {
   stepCountsToMetrics,
   type TimingPresetSet,
 } from "../../utils/spinTiming";
-import { OBSLobby } from "./OBSLobby";
+import { type LobbySettings, OBSLobby } from "./OBSLobby";
 
 // OBS stubs — functions referenced by the spin logic but not needed for overlay
 const track = (..._args: unknown[]) => {};
@@ -3905,8 +3905,8 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           fireBurst();
           setTimeout(fireBurst, 200);
           setTimeout(fireBurst, 500);
-        } catch {
-          /* confetti unavailable */
+        } catch (err) {
+          console.warn("Confetti celebration failed", err);
         }
       })();
 
@@ -4409,7 +4409,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   }, []);
 
   // =======================================================================
-  // OBS: Command handling — spin, clear, lobby
+  // OBS: Command dispatch — spin, countdown, clear, lobby, brb, test
   // =======================================================================
   const lastSeqRef = useRef<number | null>(null);
   const initializedSeqRef = useRef(false);
@@ -4424,14 +4424,11 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   const [countdownPreview, setCountdownPreview] = useState<string | null>(null);
   const [spinDone, setSpinDone] = useState(false);
   const autoClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoClearSecondsRef = useRef(
-    ((sessionSettings as Record<string, unknown> | undefined)
-      ?.autoClearSeconds as number | undefined) ?? 30,
-  );
-  // Keep ref in sync with session settings
-  autoClearSecondsRef.current =
+  const resolvedAutoClear =
     ((sessionSettings as Record<string, unknown> | undefined)
       ?.autoClearSeconds as number | undefined) ?? 30;
+  const autoClearSecondsRef = useRef(resolvedAutoClear);
+  autoClearSecondsRef.current = resolvedAutoClear;
   const [spinVisible, setSpinVisible] = useState(false);
   const [spinBoardVisible, setSpinBoardVisible] = useState(false);
   const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -4452,7 +4449,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     setSpinDone(false);
   }, []);
 
-  // Fade-in when entering active phase (5s)
+  // Visibility transitions for active and fading phases
   useEffect(() => {
     if (obsPhase === "active") {
       const raf = requestAnimationFrame(() => setSpinVisible(true));
@@ -4641,7 +4638,11 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         break;
       case "clear":
         resetCommandState();
-        if (obsPhase === "active" || obsPhase === "countdown") {
+        if (
+          obsPhase === "active" ||
+          obsPhase === "countdown" ||
+          obsPhase === "brb"
+        ) {
           setObsPhase("fading");
         } else {
           setObsPhase("idle");
@@ -4657,7 +4658,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         setObsPhase("brb");
         break;
       case "test":
-        // Test mode — no-op for now, visual handled by session.testMode
+        // No-op — test mode rendering is handled by the session.testMode early-return above
         break;
     }
   }, [
@@ -4707,7 +4708,8 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       includeBaseColours,
       extendedModes: extendedModesArray,
       exactLayerCounts,
-      lobbyMode: (rawSession?.lobbyMode as string) ?? "fruit-ninja",
+      lobbyMode:
+        (rawSession?.lobbyMode as LobbySettings["lobbyMode"]) ?? "fruit-ninja",
       lobbyCatCount: (rawSession?.lobbyCatCount as number) ?? 4,
       lobbyMoveSpeed: (rawSession?.lobbyMoveSpeed as number) ?? 1.0,
       lobbySwapSpeed: (rawSession?.lobbySwapSpeed as number) ?? 1.0,
@@ -4730,8 +4732,6 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     ],
   );
 
-  // Track whether lobby was showing before countdown (for crossfade)
-  const _showLobbyLayer = obsPhase === "lobby" || obsPhase === "countdown";
   const showCountdownLayer = obsPhase === "countdown";
 
   // Test mode — layout guide for OBS positioning

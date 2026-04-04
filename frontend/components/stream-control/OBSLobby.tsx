@@ -40,7 +40,7 @@ export interface LobbySettings {
   includeBaseColours: boolean;
   extendedModes: string[];
   exactLayerCounts?: boolean;
-  lobbyMode?: string;
+  lobbyMode?: "fruit-ninja" | "matrix" | "dvd";
   lobbyCatCount?: number;
   lobbyMoveSpeed?: number;
   lobbySwapSpeed?: number;
@@ -58,7 +58,7 @@ interface FlyingCat {
   duration: number;
   peakY: number;
   rotation: number;
-  size: number; // 1.0 to 2.0
+  size: number; // lobbyCatMinSize..lobbyCatMaxSize (default 1–2)
   mode: "fruit-ninja" | "matrix" | "dvd"; // locked at spawn time
 }
 
@@ -75,10 +75,7 @@ export function OBSLobby({
   generator: CatGeneratorApi | null;
   hideSettings?: boolean;
 }) {
-  const lobbyMode = (settings.lobbyMode ?? "fruit-ninja") as
-    | "fruit-ninja"
-    | "matrix"
-    | "dvd";
+  const lobbyMode = settings.lobbyMode ?? "fruit-ninja";
   const maxCats = settings.lobbyCatCount ?? 4;
   const moveSpeed = settings.lobbyMoveSpeed ?? 1.0;
   const swapSpeed = settings.lobbySwapSpeed ?? 1.0;

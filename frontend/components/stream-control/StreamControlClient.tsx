@@ -54,6 +54,11 @@ const LOBBY_MODE_DEFAULTS = {
   dvd: { cats: 3, move: 0.5, swap: 1 },
 } as const;
 
+/** Format a multiplier value like 1 -> "1x", 0.25 -> "0.25x", 2.50 -> "2.5x" */
+function formatMultiplier(v: number): string {
+  return `${v.toFixed(2).replace(/\.?0+$/, "")}x`;
+}
+
 export function StreamControlClient() {
   const clerk = useClerk();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
@@ -772,7 +777,7 @@ export function StreamControlClient() {
                   min={0.25}
                   max={4}
                   step={0.25}
-                  format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
+                  format={formatMultiplier}
                   onChange={(v) => updateSettings({ speedMultiplier: v })}
                 />
               </div>
@@ -815,45 +820,51 @@ export function StreamControlClient() {
                     danger: true,
                   },
                 ] as const
-              ).map((btn) => (
-                <button
-                  type="button"
-                  key={btn.label}
-                  onClick={btn.onClick}
-                  className={cn(
-                    "group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition",
-                    btn.active
-                      ? "border-amber-500/50 bg-amber-500/10"
-                      : btn.danger
-                        ? "border-border/50 hover:border-red-500/40 hover:bg-red-500/5"
-                        : "border-border/50 hover:border-amber-500/40 hover:bg-amber-500/5",
-                  )}
-                >
-                  <btn.icon
+              ).map((btn) => {
+                let borderClass: string;
+                let iconClass: string;
+                if (btn.active) {
+                  borderClass = "border-amber-500/50 bg-amber-500/10";
+                  iconClass = "text-amber-500";
+                } else if (btn.danger) {
+                  borderClass =
+                    "border-border/50 hover:border-red-500/40 hover:bg-red-500/5";
+                  iconClass = "text-muted-foreground group-hover:text-red-400";
+                } else {
+                  borderClass =
+                    "border-border/50 hover:border-amber-500/40 hover:bg-amber-500/5";
+                  iconClass =
+                    "text-muted-foreground group-hover:text-amber-500";
+                }
+                return (
+                  <button
+                    type="button"
+                    key={btn.label}
+                    onClick={btn.onClick}
                     className={cn(
-                      "size-4 shrink-0 transition",
-                      btn.active
-                        ? "text-amber-500"
-                        : btn.danger
-                          ? "text-muted-foreground group-hover:text-red-400"
-                          : "text-muted-foreground group-hover:text-amber-500",
+                      "group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition",
+                      borderClass,
                     )}
-                  />
-                  <div className="min-w-0">
-                    <div
-                      className={cn(
-                        "text-xs font-semibold",
-                        btn.active ? "text-amber-400" : "text-foreground",
-                      )}
-                    >
-                      {btn.label}
+                  >
+                    <btn.icon
+                      className={cn("size-4 shrink-0 transition", iconClass)}
+                    />
+                    <div className="min-w-0">
+                      <div
+                        className={cn(
+                          "text-xs font-semibold",
+                          btn.active ? "text-amber-400" : "text-foreground",
+                        )}
+                      >
+                        {btn.label}
+                      </div>
+                      <div className="truncate text-[10px] text-muted-foreground/60">
+                        {btn.desc}
+                      </div>
                     </div>
-                    <div className="truncate text-[10px] text-muted-foreground/60">
-                      {btn.desc}
-                    </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </section>
         </div>
@@ -925,7 +936,7 @@ export function StreamControlClient() {
             min={0.25}
             max={4}
             step={0.25}
-            format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
+            format={formatMultiplier}
             onChange={(v) => {
               setLobbyMoveSpeed(v);
               syncLobbySettings({ lobbyMoveSpeed: v });
@@ -937,7 +948,7 @@ export function StreamControlClient() {
             min={0.25}
             max={4}
             step={0.25}
-            format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
+            format={formatMultiplier}
             onChange={(v) => {
               setLobbySwapSpeed(v);
               syncLobbySettings({ lobbySwapSpeed: v });
@@ -949,7 +960,7 @@ export function StreamControlClient() {
             min={0.25}
             max={4}
             step={0.25}
-            format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
+            format={formatMultiplier}
             onChange={(v) => {
               setLobbyCatMinSize(v);
               if (v > lobbyCatMaxSize) setLobbyCatMaxSize(v);
@@ -965,7 +976,7 @@ export function StreamControlClient() {
             min={0.25}
             max={4}
             step={0.25}
-            format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
+            format={formatMultiplier}
             onChange={(v) => {
               setLobbyCatMaxSize(v);
               if (v < lobbyCatMinSize) setLobbyCatMinSize(v);

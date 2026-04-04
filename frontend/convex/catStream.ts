@@ -17,6 +17,17 @@ async function requireUser(ctx: MutationCtx) {
   return user;
 }
 
+/** Helper: get the authenticated user's stream session or throw. */
+async function requireSession(ctx: MutationCtx) {
+  const user = await requireUser(ctx);
+  const session = await ctx.db
+    .query("cat_stream_sessions")
+    .withIndex("byUserId", (q) => q.eq("userId", user._id))
+    .unique();
+  if (!session) throw new Error("No stream session found");
+  return session;
+}
+
 // ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
@@ -100,14 +111,7 @@ export const ensureSession = mutation({
 export const updateSettings = mutation({
   args: { settings: v.any() },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-
-    const session = await ctx.db
-      .query("cat_stream_sessions")
-      .withIndex("byUserId", (q) => q.eq("userId", user._id))
-      .unique();
-    if (!session) throw new Error("No stream session found");
-
+    const session = await requireSession(ctx);
     await ctx.db.patch(session._id, {
       settings: args.settings,
       updatedAt: Date.now(),
@@ -126,14 +130,7 @@ export const triggerSpin = mutation({
     countdownSeconds: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const user = await requireUser(ctx);
-
-    const session = await ctx.db
-      .query("cat_stream_sessions")
-      .withIndex("byUserId", (q) => q.eq("userId", user._id))
-      .unique();
-    if (!session) throw new Error("No stream session found");
-
+    const session = await requireSession(ctx);
     const prevSeq = session.currentCommand?.seq ?? 0;
 
     const command: Record<string, unknown> = {
@@ -160,16 +157,8 @@ export const triggerSpin = mutation({
 export const showLobby = mutation({
   args: {},
   handler: async (ctx) => {
-    const user = await requireUser(ctx);
-
-    const session = await ctx.db
-      .query("cat_stream_sessions")
-      .withIndex("byUserId", (q) => q.eq("userId", user._id))
-      .unique();
-    if (!session) throw new Error("No stream session found");
-
+    const session = await requireSession(ctx);
     const prevSeq = session.currentCommand?.seq ?? 0;
-
     await ctx.db.patch(session._id, {
       status: "active",
       currentCommand: {
@@ -188,23 +177,11 @@ export const showLobby = mutation({
 export const showBrb = mutation({
   args: {},
   handler: async (ctx) => {
-    const user = await requireUser(ctx);
-
-    const session = await ctx.db
-      .query("cat_stream_sessions")
-      .withIndex("byUserId", (q) => q.eq("userId", user._id))
-      .unique();
-    if (!session) throw new Error("No stream session found");
-
+    const session = await requireSession(ctx);
     const prevSeq = session.currentCommand?.seq ?? 0;
-
     await ctx.db.patch(session._id, {
       status: "active",
-      currentCommand: {
-        type: "brb",
-        seq: prevSeq + 1,
-        timestamp: Date.now(),
-      },
+      currentCommand: { type: "brb", seq: prevSeq + 1, timestamp: Date.now() },
       updatedAt: Date.now(),
     });
   },
@@ -216,16 +193,8 @@ export const showBrb = mutation({
 export const clearOverlay = mutation({
   args: {},
   handler: async (ctx) => {
-    const user = await requireUser(ctx);
-
-    const session = await ctx.db
-      .query("cat_stream_sessions")
-      .withIndex("byUserId", (q) => q.eq("userId", user._id))
-      .unique();
-    if (!session) throw new Error("No stream session found");
-
+    const session = await requireSession(ctx);
     const prevSeq = session.currentCommand?.seq ?? 0;
-
     await ctx.db.patch(session._id, {
       status: "idle",
       currentCommand: {
@@ -244,24 +213,11 @@ export const clearOverlay = mutation({
 export const toggleTestMode = mutation({
   args: {},
   handler: async (ctx) => {
-    const user = await requireUser(ctx);
-
-    const session = await ctx.db
-      .query("cat_stream_sessions")
-      .withIndex("byUserId", (q) => q.eq("userId", user._id))
-      .unique();
-    if (!session) throw new Error("No stream session found");
-
+    const session = await requireSession(ctx);
     const prevSeq = session.currentCommand?.seq ?? 0;
-    const newTestMode = !session.testMode;
-
     await ctx.db.patch(session._id, {
-      testMode: newTestMode,
-      currentCommand: {
-        type: "test",
-        seq: prevSeq + 1,
-        timestamp: Date.now(),
-      },
+      testMode: !session.testMode,
+      currentCommand: { type: "test", seq: prevSeq + 1, timestamp: Date.now() },
       updatedAt: Date.now(),
     });
   },
