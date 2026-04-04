@@ -10,6 +10,16 @@ export type ClassicWheelSelection = {
   random?: number;
 };
 
+/** Wire format for wheel spin data sent to/from Convex. */
+export type StreamWheelSpin = {
+  prizeName: string;
+  prizeIndex: number;
+  color: string;
+  chance: number;
+  randomBucket?: number;
+  forced: boolean;
+};
+
 export const CLASSIC_WHEEL_PRIZES: ClassicWheelPrize[] = [
   { name: "Moondust", chance: 40, color: "#8b8b7a" },
   { name: "Starborn", chance: 25, color: "#6b8e4e" },
@@ -27,6 +37,8 @@ export const CLASSIC_WHEEL_ITEMS = CLASSIC_WHEEL_PRIZES.map((prize) => ({
   labelColor: "#ffffff",
 }));
 
+// Rejection sampling: discard values >= 200 to avoid modulo bias
+// (200 is the largest multiple of 100 within Uint8 range 0-255).
 function getSecureRandomInt100() {
   const array = new Uint8Array(1);
   let value = 0;
@@ -41,18 +53,30 @@ export function pickClassicWheelPrize(
   forcedIndex?: number,
 ): ClassicWheelSelection {
   if (typeof forcedIndex === "number") {
+    if (
+      !Number.isInteger(forcedIndex) ||
+      forcedIndex < 0 ||
+      forcedIndex >= CLASSIC_WHEEL_PRIZES.length
+    ) {
+      throw new RangeError(
+        `Invalid prize index ${forcedIndex} — must be 0..${CLASSIC_WHEEL_PRIZES.length - 1}`,
+      );
+    }
     return {
       prize: CLASSIC_WHEEL_PRIZES[forcedIndex],
       index: forcedIndex,
     };
   }
 
+  // Cumulative probability thresholds computed from CLASSIC_WHEEL_PRIZES.chance values.
   const random = getSecureRandomInt100();
-  if (random < 40) return { prize: CLASSIC_WHEEL_PRIZES[0], index: 0, random };
-  if (random < 65) return { prize: CLASSIC_WHEEL_PRIZES[1], index: 1, random };
-  if (random < 80) return { prize: CLASSIC_WHEEL_PRIZES[2], index: 2, random };
-  if (random < 90) return { prize: CLASSIC_WHEEL_PRIZES[3], index: 3, random };
-  if (random < 96) return { prize: CLASSIC_WHEEL_PRIZES[4], index: 4, random };
-  if (random < 99) return { prize: CLASSIC_WHEEL_PRIZES[5], index: 5, random };
-  return { prize: CLASSIC_WHEEL_PRIZES[6], index: 6, random };
+  let cumulative = 0;
+  for (let i = 0; i < CLASSIC_WHEEL_PRIZES.length; i++) {
+    cumulative += CLASSIC_WHEEL_PRIZES[i].chance;
+    if (random < cumulative) {
+      return { prize: CLASSIC_WHEEL_PRIZES[i], index: i, random };
+    }
+  }
+  const last = CLASSIC_WHEEL_PRIZES.length - 1;
+  return { prize: CLASSIC_WHEEL_PRIZES[last], index: last, random };
 }

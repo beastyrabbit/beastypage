@@ -32,7 +32,10 @@ import {
   encodePortableSettings,
 } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
-import { pickClassicWheelPrize } from "@/lib/wheel/classicWheel";
+import {
+  pickClassicWheelPrize,
+  type StreamWheelSpin,
+} from "@/lib/wheel/classicWheel";
 import {
   AFTERLIFE_OPTIONS,
   computeLayerCount,
@@ -55,15 +58,6 @@ const LOBBY_MODE_DEFAULTS = {
   dvd: { cats: 3, move: 0.5, swap: 1 },
 } as const;
 const FULL_EXPORT_SIZE = 700;
-
-type StreamWheelSpin = {
-  prizeName: string;
-  prizeIndex: number;
-  color: string;
-  chance: number;
-  randomBucket?: number;
-  forced: boolean;
-};
 
 function toWheelSpinPayload(
   selection: ReturnType<typeof pickClassicWheelPrize>,
@@ -228,7 +222,7 @@ export function StreamControlClient() {
     [],
   );
 
-  // Instant sync for lobby settings — no debounce
+  // Instant sync for session settings (lobby + result auto-clear) — no debounce
   const syncSessionSettings = useCallback(
     (updates: Record<string, unknown>) => {
       const merged = buildSessionSettings(settingsRef.current, updates);
@@ -1116,10 +1110,10 @@ export function StreamControlClient() {
                     setLobbyCatCount(defaults.cats);
                     setLobbyMoveSpeed(defaults.move);
                     setLobbySwapSpeed(defaults.swap);
-                      syncSessionSettings({
-                        lobbyMode: key,
-                        lobbyCatCount: defaults.cats,
-                        lobbyMoveSpeed: defaults.move,
+                    syncSessionSettings({
+                      lobbyMode: key,
+                      lobbyCatCount: defaults.cats,
+                      lobbyMoveSpeed: defaults.move,
                       lobbySwapSpeed: defaults.swap,
                     });
                   }}

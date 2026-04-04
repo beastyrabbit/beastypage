@@ -1,7 +1,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-const wheelSpinValidator = v.object({
+export const wheelSpinValidator = v.object({
   prizeName: v.string(),
   prizeIndex: v.number(),
   color: v.string(),

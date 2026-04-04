@@ -1,15 +1,7 @@
 import { v } from "convex/values";
 import type { MutationCtx } from "./_generated/server.js";
 import { mutation, query } from "./_generated/server.js";
-
-const wheelSpinValidator = v.object({
-  prizeName: v.string(),
-  prizeIndex: v.number(),
-  color: v.string(),
-  chance: v.number(),
-  randomBucket: v.optional(v.number()),
-  forced: v.boolean(),
-});
+import { wheelSpinValidator } from "./schema.js";
 
 /** Helper: get the authenticated user or throw. */
 async function requireUser(ctx: MutationCtx) {
@@ -42,7 +34,7 @@ async function requireSession(ctx: MutationCtx) {
 // ---------------------------------------------------------------------------
 
 /**
- * Get or create the authenticated user's stream session.
+ * Get the authenticated user's stream session, if one exists.
  */
 export const getSession = query({
   args: {},

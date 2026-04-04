@@ -40,11 +40,23 @@ describe("classicWheel", () => {
     );
   });
 
+  it("prize chances sum to exactly 100", () => {
+    const total = CLASSIC_WHEEL_PRIZES.reduce((sum, p) => sum + p.chance, 0);
+    expect(total).toBe(100);
+  });
+
   it("supports forced selections by index", () => {
     const selection = pickClassicWheelPrize(4);
     expect(selection.index).toBe(4);
     expect(selection.prize).toEqual(CLASSIC_WHEEL_PRIZES[4]);
     expect(selection.random).toBeUndefined();
+  });
+
+  it("throws on out-of-bounds forced index", () => {
+    expect(() => pickClassicWheelPrize(-1)).toThrow(RangeError);
+    expect(() => pickClassicWheelPrize(7)).toThrow(RangeError);
+    expect(() => pickClassicWheelPrize(NaN)).toThrow(RangeError);
+    expect(() => pickClassicWheelPrize(1.5)).toThrow(RangeError);
   });
 
   it.each([

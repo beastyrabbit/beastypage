@@ -12,6 +12,7 @@ import {
   CLASSIC_WHEEL_ITEMS,
   type ClassicWheelSelection,
 } from "@/lib/wheel/classicWheel";
+import { cn } from "@/lib/utils";
 
 export interface OBSClassicWheelHandle {
   spinTo: (selection: ClassicWheelSelection) => Promise<void>;
@@ -38,37 +39,42 @@ export const OBSClassicWheel = forwardRef<
     if (!containerRef.current) return;
     wheelRef.current?.remove();
 
-    const wheel = new Wheel(containerRef.current, {
-      items: CLASSIC_WHEEL_ITEMS,
-      radius: Math.floor(size / 2) - 8,
-      itemLabelRadius: 0.83,
-      itemLabelRadiusMax: 0.3,
-      itemLabelRotation: 0,
-      itemLabelAlign: "right",
-      itemLabelColors: ["#ffffff"],
-      itemLabelBaselineOffset: -0.07,
-      itemLabelFont: "Geist Sans, Inter, Arial, sans-serif",
-      itemLabelFontSizeMax: Math.min(28, Math.floor(size / 14)),
-      itemBackgroundColors: CLASSIC_WHEEL_ITEMS.map(
-        (item) => item.backgroundColor,
-      ),
-      rotationSpeedMax: 300,
-      rotationResistance: -50,
-      lineWidth: 3,
-      lineColor: "rgba(255,255,255,0.72)",
-      borderWidth: 4,
-      borderColor: "rgba(255,255,255,0.22)",
-      isInteractive: false,
-      pointerAngle: 0,
-    });
+    try {
+      const wheel = new Wheel(containerRef.current, {
+        items: CLASSIC_WHEEL_ITEMS,
+        radius: Math.floor(size / 2) - 8,
+        itemLabelRadius: 0.83,
+        itemLabelRadiusMax: 0.3,
+        itemLabelRotation: 0,
+        itemLabelAlign: "right",
+        itemLabelColors: ["#ffffff"],
+        itemLabelBaselineOffset: -0.07,
+        itemLabelFont: "Geist Sans, Inter, Arial, sans-serif",
+        itemLabelFontSizeMax: Math.min(28, Math.floor(size / 14)),
+        itemBackgroundColors: CLASSIC_WHEEL_ITEMS.map(
+          (item) => item.backgroundColor,
+        ),
+        rotationSpeedMax: 300,
+        rotationResistance: -50,
+        lineWidth: 3,
+        lineColor: "rgba(255,255,255,0.72)",
+        borderWidth: 4,
+        borderColor: "rgba(255,255,255,0.22)",
+        isInteractive: false,
+        pointerAngle: 0,
+      });
 
-    wheel.onRest = () => {
-      resolveSpinRef.current?.();
-      resolveSpinRef.current = null;
-    };
+      wheel.onRest = () => {
+        resolveSpinRef.current?.();
+        resolveSpinRef.current = null;
+      };
 
-    wheelRef.current = wheel;
-    wheel.resize();
+      wheelRef.current = wheel;
+      wheel.resize();
+    } catch (err) {
+      console.error("[OBSClassicWheel] Failed to create wheel instance", err);
+      wheelRef.current = null;
+    }
   }, [size]);
 
   useEffect(() => {
@@ -84,19 +90,38 @@ export const OBSClassicWheel = forwardRef<
     ref,
     () => ({
       spinTo(selection: ClassicWheelSelection) {
+        // Resolve any previous in-flight spin so callers unblock
+        resolveSpinRef.current?.();
+        resolveSpinRef.current = null;
+
         if (!wheelRef.current) {
           createWheel();
         }
         if (!wheelRef.current) {
+          console.warn(
+            "[OBSClassicWheel] Wheel creation failed — container may not be mounted",
+          );
           return Promise.resolve();
         }
 
         return new Promise<void>((resolve) => {
           resolveSpinRef.current = resolve;
           wheelRef.current?.spinToItem(selection.index, 4200, false, 6, 1);
+          // Safety timeout in case onRest never fires
+          setTimeout(() => {
+            if (resolveSpinRef.current === resolve) {
+              console.warn(
+                "[OBSClassicWheel] Spin timed out after 10s — force resolving",
+              );
+              resolveSpinRef.current = null;
+              resolve();
+            }
+          }, 10000);
         });
       },
       reset() {
+        // Resolve any pending spinTo promise before recreating
+        resolveSpinRef.current?.();
         resolveSpinRef.current = null;
         createWheel();
       },
@@ -106,7 +131,7 @@ export const OBSClassicWheel = forwardRef<
 
   return (
     <div
-      className={["relative", className].filter(Boolean).join(" ")}
+      className={cn("relative", className)}
       style={{
         width: `${size}px`,
         height: `${size}px`,

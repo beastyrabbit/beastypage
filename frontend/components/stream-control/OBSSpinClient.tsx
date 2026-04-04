@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * OBSSpinClient — copied from SingleCatPlusClient.tsx
+ * OBSSpinClient — forked from SingleCatPlusClient.tsx
  *
- * ALL spin logic (generateCatPlus, flip sequences, timing, layer count spinner)
- * is kept byte-for-byte identical. Only the component shell changed:
- * - Props: accepts apiKey instead of page-level settings
- * - Settings: read from Convex session instead of local state/variants
+ * Core spin logic (generateCatPlus, flip sequences, timing) originated from
+ * that component but has diverged. Key differences:
+ * - Props: accepts apiKey, reads settings from Convex session
  * - JSX: OBS overlay layout instead of full page UI
  * - Trigger: Convex subscription instead of button click
+ * - Adds wheel reward overlay system (spin/settle/banner)
+ * - Auto-clear timer moved to shared scheduleAutoClear helper
  */
 
 import { useQuery } from "convex/react";
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 import {
   CLASSIC_WHEEL_PRIZES,
   type ClassicWheelSelection,
+  type StreamWheelSpin,
 } from "@/lib/wheel/classicWheel";
 import "react-split-flap-effect/extras/themes.css";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
@@ -170,15 +172,6 @@ interface CatState {
   catName?: string | null;
   creatorName?: string | null;
   catShareSlug?: string | null;
-}
-
-interface StreamWheelSpin {
-  prizeName: string;
-  prizeIndex: number;
-  color: string;
-  chance: number;
-  randomBucket?: number;
-  forced: boolean;
 }
 
 interface WheelRewardState {
@@ -1160,7 +1153,10 @@ function getParameterValueForDisplay(
 }
 
 function parseStreamWheelSpin(value: unknown): StreamWheelSpin | null {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== "object") {
+    console.error("[OBSSpinClient] Invalid wheelSpin data — not an object", value);
+    return null;
+  }
   const spin = value as Partial<StreamWheelSpin>;
   if (
     typeof spin.prizeName !== "string" ||
@@ -1169,6 +1165,7 @@ function parseStreamWheelSpin(value: unknown): StreamWheelSpin | null {
     typeof spin.chance !== "number" ||
     typeof spin.forced !== "boolean"
   ) {
+    console.error("[OBSSpinClient] Invalid wheelSpin data — missing or wrong fields", value);
     return null;
   }
   return {
@@ -1190,18 +1187,18 @@ function toClassicWheelSelection(
     chance: wheelSpin.chance,
     color: wheelSpin.color,
   };
-  const prize = CLASSIC_WHEEL_PRIZES[wheelSpin.prizeIndex] ?? fallbackPrize;
+  const prize = CLASSIC_WHEEL_PRIZES[wheelSpin.prizeIndex];
+  if (!prize) {
+    console.warn(
+      `[OBSSpinClient] Prize index ${wheelSpin.prizeIndex} out of range (max ${CLASSIC_WHEEL_PRIZES.length - 1}), using fallback`,
+    );
+  }
   return {
-    prize,
+    prize: prize ?? fallbackPrize,
     index: wheelSpin.prizeIndex,
     random: wheelSpin.randomBucket,
   };
 }
-
-// clampLayerValue, computeLayerCount imported from @/utils/catSettingsHelpers
-// LayerRangeSelector imported from @/components/common/LayerRangeSelector
-
-// resolveAfterlife imported from @/utils/catSettingsHelpers
 
 function _randomFrom<T>(list: T[]): T {
   return list[Math.floor(Math.random() * list.length)];
@@ -2558,6 +2555,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         if (generationIdRef.current !== token) return;
         await wheelRef.current.spinTo(wheelSelection);
       } else {
+        console.warn("[OBSSpinClient] Wheel ref not available after 1s polling — falling back to timed delay");
         await wait(4200);
       }
 
@@ -4130,6 +4128,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       });
       setIsGenerating(false);
       setSpinDone(true);
+      scheduleAutoClear(token);
 
       // Gold fireworks celebration
       (async () => {
@@ -4335,6 +4334,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     createMapper,
     resetMetaDrafts,
     resetWheelOverlay,
+    scheduleAutoClear,
     getDelayWithMultiplier,
     exactLayerCounts,
     timingConfig.allowFastFlips,
@@ -4671,7 +4671,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   }, []);
 
   // =======================================================================
-  // OBS: Command dispatch — spin, countdown, clear, lobby, brb, test
+  // OBS: Command dispatch — spin, wheel, countdown, clear, lobby, brb, test
   // =======================================================================
   const lastSeqRef = useRef<number | null>(null);
   const initializedSeqRef = useRef(false);
@@ -4752,6 +4752,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       } else if (params) {
         await primeOverlayFromCommand(params, slots);
       } else {
+        console.warn("[OBSSpinClient] Wheel command received but no cat state or params available");
         resetWheelOverlay();
         drawPlaceholder();
         return;
@@ -4968,7 +4969,11 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         if (!wheelSpin) {
           break;
         }
-        void handleWheelCommand(wheelSpin, cmd.params, cmd.slots);
+        handleWheelCommand(wheelSpin, cmd.params, cmd.slots).catch((err) => {
+          console.error("[OBSSpinClient] Wheel command failed", err);
+          resetCommandState();
+          drawPlaceholder();
+        });
         break;
       }
       case "clear":
@@ -5944,10 +5949,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
               <div className="flex-1 overflow-hidden">
                 <span
                   className={cn(
-                    "block truncate font-mono text-xl font-bold",
-                    wheelReward.status === "spinning"
-                      ? "text-white"
-                      : "text-white",
+                    "block truncate font-mono text-xl font-bold text-white",
                   )}
                   style={{
                     color:
