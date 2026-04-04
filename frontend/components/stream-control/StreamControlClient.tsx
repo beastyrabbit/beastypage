@@ -53,6 +53,7 @@ const LOBBY_MODE_DEFAULTS = {
   matrix: { cats: 8, move: 1, swap: 1 },
   dvd: { cats: 3, move: 0.5, swap: 1 },
 } as const;
+const FULL_EXPORT_SIZE = 700;
 
 /** Format a multiplier value like 1 -> "1x", 0.25 -> "0.25x", 2.50 -> "2.5x" */
 function formatMultiplier(v: number): string {
@@ -436,9 +437,6 @@ export function StreamControlClient() {
     },
     [buildSessionSettings, updateSettingsMut],
   );
-
-  // Export handlers — copy / download the last generated cat
-  const FULL_EXPORT_SIZE = 700;
 
   const copyCanvasToClipboard = useCallback(
     async (
