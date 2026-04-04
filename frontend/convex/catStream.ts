@@ -183,6 +183,34 @@ export const showLobby = mutation({
 });
 
 /**
+ * Send a BRB command — lobby cats without the settings table.
+ */
+export const showBrb = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await requireUser(ctx);
+
+    const session = await ctx.db
+      .query("cat_stream_sessions")
+      .withIndex("byUserId", (q) => q.eq("userId", user._id))
+      .unique();
+    if (!session) throw new Error("No stream session found");
+
+    const prevSeq = session.currentCommand?.seq ?? 0;
+
+    await ctx.db.patch(session._id, {
+      status: "active",
+      currentCommand: {
+        type: "brb",
+        seq: prevSeq + 1,
+        timestamp: Date.now(),
+      },
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
  * Clear the overlay (hide everything).
  */
 export const clearOverlay = mutation({

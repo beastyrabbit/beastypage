@@ -1,5 +1,6 @@
 "use client";
 
+import { useClerk } from "@clerk/nextjs";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import {
   ArrowUpRight,
@@ -7,9 +8,7 @@ import {
   Download,
   Eye,
   Loader2,
-  Minus,
   Play,
-  Plus,
   Radio,
   RotateCcw,
   SendHorizontal,
@@ -17,7 +16,6 @@ import {
   Square,
   Timer,
   Tv,
-  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,7 +27,6 @@ import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { PaletteId } from "@/lib/palettes";
-import { useClerk } from "@clerk/nextjs";
 import {
   decodePortableSettings,
   encodePortableSettings,
@@ -70,6 +67,7 @@ export function StreamControlClient() {
   const updateSettingsMut = useMutation(api.catStream.updateSettings);
   const triggerSpinMut = useMutation(api.catStream.triggerSpin);
   const showLobbyMut = useMutation(api.catStream.showLobby);
+  const showBrbMut = useMutation(api.catStream.showBrb);
   const clearOverlayMut = useMutation(api.catStream.clearOverlay);
   const toggleTestModeMut = useMutation(api.catStream.toggleTestMode);
   const createMapper = useMutation(api.mapper.create);
@@ -114,9 +112,12 @@ export function StreamControlClient() {
   const [lobbyCatCount, setLobbyCatCount] = useState(4);
   const [lobbyMoveSpeed, setLobbyMoveSpeed] = useState(1.0);
   const [lobbySwapSpeed, setLobbySwapSpeed] = useState(1.0);
+  const [lobbyCatMinSize, setLobbyCatMinSize] = useState(1.0);
+  const [lobbyCatMaxSize, setLobbyCatMaxSize] = useState(2.0);
   const [paletteDisplayMode, setPaletteDisplayMode] = useState<"cycle" | "all">(
     "cycle",
   );
+  const [autoClearSeconds, setAutoClearSeconds] = useState(30);
 
   // Instant sync for lobby settings — no debounce
   const syncLobbySettings = useCallback(
@@ -127,7 +128,10 @@ export function StreamControlClient() {
         lobbyCatCount,
         lobbyMoveSpeed,
         lobbySwapSpeed,
+        lobbyCatMinSize,
+        lobbyCatMaxSize,
         paletteDisplayMode,
+        autoClearSeconds,
         ...updates,
       };
       if (session) updateSettingsMut({ settings: merged }).catch(() => {});
@@ -138,7 +142,10 @@ export function StreamControlClient() {
       lobbyCatCount,
       lobbyMoveSpeed,
       lobbySwapSpeed,
+      lobbyCatMinSize,
+      lobbyCatMaxSize,
       paletteDisplayMode,
+      autoClearSeconds,
       session,
       updateSettingsMut,
     ],
@@ -154,8 +161,14 @@ export function StreamControlClient() {
         if (s.lobbyCatCount) setLobbyCatCount(s.lobbyCatCount as number);
         if (s.lobbyMoveSpeed) setLobbyMoveSpeed(s.lobbyMoveSpeed as number);
         if (s.lobbySwapSpeed) setLobbySwapSpeed(s.lobbySwapSpeed as number);
+        if (s.lobbyCatMinSize != null)
+          setLobbyCatMinSize(s.lobbyCatMinSize as number);
+        if (s.lobbyCatMaxSize != null)
+          setLobbyCatMaxSize(s.lobbyCatMaxSize as number);
         if (s.paletteDisplayMode)
           setPaletteDisplayMode(s.paletteDisplayMode as "cycle" | "all");
+        if (s.autoClearSeconds != null)
+          setAutoClearSeconds(s.autoClearSeconds as number);
         if (typeof s.creatorName === "string" && s.creatorName) {
           setCreatorNameDraft(s.creatorName);
           creatorFilledRef.current = true;
@@ -207,8 +220,14 @@ export function StreamControlClient() {
   lobbyMoveSpeedRef.current = lobbyMoveSpeed;
   const lobbySwapSpeedRef = useRef(lobbySwapSpeed);
   lobbySwapSpeedRef.current = lobbySwapSpeed;
+  const lobbyCatMinSizeRef = useRef(lobbyCatMinSize);
+  lobbyCatMinSizeRef.current = lobbyCatMinSize;
+  const lobbyCatMaxSizeRef = useRef(lobbyCatMaxSize);
+  lobbyCatMaxSizeRef.current = lobbyCatMaxSize;
   const paletteDisplayModeRef = useRef(paletteDisplayMode);
   paletteDisplayModeRef.current = paletteDisplayMode;
+  const autoClearSecondsRef = useRef(autoClearSeconds);
+  autoClearSecondsRef.current = autoClearSeconds;
 
   const updateSettings = useCallback(
     (next: Partial<SingleCatSettings>) => {
@@ -224,7 +243,10 @@ export function StreamControlClient() {
               lobbyCatCount: lobbyCatCountRef.current,
               lobbyMoveSpeed: lobbyMoveSpeedRef.current,
               lobbySwapSpeed: lobbySwapSpeedRef.current,
+              lobbyCatMinSize: lobbyCatMinSizeRef.current,
+              lobbyCatMaxSize: lobbyCatMaxSizeRef.current,
               paletteDisplayMode: paletteDisplayModeRef.current,
+              autoClearSeconds: autoClearSecondsRef.current,
             };
             updateSettingsMut({ settings: full }).catch(() => {});
           }
@@ -714,19 +736,16 @@ export function StreamControlClient() {
 
           {/* Controls */}
           <section className="rounded-2xl border border-border/40 bg-background/80 p-4 backdrop-blur">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Controls
-            </h3>
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Spin */}
+            {/* Spin + sliders row */}
+            <div className="mb-4 flex items-center gap-3">
               <button
                 type="button"
                 onClick={handleSpin}
                 disabled={spinning || !generatorReady}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-2.5",
-                  "text-sm font-semibold text-white transition",
-                  "hover:bg-amber-700 disabled:opacity-50",
+                  "inline-flex items-center gap-2 rounded-xl bg-amber-600 px-6 py-3",
+                  "text-sm font-bold text-white shadow-lg shadow-amber-900/20 transition",
+                  "hover:bg-amber-500 active:bg-amber-700 disabled:opacity-50",
                 )}
               >
                 {spinning ? (
@@ -734,160 +753,162 @@ export function StreamControlClient() {
                 ) : (
                   <Play className="size-4" />
                 )}
-                Spin!
+                {spinning ? "Spinning…" : "Spin!"}
               </button>
 
-              {/* Countdown */}
-              <div className="flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5">
-                <Timer className="size-3.5 text-muted-foreground" />
-                <input
-                  type="number"
-                  min={0}
-                  max={30}
+              <div className="flex flex-1 items-center gap-4">
+                <SliderControl
+                  label="Countdown"
                   value={countdownSeconds}
-                  onChange={(e) =>
-                    setCountdownSeconds(
-                      Math.max(0, Math.min(30, Number(e.target.value))),
-                    )
-                  }
-                  className="w-10 bg-transparent text-center text-sm text-foreground focus:outline-none"
+                  min={0}
+                  max={15}
+                  step={1}
+                  format={(v) => `${v}s`}
+                  onChange={setCountdownSeconds}
                 />
-                <span className="text-xs text-muted-foreground">sec</span>
+                <SliderControl
+                  label="Speed"
+                  value={settings.speedMultiplier ?? 1}
+                  min={0.25}
+                  max={4}
+                  step={0.25}
+                  format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
+                  onChange={(v) => updateSettings({ speedMultiplier: v })}
+                />
               </div>
+            </div>
 
-              {/* Speed */}
-              <div className="flex items-center gap-1 rounded-lg border border-border/50 px-1.5 py-1">
-                <Zap className="size-3.5 text-muted-foreground" />
+            {/* Scene buttons */}
+            <div className="grid grid-cols-4 gap-2">
+              {(
+                [
+                  {
+                    label: "Lobby",
+                    desc: "Settings + cats",
+                    icon: Eye,
+                    onClick: () => showLobbyMut().catch(console.error),
+                    active: false,
+                    danger: false,
+                  },
+                  {
+                    label: "BRB",
+                    desc: "Cats only",
+                    icon: Timer,
+                    onClick: () => showBrbMut().catch(console.error),
+                    active: false,
+                    danger: false,
+                  },
+                  {
+                    label: "Test",
+                    desc: session?.testMode ? "On" : "Debug border",
+                    icon: Radio,
+                    onClick: () => toggleTestModeMut().catch(console.error),
+                    active: session?.testMode ?? false,
+                    danger: false,
+                  },
+                  {
+                    label: "Clear",
+                    desc: "Hide overlay",
+                    icon: Square,
+                    onClick: () => clearOverlayMut().catch(console.error),
+                    active: false,
+                    danger: true,
+                  },
+                ] as const
+              ).map((btn) => (
                 <button
                   type="button"
-                  onClick={() =>
-                    updateSettings({
-                      speedMultiplier: Math.max(
-                        0.25,
-                        (settings.speedMultiplier ?? 1) - 0.25,
-                      ),
-                    })
-                  }
-                  className="rounded p-1 text-muted-foreground transition hover:bg-foreground hover:text-background"
+                  key={btn.label}
+                  onClick={btn.onClick}
+                  className={cn(
+                    "group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition",
+                    btn.active
+                      ? "border-amber-500/50 bg-amber-500/10"
+                      : btn.danger
+                        ? "border-border/50 hover:border-red-500/40 hover:bg-red-500/5"
+                        : "border-border/50 hover:border-amber-500/40 hover:bg-amber-500/5",
+                  )}
                 >
-                  <Minus className="size-3" />
+                  <btn.icon
+                    className={cn(
+                      "size-4 shrink-0 transition",
+                      btn.active
+                        ? "text-amber-500"
+                        : btn.danger
+                          ? "text-muted-foreground group-hover:text-red-400"
+                          : "text-muted-foreground group-hover:text-amber-500",
+                    )}
+                  />
+                  <div className="min-w-0">
+                    <div
+                      className={cn(
+                        "text-xs font-semibold",
+                        btn.active ? "text-amber-400" : "text-foreground",
+                      )}
+                    >
+                      {btn.label}
+                    </div>
+                    <div className="truncate text-[10px] text-muted-foreground/60">
+                      {btn.desc}
+                    </div>
+                  </div>
                 </button>
-                <span className="w-8 text-center text-xs font-semibold text-foreground">
-                  {(settings.speedMultiplier ?? 1)
-                    .toFixed(2)
-                    .replace(/\.?0+$/, "")}
-                  x
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateSettings({
-                      speedMultiplier: Math.min(
-                        4,
-                        (settings.speedMultiplier ?? 1) + 0.25,
-                      ),
-                    })
-                  }
-                  className="rounded p-1 text-muted-foreground transition hover:bg-foreground hover:text-background"
-                >
-                  <Plus className="size-3" />
-                </button>
-              </div>
-
-              {/* Lobby */}
-              <button
-                type="button"
-                onClick={() => showLobbyMut().catch(console.error)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-3 py-2",
-                  "text-xs font-medium text-muted-foreground transition",
-                  "hover:bg-foreground hover:text-background",
-                )}
-              >
-                <Eye className="size-3.5" />
-                Lobby
-              </button>
-
-              {/* Test Mode */}
-              <button
-                type="button"
-                onClick={() => toggleTestModeMut().catch(console.error)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg border px-3 py-2",
-                  "text-xs font-medium transition",
-                  session?.testMode
-                    ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
-                    : "border-border/50 text-muted-foreground hover:bg-foreground hover:text-background",
-                )}
-              >
-                <Radio className="size-3.5" />
-                Test
-              </button>
-
-              {/* Clear */}
-              <button
-                type="button"
-                onClick={() => clearOverlayMut().catch(console.error)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-3 py-2",
-                  "text-xs font-medium text-muted-foreground transition",
-                  "hover:bg-foreground hover:text-background",
-                )}
-              >
-                <Square className="size-3.5" />
-                Clear
-              </button>
+              ))}
             </div>
           </section>
         </div>
       </div>
 
-      {/* Lobby Animation Settings */}
-      <section className="rounded-2xl border border-border/40 bg-background/80 p-5 backdrop-blur">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Lobby Animation
-        </h3>
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Mode */}
-          <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1">
-            {(["fruit-ninja", "matrix", "dvd"] as const).map((m) => {
-              const defaults = LOBBY_MODE_DEFAULTS[m];
+      {/* Lobby Animation */}
+      <section className="rounded-2xl border border-border/40 bg-background/80 backdrop-blur">
+        {/* Header with mode selector */}
+        <div className="flex items-center justify-between border-b border-border/30 px-5 py-3">
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            Lobby Animation
+          </h3>
+          <div className="flex items-center gap-1 rounded-lg border border-border/40 p-0.5">
+            {(
+              [
+                { key: "fruit-ninja" as const, label: "Fruit Ninja" },
+                { key: "matrix" as const, label: "Matrix" },
+                { key: "dvd" as const, label: "DVD Bounce" },
+              ] as const
+            ).map(({ key, label }) => {
+              const defaults = LOBBY_MODE_DEFAULTS[key];
               return (
                 <button
                   type="button"
-                  key={m}
+                  key={key}
                   onClick={() => {
-                    setLobbyMode(m);
+                    setLobbyMode(key);
                     setLobbyCatCount(defaults.cats);
                     setLobbyMoveSpeed(defaults.move);
                     setLobbySwapSpeed(defaults.swap);
                     syncLobbySettings({
-                      lobbyMode: m,
+                      lobbyMode: key,
                       lobbyCatCount: defaults.cats,
                       lobbyMoveSpeed: defaults.move,
                       lobbySwapSpeed: defaults.swap,
                     });
                   }}
                   className={cn(
-                    "rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition",
-                    lobbyMode === m
-                      ? "bg-primary text-primary-foreground shadow-sm"
+                    "rounded-md px-3 py-1 text-xs font-semibold transition",
+                    lobbyMode === key
+                      ? "bg-amber-600 text-white shadow-sm"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {m === "dvd"
-                    ? "DVD Bounce"
-                    : m === "matrix"
-                      ? "Matrix"
-                      : "Fruit Ninja"}
+                  {label}
                 </button>
               );
             })}
           </div>
+        </div>
 
-          {/* Cat count */}
-          <LobbyControl
-            label="Cats"
+        {/* Sliders grid — 3 columns, clean rows */}
+        <div className="grid gap-x-8 gap-y-5 p-5 sm:grid-cols-2 lg:grid-cols-3">
+          <SliderControl
+            label="Cats on Screen"
             value={lobbyCatCount}
             min={1}
             max={12}
@@ -898,10 +919,8 @@ export function StreamControlClient() {
               syncLobbySettings({ lobbyCatCount: v });
             }}
           />
-
-          {/* Move speed */}
-          <LobbyControl
-            label="Move"
+          <SliderControl
+            label="Move Speed"
             value={lobbyMoveSpeed}
             min={0.25}
             max={4}
@@ -912,10 +931,8 @@ export function StreamControlClient() {
               syncLobbySettings({ lobbyMoveSpeed: v });
             }}
           />
-
-          {/* Swap speed */}
-          <LobbyControl
-            label="Swap"
+          <SliderControl
+            label="Frame Swap"
             value={lobbySwapSpeed}
             min={0.25}
             max={4}
@@ -926,19 +943,64 @@ export function StreamControlClient() {
               syncLobbySettings({ lobbySwapSpeed: v });
             }}
           />
+          <SliderControl
+            label="Min Cat Size"
+            value={lobbyCatMinSize}
+            min={0.25}
+            max={4}
+            step={0.25}
+            format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
+            onChange={(v) => {
+              setLobbyCatMinSize(v);
+              if (v > lobbyCatMaxSize) setLobbyCatMaxSize(v);
+              syncLobbySettings({
+                lobbyCatMinSize: v,
+                lobbyCatMaxSize: Math.max(v, lobbyCatMaxSize),
+              });
+            }}
+          />
+          <SliderControl
+            label="Max Cat Size"
+            value={lobbyCatMaxSize}
+            min={0.25}
+            max={4}
+            step={0.25}
+            format={(v) => `${v.toFixed(2).replace(/\.?0+$/, "")}x`}
+            onChange={(v) => {
+              setLobbyCatMaxSize(v);
+              if (v < lobbyCatMinSize) setLobbyCatMinSize(v);
+              syncLobbySettings({
+                lobbyCatMaxSize: v,
+                lobbyCatMinSize: Math.min(v, lobbyCatMinSize),
+              });
+            }}
+          />
+          <SliderControl
+            label="Auto-Clear"
+            value={autoClearSeconds}
+            min={0}
+            max={120}
+            step={5}
+            format={(v) => (v === 0 ? "Off" : `${v}s`)}
+            onChange={(v) => {
+              setAutoClearSeconds(v);
+              syncLobbySettings({ autoClearSeconds: v });
+            }}
+          />
+        </div>
 
-          {/* Clear cats */}
+        {/* Footer action */}
+        <div className="border-t border-border/30 px-5 py-2.5">
           <button
             type="button"
             onClick={() => syncLobbySettings({ lobbyClearSeq: Date.now() })}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-3 py-1.5",
-              "text-xs font-medium text-muted-foreground transition",
-              "hover:bg-foreground hover:text-background",
+              "inline-flex items-center gap-1.5 text-xs text-muted-foreground/50 transition",
+              "hover:text-red-400",
             )}
           >
             <RotateCcw className="size-3" />
-            Reset
+            Clear all cats from screen
           </button>
         </div>
       </section>
@@ -1207,10 +1269,10 @@ function SettingsCode({
 }
 
 // ---------------------------------------------------------------------------
-// Lobby control — reusable +/- number input
+// SliderControl — labeled slider with value readout
 // ---------------------------------------------------------------------------
 
-function LobbyControl({
+function SliderControl({
   label,
   value,
   min,
@@ -1228,25 +1290,22 @@ function LobbyControl({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5">
-      <span className="text-xs text-muted-foreground">{label}:</span>
-      <button
-        type="button"
-        onClick={() => onChange(Math.max(min, +(value - step).toFixed(2)))}
-        className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
-      >
-        <Minus className="size-3" />
-      </button>
-      <span className="w-8 text-center text-xs font-semibold text-foreground">
-        {format(value)}
-      </span>
-      <button
-        type="button"
-        onClick={() => onChange(Math.min(max, +(value + step).toFixed(2)))}
-        className="rounded p-0.5 text-muted-foreground hover:bg-foreground hover:text-background"
-      >
-        <Plus className="size-3" />
-      </button>
-    </div>
+    <label className="block">
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="tabular-nums text-sm font-semibold text-foreground">
+          {format(value)}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-border/40 accent-amber-500 [&::-webkit-slider-thumb]:size-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:shadow [&::-webkit-slider-thumb]:shadow-amber-900/30"
+      />
+    </label>
   );
 }

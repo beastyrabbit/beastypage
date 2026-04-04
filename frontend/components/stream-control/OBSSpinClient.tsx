@@ -3360,6 +3360,8 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     setRollSummary(null);
     setActiveParamId(null);
     setHasTint(false);
+    setSpinDone(false);
+    if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
     clearMirror();
     drawPlaceholder();
     setRollerExpanded(true);
@@ -3855,6 +3857,70 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           typeof performance !== "undefined" ? performance.now() : Date.now(),
       });
       setIsGenerating(false);
+      setSpinDone(true);
+
+      // Gold fireworks celebration
+      (async () => {
+        try {
+          const confetti = (await import("canvas-confetti")).default;
+          const gold = ["#f59e0b", "#fbbf24", "#d97706", "#eab308"];
+          const fireBurst = () => {
+            confetti({
+              particleCount: 60,
+              spread: 100,
+              origin: { x: 0.5, y: 0.5 },
+              colors: gold,
+              zIndex: 10000,
+              startVelocity: 30,
+            });
+            confetti({
+              angle: 60,
+              spread: 55,
+              origin: { x: 0, y: 0.6 },
+              particleCount: 40,
+              colors: gold,
+              zIndex: 10000,
+              startVelocity: 40,
+            });
+            confetti({
+              angle: 120,
+              spread: 55,
+              origin: { x: 1, y: 0.6 },
+              particleCount: 40,
+              colors: gold,
+              zIndex: 10000,
+              startVelocity: 40,
+            });
+            confetti({
+              spread: 360,
+              ticks: 60,
+              startVelocity: 25,
+              particleCount: 30,
+              origin: { x: 0.3 + Math.random() * 0.4, y: Math.random() * 0.4 },
+              colors: gold,
+              shapes: ["star"],
+              zIndex: 10000,
+            });
+          };
+          fireBurst();
+          setTimeout(fireBurst, 200);
+          setTimeout(fireBurst, 500);
+        } catch {
+          /* confetti unavailable */
+        }
+      })();
+
+      // Auto-clear timer
+      const autoClearMs = autoClearSecondsRef.current * 1000;
+      if (autoClearMs > 0) {
+        if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
+        autoClearTimerRef.current = setTimeout(() => {
+          if (generationIdRef.current === token) {
+            setObsPhase("fading");
+          }
+        }, autoClearMs);
+      }
+
       track("single_cat_generated", {
         mode: modeRef.current,
         accessories: countsResult.accessories > 0,
@@ -4352,10 +4418,20 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     null,
   );
   const [obsPhase, setObsPhase] = useState<
-    "idle" | "lobby" | "active" | "countdown" | "fading"
+    "idle" | "lobby" | "brb" | "active" | "countdown" | "fading"
   >("idle");
   const [countdownValue, setCountdownValue] = useState(0);
   const [countdownPreview, setCountdownPreview] = useState<string | null>(null);
+  const [spinDone, setSpinDone] = useState(false);
+  const autoClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoClearSecondsRef = useRef(
+    ((sessionSettings as Record<string, unknown> | undefined)
+      ?.autoClearSeconds as number | undefined) ?? 30,
+  );
+  // Keep ref in sync with session settings
+  autoClearSecondsRef.current =
+    ((sessionSettings as Record<string, unknown> | undefined)
+      ?.autoClearSeconds as number | undefined) ?? 30;
   const [spinVisible, setSpinVisible] = useState(false);
   const [spinBoardVisible, setSpinBoardVisible] = useState(false);
   const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -4368,10 +4444,12 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   const resetCommandState = useCallback(() => {
     if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
     if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
+    if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
     generationIdRef.current++;
     setParamRows([]);
     setRollerLabel(null);
     setRollerActiveValue(null);
+    setSpinDone(false);
   }, []);
 
   // Fade-in when entering active phase (5s)
@@ -4574,6 +4652,10 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         resetCommandState();
         setObsPhase("lobby");
         break;
+      case "brb":
+        resetCommandState();
+        setObsPhase("brb");
+        break;
       case "test":
         // Test mode — no-op for now, visual handled by session.testMode
         break;
@@ -4632,6 +4714,8 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       lobbyClearSeq: (rawSession?.lobbyClearSeq as number) ?? 0,
       paletteDisplayMode:
         (rawSession?.paletteDisplayMode as "cycle" | "all") ?? "cycle",
+      lobbyCatMinSize: (rawSession?.lobbyCatMinSize as number) ?? 1,
+      lobbyCatMaxSize: (rawSession?.lobbyCatMaxSize as number) ?? 2,
     }),
     [
       mode,
@@ -4650,9 +4734,280 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   const _showLobbyLayer = obsPhase === "lobby" || obsPhase === "countdown";
   const showCountdownLayer = obsPhase === "countdown";
 
+  // Test mode — layout guide for OBS positioning
+  if (session?.testMode) {
+    return (
+      <div
+        className="relative"
+        style={{
+          width: "1920px",
+          height: "1080px",
+          background:
+            "repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 0 0 / 40px 40px",
+          border: "3px solid rgba(245, 158, 11, 0.6)",
+          overflow: "hidden",
+        }}
+      >
+        {/* Full-screen dimension label */}
+        <div
+          className="absolute flex items-center justify-center"
+          style={{ inset: 0, pointerEvents: "none" }}
+        >
+          <span
+            style={{
+              fontSize: "80px",
+              fontWeight: 900,
+              color: "rgba(245, 158, 11, 0.08)",
+              letterSpacing: "0.05em",
+              fontFamily: "monospace",
+            }}
+          >
+            1920 x 1080
+          </span>
+        </div>
+
+        {/* Corner markers */}
+        {[
+          [0, 0],
+          [1, 0],
+          [0, 1],
+          [1, 1],
+        ].map(([x, y]) => (
+          <div
+            key={`corner-${x}-${y}`}
+            className="absolute"
+            style={{
+              left: x ? undefined : 0,
+              right: x ? 0 : undefined,
+              top: y ? undefined : 0,
+              bottom: y ? 0 : undefined,
+              width: "30px",
+              height: "30px",
+              borderLeft: !x ? "3px solid rgba(245,158,11,0.5)" : undefined,
+              borderRight: x ? "3px solid rgba(245,158,11,0.5)" : undefined,
+              borderTop: !y ? "3px solid rgba(245,158,11,0.5)" : undefined,
+              borderBottom: y ? "3px solid rgba(245,158,11,0.5)" : undefined,
+            }}
+          />
+        ))}
+
+        {/* ── Lobby: Settings table ── */}
+        <div
+          className="absolute flex flex-col items-center justify-center"
+          style={{
+            left: "40px",
+            top: "40px",
+            width: "900px",
+            height: "600px",
+            border: "2px dashed rgba(59, 130, 246, 0.5)",
+            borderRadius: "20px",
+            background: "rgba(59, 130, 246, 0.03)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "16px",
+              fontWeight: 700,
+              color: "rgba(59, 130, 246, 0.6)",
+              fontFamily: "monospace",
+            }}
+          >
+            LOBBY — Settings Table
+          </span>
+          <span
+            style={{
+              fontSize: "12px",
+              color: "rgba(59, 130, 246, 0.4)",
+              fontFamily: "monospace",
+              marginTop: "4px",
+            }}
+          >
+            900 x ~600 &middot; top-left
+          </span>
+        </div>
+
+        {/* ── Spin: Cat canvas ── */}
+        <div
+          className="absolute flex flex-col items-center justify-center"
+          style={{
+            left: "0px",
+            top: "0px",
+            width: "750px",
+            height: "780px",
+            border: "2px dashed rgba(34, 197, 94, 0.5)",
+            borderRadius: "8px",
+            background: "rgba(34, 197, 94, 0.03)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "16px",
+              fontWeight: 700,
+              color: "rgba(34, 197, 94, 0.6)",
+              fontFamily: "monospace",
+            }}
+          >
+            SPIN — Cat Canvas
+          </span>
+          <span
+            style={{
+              fontSize: "12px",
+              color: "rgba(34, 197, 94, 0.4)",
+              fontFamily: "monospace",
+              marginTop: "4px",
+            }}
+          >
+            750 x 780 &middot; top-left
+          </span>
+        </div>
+
+        {/* ── Spin: Param board (right column) ── */}
+        <div
+          className="absolute flex flex-col items-center justify-center"
+          style={{
+            left: "750px",
+            top: "20px",
+            width: "510px",
+            bottom: "220px",
+            border: "2px dashed rgba(245, 158, 11, 0.5)",
+            borderRadius: "20px",
+            background: "rgba(245, 158, 11, 0.03)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "16px",
+              fontWeight: 700,
+              color: "rgba(245, 158, 11, 0.6)",
+              fontFamily: "monospace",
+            }}
+          >
+            SPIN — Param Board
+          </span>
+          <span
+            style={{
+              fontSize: "12px",
+              color: "rgba(245, 158, 11, 0.4)",
+              fontFamily: "monospace",
+              marginTop: "4px",
+            }}
+          >
+            510 x ~840 &middot; right
+          </span>
+        </div>
+
+        {/* ── Spin: Layer details (bottom bar) ── */}
+        <div
+          className="absolute flex flex-col items-center justify-center"
+          style={{
+            left: "20px",
+            bottom: "20px",
+            right: "660px",
+            height: "180px",
+            border: "2px dashed rgba(168, 85, 247, 0.5)",
+            borderRadius: "16px",
+            background: "rgba(168, 85, 247, 0.03)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "14px",
+              fontWeight: 700,
+              color: "rgba(168, 85, 247, 0.6)",
+              fontFamily: "monospace",
+            }}
+          >
+            SPIN — Layer Details
+          </span>
+          <span
+            style={{
+              fontSize: "12px",
+              color: "rgba(168, 85, 247, 0.4)",
+              fontFamily: "monospace",
+              marginTop: "4px",
+            }}
+          >
+            ~1240 x 180 &middot; bottom
+          </span>
+        </div>
+
+        {/* ── Flying cats area indicator ── */}
+        <div
+          className="absolute"
+          style={{
+            inset: "4px",
+            border: "1px dotted rgba(255, 255, 255, 0.1)",
+            borderRadius: "4px",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          className="absolute"
+          style={{
+            right: "12px",
+            top: "12px",
+            fontSize: "11px",
+            color: "rgba(255,255,255,0.2)",
+            fontFamily: "monospace",
+          }}
+        >
+          Flying cats: full 1920x1080
+        </div>
+
+        {/* TEST MODE badge */}
+        <div
+          className="absolute flex items-center gap-2"
+          style={{
+            left: "50%",
+            bottom: "30px",
+            transform: "translateX(-50%)",
+            background: "rgba(245, 158, 11, 0.15)",
+            border: "1px solid rgba(245, 158, 11, 0.3)",
+            borderRadius: "8px",
+            padding: "8px 20px",
+          }}
+        >
+          <div
+            style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "50%",
+              background: "#f59e0b",
+              animation: "obs-dot-pulse 1s ease-in-out infinite",
+            }}
+          />
+          <span
+            style={{
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "#f59e0b",
+              fontFamily: "monospace",
+              letterSpacing: "0.1em",
+            }}
+          >
+            TEST MODE — Position this source in OBS
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   // When idle (after clear), show nothing — fully transparent
   if (obsPhase === "idle" && !initializing) {
     return null;
+  }
+
+  // BRB mode — lobby cats without the settings panel
+  if (obsPhase === "brb") {
+    return (
+      <div className="relative" style={{ width: "1920px", height: "1080px" }}>
+        <OBSLobby
+          settings={lobbySettings}
+          generator={generatorRef.current}
+          hideSettings
+        />
+      </div>
+    );
   }
 
   // Lobby + Countdown crossfade: both render as overlapping layers.
@@ -4836,6 +5191,10 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         @keyframes obs-dot-pulse {
           0%, 100% { opacity: 0.4; transform: scale(0.8); }
           50% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes obs-done-pulse {
+          0%, 100% { opacity: 0.8; text-shadow: 0 0 12px rgba(245,158,11,0.5), 0 0 24px rgba(245,158,11,0.25); }
+          50% { opacity: 1; text-shadow: 0 0 20px rgba(245,158,11,0.7), 0 0 40px rgba(245,158,11,0.4); }
         }
         /* Split-flap overrides — clean dark tiles, single line */
         .obs-flap { white-space: nowrap !important; flex-wrap: nowrap !important; }
@@ -5023,6 +5382,20 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
                 </div>
               )}
             </>
+          ) : spinDone ? (
+            <div className="flex items-center gap-2.5">
+              <span
+                className="text-lg font-black uppercase tracking-[0.3em]"
+                style={{
+                  color: "#f59e0b",
+                  textShadow:
+                    "0 0 12px rgba(245,158,11,0.5), 0 0 24px rgba(245,158,11,0.25)",
+                  animation: "obs-done-pulse 2s ease-in-out infinite",
+                }}
+              >
+                Done
+              </span>
+            </div>
           ) : (
             <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
               Ready
