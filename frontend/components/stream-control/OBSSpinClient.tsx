@@ -4748,6 +4748,12 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           overflow: "hidden",
         }}
       >
+        <style>{`
+          @keyframes obs-dot-pulse {
+            0%, 100% { opacity: 0.4; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1); }
+          }
+        `}</style>
         {/* Full-screen dimension label */}
         <div
           className="absolute flex items-center justify-center"

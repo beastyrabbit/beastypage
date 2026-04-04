@@ -175,6 +175,8 @@ export function StreamControlClient() {
           setPaletteDisplayMode(s.paletteDisplayMode as "cycle" | "all");
         if (s.autoClearSeconds != null)
           setAutoClearSeconds(s.autoClearSeconds as number);
+        if (s.lobbyClearSeq != null)
+          clearSeqRef.current = s.lobbyClearSeq as number;
         if (typeof s.creatorName === "string" && s.creatorName) {
           setCreatorNameDraft(s.creatorName);
           creatorFilledRef.current = true;
