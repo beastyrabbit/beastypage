@@ -2,16 +2,19 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useSync } from "@tldraw/sync";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  DefaultToolbar,
+  DefaultToolbarContent,
   type TLAssetStore,
   type TLComponents,
   type TLUiOverrides,
   Tldraw,
+  ToolbarItem,
   useEditor,
 } from "tldraw";
 import "tldraw/tldraw.css";
-import { buildEditorWsUrl, uploadFile } from "@/lib/stream-canvas/api";
+import { buildEditorWsUrl, CANVAS_API, uploadFile } from "@/lib/stream-canvas/api";
 import { STREAM_ZONE } from "@/lib/stream-canvas/stream-zone";
 import { customShapeUtils, customTools } from "./shapes/shared";
 import { AudioUploadCtx } from "./shapes/audio/AudioPlayerShape";
@@ -29,6 +32,7 @@ interface CanvasEditorProps {
 function CanvasBackground({ channel }: { channel?: string | null }) {
   const editor = useEditor();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [interactMode, setInteractMode] = useState(false);
 
   useEffect(() => {
     function update() {
@@ -36,11 +40,7 @@ function CanvasBackground({ channel }: { channel?: string | null }) {
       const { x, y, z } = editor.getCamera();
       const screenX = STREAM_ZONE.x * z + x;
       const screenY = STREAM_ZONE.y * z + y;
-      const screenW = STREAM_ZONE.width * z;
-      const screenH = STREAM_ZONE.height * z;
-      containerRef.current.style.transform = `translate(${screenX}px, ${screenY}px)`;
-      containerRef.current.style.width = `${screenW}px`;
-      containerRef.current.style.height = `${screenH}px`;
+      containerRef.current.style.transform = `translate(${screenX}px, ${screenY}px) scale(${z})`;
     }
 
     const dispose = editor.store.listen(update, {
@@ -72,6 +72,9 @@ function CanvasBackground({ channel }: { channel?: string | null }) {
           position: "absolute",
           top: 0,
           left: 0,
+          width: STREAM_ZONE.width,
+          height: STREAM_ZONE.height,
+          transformOrigin: "0 0",
           pointerEvents: "none",
         }}
       >
@@ -107,7 +110,7 @@ function CanvasBackground({ channel }: { channel?: string | null }) {
                   height: "100%",
                   border: "none",
                   borderRadius: "4px",
-                  pointerEvents: "auto",
+                  pointerEvents: interactMode ? "auto" : "none",
                 }}
                 allowFullScreen
                 title={`${channel} Twitch stream`}
@@ -139,6 +142,30 @@ function CanvasBackground({ channel }: { channel?: string | null }) {
         >
           Stream Zone (1920×1080)
         </span>
+        {channel && (
+          <button
+            type="button"
+            onClick={() => setInteractMode((prev) => !prev)}
+            style={{
+              position: "absolute",
+              top: "-24px",
+              right: "8px",
+              fontSize: "11px",
+              padding: "2px 8px",
+              borderRadius: "3px",
+              border: "1px solid rgba(59, 130, 246, 0.5)",
+              background: interactMode
+                ? "rgba(59, 130, 246, 0.2)"
+                : "transparent",
+              color: "rgba(59, 130, 246, 0.8)",
+              cursor: "pointer",
+              pointerEvents: "auto",
+              userSelect: "none",
+            }}
+          >
+            {interactMode ? "Back to drawing" : "Interact with stream"}
+          </button>
+        )}
       </div>
     </>
   );
@@ -185,6 +212,16 @@ const editorOverrides: TLUiOverrides = {
   },
 };
 
+function CanvasToolbar() {
+  return (
+    <DefaultToolbar>
+      <DefaultToolbarContent />
+      <ToolbarItem tool="youtube-embed" />
+      <ToolbarItem tool="audio-player" />
+    </DefaultToolbar>
+  );
+}
+
 export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   const { getToken } = useAuth();
 
@@ -198,10 +235,7 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
     () => ({
       async upload(_asset, file) {
         const result = await uploadFile(roomId, file, getToken);
-        const apiBase =
-          process.env.NEXT_PUBLIC_CANVAS_API_URL ??
-          "https://stream-canvas.localhost:1355";
-        return { src: `${apiBase}${result.url}` };
+        return { src: `${CANVAS_API}${result.url}` };
       },
       resolve(asset) {
         return asset.props.src ?? null;
@@ -213,6 +247,7 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   const components = useMemo<TLComponents>(
     () => ({
       Background: () => <CanvasBackground channel={twitchChannel} />,
+      Toolbar: CanvasToolbar,
     }),
     [twitchChannel],
   );

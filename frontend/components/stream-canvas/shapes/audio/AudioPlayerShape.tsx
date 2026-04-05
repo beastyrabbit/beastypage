@@ -9,7 +9,7 @@ import {
   resizeBox,
 } from "tldraw";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { uploadFile } from "@/lib/stream-canvas/api";
+import { CANVAS_API, uploadFile } from "@/lib/stream-canvas/api";
 
 // ---------------------------------------------------------------------------
 // Shape type
@@ -58,10 +58,6 @@ export const AudioUploadCtx = createContext<AudioUploadContext | null>(null);
 // Audio player component (used inside the shape)
 // ---------------------------------------------------------------------------
 
-const CANVAS_API =
-  process.env.NEXT_PUBLIC_CANVAS_API_URL ??
-  "https://stream-canvas.localhost:1355";
-
 function AudioPlayerComponent({
   shape,
   isReadonly,
@@ -74,6 +70,7 @@ function AudioPlayerComponent({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const uploadCtx = useContext(AudioUploadCtx);
 
   // Auto-play in OBS mirror (read-only mode)
@@ -98,6 +95,7 @@ function AudioPlayerComponent({
   const handleFileUpload = async (file: File) => {
     if (!uploadCtx) return;
     setUploading(true);
+    setUploadError(null);
     try {
       const result = await uploadFile(
         uploadCtx.roomId,
@@ -107,6 +105,7 @@ function AudioPlayerComponent({
       onUpdateProps({ url: `${CANVAS_API}${result.url}` });
     } catch (err) {
       console.error("[audio-player] Upload failed:", err);
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setUploading(false);
     }
@@ -121,6 +120,7 @@ function AudioPlayerComponent({
     if (!shape.props.url) return null;
     return (
       <div style={{ width: "100%", height: "100%", background: "transparent" }}>
+        {/* biome-ignore lint/a11y/useMediaCaption: OBS uses this audio-only element for stream playback */}
         <audio
           ref={audioRef}
           src={shape.props.url}
@@ -161,6 +161,7 @@ function AudioPlayerComponent({
           strokeLinejoin="round"
           style={{ opacity: 0.6 }}
         >
+          <title>Audio player placeholder</title>
           <path d="M9 18V5l12-2v13" />
           <circle cx="6" cy="18" r="3" />
           <circle cx="18" cy="16" r="3" />
@@ -188,27 +189,41 @@ function AudioPlayerComponent({
           }}
         />
         {uploadCtx && (
-          <label
-            style={{
-              fontSize: 11,
-              color: "rgba(255,255,255,0.6)",
-              cursor: uploading ? "wait" : "pointer",
-              textDecoration: "underline",
-            }}
-          >
-            {uploading ? "Uploading..." : "or upload a file"}
-            <input
-              type="file"
-              accept="audio/*"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileUpload(file);
+          <>
+            <label
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.6)",
+                cursor: uploading ? "wait" : "pointer",
+                textDecoration: "underline",
               }}
-              onPointerDown={(e) => e.stopPropagation()}
-              disabled={uploading}
-            />
-          </label>
+            >
+              {uploading ? "Uploading..." : "or upload a file"}
+              <input
+                type="file"
+                accept="audio/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(file);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                disabled={uploading}
+              />
+            </label>
+            {uploadError && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "#fca5a5",
+                  textAlign: "center",
+                  maxWidth: "85%",
+                }}
+              >
+                {uploadError}
+              </div>
+            )}
+          </>
         )}
       </div>
     );
@@ -231,7 +246,13 @@ function AudioPlayerComponent({
         padding: "8px 14px",
       }}
     >
-      <audio ref={audioRef} src={shape.props.url} loop={shape.props.loop} />
+      {/* biome-ignore lint/a11y/useMediaCaption: audio-only controls in the editor do not support caption tracks */}
+      <audio
+        ref={audioRef}
+        src={shape.props.url}
+        loop={shape.props.loop}
+        onEnded={() => setPlaying(false)}
+      />
 
       {/* Filename */}
       <div

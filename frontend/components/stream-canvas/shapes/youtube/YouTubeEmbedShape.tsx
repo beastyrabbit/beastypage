@@ -107,7 +107,7 @@ export class YouTubeEmbedShapeUtil extends BaseBoxShapeUtil<YouTubeEmbedShape> {
               width: "100%",
               height: "100%",
               border: "none",
-              pointerEvents: isReadonly ? "auto" : "auto",
+              pointerEvents: isReadonly ? "auto" : "none",
             }}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
@@ -140,6 +140,7 @@ export class YouTubeEmbedShapeUtil extends BaseBoxShapeUtil<YouTubeEmbedShape> {
               strokeLinejoin="round"
               style={{ opacity: 0.6 }}
             >
+              <title>YouTube video placeholder</title>
               <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17" />
               <path d="m10 15 5-3-5-3z" />
             </svg>
@@ -150,6 +151,11 @@ export class YouTubeEmbedShapeUtil extends BaseBoxShapeUtil<YouTubeEmbedShape> {
                 </span>
                 <input
                   type="text"
+                  ref={(element) => {
+                    if (element && isEditing && document.activeElement !== element) {
+                      element.focus();
+                    }
+                  }}
                   placeholder="https://youtube.com/watch?v=..."
                   defaultValue={shape.props.url}
                   onPointerDown={(e) => e.stopPropagation()}
@@ -186,7 +192,6 @@ export class YouTubeEmbedShapeUtil extends BaseBoxShapeUtil<YouTubeEmbedShape> {
                     fontSize: 13,
                     outline: "none",
                   }}
-                  autoFocus={isEditing}
                 />
               </>
             )}

@@ -1,7 +1,7 @@
 import type { AccessibleRoom, CanvasRoom } from "./types";
 
 /** Canvas backend base URL. Use `/canvas-api` in production (same-origin, no CORS). */
-const CANVAS_API =
+export const CANVAS_API =
   process.env.NEXT_PUBLIC_CANVAS_API_URL ?? "https://stream-canvas.localhost:1355";
 
 /** Fetch helper that attaches the Clerk session token. */
