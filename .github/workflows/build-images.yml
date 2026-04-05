@@ -36,6 +36,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   OWNER: ${{ github.repository_owner }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # Only run path filtering on main branch pushes, not on tags
