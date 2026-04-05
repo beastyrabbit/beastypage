@@ -36,7 +36,6 @@ permissions:
 env:
   REGISTRY: ghcr.io
   OWNER: ${{ github.repository_owner }}
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # Only run path filtering on main branch pushes, not on tags
@@ -90,7 +89,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
 
@@ -147,8 +146,8 @@ jobs:
             NEXT_PUBLIC_CANVAS_API_URL=/canvas-api
             NEXT_PUBLIC_TLDRAW_LICENSE_KEY=${{ secrets.NEXT_PUBLIC_TLDRAW_LICENSE_KEY }}
             APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-frontend:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-frontend:buildcache,mode=max
 
   build-renderer:
     needs: changes
@@ -187,8 +186,8 @@ jobs:
           file: ./backend/renderer_service/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-renderer:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-renderer:buildcache,mode=max
 
   build-image-processing:
     needs: changes
@@ -226,8 +225,8 @@ jobs:
           file: ./backend/image_processing_service/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-image-processing:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-image-processing:buildcache,mode=max
 
   build-discord-bot:
     needs: changes
@@ -265,8 +264,8 @@ jobs:
           file: ./backend/discord-bot/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-discord-bot:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-discord-bot:buildcache,mode=max
 
   build-stream-canvas:
     needs: changes
@@ -304,5 +303,5 @@ jobs:
           file: ./backend/stream-canvas/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-stream-canvas:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-stream-canvas:buildcache,mode=max
