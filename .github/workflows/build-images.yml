@@ -40,7 +40,7 @@ env:
 jobs:
   # Only run path filtering on main branch pushes, not on tags
   changes:
-    runs-on: arc-kub-homelab
+    runs-on: arc-beastypage
     if: github.ref == 'refs/heads/main'
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
@@ -76,7 +76,7 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.convex == 'true' ||
        github.event.inputs.build_frontend == 'true')
-    runs-on: arc-kub-homelab
+    runs-on: arc-beastypage
     defaults:
       run:
         working-directory: frontend
@@ -107,7 +107,7 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.frontend == 'true' ||
        github.event.inputs.build_frontend == 'true')
-    runs-on: arc-kub-homelab
+    runs-on: arc-beastypage
     steps:
       - uses: actions/checkout@v4
 
@@ -157,7 +157,7 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.renderer == 'true' ||
        github.event.inputs.build_renderer == 'true')
-    runs-on: arc-kub-homelab
+    runs-on: arc-beastypage
     steps:
       - uses: actions/checkout@v4
 
@@ -196,7 +196,7 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.image_processing == 'true' ||
        github.event.inputs.build_image_processing == 'true')
-    runs-on: arc-kub-homelab
+    runs-on: arc-beastypage
     steps:
       - uses: actions/checkout@v4
 
@@ -235,7 +235,7 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.discord_bot == 'true' ||
        github.event.inputs.build_discord_bot == 'true')
-    runs-on: arc-kub-homelab
+    runs-on: arc-beastypage
     steps:
       - uses: actions/checkout@v4
 
@@ -274,7 +274,7 @@ jobs:
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.stream_canvas == 'true' ||
        github.event.inputs.build_stream_canvas == 'true')
-    runs-on: arc-kub-homelab
+    runs-on: arc-beastypage
     steps:
       - uses: actions/checkout@v4
 
