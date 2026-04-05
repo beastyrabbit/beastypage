@@ -112,6 +112,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - uses: docker/login-action@v4
         with:
@@ -146,8 +148,6 @@ jobs:
             NEXT_PUBLIC_CANVAS_API_URL=/canvas-api
             NEXT_PUBLIC_TLDRAW_LICENSE_KEY=${{ secrets.NEXT_PUBLIC_TLDRAW_LICENSE_KEY }}
             APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-frontend:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-frontend:buildcache,mode=max
 
   build-renderer:
     needs: changes
@@ -162,6 +162,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - uses: docker/login-action@v4
         with:
@@ -186,8 +188,6 @@ jobs:
           file: ./backend/renderer_service/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-renderer:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-renderer:buildcache,mode=max
 
   build-image-processing:
     needs: changes
@@ -201,6 +201,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - uses: docker/login-action@v4
         with:
@@ -225,8 +227,6 @@ jobs:
           file: ./backend/image_processing_service/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-image-processing:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-image-processing:buildcache,mode=max
 
   build-discord-bot:
     needs: changes
@@ -240,6 +240,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - uses: docker/login-action@v4
         with:
@@ -264,8 +266,6 @@ jobs:
           file: ./backend/discord-bot/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-discord-bot:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-discord-bot:buildcache,mode=max
 
   build-stream-canvas:
     needs: changes
@@ -279,6 +279,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker
 
       - uses: docker/login-action@v4
         with:
@@ -303,5 +305,3 @@ jobs:
           file: ./backend/stream-canvas/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-stream-canvas:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-stream-canvas:buildcache,mode=max
