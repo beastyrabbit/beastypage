@@ -224,7 +224,7 @@ authed.post("/rooms/:id/upload", async (c) => {
   }
 
   const ALLOWED_TYPES = new Set([
-    "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+    "image/jpeg", "image/png", "image/gif", "image/webp",
     "video/mp4", "video/webm",
     "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm",
   ]);
