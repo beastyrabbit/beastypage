@@ -1,8 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-export const config = {
-  api: { bodyParser: { sizeLimit: "60mb" } },
-};
+export const bodySizeLimit = "60mb";
 
 const BACKEND_BASE = (
   process.env.IMAGE_PROCESSING_INTERNAL_URL ?? "http://127.0.0.1:8002"
