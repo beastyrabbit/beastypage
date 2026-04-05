@@ -1,5 +1,5 @@
 {
-  "setup-worktree": [
+  "setup": [
     "cp $ROOT_WORKTREE_PATH/.env.local .env.local",
     "cp $ROOT_WORKTREE_PATH/frontend/.env.local frontend/.env.local",
     "pnpm install",

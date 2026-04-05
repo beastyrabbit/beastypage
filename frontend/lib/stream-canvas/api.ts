@@ -1,7 +1,8 @@
 import type { AccessibleRoom, CanvasRoom } from "./types";
 
 const CANVAS_API =
-  process.env.NEXT_PUBLIC_CANVAS_API_URL ?? "https://stream-canvas.localhost:1355";
+  process.env.NEXT_PUBLIC_CANVAS_API_URL ??
+  "https://stream-canvas.localhost:1355";
 
 /** Fetch helper that attaches the Clerk session token. */
 async function fetchApi(
@@ -84,9 +85,12 @@ export function getObsSecret(
 }
 
 /** Exchange an OBS bootstrap secret for a short-lived WS token (unauthenticated). */
-export async function exchangeObsToken(
-  secret: string,
-): Promise<{ token: string; roomId: string; twitchChannel: string | null; expiresIn: number }> {
+export async function exchangeObsToken(secret: string): Promise<{
+  token: string;
+  roomId: string;
+  twitchChannel: string | null;
+  expiresIn: number;
+}> {
   const res = await fetch(`${CANVAS_API}/obs/token`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -122,21 +126,16 @@ export async function uploadFile(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(
-      (body as { error?: string }).error ?? `Upload failed`,
-    );
+    throw new Error((body as { error?: string }).error ?? `Upload failed`);
   }
   return res.json();
 }
 
-/** Build the WebSocket URL for canvas editors. */
-export function buildEditorWsUrl(roomId: string, clerkToken: string): string {
+/** Build a WebSocket URL for a canvas room. Used by both editors and OBS. */
+function buildWsUrl(roomId: string, token: string): string {
   const base = CANVAS_API.replace(/^http/, "ws");
-  return `${base}/ws?roomId=${encodeURIComponent(roomId)}&token=${encodeURIComponent(clerkToken)}`;
+  return `${base}/ws?roomId=${encodeURIComponent(roomId)}&token=${encodeURIComponent(token)}`;
 }
 
-/** Build the WebSocket URL for OBS (read-only). */
-export function buildObsWsUrl(roomId: string, obsToken: string): string {
-  const base = CANVAS_API.replace(/^http/, "ws");
-  return `${base}/ws?roomId=${encodeURIComponent(roomId)}&token=${encodeURIComponent(obsToken)}`;
-}
+export const buildEditorWsUrl = buildWsUrl;
+export const buildObsWsUrl = buildWsUrl;
