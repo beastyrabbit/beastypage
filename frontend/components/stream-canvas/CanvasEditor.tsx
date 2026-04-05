@@ -6,12 +6,15 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   type TLAssetStore,
   type TLComponents,
+  type TLUiOverrides,
   Tldraw,
   useEditor,
 } from "tldraw";
 import "tldraw/tldraw.css";
 import { buildEditorWsUrl, uploadFile } from "@/lib/stream-canvas/api";
 import { STREAM_ZONE } from "@/lib/stream-canvas/stream-zone";
+import { customShapeUtils, customTools } from "./shapes/shared";
+import { AudioUploadCtx } from "./shapes/audio/AudioPlayerShape";
 
 interface CanvasEditorProps {
   roomId: string;
@@ -156,6 +159,32 @@ function LegacyCleanup() {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Toolbar overrides — add YouTube and Audio tool buttons
+// ---------------------------------------------------------------------------
+
+const editorOverrides: TLUiOverrides = {
+  tools(editor, tools) {
+    tools["youtube-embed"] = {
+      id: "youtube-embed",
+      icon: "tool-media",
+      label: "YouTube",
+      onSelect: () => {
+        editor.setCurrentTool("youtube-embed");
+      },
+    };
+    tools["audio-player"] = {
+      id: "audio-player",
+      icon: "tool-media",
+      label: "Audio",
+      onSelect: () => {
+        editor.setCurrentTool("audio-player");
+      },
+    };
+    return tools;
+  },
+};
+
 export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   const { getToken } = useAuth();
 
@@ -188,6 +217,11 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
     [twitchChannel],
   );
 
+  const audioUploadCtx = useMemo(
+    () => ({ roomId, getToken }),
+    [roomId, getToken],
+  );
+
   const storeWithStatus = useSync({ uri: getUri, assets });
 
   if (storeWithStatus.status === "loading") {
@@ -208,9 +242,17 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
 
   return (
     <div className="relative h-full w-full">
-      <Tldraw store={storeWithStatus.store} components={components}>
-        <LegacyCleanup />
-      </Tldraw>
+      <AudioUploadCtx.Provider value={audioUploadCtx}>
+        <Tldraw
+          store={storeWithStatus.store}
+          shapeUtils={customShapeUtils}
+          tools={customTools}
+          overrides={editorOverrides}
+          components={components}
+        >
+          <LegacyCleanup />
+        </Tldraw>
+      </AudioUploadCtx.Provider>
     </div>
   );
 }
