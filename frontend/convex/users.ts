@@ -197,6 +197,67 @@ export const getUserByApiKey = internalQuery({
   },
 });
 
+/** Extract the Clerk user ID from a tokenIdentifier (e.g. "https://…|user_2xxx" → "user_2xxx"). */
+function clerkUserId(tokenIdentifier: string): string {
+  const parts = tokenIdentifier.split("|");
+  return parts[parts.length - 1] ?? tokenIdentifier;
+}
+
+/**
+ * Search users by username prefix. Returns up to 10 matches with their Clerk user ID.
+ * Requires authentication.
+ */
+export const searchByUsername = query({
+  args: { prefix: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const trimmed = args.prefix.trim().toLowerCase();
+    if (trimmed.length === 0) return [];
+
+    // Convex doesn't support LIKE queries, so fetch a range and filter
+    const candidates = await ctx.db
+      .query("users")
+      .withIndex("byUsername")
+      .collect();
+
+    return candidates
+      .filter(
+        (u) => u.username && u.username.toLowerCase().startsWith(trimmed),
+      )
+      .slice(0, 10)
+      .map((u) => ({
+        userId: clerkUserId(u.tokenIdentifier),
+        username: u.username ?? "unknown",
+      }));
+  },
+});
+
+/**
+ * Look up usernames for a list of Clerk user IDs.
+ * Used to display friendly names for allowed-user lists.
+ */
+export const resolveUsernames = query({
+  args: { userIds: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+
+    const allUsers = await ctx.db.query("users").collect();
+
+    const byClerkId = new Map<string, string>();
+    for (const u of allUsers) {
+      byClerkId.set(clerkUserId(u.tokenIdentifier), u.username ?? "unknown");
+    }
+
+    return args.userIds.map((id) => ({
+      userId: id,
+      username: byClerkId.get(id) ?? id,
+    }));
+  },
+});
+
 /**
  * Delete the authenticated user's account.
  */

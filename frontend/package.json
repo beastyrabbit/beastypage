@@ -25,6 +25,8 @@
     "@napi-rs/canvas": "^0.1.90",
     "@scalar/nextjs-api-reference": "^0.9.18",
     "@tailwindcss/postcss": "4.1.18",
+    "@tldraw/sync": "^4.5.7",
+    "@tldraw/sync-core": "^4.5.7",
     "binpackingjs": "^3.0.2",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
@@ -47,7 +49,8 @@
     "sonner": "^2.0.7",
     "spin-wheel": "^5.0.2",
     "tailwind-merge": "^3.4.0",
-    "tailwindcss": "4.1.18"
+    "tailwindcss": "4.1.18",
+    "tldraw": "^4.5.7"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
