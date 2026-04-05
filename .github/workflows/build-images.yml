@@ -144,6 +144,7 @@ jobs:
             NEXT_PUBLIC_POSTHOG_HOST=${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
             NEXT_PUBLIC_CANVAS_API_URL=/canvas-api
+            NEXT_PUBLIC_TLDRAW_LICENSE_KEY=${{ secrets.NEXT_PUBLIC_TLDRAW_LICENSE_KEY }}
             APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
