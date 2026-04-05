@@ -1,5 +1,6 @@
 import type { AccessibleRoom, CanvasRoom } from "./types";
 
+/** Canvas backend base URL. Use `/canvas-api` in production (same-origin, no CORS). */
 const CANVAS_API =
   process.env.NEXT_PUBLIC_CANVAS_API_URL ?? "https://stream-canvas.localhost:1355";
 
@@ -129,14 +130,19 @@ export async function uploadFile(
   return res.json();
 }
 
-/** Build the WebSocket URL for canvas editors. */
-export function buildEditorWsUrl(roomId: string, clerkToken: string): string {
-  const base = CANVAS_API.replace(/^http/, "ws");
-  return `${base}/ws?roomId=${encodeURIComponent(roomId)}&token=${encodeURIComponent(clerkToken)}`;
+/** Build an absolute WebSocket URL, handling both relative and absolute CANVAS_API. */
+function buildWsUrl(roomId: string, token: string): string {
+  let base: string;
+  if (CANVAS_API.startsWith("/")) {
+    // Relative path — construct from current page origin
+    const proto = typeof window !== "undefined" && window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host = typeof window !== "undefined" ? window.location.host : "localhost";
+    base = `${proto}//${host}${CANVAS_API}`;
+  } else {
+    base = CANVAS_API.replace(/^http/, "ws");
+  }
+  return `${base}/ws?roomId=${encodeURIComponent(roomId)}&token=${encodeURIComponent(token)}`;
 }
 
-/** Build the WebSocket URL for OBS (read-only). */
-export function buildObsWsUrl(roomId: string, obsToken: string): string {
-  const base = CANVAS_API.replace(/^http/, "ws");
-  return `${base}/ws?roomId=${encodeURIComponent(roomId)}&token=${encodeURIComponent(obsToken)}`;
-}
+export const buildEditorWsUrl = buildWsUrl;
+export const buildObsWsUrl = buildWsUrl;
