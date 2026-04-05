@@ -1,4 +1,4 @@
-import { ArrowRight, Bot, PlugZap, Workflow } from "lucide-react";
+import { ArrowRight, Bot, Layers, PlugZap, Workflow } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -25,8 +25,14 @@ const STREAM_FEATURES: StreamFeature[] = [
     description:
       "Manage triggers, cooldowns, and moderation from one dashboard.",
     icon: <PlugZap className="size-4" />,
-    href: "https://beastytwitch.github.io/StreamCommands/",
-    external: true,
+    comingSoon: true,
+  },
+  {
+    title: "Stream Canvas",
+    description:
+      "Multi-user canvas overlay — drag images, gifs, and videos onto your stream in real-time.",
+    icon: <Layers className="size-4" />,
+    href: "/stream-canvas",
   },
   {
     title: "Chat game",

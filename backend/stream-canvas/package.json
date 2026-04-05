@@ -1,0 +1,38 @@
+{
+  "name": "stream-canvas",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "portless run node --watch --env-file=.env --experimental-strip-types src/index.ts",
+    "start": "node --env-file=.env --experimental-strip-types src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@clerk/backend": "^1.27.0",
+    "@hono/node-server": "^1.19.9",
+    "@tldraw/sync-core": "^4.3.0",
+    "better-sqlite3": "^12.0.0",
+    "drizzle-orm": "^0.44.0",
+    "hono": "^4.11.7",
+    "tldraw": "^4.3.0",
+    "uuid": "^11.1.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.0",
+    "drizzle-kit": "^0.31.0",
+    "typescript": "^6.0.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "@clerk/shared"
+    ]
+  }
+}
