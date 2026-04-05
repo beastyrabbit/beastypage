@@ -12,11 +12,17 @@ import { isOriginAllowed, verifyClerkJwt, verifyObsToken } from "./auth.ts";
 import type { ConnectionRole } from "./types.ts";
 
 // ---------------------------------------------------------------------------
-// tldraw storage — SQLiteSyncStorage creates and manages its own tables
-// in the same SQLite database, separate from the Drizzle-managed schema.
+// tldraw storage — each room gets its own SQLiteSyncStorage with a unique
+// tablePrefix so documents are isolated per room in the same SQLite DB.
 // ---------------------------------------------------------------------------
 
-const tldrawStorage = new SQLiteSyncStorage({ sql: new NodeSqliteWrapper(sqlite) });
+function createRoomStorage(roomId: string) {
+  // Sanitize roomId for use as a SQL table prefix (UUIDs contain hyphens)
+  const safePrefix = `tl_${roomId.replace(/-/g, "_")}_`;
+  return new SQLiteSyncStorage({
+    sql: new NodeSqliteWrapper(sqlite, { tablePrefix: safePrefix }),
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Room management
@@ -29,7 +35,7 @@ function getOrCreateRoom(roomId: string): TLSocketRoom {
   if (room) return room;
 
   room = new TLSocketRoom({
-    storage: tldrawStorage,
+    storage: createRoomStorage(roomId),
     onSessionRemoved(_room, { numSessionsRemaining }) {
       // Wait 30s before cleanup to allow brief reconnects (e.g., page refresh)
       if (numSessionsRemaining === 0) {
