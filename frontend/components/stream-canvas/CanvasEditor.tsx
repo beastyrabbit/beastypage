@@ -117,7 +117,7 @@ function TwitchEmbed({ channel }: { channel: string }) {
         top: 0,
         left: 0,
         pointerEvents: "none",
-        zIndex: 1,
+        zIndex: -1,
         overflow: "hidden",
         borderRadius: "4px",
       }}
