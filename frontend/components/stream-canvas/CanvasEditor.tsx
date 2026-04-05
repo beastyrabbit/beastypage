@@ -25,8 +25,9 @@ function useStreamZoneOverlay() {
     function update() {
       if (!ref.current) return;
       const { x, y, z } = editor.getCamera();
-      const screenX = STREAM_ZONE.x * z + x * z;
-      const screenY = STREAM_ZONE.y * z + y * z;
+      // camera.x/y are already in screen-space — do NOT multiply by z
+      const screenX = STREAM_ZONE.x * z + x;
+      const screenY = STREAM_ZONE.y * z + y;
       const screenW = STREAM_ZONE.width * z;
       const screenH = STREAM_ZONE.height * z;
       ref.current.style.transform = `translate(${screenX}px, ${screenY}px)`;

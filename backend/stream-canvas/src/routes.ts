@@ -223,6 +223,15 @@ authed.post("/rooms/:id/upload", async (c) => {
     return c.json({ error: "File too large (max 10 MB)" }, 413);
   }
 
+  const ALLOWED_TYPES = new Set([
+    "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+    "video/mp4", "video/webm",
+    "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm",
+  ]);
+  if (!ALLOWED_TYPES.has(file.type)) {
+    return c.json({ error: "File type not allowed" }, 415);
+  }
+
   const uploadId = uuidv4();
   const roomDir = join(config.uploadsDir, room.id);
   await mkdir(roomDir, { recursive: true });
