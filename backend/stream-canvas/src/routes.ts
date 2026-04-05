@@ -1,9 +1,9 @@
 import { createReadStream, existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { Readable } from "node:stream";
 import { eq } from "drizzle-orm";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { v4 as uuidv4 } from "uuid";
 import {
   extractBearer,
@@ -30,7 +30,8 @@ requireAuth.use("*", async (c, next) => {
     const claims = await verifyClerkJwt(bearer);
     c.set("clerkUser", claims);
     await next();
-  } catch {
+  } catch (err) {
+    console.error("[auth] JWT verification failed:", err);
     return c.json({ error: "Invalid token" }, 401);
   }
 });
@@ -53,13 +54,14 @@ api.get("/uploads/:uploadId/:filename", async (c) => {
     return c.json({ error: "Not found" }, 404);
   }
   c.header("Content-Type", upload.mimeType);
+  c.header("X-Content-Type-Options", "nosniff");
   c.header("Cache-Control", "public, max-age=31536000, immutable");
   const stream = createReadStream(upload.path);
   return c.body(Readable.toWeb(stream) as ReadableStream);
 });
 
 // ---------------------------------------------------------------------------
-// OBS token exchange (unauthenticated — uses obsSecret as bootstrap token)
+// OBS token exchange (unauthenticated — exchanges room secret for short-lived WS token)
 // ---------------------------------------------------------------------------
 
 /**
@@ -115,7 +117,8 @@ authed.post("/rooms", async (c) => {
   });
 
   const room = await db.query.rooms.findFirst({ where: eq(rooms.id, id) });
-  return c.json(sanitizeRoom(room!), 201);
+  if (!room) return c.json({ error: "Room created but could not be retrieved" }, 500);
+  return c.json(sanitizeRoom(room), 201);
 });
 
 // Get current user's room
@@ -148,13 +151,8 @@ authed.get("/rooms/accessible", async (c) => {
 
 // Update room config
 authed.patch("/rooms/:id", async (c) => {
-  const user = c.get("clerkUser");
-  const room = await db.query.rooms.findFirst({
-    where: eq(rooms.id, c.req.param("id")),
-  });
-  if (!room || room.ownerClerkId !== user.sub) {
-    return c.json({ error: "Not found" }, 404);
-  }
+  const room = await findOwnedRoom(c);
+  if (!room) return c.json({ error: "Not found" }, 404);
 
   const body = await c.req.json<{
     twitchChannel?: string;
@@ -182,13 +180,8 @@ authed.patch("/rooms/:id", async (c) => {
 
 // Regenerate OBS secret
 authed.post("/rooms/:id/regenerate-secret", async (c) => {
-  const user = c.get("clerkUser");
-  const room = await db.query.rooms.findFirst({
-    where: eq(rooms.id, c.req.param("id")),
-  });
-  if (!room || room.ownerClerkId !== user.sub) {
-    return c.json({ error: "Not found" }, 404);
-  }
+  const room = await findOwnedRoom(c);
+  if (!room) return c.json({ error: "Not found" }, 404);
 
   const newSecret = uuidv4();
   await db
@@ -201,13 +194,8 @@ authed.post("/rooms/:id/regenerate-secret", async (c) => {
 
 // Get the OBS secret (only the room owner can see this — for the settings page)
 authed.get("/rooms/:id/obs-secret", async (c) => {
-  const user = c.get("clerkUser");
-  const room = await db.query.rooms.findFirst({
-    where: eq(rooms.id, c.req.param("id")),
-  });
-  if (!room || room.ownerClerkId !== user.sub) {
-    return c.json({ error: "Not found" }, 404);
-  }
+  const room = await findOwnedRoom(c);
+  if (!room) return c.json({ error: "Not found" }, 404);
 
   return c.json({ obsSecret: room.obsSecret });
 });
@@ -230,10 +218,17 @@ authed.post("/rooms/:id/upload", async (c) => {
   const file = formData.get("file") as File | null;
   if (!file) return c.json({ error: "No file provided" }, 400);
 
+  const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10 MB
+  if (file.size > MAX_UPLOAD_SIZE) {
+    return c.json({ error: "File too large (max 10 MB)" }, 413);
+  }
+
   const uploadId = uuidv4();
   const roomDir = join(config.uploadsDir, room.id);
   await mkdir(roomDir, { recursive: true });
-  const filePath = join(roomDir, `${uploadId}-${file.name}`);
+  // Sanitize filename to prevent path traversal
+  const safeName = basename(file.name).replace(/\.\./g, "_");
+  const filePath = join(roomDir, `${uploadId}-${safeName}`);
 
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(filePath, buffer);
@@ -257,6 +252,19 @@ api.route("/api", authed);
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Find a room by :id param and verify the authenticated user owns it. */
+async function findOwnedRoom(c: Context<AuthEnv>) {
+  const user = c.get("clerkUser");
+  const roomId = c.req.param("id");
+  if (!roomId) return null;
+
+  const room = await db.query.rooms.findFirst({
+    where: eq(rooms.id, roomId),
+  });
+  if (!room || room.ownerClerkId !== user.sub) return null;
+  return room;
+}
 
 /** Strip server-only fields before sending to client. */
 function sanitizeRoom(room: {

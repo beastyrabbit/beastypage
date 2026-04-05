@@ -12,7 +12,8 @@ import { isOriginAllowed, verifyClerkJwt, verifyObsToken } from "./auth.ts";
 import type { ConnectionRole } from "./types.ts";
 
 // ---------------------------------------------------------------------------
-// tldraw storage — SQLiteSyncStorage handles its own tables automatically
+// tldraw storage — SQLiteSyncStorage creates and manages its own tables
+// in the same SQLite database, separate from the Drizzle-managed schema.
 // ---------------------------------------------------------------------------
 
 const tldrawStorage = new SQLiteSyncStorage({ sql: new NodeSqliteWrapper(sqlite) });
@@ -29,8 +30,8 @@ function getOrCreateRoom(roomId: string): TLSocketRoom {
 
   room = new TLSocketRoom({
     storage: tldrawStorage,
-    onSessionRemoved(_room, { numSessionsRemaining, sessionId }) {
-      // If no more sessions, clean up after a delay
+    onSessionRemoved(_room, { numSessionsRemaining }) {
+      // Wait 30s before cleanup to allow brief reconnects (e.g., page refresh)
       if (numSessionsRemaining === 0) {
         setTimeout(() => {
           const r = activeRooms.get(roomId);
@@ -102,8 +103,10 @@ async function authenticateUpgrade(
     if (!isOwner && !isAllowed) return null;
 
     return { role: "editor", roomId, userId: claims.sub };
-  } catch {
+  } catch (err) {
     // Not a valid Clerk JWT — try as OBS token
+    console.debug("[ws] Clerk JWT verification failed, trying OBS token:",
+      err instanceof Error ? err.message : err);
   }
 
   // Try as short-lived OBS token

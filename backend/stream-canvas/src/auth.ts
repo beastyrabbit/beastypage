@@ -1,36 +1,25 @@
-import { createHmac, randomBytes } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { config } from "./config.ts";
 import type { ClerkClaims, ObsTokenClaims } from "./types.ts";
 
 // ---------------------------------------------------------------------------
-// Clerk JWT verification (networkless via JWKS public key)
+// Clerk JWT verification — uses jwtKey for local (networkless) verification
+// when set, otherwise falls back to secretKey (requires network).
 // ---------------------------------------------------------------------------
 
-let verifyClerkToken: ((token: string) => Promise<ClerkClaims>) | null = null;
+/** Lazy-load @clerk/backend once, then reuse. */
+let clerkBackend: typeof import("@clerk/backend") | undefined;
 
-async function getClerkVerifier() {
-  if (verifyClerkToken) return verifyClerkToken;
-
-  const { verifyToken } = await import("@clerk/backend");
-
-  verifyClerkToken = async (token: string): Promise<ClerkClaims> => {
-    const payload = await verifyToken(token, {
-      jwtKey: config.clerkJwtKey || undefined,
-      secretKey: config.clerkSecretKey || undefined,
-    });
-    return payload as unknown as ClerkClaims;
-  };
-
-  return verifyClerkToken;
-}
-
-/**
- * Verify a Clerk JWT and return the decoded claims.
- * Uses `jwtKey` for networkless verification when available.
- */
+/** Verify a Clerk JWT and return the decoded claims. */
 export async function verifyClerkJwt(token: string): Promise<ClerkClaims> {
-  const verify = await getClerkVerifier();
-  return verify(token);
+  clerkBackend ??= await import("@clerk/backend");
+
+  const payload = await clerkBackend.verifyToken(token, {
+    jwtKey: config.clerkJwtKey || undefined,
+    secretKey: config.clerkSecretKey || undefined,
+  });
+
+  return payload as unknown as ClerkClaims;
 }
 
 // ---------------------------------------------------------------------------
@@ -39,6 +28,17 @@ export async function verifyClerkJwt(token: string): Promise<ClerkClaims> {
 
 const OBS_TOKEN_SECRET =
   process.env.OBS_TOKEN_SIGNING_SECRET ?? randomBytes(32).toString("hex");
+
+if (!process.env.OBS_TOKEN_SIGNING_SECRET) {
+  console.warn(
+    "[stream-canvas] OBS_TOKEN_SIGNING_SECRET not set — using random secret. OBS tokens will not survive restarts.",
+  );
+}
+if (!config.clerkJwtKey && !config.clerkSecretKey) {
+  console.warn(
+    "[stream-canvas] Neither CLERK_JWT_KEY nor CLERK_SECRET_KEY is set. All authenticated requests will fail.",
+  );
+}
 
 function hmacSign(payload: string): string {
   return createHmac("sha256", OBS_TOKEN_SECRET)
@@ -65,7 +65,10 @@ export function verifyObsToken(token: string): ObsTokenClaims | null {
   if (!payload || !signature) return null;
 
   const expected = hmacSign(payload);
-  if (signature !== expected) return null;
+  const sigBuf = Buffer.from(signature);
+  const expBuf = Buffer.from(expected);
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf))
+    return null;
 
   try {
     const claims: ObsTokenClaims = JSON.parse(

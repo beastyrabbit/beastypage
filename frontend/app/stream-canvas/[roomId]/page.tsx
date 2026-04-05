@@ -22,7 +22,9 @@ export default function StreamCanvasRoomPage() {
         const room = rooms.find((r) => r.id === roomId);
         if (!cancelled && room) setTwitchChannel(room.twitchChannel);
       })
-      .catch(() => {});
+      .catch((err) => {
+        if (!cancelled) console.error("[stream-canvas] Failed to load room info:", err);
+      });
     return () => {
       cancelled = true;
     };

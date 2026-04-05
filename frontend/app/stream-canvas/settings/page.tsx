@@ -1,21 +1,12 @@
 "use client";
 
-import { useConvexAuth } from "convex/react";
 import { useAuth, useClerk } from "@clerk/nextjs";
-import {
-  Copy,
-  Eye,
-  EyeOff,
-  Loader2,
-  RefreshCw,
-  Save,
-  Tv,
-} from "lucide-react";
+import { useConvexAuth } from "convex/react";
+import { Copy, Eye, EyeOff, Loader2, RefreshCw, Save, Tv } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PageHero } from "@/components/common/PageHero";
 import { UserMultiSelect } from "@/components/stream-canvas/UserMultiSelect";
-import { cn } from "@/lib/utils";
 import {
   createRoom,
   getObsSecret,
@@ -23,6 +14,7 @@ import {
   updateRoom,
 } from "@/lib/stream-canvas/api";
 import type { CanvasRoom } from "@/lib/stream-canvas/types";
+import { cn } from "@/lib/utils";
 
 export default function StreamCanvasSettingsPage() {
   const clerk = useClerk();
@@ -41,17 +33,25 @@ export default function StreamCanvasSettingsPage() {
     if (!isAuthenticated) return;
     let cancelled = false;
 
-    createRoom(getToken).then((r) => {
-      if (cancelled) return;
-      setRoom(r);
-      setTwitchChannel(r.twitchChannel ?? "");
-      setAllowedUsers(r.allowedUsers);
+    createRoom(getToken)
+      .then((r) => {
+        if (cancelled) return;
+        setRoom(r);
+        setTwitchChannel(r.twitchChannel ?? "");
+        setAllowedUsers(r.allowedUsers);
 
-      // Load OBS secret
-      getObsSecret(r.id, getToken).then((data) => {
-        if (!cancelled) setObsSecret(data.obsSecret);
+        // Load OBS secret
+        getObsSecret(r.id, getToken)
+          .then((data) => {
+            if (!cancelled) setObsSecret(data.obsSecret);
+          })
+          .catch((err) => {
+            if (!cancelled) toast.error("Failed to load OBS secret: " + (err instanceof Error ? err.message : String(err)));
+          });
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error(err instanceof Error ? err.message : "Failed to load room settings");
       });
-    });
 
     return () => {
       cancelled = true;
@@ -64,10 +64,7 @@ export default function StreamCanvasSettingsPage() {
     try {
       const updated = await updateRoom(
         room.id,
-        {
-          twitchChannel: twitchChannel || undefined,
-          allowedUsers: allowedUsers,
-        },
+        { twitchChannel: twitchChannel || undefined, allowedUsers },
         getToken,
       );
       setRoom(updated);
@@ -98,9 +95,10 @@ export default function StreamCanvasSettingsPage() {
     }
   }, [room, getToken]);
 
-  const obsUrl = obsSecret
-    ? `${window.location.origin}/stream-canvas/obs?secret=${obsSecret}`
-    : null;
+  const obsUrl =
+    obsSecret && typeof window !== "undefined"
+      ? `${window.location.origin}/stream-canvas/obs?secret=${obsSecret}`
+      : null;
 
   if (authLoading) {
     return (
@@ -174,10 +172,7 @@ export default function StreamCanvasSettingsPage() {
             <label className="mb-2 block text-sm font-medium text-foreground">
               Allowed Users
             </label>
-            <UserMultiSelect
-              value={allowedUsers}
-              onChange={setAllowedUsers}
-            />
+            <UserMultiSelect value={allowedUsers} onChange={setAllowedUsers} />
             <p className="mt-1 text-xs text-muted-foreground">
               Users who can edit your canvas. Search by username — stored by
               user ID so username changes don't break access.
@@ -210,11 +205,11 @@ export default function StreamCanvasSettingsPage() {
             </h3>
             <div className="flex items-center gap-2">
               <code className="flex-1 overflow-x-auto rounded-lg border border-border/50 bg-background px-3 py-2 text-xs">
-                {secretRevealed
-                  ? obsUrl ?? "Loading…"
-                  : obsUrl
-                    ? `${window.location.origin}/stream-canvas/obs?secret=${"•".repeat(8)}`
-                    : "Loading…"}
+                {obsUrl === null
+                  ? "Loading…"
+                  : secretRevealed
+                    ? obsUrl
+                    : `${window.location.origin}/stream-canvas/obs?secret=${"•".repeat(8)}`}
               </code>
               <button
                 type="button"
@@ -232,8 +227,12 @@ export default function StreamCanvasSettingsPage() {
                 type="button"
                 onClick={async () => {
                   if (!obsUrl) return;
-                  await navigator.clipboard.writeText(obsUrl);
-                  toast.success("Copied to clipboard");
+                  try {
+                    await navigator.clipboard.writeText(obsUrl);
+                    toast.success("Copied to clipboard");
+                  } catch {
+                    toast.error("Failed to copy — please select and copy manually");
+                  }
                 }}
                 className="rounded-lg border border-border/50 p-2 text-muted-foreground hover:text-foreground"
                 title="Copy URL"

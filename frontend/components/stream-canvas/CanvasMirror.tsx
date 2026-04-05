@@ -3,9 +3,9 @@
 import { useSync } from "@tldraw/sync";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Tldraw,
   type TLAssetStore,
   type TLComponents,
+  Tldraw,
   useEditor,
 } from "tldraw";
 import "tldraw/tldraw.css";
@@ -110,6 +110,7 @@ export function CanvasMirror({ obsSecret }: CanvasMirrorProps) {
   }
 
   if (storeWithStatus.status === "error") {
+    console.error("[obs-mirror] WebSocket connection error:", storeWithStatus.error);
     return null; // Transparent on error — OBS shouldn't show error text
   }
 
@@ -125,11 +126,7 @@ export function CanvasMirror({ obsSecret }: CanvasMirrorProps) {
         inset: 0,
       }}
     >
-      <Tldraw
-        store={storeWithStatus.store}
-        hideUi
-        components={obsComponents}
-      >
+      <Tldraw store={storeWithStatus.store} hideUi components={obsComponents}>
         <OBSSetup />
       </Tldraw>
     </div>

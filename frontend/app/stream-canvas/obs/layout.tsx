@@ -34,7 +34,7 @@ export default function StreamCanvasOBSLayout({
         .obs-mirror {
           --tl-color-background: rgba(0,0,0,0) !important;
         }
-        /* tldraw frame shapes render a white SVG rect — hide it */
+        /* Defensive: tldraw frame shapes (if any exist in the document) render a white SVG rect — force transparent for OBS */
         rect.tl-frame__body {
           fill: transparent !important;
         }

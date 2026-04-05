@@ -2,12 +2,8 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useSync } from "@tldraw/sync";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Tldraw,
-  type TLAssetStore,
-  useEditor,
-} from "tldraw";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { type TLAssetStore, Tldraw, useEditor } from "tldraw";
 import "tldraw/tldraw.css";
 import { buildEditorWsUrl, uploadFile } from "@/lib/stream-canvas/api";
 import { STREAM_ZONE } from "@/lib/stream-canvas/stream-zone";
@@ -18,13 +14,45 @@ interface CanvasEditorProps {
 }
 
 /**
+ * Keep a DOM element positioned over the stream zone as the tldraw camera moves.
+ * Returns a ref to attach to the element.
+ */
+function useStreamZoneOverlay() {
+  const editor = useEditor();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function update() {
+      if (!ref.current) return;
+      const { x, y, z } = editor.getCamera();
+      const screenX = STREAM_ZONE.x * z + x * z;
+      const screenY = STREAM_ZONE.y * z + y * z;
+      const screenW = STREAM_ZONE.width * z;
+      const screenH = STREAM_ZONE.height * z;
+      ref.current.style.transform = `translate(${screenX}px, ${screenY}px)`;
+      ref.current.style.width = `${screenW}px`;
+      ref.current.style.height = `${screenH}px`;
+    }
+
+    const dispose = editor.store.listen(update, {
+      source: "all",
+      scope: "session",
+    });
+    update();
+    return dispose;
+  }, [editor]);
+
+  return ref;
+}
+
+/**
  * Pure CSS overlay showing the 1920x1080 stream zone.
  * This is NOT a tldraw shape — it's a DOM overlay that moves with the camera.
  * It won't appear on the OBS mirror since it doesn't exist in the tldraw store.
  */
 function StreamZoneIndicator() {
   const editor = useEditor();
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useStreamZoneOverlay();
 
   // Clean up any leftover stream zone frame shapes from the old implementation
   useEffect(() => {
@@ -33,31 +61,6 @@ function StreamZoneIndicator() {
         editor.deleteShape(shape.id);
       }
     }
-  }, [editor]);
-
-  useEffect(() => {
-    const update = () => {
-      if (!ref.current) return;
-      const camera = editor.getCamera();
-      const { x, y, z } = camera;
-      // Convert page coordinates to screen coordinates
-      const screenX = STREAM_ZONE.x * z + x * z;
-      const screenY = STREAM_ZONE.y * z + y * z;
-      const screenW = STREAM_ZONE.width * z;
-      const screenH = STREAM_ZONE.height * z;
-      ref.current.style.transform = `translate(${screenX}px, ${screenY}px)`;
-      ref.current.style.width = `${screenW}px`;
-      ref.current.style.height = `${screenH}px`;
-    };
-
-    // Update on camera changes
-    const dispose = editor.store.listen(update, {
-      source: "all",
-      scope: "session",
-    });
-    update();
-
-    return dispose;
   }, [editor]);
 
   return (
@@ -96,34 +99,13 @@ function StreamZoneIndicator() {
  * Rendered as a DOM overlay — not a tldraw shape, so it won't appear on OBS.
  */
 function TwitchEmbed({ channel }: { channel: string }) {
-  const editor = useEditor();
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const update = () => {
-      if (!ref.current) return;
-      const { x, y, z } = editor.getCamera();
-      const screenX = STREAM_ZONE.x * z + x * z;
-      const screenY = STREAM_ZONE.y * z + y * z;
-      const screenW = STREAM_ZONE.width * z;
-      const screenH = STREAM_ZONE.height * z;
-      ref.current.style.transform = `translate(${screenX}px, ${screenY}px)`;
-      ref.current.style.width = `${screenW}px`;
-      ref.current.style.height = `${screenH}px`;
-    };
-
-    const dispose = editor.store.listen(update, {
-      source: "all",
-      scope: "session",
-    });
-    update();
-    return dispose;
-  }, [editor]);
+  const ref = useStreamZoneOverlay();
 
   // Twitch requires the parent domain in the embed URL.
   // .localhost domains are rejected — use the base hostname for production,
   // and show a placeholder locally.
-  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+  const hostname =
+    typeof window !== "undefined" ? window.location.hostname : "";
   const isLocal = hostname.endsWith(".localhost") || hostname === "localhost";
 
   return (
@@ -179,7 +161,7 @@ function TwitchEmbed({ channel }: { channel: string }) {
 export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   const { getToken } = useAuth();
 
-  // Provide a fresh URI on each (re)connection — Clerk tokens refresh ~60s
+  // Provide a fresh URI on each (re)connection so Clerk tokens are always current
   const getUri = useCallback(async () => {
     const token = await getToken();
     if (!token) throw new Error("Not authenticated");
@@ -189,10 +171,11 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   // Asset store: upload files to the canvas backend, resolve by returning src as-is
   const assets = useMemo<TLAssetStore>(
     () => ({
-      async upload(asset, file) {
+      async upload(_asset, file) {
         const result = await uploadFile(roomId, file, getToken);
         const apiBase =
-          process.env.NEXT_PUBLIC_CANVAS_API_URL ?? "https://stream-canvas.localhost:1355";
+          process.env.NEXT_PUBLIC_CANVAS_API_URL ??
+          "https://stream-canvas.localhost:1355";
         return { src: `${apiBase}${result.url}` };
       },
       resolve(asset) {
