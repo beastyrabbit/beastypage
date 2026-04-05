@@ -2,7 +2,7 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useSync } from "@tldraw/sync";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   type TLAssetStore,
   type TLComponents,
@@ -19,95 +19,124 @@ interface CanvasEditorProps {
 }
 
 /**
- * Custom Background component that renders:
- * 1. The default canvas background color
- * 2. The Twitch stream embed at the stream zone position
- * 3. The stream zone border indicator
- *
- * All in canvas coordinates — tldraw handles pan/zoom transforms.
- * OBS mirror uses `Background: null` so none of this shows there.
+ * Custom Background that renders the Twitch embed and stream zone indicator
+ * inside tldraw's background layer (behind shapes, moves with camera).
+ * OBS mirror sets Background: null, so none of this shows there.
  */
 function CanvasBackground({ channel }: { channel?: string | null }) {
+  const editor = useEditor();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function update() {
+      if (!containerRef.current) return;
+      const { x, y, z } = editor.getCamera();
+      const screenX = STREAM_ZONE.x * z + x;
+      const screenY = STREAM_ZONE.y * z + y;
+      const screenW = STREAM_ZONE.width * z;
+      const screenH = STREAM_ZONE.height * z;
+      containerRef.current.style.transform = `translate(${screenX}px, ${screenY}px)`;
+      containerRef.current.style.width = `${screenW}px`;
+      containerRef.current.style.height = `${screenH}px`;
+    }
+
+    const dispose = editor.store.listen(update, {
+      source: "all",
+      scope: "session",
+    });
+    update();
+    return dispose;
+  }, [editor]);
+
   const hostname =
     typeof window !== "undefined" ? window.location.hostname : "";
   const isLocal = hostname.endsWith(".localhost") || hostname === "localhost";
 
   return (
     <>
-      {/* Default background fill */}
-      <rect
-        x={-10000}
-        y={-10000}
-        width={20000}
-        height={20000}
-        fill="var(--tl-color-background)"
+      {/* Default background */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: "var(--tl-color-background)",
+        }}
       />
-
-      {/* Twitch embed via foreignObject — positioned at stream zone in canvas coords */}
-      {channel && (
-        <foreignObject
-          x={STREAM_ZONE.x}
-          y={STREAM_ZONE.y}
-          width={STREAM_ZONE.width}
-          height={STREAM_ZONE.height}
-        >
-          {isLocal ? (
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "rgba(0,0,0,0.85)",
-                color: "rgba(255,255,255,0.5)",
-                fontSize: "14px",
-                fontFamily: "sans-serif",
-              }}
-            >
-              Twitch embed disabled on localhost
-              <span style={{ fontSize: "12px", opacity: 0.6 }}>
-                twitch.tv/{channel}
-              </span>
-            </div>
-          ) : (
-            <iframe
-              src={`https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${hostname}&muted=true`}
-              style={{
-                width: "100%",
-                height: "100%",
-                border: "none",
-              }}
-              allowFullScreen
-              title={`${channel} Twitch stream`}
-            />
-          )}
-        </foreignObject>
-      )}
-
-      {/* Stream zone border indicator */}
-      <rect
-        x={STREAM_ZONE.x}
-        y={STREAM_ZONE.y}
-        width={STREAM_ZONE.width}
-        height={STREAM_ZONE.height}
-        fill="none"
-        stroke="rgba(59, 130, 246, 0.5)"
-        strokeWidth={2}
-        strokeDasharray="8 4"
-        rx={4}
-      />
-      <text
-        x={STREAM_ZONE.x + 8}
-        y={STREAM_ZONE.y - 8}
-        fill="rgba(59, 130, 246, 0.8)"
-        fontSize={14}
-        fontWeight={600}
-        fontFamily="sans-serif"
+      {/* Stream zone + Twitch embed — positioned in canvas coordinates */}
+      <div
+        ref={containerRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          pointerEvents: "none",
+        }}
       >
-        Stream Zone (1920×1080)
-      </text>
+        {/* Twitch embed */}
+        {channel && (
+          <div style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }}>
+            {isLocal ? (
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(0,0,0,0.85)",
+                  color: "rgba(255,255,255,0.5)",
+                  fontSize: "14px",
+                  fontFamily: "sans-serif",
+                  borderRadius: "4px",
+                }}
+              >
+                Twitch embed disabled on localhost
+                <span style={{ fontSize: "12px", opacity: 0.6 }}>
+                  twitch.tv/{channel}
+                </span>
+              </div>
+            ) : (
+              <iframe
+                src={`https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${hostname}&muted=true`}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                  borderRadius: "4px",
+                  pointerEvents: "auto",
+                }}
+                allowFullScreen
+                title={`${channel} Twitch stream`}
+              />
+            )}
+          </div>
+        )}
+        {/* Stream zone border */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            border: "2px dashed rgba(59, 130, 246, 0.5)",
+            borderRadius: "4px",
+          }}
+        />
+        {/* Stream zone label */}
+        <span
+          style={{
+            position: "absolute",
+            top: "-24px",
+            left: "8px",
+            fontSize: "12px",
+            color: "rgba(59, 130, 246, 0.8)",
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+            userSelect: "none",
+          }}
+        >
+          Stream Zone (1920×1080)
+        </span>
+      </div>
     </>
   );
 }
@@ -152,7 +181,6 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
     [roomId, getToken],
   );
 
-  // Inject the Twitch embed + stream zone as the canvas Background component
   const components = useMemo<TLComponents>(
     () => ({
       Background: () => <CanvasBackground channel={twitchChannel} />,
