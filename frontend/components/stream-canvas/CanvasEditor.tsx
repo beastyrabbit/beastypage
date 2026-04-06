@@ -15,7 +15,10 @@ import {
 } from "tldraw";
 import "tldraw/tldraw.css";
 import { buildEditorWsUrl, CANVAS_API, uploadFile } from "@/lib/stream-canvas/api";
-import { STREAM_ZONE } from "@/lib/stream-canvas/stream-zone";
+import {
+  STREAM_ZONE,
+  getStreamZoneViewportPlacement,
+} from "@/lib/stream-canvas/stream-zone";
 import { customShapeUtils, customTools } from "./shapes/shared";
 import { AudioUploadCtx } from "./shapes/audio/AudioPlayerShape";
 
@@ -37,10 +40,12 @@ function CanvasBackground({ channel }: { channel?: string | null }) {
   useEffect(() => {
     function update() {
       if (!containerRef.current) return;
-      const { x, y, z } = editor.getCamera();
-      const screenX = STREAM_ZONE.x * z + x;
-      const screenY = STREAM_ZONE.y * z + y;
-      containerRef.current.style.transform = `translate(${screenX}px, ${screenY}px) scale(${z})`;
+      const camera = editor.getCamera();
+      const { transform } = getStreamZoneViewportPlacement(
+        (point) => editor.pageToViewport(point),
+        camera,
+      );
+      containerRef.current.style.transform = transform;
     }
 
     const dispose = editor.store.listen(update, {
