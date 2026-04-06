@@ -4,14 +4,20 @@ import { useAuth } from "@clerk/nextjs";
 import { useSync } from "@tldraw/sync";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  DefaultToolbar,
+  DefaultToolbarContent,
   type TLAssetStore,
   type TLComponents,
+  type TLUiOverrides,
   Tldraw,
+  ToolbarItem,
   useEditor,
 } from "tldraw";
 import "tldraw/tldraw.css";
-import { buildEditorWsUrl, uploadFile } from "@/lib/stream-canvas/api";
+import { buildEditorWsUrl, CANVAS_API, uploadFile } from "@/lib/stream-canvas/api";
 import { STREAM_ZONE } from "@/lib/stream-canvas/stream-zone";
+import { customShapeUtils, customTools } from "./shapes/shared";
+import { AudioUploadCtx } from "./shapes/audio/AudioPlayerShape";
 
 interface CanvasEditorProps {
   roomId: string;
@@ -139,7 +145,7 @@ function CanvasBackground({ channel }: { channel?: string | null }) {
         {channel && (
           <button
             type="button"
-            onClick={() => setInteractMode((prev: boolean) => !prev)}
+            onClick={() => setInteractMode((prev) => !prev)}
             style={{
               position: "absolute",
               top: "-24px",
@@ -180,6 +186,42 @@ function LegacyCleanup() {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Toolbar overrides — add YouTube and Audio tool buttons
+// ---------------------------------------------------------------------------
+
+const editorOverrides: TLUiOverrides = {
+  tools(editor, tools) {
+    tools["youtube-embed"] = {
+      id: "youtube-embed",
+      icon: "tool-media",
+      label: "YouTube",
+      onSelect: () => {
+        editor.setCurrentTool("youtube-embed");
+      },
+    };
+    tools["audio-player"] = {
+      id: "audio-player",
+      icon: "tool-media",
+      label: "Audio",
+      onSelect: () => {
+        editor.setCurrentTool("audio-player");
+      },
+    };
+    return tools;
+  },
+};
+
+function CanvasToolbar() {
+  return (
+    <DefaultToolbar>
+      <DefaultToolbarContent />
+      <ToolbarItem tool="youtube-embed" />
+      <ToolbarItem tool="audio-player" />
+    </DefaultToolbar>
+  );
+}
+
 export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   const { getToken } = useAuth();
 
@@ -193,10 +235,7 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
     () => ({
       async upload(_asset, file) {
         const result = await uploadFile(roomId, file, getToken);
-        const apiBase =
-          process.env.NEXT_PUBLIC_CANVAS_API_URL ??
-          "https://stream-canvas.localhost:1355";
-        return { src: `${apiBase}${result.url}` };
+        return { src: `${CANVAS_API}${result.url}` };
       },
       resolve(asset) {
         return asset.props.src ?? null;
@@ -208,8 +247,14 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   const components = useMemo<TLComponents>(
     () => ({
       Background: () => <CanvasBackground channel={twitchChannel} />,
+      Toolbar: CanvasToolbar,
     }),
     [twitchChannel],
+  );
+
+  const audioUploadCtx = useMemo(
+    () => ({ roomId, getToken }),
+    [roomId, getToken],
   );
 
   const storeWithStatus = useSync({ uri: getUri, assets });
@@ -232,9 +277,17 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
 
   return (
     <div className="relative h-full w-full">
-      <Tldraw store={storeWithStatus.store} components={components}>
-        <LegacyCleanup />
-      </Tldraw>
+      <AudioUploadCtx.Provider value={audioUploadCtx}>
+        <Tldraw
+          store={storeWithStatus.store}
+          shapeUtils={customShapeUtils}
+          tools={customTools}
+          overrides={editorOverrides}
+          components={components}
+        >
+          <LegacyCleanup />
+        </Tldraw>
+      </AudioUploadCtx.Provider>
     </div>
   );
 }
