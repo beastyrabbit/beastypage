@@ -2,16 +2,23 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useSync } from "@tldraw/sync";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
+  DefaultContextMenu,
+  DefaultContextMenuContent,
   DefaultToolbar,
   DefaultToolbarContent,
   type TLAssetStore,
   type TLComponents,
+  type TLUiContextMenuProps,
   type TLUiOverrides,
+  TldrawUiMenuActionItem,
+  TldrawUiMenuGroup,
+  TldrawUiMenuItem,
   Tldraw,
   ToolbarItem,
   useEditor,
+  useValue,
 } from "tldraw";
 import "tldraw/tldraw.css";
 import { buildEditorWsUrl, CANVAS_API, uploadFile } from "@/lib/stream-canvas/api";
@@ -19,8 +26,15 @@ import {
   STREAM_ZONE,
   getStreamZoneViewportPlacement,
 } from "@/lib/stream-canvas/stream-zone";
-import { customShapeUtils, customTools } from "./shapes/shared";
-import { AudioUploadCtx } from "./shapes/audio/AudioPlayerShape";
+import { customShapeUtils, customTools, syncShapeUtils } from "./shapes/shared";
+import {
+  AudioUploadCtx,
+  getAudioSyncedPlaybackPosition,
+} from "./shapes/audio/AudioPlayerShape";
+import {
+  getSyncedPlaybackPosition,
+  YouTubeInteractionCtx,
+} from "./shapes/youtube/YouTubeEmbedShape";
 
 interface CanvasEditorProps {
   roomId: string;
@@ -227,8 +241,206 @@ function CanvasToolbar() {
   );
 }
 
+function isMediaShape(shape: ReturnType<typeof useEditor>["getOnlySelectedShape"] extends (...args: never[]) => infer T ? T : never) {
+  return shape?.type === "youtube-embed" || shape?.type === "audio-player";
+}
+
+function MediaShapeContextMenuContent() {
+  const editor = useEditor();
+  const { interactiveShapeId, setInteractiveShapeId } = useContext(YouTubeInteractionCtx);
+  const selectedShape = useValue(
+    "selected media shape",
+    () => editor.getOnlySelectedShape(),
+    [editor],
+  );
+
+  if (!selectedShape || !isMediaShape(selectedShape)) {
+    return null;
+  }
+
+  const hasUrl = Boolean(selectedShape.props.url);
+  const isYouTubeShape = selectedShape.type === "youtube-embed";
+  const isAudioShape = selectedShape.type === "audio-player";
+  const canInteract = (isYouTubeShape || isAudioShape) && hasUrl;
+  const isInteractive = interactiveShapeId === selectedShape.id;
+
+  const enterEditingShape = () => {
+    queueMicrotask(() => {
+      if (!editor.getShape(selectedShape.id)) return;
+      editor.setCurrentTool("select");
+      editor.setEditingShape(selectedShape.id);
+    });
+  };
+
+  return (
+    <>
+      <TldrawUiMenuGroup id="media-shape-actions">
+        {isYouTubeShape ? (
+          <TldrawUiMenuItem
+            id="media-shape-settings"
+            icon="edit"
+            label="Open settings"
+            onSelect={() => {
+              if (canInteract) {
+                const playbackPosition = getSyncedPlaybackPosition(selectedShape.props);
+                editor.updateShape({
+                  id: selectedShape.id,
+                  type: "youtube-embed",
+                  props: {
+                    playbackPosition,
+                    playbackUpdatedAt: Date.now(),
+                  },
+                });
+              }
+
+              setInteractiveShapeId(null);
+              enterEditingShape();
+            }}
+          />
+        ) : null}
+        {canInteract ? (
+          <>
+            <TldrawUiMenuItem
+              id="media-shape-interact"
+              icon="external-link"
+              label={isInteractive ? "Exit interact mode" : "Enter interact mode"}
+              onSelect={() => {
+                if (isInteractive) {
+                  setInteractiveShapeId(null);
+                  editor.setCurrentTool("select");
+                  editor.setEditingShape(null);
+                  return;
+                }
+
+                setInteractiveShapeId(selectedShape.id);
+                editor.setCurrentTool("select");
+                if (isAudioShape) {
+                  editor.setEditingShape(null);
+                } else {
+                  enterEditingShape();
+                }
+              }}
+            />
+            <TldrawUiMenuItem
+              id="media-shape-resync"
+              label="Resync player"
+              onSelect={() => {
+                if (isYouTubeShape) {
+                  const playbackPosition = getSyncedPlaybackPosition(selectedShape.props);
+                  editor.updateShape({
+                    id: selectedShape.id,
+                    type: "youtube-embed",
+                    props: {
+                      playbackPosition,
+                      playbackUpdatedAt: Date.now(),
+                    },
+                  });
+                }
+
+                if (isAudioShape) {
+                  const playbackPosition = getAudioSyncedPlaybackPosition(selectedShape.props);
+                  editor.updateShape({
+                    id: selectedShape.id,
+                    type: "audio-player",
+                    props: {
+                      playbackPosition,
+                      playbackUpdatedAt: Date.now(),
+                    },
+                  });
+                }
+              }}
+            />
+          </>
+        ) : null}
+      </TldrawUiMenuGroup>
+      <TldrawUiMenuGroup id="media-shape-edit-actions">
+        <TldrawUiMenuActionItem actionId="duplicate" />
+        <TldrawUiMenuActionItem actionId="delete" />
+      </TldrawUiMenuGroup>
+    </>
+  );
+}
+
+function CanvasContextMenu(props: TLUiContextMenuProps) {
+  const editor = useEditor();
+  const selectedShape = useValue(
+    "selected context menu shape",
+    () => editor.getOnlySelectedShape(),
+    [editor],
+  );
+  const showMediaMenu = Boolean(selectedShape && isMediaShape(selectedShape));
+
+  return (
+    <DefaultContextMenu {...props}>
+      {showMediaMenu ? <MediaShapeContextMenuContent /> : <DefaultContextMenuContent />}
+    </DefaultContextMenu>
+  );
+}
+
+function YouTubeInteractionController() {
+  const editor = useEditor();
+  const { interactiveShapeId, setInteractiveShapeId } = useContext(YouTubeInteractionCtx);
+  const selectedShape = useValue(
+    "selected youtube shape",
+    () => editor.getOnlySelectedShape(),
+    [editor],
+  );
+  const editingShapeId = useValue(
+    "editing shape id",
+    () => editor.getEditingShapeId(),
+    [editor],
+  );
+
+  useEffect(() => {
+    if (!interactiveShapeId) return;
+
+    if (
+      !selectedShape ||
+      selectedShape.id !== interactiveShapeId ||
+      (selectedShape.type !== "youtube-embed" && selectedShape.type !== "audio-player")
+    ) {
+      setInteractiveShapeId(null);
+      editor.setCurrentTool("select");
+      editor.setEditingShape(null);
+    }
+  }, [editor, interactiveShapeId, selectedShape, setInteractiveShapeId]);
+
+  useEffect(() => {
+    if (!interactiveShapeId) return;
+
+    if (editingShapeId === interactiveShapeId || editingShapeId === null) {
+      return;
+    }
+
+    setInteractiveShapeId(null);
+    editor.setCurrentTool("select");
+    editor.setEditingShape(null);
+  }, [editor, editingShapeId, interactiveShapeId, setInteractiveShapeId]);
+
+  useEffect(() => {
+    if (!interactiveShapeId) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setInteractiveShapeId(null);
+      editor.setCurrentTool("select");
+      editor.setEditingShape(null);
+      editor.getContainer().focus();
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [editor, interactiveShapeId, setInteractiveShapeId]);
+
+  return null;
+}
+
 export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   const { getToken } = useAuth();
+  const [interactiveShapeId, setInteractiveShapeId] = useState<string | null>(null);
 
   const getUri = useCallback(async () => {
     const token = await getToken();
@@ -252,6 +464,7 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   const components = useMemo<TLComponents>(
     () => ({
       Background: () => <CanvasBackground channel={twitchChannel} />,
+      ContextMenu: CanvasContextMenu,
       Toolbar: CanvasToolbar,
     }),
     [twitchChannel],
@@ -261,8 +474,16 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
     () => ({ roomId, getToken }),
     [roomId, getToken],
   );
+  const youtubeInteractionCtx = useMemo(
+    () => ({ interactiveShapeId, setInteractiveShapeId }),
+    [interactiveShapeId],
+  );
 
-  const storeWithStatus = useSync({ uri: getUri, assets });
+  const storeWithStatus = useSync({
+    uri: getUri,
+    assets,
+    shapeUtils: syncShapeUtils,
+  });
 
   if (storeWithStatus.status === "loading") {
     return (
@@ -283,15 +504,18 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   return (
     <div className="relative h-full w-full">
       <AudioUploadCtx.Provider value={audioUploadCtx}>
-        <Tldraw
-          store={storeWithStatus.store}
-          shapeUtils={customShapeUtils}
-          tools={customTools}
-          overrides={editorOverrides}
-          components={components}
-        >
-          <LegacyCleanup />
-        </Tldraw>
+        <YouTubeInteractionCtx.Provider value={youtubeInteractionCtx}>
+          <Tldraw
+            store={storeWithStatus.store}
+            shapeUtils={customShapeUtils}
+            tools={customTools}
+            overrides={editorOverrides}
+            components={components}
+          >
+            <LegacyCleanup />
+            <YouTubeInteractionController />
+          </Tldraw>
+        </YouTubeInteractionCtx.Provider>
       </AudioUploadCtx.Provider>
     </div>
   );

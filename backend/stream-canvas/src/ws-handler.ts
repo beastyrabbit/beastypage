@@ -8,6 +8,7 @@ import {
 import { eq } from "drizzle-orm";
 import { db, sqlite } from "./db.ts";
 import { rooms } from "./schema.ts";
+import { streamCanvasSchema } from "./tldraw-schema.ts";
 import { isOriginAllowed, verifyClerkJwt, verifyObsToken } from "./auth.ts";
 import type { ConnectionRole } from "./types.ts";
 
@@ -36,6 +37,7 @@ function getOrCreateRoom(roomId: string): TLSocketRoom {
 
   room = new TLSocketRoom({
     storage: createRoomStorage(roomId),
+    schema: streamCanvasSchema,
     onSessionRemoved(_room, { numSessionsRemaining }) {
       // Wait 30s before cleanup to allow brief reconnects (e.g., page refresh)
       if (numSessionsRemaining === 0) {

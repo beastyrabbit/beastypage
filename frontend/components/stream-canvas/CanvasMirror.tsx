@@ -11,7 +11,7 @@ import {
 import "tldraw/tldraw.css";
 import { buildObsWsUrl, exchangeObsToken } from "@/lib/stream-canvas/api";
 import { STREAM_ZONE } from "@/lib/stream-canvas/stream-zone";
-import { customShapeUtils } from "./shapes/shared";
+import { customShapeUtils, syncShapeUtils } from "./shapes/shared";
 
 interface CanvasMirrorProps {
   /** The long-lived OBS bootstrap secret from the URL. */
@@ -61,11 +61,16 @@ function OBSSetup() {
 export function CanvasMirror({ obsSecret }: CanvasMirrorProps) {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const initialTokenExchangeRef = useRef<ReturnType<typeof exchangeObsToken> | null>(
+    null,
+  );
 
   // Verify the secret is valid on mount
   useEffect(() => {
     let cancelled = false;
-    exchangeObsToken(obsSecret)
+    const tokenExchangePromise = exchangeObsToken(obsSecret);
+    initialTokenExchangeRef.current = tokenExchangePromise;
+    tokenExchangePromise
       .then(() => {
         if (!cancelled) setReady(true);
       })
@@ -74,12 +79,18 @@ export function CanvasMirror({ obsSecret }: CanvasMirrorProps) {
       });
     return () => {
       cancelled = true;
+      if (initialTokenExchangeRef.current === tokenExchangePromise) {
+        initialTokenExchangeRef.current = null;
+      }
     };
   }, [obsSecret]);
 
   // Build the WS URL using a fresh short-lived token on each (re)connection
   const getUri = useCallback(async () => {
-    const data = await exchangeObsToken(obsSecret);
+    const tokenExchangePromise =
+      initialTokenExchangeRef.current ?? exchangeObsToken(obsSecret);
+    initialTokenExchangeRef.current = null;
+    const data = await tokenExchangePromise;
     return buildObsWsUrl(data.roomId, data.token);
   }, [obsSecret]);
 
@@ -96,7 +107,11 @@ export function CanvasMirror({ obsSecret }: CanvasMirrorProps) {
     [],
   );
 
-  const storeWithStatus = useSync({ uri: getUri, assets });
+  const storeWithStatus = useSync({
+    uri: getUri,
+    assets,
+    shapeUtils: syncShapeUtils,
+  });
 
   if (error) {
     return (

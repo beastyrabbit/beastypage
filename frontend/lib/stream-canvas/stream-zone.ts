@@ -37,3 +37,23 @@ export function getStreamZoneViewportPlacement(
     transform: `translate(${topLeft.x}px, ${topLeft.y}px) scale(${camera.z})`,
   };
 }
+
+
+type StreamZoneBounds = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+export function rectIntersectsStreamZone(
+  bounds: StreamZoneBounds,
+  zone: typeof STREAM_ZONE = STREAM_ZONE,
+) {
+  return (
+    bounds.x < zone.x + zone.width &&
+    bounds.x + bounds.w > zone.x &&
+    bounds.y < zone.y + zone.height &&
+    bounds.y + bounds.h > zone.y
+  );
+}
