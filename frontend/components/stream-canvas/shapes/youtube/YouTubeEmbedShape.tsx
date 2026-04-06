@@ -62,13 +62,17 @@ export const youtubeEmbedShapeProps: RecordProps<YouTubeEmbedShape> = {
 
 export interface YouTubeInteractionContextValue {
   interactiveShapeId: string | null;
+  settingsShapeId: string | null;
   setInteractiveShapeId: (shapeId: string | null) => void;
+  setSettingsShapeId: (shapeId: string | null) => void;
 }
 
 export const YouTubeInteractionCtx =
   createContext<YouTubeInteractionContextValue>({
     interactiveShapeId: null,
+    settingsShapeId: null,
     setInteractiveShapeId: () => {},
+    setSettingsShapeId: () => {},
   });
 
 type EventWithStopPropagation = {
@@ -571,7 +575,6 @@ function YouTubeEmbedPlayer({
             e.stopPropagation();
             setInteractiveShapeId(null);
             editor.setCurrentTool("select");
-            editor.setEditingShape(null);
           }}
           style={{
             position: "absolute",
@@ -623,7 +626,6 @@ function YouTubeEmbedPlayer({
             e.stopPropagation();
             setInteractiveShapeId(shape.id);
             editor.setCurrentTool("select");
-            editor.setEditingShape(shape.id);
           }}
           onKeyDown={(e) => {
             if (e.key !== "Enter" && e.key !== " ") {
@@ -634,7 +636,6 @@ function YouTubeEmbedPlayer({
             e.stopPropagation();
             setInteractiveShapeId(shape.id);
             editor.setCurrentTool("select");
-            editor.setEditingShape(shape.id);
           }}
         />
       ) : null}
@@ -653,20 +654,15 @@ function YouTubeEmbedShapeComponent({
   editor: Editor;
   shape: YouTubeEmbedShape;
 }) {
-  const { interactiveShapeId } = useContext(YouTubeInteractionCtx);
+  const { interactiveShapeId, settingsShapeId, setSettingsShapeId } =
+    useContext(YouTubeInteractionCtx);
   const videoId = extractYouTubeId(shape.props.url);
-  const editingShapeId = useValue(
-    "editing youtube shape",
-    () => editor.getEditingShapeId(),
-    [editor],
-  );
   const isReadonly = useValue(
     "youtube readonly state",
     () => editor.getInstanceState().isReadonly,
     [editor],
   );
-  const isSettingsOpen =
-    editingShapeId === shape.id && interactiveShapeId !== shape.id;
+  const isSettingsOpen = settingsShapeId === shape.id;
   const pageBounds = useValue(
     "youtube page bounds",
     () => editor.getShapePageBounds(shape),
@@ -715,8 +711,8 @@ function YouTubeEmbedShapeComponent({
       });
     }
 
+    setSettingsShapeId(null);
     editor.setCurrentTool("select");
-    editor.setEditingShape(null);
   };
 
   return (

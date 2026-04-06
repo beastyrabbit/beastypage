@@ -162,9 +162,7 @@ function AudioPlayerComponent({
   const showControls = !shape.props.url || isInteractive;
   const effectiveVolume = getEffectiveMediaVolume(shape.props.volume);
   const isVolumeMuted = effectiveVolume <= 0.001;
-  const shouldOutputAudio = isReadonly
-    ? isAudibleInReadonly
-    : isInteractive || isAudibleInReadonly;
+  const shouldOutputAudio = isReadonly ? isAudibleInReadonly : isInteractive;
   const currentSyncedTime = getAudioSyncedPlaybackPosition(shape.props);
   const seekPreviewTime = scrubTime ?? displayTime;
   const maxTimelineTime = Math.max(duration, displayTime, currentSyncedTime, 0);
@@ -211,6 +209,11 @@ function AudioPlayerComponent({
     }
     lastObservedPlaybackRef.current = desiredTime;
 
+    if (!isReadonly && !isInteractive) {
+      audio.pause();
+      return;
+    }
+
     if (syncedIsPlaying) {
       void audio.play().catch(() => {
         // Browser may block playback without a user gesture.
@@ -221,6 +224,8 @@ function AudioPlayerComponent({
     audio.pause();
   }, [
     shape.props.url,
+    isInteractive,
+    isReadonly,
     syncedIsPlaying,
     syncedPlaybackPosition,
     syncedPlaybackUpdatedAt,

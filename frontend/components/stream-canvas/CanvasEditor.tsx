@@ -49,7 +49,22 @@ interface CanvasEditorProps {
 function CanvasBackground({ channel }: { channel?: string | null }) {
   const editor = useEditor();
   const containerRef = useRef<HTMLDivElement>(null);
+  const streamChipRef = useRef<HTMLButtonElement>(null);
+  const streamMenuRef = useRef<HTMLDivElement>(null);
   const [interactMode, setInteractMode] = useState(false);
+  const [streamMenu, setStreamMenu] = useState<{ x: number; y: number } | null>(null);
+
+  const closeStreamMenu = useCallback(() => {
+    setStreamMenu(null);
+  }, []);
+
+  const openStreamMenu = useCallback(
+    (x: number, y: number) => {
+      if (!channel) return;
+      setStreamMenu({ x, y });
+    },
+    [channel],
+  );
 
   useEffect(() => {
     function update() {
@@ -69,6 +84,34 @@ function CanvasBackground({ channel }: { channel?: string | null }) {
     update();
     return dispose;
   }, [editor]);
+
+  useEffect(() => {
+    if (!streamMenu) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        (streamMenuRef.current?.contains(target) || streamChipRef.current?.contains(target))
+      ) {
+        return;
+      }
+
+      closeStreamMenu();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeStreamMenu();
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [closeStreamMenu, streamMenu]);
 
   const hostname =
     typeof window !== "undefined" ? window.location.hostname : "";
@@ -163,29 +206,101 @@ function CanvasBackground({ channel }: { channel?: string | null }) {
         </span>
         {channel && (
           <button
+            ref={streamChipRef}
             type="button"
-            onClick={() => setInteractMode((prev) => !prev)}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              openStreamMenu(event.clientX, event.clientY);
+            }}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              openStreamMenu(event.clientX, event.clientY);
+            }}
+            aria-label="Open stream controls"
             style={{
               position: "absolute",
-              top: "-24px",
+              top: "-26px",
               right: "8px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
               fontSize: "11px",
-              padding: "2px 8px",
-              borderRadius: "3px",
-              border: "1px solid rgba(59, 130, 246, 0.5)",
+              padding: "3px 10px",
+              borderRadius: "999px",
+              border: "1px solid rgba(59, 130, 246, 0.35)",
               background: interactMode
-                ? "rgba(59, 130, 246, 0.2)"
-                : "transparent",
-              color: "rgba(59, 130, 246, 0.8)",
-              cursor: "pointer",
+                ? "rgba(59, 130, 246, 0.22)"
+                : "rgba(15, 23, 42, 0.72)",
+              color: "rgba(255, 255, 255, 0.9)",
+              cursor: "context-menu",
               pointerEvents: "auto",
               userSelect: "none",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
             }}
           >
-            {interactMode ? "Back to drawing" : "Interact with stream"}
+            <span
+              aria-hidden="true"
+              style={{
+                width: "7px",
+                height: "7px",
+                borderRadius: "999px",
+                background: interactMode ? "rgb(34, 197, 94)" : "rgba(255, 255, 255, 0.45)",
+                boxShadow: interactMode ? "0 0 8px rgba(34, 197, 94, 0.65)" : "none",
+              }}
+            />
+            Stream
           </button>
         )}
       </div>
+      {streamMenu ? (
+        <div
+          ref={streamMenuRef}
+          style={{
+            position: "fixed",
+            top: streamMenu.y,
+            left: streamMenu.x,
+            zIndex: 1000,
+            minWidth: "200px",
+            padding: "6px",
+            borderRadius: "10px",
+            border: "1px solid rgba(148, 163, 184, 0.18)",
+            background: "rgba(15, 23, 42, 0.96)",
+            boxShadow: "0 18px 40px rgba(2, 6, 23, 0.45)",
+            backdropFilter: "blur(14px)",
+            WebkitBackdropFilter: "blur(14px)",
+            pointerEvents: "auto",
+          }}
+          onPointerDown={(event) => event.stopPropagation()}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setInteractMode((prev) => !prev);
+              closeStreamMenu();
+            }}
+            style={{
+              width: "100%",
+              border: "none",
+              background: "transparent",
+              color: "rgba(255, 255, 255, 0.92)",
+              fontSize: "13px",
+              textAlign: "left",
+              padding: "9px 10px",
+              borderRadius: "8px",
+              cursor: "pointer",
+            }}
+          >
+            {interactMode ? "Back to drawing" : "Enter interact mode"}
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -247,7 +362,11 @@ function isMediaShape(shape: ReturnType<typeof useEditor>["getOnlySelectedShape"
 
 function MediaShapeContextMenuContent() {
   const editor = useEditor();
-  const { interactiveShapeId, setInteractiveShapeId } = useContext(YouTubeInteractionCtx);
+  const {
+    interactiveShapeId,
+    setInteractiveShapeId,
+    setSettingsShapeId,
+  } = useContext(YouTubeInteractionCtx);
   const selectedShape = useValue(
     "selected media shape",
     () => editor.getOnlySelectedShape(),
@@ -263,14 +382,6 @@ function MediaShapeContextMenuContent() {
   const isAudioShape = selectedShape.type === "audio-player";
   const canInteract = (isYouTubeShape || isAudioShape) && hasUrl;
   const isInteractive = interactiveShapeId === selectedShape.id;
-
-  const enterEditingShape = () => {
-    queueMicrotask(() => {
-      if (!editor.getShape(selectedShape.id)) return;
-      editor.setCurrentTool("select");
-      editor.setEditingShape(selectedShape.id);
-    });
-  };
 
   return (
     <>
@@ -294,7 +405,9 @@ function MediaShapeContextMenuContent() {
               }
 
               setInteractiveShapeId(null);
-              enterEditingShape();
+              setSettingsShapeId(selectedShape.id);
+              editor.setCurrentTool("select");
+              editor.setEditingShape(null);
             }}
           />
         ) : null}
@@ -307,18 +420,16 @@ function MediaShapeContextMenuContent() {
               onSelect={() => {
                 if (isInteractive) {
                   setInteractiveShapeId(null);
+                  setSettingsShapeId(null);
                   editor.setCurrentTool("select");
                   editor.setEditingShape(null);
                   return;
                 }
 
+                setSettingsShapeId(null);
                 setInteractiveShapeId(selectedShape.id);
                 editor.setCurrentTool("select");
-                if (isAudioShape) {
-                  editor.setEditingShape(null);
-                } else {
-                  enterEditingShape();
-                }
+                editor.setEditingShape(null);
               }}
             />
             <TldrawUiMenuItem
@@ -379,51 +490,49 @@ function CanvasContextMenu(props: TLUiContextMenuProps) {
 
 function YouTubeInteractionController() {
   const editor = useEditor();
-  const { interactiveShapeId, setInteractiveShapeId } = useContext(YouTubeInteractionCtx);
+  const {
+    interactiveShapeId,
+    settingsShapeId,
+    setInteractiveShapeId,
+    setSettingsShapeId,
+  } = useContext(YouTubeInteractionCtx);
   const selectedShape = useValue(
     "selected youtube shape",
     () => editor.getOnlySelectedShape(),
     [editor],
   );
-  const editingShapeId = useValue(
-    "editing shape id",
-    () => editor.getEditingShapeId(),
-    [editor],
-  );
 
   useEffect(() => {
-    if (!interactiveShapeId) return;
+    if (!interactiveShapeId && !settingsShapeId) return;
 
     if (
       !selectedShape ||
-      selectedShape.id !== interactiveShapeId ||
+      (interactiveShapeId && selectedShape.id !== interactiveShapeId) ||
+      (settingsShapeId && selectedShape.id !== settingsShapeId) ||
       (selectedShape.type !== "youtube-embed" && selectedShape.type !== "audio-player")
     ) {
       setInteractiveShapeId(null);
+      setSettingsShapeId(null);
       editor.setCurrentTool("select");
       editor.setEditingShape(null);
     }
-  }, [editor, interactiveShapeId, selectedShape, setInteractiveShapeId]);
+  }, [
+    editor,
+    interactiveShapeId,
+    selectedShape,
+    setInteractiveShapeId,
+    setSettingsShapeId,
+    settingsShapeId,
+  ]);
 
   useEffect(() => {
-    if (!interactiveShapeId) return;
-
-    if (editingShapeId === interactiveShapeId || editingShapeId === null) {
-      return;
-    }
-
-    setInteractiveShapeId(null);
-    editor.setCurrentTool("select");
-    editor.setEditingShape(null);
-  }, [editor, editingShapeId, interactiveShapeId, setInteractiveShapeId]);
-
-  useEffect(() => {
-    if (!interactiveShapeId) return;
+    if (!interactiveShapeId && !settingsShapeId) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.stopPropagation();
       setInteractiveShapeId(null);
+      setSettingsShapeId(null);
       editor.setCurrentTool("select");
       editor.setEditingShape(null);
       editor.getContainer().focus();
@@ -433,7 +542,13 @@ function YouTubeInteractionController() {
     return () => {
       window.removeEventListener("keydown", onKeyDown, true);
     };
-  }, [editor, interactiveShapeId, setInteractiveShapeId]);
+  }, [
+    editor,
+    interactiveShapeId,
+    setInteractiveShapeId,
+    setSettingsShapeId,
+    settingsShapeId,
+  ]);
 
   return null;
 }
@@ -441,6 +556,7 @@ function YouTubeInteractionController() {
 export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
   const { getToken } = useAuth();
   const [interactiveShapeId, setInteractiveShapeId] = useState<string | null>(null);
+  const [settingsShapeId, setSettingsShapeId] = useState<string | null>(null);
 
   const getUri = useCallback(async () => {
     const token = await getToken();
@@ -475,8 +591,13 @@ export function CanvasEditor({ roomId, twitchChannel }: CanvasEditorProps) {
     [roomId, getToken],
   );
   const youtubeInteractionCtx = useMemo(
-    () => ({ interactiveShapeId, setInteractiveShapeId }),
-    [interactiveShapeId],
+    () => ({
+      interactiveShapeId,
+      settingsShapeId,
+      setInteractiveShapeId,
+      setSettingsShapeId,
+    }),
+    [interactiveShapeId, settingsShapeId],
   );
 
   const storeWithStatus = useSync({
