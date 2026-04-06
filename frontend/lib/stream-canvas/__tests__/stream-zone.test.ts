@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   STREAM_ZONE,
   getStreamZoneViewportPlacement,
+  rectIntersectsStreamZone,
 } from "@/lib/stream-canvas/stream-zone";
 
 function createPageToViewport(camera: { x: number; y: number; z: number }) {
@@ -87,5 +88,30 @@ describe("getStreamZoneViewportPlacement", () => {
       x: pointInZone.x * cameraB.z,
       y: pointInZone.y * cameraB.z,
     });
+  });
+});
+
+
+describe("rectIntersectsStreamZone", () => {
+  it("returns true when a shape overlaps the stream zone", () => {
+    expect(
+      rectIntersectsStreamZone({
+        x: STREAM_ZONE.x + STREAM_ZONE.width - 10,
+        y: STREAM_ZONE.y + 20,
+        w: 100,
+        h: 100,
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when a shape is fully outside the stream zone", () => {
+    expect(
+      rectIntersectsStreamZone({
+        x: STREAM_ZONE.x + STREAM_ZONE.width + 1,
+        y: STREAM_ZONE.y,
+        w: 100,
+        h: 100,
+      }),
+    ).toBe(false);
   });
 });

@@ -11,7 +11,7 @@ import {
 import "tldraw/tldraw.css";
 import { buildObsWsUrl, exchangeObsToken } from "@/lib/stream-canvas/api";
 import { STREAM_ZONE } from "@/lib/stream-canvas/stream-zone";
-import { customShapeUtils } from "./shapes/shared";
+import { customShapeUtils, syncShapeUtils } from "./shapes/shared";
 
 interface CanvasMirrorProps {
   /** The long-lived OBS bootstrap secret from the URL. */
@@ -96,7 +96,11 @@ export function CanvasMirror({ obsSecret }: CanvasMirrorProps) {
     [],
   );
 
-  const storeWithStatus = useSync({ uri: getUri, assets });
+  const storeWithStatus = useSync({
+    uri: getUri,
+    assets,
+    shapeUtils: syncShapeUtils,
+  });
 
   if (error) {
     return (

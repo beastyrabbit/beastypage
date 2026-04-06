@@ -1,5 +1,5 @@
 import { createReadStream, existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { Readable } from "node:stream";
 import { eq } from "drizzle-orm";
@@ -12,6 +12,7 @@ import {
 } from "./auth.ts";
 import { config } from "./config.ts";
 import { db } from "./db.ts";
+import { parseSingleByteRange } from "./http-range.ts";
 import { rooms, uploads } from "./schema.ts";
 import type { ClerkClaims } from "./types.ts";
 
@@ -53,9 +54,33 @@ api.get("/uploads/:uploadId/:filename", async (c) => {
   if (!upload || !existsSync(upload.path)) {
     return c.json({ error: "Not found" }, 404);
   }
-  c.header("Content-Type", upload.mimeType);
+
+  const fileStats = await stat(upload.path);
+  const fileSize = fileStats.size;
+  const range = parseSingleByteRange(c.req.header("range"), fileSize);
+  const contentType = upload.mimeType || "application/octet-stream";
+
+  c.header("Accept-Ranges", "bytes");
+  c.header("Content-Type", contentType);
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Cache-Control", "public, max-age=31536000, immutable");
+
+  if (range.kind === "invalid") {
+    c.header("Content-Range", `bytes */${fileSize}`);
+    return c.body(null, 416);
+  }
+
+  if (range.kind === "range") {
+    c.header("Content-Range", `bytes ${range.start}-${range.end}/${fileSize}`);
+    c.header("Content-Length", String(range.length));
+    const stream = createReadStream(upload.path, {
+      start: range.start,
+      end: range.end,
+    });
+    return c.body(Readable.toWeb(stream) as ReadableStream, 206);
+  }
+
+  c.header("Content-Length", String(fileSize));
   const stream = createReadStream(upload.path);
   return c.body(Readable.toWeb(stream) as ReadableStream);
 });
