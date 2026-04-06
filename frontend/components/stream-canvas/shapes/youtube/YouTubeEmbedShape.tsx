@@ -281,6 +281,10 @@ function YouTubeEmbedPlayer({
   const syncedPlaybackUpdatedAt = shape.props.playbackUpdatedAt ?? 0;
 
   const syncLocalAudioState = useEffectEvent((player: YouTubePlayer) => {
+    if (!playerReadyRef.current) {
+      return;
+    }
+
     const effectiveVolume = getEffectiveMediaVolume(syncedVolumeRef.current);
     const isVolumeMuted = effectiveVolume <= 0.001;
 
@@ -363,7 +367,7 @@ function YouTubeEmbedPlayer({
     }
 
     const player = playerRef.current;
-    if (player) {
+    if (player && playerReadyRef.current) {
       syncLocalAudioState(player);
     }
 
@@ -413,6 +417,7 @@ function YouTubeEmbedPlayer({
             autoplay: 0,
             fs: 1,
             modestbranding: 1,
+            origin: window.location.origin,
           },
           events: {
             onReady: (event) => {
@@ -588,42 +593,6 @@ function YouTubeEmbedPlayer({
     </>
   );
 
-  if (!isReadonly && !isInteractive) {
-    return (
-      <button
-        type="button"
-        style={{
-          position: "relative",
-          width: "100%",
-          height: "100%",
-          border: "none",
-          padding: 0,
-          background: "transparent",
-          cursor: "pointer",
-        }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          setInteractiveShapeId(shape.id);
-          editor.setCurrentTool("select");
-          editor.setEditingShape(shape.id);
-        }}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter" && e.key !== " ") {
-            return;
-          }
-
-          e.preventDefault();
-          e.stopPropagation();
-          setInteractiveShapeId(shape.id);
-          editor.setCurrentTool("select");
-          editor.setEditingShape(shape.id);
-        }}
-      >
-        {playerContent}
-      </button>
-    );
-  }
-
   return (
     <div
       style={{ position: "relative", width: "100%", height: "100%" }}
@@ -639,6 +608,36 @@ function YouTubeEmbedPlayer({
       }}
     >
       {playerContent}
+      {!isReadonly && !isInteractive ? (
+        <button
+          type="button"
+          style={{
+            position: "absolute",
+            inset: 0,
+            border: "none",
+            padding: 0,
+            background: "transparent",
+            cursor: "pointer",
+          }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setInteractiveShapeId(shape.id);
+            editor.setCurrentTool("select");
+            editor.setEditingShape(shape.id);
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" && e.key !== " ") {
+              return;
+            }
+
+            e.preventDefault();
+            e.stopPropagation();
+            setInteractiveShapeId(shape.id);
+            editor.setCurrentTool("select");
+            editor.setEditingShape(shape.id);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
