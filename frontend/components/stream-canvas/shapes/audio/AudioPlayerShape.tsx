@@ -76,13 +76,11 @@ function AudioPlayerComponent({
   // Auto-play in OBS mirror (read-only mode)
   useEffect(() => {
     if (isReadonly && shape.props.url && audioRef.current) {
-      audioRef.current.volume = shape.props.volume;
-      audioRef.current.loop = shape.props.loop;
       audioRef.current.play().catch(() => {
         // Browser may block autoplay — OBS Chromium usually allows it
       });
     }
-  }, [isReadonly, shape.props.url, shape.props.volume, shape.props.loop]);
+  }, [isReadonly, shape.props.url]);
 
   // Sync volume/loop changes
   useEffect(() => {
