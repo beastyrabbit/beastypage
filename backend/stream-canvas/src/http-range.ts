@@ -3,6 +3,19 @@ export type ByteRangeParseResult =
   | { kind: "invalid" }
   | { kind: "range"; start: number; end: number; length: number };
 
+function parseStrictNonNegativeInteger(value: string): number | null {
+  if (!/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const parsedValue = Number(value);
+  if (!Number.isSafeInteger(parsedValue)) {
+    return null;
+  }
+
+  return parsedValue;
+}
+
 export function parseSingleByteRange(
   rangeHeader: string | undefined,
   fileSize: number,
@@ -36,23 +49,25 @@ export function parseSingleByteRange(
   let end = fileSize - 1;
 
   if (!startPart) {
-    const suffixLength = Number.parseInt(endPart, 10);
-    if (!Number.isFinite(suffixLength) || suffixLength <= 0) {
+    const suffixLength = parseStrictNonNegativeInteger(endPart);
+    if (suffixLength === null || suffixLength <= 0) {
       return { kind: "invalid" };
     }
 
     start = Math.max(0, fileSize - suffixLength);
   } else {
-    start = Number.parseInt(startPart, 10);
-    if (!Number.isFinite(start) || start < 0) {
+    const parsedStart = parseStrictNonNegativeInteger(startPart);
+    if (parsedStart === null) {
       return { kind: "invalid" };
     }
+    start = parsedStart;
 
     if (endPart) {
-      end = Number.parseInt(endPart, 10);
-      if (!Number.isFinite(end) || end < 0) {
+      const parsedEnd = parseStrictNonNegativeInteger(endPart);
+      if (parsedEnd === null) {
         return { kind: "invalid" };
       }
+      end = parsedEnd;
     }
   }
 

@@ -35,6 +35,9 @@ test("parseSingleByteRange parses suffix ranges", () => {
 
 test("parseSingleByteRange rejects malformed or out-of-bounds ranges", () => {
   assert.deepEqual(parseSingleByteRange("items=0-10", 1000), { kind: "invalid" });
+  assert.deepEqual(parseSingleByteRange("bytes=100abc-200", 1000), {
+    kind: "invalid",
+  });
   assert.deepEqual(parseSingleByteRange("bytes=1000-1200", 1000), { kind: "invalid" });
   assert.deepEqual(parseSingleByteRange("bytes=500-100", 1000), { kind: "invalid" });
 });
