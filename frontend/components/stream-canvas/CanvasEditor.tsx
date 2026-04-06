@@ -382,6 +382,7 @@ function MediaShapeContextMenuContent() {
   const isAudioShape = selectedShape.type === "audio-player";
   const canInteract = (isYouTubeShape || isAudioShape) && hasUrl;
   const isInteractive = interactiveShapeId === selectedShape.id;
+  const isEditorAudioEnabled = selectedShape.props.editorAudioEnabled ?? false;
 
   return (
     <>
@@ -430,6 +431,31 @@ function MediaShapeContextMenuContent() {
                 setInteractiveShapeId(selectedShape.id);
                 editor.setCurrentTool("select");
                 editor.setEditingShape(null);
+              }}
+            />
+            <TldrawUiMenuItem
+              id="media-shape-editor-audio"
+              label={`Editor audio: ${isEditorAudioEnabled ? "On" : "Off"}`}
+              onSelect={() => {
+                if (isYouTubeShape) {
+                  editor.updateShape({
+                    id: selectedShape.id,
+                    type: "youtube-embed",
+                    props: {
+                      editorAudioEnabled: !isEditorAudioEnabled,
+                    },
+                  });
+                }
+
+                if (isAudioShape) {
+                  editor.updateShape({
+                    id: selectedShape.id,
+                    type: "audio-player",
+                    props: {
+                      editorAudioEnabled: !isEditorAudioEnabled,
+                    },
+                  });
+                }
               }}
             />
             <TldrawUiMenuItem

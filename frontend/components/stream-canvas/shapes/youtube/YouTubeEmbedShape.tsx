@@ -33,6 +33,7 @@ type YouTubeEmbedShapeProps = {
   h: number;
   url: string;
   volume?: number;
+  editorAudioEnabled?: boolean;
   isPlaying?: boolean;
   playbackPosition?: number;
   playbackUpdatedAt?: number;
@@ -55,6 +56,7 @@ export const youtubeEmbedShapeProps: RecordProps<YouTubeEmbedShape> = {
   h: T.number,
   url: T.string,
   volume: T.optional(T.number),
+  editorAudioEnabled: T.optional(T.boolean),
   isPlaying: T.optional(T.boolean),
   playbackPosition: T.optional(T.number),
   playbackUpdatedAt: T.optional(T.number),
@@ -270,8 +272,10 @@ function YouTubeEmbedPlayer({
   const interactiveRef = useRef(false);
   const readonlyRef = useRef(isReadonly);
   const syncedVolume = shape.props.volume ?? DEFAULT_MEDIA_VOLUME;
+  const syncedEditorAudioEnabled = shape.props.editorAudioEnabled ?? false;
   const audibleInReadonlyRef = useRef(isAudibleInReadonly);
   const syncedVolumeRef = useRef(syncedVolume);
+  const editorAudioEnabledRef = useRef(syncedEditorAudioEnabled);
   const updatePropsRef = useRef(onUpdateProps);
   const syncedStateRef = useRef({
     isPlaying: shape.props.isPlaying ?? false,
@@ -303,7 +307,11 @@ function YouTubeEmbedPlayer({
       return;
     }
 
-    if (!interactiveRef.current || isVolumeMuted) {
+    if (
+      !interactiveRef.current ||
+      !editorAudioEnabledRef.current ||
+      isVolumeMuted
+    ) {
       player.mute();
       return;
     }
@@ -356,6 +364,7 @@ function YouTubeEmbedPlayer({
     readonlyRef.current = isReadonly;
     audibleInReadonlyRef.current = isAudibleInReadonly;
     syncedVolumeRef.current = syncedVolume;
+    editorAudioEnabledRef.current = syncedEditorAudioEnabled;
     updatePropsRef.current = onUpdateProps;
     syncedStateRef.current = {
       isPlaying: syncedIsPlaying,
@@ -393,6 +402,7 @@ function YouTubeEmbedPlayer({
     syncedPlaybackPosition,
     syncedPlaybackUpdatedAt,
     syncedVolume,
+    syncedEditorAudioEnabled,
   ]);
 
   useEffect(() => {
@@ -928,6 +938,7 @@ export class YouTubeEmbedShapeUtil extends BaseBoxShapeUtil<YouTubeEmbedShape> {
       h: 270,
       url: "",
       volume: DEFAULT_MEDIA_VOLUME,
+      editorAudioEnabled: false,
       isPlaying: false,
       playbackPosition: 0,
       playbackUpdatedAt: 0,

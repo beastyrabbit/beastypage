@@ -29,6 +29,7 @@ type AudioPlayerShapeProps = {
   url: string;
   volume: number;
   loop: boolean;
+  editorAudioEnabled?: boolean;
   isPlaying?: boolean;
   playbackPosition?: number;
   playbackUpdatedAt?: number;
@@ -52,6 +53,7 @@ export const audioPlayerShapeProps: RecordProps<AudioPlayerShape> = {
   url: T.string,
   volume: T.number,
   loop: T.boolean,
+  editorAudioEnabled: T.optional(T.boolean),
   isPlaying: T.optional(T.boolean),
   playbackPosition: T.optional(T.number),
   playbackUpdatedAt: T.optional(T.number),
@@ -160,9 +162,12 @@ function AudioPlayerComponent({
   );
   const isInteractive = isReadonly || interactiveShapeId === shape.id;
   const showControls = !shape.props.url || isInteractive;
+  const editorAudioEnabled = shape.props.editorAudioEnabled ?? false;
   const effectiveVolume = getEffectiveMediaVolume(shape.props.volume);
   const isVolumeMuted = effectiveVolume <= 0.001;
-  const shouldOutputAudio = isReadonly ? isAudibleInReadonly : isInteractive;
+  const shouldOutputAudio = isReadonly
+    ? isAudibleInReadonly
+    : isInteractive && editorAudioEnabled;
   const currentSyncedTime = getAudioSyncedPlaybackPosition(shape.props);
   const seekPreviewTime = scrubTime ?? displayTime;
   const maxTimelineTime = Math.max(duration, displayTime, currentSyncedTime, 0);
@@ -181,8 +186,28 @@ function AudioPlayerComponent({
       return;
     }
 
-    setDisplayTime(currentSyncedTime);
-  }, [currentSyncedTime, shape.props.url]);
+    if (scrubTime !== null) {
+      return;
+    }
+
+    const nextDisplayTime = getAudioSyncedPlaybackPosition({
+      isPlaying: syncedIsPlaying,
+      playbackPosition: syncedPlaybackPosition,
+      playbackUpdatedAt: syncedPlaybackUpdatedAt,
+    });
+
+    setDisplayTime((previousTime) =>
+      Math.abs(previousTime - nextDisplayTime) < 0.01
+        ? previousTime
+        : nextDisplayTime,
+    );
+  }, [
+    scrubTime,
+    shape.props.url,
+    syncedIsPlaying,
+    syncedPlaybackPosition,
+    syncedPlaybackUpdatedAt,
+  ]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -1012,6 +1037,7 @@ export class AudioPlayerShapeUtil extends BaseBoxShapeUtil<AudioPlayerShape> {
       url: "",
       volume: DEFAULT_MEDIA_VOLUME,
       loop: false,
+      editorAudioEnabled: false,
       isPlaying: false,
       playbackPosition: 0,
       playbackUpdatedAt: 0,
