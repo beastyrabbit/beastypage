@@ -379,9 +379,7 @@ function AudioPlayerComponent({
       !isReadonly &&
       syncedIsPlaying &&
       shape.props.loop &&
-      duration > 0 &&
-      previousTime / duration > 0.9 &&
-      currentTime / duration < 0.1;
+      currentTime + Math.max(0.5, duration * 0.25) < previousTime;
 
     if (didLoopWrap) {
       const now = Date.now();
