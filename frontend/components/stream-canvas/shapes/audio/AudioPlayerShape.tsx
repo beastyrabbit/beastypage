@@ -133,6 +133,7 @@ function AudioPlayerComponent({
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastSharedPlaybackRef = useRef(0);
+  const lastObservedPlaybackRef = useRef(0);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadingFilename, setUploadingFilename] = useState<string | null>(
@@ -208,6 +209,7 @@ function AudioPlayerComponent({
     if (Math.abs(audio.currentTime - desiredTime) > 0.5) {
       audio.currentTime = desiredTime;
     }
+    lastObservedPlaybackRef.current = desiredTime;
 
     if (syncedIsPlaying) {
       void audio.play().catch(() => {
@@ -368,8 +370,28 @@ function AudioPlayerComponent({
   const handleTimeUpdate = () => {
     if (!audioRef.current) return;
     const currentTime = audioRef.current.currentTime;
+    const previousTime = lastObservedPlaybackRef.current;
+    lastObservedPlaybackRef.current = currentTime;
     if (scrubTime !== null) return;
     setDisplayTime(currentTime);
+
+    const didLoopWrap =
+      !isReadonly &&
+      syncedIsPlaying &&
+      shape.props.loop &&
+      duration > 0 &&
+      previousTime / duration > 0.9 &&
+      currentTime / duration < 0.1;
+
+    if (didLoopWrap) {
+      const now = Date.now();
+      lastSharedPlaybackRef.current = now;
+      onUpdateProps({
+        playbackPosition: currentTime,
+        playbackUpdatedAt: now,
+      });
+      return;
+    }
 
     if (!isReadonly && isInteractive && syncedIsPlaying) {
       const now = Date.now();
