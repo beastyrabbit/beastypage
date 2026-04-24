@@ -97,17 +97,17 @@ const nextConfig = {
       {
         source: "/stream-canvas",
         destination: "https://moddrop.live/",
-        permanent: false,
+        permanent: true,
       },
       {
         source: "/stream-canvas/:path*",
         destination: "https://moddrop.live/:path*",
-        permanent: false,
+        permanent: true,
       },
       {
         source: "/stream-canvas/:path*/",
         destination: "https://moddrop.live/:path*/",
-        permanent: false,
+        permanent: true,
       },
       // Redirect old /gatcha to new /projects
       {
