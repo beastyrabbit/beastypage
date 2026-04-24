@@ -1,4 +1,4 @@
-import { ArrowRight, Bot, PlugZap, Workflow } from "lucide-react";
+import { ArrowRight, Bot, Layers, PlugZap, Workflow } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -20,6 +20,14 @@ type CommandRow = {
 };
 
 const STREAM_FEATURES: StreamFeature[] = [
+  {
+    title: "ModDrop",
+    description:
+      "Separate stream canvas and drop-board tools, now hosted at moddrop.live.",
+    icon: <Layers className="size-4" />,
+    href: "https://moddrop.live/",
+    external: true,
+  },
   {
     title: "Chat control",
     description:
@@ -104,7 +112,7 @@ export default function StreamLanding() {
         </Link>
       </PageHero>
 
-      <section className="grid gap-6 sm:grid-cols-3">
+      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {STREAM_FEATURES.map((feature, index) => {
           const isActive = Boolean(feature.href && !feature.comingSoon);
           const wrapperClassName = `transition-all duration-500 ${

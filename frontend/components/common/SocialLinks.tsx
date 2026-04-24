@@ -1,6 +1,6 @@
 "use client";
 
-import { Cloud, PawPrint, Twitch } from "lucide-react";
+import { Cloud, Layers, PawPrint, Twitch } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType } from "react";
 import CoffeeIcon from "@/components/ui/coffee-icon";
@@ -38,6 +38,11 @@ const SECONDARY_LINKS: LinkCard[] = [
     href: "https://www.youtube.com/@beastyrabbit",
     label: "YouTube",
     icon: YoutubeIcon,
+  },
+  {
+    href: "https://moddrop.live/",
+    label: "ModDrop",
+    icon: Layers,
   },
   {
     href: "https://bsky.app/profile/beastyrabbit.com",
