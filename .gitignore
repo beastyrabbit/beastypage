@@ -45,6 +45,7 @@ backend/catdex-export-20251022-142634/
 backend/catdex-runtime/
 
 # Legacy folders no longer tracked
+backend/stream-canvas/
 frontend-lagacy/
 lifegen-fullgen/
 node_modules/

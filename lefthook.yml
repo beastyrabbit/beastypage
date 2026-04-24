@@ -15,6 +15,3 @@ pre-commit:
     tsc-discord-bot:
       glob: "backend/discord-bot/**/*.ts"
       run: cd backend/discord-bot && npx tsc --noEmit
-    tsc-stream-canvas:
-      glob: "backend/stream-canvas/**/*.ts"
-      run: cd backend/stream-canvas && npx tsc --noEmit

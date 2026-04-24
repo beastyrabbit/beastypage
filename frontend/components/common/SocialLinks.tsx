@@ -1,6 +1,4 @@
-"use client";
-
-import { Cloud, PawPrint, Twitch } from "lucide-react";
+import { Cloud, Layers, PawPrint, Twitch } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType } from "react";
 import CoffeeIcon from "@/components/ui/coffee-icon";
@@ -40,6 +38,11 @@ const SECONDARY_LINKS: LinkCard[] = [
     icon: YoutubeIcon,
   },
   {
+    href: "https://moddrop.live/",
+    label: "ModDrop",
+    icon: Layers,
+  },
+  {
     href: "https://bsky.app/profile/beastyrabbit.com",
     label: "Bluesky",
     icon: Cloud,
@@ -70,7 +73,10 @@ const ALL_LINKS: LinkCard[] = [
 ];
 
 const HERO_BUTTON_CLASS =
-  "inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]";
+  "inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-[background-color,border-color,box-shadow,color] hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+const LINK_FOCUS_CLASS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /** Hero quick-links (Twitch + Twitter pills) used on the home and personal pages */
 export function HeroSocialButtons({
@@ -110,7 +116,7 @@ export function PrimarySocialLinks() {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="glass-card group flex items-center gap-4 p-6 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-white/20 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
+          className={`glass-card group flex items-center gap-4 p-6 transition-[border-color,box-shadow,transform] duration-300 motion-safe:hover:-translate-y-2 hover:shadow-2xl hover:border-white/20 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-8 motion-reduce:opacity-100 fill-mode-backwards ${LINK_FOCUS_CLASS}`}
           style={{ animationDelay: `${index * 50}ms` }}
         >
           <div className="p-3 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors">
@@ -138,7 +144,7 @@ export function SecondarySocialLinks() {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:border-white/20 hover:bg-white/10 hover:text-foreground"
+          className={`group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-muted-foreground transition-[background-color,border-color,color] hover:border-white/20 hover:bg-white/10 hover:text-foreground ${LINK_FOCUS_CLASS}`}
         >
           <Icon size={16} />
           <span>{label}</span>
@@ -158,7 +164,7 @@ export function AllSocialLinks() {
           href={href}
           target="_blank"
           rel="noopener noreferrer"
-          className="glass-card group flex items-center gap-4 p-5 transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl hover:border-white/20 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
+          className={`glass-card group flex items-center gap-4 p-5 transition-[border-color,box-shadow,transform] duration-300 motion-safe:hover:-translate-y-2 hover:shadow-2xl hover:border-white/20 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-8 motion-reduce:opacity-100 fill-mode-backwards ${LINK_FOCUS_CLASS}`}
           style={{ animationDelay: `${index * 50}ms` }}
         >
           <div className="p-3 rounded-xl bg-white/5 group-hover:bg-white/10 transition-colors">

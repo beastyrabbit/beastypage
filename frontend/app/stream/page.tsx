@@ -21,18 +21,19 @@ type CommandRow = {
 
 const STREAM_FEATURES: StreamFeature[] = [
   {
+    title: "ModDrop",
+    description:
+      "Separate stream canvas and drop-board tools, now hosted at moddrop.live.",
+    icon: <Layers className="size-4" />,
+    href: "https://moddrop.live/",
+    external: true,
+  },
+  {
     title: "Chat control",
     description:
       "Manage triggers, cooldowns, and moderation from one dashboard.",
     icon: <PlugZap className="size-4" />,
     comingSoon: true,
-  },
-  {
-    title: "Stream Canvas",
-    description:
-      "Multi-user canvas overlay — drag images, gifs, and videos onto your stream in real-time.",
-    icon: <Layers className="size-4" />,
-    href: "/stream-canvas",
   },
   {
     title: "Chat game",
@@ -71,6 +72,9 @@ const COMMANDS: CommandRow[] = [
   },
 ];
 
+const INTERACTIVE_FOCUS_CLASS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 export const metadata: Metadata = {
   title: "Stream Tools | BeastyRabbit",
   description:
@@ -90,7 +94,7 @@ export default function StreamLanding() {
         title={
           <>
             Things to do in{" "}
-            <span className="text-gradient-stream animate-shimmer bg-[length:200%_auto]">
+            <span className="text-gradient-stream bg-[length:200%_auto] motion-safe:animate-shimmer motion-reduce:animate-none">
               my stream
             </span>
           </>
@@ -101,22 +105,22 @@ export default function StreamLanding() {
           href="https://twitch.tv/BeastyRabbit"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:-translate-y-1 hover:shadow-primary/40 hover:scale-105 animate-pulse-glow"
+          className={`inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/25 transition-[box-shadow,transform] duration-300 hover:shadow-primary/40 motion-safe:hover:-translate-y-1 motion-safe:hover:scale-105 motion-safe:animate-pulse-glow motion-reduce:animate-none ${INTERACTIVE_FOCUS_CLASS}`}
         >
           <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"></span>
+            <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-75 motion-safe:animate-ping motion-reduce:animate-none"></span>
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white"></span>
           </span>
           Watch live <ArrowRight className="size-4" />
         </Link>
       </PageHero>
 
-      <section className="grid gap-6 sm:grid-cols-3">
+      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {STREAM_FEATURES.map((feature, index) => {
           const isActive = Boolean(feature.href && !feature.comingSoon);
           const wrapperClassName = `transition-all duration-500 ${
             isActive
-              ? "hover:-translate-y-2 hover:shadow-2xl"
+              ? "motion-safe:hover:-translate-y-2 hover:shadow-2xl"
               : "pointer-events-none opacity-60 grayscale-[0.5]"
           }`;
           const cardContent = (
@@ -126,7 +130,7 @@ export default function StreamLanding() {
                 role="presentation"
                 aria-hidden="true"
               />
-              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:animate-shine" />
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 motion-safe:group-hover:animate-shine motion-reduce:hidden" />
 
               <div className="relative flex h-full flex-col gap-4">
                 <span className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.2em] text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
@@ -154,7 +158,7 @@ export default function StreamLanding() {
                 href={feature.href}
                 target={feature.external ? "_blank" : undefined}
                 rel={feature.external ? "noopener noreferrer" : undefined}
-                className={`${wrapperClassName} animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards`}
+                className={`${wrapperClassName} ${INTERACTIVE_FOCUS_CLASS} motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-8 motion-reduce:opacity-100 duration-700 fill-mode-backwards`}
                 style={{ animationDelay: `${index * 150}ms` }}
               >
                 {cardContent}
@@ -165,7 +169,7 @@ export default function StreamLanding() {
           return (
             <div
               key={feature.title}
-              className={`${wrapperClassName} animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards`}
+              className={`${wrapperClassName} motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-8 motion-reduce:opacity-100 duration-700 fill-mode-backwards`}
               style={{ animationDelay: `${index * 150}ms` }}
             >
               {cardContent}
@@ -209,7 +213,9 @@ export default function StreamLanding() {
                   </span>
                 </div>
               ))}
-              <div className="animate-pulse text-emerald-500 mt-2">_</div>
+              <div className="mt-2 text-emerald-500 motion-safe:animate-pulse motion-reduce:animate-none">
+                _
+              </div>
             </div>
           </div>
         </div>

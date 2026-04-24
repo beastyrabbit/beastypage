@@ -93,6 +93,22 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Stream Canvas moved to the separate ModDrop project.
+      {
+        source: "/stream-canvas",
+        destination: "https://moddrop.live/",
+        permanent: true,
+      },
+      {
+        source: "/stream-canvas/:path*",
+        destination: "https://moddrop.live/:path*",
+        permanent: true,
+      },
+      {
+        source: "/stream-canvas/:path*/",
+        destination: "https://moddrop.live/:path*/",
+        permanent: true,
+      },
       // Redirect old /gatcha to new /projects
       {
         source: "/gatcha",
