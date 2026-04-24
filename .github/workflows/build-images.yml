@@ -24,10 +24,13 @@ on:
         description: 'Build Discord bot image'
         type: boolean
         default: true
+      deploy_convex:
+        description: 'Deploy Convex backend (main branch only)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-  packages: write
 
 env:
   REGISTRY: ghcr.io
@@ -102,15 +105,15 @@ jobs:
 
   deploy-convex:
     needs: [changes, tag-convex-changes]
-    # Deploy if Convex changed on main, Convex changed since the previous tag,
-    # or a manual frontend build explicitly requests it.
+    # Deploy only from protected release refs or explicit main-branch dispatches.
     if: |
       always() &&
       ((github.ref == 'refs/heads/main' &&
         needs.changes.outputs.convex == 'true') ||
        (startsWith(github.ref, 'refs/tags/v') &&
-        needs.tag-convex-changes.outputs.convex == 'true') ||
-       github.event.inputs.build_frontend == 'true')
+         needs.tag-convex-changes.outputs.convex == 'true') ||
+       (github.ref == 'refs/heads/main' &&
+        github.event.inputs.deploy_convex == 'true'))
     runs-on: arc-beastypage
     defaults:
       run:
@@ -143,6 +146,9 @@ jobs:
        needs.changes.outputs.frontend == 'true' ||
        github.event.inputs.build_frontend == 'true')
     runs-on: arc-beastypage
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v6
 
@@ -192,6 +198,9 @@ jobs:
        needs.changes.outputs.renderer == 'true' ||
        github.event.inputs.build_renderer == 'true')
     runs-on: arc-beastypage
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v6
 
@@ -232,6 +241,9 @@ jobs:
        needs.changes.outputs.image_processing == 'true' ||
        github.event.inputs.build_image_processing == 'true')
     runs-on: arc-beastypage
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v6
 
@@ -272,6 +284,9 @@ jobs:
        needs.changes.outputs.discord_bot == 'true' ||
        github.event.inputs.build_discord_bot == 'true')
     runs-on: arc-beastypage
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v6
 
