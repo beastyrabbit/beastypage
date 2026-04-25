@@ -35,10 +35,6 @@ import {
 } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
 import {
-  pickClassicWheelPrize,
-  type StreamWheelSpin,
-} from "@/lib/wheel/classicWheel";
-import {
   AFTERLIFE_OPTIONS,
   computeLayerCount,
   withResolvedAfterlifeParams,
@@ -95,20 +91,6 @@ function canvasToPngBlob(canvas: CanvasExportSource): Promise<Blob> {
   });
 }
 
-function toWheelSpinPayload(
-  selection: ReturnType<typeof pickClassicWheelPrize>,
-  forced: boolean,
-): StreamWheelSpin {
-  return {
-    prizeName: selection.prize.name,
-    prizeIndex: selection.index,
-    color: selection.prize.color,
-    chance: selection.prize.chance,
-    randomBucket: selection.random,
-    forced,
-  };
-}
-
 /** Format a multiplier value like 1 -> "1x", 0.25 -> "0.25x", 2.50 -> "2.5x" */
 function formatMultiplier(v: number): string {
   return `${v.toFixed(2).replace(/\.?0+$/, "")}x`;
@@ -143,7 +125,6 @@ export function StreamControlClient() {
   const showBrbMut = useMutation(api.catStream.showBrb);
   const clearOverlayMut = useMutation(api.catStream.clearOverlay);
   const toggleTestModeMut = useMutation(api.catStream.toggleTestMode);
-  const logWheelSpinMut = useMutation(api.wheel.logSpin);
   const createMapper = useMutation(api.mapper.create);
   const updateMapperMeta = useMutation(api.mapper.updateMeta);
 
@@ -174,8 +155,10 @@ export function StreamControlClient() {
   const [catNameDraft, setCatNameDraft] = useState("");
   const [creatorNameDraft, setCreatorNameDraft] = useState("");
   const [metaDirty, setMetaDirty] = useState(false);
+  const [historySaving, setHistorySaving] = useState(false);
   const [metaSaving, setMetaSaving] = useState(false);
   const creatorFilledRef = useRef(false);
+  const spinRequestSeqRef = useRef(0);
   const lastResultRef = useRef<{
     canvas: HTMLCanvasElement | OffscreenCanvas;
     params: Record<string, unknown>;
@@ -416,7 +399,9 @@ export function StreamControlClient() {
   // Spin handler
   const handleSpin = useCallback(async () => {
     if (!generator || spinning || wheelSpinning || sceneCommandPending) return;
+    const requestSeq = ++spinRequestSeqRef.current;
     setSpinning(true);
+    setHistorySaving(false);
     try {
       if (!generator.generateRandomCat) {
         throw new Error("Generator does not support random cat generation");
@@ -460,32 +445,44 @@ export function StreamControlClient() {
         slots: result.slotSelections,
         countdownSeconds,
       });
+      setSpinning(false);
 
       // Store result only after the live stream command succeeds.
       lastResultRef.current = nextLastResult;
       setHasTint(generatedHasTint);
+      setCurrentProfileId(null);
+      setCurrentSlug(null);
+      setShareLink(null);
+      setMetaDirty(false);
+      toast.success("Spin triggered!");
 
-      // Persist to cat_profile (same as SingleCatPlus)
-      const catData = {
-        params: resolvedParams,
-        accessorySlots: result.slotSelections?.accessories ?? [],
-        scarSlots: result.slotSelections?.scars ?? [],
-        tortieSlots: result.slotSelections?.tortie ?? [],
-        counts: {
-          accessories: (result.slotSelections?.accessories ?? []).filter(
-            (s: string) => s !== "none",
-          ).length,
-          scars: (result.slotSelections?.scars ?? []).filter(
-            (s: string) => s !== "none",
-          ).length,
-          tortie: (result.slotSelections?.tortie ?? []).filter(Boolean).length,
-        },
-      };
-      const profile = await createMapper({
-        catData,
-        creatorName: creatorNameDraft.trim() || undefined,
-      });
-      if (profile) {
+      setHistorySaving(true);
+      try {
+        // Persist to cat_profile (same as SingleCatPlus)
+        const catData = {
+          params: resolvedParams,
+          accessorySlots: result.slotSelections?.accessories ?? [],
+          scarSlots: result.slotSelections?.scars ?? [],
+          tortieSlots: result.slotSelections?.tortie ?? [],
+          counts: {
+            accessories: (result.slotSelections?.accessories ?? []).filter(
+              (s: string) => s !== "none",
+            ).length,
+            scars: (result.slotSelections?.scars ?? []).filter(
+              (s: string) => s !== "none",
+            ).length,
+            tortie: (result.slotSelections?.tortie ?? []).filter(Boolean)
+              .length,
+          },
+        };
+        const profile = await createMapper({
+          catData,
+          creatorName: creatorNameDraft.trim() || undefined,
+        });
+        if (!profile) {
+          throw new Error("History save returned no profile");
+        }
+        if (spinRequestSeqRef.current !== requestSeq) return;
         setCurrentProfileId(profile.id);
         setCurrentSlug(profile.slug);
         const origin =
@@ -493,15 +490,26 @@ export function StreamControlClient() {
         setShareLink(`${origin}/view/${profile.slug}`);
         setCatNameDraft("");
         setMetaDirty(false);
+      } catch (err) {
+        if (spinRequestSeqRef.current !== requestSeq) return;
+        console.error("Failed to save stream history entry", err);
+        toast.warning("Spin triggered, but history save failed.");
+      } finally {
+        if (spinRequestSeqRef.current === requestSeq) {
+          setHistorySaving(false);
+        }
       }
-
-      toast.success("Spin triggered!");
     } catch (err) {
+      if (spinRequestSeqRef.current === requestSeq) {
+        setHistorySaving(false);
+      }
       toast.error(
         err instanceof Error ? err.message : "Failed to trigger spin",
       );
     } finally {
-      setSpinning(false);
+      if (spinRequestSeqRef.current === requestSeq) {
+        setSpinning(false);
+      }
     }
   }, [
     buildSessionSettings,
@@ -522,43 +530,19 @@ export function StreamControlClient() {
 
     const command = session?.currentCommand as
       | {
+          type?: string;
           params?: unknown;
-          slots?: unknown;
         }
       | undefined;
-    const params =
-      lastResultRef.current?.params ??
-      (command?.params as Record<string, unknown> | undefined);
-    const slots =
-      lastResultRef.current?.slots ??
-      (command?.slots as
-        | {
-            accessories?: string[];
-            scars?: string[];
-            tortie?: unknown[];
-          }
-        | undefined);
 
-    if (!params) {
+    if (command?.type !== "spin" || command.params === undefined) {
       toast.error("Spin a cat before spinning the wheel.");
       return;
     }
 
     setWheelSpinning(true);
     try {
-      const wheelSpin = toWheelSpinPayload(pickClassicWheelPrize(), false);
-      await triggerWheelMut({
-        params,
-        slots,
-        wheelSpin,
-      });
-      void logWheelSpinMut({
-        prizeName: wheelSpin.prizeName,
-        forced: wheelSpin.forced,
-        randomBucket: wheelSpin.randomBucket,
-      }).catch((error) => {
-        console.error("Failed to log manual stream wheel spin", error);
-      });
+      await triggerWheelMut({});
       toast.success("Wheel triggered!");
     } catch (err) {
       toast.error(
@@ -573,7 +557,6 @@ export function StreamControlClient() {
     sceneCommandPending,
     triggerWheelMut,
     wheelSpinning,
-    logWheelSpinMut,
   ]);
 
   // Save meta (cat name / creator name) to existing profile
@@ -775,11 +758,12 @@ export function StreamControlClient() {
   const fallbackCommand =
     (session?.currentCommand as
       | {
+          type?: string;
           params?: unknown;
         }
       | undefined) ?? undefined;
   const hasWheelSource = Boolean(
-    lastResultRef.current?.params ?? fallbackCommand?.params,
+    fallbackCommand?.type === "spin" && fallbackCommand.params !== undefined,
   );
   const commandBusy = spinning || wheelSpinning || sceneCommandPending !== null;
   const activeScene = getActiveStreamScene(session);
@@ -1478,9 +1462,16 @@ export function StreamControlClient() {
                 "hover:bg-foreground hover:text-background disabled:opacity-50",
               )}
               onClick={handleSaveMeta}
-              disabled={!currentProfileId || metaSaving || !metaDirty}
+              disabled={
+                !currentProfileId || historySaving || metaSaving || !metaDirty
+              }
             >
-              <Sparkles className="size-4" /> Save to History
+              {historySaving || metaSaving ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Sparkles className="size-4" />
+              )}{" "}
+              Save to History
             </button>
             <Link
               href="/history"

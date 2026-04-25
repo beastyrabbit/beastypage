@@ -47,17 +47,16 @@ describe("withResolvedAfterlifeParams", () => {
     });
   });
 
-  it("resolves random afterlife modes into one concrete params object", () => {
-    const random = vi
-      .spyOn(Math, "random")
-      .mockReturnValueOnce(0.05)
-      .mockReturnValueOnce(0.95);
+  it.each([
+    [0.05, { darkForest: true, darkMode: true, dead: false }],
+    [0.1, { darkForest: false, darkMode: false, dead: true }],
+    [0.15, { darkForest: false, darkMode: false, dead: true }],
+    [0.2, { darkForest: false, darkMode: false, dead: false }],
+    [0.25, { darkForest: false, darkMode: false, dead: false }],
+  ])("resolves both10 roll %s into one afterlife outcome", (roll, expected) => {
+    const random = vi.spyOn(Math, "random").mockReturnValueOnce(roll);
 
-    expect(withResolvedAfterlifeParams({}, "both10")).toMatchObject({
-      darkForest: true,
-      darkMode: true,
-      dead: false,
-    });
-    expect(random).toHaveBeenCalledTimes(2);
+    expect(withResolvedAfterlifeParams({}, "both10")).toMatchObject(expected);
+    expect(random).toHaveBeenCalledTimes(1);
   });
 });

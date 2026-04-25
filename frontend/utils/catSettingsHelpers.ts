@@ -37,11 +37,12 @@ export function resolveAfterlife(option: AfterlifeOption): {
       return { darkForest: Math.random() < 0.1, dead: false };
     case "star10":
       return { darkForest: false, dead: Math.random() < 0.1 };
-    case "both10":
-      return {
-        darkForest: Math.random() < 0.1,
-        dead: Math.random() < 0.1,
-      };
+    case "both10": {
+      const roll = Math.random();
+      if (roll < 0.1) return { darkForest: true, dead: false };
+      if (roll < 0.2) return { darkForest: false, dead: true };
+      return { darkForest: false, dead: false };
+    }
     case "darkForce":
       return { darkForest: true, dead: false };
     case "starForce":

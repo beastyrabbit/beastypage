@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { MutationCtx } from "./_generated/server.js";
 import { mutation, query } from "./_generated/server.js";
-import { wheelSpinValidator } from "./schema.js";
+import { buildStreamWheelUpdate, pickStreamWheelSpin } from "./streamWheel.js";
 
 /** Helper: get the authenticated user or throw. */
 async function requireUser(ctx: MutationCtx) {
@@ -137,7 +137,6 @@ export const triggerSpin = mutation({
   args: {
     params: v.any(),
     slots: v.optional(v.any()),
-    wheelSpin: v.optional(wheelSpinValidator),
     countdownSeconds: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -151,7 +150,6 @@ export const triggerSpin = mutation({
       timestamp: Date.now(),
     };
     if (args.slots !== undefined) command.slots = args.slots;
-    if (args.wheelSpin !== undefined) command.wheelSpin = args.wheelSpin;
     if (args.countdownSeconds !== undefined)
       command.countdownSeconds = args.countdownSeconds;
 
@@ -167,27 +165,29 @@ export const triggerSpin = mutation({
  * Trigger only the wheel reward for the active cat on the OBS overlay.
  */
 export const triggerWheel = mutation({
-  args: {
-    params: v.any(),
-    slots: v.optional(v.any()),
-    wheelSpin: wheelSpinValidator,
-  },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
     const session = await requireSession(ctx);
-    const prevSeq = session.currentCommand?.seq ?? 0;
+    const sourceCommand = session.currentCommand;
+    if (
+      !sourceCommand ||
+      sourceCommand.type !== "spin" ||
+      sourceCommand.params === undefined
+    ) {
+      throw new Error("Spin a cat before spinning the wheel.");
+    }
+    if (session.lastWheelSpinForSeq === sourceCommand.seq) {
+      throw new Error("Wheel already spun for this cat.");
+    }
+    const now = Date.now();
+    const wheelSpin = pickStreamWheelSpin();
+    const wheelUpdate = buildStreamWheelUpdate(session, wheelSpin, now);
 
-    await ctx.db.patch(session._id, {
-      status: "active" as const,
-      currentCommand: {
-        type: "wheel",
-        seq: prevSeq + 1,
-        params: args.params,
-        slots: args.slots,
-        wheelSpin: args.wheelSpin,
-        timestamp: Date.now(),
-      },
-      updatedAt: Date.now(),
-    });
+    await ctx.db.insert("wheel_spins", wheelUpdate.wheelLog);
+
+    await ctx.db.patch(session._id, wheelUpdate.patch);
+
+    return wheelSpin;
   },
 });
 
