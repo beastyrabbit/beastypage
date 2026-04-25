@@ -344,10 +344,13 @@ export function StreamControlClient() {
           );
         }
         if (typeof s.brbSettingsCode === "string") {
-          const normalized =
-            normalizePortableSettingsCode(s.brbSettingsCode) ?? "";
-          setBrbSettingsCode(normalized);
-          setBrbSettingsDraft(normalized);
+          const storedCode = s.brbSettingsCode.trim();
+          const normalized = storedCode
+            ? normalizePortableSettingsCode(storedCode)
+            : "";
+          const displayCode = normalized ?? storedCode;
+          setBrbSettingsCode(displayCode);
+          setBrbSettingsDraft(displayCode);
         }
         if (isPositiveFiniteNumber(s.lobbyClearSeq))
           clearSeqRef.current = s.lobbyClearSeq;
@@ -1525,6 +1528,11 @@ function BrbPresetSection({
   const presetValid = hasSavedPreset
     ? Boolean(decodePortableSettings(savedCode))
     : true;
+  const presetStatus = hasSavedPreset
+    ? presetValid
+      ? "Preset Ready"
+      : "Invalid Preset"
+    : "Uses Live Settings";
 
   const runSave = async (value: string) => {
     setSaving(true);
@@ -1559,12 +1567,12 @@ function BrbPresetSection({
             "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
             hasSavedPreset && presetValid
               ? "border-emerald-500/30 text-emerald-400"
-              : "border-border/40 text-muted-foreground",
+              : hasSavedPreset
+                ? "border-red-500/30 text-red-400"
+                : "border-border/40 text-muted-foreground",
           )}
         >
-          {hasSavedPreset && presetValid
-            ? "Preset Ready"
-            : "Uses Live Settings"}
+          {presetStatus}
         </span>
       </div>
 

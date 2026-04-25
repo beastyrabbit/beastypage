@@ -74,7 +74,7 @@ function encodeRange(range: LayerRange): number {
   const max = Math.max(range.min, range.max);
   const index = getRangeIndex().get(`${min},${max}`);
   if (index === undefined) {
-    throw new RangeError("Portable settings range is not encodable");
+    throw new Error("Internal portable settings range table is incomplete");
   }
   return index;
 }
