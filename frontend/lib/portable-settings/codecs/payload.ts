@@ -55,10 +55,28 @@ const AFTERLIFE_INDEX = new Map<string, number>(
   AFTERLIFE_TABLE.map((v, i) => [v, i]),
 );
 
+const MAX_RANGE_VALUE = 4;
+const PALETTE_LOW_BITS = 27;
+const PALETTE_BIT_CAPACITY = 74;
+
+function isRangeValue(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= MAX_RANGE_VALUE;
+}
+
 function encodeRange(range: LayerRange): number {
+  if (!isRangeValue(range.min) || !isRangeValue(range.max)) {
+    throw new RangeError(
+      "Portable settings ranges must be integers from 0 to 4",
+    );
+  }
+
   const min = Math.min(range.min, range.max);
   const max = Math.max(range.min, range.max);
-  return getRangeIndex().get(`${min},${max}`) ?? 0;
+  const index = getRangeIndex().get(`${min},${max}`);
+  if (index === undefined) {
+    throw new RangeError("Portable settings range is not encodable");
+  }
+  return index;
 }
 
 function decodeRange(index: number): LayerRange {
@@ -105,6 +123,25 @@ function decodePaletteMask(low: number, high: number): ExtendedMode[] {
     }
   }
   return modes;
+}
+
+function hasBitsAtOrAbove(value: number, startBit: number): boolean {
+  if (startBit <= 0) return value !== 0;
+  return Math.floor(value / 2 ** startBit) > 0;
+}
+
+function hasUnusedPaletteBits(low: number, high: number): boolean {
+  const usedBits = Math.min(
+    PORTABLE_PALETTE_REGISTRY.length,
+    PALETTE_BIT_CAPACITY,
+  );
+
+  if (usedBits < PALETTE_LOW_BITS && hasBitsAtOrAbove(low, usedBits)) {
+    return true;
+  }
+
+  const usedHighBits = Math.max(0, usedBits - PALETTE_LOW_BITS);
+  return hasBitsAtOrAbove(high, usedHighBits);
 }
 
 // 6 words x 16 bits = 96 bits. The value is split into two safe 48-bit halves.
@@ -181,6 +218,8 @@ export function unpackPayload(
   const reservedModeBit = Math.floor(upper / 2 ** 47) % 2;
   const paletteHigh = upper % 2 ** 47;
 
+  if (hasUnusedPaletteBits(paletteLow, paletteHigh)) return null;
+
   return {
     accessoryRange: decodeRange(accIdx),
     scarRange: decodeRange(scarIdx),
@@ -191,4 +230,3 @@ export function unpackPayload(
     extendedModes: decodePaletteMask(paletteLow, paletteHigh),
   };
 }
-

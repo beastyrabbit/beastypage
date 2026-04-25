@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { SingleCatSettings } from "@/utils/singleCatVariants";
 import { DEFAULT_SINGLE_CAT_SETTINGS } from "@/utils/singleCatVariants";
+import { POSITION_MASKS } from "../codecs/currentV3";
+import type { RawCodeWords } from "../codecs/payload";
 import {
   decodePortableSettings,
   encodePortableSettings,
   isValidSettingsCode,
   normalizePortableSettingsCode,
+  SETTINGS_CODE_MAX_INPUT_LENGTH,
 } from "../encoding";
 import { applyPortableSettings, extractPortableSettings } from "../helpers";
 import { PORTABLE_PALETTE_REGISTRY } from "../registry";
@@ -44,6 +47,28 @@ function assertRoundTrip(settings: SingleCatPortableSettings) {
   expect([...(decoded?.extendedModes ?? [])].sort()).toEqual(
     [...settings.extendedModes].sort(),
   );
+}
+
+const WORD_BASE = 65_536;
+const WORD_BASE_SQUARED = WORD_BASE * WORD_BASE;
+
+function splitPayloadHalves(lower: number, upper: number): RawCodeWords {
+  return [
+    lower % WORD_BASE,
+    Math.floor(lower / WORD_BASE) % WORD_BASE,
+    Math.floor(lower / WORD_BASE_SQUARED) % WORD_BASE,
+    upper % WORD_BASE,
+    Math.floor(upper / WORD_BASE) % WORD_BASE,
+    Math.floor(upper / WORD_BASE_SQUARED) % WORD_BASE,
+  ];
+}
+
+function formatRawCodeWords(rawWords: RawCodeWords): string {
+  return rawWords
+    .map(
+      (rawIndex, position) => WORDLIST_V3[rawIndex ^ POSITION_MASKS[position]],
+    )
+    .join("-");
 }
 
 // ---------------------------------------------------------------------------
@@ -202,10 +227,11 @@ describe("encodePortableSettings / decodePortableSettings", () => {
       .map((w, i) => (i === 1 ? w.toUpperCase() : w))
       .join("-");
 
-    expect(decodePortableSettings(upper)).not.toBeNull();
+    const decodedUpper = decodePortableSettings(upper);
+    expect(decodedUpper).not.toBeNull();
     expect(decodePortableSettings(mixed)).not.toBeNull();
 
-    const decodedUpper = decodePortableSettings(upper)!;
+    if (!decodedUpper) throw new Error("Expected uppercase code to decode");
     expect(decodedUpper.afterlifeMode).toBe(settings.afterlifeMode);
     expect([...decodedUpper.extendedModes].sort()).toEqual(
       [...settings.extendedModes].sort(),
@@ -245,6 +271,16 @@ describe("encodePortableSettings / decodePortableSettings", () => {
     expect(decodePortableSettings("")).toBeNull();
   });
 
+  it("rejects oversized input before normalization", () => {
+    const code = encodePortableSettings(makeSettings());
+    const oversized = `${" ".repeat(
+      SETTINGS_CODE_MAX_INPUT_LENGTH + 1,
+    )}${code}`;
+
+    expect(decodePortableSettings(oversized)).toBeNull();
+    expect(normalizePortableSettingsCode(oversized)).toBeNull();
+  });
+
   it("produces different codes for different settings", () => {
     const a = encodePortableSettings(makeSettings({ afterlifeMode: "off" }));
     const b = encodePortableSettings(
@@ -260,6 +296,45 @@ describe("encodePortableSettings / decodePortableSettings", () => {
     expect(
       decodePortableSettings("alkaloids-which-that-that-that-that"),
     ).toBeNull();
+  });
+
+  it("rejects V3 payloads with currently unused palette bits set", () => {
+    const sparePalettePosition = PORTABLE_PALETTE_REGISTRY.length;
+    expect(sparePalettePosition).toBeLessThan(74);
+
+    const lower =
+      3 + (sparePalettePosition < 27 ? 2 ** (21 + sparePalettePosition) : 0);
+    const upper =
+      sparePalettePosition >= 27 ? 2 ** (sparePalettePosition - 27) : 0;
+    const code = formatRawCodeWords(splitPayloadHalves(lower, upper));
+
+    expect(decodePortableSettings(code)).toBeNull();
+    expect(normalizePortableSettingsCode(code)).toBeNull();
+  });
+
+  it("rejects valid-word V3 payloads with invalid field values", () => {
+    const invalidCodes = [
+      splitPayloadHalves(2, 0),
+      splitPayloadHalves(3 + 15 * 16, 0),
+      splitPayloadHalves(3 + 6 * 65_536, 0),
+    ].map(formatRawCodeWords);
+
+    for (const code of invalidCodes) {
+      expect(decodePortableSettings(code)).toBeNull();
+      expect(normalizePortableSettingsCode(code)).toBeNull();
+      expect(isValidSettingsCode(code)).toBe(false);
+    }
+  });
+
+  it("throws when encoding invalid range values", () => {
+    expect(() =>
+      encodePortableSettings(
+        makeSettings({ accessoryRange: { min: 0, max: 5 } }),
+      ),
+    ).toThrow("Portable settings ranges");
+    expect(() =>
+      encodePortableSettings(makeSettings({ scarRange: { min: 0.5, max: 2 } })),
+    ).toThrow("Portable settings ranges");
   });
 });
 
@@ -410,8 +485,12 @@ describe("append-compatibility", () => {
       scarRange: { min: 0, max: 0 },
       tortieRange: { min: 3, max: 4 },
     });
-    const code = encodePortableSettings(settings);
-    const decoded = decodePortableSettings(code)!;
+    const code = "applejack-bluefin-rollins-newsrooms-coun-spilled";
+    expect(encodePortableSettings(settings)).toBe(code);
+
+    const decoded = decodePortableSettings(code);
+    expect(decoded).not.toBeNull();
+    if (!decoded) throw new Error("Expected fixed V3 code to decode");
     expect([...decoded.extendedModes].sort()).toEqual([
       "blackout",
       "fma",
@@ -419,6 +498,11 @@ describe("append-compatibility", () => {
       "scottish-clans",
     ]);
     expect(decoded.accessoryRange).toEqual({ min: 2, max: 4 });
+    expect(decoded.scarRange).toEqual({ min: 0, max: 0 });
+    expect(decoded.tortieRange).toEqual({ min: 3, max: 4 });
+    expect(decoded.exactLayerCounts).toBe(true);
+    expect(decoded.afterlifeMode).toBe("both10");
+    expect(decoded.includeBaseColours).toBe(true);
   });
 });
 

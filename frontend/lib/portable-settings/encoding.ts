@@ -5,6 +5,8 @@ import {
 } from "./codecs/currentV3";
 import type { SingleCatPortableSettings } from "./types";
 
+export { SETTINGS_CODE_MAX_INPUT_LENGTH } from "./codecs/settingsCode";
+
 /**
  * Encode portable settings into a strict 6-word current settings code.
  *

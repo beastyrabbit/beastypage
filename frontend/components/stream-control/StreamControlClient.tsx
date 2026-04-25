@@ -31,6 +31,7 @@ import {
   decodePortableSettings,
   encodePortableSettings,
   normalizePortableSettingsCode,
+  SETTINGS_CODE_MAX_INPUT_LENGTH,
 } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
 import {
@@ -1572,6 +1573,7 @@ function BrbPresetSection({
           <input
             type="text"
             aria-label="BRB settings code"
+            maxLength={SETTINGS_CODE_MAX_INPUT_LENGTH}
             value={draftCode}
             onChange={(e) => onDraftChange(e.target.value)}
             onKeyDown={(e) => {
@@ -1724,6 +1726,7 @@ function SettingsCode({
         <input
           type="text"
           aria-label="Settings code"
+          maxLength={SETTINGS_CODE_MAX_INPUT_LENGTH}
           value={codeInput}
           onChange={(e) => setCodeInput(e.target.value)}
           onKeyDown={(e) => {

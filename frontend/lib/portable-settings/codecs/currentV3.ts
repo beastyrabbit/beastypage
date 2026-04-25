@@ -53,9 +53,7 @@ function decodeRawWords(code: string): {
   };
 }
 
-export function encodeCurrentV3(
-  settings: SingleCatPortableSettings,
-): string {
+export function encodeCurrentV3(settings: SingleCatPortableSettings): string {
   const rawWords = packPayload(settings, CURRENT_PAYLOAD_VERSION);
   return formatSettingsCodeWords(
     rawWords.map((rawIndex, position) => {
@@ -79,4 +77,3 @@ export function normalizeCurrentV3Code(code: string): string | null {
   if (!unpackPayload(decoded.rawWords, CURRENT_PAYLOAD_VERSION)) return null;
   return formatSettingsCodeWords(decoded.displayWords);
 }
-
