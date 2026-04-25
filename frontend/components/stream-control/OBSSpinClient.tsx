@@ -1155,27 +1155,52 @@ function getParameterValueForDisplay(
 
 function parseStreamWheelSpin(value: unknown): StreamWheelSpin | null {
   if (!value || typeof value !== "object") {
-    console.error("[OBSSpinClient] Invalid wheelSpin data — not an object", value);
+    console.error(
+      "[OBSSpinClient] Invalid wheelSpin data — not an object",
+      value,
+    );
     return null;
   }
   const spin = value as Partial<StreamWheelSpin>;
   if (
-    typeof spin.prizeName !== "string" ||
     typeof spin.prizeIndex !== "number" ||
-    typeof spin.color !== "string" ||
-    typeof spin.chance !== "number" ||
+    !Number.isInteger(spin.prizeIndex) ||
+    spin.prizeIndex < 0 ||
+    spin.prizeIndex >= CLASSIC_WHEEL_PRIZES.length ||
     typeof spin.forced !== "boolean"
   ) {
-    console.error("[OBSSpinClient] Invalid wheelSpin data — missing or wrong fields", value);
+    console.error(
+      "[OBSSpinClient] Invalid wheelSpin data — missing or wrong fields",
+      value,
+    );
     return null;
   }
+  const prize = CLASSIC_WHEEL_PRIZES[spin.prizeIndex];
+  if (
+    spin.prizeName !== prize.name ||
+    spin.color !== prize.color ||
+    spin.chance !== prize.chance
+  ) {
+    console.error(
+      "[OBSSpinClient] Invalid wheelSpin data - prize fields do not match index",
+      value,
+    );
+    return null;
+  }
+  const randomBucket =
+    typeof spin.randomBucket === "number" &&
+    Number.isFinite(spin.randomBucket) &&
+    Number.isInteger(spin.randomBucket) &&
+    spin.randomBucket >= 0 &&
+    spin.randomBucket < 100
+      ? spin.randomBucket
+      : undefined;
   return {
-    prizeName: spin.prizeName,
+    prizeName: prize.name,
     prizeIndex: spin.prizeIndex,
-    color: spin.color,
-    chance: spin.chance,
-    randomBucket:
-      typeof spin.randomBucket === "number" ? spin.randomBucket : undefined,
+    color: prize.color,
+    chance: prize.chance,
+    randomBucket,
     forced: spin.forced,
   };
 }
@@ -1183,20 +1208,16 @@ function parseStreamWheelSpin(value: unknown): StreamWheelSpin | null {
 function toClassicWheelSelection(
   wheelSpin: StreamWheelSpin,
 ): ClassicWheelSelection {
-  const fallbackPrize = {
-    name: wheelSpin.prizeName,
-    chance: wheelSpin.chance,
-    color: wheelSpin.color,
-  };
-  const prize = CLASSIC_WHEEL_PRIZES[wheelSpin.prizeIndex];
-  if (!prize) {
-    console.warn(
-      `[OBSSpinClient] Prize index ${wheelSpin.prizeIndex} out of range (max ${CLASSIC_WHEEL_PRIZES.length - 1}), using fallback`,
-    );
-  }
+  const index =
+    Number.isInteger(wheelSpin.prizeIndex) &&
+    wheelSpin.prizeIndex >= 0 &&
+    wheelSpin.prizeIndex < CLASSIC_WHEEL_PRIZES.length
+      ? wheelSpin.prizeIndex
+      : CLASSIC_WHEEL_PRIZES.length - 1;
+  const prize = CLASSIC_WHEEL_PRIZES[index];
   return {
-    prize: prize ?? fallbackPrize,
-    index: prize ? wheelSpin.prizeIndex : CLASSIC_WHEEL_PRIZES.length - 1,
+    prize,
+    index,
     random: wheelSpin.randomBucket,
   };
 }
@@ -2556,7 +2577,9 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         if (generationIdRef.current !== token) return;
         await wheelRef.current.spinTo(wheelSelection);
       } else {
-        console.warn("[OBSSpinClient] Wheel ref not available after 1s polling — falling back to timed delay");
+        console.warn(
+          "[OBSSpinClient] Wheel ref not available after 1s polling — falling back to timed delay",
+        );
         await wait(WHEEL_SPIN_DURATION_MS);
       }
 
@@ -3387,6 +3410,22 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         window.clearTimeout(toastTimerRef.current);
         toastTimerRef.current = null;
       }
+      if (countdownTimerRef.current) {
+        clearTimeout(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      if (previewIntervalRef.current) {
+        clearInterval(previewIntervalRef.current);
+        previewIntervalRef.current = null;
+      }
+      if (autoClearTimerRef.current) {
+        clearTimeout(autoClearTimerRef.current);
+        autoClearTimerRef.current = null;
+      }
+      if (fadeTimerRef.current) {
+        clearTimeout(fadeTimerRef.current);
+        fadeTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -3651,12 +3690,15 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       // OBS: Use override params from the control page if available
       const override = overrideParamsRef.current;
       overrideParamsRef.current = null; // consume once
+      const overrideParams = override?.params;
+      const overrideSlots = override?.slots;
+      const usingOverrideParams = Boolean(overrideParams);
       // biome-ignore lint/suspicious/noExplicitAny: dynamic random generation result with varying shape
       let randomResult: any;
-      if (override?.params) {
+      if (overrideParams) {
         randomResult = {
-          params: override.params as Record<string, unknown>,
-          slotSelections: override.slots as typeof randomResult.slotSelections,
+          params: overrideParams as Record<string, unknown>,
+          slotSelections: overrideSlots as typeof randomResult.slotSelections,
         };
       } else {
         if (!generator.generateRandomCat) {
@@ -3708,11 +3750,18 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
 
       initMaxLayerRows();
 
-      const { darkForest: enableDarkForest, dead: enableDead } =
-        resolveAfterlife(afterlifeMode);
-      params.darkForest = enableDarkForest;
-      params.darkMode = enableDarkForest;
-      params.dead = enableDead;
+      if (usingOverrideParams) {
+        const enableDarkForest = Boolean(params.darkForest || params.darkMode);
+        params.darkForest = enableDarkForest;
+        params.darkMode = enableDarkForest;
+        params.dead = Boolean(params.dead);
+      } else {
+        const { darkForest: enableDarkForest, dead: enableDead } =
+          resolveAfterlife(afterlifeMode);
+        params.darkForest = enableDarkForest;
+        params.darkMode = enableDarkForest;
+        params.dead = enableDead;
+      }
 
       const countsResult: GenerationCounts = {
         accessories: accessorySlots.length,
@@ -3723,7 +3772,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       setRollSummary(
         `Rolled → Accessories: ${countsResult.accessories} • Scars: ${countsResult.scars} • Tortie layers: ${countsResult.tortie}`,
       );
-      setHasTint(Boolean(enableDarkForest || enableDead));
+      setHasTint(Boolean(params.darkForest || params.dead));
       setSpriteGalleryOpen(false);
 
       const uniqueAccessories: string[] = Array.from(
@@ -4716,22 +4765,51 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
 
   /** Cancel running timers + reset roller/param state for phase transitions */
   const resetCommandState = useCallback(() => {
-    if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
-    if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
-    if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
+    if (countdownTimerRef.current) {
+      clearTimeout(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+    if (previewIntervalRef.current) {
+      clearInterval(previewIntervalRef.current);
+      previewIntervalRef.current = null;
+    }
+    if (autoClearTimerRef.current) {
+      clearTimeout(autoClearTimerRef.current);
+      autoClearTimerRef.current = null;
+    }
+    if (fadeTimerRef.current) {
+      clearTimeout(fadeTimerRef.current);
+      fadeTimerRef.current = null;
+    }
     generationIdRef.current++;
     setParamRows([]);
     setRollerLabel(null);
     setRollerActiveValue(null);
+    setCountdownPreview(null);
+    setCountdownValue(0);
+    setSpinBoardVisible(false);
     setSpinDone(false);
     resetWheelOverlay();
   }, [resetWheelOverlay]);
 
   const handleWheelCommand = useCallback(
     async (wheelSpin: StreamWheelSpin, params?: unknown, slots?: unknown) => {
-      if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
-      if (previewIntervalRef.current) clearInterval(previewIntervalRef.current);
-      if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
+      if (countdownTimerRef.current) {
+        clearTimeout(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      if (previewIntervalRef.current) {
+        clearInterval(previewIntervalRef.current);
+        previewIntervalRef.current = null;
+      }
+      if (autoClearTimerRef.current) {
+        clearTimeout(autoClearTimerRef.current);
+        autoClearTimerRef.current = null;
+      }
+      if (fadeTimerRef.current) {
+        clearTimeout(fadeTimerRef.current);
+        fadeTimerRef.current = null;
+      }
 
       const token = ++generationIdRef.current;
       setSpinDone(false);
@@ -4745,18 +4823,22 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       setSpinBoardVisible(false);
       setObsPhase("active");
 
-      const currentState = catStateRef.current;
-      if (currentState) {
-        if (obsPhase !== "active") {
-          await showStaticCatState(currentState);
-        }
-      } else if (params) {
+      if (params) {
         await primeOverlayFromCommand(params, slots);
       } else {
-        console.warn("[OBSSpinClient] Wheel command received but no cat state or params available");
-        resetWheelOverlay();
-        drawPlaceholder();
-        return;
+        const currentState = catStateRef.current;
+        if (currentState) {
+          if (obsPhase !== "active") {
+            await showStaticCatState(currentState);
+          }
+        } else {
+          console.warn(
+            "[OBSSpinClient] Wheel command received but no cat state or params available",
+          );
+          resetWheelOverlay();
+          drawPlaceholder();
+          return;
+        }
       }
 
       if (generationIdRef.current !== token) return;
@@ -4787,7 +4869,10 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       setSpinVisible(false);
       fadeTimerRef.current = setTimeout(() => setObsPhase("idle"), 1500);
       return () => {
-        if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+        if (fadeTimerRef.current) {
+          clearTimeout(fadeTimerRef.current);
+          fadeTimerRef.current = null;
+        }
       };
     }
     setSpinVisible(false);
@@ -4796,28 +4881,85 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   useEffect(() => {
     if (!session?.currentCommand) return;
     const cmd = session.currentCommand;
+    const cmdSeq = typeof cmd.seq === "number" ? cmd.seq : 0;
+    const isTransientCommand = cmd.type === "spin" || cmd.type === "wheel";
+    const isInitialCommand = !initializedSeqRef.current;
 
-    // On first load, just record the current seq — don't replay it
-    if (!initializedSeqRef.current) {
-      initializedSeqRef.current = true;
-      lastSeqRef.current = cmd.seq;
+    if (lastSeqRef.current !== null && cmdSeq <= lastSeqRef.current) return;
+
+    if (isTransientCommand && generationDisabled) {
+      if (!initializing) {
+        lastSeqRef.current = cmdSeq;
+        initializedSeqRef.current = true;
+      }
       return;
     }
 
-    if (lastSeqRef.current !== null && cmd.seq <= lastSeqRef.current) return;
-    lastSeqRef.current = cmd.seq;
+    if (isInitialCommand) {
+      initializedSeqRef.current = true;
+      if (isTransientCommand && !resultAutoClearEnabledRef.current) {
+        lastSeqRef.current = cmdSeq;
+        resetCommandState();
+        if (!cmd.params) {
+          setObsPhase("idle");
+          drawPlaceholder();
+          return;
+        }
+        const restoredWheelSpin =
+          cmd.type === "wheel"
+            ? parseStreamWheelSpin((cmd as Record<string, unknown>).wheelSpin)
+            : null;
+        if (cmd.type === "wheel" && !restoredWheelSpin) {
+          setObsPhase("idle");
+          drawPlaceholder();
+          return;
+        }
+        const restoreToken = generationIdRef.current;
+        setObsPhase("active");
+        primeOverlayFromCommand(cmd.params, cmd.slots)
+          .then(() => {
+            if (generationIdRef.current !== restoreToken) return;
+            setSpinDone(true);
+            if (restoredWheelSpin) {
+              setWheelReward({ status: "settled", prize: restoredWheelSpin });
+              setWheelBannerVisible(true);
+            }
+          })
+          .catch((err) => {
+            if (generationIdRef.current !== restoreToken) return;
+            console.error("[OBSSpinClient] Failed to restore OBS command", err);
+            resetCommandState();
+            setObsPhase("idle");
+            drawPlaceholder();
+          });
+        return;
+      }
+
+      if (isTransientCommand) {
+        const commandAgeMs = Date.now() - cmd.timestamp;
+        const staleAfterMs = resultAutoClearSecondsRef.current * 1000 + 1500;
+        if (Number.isFinite(commandAgeMs) && commandAgeMs > staleAfterMs) {
+          lastSeqRef.current = cmdSeq;
+          resetCommandState();
+          setObsPhase("idle");
+          drawPlaceholder();
+          return;
+        }
+      }
+    }
+
+    lastSeqRef.current = cmdSeq;
 
     switch (cmd.type) {
       case "spin":
         if (!generationDisabled) {
+          resetCommandState();
+          const commandToken = generationIdRef.current;
           // Store the params from the control page so generateCatPlus uses them
           overrideParamsRef.current = {
             params: cmd.params,
             slots: cmd.slots,
           };
-          setParamRows([]);
-          setRollerLabel(null);
-          setRollerActiveValue(null);
           setRollerHighlight(false);
           setActiveParamId(null);
 
@@ -4833,8 +4975,10 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
 
             // Rich full-screen fireworks
             const fireConfetti = async () => {
+              if (generationIdRef.current !== commandToken) return;
               try {
                 const confetti = (await import("canvas-confetti")).default;
+                if (generationIdRef.current !== commandToken) return;
                 const colors = [
                   "#f59e0b",
                   "#ef4444",
@@ -4905,6 +5049,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
             const genRef = generatorRef.current;
             if (genRef?.generateRandomCat) {
               const cycle = async () => {
+                if (generationIdRef.current !== commandToken) return;
                 try {
                   const r = await genRef.generateRandomCat?.({
                     accessoryCount: computeLayerCount(accessoryRange),
@@ -4917,7 +5062,10 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
                         : undefined,
                     includeBaseColours,
                   });
-                  if (r?.canvas instanceof HTMLCanvasElement) {
+                  if (
+                    generationIdRef.current === commandToken &&
+                    r?.canvas instanceof HTMLCanvasElement
+                  ) {
                     setCountdownPreview(r.canvas.toDataURL("image/png"));
                   }
                 } catch {
@@ -4929,17 +5077,25 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
             }
 
             const tick = () => {
+              if (generationIdRef.current !== commandToken) return;
               remaining--;
               if (remaining <= 0) {
                 // "GO!" flash — big finale burst, hold 800ms then start spin
                 setCountdownValue(0);
-                if (previewIntervalRef.current)
+                if (previewIntervalRef.current) {
                   clearInterval(previewIntervalRef.current);
+                  previewIntervalRef.current = null;
+                }
                 // Massive finale — triple burst
                 fireConfetti();
-                setTimeout(() => fireConfetti(), 150);
-                setTimeout(() => fireConfetti(), 300);
+                setTimeout(() => {
+                  if (generationIdRef.current === commandToken) fireConfetti();
+                }, 150);
+                setTimeout(() => {
+                  if (generationIdRef.current === commandToken) fireConfetti();
+                }, 300);
                 countdownTimerRef.current = setTimeout(() => {
+                  if (generationIdRef.current !== commandToken) return;
                   setCountdownPreview(null);
                   setObsPhase("active");
                   generateCatPlus();
@@ -4949,8 +5105,14 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
                 fireConfetti();
                 // Last 3 seconds — extra bursts + start fading in the spin board
                 if (remaining <= 3) {
-                  setTimeout(() => fireConfetti(), 400);
-                  setTimeout(() => fireConfetti(), 700);
+                  setTimeout(() => {
+                    if (generationIdRef.current === commandToken)
+                      fireConfetti();
+                  }, 400);
+                  setTimeout(() => {
+                    if (generationIdRef.current === commandToken)
+                      fireConfetti();
+                  }, 700);
                   setSpinBoardVisible(true);
                 }
                 countdownTimerRef.current = setTimeout(tick, 1000);
@@ -5005,8 +5167,10 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   }, [
     session?.currentCommand,
     generationDisabled,
+    initializing,
     handleWheelCommand,
     generateCatPlus,
+    primeOverlayFromCommand,
     drawPlaceholder,
     resetCommandState,
     exactLayerCounts,

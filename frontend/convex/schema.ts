@@ -373,6 +373,7 @@ export default defineSchema({
       }),
     ),
     testMode: v.boolean(),
+    lastWheelSpinForSeq: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("byUserId", ["userId"]),
