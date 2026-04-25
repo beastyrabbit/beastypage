@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { getActiveStreamScene } from "./sceneState";
 
 describe("getActiveStreamScene", () => {
+  it.each([
+    null,
+    undefined,
+  ])("returns null when the session is %s", (session) => {
+    expect(getActiveStreamScene(session)).toBeNull();
+  });
+
   it("returns lobby for an active lobby command", () => {
     expect(
       getActiveStreamScene({

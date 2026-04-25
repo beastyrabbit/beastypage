@@ -315,9 +315,9 @@ export function StreamControlClient() {
         if (isLobbyMode(s.lobbyMode)) setLobbyMode(s.lobbyMode);
         if (isPositiveFiniteNumber(s.lobbyCatCount))
           setLobbyCatCount(s.lobbyCatCount);
-        if (isPositiveFiniteNumber(s.lobbyMoveSpeed))
+        if (isNonNegativeFiniteNumber(s.lobbyMoveSpeed))
           setLobbyMoveSpeed(s.lobbyMoveSpeed);
-        if (isPositiveFiniteNumber(s.lobbySwapSpeed))
+        if (isNonNegativeFiniteNumber(s.lobbySwapSpeed))
           setLobbySwapSpeed(s.lobbySwapSpeed);
         if (isNonNegativeFiniteNumber(s.lobbyCatMinSize))
           setLobbyCatMinSize(s.lobbyCatMinSize);
