@@ -47,6 +47,7 @@ import {
   type SingleCatSettings,
 } from "@/utils/singleCatVariants";
 import { useVariants } from "@/utils/variants";
+import { getActiveStreamScene } from "./sceneState";
 
 // ---------------------------------------------------------------------------
 // StreamControlClient
@@ -228,7 +229,10 @@ export function StreamControlClient() {
       const merged = buildSessionSettings(settingsRef.current, updates);
       if (sessionRef.current) {
         updateSettingsMut({ settings: merged }).catch((err) => {
-          console.error("[StreamControl] Failed to sync settings to Convex", err);
+          console.error(
+            "[StreamControl] Failed to sync settings to Convex",
+            err,
+          );
         });
       }
     },
@@ -327,7 +331,10 @@ export function StreamControlClient() {
           if (sessionRef.current) {
             const full = buildSessionSettings(merged);
             updateSettingsMut({ settings: full }).catch((err) => {
-              console.error("[StreamControl] Failed to sync settings to Convex", err);
+              console.error(
+                "[StreamControl] Failed to sync settings to Convex",
+                err,
+              );
             });
           }
         }, 500);
@@ -691,6 +698,7 @@ export function StreamControlClient() {
     lastResultRef.current?.params ?? fallbackCommand?.params,
   );
   const commandBusy = spinning || wheelSpinning;
+  const activeScene = getActiveStreamScene(session);
 
   return (
     <div className="space-y-6">
@@ -1006,7 +1014,7 @@ export function StreamControlClient() {
                     desc: "Settings + cats",
                     icon: Eye,
                     onClick: () => showLobbyMut().catch(console.error),
-                    active: false,
+                    active: activeScene === "lobby",
                     danger: false,
                   },
                   {
@@ -1014,7 +1022,7 @@ export function StreamControlClient() {
                     desc: "Cats only",
                     icon: Timer,
                     onClick: () => showBrbMut().catch(console.error),
-                    active: false,
+                    active: activeScene === "brb",
                     danger: false,
                   },
                   {
@@ -1022,7 +1030,7 @@ export function StreamControlClient() {
                     desc: session?.testMode ? "On" : "Debug border",
                     icon: Radio,
                     onClick: () => toggleTestModeMut().catch(console.error),
-                    active: session?.testMode ?? false,
+                    active: activeScene === "test",
                     danger: false,
                   },
                   {
@@ -1055,6 +1063,7 @@ export function StreamControlClient() {
                     type="button"
                     key={btn.label}
                     onClick={btn.onClick}
+                    aria-pressed={btn.active}
                     className={cn(
                       "group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition",
                       borderClass,
@@ -1422,7 +1431,9 @@ function BrbPresetSection({
     [settings],
   );
   const hasSavedPreset = savedCode.length > 0;
-  const presetValid = hasSavedPreset ? Boolean(decodePortableSettings(savedCode)) : true;
+  const presetValid = hasSavedPreset
+    ? Boolean(decodePortableSettings(savedCode))
+    : true;
 
   const runSave = async (value: string) => {
     setSaving(true);
@@ -1448,8 +1459,8 @@ function BrbPresetSection({
         <div>
           <h3 className="text-sm font-semibold text-foreground">BRB Preset</h3>
           <p className="text-xs text-muted-foreground">
-            Save an optional 6-word code. The BRB button uses this preset without
-            changing your live stream settings.
+            Save an optional 6-word code. The BRB button uses this preset
+            without changing your live stream settings.
           </p>
         </div>
         <span
@@ -1460,7 +1471,9 @@ function BrbPresetSection({
               : "border-border/40 text-muted-foreground",
           )}
         >
-          {hasSavedPreset && presetValid ? "Preset Ready" : "Uses Live Settings"}
+          {hasSavedPreset && presetValid
+            ? "Preset Ready"
+            : "Uses Live Settings"}
         </span>
       </div>
 
@@ -1528,16 +1541,15 @@ function BrbPresetSection({
 
         {hasSavedPreset ? (
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Saved BRB code
-            </p>
+            <p className="text-xs text-muted-foreground">Saved BRB code</p>
             <code className="block rounded-lg border border-border/40 bg-background/60 px-3 py-2 font-mono text-xs text-foreground">
               {savedCode}
             </code>
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            No preset saved. BRB will use whatever settings are currently active.
+            No preset saved. BRB will use whatever settings are currently
+            active.
           </p>
         )}
       </div>
