@@ -1190,6 +1190,7 @@ function parseStreamWheelSpin(value: unknown): StreamWheelSpin | null {
   const randomBucket =
     typeof spin.randomBucket === "number" &&
     Number.isFinite(spin.randomBucket) &&
+    Number.isInteger(spin.randomBucket) &&
     spin.randomBucket >= 0 &&
     spin.randomBucket < 100
       ? spin.randomBucket
@@ -4887,6 +4888,10 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     if (lastSeqRef.current !== null && cmdSeq <= lastSeqRef.current) return;
 
     if (isTransientCommand && generationDisabled) {
+      if (!initializing) {
+        lastSeqRef.current = cmdSeq;
+        initializedSeqRef.current = true;
+      }
       return;
     }
 
@@ -5162,6 +5167,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   }, [
     session?.currentCommand,
     generationDisabled,
+    initializing,
     handleWheelCommand,
     generateCatPlus,
     primeOverlayFromCommand,
