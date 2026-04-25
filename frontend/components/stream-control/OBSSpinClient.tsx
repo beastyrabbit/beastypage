@@ -3651,12 +3651,15 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       // OBS: Use override params from the control page if available
       const override = overrideParamsRef.current;
       overrideParamsRef.current = null; // consume once
+      const overrideParams = override?.params;
+      const overrideSlots = override?.slots;
+      const usingOverrideParams = Boolean(overrideParams);
       // biome-ignore lint/suspicious/noExplicitAny: dynamic random generation result with varying shape
       let randomResult: any;
-      if (override?.params) {
+      if (overrideParams) {
         randomResult = {
-          params: override.params as Record<string, unknown>,
-          slotSelections: override.slots as typeof randomResult.slotSelections,
+          params: overrideParams as Record<string, unknown>,
+          slotSelections: overrideSlots as typeof randomResult.slotSelections,
         };
       } else {
         if (!generator.generateRandomCat) {
@@ -3708,11 +3711,18 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
 
       initMaxLayerRows();
 
-      const { darkForest: enableDarkForest, dead: enableDead } =
-        resolveAfterlife(afterlifeMode);
-      params.darkForest = enableDarkForest;
-      params.darkMode = enableDarkForest;
-      params.dead = enableDead;
+      if (usingOverrideParams) {
+        const enableDarkForest = Boolean(params.darkForest || params.darkMode);
+        params.darkForest = enableDarkForest;
+        params.darkMode = enableDarkForest;
+        params.dead = Boolean(params.dead);
+      } else {
+        const { darkForest: enableDarkForest, dead: enableDead } =
+          resolveAfterlife(afterlifeMode);
+        params.darkForest = enableDarkForest;
+        params.darkMode = enableDarkForest;
+        params.dead = enableDead;
+      }
 
       const countsResult: GenerationCounts = {
         accessories: accessorySlots.length,
@@ -3723,7 +3733,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       setRollSummary(
         `Rolled → Accessories: ${countsResult.accessories} • Scars: ${countsResult.scars} • Tortie layers: ${countsResult.tortie}`,
       );
-      setHasTint(Boolean(enableDarkForest || enableDead));
+      setHasTint(Boolean(params.darkForest || params.dead));
       setSpriteGalleryOpen(false);
 
       const uniqueAccessories: string[] = Array.from(

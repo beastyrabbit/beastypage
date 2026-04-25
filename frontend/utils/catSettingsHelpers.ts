@@ -51,6 +51,20 @@ export function resolveAfterlife(option: AfterlifeOption): {
   }
 }
 
+/** Return cat params with a single resolved afterlife outcome applied. */
+export function withResolvedAfterlifeParams<T extends Record<string, unknown>>(
+  params: T,
+  option: AfterlifeOption,
+): T & { darkForest: boolean; darkMode: boolean; dead: boolean } {
+  const { darkForest, dead } = resolveAfterlife(option);
+  return {
+    ...params,
+    darkForest,
+    darkMode: darkForest,
+    dead,
+  };
+}
+
 /** Labeled afterlife options for dropdowns / selectors. */
 export const AFTERLIFE_OPTIONS: {
   label: string;

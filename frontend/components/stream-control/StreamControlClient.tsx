@@ -41,6 +41,7 @@ import {
 import {
   AFTERLIFE_OPTIONS,
   computeLayerCount,
+  withResolvedAfterlifeParams,
 } from "@/utils/catSettingsHelpers";
 import {
   type AfterlifeOption,
@@ -432,13 +433,21 @@ export function StreamControlClient() {
         tortieCount: computeLayerCount(settings.tortieRange),
       });
 
+      const resolvedParams = withResolvedAfterlifeParams(
+        result.params as unknown as Record<string, unknown>,
+        settings.afterlifeMode,
+      );
+      const generatedHasTint = Boolean(
+        resolvedParams.darkForest || resolvedParams.dead,
+      );
+      const resolvedCanvas = (await generator.generateCat(resolvedParams))
+        .canvas;
+
       const nextLastResult = {
-        canvas: result.canvas,
-        params: result.params as unknown as Record<string, unknown>,
+        canvas: resolvedCanvas,
+        params: resolvedParams,
         slots: result.slotSelections,
       };
-      const p = result.params as unknown as Record<string, unknown>;
-      const generatedHasTint = Boolean(p.darkForest || p.darkMode || p.dead);
       // Flush settings (including creatorName) to Convex so OBS has them before spinning
       clearTimeout(syncTimer.current);
       const settingsWithCreator = buildSessionSettings(settings, {
@@ -447,7 +456,7 @@ export function StreamControlClient() {
       await saveSessionSettings(settingsWithCreator);
 
       await triggerSpinMut({
-        params: result.params,
+        params: resolvedParams,
         slots: result.slotSelections,
         countdownSeconds,
       });
@@ -458,7 +467,7 @@ export function StreamControlClient() {
 
       // Persist to cat_profile (same as SingleCatPlus)
       const catData = {
-        params: result.params,
+        params: resolvedParams,
         accessorySlots: result.slotSelections?.accessories ?? [],
         scarSlots: result.slotSelections?.scars ?? [],
         tortieSlots: result.slotSelections?.tortie ?? [],
