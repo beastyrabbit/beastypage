@@ -30,6 +30,8 @@ import type { PaletteId } from "@/lib/palettes";
 import {
   decodePortableSettings,
   encodePortableSettings,
+  normalizePortableSettingsCode,
+  SETTINGS_CODE_MAX_INPUT_LENGTH,
 } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
 import {
@@ -109,10 +111,6 @@ function toWheelSpinPayload(
 /** Format a multiplier value like 1 -> "1x", 0.25 -> "0.25x", 2.50 -> "2.5x" */
 function formatMultiplier(v: number): string {
   return `${v.toFixed(2).replace(/\.?0+$/, "")}x`;
-}
-
-function normalizePortableCode(value: string): string {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function encodePortableCodeFromSettings(settings: SingleCatSettings): string {
@@ -346,9 +344,13 @@ export function StreamControlClient() {
           );
         }
         if (typeof s.brbSettingsCode === "string") {
-          const normalized = normalizePortableCode(s.brbSettingsCode);
-          setBrbSettingsCode(normalized);
-          setBrbSettingsDraft(normalized);
+          const storedCode = s.brbSettingsCode.trim();
+          const normalized = storedCode
+            ? normalizePortableSettingsCode(storedCode)
+            : "";
+          const displayCode = normalized ?? storedCode;
+          setBrbSettingsCode(displayCode);
+          setBrbSettingsDraft(displayCode);
         }
         if (isPositiveFiniteNumber(s.lobbyClearSeq))
           clearSeqRef.current = s.lobbyClearSeq;
@@ -605,8 +607,10 @@ export function StreamControlClient() {
 
   const saveBrbSettingsCode = useCallback(
     async (rawCode: string) => {
-      const normalized = normalizePortableCode(rawCode);
-      if (normalized && !decodePortableSettings(normalized)) {
+      const normalized = rawCode.trim()
+        ? normalizePortableSettingsCode(rawCode)
+        : "";
+      if (normalized === null) {
         toast.error("Invalid BRB settings code");
         return false;
       }
@@ -1524,6 +1528,11 @@ function BrbPresetSection({
   const presetValid = hasSavedPreset
     ? Boolean(decodePortableSettings(savedCode))
     : true;
+  const presetStatus = hasSavedPreset
+    ? presetValid
+      ? "Preset Ready"
+      : "Invalid Preset"
+    : "Uses Live Settings";
 
   const runSave = async (value: string) => {
     setSaving(true);
@@ -1558,12 +1567,12 @@ function BrbPresetSection({
             "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
             hasSavedPreset && presetValid
               ? "border-emerald-500/30 text-emerald-400"
-              : "border-border/40 text-muted-foreground",
+              : hasSavedPreset
+                ? "border-red-500/30 text-red-400"
+                : "border-border/40 text-muted-foreground",
           )}
         >
-          {hasSavedPreset && presetValid
-            ? "Preset Ready"
-            : "Uses Live Settings"}
+          {presetStatus}
         </span>
       </div>
 
@@ -1572,6 +1581,7 @@ function BrbPresetSection({
           <input
             type="text"
             aria-label="BRB settings code"
+            maxLength={SETTINGS_CODE_MAX_INPUT_LENGTH}
             value={draftCode}
             onChange={(e) => onDraftChange(e.target.value)}
             onKeyDown={(e) => {
@@ -1724,6 +1734,7 @@ function SettingsCode({
         <input
           type="text"
           aria-label="Settings code"
+          maxLength={SETTINGS_CODE_MAX_INPUT_LENGTH}
           value={codeInput}
           onChange={(e) => setCodeInput(e.target.value)}
           onKeyDown={(e) => {

@@ -1,7 +1,7 @@
 import type { ExtendedMode } from "@/utils/singleCatVariants";
 
 /**
- * Append-only palette registry for portable settings encoding (v1).
+ * Append-only palette registry for portable settings payload encoding.
  *
  * Each entry's array index defines its **bit position** in the palette
  * bitmask.  **New palettes MUST only be appended — never reorder or
