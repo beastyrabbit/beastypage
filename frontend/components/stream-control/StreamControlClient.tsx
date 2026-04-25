@@ -44,9 +44,11 @@ import {
   type AfterlifeOption,
   DEFAULT_SINGLE_CAT_SETTINGS,
   type LayerRange,
+  parseSingleCatPayload,
   type SingleCatSettings,
 } from "@/utils/singleCatVariants";
 import { useVariants } from "@/utils/variants";
+import { getActiveStreamScene } from "./sceneState";
 
 // ---------------------------------------------------------------------------
 // StreamControlClient
@@ -58,6 +60,37 @@ const LOBBY_MODE_DEFAULTS = {
   dvd: { cats: 3, move: 0.5, swap: 1 },
 } as const;
 const FULL_EXPORT_SIZE = 700;
+type LobbyMode = keyof typeof LOBBY_MODE_DEFAULTS;
+type CanvasExportSource = HTMLCanvasElement | OffscreenCanvas;
+
+function isPositiveFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isLobbyMode(value: unknown): value is LobbyMode {
+  return value === "fruit-ninja" || value === "matrix" || value === "dvd";
+}
+
+function isPaletteDisplayMode(value: unknown): value is "cycle" | "all" {
+  return value === "cycle" || value === "all";
+}
+
+function canvasToPngBlob(canvas: CanvasExportSource): Promise<Blob> {
+  if ("convertToBlob" in canvas) {
+    return (canvas as OffscreenCanvas).convertToBlob({ type: "image/png" });
+  }
+
+  return new Promise<Blob>((resolve, reject) => {
+    (canvas as HTMLCanvasElement).toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("toBlob failed"))),
+      "image/png",
+    );
+  });
+}
 
 function toWheelSpinPayload(
   selection: ReturnType<typeof pickClassicWheelPrize>,
@@ -130,6 +163,9 @@ export function StreamControlClient() {
   const [countdownSeconds, setCountdownSeconds] = useState(10);
   const [spinning, setSpinning] = useState(false);
   const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [sceneCommandPending, setSceneCommandPending] = useState<string | null>(
+    null,
+  );
   const [initialized, setInitialized] = useState(false);
 
   // Cat profile state — for "Links & Actions" / history entry
@@ -222,17 +258,52 @@ export function StreamControlClient() {
     [],
   );
 
+  const saveSessionSettings = useCallback(
+    async (settingsSnapshot: Record<string, unknown>) => {
+      if (!sessionRef.current) {
+        await ensureSession({ settings: settingsSnapshot });
+        return;
+      }
+      await updateSettingsMut({ settings: settingsSnapshot });
+    },
+    [ensureSession, updateSettingsMut],
+  );
+
   // Instant sync for session settings (lobby + result auto-clear) — no debounce
   const syncSessionSettings = useCallback(
     (updates: Record<string, unknown>) => {
       const merged = buildSessionSettings(settingsRef.current, updates);
-      if (sessionRef.current) {
-        updateSettingsMut({ settings: merged }).catch((err) => {
-          console.error("[StreamControl] Failed to sync settings to Convex", err);
-        });
+      void saveSessionSettings(merged).catch((err) => {
+        console.error("[StreamControl] Failed to sync settings to Convex", err);
+        toast.error("Failed to save stream settings");
+      });
+    },
+    [buildSessionSettings, saveSessionSettings],
+  );
+
+  const runSceneCommand = useCallback(
+    async (label: string, action: () => Promise<unknown>) => {
+      if (sceneCommandPending || spinning || wheelSpinning) return;
+      setSceneCommandPending(label);
+      try {
+        await saveSessionSettings(buildSessionSettings(settingsRef.current));
+        await action();
+      } catch (err) {
+        console.error(`[StreamControl] Failed to run ${label} command`, err);
+        toast.error(
+          err instanceof Error ? err.message : `Failed to run ${label}`,
+        );
+      } finally {
+        setSceneCommandPending(null);
       }
     },
-    [buildSessionSettings, updateSettingsMut],
+    [
+      buildSessionSettings,
+      saveSessionSettings,
+      sceneCommandPending,
+      spinning,
+      wheelSpinning,
+    ],
   );
 
   // Seed from session settings on first load
@@ -240,30 +311,30 @@ export function StreamControlClient() {
     if (session && !initialized) {
       if (session.settings && typeof session.settings === "object") {
         const s = session.settings as Record<string, unknown>;
-        setSettings((prev) => ({ ...prev, ...s }));
-        if (s.lobbyMode) setLobbyMode(s.lobbyMode as typeof lobbyMode);
-        if (s.lobbyCatCount) setLobbyCatCount(s.lobbyCatCount as number);
-        if (s.lobbyMoveSpeed) setLobbyMoveSpeed(s.lobbyMoveSpeed as number);
-        if (s.lobbySwapSpeed) setLobbySwapSpeed(s.lobbySwapSpeed as number);
-        if (s.lobbyCatMinSize != null)
-          setLobbyCatMinSize(s.lobbyCatMinSize as number);
-        if (s.lobbyCatMaxSize != null)
-          setLobbyCatMaxSize(s.lobbyCatMaxSize as number);
-        if (
-          typeof s.lobbyAutoClearSeconds === "number" &&
-          s.lobbyAutoClearSeconds > 0
-        ) {
-          setLobbyAutoClearSeconds(s.lobbyAutoClearSeconds as number);
+        setSettings(parseSingleCatPayload(s));
+        if (isLobbyMode(s.lobbyMode)) setLobbyMode(s.lobbyMode);
+        if (isPositiveFiniteNumber(s.lobbyCatCount))
+          setLobbyCatCount(s.lobbyCatCount);
+        if (isNonNegativeFiniteNumber(s.lobbyMoveSpeed))
+          setLobbyMoveSpeed(s.lobbyMoveSpeed);
+        if (isNonNegativeFiniteNumber(s.lobbySwapSpeed))
+          setLobbySwapSpeed(s.lobbySwapSpeed);
+        if (isNonNegativeFiniteNumber(s.lobbyCatMinSize))
+          setLobbyCatMinSize(s.lobbyCatMinSize);
+        if (isNonNegativeFiniteNumber(s.lobbyCatMaxSize))
+          setLobbyCatMaxSize(s.lobbyCatMaxSize);
+        if (isPositiveFiniteNumber(s.lobbyAutoClearSeconds)) {
+          setLobbyAutoClearSeconds(s.lobbyAutoClearSeconds);
         }
-        if (s.paletteDisplayMode)
-          setPaletteDisplayMode(s.paletteDisplayMode as "cycle" | "all");
-        const savedResultAutoClearSeconds =
-          typeof s.resultAutoClearSeconds === "number" &&
-          s.resultAutoClearSeconds > 0
-            ? s.resultAutoClearSeconds
-            : typeof s.autoClearSeconds === "number" && s.autoClearSeconds > 0
-              ? s.autoClearSeconds
-              : 30;
+        if (isPaletteDisplayMode(s.paletteDisplayMode))
+          setPaletteDisplayMode(s.paletteDisplayMode);
+        const savedResultAutoClearSeconds = isPositiveFiniteNumber(
+          s.resultAutoClearSeconds,
+        )
+          ? s.resultAutoClearSeconds
+          : isPositiveFiniteNumber(s.autoClearSeconds)
+            ? s.autoClearSeconds
+            : 30;
         setResultAutoClearSeconds(savedResultAutoClearSeconds);
         if (typeof s.resultAutoClearEnabled === "boolean") {
           setResultAutoClearEnabled(s.resultAutoClearEnabled);
@@ -279,8 +350,8 @@ export function StreamControlClient() {
           setBrbSettingsCode(normalized);
           setBrbSettingsDraft(normalized);
         }
-        if (s.lobbyClearSeq != null)
-          clearSeqRef.current = s.lobbyClearSeq as number;
+        if (isPositiveFiniteNumber(s.lobbyClearSeq))
+          clearSeqRef.current = s.lobbyClearSeq;
         if (typeof s.creatorName === "string" && s.creatorName) {
           setCreatorNameDraft(s.creatorName);
           creatorFilledRef.current = true;
@@ -324,22 +395,24 @@ export function StreamControlClient() {
         const merged = { ...prev, ...next };
         clearTimeout(syncTimer.current);
         syncTimer.current = setTimeout(() => {
-          if (sessionRef.current) {
-            const full = buildSessionSettings(merged);
-            updateSettingsMut({ settings: full }).catch((err) => {
-              console.error("[StreamControl] Failed to sync settings to Convex", err);
-            });
-          }
+          const full = buildSessionSettings(merged);
+          void saveSessionSettings(full).catch((err) => {
+            console.error(
+              "[StreamControl] Failed to sync settings to Convex",
+              err,
+            );
+            toast.error("Failed to save stream settings");
+          });
         }, 500);
         return merged;
       });
     },
-    [buildSessionSettings, updateSettingsMut],
+    [buildSessionSettings, saveSessionSettings],
   );
 
   // Spin handler
   const handleSpin = useCallback(async () => {
-    if (!generator || spinning || wheelSpinning) return;
+    if (!generator || spinning || wheelSpinning || sceneCommandPending) return;
     setSpinning(true);
     try {
       if (!generator.generateRandomCat) {
@@ -357,26 +430,29 @@ export function StreamControlClient() {
         tortieCount: computeLayerCount(settings.tortieRange),
       });
 
-      // Store result for export buttons
-      lastResultRef.current = {
+      const nextLastResult = {
         canvas: result.canvas,
         params: result.params as unknown as Record<string, unknown>,
         slots: result.slotSelections,
       };
       const p = result.params as unknown as Record<string, unknown>;
-      setHasTint(Boolean(p.darkForest || p.darkMode || p.dead));
+      const generatedHasTint = Boolean(p.darkForest || p.darkMode || p.dead);
       // Flush settings (including creatorName) to Convex so OBS has them before spinning
       clearTimeout(syncTimer.current);
       const settingsWithCreator = buildSessionSettings(settings, {
         creatorName: creatorNameDraft,
       });
-      await updateSettingsMut({ settings: settingsWithCreator });
+      await saveSessionSettings(settingsWithCreator);
 
       await triggerSpinMut({
         params: result.params,
         slots: result.slotSelections,
         countdownSeconds,
       });
+
+      // Store result only after the live stream command succeeds.
+      lastResultRef.current = nextLastResult;
+      setHasTint(generatedHasTint);
 
       // Persist to cat_profile (same as SingleCatPlus)
       const catData = {
@@ -421,16 +497,17 @@ export function StreamControlClient() {
     generator,
     spinning,
     wheelSpinning,
+    sceneCommandPending,
     settings,
     countdownSeconds,
     creatorNameDraft,
     triggerSpinMut,
     createMapper,
-    updateSettingsMut,
+    saveSessionSettings,
   ]);
 
   const handleWheelSpin = useCallback(async () => {
-    if (spinning || wheelSpinning) return;
+    if (spinning || wheelSpinning || sceneCommandPending) return;
 
     const command = session?.currentCommand as
       | {
@@ -482,6 +559,7 @@ export function StreamControlClient() {
   }, [
     session?.currentCommand,
     spinning,
+    sceneCommandPending,
     triggerWheelMut,
     wheelSpinning,
     logWheelSpinMut,
@@ -533,42 +611,37 @@ export function StreamControlClient() {
         return false;
       }
 
-      setBrbSettingsCode(normalized);
-      setBrbSettingsDraft(normalized);
+      clearTimeout(syncTimer.current);
+      const previousCode = brbSettingsCodeRef.current;
       brbSettingsCodeRef.current = normalized;
-
-      if (sessionRef.current) {
-        try {
-          await updateSettingsMut({
-            settings: buildSessionSettings(settingsRef.current, {
-              brbSettingsCode: normalized,
-            }),
-          });
-        } catch {
-          toast.error("Failed to save BRB preset");
-          return false;
-        }
+      try {
+        await saveSessionSettings(
+          buildSessionSettings(settingsRef.current, {
+            brbSettingsCode: normalized,
+          }),
+        );
+      } catch {
+        brbSettingsCodeRef.current = previousCode;
+        toast.error("Failed to save BRB preset");
+        return false;
       }
 
+      setBrbSettingsCode(normalized);
+      setBrbSettingsDraft(normalized);
       toast.success(normalized ? "BRB preset saved" : "BRB preset cleared");
       return true;
     },
-    [buildSessionSettings, updateSettingsMut],
+    [buildSessionSettings, saveSessionSettings],
   );
 
   const copyCanvasToClipboard = useCallback(
     async (
-      canvas: HTMLCanvasElement,
+      canvas: CanvasExportSource,
       successMsg: string,
       fallbackName: string,
     ) => {
       try {
-        const blob = await new Promise<Blob>((resolve, reject) => {
-          canvas.toBlob(
-            (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
-            "image/png",
-          );
-        });
+        const blob = await canvasToPngBlob(canvas);
         if (navigator.clipboard && "write" in navigator.clipboard) {
           await navigator.clipboard.write([
             new ClipboardItem({ "image/png": blob }),
@@ -597,7 +670,7 @@ export function StreamControlClient() {
     async (options?: { noTint?: boolean; size?: number }) => {
       const last = lastResultRef.current;
       if (!last || !generator) return;
-      let sourceCanvas = last.canvas as HTMLCanvasElement;
+      let sourceCanvas: CanvasExportSource = last.canvas;
       if (options?.noTint) {
         const params = {
           ...last.params,
@@ -606,7 +679,7 @@ export function StreamControlClient() {
           dead: false,
         };
         const rendered = await generator.generateCat(params);
-        sourceCanvas = rendered.canvas as HTMLCanvasElement;
+        sourceCanvas = rendered.canvas;
       }
       const size = options?.size ?? FULL_EXPORT_SIZE;
       const exportCanvas = document.createElement("canvas");
@@ -629,12 +702,15 @@ export function StreamControlClient() {
     [generator, copyCanvasToClipboard],
   );
 
-  const handleDownload = useCallback(() => {
+  const handleDownload = useCallback(async () => {
     const last = lastResultRef.current;
-    if (!last) return;
-    const canvas = last.canvas as HTMLCanvasElement;
-    canvas.toBlob((blob) => {
-      if (!blob) return;
+    if (!last) {
+      toast.error("Roll a cat before downloading.");
+      return;
+    }
+
+    try {
+      const blob = await canvasToPngBlob(last.canvas);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -644,7 +720,9 @@ export function StreamControlClient() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       toast.success("Downloaded PNG");
-    }, "image/png");
+    } catch {
+      toast.error("Failed to download PNG");
+    }
   }, []);
 
   // Auth gate
@@ -690,7 +768,8 @@ export function StreamControlClient() {
   const hasWheelSource = Boolean(
     lastResultRef.current?.params ?? fallbackCommand?.params,
   );
-  const commandBusy = spinning || wheelSpinning;
+  const commandBusy = spinning || wheelSpinning || sceneCommandPending !== null;
+  const activeScene = getActiveStreamScene(session);
 
   return (
     <div className="space-y-6">
@@ -704,10 +783,14 @@ export function StreamControlClient() {
           <div className="space-y-4">
             {/* Timing Variant */}
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">
+              <label
+                htmlFor="stream-variant-select"
+                className="text-xs font-medium text-muted-foreground"
+              >
                 Variant
-              </span>
+              </label>
               <select
+                id="stream-variant-select"
                 value={variants.store.activeId ?? ""}
                 onChange={(e) => handleVariantSelect(e.target.value || null)}
                 className={cn(
@@ -785,10 +868,14 @@ export function StreamControlClient() {
 
             {/* Afterlife */}
             <div>
-              <span className="mb-1 block text-xs font-medium text-muted-foreground">
+              <label
+                htmlFor="stream-afterlife-select"
+                className="mb-1 block text-xs font-medium text-muted-foreground"
+              >
                 Afterlife
-              </span>
+              </label>
               <select
+                id="stream-afterlife-select"
                 value={settings.afterlifeMode}
                 onChange={(e) =>
                   updateSettings({
@@ -874,8 +961,14 @@ export function StreamControlClient() {
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(obsUrl);
-                    toast.success("OBS URL copied!");
+                    void (async () => {
+                      try {
+                        await navigator.clipboard.writeText(obsUrl);
+                        toast.success("OBS URL copied!");
+                      } catch {
+                        toast.error("Failed to copy OBS URL");
+                      }
+                    })();
                   }}
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-2.5 py-1.5",
@@ -1005,39 +1098,42 @@ export function StreamControlClient() {
                     label: "Lobby",
                     desc: "Settings + cats",
                     icon: Eye,
-                    onClick: () => showLobbyMut().catch(console.error),
-                    active: false,
+                    onClick: () =>
+                      runSceneCommand("Lobby", () => showLobbyMut()),
+                    pressed: activeScene === "lobby",
                     danger: false,
                   },
                   {
                     label: "BRB",
                     desc: "Cats only",
                     icon: Timer,
-                    onClick: () => showBrbMut().catch(console.error),
-                    active: false,
+                    onClick: () => runSceneCommand("BRB", () => showBrbMut()),
+                    pressed: activeScene === "brb",
                     danger: false,
                   },
                   {
                     label: "Test",
                     desc: session?.testMode ? "On" : "Debug border",
                     icon: Radio,
-                    onClick: () => toggleTestModeMut().catch(console.error),
-                    active: session?.testMode ?? false,
+                    onClick: () =>
+                      runSceneCommand("Test", () => toggleTestModeMut()),
+                    pressed: activeScene === "test",
                     danger: false,
                   },
                   {
                     label: "Clear",
                     desc: "Hide overlay",
                     icon: Square,
-                    onClick: () => clearOverlayMut().catch(console.error),
-                    active: false,
+                    onClick: () =>
+                      runSceneCommand("Clear", () => clearOverlayMut()),
+                    pressed: undefined,
                     danger: true,
                   },
                 ] as const
               ).map((btn) => {
                 let borderClass: string;
                 let iconClass: string;
-                if (btn.active) {
+                if (btn.pressed) {
                   borderClass = "border-amber-500/50 bg-amber-500/10";
                   iconClass = "text-amber-500";
                 } else if (btn.danger) {
@@ -1055,8 +1151,11 @@ export function StreamControlClient() {
                     type="button"
                     key={btn.label}
                     onClick={btn.onClick}
+                    aria-pressed={btn.pressed}
+                    disabled={commandBusy}
                     className={cn(
                       "group flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition",
+                      "disabled:cursor-not-allowed disabled:opacity-60",
                       borderClass,
                     )}
                   >
@@ -1067,7 +1166,7 @@ export function StreamControlClient() {
                       <div
                         className={cn(
                           "text-xs font-semibold",
-                          btn.active ? "text-amber-400" : "text-foreground",
+                          btn.pressed ? "text-amber-400" : "text-foreground",
                         )}
                       >
                         {btn.label}
@@ -1288,7 +1387,7 @@ export function StreamControlClient() {
               "text-xs font-medium text-muted-foreground transition",
               "hover:bg-foreground hover:text-background disabled:opacity-50",
             )}
-            onClick={handleDownload}
+            onClick={() => void handleDownload()}
             disabled={!lastResultRef.current}
           >
             <Download className="size-4" /> Download PNG
@@ -1422,7 +1521,9 @@ function BrbPresetSection({
     [settings],
   );
   const hasSavedPreset = savedCode.length > 0;
-  const presetValid = hasSavedPreset ? Boolean(decodePortableSettings(savedCode)) : true;
+  const presetValid = hasSavedPreset
+    ? Boolean(decodePortableSettings(savedCode))
+    : true;
 
   const runSave = async (value: string) => {
     setSaving(true);
@@ -1448,8 +1549,8 @@ function BrbPresetSection({
         <div>
           <h3 className="text-sm font-semibold text-foreground">BRB Preset</h3>
           <p className="text-xs text-muted-foreground">
-            Save an optional 6-word code. The BRB button uses this preset without
-            changing your live stream settings.
+            Save an optional 6-word code. The BRB button uses this preset
+            without changing your live stream settings.
           </p>
         </div>
         <span
@@ -1460,7 +1561,9 @@ function BrbPresetSection({
               : "border-border/40 text-muted-foreground",
           )}
         >
-          {hasSavedPreset && presetValid ? "Preset Ready" : "Uses Live Settings"}
+          {hasSavedPreset && presetValid
+            ? "Preset Ready"
+            : "Uses Live Settings"}
         </span>
       </div>
 
@@ -1468,6 +1571,7 @@ function BrbPresetSection({
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             type="text"
+            aria-label="BRB settings code"
             value={draftCode}
             onChange={(e) => onDraftChange(e.target.value)}
             onKeyDown={(e) => {
@@ -1528,16 +1632,15 @@ function BrbPresetSection({
 
         {hasSavedPreset ? (
           <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Saved BRB code
-            </p>
+            <p className="text-xs text-muted-foreground">Saved BRB code</p>
             <code className="block rounded-lg border border-border/40 bg-background/60 px-3 py-2 font-mono text-xs text-foreground">
               {savedCode}
             </code>
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            No preset saved. BRB will use whatever settings are currently active.
+            No preset saved. BRB will use whatever settings are currently
+            active.
           </p>
         )}
       </div>
@@ -1620,6 +1723,7 @@ function SettingsCode({
       <div className="flex items-center gap-2">
         <input
           type="text"
+          aria-label="Settings code"
           value={codeInput}
           onChange={(e) => setCodeInput(e.target.value)}
           onKeyDown={(e) => {
