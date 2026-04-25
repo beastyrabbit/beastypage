@@ -30,6 +30,7 @@ import type { PaletteId } from "@/lib/palettes";
 import {
   decodePortableSettings,
   encodePortableSettings,
+  normalizePortableSettingsCode,
 } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
 import {
@@ -109,10 +110,6 @@ function toWheelSpinPayload(
 /** Format a multiplier value like 1 -> "1x", 0.25 -> "0.25x", 2.50 -> "2.5x" */
 function formatMultiplier(v: number): string {
   return `${v.toFixed(2).replace(/\.?0+$/, "")}x`;
-}
-
-function normalizePortableCode(value: string): string {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function encodePortableCodeFromSettings(settings: SingleCatSettings): string {
@@ -346,7 +343,8 @@ export function StreamControlClient() {
           );
         }
         if (typeof s.brbSettingsCode === "string") {
-          const normalized = normalizePortableCode(s.brbSettingsCode);
+          const normalized =
+            normalizePortableSettingsCode(s.brbSettingsCode) ?? "";
           setBrbSettingsCode(normalized);
           setBrbSettingsDraft(normalized);
         }
@@ -605,8 +603,10 @@ export function StreamControlClient() {
 
   const saveBrbSettingsCode = useCallback(
     async (rawCode: string) => {
-      const normalized = normalizePortableCode(rawCode);
-      if (normalized && !decodePortableSettings(normalized)) {
+      const normalized = rawCode.trim()
+        ? normalizePortableSettingsCode(rawCode)
+        : "";
+      if (normalized === null) {
         toast.error("Invalid BRB settings code");
         return false;
       }

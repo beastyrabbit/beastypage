@@ -5,10 +5,12 @@ import {
   decodePortableSettings,
   encodePortableSettings,
   isValidSettingsCode,
+  normalizePortableSettingsCode,
 } from "../encoding";
 import { applyPortableSettings, extractPortableSettings } from "../helpers";
 import { PORTABLE_PALETTE_REGISTRY } from "../registry";
 import type { SingleCatPortableSettings } from "../types";
+import { WORDLIST_V3, WORDLIST_V3_BLOCKLIST } from "../wordlist-v3";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,6 +51,43 @@ function assertRoundTrip(settings: SingleCatPortableSettings) {
 // ---------------------------------------------------------------------------
 
 describe("encodePortableSettings / decodePortableSettings", () => {
+  it("uses a full safe V3 wordlist for new codes", () => {
+    expect(WORDLIST_V3).toHaveLength(65_536);
+
+    const words = new Set(WORDLIST_V3);
+    expect(words.size).toBe(WORDLIST_V3.length);
+
+    for (const word of WORDLIST_V3) {
+      expect(word).toMatch(/^[a-z]+$/);
+    }
+
+    for (const blockedWord of WORDLIST_V3_BLOCKLIST) {
+      expect(words.has(blockedWord)).toBe(false);
+    }
+  });
+
+  it("excludes blocked words without shrinking code capacity", () => {
+    const blockedWords = [
+      "that",
+      "there",
+      "this",
+      "with",
+      "have",
+      "migrant",
+      "immigrant",
+      "refugee",
+      "deport",
+      "illegal",
+      "alkaloids",
+      "reefer",
+    ];
+
+    for (const word of blockedWords) {
+      expect(WORDLIST_V3).not.toContain(word);
+    }
+    expect(WORDLIST_V3).toHaveLength(65_536);
+  });
+
   it("round-trips default settings", () => {
     assertRoundTrip(makeSettings());
   });
@@ -145,6 +184,15 @@ describe("encodePortableSettings / decodePortableSettings", () => {
     }
   });
 
+  it("uses position masks so repeated raw values display as different words", () => {
+    const code = encodePortableSettings(
+      makeSettings({ exactLayerCounts: true, extendedModes: [] }),
+    );
+    const words = code.split("-");
+
+    expect(new Set(words.slice(3)).size).toBe(3);
+  });
+
   it("decodes case-insensitively", () => {
     const settings = makeSettings({ extendedModes: ["howl", "fma"] });
     const code = encodePortableSettings(settings);
@@ -205,12 +253,44 @@ describe("encodePortableSettings / decodePortableSettings", () => {
     expect(a).not.toBe(b);
   });
 
-  it("decodes pre-change codes as exactLayerCounts = true", () => {
-    const decoded = decodePortableSettings(
-      "alkaloids-which-that-that-that-that",
+  it("rejects old V1 codes containing blocked V3 words", () => {
+    expect(
+      decodePortableSettings("migrant-there-that-that-that-that"),
+    ).toBeNull();
+    expect(
+      decodePortableSettings("alkaloids-which-that-that-that-that"),
+    ).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Normalization
+// ---------------------------------------------------------------------------
+
+describe("normalizePortableSettingsCode", () => {
+  it("normalizes V3 codes to lowercase hyphen formatting", () => {
+    const code = encodePortableSettings(
+      makeSettings({ extendedModes: ["howl", "fma"] }),
     );
-    expect(decoded).not.toBeNull();
-    expect(decoded?.exactLayerCounts).toBe(true);
+    const messy = `  ${code.toUpperCase().replace(/-/g, " - ")}  `;
+
+    expect(normalizePortableSettingsCode(messy)).toBe(code);
+  });
+
+  it("returns null for old V1 codes", () => {
+    const oldCodes = [
+      "migrant-there-that-that-that-that",
+      "alkaloids-which-that-that-that-that",
+    ];
+
+    for (const oldCode of oldCodes) {
+      expect(normalizePortableSettingsCode(oldCode)).toBeNull();
+    }
+  });
+
+  it("returns null for invalid codes", () => {
+    expect(normalizePortableSettingsCode("not a real code at all")).toBeNull();
+    expect(normalizePortableSettingsCode("")).toBeNull();
   });
 });
 
