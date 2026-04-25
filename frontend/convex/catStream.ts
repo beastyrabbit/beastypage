@@ -82,7 +82,8 @@ export const getSessionByApiKey = query({
 // ---------------------------------------------------------------------------
 
 /**
- * Ensure the user's stream session exists. Called from the control page on mount.
+ * Ensure the user's stream session exists. When settings are supplied, apply
+ * them to an existing session or seed them into a newly created session.
  */
 export const ensureSession = mutation({
   args: { settings: v.optional(v.any()) },
@@ -93,7 +94,15 @@ export const ensureSession = mutation({
       .query("cat_stream_sessions")
       .withIndex("byUserId", (q) => q.eq("userId", user._id))
       .unique();
-    if (existing) return existing._id;
+    if (existing) {
+      if (args.settings !== undefined) {
+        await ctx.db.patch(existing._id, {
+          settings: args.settings,
+          updatedAt: Date.now(),
+        });
+      }
+      return existing._id;
+    }
 
     return ctx.db.insert("cat_stream_sessions", {
       userId: user._id,

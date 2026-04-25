@@ -67,6 +67,10 @@ function isPositiveFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
 function isLobbyMode(value: unknown): value is LobbyMode {
   return value === "fruit-ninja" || value === "matrix" || value === "dvd";
 }
@@ -258,6 +262,7 @@ export function StreamControlClient() {
     async (settingsSnapshot: Record<string, unknown>) => {
       if (!sessionRef.current) {
         await ensureSession({ settings: settingsSnapshot });
+        return;
       }
       await updateSettingsMut({ settings: settingsSnapshot });
     },
@@ -314,9 +319,9 @@ export function StreamControlClient() {
           setLobbyMoveSpeed(s.lobbyMoveSpeed);
         if (isPositiveFiniteNumber(s.lobbySwapSpeed))
           setLobbySwapSpeed(s.lobbySwapSpeed);
-        if (isPositiveFiniteNumber(s.lobbyCatMinSize))
+        if (isNonNegativeFiniteNumber(s.lobbyCatMinSize))
           setLobbyCatMinSize(s.lobbyCatMinSize);
-        if (isPositiveFiniteNumber(s.lobbyCatMaxSize))
+        if (isNonNegativeFiniteNumber(s.lobbyCatMaxSize))
           setLobbyCatMaxSize(s.lobbyCatMaxSize);
         if (isPositiveFiniteNumber(s.lobbyAutoClearSeconds)) {
           setLobbyAutoClearSeconds(s.lobbyAutoClearSeconds);
