@@ -32,6 +32,32 @@ describe("getActiveStreamScene", () => {
     ).toBe("test");
   });
 
+  it.each([
+    "idle",
+    null,
+  ])("returns test for %s sessions when test mode is enabled", (status) => {
+    expect(
+      getActiveStreamScene({
+        status,
+        currentCommand: { type: "clear" },
+        testMode: true,
+      }),
+    ).toBe("test");
+  });
+
+  it.each([
+    "lobby",
+    "brb",
+  ] as const)("does not mark %s active for idle sessions", (type) => {
+    expect(
+      getActiveStreamScene({
+        status: "idle",
+        currentCommand: { type },
+        testMode: false,
+      }),
+    ).toBeNull();
+  });
+
   it("clears scene state for idle or clear sessions", () => {
     expect(
       getActiveStreamScene({
