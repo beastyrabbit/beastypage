@@ -254,10 +254,8 @@ export const toggleTestMode = mutation({
   args: {},
   handler: async (ctx) => {
     const session = await requireSession(ctx);
-    const prevSeq = session.currentCommand?.seq ?? 0;
     await ctx.db.patch(session._id, {
       testMode: !session.testMode,
-      currentCommand: { type: "test", seq: prevSeq + 1, timestamp: Date.now() },
       updatedAt: Date.now(),
     });
   },
