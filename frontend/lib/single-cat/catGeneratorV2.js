@@ -1915,23 +1915,32 @@ if (typeof window !== 'undefined') {
 // ============================================================================
 
 // Support both ES6 and CommonJS
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = CatGenerator;
-} else if (typeof define === 'function' && define.amd) {
-    define([], function() { return CatGenerator; });
-} else if (typeof window !== 'undefined') {
-    window.CatGenerator = CatGenerator;
-    window.CatGeneratorV2 = CatGenerator; // Alias for compatibility
+try {
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = CatGenerator;
+    } else if (typeof define === 'function' && define.amd) {
+        define([], function() { return CatGenerator; });
+    } else if (typeof window !== 'undefined') {
+        window.CatGenerator = CatGenerator;
+        window.CatGeneratorV2 = CatGenerator; // Alias for compatibility
+    }
+} catch (_error) {
+    if (typeof window !== 'undefined') {
+        window.CatGenerator = CatGenerator;
+        window.CatGeneratorV2 = CatGenerator;
+    }
 }
 
 // Export classes for testing
-if (typeof exports !== 'undefined') {
-    exports.CatGenerator = CatGenerator;
-    // CanvasPool removed
-    exports.ResourceManager = ResourceManager;
-    exports.RenderPipeline = RenderPipeline;
-    exports.ParamValidator = ParamValidator;
-}
+try {
+    if (typeof exports !== 'undefined') {
+        exports.CatGenerator = CatGenerator;
+        // CanvasPool removed
+        exports.ResourceManager = ResourceManager;
+        exports.RenderPipeline = RenderPipeline;
+        exports.ParamValidator = ParamValidator;
+    }
+} catch (_error) {}
 
 // Create singleton instance
 const catGenerator = new CatGenerator();

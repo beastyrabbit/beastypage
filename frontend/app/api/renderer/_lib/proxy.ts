@@ -1,8 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-export const RENDERER_BASE = (
-  process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001"
-).replace(/\/$/, "");
+function normalizeRendererBase(url: string) {
+  const trimmed = url.replace(/\/$/, "");
+  if (/^http:\/\/[^/]+\.localhost:1355$/i.test(trimmed)) {
+    return trimmed.replace(/^http:/i, "https:");
+  }
+  return trimmed;
+}
+
+export const RENDERER_BASE = normalizeRendererBase(
+  process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001",
+);
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 

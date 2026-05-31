@@ -59,6 +59,14 @@ export const TOOL_REGISTRY: ToolWidgetMeta[] = [
     "category": "artist"
   },
   {
+    "id": "evolution-generator",
+    "title": "Evolution Lines",
+    "description": "Branch one starter cat into evolution forms with cumulative torties, scars, and accessories.",
+    "icon": "🌿",
+    "href": "/evolution-generator",
+    "category": "gacha"
+  },
+  {
     "id": "guided-builder",
     "title": "Guided Builder Tour",
     "description": "Step-by-step wizard with a growing sidebar tree and timeline tracking.",

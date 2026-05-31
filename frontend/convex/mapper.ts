@@ -112,15 +112,21 @@ export const updateMeta = mutation({
     const doc = await ctx.db.get(args.id);
     if (!doc) throw new Error("Profile not found");
 
-    await ctx.db.patch(args.id, {
-      catName: sanitizeOptionalString(args.catName),
-      creatorName: sanitizeOptionalString(args.creatorName),
+    const patch = {
       catData: {
         ...doc.catData,
         metaLocked: true,
       },
       updatedAt: Date.now(),
-    });
+      ...("catName" in args
+        ? { catName: sanitizeOptionalString(args.catName) }
+        : {}),
+      ...("creatorName" in args
+        ? { creatorName: sanitizeOptionalString(args.creatorName) }
+        : {}),
+    };
+
+    await ctx.db.patch(args.id, patch);
 
     const updated = await ctx.db.get(args.id);
     return updated ? await profileToClient(ctx, updated) : null;

@@ -53,8 +53,16 @@ beforeAll(async () => {
   const parsedUrl = new URL(baseUrl);
   const port = parsedUrl.port || "8001";
 
-  serverProcess = spawn(process.execPath, ["run", "backend:test-server"], {
-    cwd: resolve(__dirname, ".."),
+  serverProcess = spawn("uv", [
+    "run",
+    "uvicorn",
+    "renderer_service.app.main:app",
+    "--host",
+    parsedUrl.hostname || "127.0.0.1",
+    "--port",
+    port,
+  ], {
+    cwd: resolve(__dirname, "../backend/renderer_service"),
     stdio: "inherit",
     env: {
       ...process.env,

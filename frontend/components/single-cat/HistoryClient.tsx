@@ -16,6 +16,7 @@ import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
 import { encodeCatShare } from "@/lib/catShare";
+import { isEvolutionBatchSettings } from "@/lib/evolution/evolutionGenerator";
 import { HistoryAncestryTreeCard } from "./HistoryAncestryTreeCard";
 
 type SortMode = "newest" | "oldest" | "name";
@@ -59,6 +60,10 @@ type HistoryItem =
       fullUrl: string | null;
       slug: string;
       cats: AdoptionHistoryCat[];
+      isEvolution: boolean;
+      href: string;
+      badgeLabel: string;
+      actionLabel: string;
     }
   | {
       kind: "tree";
@@ -190,7 +195,10 @@ export function HistoryClient() {
     });
 
   const adoptionItems: HistoryItem[] = batches.map((batch) => {
-    const baseTitle = cleanDisplay(batch.title) || "Adoption Batch";
+    const isEvolution = isEvolutionBatchSettings(batch.settings);
+    const baseTitle =
+      cleanDisplay(batch.title) ||
+      (isEvolution ? "Evolution Batch" : "Adoption Batch");
     const baseCreator = cleanDisplay(batch.creatorName) || null;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const cats: AdoptionHistoryCat[] = (batch.cats ?? []).map((cat, index) => {
@@ -241,6 +249,12 @@ export function HistoryClient() {
       fullUrl,
       slug: batch.slug ?? batch.id,
       cats,
+      isEvolution,
+      href: isEvolution
+        ? `/evolution/${batch.slug ?? batch.id}`
+        : `/adoption/${batch.slug ?? batch.id}`,
+      badgeLabel: isEvolution ? "Evolution" : "Batch",
+      actionLabel: isEvolution ? "View evolution" : "View batch",
     };
   });
 
@@ -387,28 +401,13 @@ export function HistoryClient() {
       </section>
 
       {focusedPreview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
-          role="button"
-          tabIndex={0}
-          onClick={(event) => {
-            if (event.target !== event.currentTarget) return;
-            setFocusedPreview(null);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              setFocusedPreview(null);
-            }
-            if (
-              (event.key === "Enter" || event.key === " ") &&
-              event.target === event.currentTarget
-            ) {
-              event.preventDefault();
-              setFocusedPreview(null);
-            }
-          }}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10">
+          <button
+            type="button"
+            aria-label="Close preview"
+            className="absolute inset-0 cursor-default"
+            onClick={() => setFocusedPreview(null)}
+          />
           <div className="relative w-full max-w-4xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
             <button
               type="button"
@@ -568,13 +567,13 @@ function HistoryAdoptionCard({ item, onPreview }: HistoryAdoptionCardProps) {
     cleanDisplay(activeCat?.label) ||
     cardTitle ||
     "Adoption preview";
-  const href = `/adoption/${item.slug}`;
+  const href = item.href;
 
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-border/40 bg-background/70 p-4 transition hover:border-primary/40">
       <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border/30 bg-background">
         <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/65 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-          Batch
+          {item.badgeLabel}
         </span>
         {totalCats > 1 && (
           <button
@@ -645,7 +644,7 @@ function HistoryAdoptionCard({ item, onPreview }: HistoryAdoptionCardProps) {
           href={href}
           className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-border/60 px-4 py-2.5 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
         >
-          View batch <ArrowUpRight className="size-4" />
+          {item.actionLabel} <ArrowUpRight className="size-4" />
         </Link>
       </div>
     </article>
