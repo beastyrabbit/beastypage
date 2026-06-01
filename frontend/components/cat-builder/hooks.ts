@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "./types";
-import { getUserSelectablePoseNames } from "@/lib/cat-v3/poseOptions";
+import { getAvailablePoseNames } from "@/lib/cat-v3/poseOptions";
 
 export function useSpriteMapperOptions() {
   const [mapper, setMapper] = useState<SpriteMapperApi | null>(null);
@@ -28,7 +28,7 @@ export function useSpriteMapperOptions() {
 
         setMapper(spriteMapper);
 
-        const poseNames = getUserSelectablePoseNames(spriteMapper);
+        const poseNames = getAvailablePoseNames(spriteMapper);
         const builderOptions: BuilderOptions = {
           poseNames,
           pelts: spriteMapper.getPeltNames(),

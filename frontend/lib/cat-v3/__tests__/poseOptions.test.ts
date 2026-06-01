@@ -1,0 +1,27 @@
+import { describe, expect, it } from "vitest";
+import {
+  getAvailablePoseNames,
+  getRandomSelectablePoseNames,
+} from "../poseOptions";
+
+describe("pose options", () => {
+  it("keeps builder pose availability separate from random roll filters", () => {
+    const mapper = {
+      getPoseNames: () => [
+        "newborn0",
+        "kitten0",
+        "adolescent_long0",
+        "adult_short0",
+      ],
+      getRenderablePoseNames: () => ["adolescent_long0", "adult_short0"],
+    };
+
+    expect(getAvailablePoseNames(mapper)).toEqual([
+      "newborn0",
+      "kitten0",
+      "adolescent_long0",
+      "adult_short0",
+    ]);
+    expect(getRandomSelectablePoseNames(mapper)).toEqual(["adult_short0"]);
+  });
+});
