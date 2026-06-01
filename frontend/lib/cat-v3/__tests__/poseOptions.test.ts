@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getAvailablePoseNames,
   getRandomSelectablePoseNames,
+  getUserSelectablePoseNames,
 } from "../poseOptions";
 
 describe("pose options", () => {
@@ -23,5 +24,11 @@ describe("pose options", () => {
       "adult_short0",
     ]);
     expect(getRandomSelectablePoseNames(mapper)).toEqual(["adult_short0"]);
+    expect(getUserSelectablePoseNames(mapper)).toEqual([
+      "newborn0",
+      "kitten0",
+      "adolescent_long0",
+      "adult_short0",
+    ]);
   });
 });

@@ -15,7 +15,7 @@ import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import { api } from "@/convex/_generated/api";
 import {
   formatPoseName,
-  getUserSelectablePoseNames,
+  getAvailablePoseNames,
 } from "@/lib/cat-v3/poseOptions";
 import type { TortieLayer } from "@/lib/cat-v3/types";
 import { createCatShare, decodeCatShare, encodeCatShare } from "@/lib/catShare";
@@ -458,7 +458,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
         typeof catPayload.params.spriteNumber === "number"
           ? catPayload.params.spriteNumber
           : 0;
-      const poseChoices = getUserSelectablePoseNames(spriteMapper).map(
+      const poseChoices = getAvailablePoseNames(spriteMapper).map(
         (poseName: string) => ({
           id: `pose-${poseName}`,
           poseName,

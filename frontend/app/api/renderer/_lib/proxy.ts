@@ -56,11 +56,7 @@ function ensureJson(contentType: string | null): string | null {
 }
 
 function isManualRedirect(response: Response): boolean {
-  return (
-    response.type === "opaqueredirect" ||
-    response.status === 0 ||
-    (response.status >= 300 && response.status < 400)
-  );
+  return response.status >= 300 && response.status < 400;
 }
 
 function streamWithFinalizer(
@@ -162,12 +158,15 @@ export async function proxyRendererJson(
     if (isManualRedirect(upstream)) {
       clear();
       const location = upstream.headers.get("location");
+      console.error(
+        "[renderer-proxy] upstream redirect for %s %s returned %d%s",
+        "POST",
+        targetUrl,
+        upstream.status,
+        location ? " with location header" : "",
+      );
       return NextResponse.json(
-        {
-          error: location
-            ? `Renderer request was redirected to ${location}`
-            : "Renderer request was redirected",
-        },
+        { error: "Renderer request was redirected" },
         { status: 502 },
       );
     }

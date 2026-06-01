@@ -30,7 +30,8 @@ import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import {
   DEFAULT_POSE_NAME,
   formatPoseName,
-  getUserSelectablePoseNames,
+  getAvailablePoseNames,
+  getRandomSelectablePoseNames,
 } from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { decodePortableSettings } from "@/lib/portable-settings";
@@ -1085,6 +1086,7 @@ function applyParamValue(
         const parsed = coerceSpriteNumber(value);
         if (parsed !== undefined) {
           params.spriteNumber = parsed;
+          params.poseName = undefined;
         }
       }
       break;
@@ -1372,7 +1374,7 @@ async function buildParameterOptions(
   const vitiligo = invokeMapperArray(mapper, mapper.getVitiligo);
   const accessories = invokeMapperArray(mapper, mapper.getAccessories);
   const scars = invokeMapperArray(mapper, mapper.getScars);
-  const poseNames = getUserSelectablePoseNames(mapper);
+  const poseNames = getRandomSelectablePoseNames(mapper);
 
   return {
     sprite: poseNames,
@@ -4101,7 +4103,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       const catUrl = generator.buildCatURL?.(builderParams) ?? "";
 
       const spritePreview: SpriteVariation[] = [];
-      for (const poseName of getUserSelectablePoseNames(mapper)) {
+      for (const poseName of getAvailablePoseNames(mapper)) {
         if (generationIdRef.current !== token) return;
         const spriteParams = {
           ...params,

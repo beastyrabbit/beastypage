@@ -391,10 +391,14 @@ export function VisualBuilderClient({
   useEffect(() => {
     if (!initialCat || initialisedRef.current) return;
     initialisedRef.current = true;
-    const mergedParams = cloneParams({
+    const initialParams = {
       ...DEFAULT_PARAMS,
       ...initialCat.params,
-    });
+    };
+    if (initialCat.params.poseName === undefined) {
+      delete initialParams.poseName;
+    }
+    const mergedParams = cloneParams(initialParams);
     const incomingTortie = (
       initialCat.tortie ??
       mergedParams.tortie ??

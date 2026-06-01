@@ -1,6 +1,8 @@
 from pathlib import Path
 import json
 
+from PIL import Image
+
 from renderer_service.renderer.sprite_mapper import SpriteMapper
 from renderer_service.renderer.repository import SpriteRepository
 
@@ -98,6 +100,43 @@ def test_missing_scar_mask_cache_separates_named_and_legacy_offsets():
 
     assert legacy_number_mask.tobytes() == fresh_legacy_mask.tobytes()
     assert named_pose_mask.tobytes() != legacy_number_mask.tobytes()
+
+
+def test_invalid_pose_names_share_canonical_sprite_cache_key():
+    repo = SpriteRepository()
+
+    repo.get_sprite("singleWHITE", 8, "invalid-one")
+    repo.get_sprite("singleWHITE", 8, "invalid-two")
+
+    cache_keys = [key for key in repo._sprite_cache if key[0] == "singleWHITE"]
+    assert cache_keys == [("singleWHITE", 8, "adult_short2", None)]
+
+
+def test_palette_map_uses_original_pixels_for_overlapping_targets():
+    repo = SpriteRepository()
+    sprite = Image.new("RGBA", (2, 1))
+    sprite.putdata([(1, 1, 1, 255), (2, 2, 2, 255)])
+    palette = Image.new("RGBA", (2, 2))
+    palette.putdata(
+        [
+            (1, 1, 1, 255),
+            (2, 2, 2, 255),
+            (2, 2, 2, 255),
+            (3, 3, 3, 255),
+        ]
+    )
+    repo._sheet_cache["test_palette"] = palette
+
+    mapped = repo._apply_palette_map(
+        sprite,
+        {
+            "paletteSheet": "test_palette",
+            "paletteName": "TARGET",
+            "paletteNames": ["BASE", "TARGET"],
+        },
+    )
+
+    assert list(mapped.getdata()) == [(2, 2, 2, 255), (3, 3, 3, 255)]
 
 
 def test_generated_metadata_covers_upstream_sprite_dicts():

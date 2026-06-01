@@ -22,7 +22,8 @@ import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import {
   DEFAULT_POSE_NAME,
   formatPoseName,
-  getUserSelectablePoseNames,
+  getAvailablePoseNames,
+  getRandomSelectablePoseNames,
 } from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
@@ -1299,7 +1300,7 @@ async function buildParameterOptions(
   const vitiligo = invokeMapperArray(mapper, mapper.getVitiligo);
   const accessories = invokeMapperArray(mapper, mapper.getAccessories);
   const scars = invokeMapperArray(mapper, mapper.getScars);
-  const poseNames = getUserSelectablePoseNames(mapper);
+  const poseNames = getRandomSelectablePoseNames(mapper);
 
   return {
     sprite: poseNames,
@@ -3713,14 +3714,12 @@ export function SingleCatPlusClient({
 
       const catUrl = generator.buildCatURL?.(builderParams) ?? "";
 
-      const poseChoices = getUserSelectablePoseNames(mapper).map(
-        (poseName) => ({
-          id: `pose-${poseName}`,
-          poseName,
-          spriteNumber: params.spriteNumber ?? DEFAULT_SPRITE_NUMBER,
-          name: formatPoseName(poseName),
-        }),
-      );
+      const poseChoices = getAvailablePoseNames(mapper).map((poseName) => ({
+        id: `pose-${poseName}`,
+        poseName,
+        spriteNumber: params.spriteNumber ?? DEFAULT_SPRITE_NUMBER,
+        name: formatPoseName(poseName),
+      }));
 
       const spritePreview = (
         await Promise.all(

@@ -80,6 +80,7 @@ describe("renderer proxy", () => {
 
     expect(response.status).toBe(502);
     expect(payload.error).toContain("redirected");
-    expect(payload.error).toContain("/render/");
+    expect(payload.error).not.toContain("127.0.0.1");
+    expect(payload.error).not.toContain("/render/");
   });
 });

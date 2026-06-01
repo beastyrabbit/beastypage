@@ -70,6 +70,31 @@ class SpriteRepository:
         number = max(0, number)
         return {"x": number % 3, "y": number // 3}
 
+    def _normalise_pose_name(self, pose_name: str | None) -> str | None:
+        if not isinstance(pose_name, str):
+            return None
+        pose = pose_name.strip()
+        if not pose or len(pose) > 64:
+            return None
+        return pose
+
+    def _canonical_pose_name(
+        self,
+        sprite_number: int | None = None,
+        pose_name: str | None = None,
+        pose_layout: str | None = None,
+    ) -> str | None:
+        pose = self._normalise_pose_name(pose_name)
+        if pose_layout == "legacy":
+            if pose and pose in self.legacy_pose_to_offset:
+                return pose
+            return None
+
+        if pose and pose in self.pose_name_to_offset:
+            return pose
+
+        return self.pose_name_for_sprite_number(sprite_number)
+
     def _resolve_pose_offset(
         self,
         sprite_number: int | None = None,
@@ -81,8 +106,8 @@ class SpriteRepository:
                 return self.legacy_pose_to_offset.get(str(pose_name))
             return self._legacy_offset_for_number(sprite_number)
 
-        if pose_name:
-            pose = str(pose_name)
+        pose = self._normalise_pose_name(pose_name)
+        if pose:
             offset = self.pose_name_to_offset.get(pose)
             if offset:
                 return offset
@@ -113,8 +138,8 @@ class SpriteRepository:
         fallback: int | None = 0,
         pose_layout: str | None = None,
     ) -> int:
-        if pose_name:
-            pose = str(pose_name)
+        pose = self._normalise_pose_name(pose_name)
+        if pose:
             if pose in self.legacy_pose_to_sprite:
                 return self.legacy_pose_to_sprite[pose]
             if pose_layout != "legacy" and pose in self.pose_names:
@@ -185,10 +210,22 @@ class SpriteRepository:
             y_offset = 0
             pose_layout = None
 
-        resolved_number = self.sprite_number_for_pose(
-            pose_name, sprite_number, pose_layout
+        requested_pose = self._normalise_pose_name(pose_name)
+        canonical_pose = self._canonical_pose_name(
+            sprite_number, pose_name, pose_layout
         )
-        key = (sprite_name, resolved_number, pose_name, pose_layout)
+        invalid_legacy_pose = (
+            pose_layout == "legacy"
+            and requested_pose is not None
+            and canonical_pose is None
+        )
+        resolved_number = self.sprite_number_for_pose(
+            canonical_pose, sprite_number, pose_layout
+        )
+        cache_pose = (
+            "__invalid_legacy_pose__" if invalid_legacy_pose else canonical_pose
+        )
+        key = (sprite_name, resolved_number, cache_pose, pose_layout)
         if key in self._sprite_cache:
             return self._sprite_cache[key].copy()
 
@@ -196,7 +233,11 @@ class SpriteRepository:
             sheet = self._load_sheet(sheet_name)
         except FileNotFoundError:
             return self.blank_canvas()
-        offset = self._resolve_pose_offset(resolved_number, pose_name, pose_layout)
+        offset = None
+        if not invalid_legacy_pose:
+            offset = self._resolve_pose_offset(
+                resolved_number, canonical_pose, pose_layout
+            )
         if offset is None:
             sprite = self.blank_canvas()
             self._sprite_cache[key] = sprite
@@ -221,8 +262,9 @@ class SpriteRepository:
         sprite_number: int | None,
         pose_name: str | None = None,
     ) -> Image.Image:
-        resolved_number = self.sprite_number_for_pose(pose_name, sprite_number)
-        key = (scar_name, resolved_number, pose_name)
+        canonical_pose = self._canonical_pose_name(sprite_number, pose_name)
+        resolved_number = self.sprite_number_for_pose(canonical_pose, sprite_number)
+        key = (scar_name, resolved_number, canonical_pose)
         if key in self._missing_mask_cache:
             return self._missing_mask_cache[key].copy()
 
@@ -237,7 +279,7 @@ class SpriteRepository:
 
         x_offset = int(info.get("xOffset", 0))
         y_offset = int(info.get("yOffset", 0))
-        offset = self._resolve_pose_offset(resolved_number, pose_name)
+        offset = self._resolve_pose_offset(resolved_number, canonical_pose)
 
         src_box = (
             x_offset + offset["x"] * self.tile_size,
@@ -269,7 +311,7 @@ class SpriteRepository:
             return sprite
 
         try:
-            palette = self._load_sheet(str(palette_sheet))
+            palette = self._load_sheet(str(palette_sheet)).convert("RGBA")
         except FileNotFoundError:
             return sprite
 
@@ -280,11 +322,12 @@ class SpriteRepository:
         base_colours = [palette.getpixel((x, base_row)) for x in range(width)]
         target_colours = [palette.getpixel((x, target_row)) for x in range(width)]
 
-        arr = np.array(sprite, dtype=np.uint8, copy=True)
+        original = np.array(sprite, dtype=np.uint8, copy=True)
+        arr = original.copy()
         for base, target in zip(base_colours, target_colours):
             base_arr = np.array(base, dtype=np.uint8)
             target_arr = np.array(target, dtype=np.uint8)
-            mask = np.all(arr == base_arr, axis=-1)
+            mask = np.all(original == base_arr, axis=-1)
             if np.any(mask):
                 arr[mask] = target_arr
         return Image.fromarray(arr, mode="RGBA")

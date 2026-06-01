@@ -14,7 +14,7 @@ import {
   materializeStringSlots,
   materializeTortieSlots,
 } from "./slotMaterializer";
-import { isUserSelectablePoseName } from "./poseOptions";
+import { isRandomSelectablePoseName } from "./poseOptions";
 import type { CatParams, RandomGenerationOptions } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -580,7 +580,7 @@ export async function generateRandomParamsServer(
     data.renderablePoseNames.length > 0
       ? data.renderablePoseNames
       : data.poseNames;
-  const posePool = posePoolSource.filter(isUserSelectablePoseName);
+  const posePool = posePoolSource.filter(isRandomSelectablePoseName);
   if (!posePool.length) throw new Error("Pose pool is empty");
 
   const poseName =

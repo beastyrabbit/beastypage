@@ -45,8 +45,10 @@ export function getRandomSelectablePoseNames(
   return uniqueStringValues(source.filter(isRandomSelectablePoseName));
 }
 
-export const isUserSelectablePoseName = isRandomSelectablePoseName;
-export const getUserSelectablePoseNames = getRandomSelectablePoseNames;
+export const isUserSelectablePoseName = (
+  poseName: unknown,
+): poseName is string => typeof poseName === "string" && poseName.length > 0;
+export const getUserSelectablePoseNames = getAvailablePoseNames;
 
 export function formatPoseName(poseName: string): string {
   return poseName

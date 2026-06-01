@@ -3,7 +3,7 @@ import {
   materializeStringSlots,
   materializeTortieSlots,
 } from "./slotMaterializer";
-import { getUserSelectablePoseNames } from "./poseOptions";
+import { getRandomSelectablePoseNames } from "./poseOptions";
 import type {
   CatParams,
   RandomGenerationOptions,
@@ -277,7 +277,7 @@ export async function generateRandomParamsV3Detailed(
 ): Promise<RandomGenerationResult> {
   const spriteMapper = await ensureSpriteMapper();
 
-  const posePool = getUserSelectablePoseNames(spriteMapper);
+  const posePool = getRandomSelectablePoseNames(spriteMapper);
   if (!posePool.length) {
     throw new Error("Pose pool is empty; check poseData.json");
   }
