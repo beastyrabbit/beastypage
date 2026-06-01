@@ -133,12 +133,23 @@ export async function proxyRendererJson(
   const clear = () => clearTimeout(timeout);
 
   try {
-    const upstream = await fetch(buildTargetUrl(path), {
+    const targetUrl = buildTargetUrl(path);
+    const upstream = await fetch(targetUrl, {
       method: "POST",
       headers: selectHeaders(request),
       body: rawBody,
       signal: controller.signal,
+      redirect: "manual",
     });
+
+    if (!upstream.ok) {
+      console.error(
+        "[renderer-proxy] upstream %s %s returned %d",
+        "POST",
+        targetUrl,
+        upstream.status,
+      );
+    }
 
     if (!upstream.body) {
       clear();

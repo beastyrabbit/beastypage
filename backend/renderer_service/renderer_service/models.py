@@ -31,7 +31,7 @@ class RenderOptions(BaseModel):
     )
     collect_layers: bool = Field(
         False,
-        description="Return intermediate layers for parity diagnostics",
+        description="Return intermediate layers for renderer diagnostics",
         alias="collectLayers",
     )
     diagnostics: bool = Field(
@@ -82,25 +82,6 @@ class RenderResponse(BaseModel):
     image: str
     meta: RenderMeta
     layers: Optional[List[LayerDiagnostic]] = None
-
-
-class DiffRequest(BaseModel):
-    v2: RenderParams
-    v3: RenderParams
-    epsilon: int = Field(0, ge=0, description="Allowed per-channel pixel difference")
-    collect_layers: bool = False
-
-
-class DiffLayerResult(BaseModel):
-    id: LayerIdentifier
-    mismatch_pixels: int
-    total_pixels: int
-    mismatch_ratio: float
-
-
-class DiffResponse(BaseModel):
-    composed: DiffLayerResult
-    layers: List[DiffLayerResult]
 
 
 class BatchVariant(BaseModel):

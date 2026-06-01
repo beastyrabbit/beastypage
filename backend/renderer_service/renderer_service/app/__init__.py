@@ -12,8 +12,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ..config import settings
 from ..models import (
-    DiffResponse,
-    DiffRequest,
     RenderRequest,
     RenderResponse,
     BatchRenderRequest,
@@ -173,8 +171,7 @@ def create_app() -> FastAPI:
         version="1.3.3",
         description=(
             "Composites ClanGen pixel-art sprites into cat card images. "
-            "Supports single renders, batch spritesheets, palette listing, "
-            "and V2-vs-V3 visual diffs."
+            "Supports single renders, batch spritesheets, and palette listing."
         ),
         servers=[
             {"url": "http://localhost:8001", "description": "Local dev"},
@@ -271,15 +268,6 @@ def create_app() -> FastAPI:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Renderer recovering from failures. Please retry.",
             ) from None
-
-    @app.post(
-        "/diff",
-        response_model=DiffResponse,
-        tags=["rendering"],
-        summary="V2 vs V3 visual diff (not yet implemented)",
-    )
-    def diff(_: DiffRequest) -> DiffResponse:  # pragma: no cover - placeholder
-        raise NotImplementedError("V2 vs V3 diffing is not implemented yet")
 
     @app.get("/palettes", tags=["palettes"], summary="List available color palettes")
     def get_palettes() -> list[dict]:

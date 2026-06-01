@@ -40,7 +40,7 @@ def _dedupe(seq: Iterable[str]) -> List[str]:
 
 
 class SpriteMapper:
-    """Python port of the browser sprite mapper used by catGeneratorV2."""
+    """Maps public cat-generation parameters to renderer atlas sprite keys."""
 
     def __init__(self, data_dir: Path) -> None:
         self.data_dir = data_dir
