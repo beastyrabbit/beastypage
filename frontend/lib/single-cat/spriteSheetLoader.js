@@ -20,6 +20,7 @@ class SpriteSheetLoader {
         // Sprite sheet index from pixel-cat-maker
         this.spritesIndex = null;
         this.spritesOffsetMap = null;
+        this.poseData = null;
         
         // Base path for sprite sheets - use absolute path for GitHub Pages
         this.spriteSheetPath = '/sprites/';
@@ -57,6 +58,9 @@ class SpriteSheetLoader {
             const offsetJson = await fetchJson([
                 '/sprite-data/spritesOffsetMap.json'
             ]);
+            const poseJson = await fetchJson([
+                '/sprite-data/poseData.json'
+            ]);
 
             if (!indexJson || !offsetJson) {
                 console.warn('Could not load sprite indices, falling back to individual files');
@@ -65,6 +69,7 @@ class SpriteSheetLoader {
 
             this.spritesIndex = indexJson;
             this.spritesOffsetMap = offsetJson;
+            this.poseData = poseJson;
             this.normalizedIndex = new Map(Object.keys(this.spritesIndex || {}).map(key => [key.toLowerCase(), key]));
             
             console.log(`Loaded sprite sheet index with ${Object.keys(this.spritesIndex).length} sprite groups`);
@@ -124,6 +129,40 @@ class SpriteSheetLoader {
             this.loadingSheets.delete(sheetName);
         }
     }
+
+    createSpriteCanvas() {
+        const canvas = typeof OffscreenCanvas !== 'undefined'
+            ? new OffscreenCanvas(50, 50)
+            : document.createElement('canvas');
+        canvas.width = 50;
+        canvas.height = 50;
+        return canvas;
+    }
+
+    createBlankSpriteCanvas() {
+        return this.createSpriteCanvas();
+    }
+
+    legacyOffsetForPoseName(poseName) {
+        const match = String(poseName || '').match(/^(newborn|kitten|adolescent_short|adult_short|adult_long|senior)([0-2])$/);
+        if (!match) {
+            if (poseName === 'para_adult_short0') return { x: 0, y: 5 };
+            if (poseName === 'para_adult_long0') return { x: 1, y: 5 };
+            if (poseName === 'sick_adult0') return { x: 0, y: 6 };
+            return null;
+        }
+
+        const [, group, variant] = match;
+        const rowByGroup = {
+            kitten: 0,
+            adolescent_short: 1,
+            adult_short: 2,
+            adult_long: 3,
+            senior: 4,
+            newborn: 6,
+        };
+        return { x: Number.parseInt(variant, 10), y: rowByGroup[group] };
+    }
     
     /**
      * Extract a sprite from a sprite sheet
@@ -132,46 +171,66 @@ class SpriteSheetLoader {
      * @param {number} spriteNumber - Sprite number (0-20)
      * @returns {HTMLCanvasElement|OffscreenCanvas}
      */
-    extractSprite(sheet, spriteName, spriteNumber) {
-        const cacheKey = `${spriteName}_${spriteNumber}`;
+    resolveLegacyPoseOffset(spriteNumber, poseName = null) {
+        if (poseName) {
+            return this.legacyOffsetForPoseName(poseName);
+        }
+
+        const parsed = Number.parseInt(spriteNumber, 10);
+        const number = Number.isFinite(parsed) ? parsed : 0;
+        return {
+            x: number % 3,
+            y: Math.floor(number / 3)
+        };
+    }
+
+    resolvePoseOffset(spriteNumber, poseName = null, spriteInfo = null) {
+        if (spriteInfo?.poseLayout === 'legacy') {
+            return this.resolveLegacyPoseOffset(spriteNumber, poseName);
+        }
+
+        if (poseName && this.poseData?.poseNameToOffset?.[poseName]) {
+            return this.poseData.poseNameToOffset[poseName];
+        }
+
+        const parsed = Number.parseInt(spriteNumber, 10);
+        const number = Number.isFinite(parsed) ? parsed : 0;
+        return this.spritesOffsetMap[number];
+    }
+
+    extractSprite(sheet, spriteName, spriteNumber, poseName = null, spriteInfo = null) {
+        const resolvedSpriteInfo = spriteInfo || this.spritesIndex[spriteName];
+        const poseLayout = resolvedSpriteInfo?.poseLayout || 'named';
+        const cacheKey = `${spriteName}_${poseLayout}_${poseName || spriteNumber}`;
         
         // Check cache
         if (this.extractedSprites.has(cacheKey)) {
             // Return a copy for DOM usage - create new canvas, don't use pool
             const cachedCanvas = this.extractedSprites.get(cacheKey);
-            const canvas = typeof OffscreenCanvas !== 'undefined' 
-                ? new OffscreenCanvas(50, 50)
-                : document.createElement('canvas');
-            canvas.width = 50;
-            canvas.height = 50;
+            const canvas = this.createSpriteCanvas();
             const ctx = canvas.getContext('2d');
             ctx.drawImage(cachedCanvas, 0, 0);
             return canvas;
         }
         
-        // Get sprite info
-        const spriteInfo = this.spritesIndex[spriteName];
-        if (!spriteInfo) {
+        if (!resolvedSpriteInfo) {
             console.error(`Sprite group not found: ${spriteName}`);
             return null;
         }
         
-        const offsetInfo = this.spritesOffsetMap[spriteNumber];
+        const offsetInfo = this.resolvePoseOffset(spriteNumber, poseName, resolvedSpriteInfo);
         if (!offsetInfo) {
-            console.error(`Sprite number ${spriteNumber} not found in offset map`);
-            return null;
+            const blankCanvas = this.createBlankSpriteCanvas();
+            this.extractedSprites.set(cacheKey, blankCanvas);
+            return blankCanvas;
         }
         
         // Calculate position in sprite sheet
-        const x = spriteInfo.xOffset + (50 * offsetInfo.x);
-        const y = spriteInfo.yOffset + (50 * offsetInfo.y);
+        const x = resolvedSpriteInfo.xOffset + (50 * offsetInfo.x);
+        const y = resolvedSpriteInfo.yOffset + (50 * offsetInfo.y);
         
         // Extract sprite - create new canvas, don't use pool
-        const canvas = typeof OffscreenCanvas !== 'undefined' 
-            ? new OffscreenCanvas(50, 50)
-            : document.createElement('canvas');
-        canvas.width = 50;
-        canvas.height = 50;
+        const canvas = this.createSpriteCanvas();
         const ctx = canvas.getContext('2d');
         
         ctx.drawImage(
@@ -182,9 +241,7 @@ class SpriteSheetLoader {
         
         // Cache the extracted sprite
         // Clone the canvas for caching
-        const cachedCanvas = typeof OffscreenCanvas !== 'undefined'
-            ? new OffscreenCanvas(50, 50)
-            : document.createElement('canvas');
+        const cachedCanvas = this.createSpriteCanvas();
         
         if (cachedCanvas.width !== 50) {
             cachedCanvas.width = 50;
@@ -205,7 +262,7 @@ class SpriteSheetLoader {
      * @param {number} spriteNumber - Sprite number (0-20)
      * @returns {Promise<HTMLCanvasElement|OffscreenCanvas|null>}
      */
-    async getSprite(spriteName, spriteNumber) {
+    async getSprite(spriteName, spriteNumber, poseName = null) {
         // Check if we have sprite indices
         if (!this.spritesIndex || !this.spritesOffsetMap) {
             console.error('Sprite indices not loaded');
@@ -238,7 +295,7 @@ class SpriteSheetLoader {
         }
         
         // Extract and return the sprite
-        return this.extractSprite(sheet, groupName, spriteNumber);
+        return this.extractSprite(sheet, groupName, spriteNumber, poseName, spriteInfo);
     }
     
     /**
@@ -351,8 +408,8 @@ class SpriteSheetLoader {
         }
 
         const commonSheets = [
-            'lineart', 'shadersnewwhite', 'lightingnew',
-            'singlecolours', 'tabbycolours', 'eyes', 'skin'
+            'lineart', 'shader_mask', 'shader_lighting',
+            'colours_single', 'colours_tabby', 'eyes', 'skin'
         ];
         
         const promises = commonSheets.map(sheet => this.loadSpriteSheet(sheet));

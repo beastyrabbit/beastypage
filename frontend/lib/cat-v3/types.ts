@@ -6,6 +6,7 @@ export interface TortieLayer {
 
 export interface CatParams {
   spriteNumber: number;
+  poseName?: string;
   peltName: string;
   colour: string;
   isTortie: boolean;
@@ -66,8 +67,9 @@ export interface RandomGenerationResult {
 }
 
 export interface CatRenderParams {
-  spriteNumber: number;
-  params: Partial<Omit<CatParams, "spriteNumber">>;
+  spriteNumber?: number;
+  poseName?: string;
+  params: Partial<Omit<CatParams, "spriteNumber" | "poseName">>;
   collectLayers?: boolean;
   includeLayerImages?: boolean;
 }
@@ -126,6 +128,7 @@ export interface BatchVariantPayload {
   label?: string;
   group?: string;
   spriteNumber?: number;
+  poseName?: string;
   overrides?: Partial<CatParams>;
   params?: Partial<CatParams>;
 }

@@ -221,7 +221,7 @@ export default function RendererStressHarness() {
           runEntries.push({
             id: current,
             key: `${runToken}-${current}`,
-            sprite: payload.spriteNumber,
+            sprite: payload.spriteNumber ?? 0,
             colour: payload.params.colour as string,
             startedAt,
             durationMs,
@@ -240,7 +240,7 @@ export default function RendererStressHarness() {
           runEntries.push({
             id: current,
             key: `${runToken}-${current}`,
-            sprite: payload.spriteNumber,
+            sprite: payload.spriteNumber ?? 0,
             colour: payload.params.colour as string,
             startedAt,
             durationMs,

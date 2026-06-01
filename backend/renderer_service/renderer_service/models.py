@@ -51,7 +51,8 @@ class RenderOptions(BaseModel):
 
 
 class RenderParams(BaseModel):
-    spriteNumber: int
+    spriteNumber: Optional[int] = None
+    poseName: Optional[str] = None
     params: Dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(populate_by_name=True)
@@ -98,6 +99,11 @@ class BatchVariant(BaseModel):
         default=None,
         alias="spriteNumber",
         description="Override sprite number for this variant",
+    )
+    pose_name: Optional[str] = Field(
+        default=None,
+        alias="poseName",
+        description="Override named pose for this variant",
     )
     overrides: Optional[Dict[str, Any]] = Field(
         default=None,

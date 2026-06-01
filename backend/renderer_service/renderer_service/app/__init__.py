@@ -280,7 +280,10 @@ def create_app() -> FastAPI:
 def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderResponse:
     payload = request.payload
     params = {**payload.params}
-    params.setdefault("spriteNumber", payload.spriteNumber)
+    if payload.poseName is not None:
+        params["poseName"] = payload.poseName
+    if payload.spriteNumber is not None:
+        params.setdefault("spriteNumber", payload.spriteNumber)
     collect_layers = request.options.collect_layers if request.options else False
     include_layer_images = (
         request.options.include_layer_images if request.options else False
@@ -313,7 +316,10 @@ def _render_batch(
     pipeline: RenderPipeline, request: BatchRenderRequest
 ) -> BatchRenderResponse:
     base_params = {**request.payload.params}
-    base_params.setdefault("spriteNumber", request.payload.spriteNumber)
+    if request.payload.poseName is not None:
+        base_params["poseName"] = request.payload.poseName
+    if request.payload.spriteNumber is not None:
+        base_params.setdefault("spriteNumber", request.payload.spriteNumber)
 
     options = request.options
     frame_mode = options.frame_mode if options else "composed"

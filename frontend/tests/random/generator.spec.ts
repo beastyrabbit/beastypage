@@ -55,12 +55,38 @@ describe("random generator", () => {
     expect(accessories).toContain("TOASTPB");
   });
 
+  it("exposes imported ClanGen pose and sprite metadata", async () => {
+    const spriteMapperMod = await import("@/lib/single-cat/spriteMapper");
+    const spriteMapper = spriteMapperMod.default;
+    if (!spriteMapper.loaded) {
+      await spriteMapper.init();
+    }
+
+    expect(spriteMapper.getPoseNames()).toContain("newborn0");
+    expect(spriteMapper.getRenderablePoseNames()).toContain("adolescent_long2");
+    expect(spriteMapper.getPoseNames()).toContain("para_adult_short0");
+
+    const index = JSON.parse(
+      await readFile(path.join(spriteDataDir, "spritesIndex.json"), "utf-8"),
+    ) as Record<string, { spritesheet: string }>;
+    expect(index.singleWHITE?.spritesheet).toBe("colours_single");
+    expect(index.whiteANY?.spritesheet).toBe("patches_white_high");
+    expect(index.heterochromiamask?.spritesheet).toBe("heterochromiamask");
+    expect(index.acc_plantsWISTERIA?.spritesheet).toBe("acc_plants");
+    expect(index["acc_wildsROAD RUNNER FEATHER"]?.spritesheet).toBe(
+      "acc_wilds",
+    );
+  });
+
   it("generates V3 params from bundled sprite data", async () => {
     const params = await generateRandomParamsV3({
       ignoreForbiddenSprites: true,
     });
 
     expect(params.spriteNumber).toEqual(expect.any(Number));
+    expect(params.poseName).toEqual(expect.any(String));
+    expect(params.poseName).not.toMatch(/^(newborn|kitten)/);
+    expect(params.poseName).not.toMatch(/^adolescent_long/);
     expect(params.peltName).toEqual(expect.any(String));
     expect(params.colour).toEqual(expect.any(String));
     expect(params.eyeColour).toEqual(expect.any(String));

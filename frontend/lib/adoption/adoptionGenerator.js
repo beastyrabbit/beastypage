@@ -1,4 +1,9 @@
 import { createCatShare, encodeCatShare } from "../catShare";
+import {
+  DEFAULT_POSE_NAME,
+  formatPoseName,
+  getUserSelectablePoseNames,
+} from "../cat-v3/poseOptions";
 import catGenerator from "../single-cat/catGeneratorV3";
 import spriteMapper from "../single-cat/spriteMapper.js";
 
@@ -71,24 +76,6 @@ export class AdoptionGenerator {
     this.defaults = {};
     this.stagePlan = [];
     this.catPlans = [];
-    this.spriteOptions = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
-    this.spriteNames = {
-      3: "Adolescent (3)",
-      4: "Adolescent (4)",
-      5: "Adolescent (5)",
-      6: "Adult (6)",
-      7: "Adult (7)",
-      8: "Adult (8)",
-      9: "Longhair Adult (9)",
-      10: "Longhair Adult (10)",
-      11: "Longhair Adult (11)",
-      12: "Senior (12)",
-      13: "Senior (13)",
-      14: "Senior (14)",
-      15: "Paralyzed Adult (15)",
-      16: "Paralyzed Longhair Adult (16)",
-      18: "Sick Adult (18)",
-    };
     this.isGenerating = false;
     this.awaitingRemoval = false;
     this.pendingRemovals = 0;
@@ -642,10 +629,10 @@ export class AdoptionGenerator {
       param: "reverse",
     });
     stages.push({
-      id: "spriteNumber",
-      label: "Sprite",
+      id: "poseName",
+      label: "Pose",
       type: "simple",
-      param: "spriteNumber",
+      param: "poseName",
     });
     return stages;
   }
@@ -759,6 +746,7 @@ export class AdoptionGenerator {
   buildInitialState(params, accessoryCount, scarCount, tortieCount) {
     const state = {
       spriteNumber: 8,
+      poseName: DEFAULT_POSE_NAME,
       peltName: "SingleColour",
       colour: this.defaults.colour,
       tint: "none",
@@ -1077,8 +1065,8 @@ export class AdoptionGenerator {
   }
 
   getStageValue(plan, stage) {
-    if (stage.param === "spriteNumber") {
-      return plan.params.spriteNumber;
+    if (stage.param === "poseName") {
+      return plan.params.poseName || DEFAULT_POSE_NAME;
     }
     if (stage.param === "whitePatches") {
       return plan.params.whitePatches || "none";
@@ -1108,12 +1096,8 @@ export class AdoptionGenerator {
     if (stage.param === "shading" || stage.param === "reverse") {
       return `${stage.label}: ${value ? "Enabled" : "Disabled"}`;
     }
-    if (stage.param === "spriteNumber") {
-      const spriteLabel =
-        value !== undefined && value !== null
-          ? this.spriteNames[value] || `Sprite ${value}`
-          : "Unknown Sprite";
-      return `${stage.label}: ${spriteLabel}`;
+    if (stage.param === "poseName") {
+      return `${stage.label}: ${value ? formatPoseName(value) : "Unknown Pose"}`;
     }
     return `${stage.label}: ${this.formatValue(value)}`;
   }
@@ -1158,8 +1142,8 @@ export class AdoptionGenerator {
         state.eyeColour2 = "none";
         return;
       }
-      if (stage.param === "spriteNumber") {
-        state.spriteNumber = value;
+      if (stage.param === "poseName") {
+        state.poseName = value;
         return;
       }
       state[stage.param] = value;
@@ -1182,7 +1166,7 @@ export class AdoptionGenerator {
     const results = new Set();
     results.add(finalValue);
     const desiredSamples =
-      param === "spriteNumber" ? 6 : CONFIG.ANIMATION.VARIATION_SAMPLES;
+      param === "poseName" ? 6 : CONFIG.ANIMATION.VARIATION_SAMPLES;
     const sampleCount = Math.min(
       options.length,
       Math.max(CONFIG.ANIMATION.MIN_VARIATIONS, desiredSamples),
@@ -1225,6 +1209,7 @@ export class AdoptionGenerator {
 
     return {
       spriteNumber: state.spriteNumber,
+      poseName: state.poseName || DEFAULT_POSE_NAME,
       peltName: state.peltName,
       colour: state.colour,
       tint: state.tint,
@@ -1373,6 +1358,7 @@ export class AdoptionGenerator {
       "ORIOLE",
       "CHIMERA",
     ];
+    const poseOptions = getUserSelectablePoseNames(spriteMapper);
 
     return {
       colour: this.getColourOptions(),
@@ -1392,7 +1378,7 @@ export class AdoptionGenerator {
       tortieColour: this.getColourOptions(),
       shading: [true, false],
       reverse: [true, false],
-      spriteNumber: this.spriteOptions,
+      poseName: poseOptions.length > 0 ? poseOptions : [DEFAULT_POSE_NAME],
     };
   }
 
@@ -1724,9 +1710,10 @@ export class AdoptionGenerator {
       always: true,
     });
 
-    const spriteLabel =
-      this.spriteNames[params.spriteNumber] || `Sprite ${params.spriteNumber}`;
-    addRow("Sprite", spriteLabel, { formatted: true, always: true });
+    addRow("Pose", formatPoseName(params.poseName || DEFAULT_POSE_NAME), {
+      formatted: true,
+      always: true,
+    });
   }
 
   async prepareSpriteGallery(params, token, options = {}) {
@@ -1741,9 +1728,16 @@ export class AdoptionGenerator {
     }
 
     const previews = [];
-    const tasks = this.spriteOptions.map(async (spriteNumber) => {
+    const poseOptions = getUserSelectablePoseNames(spriteMapper);
+    const galleryPoses =
+      poseOptions.length > 0 ? poseOptions : [DEFAULT_POSE_NAME];
+    const tasks = galleryPoses.map(async (poseName) => {
       try {
-        const spriteParams = { ...params, spriteNumber };
+        const spriteParams = {
+          ...params,
+          spriteNumber: params.spriteNumber ?? 8,
+          poseName,
+        };
         const result = await catGenerator.generateCat(spriteParams);
         if (!force && this.detailRenderToken !== token) return;
         if (!result?.canvas) return;
@@ -1757,8 +1751,9 @@ export class AdoptionGenerator {
         ctx.drawImage(result.canvas, 0, 0, 120, 120);
         const dataUrl = previewCanvas.toDataURL("image/png");
         previews.push({
-          spriteNumber,
-          name: this.spriteNames[spriteNumber] || `Sprite ${spriteNumber}`,
+          poseName,
+          spriteNumber: spriteParams.spriteNumber,
+          name: formatPoseName(poseName),
           dataUrl,
         });
       } catch (error) {
@@ -1772,7 +1767,6 @@ export class AdoptionGenerator {
       return;
     }
 
-    previews.sort((a, b) => a.spriteNumber - b.spriteNumber);
     this.spriteGalleryPreviews = previews;
 
     if (this.spriteGalleryOverlay?.classList.contains("open")) {
@@ -1794,12 +1788,12 @@ export class AdoptionGenerator {
       return;
     }
 
-    const activeSprite = this.currentDetailParams?.spriteNumber ?? null;
+    const activePose = this.currentDetailParams?.poseName ?? null;
 
     this.spriteGalleryPreviews.forEach((preview) => {
       const item = document.createElement("div");
       item.className = "overlay-sprite-item";
-      if (preview.spriteNumber === activeSprite) {
+      if (preview.poseName === activePose) {
         item.classList.add("active");
       }
 
@@ -1818,7 +1812,7 @@ export class AdoptionGenerator {
       copyButtons.forEach((button) => {
         button.addEventListener("click", async () => {
           const size = parseInt(button.dataset.size, 10);
-          await this.copySpriteVariation(preview.spriteNumber, size, button);
+          await this.copySpriteVariation(preview.poseName, size, button);
         });
       });
 
@@ -1848,10 +1842,10 @@ export class AdoptionGenerator {
     }
   }
 
-  async copySpriteVariation(spriteNumber, size, button) {
+  async copySpriteVariation(poseName, size, button) {
     if (!this.currentDetailParams) return;
     try {
-      const params = { ...this.currentDetailParams, spriteNumber };
+      const params = { ...this.currentDetailParams, poseName };
       const result = await catGenerator.generateCat(params);
       if (!result?.canvas) throw new Error("Sprite canvas unavailable");
       await this.copyCanvasToClipboard(result.canvas, size);

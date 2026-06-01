@@ -177,6 +177,7 @@ export function OBSLobby({
       }).catch(() => null);
       if (cancelled || !firstResult) return;
 
+      const fixedPose = firstResult.params.poseName;
       const fixedSprite = firstResult.params.spriteNumber ?? 8;
       const frames: string[] = [];
 
@@ -200,6 +201,7 @@ export function OBSLobby({
           if (r && r.canvas instanceof HTMLCanvasElement) {
             const overrideParams = {
               ...r.params,
+              poseName: fixedPose ?? r.params.poseName,
               spriteNumber: fixedSprite,
               reverse: false,
             };
@@ -217,7 +219,7 @@ export function OBSLobby({
       // Read animation settings from refs — no effect restart needed
       const curMode = lobbyModeRef.current;
       const curMaxCats = maxCatsRef.current;
-      const curMoveSpeed = moveSpeedRef.current;
+      const _curMoveSpeed = moveSpeedRef.current;
       const curMinSize = catMinSizeRef.current;
       const curMaxSize = catMaxSizeRef.current;
 

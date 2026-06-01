@@ -27,6 +27,11 @@ import "react-split-flap-effect/extras/themes.css";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { api } from "@/convex/_generated/api";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
+import {
+  DEFAULT_POSE_NAME,
+  formatPoseName,
+  getUserSelectablePoseNames,
+} from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { decodePortableSettings } from "@/lib/portable-settings";
 import {
@@ -105,7 +110,9 @@ const LAYER_PARAM_IDS = new Set([
 ]);
 
 interface SpriteVariation {
+  id: string;
   spriteNumber: number;
+  poseName: string;
   name: string;
   dataUrl: string;
 }
@@ -181,7 +188,7 @@ interface WheelRewardState {
 }
 
 interface ParameterOptions {
-  sprite: number[];
+  sprite: (number | string)[];
   pelt: string[];
   colour: string[];
   tortie: boolean[];
@@ -314,7 +321,6 @@ function _formatMs(ms: number): string {
 interface SpriteMapperApi {
   loaded: boolean;
   init: () => Promise<boolean>;
-  sprites?: number[];
   getColours?: () => string[];
   getExperimentalColoursByMode?: (...args: unknown[]) => string[];
   getWhitePatchColourOptions?: (...args: unknown[]) => string[];
@@ -328,6 +334,8 @@ interface SpriteMapperApi {
   getVitiligo?: () => string[];
   getAccessories?: () => string[];
   getScars?: () => string[];
+  getPoseNames?: () => string[];
+  getRenderablePoseNames?: () => string[];
 }
 
 type ParamId =
@@ -512,36 +520,10 @@ function getSpeedSettings(durationMs: number) {
   return scaleProfile(SPEED_PRESETS.slow, ratio, duration);
 }
 
-const VALID_SPRITES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
-
 const _layerGroupLabels: Record<LayerGroup, string> = {
   accessories: "Accessories",
   scars: "Scars",
   torties: "Tortie Layers",
-};
-
-const SPRITE_NAMES: Record<number, string> = {
-  0: "Kitten (0)",
-  1: "Kitten (1)",
-  2: "Kitten (2)",
-  3: "Adolescent (3)",
-  4: "Adolescent (4)",
-  5: "Adolescent (5)",
-  6: "Adult (6)",
-  7: "Adult (7)",
-  8: "Adult (8)",
-  9: "Longhair Adult (9)",
-  10: "Longhair Adult (10)",
-  11: "Longhair Adult (11)",
-  12: "Senior (12)",
-  13: "Senior (13)",
-  14: "Senior (14)",
-  15: "Paralyzed Adult (15)",
-  16: "Paralyzed Longhair Adult (16)",
-  17: "Paralyzed Young (17)",
-  18: "Sick Adult (18)",
-  19: "Sick Young (19)",
-  20: "Newborn (20)",
 };
 
 const PARAM_SEQUENCE: ParamDefinition[] = [
@@ -949,7 +931,7 @@ function getParameterRawValue(
 ): unknown {
   switch (paramId) {
     case "sprite":
-      return params.spriteNumber;
+      return params.poseName ?? params.spriteNumber;
     case "pelt":
       return params.peltName;
     case "colour":
@@ -989,9 +971,12 @@ function getParameterRawValue(
 
 function formatOptionDisplay(paramId: ParamId, raw: unknown): string {
   if (paramId === "sprite") {
+    if (typeof raw === "string" && !/^-?\d+$/.test(raw.trim())) {
+      return formatPoseName(raw);
+    }
     const spriteNumber = coerceSpriteNumber(raw);
     if (spriteNumber !== undefined) {
-      return SPRITE_NAMES[spriteNumber] ?? `Sprite ${spriteNumber}`;
+      return `Sprite ${spriteNumber}`;
     }
   }
 
@@ -1094,9 +1079,13 @@ function applyParamValue(
       params.reverse = value as boolean;
       break;
     case "sprite": {
-      const parsed = coerceSpriteNumber(value);
-      if (parsed !== undefined) {
-        params.spriteNumber = parsed;
+      if (typeof value === "string" && !/^-?\d+$/.test(value.trim())) {
+        params.poseName = value;
+      } else {
+        const parsed = coerceSpriteNumber(value);
+        if (parsed !== undefined) {
+          params.spriteNumber = parsed;
+        }
       }
       break;
     }
@@ -1144,10 +1133,9 @@ function getParameterValueForDisplay(
     case "reverse":
       return params.reverse ? "Yes" : "No";
     case "sprite":
-      return (
-        SPRITE_NAMES[Number(params.spriteNumber)] ??
-        `Sprite ${params.spriteNumber}`
-      );
+      return params.poseName
+        ? formatPoseName(params.poseName)
+        : `Sprite ${params.spriteNumber}`;
     default:
       return "";
   }
@@ -1384,9 +1372,10 @@ async function buildParameterOptions(
   const vitiligo = invokeMapperArray(mapper, mapper.getVitiligo);
   const accessories = invokeMapperArray(mapper, mapper.getAccessories);
   const scars = invokeMapperArray(mapper, mapper.getScars);
+  const poseNames = getUserSelectablePoseNames(mapper);
 
   return {
-    sprite: mapper.sprites ?? VALID_SPRITES,
+    sprite: poseNames,
     pelt: peltNames,
     colour: colourList,
     tortie: [true, false],
@@ -3530,7 +3519,8 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         if (generationIdRef.current !== token) return;
 
         const baseParams = catResult.params;
-        baseParams.spriteNumber = 9; // always use longhair adult for count previews
+        baseParams.spriteNumber = 9; // legacy fallback for old render paths
+        baseParams.poseName = "adult_long0";
         const slots = catResult.slotSelections;
 
         // Pre-render a frame for each possible count (0 to max), building up
@@ -4106,13 +4096,18 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         tortie: builderPrimaryTortie,
       });
       builderParams.spriteNumber = DEFAULT_SPRITE_NUMBER;
+      builderParams.poseName = DEFAULT_POSE_NAME;
 
       const catUrl = generator.buildCatURL?.(builderParams) ?? "";
 
       const spritePreview: SpriteVariation[] = [];
-      for (const spriteNumber of VALID_SPRITES) {
+      for (const poseName of getUserSelectablePoseNames(mapper)) {
         if (generationIdRef.current !== token) return;
-        const spriteParams = { ...params, spriteNumber };
+        const spriteParams = {
+          ...params,
+          spriteNumber: params.spriteNumber ?? DEFAULT_SPRITE_NUMBER,
+          poseName,
+        };
         const result = await generator.generateCat(spriteParams);
         const previewCanvas = document.createElement("canvas");
         previewCanvas.width = 120;
@@ -4129,8 +4124,10 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           );
         }
         spritePreview.push({
-          spriteNumber,
-          name: SPRITE_NAMES[spriteNumber] ?? `Sprite ${spriteNumber}`,
+          id: `pose-${poseName}`,
+          spriteNumber: spriteParams.spriteNumber,
+          poseName,
+          name: formatPoseName(poseName),
           dataUrl: previewCanvas.toDataURL("image/png"),
         });
       }
@@ -4454,12 +4451,21 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   );
 
   const _handleCopySprite = useCallback(
-    async (spriteNumber: number, size: 120 | typeof FULL_EXPORT_SIZE) => {
+    async (
+      spriteNumber: number,
+      size: 120 | typeof FULL_EXPORT_SIZE,
+      poseName?: string,
+    ) => {
       const state = catStateRef.current;
       const generator = generatorRef.current;
       if (!state || !generator) return;
-      const spriteName = SPRITE_NAMES[spriteNumber] ?? `Sprite ${spriteNumber}`;
+      const spriteName = poseName
+        ? formatPoseName(poseName)
+        : `Sprite ${spriteNumber}`;
       const params = { ...state.params, spriteNumber };
+      if (poseName) {
+        params.poseName = poseName;
+      }
       const result = await generator.generateCat(params);
       const exportCanvas = document.createElement("canvas");
       exportCanvas.width = size;
@@ -4677,7 +4683,11 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       : DEFAULT_SPRITE_NUMBER;
   const canCopySprite = Boolean(currentState && generatorRef.current);
   const _spriteToolsSubtitle = canCopySprite
-    ? `Current sprite #${currentSpriteNumber}`
+    ? `Current pose: ${
+        currentState?.params.poseName
+          ? formatPoseName(currentState.params.poseName)
+          : `Sprite ${currentSpriteNumber}`
+      }`
     : "Roll a cat to unlock sprite tools";
   const existingCatName = (currentState?.catName ?? "").trim();
   const existingCreatorName = (currentState?.creatorName ?? "").trim();

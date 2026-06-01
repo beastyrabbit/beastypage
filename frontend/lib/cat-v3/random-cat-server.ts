@@ -14,6 +14,7 @@ import {
   materializeStringSlots,
   materializeTortieSlots,
 } from "./slotMaterializer";
+import { isUserSelectablePoseName } from "./poseOptions";
 import type { CatParams, RandomGenerationOptions } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -32,10 +33,6 @@ interface CountConfig {
 
 interface GenerationConfig {
   version: number;
-  spritePool: {
-    include: number[];
-    excludeDefault?: number[];
-  };
   probabilities: Record<string, number>;
   counts: Record<CountCategory, CountConfig> & Record<string, CountConfig>;
   defaultSlots?: Record<string, number>;
@@ -64,6 +61,8 @@ interface SpriteData {
   readonly vitiligo: readonly string[];
   readonly tints: readonly string[];
   readonly whiteTints: readonly string[];
+  readonly poseNames: readonly string[];
+  readonly renderablePoseNames: readonly string[];
 }
 
 let cachedData: SpriteData | null = null;
@@ -84,15 +83,17 @@ async function loadSpriteData(): Promise<SpriteData> {
 
   loadPromise = (async () => {
     try {
-      const [indexRaw, peltRaw] = await Promise.all([
+      const [indexRaw, peltRaw, poseRaw] = await Promise.all([
         readFile(resolvePublicPath("sprite-data/spritesIndex.json"), "utf-8"),
         readFile(resolvePublicPath("sprite-data/peltInfo.json"), "utf-8"),
+        readFile(resolvePublicPath("sprite-data/poseData.json"), "utf-8"),
       ]);
 
       const spritesIndex = JSON.parse(indexRaw) as Record<string, unknown>;
       const peltInfo = JSON.parse(peltRaw) as Record<string, string[]>;
+      const poseData = JSON.parse(poseRaw) as Record<string, unknown>;
 
-      const data = extractLists(spritesIndex, peltInfo);
+      const data = extractLists(spritesIndex, peltInfo, poseData);
       cachedData = data;
       return data;
     } catch (error) {
@@ -111,6 +112,7 @@ async function loadSpriteData(): Promise<SpriteData> {
 function extractLists(
   spritesIndex: Record<string, unknown>,
   peltInfo: Record<string, string[]>,
+  poseData: Record<string, unknown>,
 ): SpriteData {
   // --- Pelt names ---
   const patterns = [
@@ -184,29 +186,32 @@ function extractLists(
   ];
 
   // --- Eye colours ---
-  const eyeColours = [
-    "YELLOW",
-    "AMBER",
-    "HAZEL",
-    "PALEGREEN",
-    "GREEN",
-    "BLUE",
-    "DARKBLUE",
-    "GREY",
-    "CYAN",
-    "EMERALD",
-    "HEATHERBLUE",
-    "SUNLITICE",
-    "COPPER",
-    "SAGE",
-    "COBALT",
-    "PALEBLUE",
-    "PALEYELLOW",
-    "GOLD",
-    "GREENYELLOW",
-    "BRONZE",
-    "SILVER",
-  ];
+  const eyeColours =
+    Array.isArray(peltInfo.eyes) && peltInfo.eyes.length > 0
+      ? peltInfo.eyes
+      : [
+          "YELLOW",
+          "AMBER",
+          "HAZEL",
+          "PALEGREEN",
+          "GREEN",
+          "BLUE",
+          "DARKBLUE",
+          "GREY",
+          "CYAN",
+          "EMERALD",
+          "HEATHERBLUE",
+          "SUNLITICE",
+          "COPPER",
+          "SAGE",
+          "COBALT",
+          "PALEBLUE",
+          "PALEYELLOW",
+          "GOLD",
+          "GREENYELLOW",
+          "BRONZE",
+          "SILVER",
+        ];
 
   // --- Skin colours ---
   const skinColors = new Set<string>();
@@ -298,23 +303,23 @@ function extractLists(
         ];
 
   // --- Points & vitiligo ---
-  const points = [
-    "COLOURPOINT",
-    "RAGDOLL",
-    "SEPIAPOINT",
-    "MINKPOINT",
-    "SEALPOINT",
-  ];
-  const vitiligo = [
-    "VITILIGO",
-    "VITILIGOTWO",
-    "MOON",
-    "PHANTOM",
-    "KARPATI",
-    "POWDER",
-    "BLEACHED",
-    "SMOKEY",
-  ];
+  const points =
+    Array.isArray(peltInfo.point_markings) && peltInfo.point_markings.length > 0
+      ? peltInfo.point_markings
+      : ["COLOURPOINT", "RAGDOLL", "SEPIAPOINT", "MINKPOINT", "SEALPOINT"];
+  const vitiligo =
+    Array.isArray(peltInfo.vitiligo) && peltInfo.vitiligo.length > 0
+      ? peltInfo.vitiligo
+      : [
+          "VITILIGO",
+          "VITILIGOTWO",
+          "MOON",
+          "PHANTOM",
+          "KARPATI",
+          "POWDER",
+          "BLEACHED",
+          "SMOKEY",
+        ];
 
   // --- White patches ---
   const whitePatchSet = new Set<string>();
@@ -362,6 +367,15 @@ function extractLists(
   ];
   const whiteTints = ["none", "darkcream", "cream", "offwhite", "gray", "pink"];
 
+  const poseNames = Array.isArray(poseData.poses)
+    ? poseData.poses.map(String)
+    : [];
+  const renderablePoseNames = Array.isArray(poseData.renderablePoseNames)
+    ? poseData.renderablePoseNames.map(String)
+    : poseNames.filter(
+        (poseName) =>
+          !poseName.startsWith("para_") && !poseName.startsWith("sick_"),
+      );
   return {
     peltNames,
     colours,
@@ -375,6 +389,8 @@ function extractLists(
     vitiligo,
     tints,
     whiteTints,
+    poseNames,
+    renderablePoseNames,
   };
 }
 
@@ -412,11 +428,6 @@ function weightedPick(
     if (target <= running) return entry.value;
   }
   return entries[entries.length - 1].value;
-}
-
-function ensureArray<T>(value: T | T[] | undefined): T[] {
-  if (value === undefined) return [];
-  return Array.isArray(value) ? value : [value];
 }
 
 function buildColourPools(
@@ -509,8 +520,9 @@ function _determineSlotCount(
   defaults: Record<string, number> | undefined,
   options: RandomGenerationOptions,
 ): number {
-  if (options.slotOverrides?.[category] !== undefined) {
-    return Math.max(0, Math.trunc(options.slotOverrides[category]!));
+  const slotOverride = options.slotOverrides?.[category];
+  if (slotOverride !== undefined) {
+    return Math.max(0, Math.trunc(slotOverride));
   }
   if (hasOverride(category, options.countsMode)) {
     const mode = resolveCountsMode(category, options.countsMode);
@@ -525,6 +537,7 @@ function _determineSlotCount(
 
 export interface DiscordCatOverrides {
   sprite?: number;
+  poseName?: string;
   pelt?: string;
   colour?: string;
   eyeColour?: string;
@@ -563,13 +576,21 @@ export async function generateRandomParamsServer(
   const data = await loadSpriteData();
   const exactLayerCounts = options.exactLayerCounts === true;
 
-  const spritePool = ensureArray(RANDOM_CONFIG.spritePool.include);
-  if (!spritePool.length) throw new Error("Sprite pool is empty");
+  const posePoolSource =
+    data.renderablePoseNames.length > 0
+      ? data.renderablePoseNames
+      : data.poseNames;
+  const posePool = posePoolSource.filter(isUserSelectablePoseName);
+  if (!posePool.length) throw new Error("Pose pool is empty");
 
+  const poseName =
+    overrides.poseName && posePool.includes(overrides.poseName)
+      ? overrides.poseName
+      : pickOne(posePool);
   const spriteNumber =
-    overrides.sprite && spritePool.includes(overrides.sprite)
+    typeof overrides.sprite === "number" && Number.isFinite(overrides.sprite)
       ? overrides.sprite
-      : pickOne(spritePool);
+      : 0;
 
   const pelts = data.peltNames.filter((p) => p !== "Tortie" && p !== "Calico");
 
@@ -590,6 +611,7 @@ export async function generateRandomParamsServer(
 
   const params: CatParams = {
     spriteNumber,
+    poseName,
     peltName:
       overrides.pelt && pelts.includes(overrides.pelt)
         ? overrides.pelt

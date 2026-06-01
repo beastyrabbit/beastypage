@@ -3,6 +3,7 @@ import {
   materializeStringSlots,
   materializeTortieSlots,
 } from "./slotMaterializer";
+import { getUserSelectablePoseNames } from "./poseOptions";
 import type {
   CatParams,
   RandomGenerationOptions,
@@ -24,10 +25,6 @@ interface CountConfig {
 
 interface GenerationConfig {
   version: number;
-  spritePool: {
-    include: number[];
-    excludeDefault?: number[];
-  };
   probabilities: Record<string, number>;
   counts: Record<CountCategory, CountConfig> & Record<string, CountConfig>;
   defaultSlots?: Record<string, number>;
@@ -42,6 +39,7 @@ const RANDOM_CONFIG = config as GenerationConfig;
 interface SpriteMapperApi {
   loaded: boolean;
   init(): Promise<boolean>;
+  getPoseNames?(): string[];
   getColourOptions(mode?: unknown, includeBase?: boolean): string[];
   getExperimentalColoursByMode(mode?: unknown): string[];
   getColours(): string[];
@@ -55,6 +53,7 @@ interface SpriteMapperApi {
   getVitiligo(): string[];
   getTortieMasks(): string[];
   getWhitePatches(): string[];
+  getRenderablePoseNames(): string[];
   getWhitePatchColourOptions(
     mode?: string,
     experimentalMode?: unknown,
@@ -172,11 +171,6 @@ function resolveCount(
   );
 }
 
-function ensureArray<T>(value: T | T[] | undefined): T[] {
-  if (value === undefined) return [];
-  return Array.isArray(value) ? value : [value];
-}
-
 function normalizeExperimentalModes(
   mode: RandomGenerationOptions["experimentalColourMode"],
 ): string[] {
@@ -257,8 +251,9 @@ function determineSlotCount(
   defaults: Record<string, number> | undefined,
   options: RandomGenerationOptions,
 ): number {
-  if (options.slotOverrides && options.slotOverrides[category] !== undefined) {
-    return Math.max(0, Math.trunc(options.slotOverrides[category]!));
+  const slotOverride = options.slotOverrides?.[category];
+  if (slotOverride !== undefined) {
+    return Math.max(0, Math.trunc(slotOverride));
   }
   if (hasOverride(category, options.countsMode)) {
     const mode = resolveCountsMode(category, options.countsMode);
@@ -282,17 +277,12 @@ export async function generateRandomParamsV3Detailed(
 ): Promise<RandomGenerationResult> {
   const spriteMapper = await ensureSpriteMapper();
 
-  const spriteInclude = ensureArray(RANDOM_CONFIG.spritePool.include);
-  const spriteExcludeDefault = ensureArray(
-    RANDOM_CONFIG.spritePool.excludeDefault,
-  );
-  const spritePool = options.ignoreForbiddenSprites
-    ? spriteInclude.filter((value) => !spriteExcludeDefault.includes(value))
-    : spriteInclude;
-  if (!spritePool.length) {
-    throw new Error("Sprite pool is empty; check random-config.json");
+  const posePool = getUserSelectablePoseNames(spriteMapper);
+  if (!posePool.length) {
+    throw new Error("Pose pool is empty; check poseData.json");
   }
-  const spriteNumber = pickOne(spritePool);
+  const poseName = pickOne(posePool);
+  const spriteNumber = 0;
 
   const experimentalMode = options.experimentalColourMode ?? "off";
   const colourPools = buildColourPools(
@@ -319,6 +309,7 @@ export async function generateRandomParamsV3Detailed(
 
   const params: CatParams = {
     spriteNumber,
+    poseName,
     peltName: pickOne(pelts),
     colour: pickColour(),
     tint: pickOne(tints),

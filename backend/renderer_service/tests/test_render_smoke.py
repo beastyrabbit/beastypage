@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from PIL import ImageOps
+from PIL import ImageChops, ImageOps
 
 from renderer_service.app import create_app
 from renderer_service.renderer.pipeline import RenderPipeline
@@ -87,6 +87,92 @@ def test_pipeline_smoke():
     assert LayerIdentifier.accessories in ids
 
 
+def test_named_pose_render_smoke():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    for pose_name in ("newborn2", "adolescent_long2", "kitten0"):
+        result = pipeline.render(
+            {
+                "poseName": pose_name,
+                "spriteNumber": 8,
+                "peltName": "SingleColour",
+                "colour": "WHITE",
+                "eyeColour": "BLUE",
+                "skinColour": "PINK",
+            },
+            collect_layers=True,
+        )
+        assert result.composed.getbbox() is not None
+        assert LayerIdentifier.base in [layer.id for layer in result.layers]
+
+
+def test_legacy_sprite_number_maps_to_original_pose():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    legacy = pipeline.render(
+        {"spriteNumber": 9, "peltName": "SingleColour", "colour": "WHITE"},
+        collect_layers=False,
+    ).composed
+    named = pipeline.render(
+        {
+            "spriteNumber": 9,
+            "poseName": "adult_long0",
+            "peltName": "SingleColour",
+            "colour": "WHITE",
+        },
+        collect_layers=False,
+    ).composed
+
+    assert legacy.tobytes() == named.tobytes()
+
+
+def test_heterochromia_uses_masked_eye_sheet():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    result = pipeline.render(
+        {
+            "poseName": "adult_short2",
+            "peltName": "SingleColour",
+            "colour": "WHITE",
+            "eyeColour": "GREEN",
+            "eyeColour2": "BLUE",
+        },
+        collect_layers=True,
+    )
+
+    eyes_layer = next(
+        layer for layer in result.layers if layer.id == LayerIdentifier.eyes
+    )
+    assert "eye:GREEN" in eyes_layer.diagnostics
+    assert "eye2:BLUE" in eyes_layer.diagnostics
+
+
+def test_null_and_none_tints_are_noops():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    base_params = {
+        "poseName": "adult_short2",
+        "peltName": "SingleColour",
+        "colour": "WHITE",
+        "whitePatches": "ANY",
+    }
+
+    none_render = pipeline.render(
+        {**base_params, "tint": "none", "whitePatchesTint": "none"},
+        collect_layers=False,
+    ).composed
+    null_render = pipeline.render(
+        {**base_params, "tint": "null", "whitePatchesTint": "null"},
+        collect_layers=False,
+    ).composed
+
+    assert none_render.tobytes() == null_render.tobytes()
+
+
 def test_reference_cat_complex_layers():
     """Full render of reference cat with combined features."""
     repo = SpriteRepository()
@@ -152,6 +238,68 @@ def test_missing_scar_masks_do_not_blank_sprite():
 
     assert scar_total < base_total
     assert scar_total > 0
+
+
+def test_named_pose_missing_scar_changes_render():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    base_params = {
+        "poseName": "adolescent_long0",
+        "spriteNumber": 8,
+        "peltName": "SingleColour",
+        "colour": "BLACK",
+        "eyeColour": "BLUE",
+        "skinColour": "PINK",
+    }
+
+    base = pipeline.render(base_params, collect_layers=False).composed.convert("RGB")
+    scar_result = pipeline.render(
+        {**base_params, "scars": ["NOTAIL"]}, collect_layers=True
+    )
+    scarred = scar_result.composed.convert("RGB")
+
+    diff = ImageChops.difference(base, scarred)
+    assert diff.getbbox() is not None
+
+    secondary_layer = next(
+        layer
+        for layer in scar_result.layers
+        if layer.id == LayerIdentifier.scars_secondary
+    )
+    assert secondary_layer.image.getbbox() is not None
+    assert "missingscarsNOTAIL" in secondary_layer.diagnostics
+
+
+def test_primary_scar_changes_render():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    base_params = {
+        "poseName": "adult_short2",
+        "spriteNumber": 8,
+        "peltName": "SingleColour",
+        "colour": "BLACK",
+        "eyeColour": "BLUE",
+        "skinColour": "PINK",
+    }
+
+    base = pipeline.render(base_params, collect_layers=False).composed.convert("RGB")
+    scar_result = pipeline.render(
+        {**base_params, "scars": ["ONE"]}, collect_layers=True
+    )
+    scarred = scar_result.composed.convert("RGB")
+
+    diff = ImageChops.difference(base, scarred)
+    assert diff.getbbox() is not None
+
+    primary_layer = next(
+        layer
+        for layer in scar_result.layers
+        if layer.id == LayerIdentifier.scars_primary
+    )
+    assert primary_layer.image.getbbox() is not None
+    assert "scarsONE" in primary_layer.diagnostics
 
 
 def test_reverse_preserves_missing_scar_orientation():

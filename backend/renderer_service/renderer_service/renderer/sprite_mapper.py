@@ -39,6 +39,12 @@ def _dedupe(seq: Iterable[str]) -> List[str]:
     return result
 
 
+def _is_empty_value(value: str | None) -> bool:
+    if value is None:
+        return True
+    return str(value).strip().lower() in {"", "none", "null"}
+
+
 class SpriteMapper:
     """Maps public cat-generation parameters to renderer atlas sprite keys."""
 
@@ -127,6 +133,14 @@ class SpriteMapper:
             for x in (
                 self.pelt_info.get("tail_accessories", []) if self.pelt_info else []
             )
+        }
+        self.collar_sprite_aliases = {
+            str(key).upper(): str(value)
+            for key, value in (
+                self.pelt_info.get("collar_sprite_aliases", {})
+                if self.pelt_info
+                else {}
+            ).items()
         }
 
         sprite_keys = set(self.sprites_index.keys()) if self.sprites_index else set()
@@ -276,26 +290,26 @@ class SpriteMapper:
     def get_experimental_definition(
         self, colour: str | None
     ) -> Optional[ExperimentalColourDefinition]:
-        if not colour:
+        if _is_empty_value(colour):
             return None
         return self.experimental_defs.get(colour.upper())
 
     def get_tint_colour(self, tint: str | None) -> Optional[List[int]]:
-        if not tint:
+        if _is_empty_value(tint):
             return None
         key = tint.lower()
         value = self.tints.get(key)
         return list(value) if value else None
 
     def get_dilute_tint_colour(self, tint: str | None) -> Optional[List[int]]:
-        if not tint:
+        if _is_empty_value(tint):
             return None
         key = tint.lower()
         value = self.dilute_tints.get(key)
         return list(value) if value else None
 
     def get_white_patch_tint(self, tint: str | None) -> Optional[List[int]]:
-        if not tint:
+        if _is_empty_value(tint):
             return None
         key = tint.lower()
         value = self.white_patch_tints.get(key)
@@ -319,6 +333,10 @@ class SpriteMapper:
         if upper in self.accessory_sprite_names:
             return upper
 
+        alias = self.collar_sprite_aliases.get(upper)
+        if alias and alias in self.accessory_sprite_names:
+            return alias
+
         if upper in self.collar_accessories:
             candidate = f"collars{upper}"
             if candidate in self.accessory_sprite_names:
@@ -328,11 +346,23 @@ class SpriteMapper:
                 return candidate
 
         if upper in self.plant_accessories:
+            candidate = f"acc_plants{trimmed}"
+            if candidate in self.accessory_sprite_names:
+                return candidate
+            candidate = f"acc_plants{upper}"
+            if candidate in self.accessory_sprite_names:
+                return candidate
             candidate = f"acc_herbs{trimmed}"
             if candidate in self.accessory_sprite_names:
                 return candidate
 
         if upper in self.wild_accessories:
+            candidate = f"acc_wilds{trimmed}"
+            if candidate in self.accessory_sprite_names:
+                return candidate
+            candidate = f"acc_wilds{upper}"
+            if candidate in self.accessory_sprite_names:
+                return candidate
             candidate = f"acc_wild{trimmed}"
             if candidate in self.accessory_sprite_names:
                 return candidate
@@ -354,7 +384,9 @@ class SpriteMapper:
 
         for prefix in (
             "acc_herbs",
+            "acc_plants",
             "acc_wild",
+            "acc_wilds",
             "acc_smallanimal",
             "acc_smallAnimal",
             "acc_tail2",

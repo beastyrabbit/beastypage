@@ -27,6 +27,7 @@ class SpriteMapper {
         // Data loaded from JSON files
         this.spritesIndex = null;
         this.peltInfo = null;
+        this.poseData = null;
         this.loaded = false;
         this.loadingPromise = null;
         
@@ -38,6 +39,8 @@ class SpriteMapper {
         this.accessories = [];
         this.scars = [];
         this.sprites = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+        this.poseNames = [];
+        this.renderablePoseNames = [];
         this.tortieMasks = [];
         this.whitePatches = [];
         this.points = [];
@@ -90,10 +93,17 @@ class SpriteMapper {
             const peltJson = await fetchJson([
                 '/sprite-data/peltInfo.json'
             ]);
+            const poseJson = await fetchJson([
+                '/sprite-data/poseData.json'
+            ]);
 
             if (indexJson) {
                 this.spritesIndex = indexJson;
                 this.extractNamesFromIndex();
+            }
+            if (poseJson) {
+                this.poseData = poseJson;
+                this.extractPoseData();
             }
             if (peltJson) {
                 this.peltInfo = peltJson;
@@ -114,6 +124,14 @@ class SpriteMapper {
             this.loadFallbackData();
             return false;
         }
+    }
+
+    extractPoseData() {
+        if (!this.poseData) return;
+        this.poseNames = Array.isArray(this.poseData.poses) ? [...this.poseData.poses] : [];
+        this.renderablePoseNames = Array.isArray(this.poseData.renderablePoseNames)
+            ? [...this.poseData.renderablePoseNames]
+            : this.poseNames.filter(name => !String(name).startsWith('newborn') && !String(name).startsWith('kitten'));
     }
     
     /**
@@ -265,6 +283,37 @@ class SpriteMapper {
      */
     extractNamesFromPeltInfo() {
         if (!this.peltInfo) return;
+
+        if (Array.isArray(this.peltInfo.patterns) && this.peltInfo.patterns.length > 0) {
+            this.peltNames = [...this.peltInfo.patterns];
+            if (this.peltNames.includes('SingleColour') && !this.peltNames.includes('TwoColour')) {
+                const singleIndex = this.peltNames.indexOf('SingleColour');
+                this.peltNames.splice(singleIndex + 1, 0, 'TwoColour');
+            }
+        }
+        if (Array.isArray(this.peltInfo.colors) && this.peltInfo.colors.length > 0) {
+            this.colours = [...this.peltInfo.colors];
+        }
+        if (Array.isArray(this.peltInfo.eyes) && this.peltInfo.eyes.length > 0) {
+            this.eyeColours = [...this.peltInfo.eyes];
+        }
+        if (Array.isArray(this.peltInfo.skin) && this.peltInfo.skin.length > 0) {
+            this.skinColours = [...this.peltInfo.skin];
+        }
+        if (Array.isArray(this.peltInfo.white) && this.peltInfo.white.length > 0) {
+            const pointsSet = new Set(this.peltInfo.point_markings || this.points);
+            const vitiligoSet = new Set(this.peltInfo.vitiligo || this.vitiligo);
+            this.whitePatches = this.peltInfo.white.filter(patch => !pointsSet.has(patch) && !vitiligoSet.has(patch));
+        }
+        if (Array.isArray(this.peltInfo.point_markings) && this.peltInfo.point_markings.length > 0) {
+            this.points = [...this.peltInfo.point_markings];
+        }
+        if (Array.isArray(this.peltInfo.vitiligo) && this.peltInfo.vitiligo.length > 0) {
+            this.vitiligo = [...this.peltInfo.vitiligo];
+        }
+        if (Array.isArray(this.peltInfo.tortie_masks) && this.peltInfo.tortie_masks.length > 0) {
+            this.tortieMasks = [...this.peltInfo.tortie_masks];
+        }
         
         // Extract accessories - combine all types
         this.accessories = [];
@@ -368,6 +417,8 @@ class SpriteMapper {
         // Use centralized palettes module for consistency
         this.experimentalColourDefs = getAllColorDefs();
         this.experimentalColourCategories = getAllCategories();
+        this.poseNames = ['newborn0', 'newborn1', 'newborn2', 'kitten0', 'kitten1', 'kitten2', 'adolescent_short0', 'adolescent_short1', 'adolescent_short2', 'adolescent_long0', 'adolescent_long1', 'adolescent_long2', 'adult_short0', 'adult_short1', 'adult_short2', 'adult_long0', 'adult_long1', 'adult_long2', 'senior0', 'senior1', 'senior2'];
+        this.renderablePoseNames = [...this.poseNames];
 
         this.loaded = true;
     }
@@ -729,7 +780,15 @@ class SpriteMapper {
     getSprites() {
         return [...this.sprites];
     }
-    
+
+    getPoseNames() {
+        return [...this.poseNames];
+    }
+
+    getRenderablePoseNames() {
+        return [...this.renderablePoseNames];
+    }
+
     /**
      * Get all tortie masks
      * @returns {string[]} Array of tortie mask names

@@ -2,8 +2,25 @@ import { describe, expect, it } from "vitest";
 import { getColorNamesForPalette } from "@/lib/palettes";
 import { generateRandomParamsServer } from "../random-cat-server";
 
-// Valid sprite pool from random-config.json
-const VALID_SPRITES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
+const VALID_POSES = [
+  "adolescent_short0",
+  "adolescent_short1",
+  "adolescent_short2",
+  "adult_short0",
+  "adult_short1",
+  "adult_short2",
+  "adult_long0",
+  "adult_long1",
+  "adult_long2",
+  "senior0",
+  "senior1",
+  "senior2",
+  "para_adult_short0",
+  "para_adult_long0",
+  "para_young0",
+  "sick_adult0",
+  "sick_young0",
+];
 
 const VALID_PELTS = [
   "SingleColour",
@@ -49,6 +66,7 @@ describe("generateRandomParamsServer", () => {
   it("returns a valid CatParams shape", async () => {
     const params = await generateRandomParamsServer();
     expect(params).toHaveProperty("spriteNumber");
+    expect(params).toHaveProperty("poseName");
     expect(params).toHaveProperty("peltName");
     expect(params).toHaveProperty("colour");
     expect(params).toHaveProperty("eyeColour");
@@ -58,10 +76,12 @@ describe("generateRandomParamsServer", () => {
     expect(typeof params.isTortie).toBe("boolean");
   });
 
-  it("generates a sprite number from the valid pool", async () => {
+  it("generates a selectable pose name from the valid pool", async () => {
     for (let i = 0; i < 10; i++) {
       const params = await generateRandomParamsServer();
-      expect(VALID_SPRITES).toContain(params.spriteNumber);
+      expect(VALID_POSES).toContain(params.poseName);
+      expect(params.poseName).not.toMatch(/^(newborn|kitten)/);
+      expect(params.poseName).not.toMatch(/^adolescent_long/);
     }
   });
 
@@ -74,9 +94,17 @@ describe("generateRandomParamsServer", () => {
     }
   });
 
-  it("applies sprite override", async () => {
+  it("keeps sprite override as numeric fallback only", async () => {
     const params = await generateRandomParamsServer({ sprite: 7 });
     expect(params.spriteNumber).toBe(7);
+    expect(VALID_POSES).toContain(params.poseName);
+  });
+
+  it("applies pose name override", async () => {
+    const params = await generateRandomParamsServer({
+      poseName: "adult_long2",
+    });
+    expect(params.poseName).toBe("adult_long2");
   });
 
   it("applies pelt override", async () => {
@@ -164,8 +192,7 @@ describe("generateRandomParamsServer", () => {
 
   it("ignores invalid sprite override", async () => {
     const params = await generateRandomParamsServer({ sprite: 999 });
-    // Should fall back to random from valid pool
-    expect(VALID_SPRITES).toContain(params.spriteNumber);
+    expect(VALID_POSES).toContain(params.poseName);
   });
 
   it("ignores invalid pelt override", async () => {

@@ -71,6 +71,7 @@ export async function renderCatV3(
     body: JSON.stringify({
       payload: {
         spriteNumber: payload.spriteNumber,
+        poseName: payload.poseName,
         params: payload.params,
       },
       options: {
