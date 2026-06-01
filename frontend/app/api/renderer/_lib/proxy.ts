@@ -55,6 +55,14 @@ function ensureJson(contentType: string | null): string | null {
   return null;
 }
 
+function isManualRedirect(response: Response): boolean {
+  return (
+    response.type === "opaqueredirect" ||
+    response.status === 0 ||
+    (response.status >= 300 && response.status < 400)
+  );
+}
+
 function streamWithFinalizer(
   body: ReadableStream<Uint8Array>,
   finalize: () => void,
@@ -148,6 +156,19 @@ export async function proxyRendererJson(
         "POST",
         targetUrl,
         upstream.status,
+      );
+    }
+
+    if (isManualRedirect(upstream)) {
+      clear();
+      const location = upstream.headers.get("location");
+      return NextResponse.json(
+        {
+          error: location
+            ? `Renderer request was redirected to ${location}`
+            : "Renderer request was redirected",
+        },
+        { status: 502 },
       );
     }
 

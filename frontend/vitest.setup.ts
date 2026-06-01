@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
-import { closeSync, openSync, unlinkSync } from "node:fs";
+import {
+  closeSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,22 +26,87 @@ let serverProcess: ReturnType<typeof spawn> | null = null;
 let rendererLockFd: number | null = null;
 let rendererLockPath: string | null = null;
 
-function tryAcquireRendererLock(port: string): boolean {
-  rendererLockPath = join(tmpdir(), `beastypage-renderer-${port}.lock`);
+function isProcessAlive(pid: number): boolean {
   try {
-    rendererLockFd = openSync(rendererLockPath, "wx");
+    process.kill(pid, 0);
     return true;
   } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
+    return (
+      error instanceof Error &&
       "code" in error &&
-      error.code === "EEXIST"
-    ) {
-      return false;
-    }
-    throw error;
+      (error as NodeJS.ErrnoException).code === "EPERM"
+    );
   }
+}
+
+function readRendererLockOwner(path: string): number | null {
+  try {
+    const raw = readFileSync(path, "utf-8");
+    const parsed = JSON.parse(raw) as { pid?: unknown };
+    return typeof parsed.pid === "number" && Number.isFinite(parsed.pid)
+      ? parsed.pid
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function tryAcquireRendererLock(port: string): boolean {
+  rendererLockPath = join(tmpdir(), `beastypage-renderer-${port}.lock`);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      rendererLockFd = openSync(rendererLockPath, "wx");
+      writeFileSync(
+        rendererLockFd,
+        JSON.stringify({
+          pid: process.pid,
+          createdAt: new Date().toISOString(),
+        }),
+      );
+      return true;
+    } catch (error) {
+      if (
+        !(
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          error.code === "EEXIST"
+        )
+      ) {
+        throw error;
+      }
+
+      const ownerPid = readRendererLockOwner(rendererLockPath);
+      if (ownerPid !== null && isProcessAlive(ownerPid)) {
+        console.warn(
+          `[vitest] Renderer lock ${rendererLockPath} is held by live PID ${ownerPid}; waiting for renderer health.`,
+        );
+        return false;
+      }
+
+      console.warn(
+        `[vitest] Removing stale renderer lock ${rendererLockPath}${
+          ownerPid === null ? "" : ` from dead PID ${ownerPid}`
+        }.`,
+      );
+      try {
+        unlinkSync(rendererLockPath);
+      } catch (unlinkError) {
+        if (
+          !(
+            unlinkError &&
+            typeof unlinkError === "object" &&
+            "code" in unlinkError &&
+            unlinkError.code === "ENOENT"
+          )
+        ) {
+          throw unlinkError;
+        }
+      }
+    }
+  }
+
+  return false;
 }
 
 function releaseRendererLock() {
