@@ -171,13 +171,16 @@ class SpriteSheetLoader {
         }
 
         const [, group, variant] = match;
+        if (group === 'newborn') {
+            return variant === '2' ? { x: 2, y: 6 } : null;
+        }
+
         const rowByGroup = {
             kitten: 0,
             adolescent_short: 1,
             adult_short: 2,
             adult_long: 3,
             senior: 4,
-            newborn: 6,
         };
         return { x: Number.parseInt(variant, 10), y: rowByGroup[group] };
     }

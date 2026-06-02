@@ -84,6 +84,17 @@ describe("SpriteSheetLoader pose offsets", () => {
     });
   });
 
+  it("does not map unsupported newborn legacy poses onto sick pose cells", () => {
+    const loader = new SpriteSheetLoader();
+    const resolveLegacyPoseOffset = loader.resolveLegacyPoseOffset.bind(
+      loader,
+    ) as (spriteNumber: number, poseName?: string | null) => unknown;
+
+    expect(resolveLegacyPoseOffset(0, "newborn0")).toBeNull();
+    expect(resolveLegacyPoseOffset(0, "newborn1")).toBeNull();
+    expect(resolveLegacyPoseOffset(0, "newborn2")).toEqual({ x: 2, y: 6 });
+  });
+
   it("does not initialize sheet mode when pose data is missing", async () => {
     const loader = new SpriteSheetLoader();
     const fetchMock = vi.fn(async (path: string) => {
