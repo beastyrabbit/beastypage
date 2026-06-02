@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 import spriteMapper from "@/lib/single-cat/spriteMapper";
+import { DEFAULT_POSE_NAME, getUserSelectablePoseNames } from "@/lib/cat-v3/poseOptions";
 
 export function getDefaultStreamParams() {
     return {
         spriteNumber: 8,
+        poseName: DEFAULT_POSE_NAME,
         peltName: 'SingleColour',
         colour: 'WHITE',
         isTortie: false,
@@ -609,13 +611,12 @@ function buildScarMoreOptions(currentSlots) {
 }
 
 function buildPoseOptions(state) {
-    const sprites = spriteMapper.getSprites();
-    const curated = limitUnique(sprites, 12);
-    return curated.map(sprite => ({
-        key: `pose_${sprite}`,
-        label: `Pose ${formatDisplayName(sprite)}`,
+    const curated = limitUnique(getUserSelectablePoseNames(spriteMapper), Number.POSITIVE_INFINITY);
+    return curated.map(poseName => ({
+        key: `pose_${poseName}`,
+        label: `Pose ${formatDisplayName(poseName)}`,
         mutate: params => {
-            params.spriteNumber = sprite;
+            params.poseName = poseName;
         }
     }));
 }

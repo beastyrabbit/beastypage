@@ -1,5 +1,13 @@
 import { spawn } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import {
+  closeSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll } from "vitest";
@@ -15,6 +23,106 @@ process.env.RENDERER_BASE_URL = baseUrl;
 process.env.NEXT_PUBLIC_RENDERER_URL ??= baseUrl;
 
 let serverProcess: ReturnType<typeof spawn> | null = null;
+let rendererLockFd: number | null = null;
+let rendererLockPath: string | null = null;
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (
+      error instanceof Error &&
+      "code" in error &&
+      (error as NodeJS.ErrnoException).code === "EPERM"
+    );
+  }
+}
+
+function readRendererLockOwner(path: string): number | null {
+  try {
+    const raw = readFileSync(path, "utf-8");
+    const parsed = JSON.parse(raw) as { pid?: unknown };
+    return typeof parsed.pid === "number" && Number.isFinite(parsed.pid)
+      ? parsed.pid
+      : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function tryAcquireRendererLock(port: string): boolean {
+  rendererLockPath = join(tmpdir(), `beastypage-renderer-${port}.lock`);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      rendererLockFd = openSync(rendererLockPath, "wx");
+      writeFileSync(
+        rendererLockFd,
+        JSON.stringify({
+          pid: process.pid,
+          createdAt: new Date().toISOString(),
+        }),
+      );
+      return true;
+    } catch (error) {
+      if (
+        !(
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          error.code === "EEXIST"
+        )
+      ) {
+        throw error;
+      }
+
+      const ownerPid = readRendererLockOwner(rendererLockPath);
+      if (ownerPid !== null && isProcessAlive(ownerPid)) {
+        console.warn(
+          `[vitest] Renderer lock ${rendererLockPath} is held by live PID ${ownerPid}; waiting for renderer health.`,
+        );
+        return false;
+      }
+
+      console.warn(
+        `[vitest] Removing stale renderer lock ${rendererLockPath}${
+          ownerPid === null ? "" : ` from dead PID ${ownerPid}`
+        }.`,
+      );
+      try {
+        unlinkSync(rendererLockPath);
+      } catch (unlinkError) {
+        if (
+          !(
+            unlinkError &&
+            typeof unlinkError === "object" &&
+            "code" in unlinkError &&
+            unlinkError.code === "ENOENT"
+          )
+        ) {
+          throw unlinkError;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+function releaseRendererLock() {
+  if (rendererLockFd !== null) {
+    closeSync(rendererLockFd);
+    rendererLockFd = null;
+  }
+  if (rendererLockPath) {
+    try {
+      unlinkSync(rendererLockPath);
+    } catch (_error) {
+      // Another process may have already cleaned up the lock.
+    }
+    rendererLockPath = null;
+  }
+}
 
 async function isServerHealthy(url: string): Promise<boolean> {
   try {
@@ -51,20 +159,41 @@ beforeAll(async () => {
   }
 
   const parsedUrl = new URL(baseUrl);
+  const host = parsedUrl.hostname || "127.0.0.1";
   const port = parsedUrl.port || "8001";
 
-  serverProcess = spawn(process.execPath, ["run", "backend:test-server"], {
-    cwd: resolve(__dirname, ".."),
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      CG3_RENDERER_PORT: port,
+  if (!tryAcquireRendererLock(port)) {
+    await waitForServer(baseUrl);
+    return;
+  }
+
+  serverProcess = spawn(
+    "uv",
+    [
+      "run",
+      "--extra",
+      "dev",
+      "uvicorn",
+      "renderer_service.app.main:app",
+      "--host",
+      host,
+      "--port",
+      port,
+    ],
+    {
+      cwd: resolve(__dirname, "../backend/renderer_service"),
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        CG3_RENDERER_PORT: port,
+      },
     },
-  });
+  );
 
   serverProcess.on("error", (error) => {
     console.error("Failed to start renderer service via uv:", error);
   });
+  serverProcess.on("exit", releaseRendererLock);
 
   await waitForServer(baseUrl);
 }, 60_000);
@@ -74,10 +203,12 @@ afterAll(async () => {
     serverProcess.kill("SIGINT");
     serverProcess = null;
   }
+  releaseRendererLock();
 });
 
 process.on("exit", () => {
   if (serverProcess) {
     serverProcess.kill("SIGINT");
   }
+  releaseRendererLock();
 });

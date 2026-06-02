@@ -20,8 +20,8 @@ backend/renderer_service/
 │   └── renderer/
 │       ├── __init__.py
 │       ├── repository.py   # atlas loader + caching
-│       ├── stages.py       # one class per render stage
-│       └── pipeline.py     # orchestrates stages and blending
+│       ├── v3_renderer.py  # compositor stages and blending
+│       └── pipeline.py     # API response and batch wrapper
 ├── sprites/                # bundled Lifegen atlases (PNG)
 ├── renderer_service/data/  # spritesIndex.json + spritesOffsetMap.json
 └── tests/
@@ -29,7 +29,7 @@ backend/renderer_service/
 
 ## Implemented pipeline
 
-The backend currently reproduces the full V2 render order:
+The backend renderer composes cats in this order:
 
 1. Base coat (pattern + tint + reverse)
 2. White patches
@@ -54,7 +54,7 @@ uv run uvicorn renderer_service.app.main:app --reload --host 127.0.0.1 --port 80
 ```
 
 * The service defaults to the bundled `sprites/` directory. Override with `CG3_SPRITE_ROOT=/path/to/sprites`.
-* `/health` returns a liveness probe plus queue metrics (`queue_size`, `circuit_open`, etc.). `/render` accepts JSON payloads mirroring the V2 generator parameters.
+* `/health` returns a liveness probe plus queue metrics (`queue_size`, `circuit_open`, etc.). `/render` accepts Cat Generator V3 JSON payloads.
 
 ### Runtime observability
 
@@ -94,7 +94,7 @@ already running instance).
 # Backend unit tests
 uv run --directory backend/renderer_service pytest
 
-# Frontend parity smoke test
+# Frontend renderer smoke test
 cd frontend
 pnpm run test
 ```
@@ -148,5 +148,4 @@ Monitor `/health` while the test runs to tune queue/worker settings and confirm 
 
 - Tune Dark Forest tint to match the original palette export.
 - Expand accessory lookup for small-animal / insect atlases and seasonal packs.
-- Integrate the renderer diff harness (V2 vs V3) into CI for regression detection.
 - Add caching/batching for repeated renders when the API is exercised in bulk.

@@ -734,7 +734,14 @@ export function AncestryTreeClient({
       // Update the cat's sprite number in the tree
       const updatedCats = tree.cats.map((c) =>
         c.id === cat.id
-          ? { ...c, params: { ...c.params, spriteNumber: newSpriteNumber } }
+          ? {
+              ...c,
+              params: {
+                ...c.params,
+                spriteNumber: newSpriteNumber,
+                poseName: undefined,
+              },
+            }
           : c,
       );
 
@@ -744,7 +751,11 @@ export function AncestryTreeClient({
       if (selectedCat?.id === cat.id) {
         setSelectedCat({
           ...cat,
-          params: { ...cat.params, spriteNumber: newSpriteNumber },
+          params: {
+            ...cat.params,
+            spriteNumber: newSpriteNumber,
+            poseName: undefined,
+          },
         });
       }
 

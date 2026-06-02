@@ -87,12 +87,19 @@ function splitPayload(params: CatParams | Partial<CatParams>): CatRenderParams {
     working.spriteNumber ?? working.sprite_number ?? working.sprite,
     0
   );
+  const poseName =
+    typeof working.poseName === 'string' && working.poseName.trim()
+      ? working.poseName.trim()
+      : undefined;
   delete working.spriteNumber;
   delete working.sprite_number;
   delete working.sprite;
+  // The render envelope carries poseName; nested params should not duplicate it.
+  delete working.poseName;
   return {
     spriteNumber,
-    params: working as Omit<CatParams, 'spriteNumber'>,
+    poseName,
+    params: working as Omit<CatParams, 'spriteNumber' | 'poseName'>,
   };
 }
 
@@ -111,6 +118,7 @@ function buildLegacyUrl(params: CatParams | null | undefined): string {
 
   if (params.peltName) urlParams.set('peltName', String(params.peltName));
   if (params.spriteNumber !== undefined) urlParams.set('spriteNumber', String(params.spriteNumber));
+  if (params.poseName) urlParams.set('poseName', String(params.poseName));
   if (params.colour) urlParams.set('colour', String(params.colour));
   if (params.tint && params.tint !== 'none') urlParams.set('tint', String(params.tint));
   if (params.skinColour) urlParams.set('skinColour', String(params.skinColour));
@@ -193,6 +201,7 @@ export class CatGeneratorV3 {
         label: variant.label,
         group: variant.group,
         spriteNumber: variantPayload.spriteNumber,
+        poseName: variantPayload.poseName,
         params: variantPayload.params,
       };
     });

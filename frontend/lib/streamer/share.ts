@@ -85,6 +85,7 @@ export function buildStreamerSharePayload(
   return {
     mode: "streamer-voting" as const,
     version: 1,
+    poseName: packaged.poseName ?? null,
     spriteNumber: packaged.spriteNumber ?? 0,
     params: packaged,
     counts,

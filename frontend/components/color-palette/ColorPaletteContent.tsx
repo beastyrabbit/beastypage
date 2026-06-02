@@ -7,19 +7,19 @@ import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import DownChevron from "@/components/ui/down-chevron";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import {
+  DEFAULT_POSE_NAME,
+  formatPoseName,
+  getUserSelectablePoseNames,
+} from "@/lib/cat-v3/poseOptions";
 import { ColorPaletteClient } from "./ColorPaletteClient";
 
 const EXPORT_SIZE = 700;
-// Exclude forbidden sprites (see FORBIDDEN_SPRITES in cat-builder/types.ts: 0, 1, 2, 3, 4, 19, 20)
-const VALID_SPRITES = [
-  5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-] as const;
 const GRID_COLS = 5;
-const GRID_ROWS = 3;
 const SPRITE_SIZE = 50;
-const ALL_SPRITES_SIZE = GRID_COLS * SPRITE_SIZE;
+const GRID_WIDTH = GRID_COLS * SPRITE_SIZE;
 
-type SpriteSelection = number | "all";
+type SpriteSelection = string | "all";
 
 type ColorPaletteContentProps = {
   slug?: string | null;
@@ -36,7 +36,9 @@ export function ColorPaletteContent({
 }: ColorPaletteContentProps = {}) {
   const [initialImage, setInitialImage] = useState<string | null>(null);
   const [generatorReady, setGeneratorReady] = useState(false);
-  const [selectedSprite, setSelectedSprite] = useState<SpriteSelection>(8);
+  const [selectedSprite, setSelectedSprite] =
+    useState<SpriteSelection>(DEFAULT_POSE_NAME);
+  const [poseOptions, setPoseOptions] = useState<string[]>([DEFAULT_POSE_NAME]);
   const [isRendering, setIsRendering] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
@@ -97,8 +99,23 @@ export function ColorPaletteContent({
         const { default: catGenerator } = await import(
           "@/lib/single-cat/catGeneratorV3"
         );
+        const { default: spriteMapper } = await import(
+          "@/lib/single-cat/spriteMapper"
+        );
+        if (!spriteMapper.loaded) {
+          await spriteMapper.init();
+        }
+        const nextPoseOptions = getUserSelectablePoseNames(spriteMapper);
         if (!cancelled) {
           generatorRef.current = catGenerator as CatGeneratorApi;
+          const selectablePoses =
+            nextPoseOptions.length > 0 ? nextPoseOptions : [DEFAULT_POSE_NAME];
+          setPoseOptions(selectablePoses);
+          setSelectedSprite((current) =>
+            current === "all" || selectablePoses.includes(current)
+              ? current
+              : selectablePoses[0],
+          );
           setGeneratorReady(true);
         }
       } catch (err) {
@@ -116,10 +133,10 @@ export function ColorPaletteContent({
     async (
       generator: CatGeneratorApi,
       params: Record<string, unknown>,
-      spriteNumber: number,
+      poseName: string,
       size: number,
     ): Promise<HTMLCanvasElement> => {
-      const result = await generator.generateCat({ ...params, spriteNumber });
+      const result = await generator.generateCat({ ...params, poseName });
       const canvas = document.createElement("canvas");
       canvas.width = size;
       canvas.height = size;
@@ -139,15 +156,16 @@ export function ColorPaletteContent({
       params: Record<string, unknown>,
     ): Promise<string> => {
       const gridCanvas = document.createElement("canvas");
-      gridCanvas.width = ALL_SPRITES_SIZE;
-      gridCanvas.height = GRID_ROWS * SPRITE_SIZE;
+      gridCanvas.width = GRID_WIDTH;
+      gridCanvas.height =
+        Math.ceil(poseOptions.length / GRID_COLS) * SPRITE_SIZE;
       const ctx = gridCanvas.getContext("2d");
       if (!ctx) throw new Error("Failed to get canvas context");
 
       ctx.imageSmoothingEnabled = false;
 
-      for (let i = 0; i < VALID_SPRITES.length; i++) {
-        const spriteNumber = VALID_SPRITES[i];
+      for (let i = 0; i < poseOptions.length; i++) {
+        const poseName = poseOptions[i];
         const col = i % GRID_COLS;
         const row = Math.floor(i / GRID_COLS);
 
@@ -155,18 +173,18 @@ export function ColorPaletteContent({
           const spriteCanvas = await renderSingleSprite(
             generator,
             params,
-            spriteNumber,
+            poseName,
             SPRITE_SIZE,
           );
           ctx.drawImage(spriteCanvas, col * SPRITE_SIZE, row * SPRITE_SIZE);
         } catch (err) {
-          console.warn(`Failed to render sprite ${spriteNumber}`, err);
+          console.warn(`Failed to render pose ${poseName}`, err);
         }
       }
 
       return gridCanvas.toDataURL("image/png");
     },
-    [renderSingleSprite],
+    [poseOptions, renderSingleSprite],
   );
 
   // Render sprite(s) when selection changes or params are ready
@@ -297,7 +315,7 @@ export function ColorPaletteContent({
         <span>
           {selectedSprite === "all"
             ? "All Sprites"
-            : `Sprite ${selectedSprite}`}
+            : formatPoseName(selectedSprite)}
         </span>
         <DownChevron
           size={16}
@@ -331,21 +349,21 @@ export function ColorPaletteContent({
               All Sprites (Grid)
             </button>
             <div className="mx-2 my-1 border-t border-border/30" />
-            {VALID_SPRITES.map((num) => (
+            {poseOptions.map((poseName) => (
               <button
-                key={num}
+                key={poseName}
                 type="button"
                 onClick={() => {
-                  setSelectedSprite(num);
+                  setSelectedSprite(poseName);
                   setDropdownOpen(false);
                 }}
                 className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-foreground/10 ${
-                  selectedSprite === num
+                  selectedSprite === poseName
                     ? "bg-primary/20 text-primary"
                     : "text-foreground"
                 }`}
               >
-                Sprite {num}
+                {formatPoseName(poseName)}
               </button>
             ))}
           </div>,

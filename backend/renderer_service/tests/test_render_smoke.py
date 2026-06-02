@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from PIL import ImageOps
+from PIL import ImageChops, ImageOps
 
 from renderer_service.app import create_app
 from renderer_service.renderer.pipeline import RenderPipeline
@@ -17,7 +17,9 @@ def load_fixture(name: str) -> dict:
         return json.load(fh)
 
 
-def render_layer_ids(pipeline: RenderPipeline, params: dict) -> tuple[list[LayerIdentifier], list[list[str]]]:
+def render_layer_ids(
+    pipeline: RenderPipeline, params: dict
+) -> tuple[list[LayerIdentifier], list[list[str]]]:
     result = pipeline.render(params, collect_layers=True)
     layer_ids = [layer.id for layer in result.layers]
     diagnostics = [layer.diagnostics for layer in result.layers]
@@ -85,6 +87,92 @@ def test_pipeline_smoke():
     assert LayerIdentifier.accessories in ids
 
 
+def test_named_pose_render_smoke():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    for pose_name in ("newborn2", "adolescent_long2", "kitten0"):
+        result = pipeline.render(
+            {
+                "poseName": pose_name,
+                "spriteNumber": 8,
+                "peltName": "SingleColour",
+                "colour": "WHITE",
+                "eyeColour": "BLUE",
+                "skinColour": "PINK",
+            },
+            collect_layers=True,
+        )
+        assert result.composed.getbbox() is not None
+        assert LayerIdentifier.base in [layer.id for layer in result.layers]
+
+
+def test_legacy_sprite_number_maps_to_original_pose():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    legacy = pipeline.render(
+        {"spriteNumber": 9, "peltName": "SingleColour", "colour": "WHITE"},
+        collect_layers=False,
+    ).composed
+    named = pipeline.render(
+        {
+            "spriteNumber": 9,
+            "poseName": "adult_long0",
+            "peltName": "SingleColour",
+            "colour": "WHITE",
+        },
+        collect_layers=False,
+    ).composed
+
+    assert legacy.tobytes() == named.tobytes()
+
+
+def test_heterochromia_uses_masked_eye_sheet():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    result = pipeline.render(
+        {
+            "poseName": "adult_short2",
+            "peltName": "SingleColour",
+            "colour": "WHITE",
+            "eyeColour": "GREEN",
+            "eyeColour2": "BLUE",
+        },
+        collect_layers=True,
+    )
+
+    eyes_layer = next(
+        layer for layer in result.layers if layer.id == LayerIdentifier.eyes
+    )
+    assert "eye:GREEN" in eyes_layer.diagnostics
+    assert "eye2:BLUE" in eyes_layer.diagnostics
+
+
+def test_null_and_none_tints_are_noops():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    base_params = {
+        "poseName": "adult_short2",
+        "peltName": "SingleColour",
+        "colour": "WHITE",
+        "whitePatches": "ANY",
+    }
+
+    none_render = pipeline.render(
+        {**base_params, "tint": "none", "whitePatchesTint": "none"},
+        collect_layers=False,
+    ).composed
+    null_render = pipeline.render(
+        {**base_params, "tint": "null", "whitePatchesTint": "null"},
+        collect_layers=False,
+    ).composed
+
+    assert none_render.tobytes() == null_render.tobytes()
+
+
 def test_reference_cat_complex_layers():
     """Full render of reference cat with combined features."""
     repo = SpriteRepository()
@@ -105,13 +193,19 @@ def test_reference_cat_complex_layers():
     # make sure we drew something visible
     assert result.composed.getbbox() is not None
 
-    accessories_layer = next(layer for layer in result.layers if layer.id == LayerIdentifier.accessories)
+    accessories_layer = next(
+        layer for layer in result.layers if layer.id == LayerIdentifier.accessories
+    )
     assert any("MAPLE" in note.upper() for note in accessories_layer.diagnostics)
 
-    scars_layer = next(layer for layer in result.layers if layer.id == LayerIdentifier.scars_primary)
+    scars_layer = next(
+        layer for layer in result.layers if layer.id == LayerIdentifier.scars_primary
+    )
     assert any("FROSTSOCK" in note.upper() for note in scars_layer.diagnostics)
 
-    tint_layer = next(layer for layer in result.layers if layer.id == LayerIdentifier.tint)
+    tint_layer = next(
+        layer for layer in result.layers if layer.id == LayerIdentifier.tint
+    )
     assert any(note.startswith("tint") for note in tint_layer.diagnostics)
 
 
@@ -146,6 +240,68 @@ def test_missing_scar_masks_do_not_blank_sprite():
     assert scar_total > 0
 
 
+def test_named_pose_missing_scar_changes_render():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    base_params = {
+        "poseName": "adolescent_long0",
+        "spriteNumber": 8,
+        "peltName": "SingleColour",
+        "colour": "BLACK",
+        "eyeColour": "BLUE",
+        "skinColour": "PINK",
+    }
+
+    base = pipeline.render(base_params, collect_layers=False).composed.convert("RGB")
+    scar_result = pipeline.render(
+        {**base_params, "scars": ["NOTAIL"]}, collect_layers=True
+    )
+    scarred = scar_result.composed.convert("RGB")
+
+    diff = ImageChops.difference(base, scarred)
+    assert diff.getbbox() is not None
+
+    secondary_layer = next(
+        layer
+        for layer in scar_result.layers
+        if layer.id == LayerIdentifier.scars_secondary
+    )
+    assert secondary_layer.image.getbbox() is not None
+    assert "missingscarsNOTAIL" in secondary_layer.diagnostics
+
+
+def test_primary_scar_changes_render():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    base_params = {
+        "poseName": "adult_short2",
+        "spriteNumber": 8,
+        "peltName": "SingleColour",
+        "colour": "BLACK",
+        "eyeColour": "BLUE",
+        "skinColour": "PINK",
+    }
+
+    base = pipeline.render(base_params, collect_layers=False).composed.convert("RGB")
+    scar_result = pipeline.render(
+        {**base_params, "scars": ["ONE"]}, collect_layers=True
+    )
+    scarred = scar_result.composed.convert("RGB")
+
+    diff = ImageChops.difference(base, scarred)
+    assert diff.getbbox() is not None
+
+    primary_layer = next(
+        layer
+        for layer in scar_result.layers
+        if layer.id == LayerIdentifier.scars_primary
+    )
+    assert primary_layer.image.getbbox() is not None
+    assert "scarsONE" in primary_layer.diagnostics
+
+
 def test_reverse_preserves_missing_scar_orientation():
     repo = SpriteRepository()
     pipeline = RenderPipeline(repository=repo)
@@ -162,22 +318,25 @@ def test_reverse_preserves_missing_scar_orientation():
     mirrored_expected = ImageOps.mirror(forward)
 
     params["reverse"] = True
-    reversed_img = pipeline.render(params, collect_layers=False).composed.convert("RGBA")
+    reversed_img = pipeline.render(params, collect_layers=False).composed.convert(
+        "RGBA"
+    )
 
     assert reversed_img.tobytes() == mirrored_expected.tobytes()
 
 
 def test_fastapi_health():
     app = create_app()
-    client = TestClient(app)
-    response = client.get("/health")
+    with TestClient(app) as client:
+        response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["metrics"]["circuit_open"] is False
 
 
 def test_render_batch_endpoint():
     app = create_app()
-    client = TestClient(app)
 
     payload = {
         "payload": {
@@ -206,7 +365,8 @@ def test_render_batch_endpoint():
         },
     }
 
-    response = client.post("/render/batch", json=payload)
+    with TestClient(app) as client:
+        response = client.post("/render/batch", json=payload)
     assert response.status_code == 200
 
     data = response.json()
@@ -220,7 +380,6 @@ def test_render_batch_endpoint():
 
 def test_render_batch_layer_mode():
     app = create_app()
-    client = TestClient(app)
 
     payload = {
         "payload": {
@@ -247,7 +406,8 @@ def test_render_batch_layer_mode():
         },
     }
 
-    response = client.post("/render/batch", json=payload)
+    with TestClient(app) as client:
+        response = client.post("/render/batch", json=payload)
     assert response.status_code == 200
 
     data = response.json()

@@ -122,6 +122,7 @@ function extractInitialPayload(
       rawParams.spriteNumber ?? rawParams.sprite ?? rawParams.sprite_number,
       DEFAULT_PARAMS.spriteNumber,
     ),
+    poseName: coerceString(rawParams.poseName ?? rawParams.pose_name),
     peltName:
       coerceString(rawParams.peltName, DEFAULT_PARAMS.peltName) ??
       DEFAULT_PARAMS.peltName,

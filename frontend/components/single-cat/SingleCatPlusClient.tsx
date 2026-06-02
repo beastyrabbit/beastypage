@@ -4,7 +4,14 @@ import { useMutation } from "convex/react";
 import { ArrowUpRight, Download, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
@@ -19,6 +26,13 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { track } from "@/lib/analytics";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
+import {
+  DEFAULT_POSE_NAME,
+  formatPoseName,
+  getAvailablePoseNames,
+  getRandomSelectablePoseNames,
+} from "@/lib/cat-v3/poseOptions";
+import { getRandomAccessoryPool } from "@/lib/cat-v3/randomAccessories";
 import type { CatParams } from "@/lib/cat-v3/types";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
@@ -90,7 +104,9 @@ interface ParamRow {
 }
 
 interface SpriteVariation {
+  id: string;
   spriteNumber: number;
+  poseName: string;
   name: string;
   dataUrl: string;
 }
@@ -161,7 +177,7 @@ interface CatState {
 }
 
 interface ParameterOptions {
-  sprite: number[];
+  sprite: (number | string)[];
   pelt: string[];
   colour: string[];
   tortie: boolean[];
@@ -307,7 +323,10 @@ interface SpriteMapperApi {
   getPoints?: () => string[];
   getVitiligo?: () => string[];
   getAccessories?: () => string[];
+  getExtraAccessories?: () => string[];
   getScars?: () => string[];
+  getPoseNames?: () => string[];
+  getRenderablePoseNames?: () => string[];
 }
 
 type ParamId =
@@ -492,36 +511,10 @@ function getSpeedSettings(durationMs: number) {
   return scaleProfile(SPEED_PRESETS.slow, ratio, duration);
 }
 
-const VALID_SPRITES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
-
 const layerGroupLabels: Record<LayerGroup, string> = {
   accessories: "Accessories",
   scars: "Scars",
   torties: "Tortie Layers",
-};
-
-const SPRITE_NAMES: Record<number, string> = {
-  0: "Kitten (0)",
-  1: "Kitten (1)",
-  2: "Kitten (2)",
-  3: "Adolescent (3)",
-  4: "Adolescent (4)",
-  5: "Adolescent (5)",
-  6: "Adult (6)",
-  7: "Adult (7)",
-  8: "Adult (8)",
-  9: "Longhair Adult (9)",
-  10: "Longhair Adult (10)",
-  11: "Longhair Adult (11)",
-  12: "Senior (12)",
-  13: "Senior (13)",
-  14: "Senior (14)",
-  15: "Paralyzed Adult (15)",
-  16: "Paralyzed Longhair Adult (16)",
-  17: "Paralyzed Young (17)",
-  18: "Sick Adult (18)",
-  19: "Sick Young (19)",
-  20: "Newborn (20)",
 };
 
 const PARAM_SEQUENCE: ParamDefinition[] = [
@@ -550,6 +543,48 @@ function wait(ms: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+const DIALOG_FOCUS_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
+function handleManagedDialogKeyDown(
+  event: ReactKeyboardEvent<HTMLElement>,
+  closeDialog: () => void,
+) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeDialog();
+    return;
+  }
+
+  if (event.key !== "Tab") return;
+
+  const focusable = Array.from(
+    event.currentTarget.querySelectorAll<HTMLElement>(DIALOG_FOCUS_SELECTOR),
+  ).filter((element) => element.offsetParent !== null);
+
+  if (focusable.length === 0) {
+    event.preventDefault();
+    event.currentTarget.focus();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function formatValue(value: unknown): string {
@@ -582,6 +617,17 @@ function coerceSpriteNumber(value: unknown): number | undefined {
     }
   }
   return undefined;
+}
+
+function getPoseDisplayName(params: Partial<CatParams>): string {
+  if (params.poseName) {
+    return formatPoseName(params.poseName);
+  }
+  const spriteNumber = coerceSpriteNumber(params.spriteNumber);
+  if (spriteNumber !== undefined) {
+    return `Sprite ${spriteNumber}`;
+  }
+  return "Sprite";
 }
 
 function cloneParams<T>(params: T): T {
@@ -929,7 +975,7 @@ function getParameterRawValue(
 ): unknown {
   switch (paramId) {
     case "sprite":
-      return params.spriteNumber;
+      return params.poseName ?? params.spriteNumber;
     case "pelt":
       return params.peltName;
     case "colour":
@@ -969,9 +1015,12 @@ function getParameterRawValue(
 
 function formatOptionDisplay(paramId: ParamId, raw: unknown): string {
   if (paramId === "sprite") {
+    if (typeof raw === "string" && !/^-?\d+$/.test(raw.trim())) {
+      return formatPoseName(raw);
+    }
     const spriteNumber = coerceSpriteNumber(raw);
     if (spriteNumber !== undefined) {
-      return SPRITE_NAMES[spriteNumber] ?? `Sprite ${spriteNumber}`;
+      return `Sprite ${spriteNumber}`;
     }
   }
 
@@ -1074,9 +1123,14 @@ function applyParamValue(
       params.reverse = value as boolean;
       break;
     case "sprite": {
-      const parsed = coerceSpriteNumber(value);
-      if (parsed !== undefined) {
-        params.spriteNumber = parsed;
+      if (typeof value === "string" && !/^-?\d+$/.test(value.trim())) {
+        params.poseName = value;
+      } else {
+        const parsed = coerceSpriteNumber(value);
+        if (parsed !== undefined) {
+          params.spriteNumber = parsed;
+          params.poseName = undefined;
+        }
       }
       break;
     }
@@ -1124,10 +1178,7 @@ function getParameterValueForDisplay(
     case "reverse":
       return params.reverse ? "Yes" : "No";
     case "sprite":
-      return (
-        SPRITE_NAMES[Number(params.spriteNumber)] ??
-        `Sprite ${params.spriteNumber}`
-      );
+      return getPoseDisplayName(params);
     default:
       return "";
   }
@@ -1258,6 +1309,7 @@ async function buildParameterOptions(
   mapper: SpriteMapperApi,
   includeBaseColours: boolean,
   extendedModes: ExtendedMode[],
+  includeNewSprites: boolean,
 ): Promise<ParameterOptions> {
   if (!mapper.loaded) {
     await mapper.init();
@@ -1298,11 +1350,14 @@ async function buildParameterOptions(
   const whitePatches = invokeMapperArray(mapper, mapper.getWhitePatches);
   const points = invokeMapperArray(mapper, mapper.getPoints);
   const vitiligo = invokeMapperArray(mapper, mapper.getVitiligo);
-  const accessories = invokeMapperArray(mapper, mapper.getAccessories);
+  const accessories = getRandomAccessoryPool(mapper, includeNewSprites);
   const scars = invokeMapperArray(mapper, mapper.getScars);
+  const poseNames = getRandomSelectablePoseNames(mapper, {
+    includeNewSprites,
+  });
 
   return {
-    sprite: mapper.sprites ?? VALID_SPRITES,
+    sprite: poseNames,
     pelt: peltNames,
     colour: colourList,
     tortie: [true, false],
@@ -1422,6 +1477,7 @@ interface SettingsCodeSectionProps {
   exactLayerCounts: boolean;
   afterlifeMode: AfterlifeOption;
   includeBaseColours: boolean;
+  includeNewSprites: boolean;
   extendedModes: Set<ExtendedMode>;
   onApply: (portable: SingleCatPortableSettings) => void;
 }
@@ -1433,6 +1489,7 @@ function SettingsCodeSection({
   exactLayerCounts,
   afterlifeMode,
   includeBaseColours,
+  includeNewSprites,
   extendedModes,
   onApply,
 }: SettingsCodeSectionProps) {
@@ -1449,6 +1506,7 @@ function SettingsCodeSection({
         exactLayerCounts,
         afterlifeMode,
         includeBaseColours,
+        includeNewSprites,
         extendedModes: Array.from(extendedModes),
       }),
     [
@@ -1458,6 +1516,7 @@ function SettingsCodeSection({
       exactLayerCounts,
       afterlifeMode,
       includeBaseColours,
+      includeNewSprites,
       extendedModes,
     ],
   );
@@ -1621,6 +1680,7 @@ export function SingleCatPlusClient({
         exactLayerCounts: initialCodeSettings.exactLayerCounts,
         afterlifeMode: initialCodeSettings.afterlifeMode,
         includeBaseColours: initialCodeSettings.includeBaseColours,
+        includeNewSprites: initialCodeSettings.includeNewSprites,
         extendedModes: [...initialCodeSettings.extendedModes],
       };
     }
@@ -1747,6 +1807,9 @@ export function SingleCatPlusClient({
   const [includeBaseColours, setIncludeBaseColours] = useState(
     initialSettings.includeBaseColours,
   );
+  const [includeNewSprites, setIncludeNewSprites] = useState(
+    initialSettings.includeNewSprites,
+  );
   const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(
     () => new Set(initialSettings.extendedModes),
   );
@@ -1769,11 +1832,16 @@ export function SingleCatPlusClient({
   const [spriteVariations, setSpriteVariations] = useState<SpriteVariation[]>(
     [],
   );
+  const [spritePreviewLoading, setSpritePreviewLoading] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [hasTint, setHasTint] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [rollerExpanded, setRollerExpanded] = useState(false);
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
+  const spriteGalleryCloseRef = useRef<HTMLButtonElement | null>(null);
+  const spritePreviewTokenRef = useRef(0);
+  const timingTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const timingCloseRef = useRef<HTMLButtonElement | null>(null);
   const defaultCreatorName = useDefaultCreatorName();
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
   const [creatorNameDraft, setCreatorNameDraft] = useState(
@@ -1790,6 +1858,36 @@ export function SingleCatPlusClient({
       creatorFilledRef.current = true;
     }
   }, [defaultCreatorName, creatorNameDraft]);
+
+  useEffect(() => {
+    if (!spriteGalleryOpen) return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const focusTimer = window.setTimeout(() => {
+      spriteGalleryCloseRef.current?.focus();
+    }, 0);
+    return () => {
+      window.clearTimeout(focusTimer);
+      previousFocus?.focus();
+    };
+  }, [spriteGalleryOpen]);
+
+  useEffect(() => {
+    if (!timingModalOpen) return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const focusTimer = window.setTimeout(() => {
+      timingCloseRef.current?.focus();
+    }, 0);
+    return () => {
+      window.clearTimeout(focusTimer);
+      previousFocus?.focus();
+    };
+  }, [timingModalOpen]);
 
   const rollerValueClass = useMemo(() => {
     if (!rollerActiveValue) {
@@ -1847,6 +1945,7 @@ export function SingleCatPlusClient({
       afterlifeMode,
       extendedModes: [...extendedModes].sort(),
       includeBaseColours,
+      includeNewSprites,
       catName: catNameDraft,
       creatorName: creatorNameDraft,
     }),
@@ -1861,6 +1960,7 @@ export function SingleCatPlusClient({
       afterlifeMode,
       extendedModes,
       includeBaseColours,
+      includeNewSprites,
       catNameDraft,
       creatorNameDraft,
     ],
@@ -1878,6 +1978,7 @@ export function SingleCatPlusClient({
       setAfterlifeMode(settings.afterlifeMode);
       setExtendedModes(new Set(settings.extendedModes));
       setIncludeBaseColours(settings.includeBaseColours);
+      setIncludeNewSprites(settings.includeNewSprites ?? false);
       setCatNameDraft(settings.catName);
       setCreatorNameDraft(settings.creatorName || defaultCreatorName);
     },
@@ -3029,6 +3130,7 @@ export function SingleCatPlusClient({
             mapperRef.current,
             includeBaseColours,
             extendedModesArray,
+            includeNewSprites,
           );
           const counts = deriveOptionCounts(parameterOptionsRef.current);
           optionCountsRef.current = counts;
@@ -3051,7 +3153,7 @@ export function SingleCatPlusClient({
     return () => {
       cancelled = true;
     };
-  }, [drawPlaceholder, includeBaseColours, extendedModesArray]);
+  }, [drawPlaceholder, includeBaseColours, extendedModesArray, includeNewSprites]);
 
   useEffect(() => {
     const mapper = mapperRef.current;
@@ -3062,6 +3164,7 @@ export function SingleCatPlusClient({
         mapper,
         includeBaseColours,
         extendedModesArray,
+        includeNewSprites,
       );
       if (!cancelled) {
         parameterOptionsRef.current = options;
@@ -3073,7 +3176,7 @@ export function SingleCatPlusClient({
     return () => {
       cancelled = true;
     };
-  }, [includeBaseColours, extendedModesArray]);
+  }, [includeBaseColours, extendedModesArray, includeNewSprites]);
 
   useEffect(() => {
     return () => {
@@ -3112,13 +3215,14 @@ export function SingleCatPlusClient({
           mapperRef.current,
           includeBaseColours,
           extendedModesArray,
+          includeNewSprites,
         );
         const counts = deriveOptionCounts(parameterOptionsRef.current);
         optionCountsRef.current = counts;
         setOptionCounts(counts);
       }
       return mapperRef.current;
-    }, [includeBaseColours, extendedModesArray]);
+    }, [includeBaseColours, extendedModesArray, includeNewSprites]);
 
   // -------------------------------------------------------------------
   // Layer count spinner — reveals accessory/scar/tortie counts visually
@@ -3135,6 +3239,7 @@ export function SingleCatPlusClient({
       genOptions: {
         experimentalColourMode: string | string[];
         includeBaseColours: boolean;
+        includeNewSprites: boolean;
       },
       token: number,
     ) => {
@@ -3182,11 +3287,13 @@ export function SingleCatPlusClient({
           exactLayerCounts: true,
           experimentalColourMode: genOptions.experimentalColourMode,
           includeBaseColours: genOptions.includeBaseColours,
+          includeNewSprites: genOptions.includeNewSprites,
         });
         if (generationIdRef.current !== token) return;
 
         const baseParams = catResult.params;
-        baseParams.spriteNumber = 9; // always use longhair adult for count previews
+        baseParams.spriteNumber = 9; // legacy fallback for old render paths
+        baseParams.poseName = "adult_long0";
         const slots = catResult.slotSelections;
 
         // Pre-render a frame for each possible count (0 to max), building up
@@ -3315,7 +3422,9 @@ export function SingleCatPlusClient({
 
     setError(null);
     setShareLink(null);
+    spritePreviewTokenRef.current += 1;
     setSpriteVariations([]);
+    setSpritePreviewLoading(false);
     setParamRows([]);
     setRollerLabel(null);
     setRollerActiveValue(null);
@@ -3348,6 +3457,7 @@ export function SingleCatPlusClient({
         experimentalColourMode: experimentalMode,
         whitePatchColourMode: "default",
         includeBaseColours,
+        includeNewSprites,
       });
 
       if (generationIdRef.current !== token) return;
@@ -3459,6 +3569,7 @@ export function SingleCatPlusClient({
           {
             experimentalColourMode: experimentalMode,
             includeBaseColours,
+            includeNewSprites,
           },
           token,
         );
@@ -3708,35 +3819,9 @@ export function SingleCatPlusClient({
         tortie: builderPrimaryTortie,
       });
       builderParams.spriteNumber = DEFAULT_SPRITE_NUMBER;
+      builderParams.poseName = DEFAULT_POSE_NAME;
 
       const catUrl = generator.buildCatURL?.(builderParams) ?? "";
-
-      const spritePreview: SpriteVariation[] = [];
-      for (const spriteNumber of VALID_SPRITES) {
-        if (generationIdRef.current !== token) return;
-        const spriteParams = { ...params, spriteNumber };
-        const result = await generator.generateCat(spriteParams);
-        const previewCanvas = document.createElement("canvas");
-        previewCanvas.width = 120;
-        previewCanvas.height = 120;
-        const previewCtx = previewCanvas.getContext("2d");
-        if (previewCtx) {
-          previewCtx.imageSmoothingEnabled = false;
-          previewCtx.drawImage(
-            result.canvas as HTMLCanvasElement,
-            0,
-            0,
-            120,
-            120,
-          );
-        }
-        spritePreview.push({
-          spriteNumber,
-          name: SPRITE_NAMES[spriteNumber] ?? `Sprite ${spriteNumber}`,
-          dataUrl: previewCanvas.toDataURL("image/png"),
-        });
-      }
-      setSpriteVariations(spritePreview);
 
       // Persist refs/state for actions
       const nextState: CatState = {
@@ -3910,6 +3995,7 @@ export function SingleCatPlusClient({
     ensureMapperReady,
     extendedModesArray,
     includeBaseColours,
+    includeNewSprites,
     afterlifeMode,
     drawCanvas,
     renderCat,
@@ -3996,12 +4082,27 @@ export function SingleCatPlusClient({
   );
 
   const handleCopySprite = useCallback(
-    async (spriteNumber: number, size: 120 | typeof FULL_EXPORT_SIZE) => {
+    async (
+      spriteNumber: number,
+      size: 120 | typeof FULL_EXPORT_SIZE,
+      poseName?: string | null,
+      displayName?: string,
+    ) => {
       const state = catStateRef.current;
       const generator = generatorRef.current;
       if (!state || !generator) return;
-      const spriteName = SPRITE_NAMES[spriteNumber] ?? `Sprite ${spriteNumber}`;
+      const spriteName =
+        displayName ??
+        (poseName
+          ? formatPoseName(poseName)
+          : getPoseDisplayName({
+              spriteNumber,
+              poseName: state.params.poseName,
+            }));
       const params = { ...state.params, spriteNumber };
+      if (poseName) {
+        params.poseName = poseName;
+      }
       const result = await generator.generateCat(params);
       const exportCanvas = document.createElement("canvas");
       exportCanvas.width = size;
@@ -4026,6 +4127,87 @@ export function SingleCatPlusClient({
     },
     [showToast],
   );
+
+  const closeSpriteGallery = useCallback(() => {
+    spritePreviewTokenRef.current += 1;
+    setSpritePreviewLoading(false);
+    setSpriteGalleryOpen(false);
+  }, []);
+
+  const generateSpritePreviews = useCallback(async () => {
+    const state = catStateRef.current;
+    const generator = generatorRef.current;
+    if (!state || !generator) return;
+
+    const mapper = await ensureMapperReady();
+    if (!mapper) return;
+
+    const previewToken = ++spritePreviewTokenRef.current;
+    setSpritePreviewLoading(true);
+    setSpriteVariations([]);
+
+    try {
+      const poseChoices = getAvailablePoseNames(mapper).map((poseName) => ({
+        id: `pose-${poseName}`,
+        poseName,
+        spriteNumber: state.params.spriteNumber ?? DEFAULT_SPRITE_NUMBER,
+        name: formatPoseName(poseName),
+      }));
+      const nextPreviews: SpriteVariation[] = [];
+
+      for (const poseChoice of poseChoices) {
+        if (spritePreviewTokenRef.current !== previewToken) return;
+        const spriteParams = {
+          ...state.params,
+          spriteNumber: poseChoice.spriteNumber,
+          poseName: poseChoice.poseName,
+        };
+        const result = await generator.generateCat(spriteParams);
+        if (spritePreviewTokenRef.current !== previewToken) return;
+        const previewCanvas = document.createElement("canvas");
+        previewCanvas.width = 120;
+        previewCanvas.height = 120;
+        const previewCtx = previewCanvas.getContext("2d");
+        if (previewCtx) {
+          previewCtx.imageSmoothingEnabled = false;
+          previewCtx.drawImage(
+            result.canvas as HTMLCanvasElement,
+            0,
+            0,
+            120,
+            120,
+          );
+        }
+        nextPreviews.push({
+          id: poseChoice.id,
+          spriteNumber: poseChoice.spriteNumber,
+          poseName: poseChoice.poseName,
+          name: poseChoice.name,
+          dataUrl: previewCanvas.toDataURL("image/png"),
+        });
+      }
+
+      if (spritePreviewTokenRef.current === previewToken) {
+        setSpriteVariations(nextPreviews);
+      }
+    } catch (error) {
+      console.error("Failed to generate sprite previews", error);
+      if (spritePreviewTokenRef.current === previewToken) {
+        setError("Failed to generate sprite previews. Please try again.");
+      }
+    } finally {
+      if (spritePreviewTokenRef.current === previewToken) {
+        setSpritePreviewLoading(false);
+      }
+    }
+  }, [ensureMapperReady]);
+
+  const handleOpenSpriteGallery = useCallback(() => {
+    setSpriteGalleryOpen(true);
+    if (spriteVariations.length === 0 && !spritePreviewLoading) {
+      void generateSpritePreviews();
+    }
+  }, [generateSpritePreviews, spritePreviewLoading, spriteVariations.length]);
 
   const buildShareUrl = useCallback(async () => {
     const state = catStateRef.current;
@@ -4217,9 +4399,12 @@ export function SingleCatPlusClient({
     typeof currentState?.params?.spriteNumber === "number"
       ? Number(currentState.params.spriteNumber)
       : DEFAULT_SPRITE_NUMBER;
+  const currentPoseLabel = currentState
+    ? getPoseDisplayName(currentState.params)
+    : null;
   const canCopySprite = Boolean(currentState && generatorRef.current);
   const spriteToolsSubtitle = canCopySprite
-    ? `Current sprite #${currentSpriteNumber}`
+    ? `Current pose: ${currentPoseLabel}`
     : "Roll a cat to unlock sprite tools";
   const existingCatName = (currentState?.catName ?? "").trim();
   const existingCreatorName = (currentState?.creatorName ?? "").trim();
@@ -4581,6 +4766,7 @@ export function SingleCatPlusClient({
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <button
+                        ref={timingTriggerRef}
                         type="button"
                         onClick={() => setTimingModalOpen(true)}
                         className="flex-1 inline-flex items-center gap-2 rounded-full border border-border/60 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
@@ -4711,6 +4897,7 @@ export function SingleCatPlusClient({
                 exactLayerCounts={exactLayerCounts}
                 afterlifeMode={afterlifeMode}
                 includeBaseColours={includeBaseColours}
+                includeNewSprites={includeNewSprites}
                 extendedModes={extendedModes}
                 onApply={(portable) => {
                   setAccessoryRange(portable.accessoryRange);
@@ -4719,6 +4906,7 @@ export function SingleCatPlusClient({
                   setExactLayerCounts(portable.exactLayerCounts);
                   setAfterlifeMode(portable.afterlifeMode);
                   setIncludeBaseColours(portable.includeBaseColours);
+                  setIncludeNewSprites(portable.includeNewSprites);
                   setExtendedModes(new Set(portable.extendedModes));
                 }}
               />
@@ -4770,8 +4958,8 @@ export function SingleCatPlusClient({
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={() => setSpriteGalleryOpen(true)}
-              disabled={spriteVariations.length === 0}
+              onClick={handleOpenSpriteGallery}
+              disabled={!canCopySprite}
             >
               View Sprite Gallery
             </button>
@@ -4782,96 +4970,114 @@ export function SingleCatPlusClient({
       {spriteGalleryOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setSpriteGalleryOpen(false);
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              setSpriteGalleryOpen(false);
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          aria-label="Close sprite gallery"
-        >
-          <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setSpriteGalleryOpen(false)}
-              aria-label="Close sprite gallery"
-              className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) {
+                  closeSpriteGallery();
+                }
+              }}
+              onKeyDown={(event) =>
+                handleManagedDialogKeyDown(event, closeSpriteGallery)
+              }
+              role="dialog"
+              aria-modal="true"
+              tabIndex={-1}
+              aria-labelledby="sprite-gallery-title"
             >
-              <XIcon size={16} />
-            </button>
-            <div className="flex flex-col gap-6">
-              <div>
-                <h2 className="text-xl font-semibold text-foreground">
-                  Sprite Gallery
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Browse every sprite rendered for this cat and copy quick
-                  exports.
-                </p>
-              </div>
-              {spriteVariations.length === 0 ? (
-                <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
-                  Roll a cat to generate sprite previews.
-                </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {spriteVariations.map((variation) => (
-                    <div
-                      key={variation.spriteNumber}
-                      className="rounded-2xl border border-border/40 bg-background/70 p-4"
+              <div className="relative flex max-h-[85vh] w-full max-w-5xl flex-col rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
+                <button
+                  ref={spriteGalleryCloseRef}
+                  type="button"
+                  onClick={closeSpriteGallery}
+                  aria-label="Close sprite gallery"
+                  className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
+                >
+                  <XIcon size={16} />
+                </button>
+                <div className="flex min-h-0 flex-col gap-6">
+                  <div>
+                    <h2
+                      id="sprite-gallery-title"
+                      className="text-xl font-semibold text-foreground"
                     >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-foreground">
-                          {variation.name}
-                        </p>
-                        <span className="text-xs text-muted-foreground">
-                          #{variation.spriteNumber}
-                        </span>
-                      </div>
-                      <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
-                        <Image
-                          src={variation.dataUrl}
-                          alt={variation.name}
-                          width={120}
-                          height={120}
-                          unoptimized
-                          className="mx-auto block h-28 w-28 image-render-pixel"
-                        />
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                          onClick={() =>
-                            handleCopySprite(variation.spriteNumber, 120)
-                          }
-                        >
-                          Copy 120×120
-                        </button>
-                        <button
-                          type="button"
-                          className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                          onClick={() =>
-                            handleCopySprite(
-                              variation.spriteNumber,
-                              FULL_EXPORT_SIZE,
-                            )
-                          }
-                        >
-                          Copy 700×700
-                        </button>
+                      Sprite Gallery
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Browse every sprite rendered for this cat and copy quick
+                      exports.
+                    </p>
+                  </div>
+                  {spritePreviewLoading ? (
+                    <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+                      Generating sprite previews...
+                    </div>
+                  ) : spriteVariations.length === 0 ? (
+                    <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+                      No sprite previews available.
+                    </div>
+                  ) : (
+                    <div className="min-h-0 overflow-y-auto pr-1">
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {spriteVariations.map((variation) => (
+                          <div
+                            key={variation.id}
+                            className="rounded-2xl border border-border/40 bg-background/70 p-4"
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-semibold text-foreground">
+                                {variation.name}
+                              </p>
+                              <span className="text-xs text-muted-foreground">
+                                Named pose
+                              </span>
+                            </div>
+                            <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
+                              <Image
+                                src={variation.dataUrl}
+                                alt={variation.name}
+                                width={120}
+                                height={120}
+                                unoptimized
+                                className="mx-auto block h-28 w-28 image-render-pixel"
+                              />
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                aria-label={`Copy ${variation.name} at 120 by 120 pixels`}
+                                className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
+                                onClick={() =>
+                                  handleCopySprite(
+                                    variation.spriteNumber,
+                                    120,
+                                    variation.poseName ?? null,
+                                    variation.name,
+                                  )
+                                }
+                              >
+                                Copy 120×120
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Copy ${variation.name} at ${FULL_EXPORT_SIZE} by ${FULL_EXPORT_SIZE} pixels`}
+                                className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
+                                onClick={() =>
+                                  handleCopySprite(
+                                    variation.spriteNumber,
+                                    FULL_EXPORT_SIZE,
+                                    variation.poseName ?? null,
+                                    variation.name,
+                                  )
+                                }
+                              >
+                                Copy 700×700
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </div>
           </div>
         </div>
       )}
@@ -4879,25 +5085,25 @@ export function SingleCatPlusClient({
       {timingModalOpen && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 py-10"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setTimingModalOpen(false);
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              setTimingModalOpen(false);
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          aria-label="Close timing settings"
-        >
-          <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setTimingModalOpen(false)}
-              className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) {
+                  setTimingModalOpen(false);
+                }
+              }}
+              onKeyDown={(event) =>
+                handleManagedDialogKeyDown(event, () => setTimingModalOpen(false))
+              }
+              role="dialog"
+              aria-modal="true"
+              tabIndex={-1}
+              aria-labelledby="spin-timing-title"
+            >
+              <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
+                <button
+                  ref={timingCloseRef}
+                  type="button"
+                  onClick={() => setTimingModalOpen(false)}
+                  className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
               aria-label="Close timing settings"
             >
               <XIcon size={16} />
@@ -4905,7 +5111,10 @@ export function SingleCatPlusClient({
             <div className="max-h-[80vh] overflow-y-auto px-6 pb-8 pt-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-foreground">
+                  <h2
+                    id="spin-timing-title"
+                    className="text-lg font-semibold text-foreground"
+                  >
                     Spin Timing
                   </h2>
                   <p className="text-sm text-muted-foreground">
