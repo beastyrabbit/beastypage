@@ -68,7 +68,7 @@ class SpriteSheetLoader {
             }
 
             if (!poseJson) {
-                console.warn('Could not load sprite pose data, falling back to individual files');
+                console.warn('Could not load sprite pose data; named sprite-sheet rendering is unavailable');
                 return false;
             }
 
@@ -194,8 +194,13 @@ class SpriteSheetLoader {
             return this.resolveLegacyPoseOffset(spriteNumber, poseName);
         }
 
-        if (poseName && this.poseData?.poseNameToOffset?.[poseName]) {
-            return this.poseData.poseNameToOffset[poseName];
+        if (poseName) {
+            const poseOffset = this.poseData?.poseNameToOffset?.[poseName];
+            if (poseOffset) {
+                return poseOffset;
+            }
+            console.warn(`Pose offset not found for pose "${poseName}"`);
+            return null;
         }
 
         const parsed = Number.parseInt(spriteNumber, 10);

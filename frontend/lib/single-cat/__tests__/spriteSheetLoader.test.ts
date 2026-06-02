@@ -57,10 +57,31 @@ describe("SpriteSheetLoader pose offsets", () => {
 
     await expect(loader.init()).resolves.toBe(false);
     expect(warnSpy).toHaveBeenCalledWith(
-      "Could not load sprite pose data, falling back to individual files",
+      "Could not load sprite pose data; named sprite-sheet rendering is unavailable",
     );
     expect(loader.spritesIndex).toBeNull();
     expect(loader.spritesOffsetMap).toBeNull();
     expect(loader.poseData).toBeNull();
+  });
+
+  it("returns no offset when a named pose is missing from pose data", () => {
+    const loader = new SpriteSheetLoader();
+    loader.poseData = {
+      poseNameToOffset: {
+        adult_short2: { x: 2, y: 2 },
+      },
+    };
+    loader.spritesOffsetMap = [{ x: 0, y: 0 }];
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const resolvePoseOffset = loader.resolvePoseOffset.bind(loader) as (
+      spriteNumber: number,
+      poseName?: string | null,
+      spriteInfo?: Record<string, unknown> | null,
+    ) => unknown;
+
+    expect(resolvePoseOffset(0, "missing_pose", {})).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Pose offset not found for pose "missing_pose"',
+    );
   });
 });
