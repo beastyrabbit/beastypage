@@ -57,10 +57,10 @@ describe("SpriteSheetLoader pose offsets", () => {
 
     await expect(loader.init()).resolves.toBe(false);
     expect(warnSpy).toHaveBeenCalledWith(
-      "Could not load sprite pose data; named sprite-sheet rendering is unavailable",
+      "Could not load sprite pose data; all sprite rendering may be degraded (pose names unresolvable)",
     );
-    expect(loader.spritesIndex).toBeNull();
-    expect(loader.spritesOffsetMap).toBeNull();
+    expect(loader.spritesIndex).toEqual({ lineart: {} });
+    expect(loader.spritesOffsetMap).toEqual([{ x: 0, y: 0 }]);
     expect(loader.poseData).toBeNull();
   });
 

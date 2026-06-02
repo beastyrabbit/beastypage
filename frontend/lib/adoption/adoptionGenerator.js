@@ -1727,41 +1727,43 @@ export class AdoptionGenerator {
       this.spriteGalleryGrid.innerHTML = "";
     }
 
-    const previews = [];
     const poseOptions = getUserSelectablePoseNames(spriteMapper);
     const galleryPoses =
       poseOptions.length > 0 ? poseOptions : [DEFAULT_POSE_NAME];
-    const tasks = galleryPoses.map(async (poseName) => {
-      try {
-        const spriteParams = {
-          ...params,
-          spriteNumber: params.spriteNumber ?? 8,
-          poseName,
-        };
-        const result = await catGenerator.generateCat(spriteParams);
-        if (!force && this.detailRenderToken !== token) return;
-        if (!result?.canvas) return;
-        const previewCanvas = document.createElement("canvas");
-        previewCanvas.width = 120;
-        previewCanvas.height = 120;
-        const ctx = previewCanvas.getContext("2d");
-        if (!ctx) return;
-        ctx.imageSmoothingEnabled = false;
-        ctx.clearRect(0, 0, 120, 120);
-        ctx.drawImage(result.canvas, 0, 0, 120, 120);
-        const dataUrl = previewCanvas.toDataURL("image/png");
-        previews.push({
-          poseName,
-          spriteNumber: spriteParams.spriteNumber,
-          name: formatPoseName(poseName),
-          dataUrl,
-        });
-      } catch (error) {
-        console.error("Failed to render sprite variation:", error);
-      }
-    });
-
-    await Promise.all(tasks);
+    const previews = (
+      await Promise.all(
+        galleryPoses.map(async (poseName) => {
+          try {
+            const spriteParams = {
+              ...params,
+              spriteNumber: params.spriteNumber ?? 8,
+              poseName,
+            };
+            const result = await catGenerator.generateCat(spriteParams);
+            if (!force && this.detailRenderToken !== token) return null;
+            if (!result?.canvas) return null;
+            const previewCanvas = document.createElement("canvas");
+            previewCanvas.width = 120;
+            previewCanvas.height = 120;
+            const ctx = previewCanvas.getContext("2d");
+            if (!ctx) return null;
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, 120, 120);
+            ctx.drawImage(result.canvas, 0, 0, 120, 120);
+            const dataUrl = previewCanvas.toDataURL("image/png");
+            return {
+              poseName,
+              spriteNumber: spriteParams.spriteNumber,
+              name: formatPoseName(poseName),
+              dataUrl,
+            };
+          } catch (error) {
+            console.error("Failed to render sprite variation:", error);
+            return null;
+          }
+        }),
+      )
+    ).filter((preview) => preview !== null);
 
     if (!force && this.detailRenderToken !== token) {
       return;

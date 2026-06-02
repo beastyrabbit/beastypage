@@ -67,15 +67,16 @@ class SpriteSheetLoader {
                 return false;
             }
 
+            this.spritesIndex = indexJson;
+            this.spritesOffsetMap = offsetJson;
+            this.normalizedIndex = new Map(Object.keys(this.spritesIndex || {}).map(key => [key.toLowerCase(), key]));
+
             if (!poseJson) {
-                console.warn('Could not load sprite pose data; named sprite-sheet rendering is unavailable');
+                console.warn('Could not load sprite pose data; all sprite rendering may be degraded (pose names unresolvable)');
                 return false;
             }
 
-            this.spritesIndex = indexJson;
-            this.spritesOffsetMap = offsetJson;
             this.poseData = poseJson;
-            this.normalizedIndex = new Map(Object.keys(this.spritesIndex || {}).map(key => [key.toLowerCase(), key]));
             
             console.log(`Loaded sprite sheet index with ${Object.keys(this.spritesIndex).length} sprite groups`);
             return true;
