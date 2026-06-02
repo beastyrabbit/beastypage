@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SpriteSheetLoader } from "../spriteSheetLoader.js";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("SpriteSheetLoader pose offsets", () => {
   it("uses legacy offsets only for preserved old-layout sheets", () => {
@@ -33,5 +38,29 @@ describe("SpriteSheetLoader pose offsets", () => {
       x: 0,
       y: 3,
     });
+  });
+
+  it("does not initialize sheet mode when pose data is missing", async () => {
+    const loader = new SpriteSheetLoader();
+    const fetchMock = vi.fn(async (path: string) => {
+      if (path.endsWith("spritesIndex.json")) {
+        return { ok: true, json: async () => ({ lineart: {} }) };
+      }
+      if (path.endsWith("spritesOffsetMap.json")) {
+        return { ok: true, json: async () => [{ x: 0, y: 0 }] };
+      }
+      return { ok: false };
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loader.init()).resolves.toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(
+      "Could not load sprite pose data, falling back to individual files",
+    );
+    expect(loader.spritesIndex).toBeNull();
+    expect(loader.spritesOffsetMap).toBeNull();
+    expect(loader.poseData).toBeNull();
   });
 });

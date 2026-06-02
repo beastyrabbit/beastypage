@@ -67,6 +67,11 @@ class SpriteSheetLoader {
                 return false;
             }
 
+            if (!poseJson) {
+                console.warn('Could not load sprite pose data, falling back to individual files');
+                return false;
+            }
+
             this.spritesIndex = indexJson;
             this.spritesOffsetMap = offsetJson;
             this.poseData = poseJson;
