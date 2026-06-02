@@ -33,6 +33,7 @@ import {
   getAvailablePoseNames,
   getRandomSelectablePoseNames,
 } from "@/lib/cat-v3/poseOptions";
+import { getRandomAccessoryPool } from "@/lib/cat-v3/randomAccessories";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { decodePortableSettings } from "@/lib/portable-settings";
 import {
@@ -334,6 +335,7 @@ interface SpriteMapperApi {
   getPoints?: () => string[];
   getVitiligo?: () => string[];
   getAccessories?: () => string[];
+  getExtraAccessories?: () => string[];
   getScars?: () => string[];
   getPoseNames?: () => string[];
   getRenderablePoseNames?: () => string[];
@@ -1332,6 +1334,7 @@ async function buildParameterOptions(
   mapper: SpriteMapperApi,
   includeBaseColours: boolean,
   extendedModes: ExtendedMode[],
+  includeNewSprites: boolean,
 ): Promise<ParameterOptions> {
   if (!mapper.loaded) {
     await mapper.init();
@@ -1372,9 +1375,11 @@ async function buildParameterOptions(
   const whitePatches = invokeMapperArray(mapper, mapper.getWhitePatches);
   const points = invokeMapperArray(mapper, mapper.getPoints);
   const vitiligo = invokeMapperArray(mapper, mapper.getVitiligo);
-  const accessories = invokeMapperArray(mapper, mapper.getAccessories);
+  const accessories = getRandomAccessoryPool(mapper, includeNewSprites);
   const scars = invokeMapperArray(mapper, mapper.getScars);
-  const poseNames = getRandomSelectablePoseNames(mapper);
+  const poseNames = getRandomSelectablePoseNames(mapper, {
+    includeNewSprites,
+  });
 
   return {
     sprite: poseNames,
@@ -1577,6 +1582,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         exactLayerCounts: initialCodeSettings.exactLayerCounts,
         afterlifeMode: initialCodeSettings.afterlifeMode,
         includeBaseColours: initialCodeSettings.includeBaseColours,
+        includeNewSprites: initialCodeSettings.includeNewSprites,
         extendedModes: [...initialCodeSettings.extendedModes],
       };
     }
@@ -1719,6 +1725,9 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   const [includeBaseColours, setIncludeBaseColours] = useState(
     initialSettings.includeBaseColours,
   );
+  const [includeNewSprites, setIncludeNewSprites] = useState(
+    initialSettings.includeNewSprites,
+  );
   const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(
     () => new Set(initialSettings.extendedModes),
   );
@@ -1748,6 +1757,10 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     setIncludeBaseColours(
       sessionSettings.includeBaseColours ??
         DEFAULT_SINGLE_CAT_SETTINGS.includeBaseColours,
+    );
+    setIncludeNewSprites(
+      sessionSettings.includeNewSprites ??
+        DEFAULT_SINGLE_CAT_SETTINGS.includeNewSprites,
     );
     setExtendedModes(
       new Set(
@@ -1892,6 +1905,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       afterlifeMode,
       extendedModes: [...extendedModes].sort(),
       includeBaseColours,
+      includeNewSprites,
       catName: catNameDraft,
       creatorName: creatorNameDraft,
     }),
@@ -1906,6 +1920,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       afterlifeMode,
       extendedModes,
       includeBaseColours,
+      includeNewSprites,
       catNameDraft,
       creatorNameDraft,
     ],
@@ -1923,6 +1938,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       setAfterlifeMode(settings.afterlifeMode);
       setExtendedModes(new Set(settings.extendedModes));
       setIncludeBaseColours(settings.includeBaseColours);
+      setIncludeNewSprites(settings.includeNewSprites ?? false);
       setCatNameDraft(settings.catName);
       setCreatorNameDraft(settings.creatorName || defaultCreatorName);
     },
@@ -3348,6 +3364,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
             mapperRef.current,
             includeBaseColours,
             extendedModesArray,
+            includeNewSprites,
           );
           const counts = deriveOptionCounts(parameterOptionsRef.current);
           optionCountsRef.current = counts;
@@ -3370,7 +3387,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     return () => {
       cancelled = true;
     };
-  }, [drawPlaceholder, includeBaseColours, extendedModesArray]);
+  }, [drawPlaceholder, includeBaseColours, extendedModesArray, includeNewSprites]);
 
   useEffect(() => {
     const mapper = mapperRef.current;
@@ -3381,6 +3398,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         mapper,
         includeBaseColours,
         extendedModesArray,
+        includeNewSprites,
       );
       if (!cancelled) {
         parameterOptionsRef.current = options;
@@ -3392,7 +3410,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     return () => {
       cancelled = true;
     };
-  }, [includeBaseColours, extendedModesArray]);
+  }, [includeBaseColours, extendedModesArray, includeNewSprites]);
 
   useEffect(() => {
     return () => {
@@ -3447,13 +3465,14 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           mapperRef.current,
           includeBaseColours,
           extendedModesArray,
+          includeNewSprites,
         );
         const counts = deriveOptionCounts(parameterOptionsRef.current);
         optionCountsRef.current = counts;
         setOptionCounts(counts);
       }
       return mapperRef.current;
-    }, [includeBaseColours, extendedModesArray]);
+    }, [includeBaseColours, extendedModesArray, includeNewSprites]);
 
   // -------------------------------------------------------------------
   // Layer count spinner — reveals accessory/scar/tortie counts visually
@@ -3470,6 +3489,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       genOptions: {
         experimentalColourMode: string | string[];
         includeBaseColours: boolean;
+        includeNewSprites: boolean;
       },
       token: number,
     ) => {
@@ -3517,6 +3537,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           exactLayerCounts: true,
           experimentalColourMode: genOptions.experimentalColourMode,
           includeBaseColours: genOptions.includeBaseColours,
+          includeNewSprites: genOptions.includeNewSprites,
         });
         if (generationIdRef.current !== token) return;
 
@@ -3704,6 +3725,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           experimentalColourMode: experimentalMode,
           whitePatchColourMode: "default",
           includeBaseColours,
+          includeNewSprites,
         });
       }
 
@@ -3827,6 +3849,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           {
             experimentalColourMode: experimentalMode,
             includeBaseColours,
+            includeNewSprites,
           },
           token,
         );
@@ -4376,6 +4399,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     ensureMapperReady,
     extendedModesArray,
     includeBaseColours,
+    includeNewSprites,
     afterlifeMode,
     drawCanvas,
     renderCat,
@@ -5086,6 +5110,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
                         ? extendedModesArray
                         : undefined,
                     includeBaseColours,
+                    includeNewSprites,
                   });
                   if (
                     generationIdRef.current === commandToken &&
@@ -5204,6 +5229,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     extendedModesArray,
     scarRange,
     includeBaseColours,
+    includeNewSprites,
     accessoryRange,
   ]);
 
@@ -5237,6 +5263,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       tortieRange,
       afterlifeMode,
       includeBaseColours,
+      includeNewSprites,
       extendedModes: extendedModesArray,
       exactLayerCounts,
       lobbyMode:
@@ -5257,6 +5284,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       tortieRange,
       afterlifeMode,
       includeBaseColours,
+      includeNewSprites,
       extendedModesArray,
       exactLayerCounts,
       rawSession,
@@ -5280,6 +5308,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
             exactLayerCounts: brbPortableSettings.exactLayerCounts,
             afterlifeMode: brbPortableSettings.afterlifeMode,
             includeBaseColours: brbPortableSettings.includeBaseColours,
+            includeNewSprites: brbPortableSettings.includeNewSprites,
             extendedModes: brbPortableSettings.extendedModes,
           }
         : lobbySettings,

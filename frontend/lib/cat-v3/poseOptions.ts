@@ -5,6 +5,10 @@ export interface PoseNameMapper {
 
 export const DEFAULT_POSE_NAME = "adult_short2";
 
+export interface RandomPoseOptions {
+  includeNewSprites?: boolean;
+}
+
 function uniqueStringValues(values: unknown[]): string[] {
   return Array.from(
     new Set(
@@ -18,13 +22,15 @@ function uniqueStringValues(values: unknown[]): string[] {
 
 export function isRandomSelectablePoseName(
   poseName: unknown,
+  options: RandomPoseOptions = {},
 ): poseName is string {
   return (
     typeof poseName === "string" &&
     poseName.length > 0 &&
     !poseName.startsWith("newborn") &&
     !poseName.startsWith("kitten") &&
-    !poseName.startsWith("adolescent_long")
+    (options.includeNewSprites === true ||
+      !poseName.startsWith("adolescent_long"))
   );
 }
 
@@ -38,11 +44,14 @@ export function getAvailablePoseNames(
 
 export function getRandomSelectablePoseNames(
   mapper: PoseNameMapper | null | undefined,
+  options: RandomPoseOptions = {},
 ): string[] {
   const renderable = mapper?.getRenderablePoseNames?.() ?? [];
   const source =
     renderable.length > 0 ? renderable : getAvailablePoseNames(mapper);
-  return uniqueStringValues(source.filter(isRandomSelectablePoseName));
+  return uniqueStringValues(
+    source.filter((poseName) => isRandomSelectablePoseName(poseName, options)),
+  );
 }
 
 export const isUserSelectablePoseName = (

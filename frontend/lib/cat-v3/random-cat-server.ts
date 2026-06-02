@@ -15,6 +15,7 @@ import {
   materializeTortieSlots,
 } from "./slotMaterializer";
 import { isRandomSelectablePoseName } from "./poseOptions";
+import { filterRandomAccessoryPool } from "./randomAccessories";
 import type { CatParams, RandomGenerationOptions } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,7 @@ interface SpriteData {
   readonly eyeColours: readonly string[];
   readonly skinColours: readonly string[];
   readonly accessories: readonly string[];
+  readonly extraAccessories: readonly string[];
   readonly scars: readonly string[];
   readonly tortieMasks: readonly string[];
   readonly whitePatches: readonly string[];
@@ -341,6 +343,9 @@ function extractLists(
     accessories.push(...peltInfo.plant_accessories);
   if (peltInfo.wild_accessories) accessories.push(...peltInfo.wild_accessories);
   if (peltInfo.collars) accessories.push(...peltInfo.collars);
+  const extraAccessories = Array.isArray(peltInfo.extra_accessories)
+    ? [...peltInfo.extra_accessories]
+    : [];
   if (peltInfo.extra_accessories)
     accessories.push(...peltInfo.extra_accessories);
 
@@ -382,6 +387,7 @@ function extractLists(
     eyeColours,
     skinColours,
     accessories,
+    extraAccessories,
     scars,
     tortieMasks,
     whitePatches,
@@ -580,7 +586,11 @@ export async function generateRandomParamsServer(
     data.renderablePoseNames.length > 0
       ? data.renderablePoseNames
       : data.poseNames;
-  const posePool = posePoolSource.filter(isRandomSelectablePoseName);
+  const posePool = posePoolSource.filter((poseName) =>
+    isRandomSelectablePoseName(poseName, {
+      includeNewSprites: options.includeNewSprites === true,
+    }),
+  );
   if (!posePool.length) throw new Error("Pose pool is empty");
 
   const poseName =
@@ -741,7 +751,12 @@ export async function generateRandomParamsServer(
   const accMin = overrides.accessoriesMin ?? 0;
   const accMax = overrides.accessoriesMax ?? 4;
   const accSlots = overrides.accessories ?? computeLayerCount(accMin, accMax);
-  if (accSlots > 0 && data.accessories.length > 0) {
+  const accessories = filterRandomAccessoryPool(
+    data.accessories,
+    data.extraAccessories,
+    options.includeNewSprites === true,
+  );
+  if (accSlots > 0 && accessories.length > 0) {
     const accConfig = RANDOM_CONFIG.counts.accessories;
     const uniqueAcc = accConfig.unique !== false;
     const accProb =
@@ -750,7 +765,7 @@ export async function generateRandomParamsServer(
       0.5;
     const accResult = materializeStringSlots({
       slotCount: accSlots,
-      availableChoices: data.accessories,
+      availableChoices: accessories,
       unique: uniqueAcc,
       exactCount: exactLayerCounts,
       placeholder: "none",

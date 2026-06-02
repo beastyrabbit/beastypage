@@ -29,6 +29,7 @@ export interface SpriteMapperApi {
   getPlantAccessories(): string[];
   getWildAccessories(): string[];
   getCollars(): string[];
+  getExtraAccessories?(): string[];
   getAccessories?(): string[];
   getScarsByCategory(category: number): string[];
   getExperimentalColourDefinition?(

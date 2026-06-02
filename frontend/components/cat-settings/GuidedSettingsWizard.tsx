@@ -31,6 +31,7 @@ const DEFAULTS: SingleCatPortableSettings = {
   exactLayerCounts: DEFAULT_SINGLE_CAT_SETTINGS.exactLayerCounts,
   afterlifeMode: DEFAULT_SINGLE_CAT_SETTINGS.afterlifeMode,
   includeBaseColours: DEFAULT_SINGLE_CAT_SETTINGS.includeBaseColours,
+  includeNewSprites: DEFAULT_SINGLE_CAT_SETTINGS.includeNewSprites,
   extendedModes: [...DEFAULT_SINGLE_CAT_SETTINGS.extendedModes],
 };
 
@@ -76,6 +77,7 @@ export function GuidedSettingsWizard({
   const [includeBaseColours, setIncludeBaseColours] = useState(
     init.includeBaseColours,
   );
+  const [includeNewSprites] = useState(init.includeNewSprites);
   const [extendedModes, setExtendedModes] = useState<ExtendedMode[]>(
     init.extendedModes,
   );
@@ -92,6 +94,7 @@ export function GuidedSettingsWizard({
       exactLayerCounts,
       afterlifeMode,
       includeBaseColours,
+      includeNewSprites,
       extendedModes,
     }),
     [
@@ -101,6 +104,7 @@ export function GuidedSettingsWizard({
       exactLayerCounts,
       afterlifeMode,
       includeBaseColours,
+      includeNewSprites,
       extendedModes,
     ],
   );

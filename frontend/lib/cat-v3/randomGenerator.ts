@@ -4,6 +4,7 @@ import {
   materializeTortieSlots,
 } from "./slotMaterializer";
 import { getRandomSelectablePoseNames } from "./poseOptions";
+import { getRandomAccessoryPool } from "./randomAccessories";
 import type {
   CatParams,
   RandomGenerationOptions,
@@ -48,6 +49,7 @@ interface SpriteMapperApi {
   getEyeColours(): string[];
   getSkinColours(): string[];
   getAccessories(): string[];
+  getExtraAccessories?(): string[];
   getScars(): string[];
   getPoints(): string[];
   getVitiligo(): string[];
@@ -277,7 +279,9 @@ export async function generateRandomParamsV3Detailed(
 ): Promise<RandomGenerationResult> {
   const spriteMapper = await ensureSpriteMapper();
 
-  const posePool = getRandomSelectablePoseNames(spriteMapper);
+  const posePool = getRandomSelectablePoseNames(spriteMapper, {
+    includeNewSprites: options.includeNewSprites === true,
+  });
   if (!posePool.length) {
     throw new Error("Pose pool is empty; check poseData.json");
   }
@@ -302,7 +306,10 @@ export async function generateRandomParamsV3Detailed(
   const tints = spriteMapper.getTints();
   const eyeColours = spriteMapper.getEyeColours();
   const skinColours = spriteMapper.getSkinColours();
-  const accessories = spriteMapper.getAccessories();
+  const accessories = getRandomAccessoryPool(
+    spriteMapper,
+    options.includeNewSprites === true,
+  );
   const scars = spriteMapper.getScars();
   const points = spriteMapper.getPoints();
   const vitiligo = spriteMapper.getVitiligo();

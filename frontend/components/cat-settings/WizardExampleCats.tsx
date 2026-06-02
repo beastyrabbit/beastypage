@@ -94,6 +94,7 @@ export function WizardExampleCats({
           exactLayerCounts: settings.exactLayerCounts,
           experimentalColourMode,
           includeBaseColours: settings.includeBaseColours,
+          includeNewSprites: settings.includeNewSprites,
         });
 
         // Resolve afterlife — use overrides if provided, else settings

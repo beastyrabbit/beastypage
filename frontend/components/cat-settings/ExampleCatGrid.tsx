@@ -66,6 +66,7 @@ export function ExampleCatGrid({ settings }: ExampleCatGridProps) {
           exactLayerCounts: settings.exactLayerCounts,
           experimentalColourMode,
           includeBaseColours: settings.includeBaseColours,
+          includeNewSprites: settings.includeNewSprites,
         });
 
         // Apply afterlife effects

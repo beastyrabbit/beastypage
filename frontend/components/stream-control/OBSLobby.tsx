@@ -38,6 +38,7 @@ export interface LobbySettings {
   tortieRange: LayerRange;
   afterlifeMode: string;
   includeBaseColours: boolean;
+  includeNewSprites?: boolean;
   extendedModes: string[];
   exactLayerCounts?: boolean;
   lobbyMode?: "fruit-ninja" | "matrix" | "dvd";
@@ -123,6 +124,7 @@ export function OBSLobby({
       exactLayerCounts: settings.exactLayerCounts ?? true,
       extendedModes: settings.extendedModes,
       includeBaseColours: settings.includeBaseColours,
+      includeNewSprites: settings.includeNewSprites === true,
     }),
     [
       settings.accessoryRange.max,
@@ -131,6 +133,7 @@ export function OBSLobby({
       settings.exactLayerCounts,
       settings.extendedModes,
       settings.includeBaseColours,
+      settings.includeNewSprites,
     ],
   );
 
@@ -174,6 +177,7 @@ export function OBSLobby({
         experimentalColourMode:
           gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
         includeBaseColours: gs.includeBaseColours,
+        includeNewSprites: gs.includeNewSprites,
       }).catch(() => null);
       if (cancelled || !firstResult) return;
 
@@ -197,6 +201,7 @@ export function OBSLobby({
             experimentalColourMode:
               gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
             includeBaseColours: gs.includeBaseColours,
+            includeNewSprites: gs.includeNewSprites,
           });
           if (r && r.canvas instanceof HTMLCanvasElement) {
             const overrideParams = {
@@ -296,6 +301,7 @@ export function OBSLobby({
         exactLayerCounts: settings.exactLayerCounts ?? true,
         afterlifeMode: settings.afterlifeMode as AfterlifeOption,
         includeBaseColours: settings.includeBaseColours,
+        includeNewSprites: settings.includeNewSprites === true,
         extendedModes: settings.extendedModes as ExtendedMode[],
       }),
     [settings],

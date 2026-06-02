@@ -6,6 +6,9 @@ const VALID_POSES = [
   "adolescent_short0",
   "adolescent_short1",
   "adolescent_short2",
+  "adolescent_long0",
+  "adolescent_long1",
+  "adolescent_long2",
   "adult_short0",
   "adult_short1",
   "adult_short2",
@@ -21,6 +24,10 @@ const VALID_POSES = [
   "sick_adult0",
   "sick_young0",
 ];
+
+const DEFAULT_VALID_POSES = VALID_POSES.filter(
+  (poseName) => !poseName.startsWith("adolescent_long"),
+);
 
 const VALID_PELTS = [
   "SingleColour",
@@ -79,10 +86,23 @@ describe("generateRandomParamsServer", () => {
   it("generates a selectable pose name from the valid pool", async () => {
     for (let i = 0; i < 10; i++) {
       const params = await generateRandomParamsServer();
-      expect(VALID_POSES).toContain(params.poseName);
+      expect(DEFAULT_VALID_POSES).toContain(params.poseName);
       expect(params.poseName).not.toMatch(/^(newborn|kitten)/);
       expect(params.poseName).not.toMatch(/^adolescent_long/);
     }
+  });
+
+  it("allows adolescent_long pose names only when new sprites are enabled", async () => {
+    const defaultParams = await generateRandomParamsServer({
+      poseName: "adolescent_long2",
+    });
+    expect(defaultParams.poseName).not.toBe("adolescent_long2");
+
+    const newSpriteParams = await generateRandomParamsServer(
+      { poseName: "adolescent_long2" },
+      { includeNewSprites: true },
+    );
+    expect(newSpriteParams.poseName).toBe("adolescent_long2");
   });
 
   it("does not pick Tortie or Calico as pelt name", async () => {
@@ -97,7 +117,7 @@ describe("generateRandomParamsServer", () => {
   it("keeps sprite override as numeric fallback only", async () => {
     const params = await generateRandomParamsServer({ sprite: 7 });
     expect(params.spriteNumber).toBe(7);
-    expect(VALID_POSES).toContain(params.poseName);
+    expect(DEFAULT_VALID_POSES).toContain(params.poseName);
   });
 
   it("applies pose name override", async () => {
@@ -192,7 +212,7 @@ describe("generateRandomParamsServer", () => {
 
   it("ignores invalid sprite override", async () => {
     const params = await generateRandomParamsServer({ sprite: 999 });
-    expect(VALID_POSES).toContain(params.poseName);
+    expect(DEFAULT_VALID_POSES).toContain(params.poseName);
   });
 
   it("ignores invalid pelt override", async () => {

@@ -40,6 +40,7 @@ export interface RandomGenerationOptions {
   ignoreForbiddenSprites?: boolean;
   experimentalColourMode?: string | string[];
   includeBaseColours?: boolean;
+  includeNewSprites?: boolean;
   exactLayerCounts?: boolean;
   countsMode?:
     | "weighted"

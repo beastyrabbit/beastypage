@@ -739,6 +739,17 @@ class SpriteMapper {
         }
         return this.peltInfo.collars ? [...this.peltInfo.collars] : [];
     }
+
+    /**
+     * Get misc legacy accessories.
+     * @returns {string[]} Array of extra accessory names
+     */
+    getExtraAccessories() {
+        if (!this.loaded || !this.peltInfo) {
+            return [];
+        }
+        return this.peltInfo.extra_accessories ? [...this.peltInfo.extra_accessories] : [];
+    }
     
     /**
      * Get all scars

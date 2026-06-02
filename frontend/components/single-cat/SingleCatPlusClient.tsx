@@ -25,6 +25,7 @@ import {
   getAvailablePoseNames,
   getRandomSelectablePoseNames,
 } from "@/lib/cat-v3/poseOptions";
+import { getRandomAccessoryPool } from "@/lib/cat-v3/randomAccessories";
 import type { CatParams } from "@/lib/cat-v3/types";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
@@ -315,6 +316,7 @@ interface SpriteMapperApi {
   getPoints?: () => string[];
   getVitiligo?: () => string[];
   getAccessories?: () => string[];
+  getExtraAccessories?: () => string[];
   getScars?: () => string[];
   getPoseNames?: () => string[];
   getRenderablePoseNames?: () => string[];
@@ -1258,6 +1260,7 @@ async function buildParameterOptions(
   mapper: SpriteMapperApi,
   includeBaseColours: boolean,
   extendedModes: ExtendedMode[],
+  includeNewSprites: boolean,
 ): Promise<ParameterOptions> {
   if (!mapper.loaded) {
     await mapper.init();
@@ -1298,9 +1301,11 @@ async function buildParameterOptions(
   const whitePatches = invokeMapperArray(mapper, mapper.getWhitePatches);
   const points = invokeMapperArray(mapper, mapper.getPoints);
   const vitiligo = invokeMapperArray(mapper, mapper.getVitiligo);
-  const accessories = invokeMapperArray(mapper, mapper.getAccessories);
+  const accessories = getRandomAccessoryPool(mapper, includeNewSprites);
   const scars = invokeMapperArray(mapper, mapper.getScars);
-  const poseNames = getRandomSelectablePoseNames(mapper);
+  const poseNames = getRandomSelectablePoseNames(mapper, {
+    includeNewSprites,
+  });
 
   return {
     sprite: poseNames,
@@ -1423,6 +1428,7 @@ interface SettingsCodeSectionProps {
   exactLayerCounts: boolean;
   afterlifeMode: AfterlifeOption;
   includeBaseColours: boolean;
+  includeNewSprites: boolean;
   extendedModes: Set<ExtendedMode>;
   onApply: (portable: SingleCatPortableSettings) => void;
 }
@@ -1434,6 +1440,7 @@ function SettingsCodeSection({
   exactLayerCounts,
   afterlifeMode,
   includeBaseColours,
+  includeNewSprites,
   extendedModes,
   onApply,
 }: SettingsCodeSectionProps) {
@@ -1450,6 +1457,7 @@ function SettingsCodeSection({
         exactLayerCounts,
         afterlifeMode,
         includeBaseColours,
+        includeNewSprites,
         extendedModes: Array.from(extendedModes),
       }),
     [
@@ -1459,6 +1467,7 @@ function SettingsCodeSection({
       exactLayerCounts,
       afterlifeMode,
       includeBaseColours,
+      includeNewSprites,
       extendedModes,
     ],
   );
@@ -1622,6 +1631,7 @@ export function SingleCatPlusClient({
         exactLayerCounts: initialCodeSettings.exactLayerCounts,
         afterlifeMode: initialCodeSettings.afterlifeMode,
         includeBaseColours: initialCodeSettings.includeBaseColours,
+        includeNewSprites: initialCodeSettings.includeNewSprites,
         extendedModes: [...initialCodeSettings.extendedModes],
       };
     }
@@ -1748,6 +1758,9 @@ export function SingleCatPlusClient({
   const [includeBaseColours, setIncludeBaseColours] = useState(
     initialSettings.includeBaseColours,
   );
+  const [includeNewSprites, setIncludeNewSprites] = useState(
+    initialSettings.includeNewSprites,
+  );
   const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(
     () => new Set(initialSettings.extendedModes),
   );
@@ -1848,6 +1861,7 @@ export function SingleCatPlusClient({
       afterlifeMode,
       extendedModes: [...extendedModes].sort(),
       includeBaseColours,
+      includeNewSprites,
       catName: catNameDraft,
       creatorName: creatorNameDraft,
     }),
@@ -1862,6 +1876,7 @@ export function SingleCatPlusClient({
       afterlifeMode,
       extendedModes,
       includeBaseColours,
+      includeNewSprites,
       catNameDraft,
       creatorNameDraft,
     ],
@@ -1879,6 +1894,7 @@ export function SingleCatPlusClient({
       setAfterlifeMode(settings.afterlifeMode);
       setExtendedModes(new Set(settings.extendedModes));
       setIncludeBaseColours(settings.includeBaseColours);
+      setIncludeNewSprites(settings.includeNewSprites ?? false);
       setCatNameDraft(settings.catName);
       setCreatorNameDraft(settings.creatorName || defaultCreatorName);
     },
@@ -3030,6 +3046,7 @@ export function SingleCatPlusClient({
             mapperRef.current,
             includeBaseColours,
             extendedModesArray,
+            includeNewSprites,
           );
           const counts = deriveOptionCounts(parameterOptionsRef.current);
           optionCountsRef.current = counts;
@@ -3052,7 +3069,7 @@ export function SingleCatPlusClient({
     return () => {
       cancelled = true;
     };
-  }, [drawPlaceholder, includeBaseColours, extendedModesArray]);
+  }, [drawPlaceholder, includeBaseColours, extendedModesArray, includeNewSprites]);
 
   useEffect(() => {
     const mapper = mapperRef.current;
@@ -3063,6 +3080,7 @@ export function SingleCatPlusClient({
         mapper,
         includeBaseColours,
         extendedModesArray,
+        includeNewSprites,
       );
       if (!cancelled) {
         parameterOptionsRef.current = options;
@@ -3074,7 +3092,7 @@ export function SingleCatPlusClient({
     return () => {
       cancelled = true;
     };
-  }, [includeBaseColours, extendedModesArray]);
+  }, [includeBaseColours, extendedModesArray, includeNewSprites]);
 
   useEffect(() => {
     return () => {
@@ -3113,13 +3131,14 @@ export function SingleCatPlusClient({
           mapperRef.current,
           includeBaseColours,
           extendedModesArray,
+          includeNewSprites,
         );
         const counts = deriveOptionCounts(parameterOptionsRef.current);
         optionCountsRef.current = counts;
         setOptionCounts(counts);
       }
       return mapperRef.current;
-    }, [includeBaseColours, extendedModesArray]);
+    }, [includeBaseColours, extendedModesArray, includeNewSprites]);
 
   // -------------------------------------------------------------------
   // Layer count spinner — reveals accessory/scar/tortie counts visually
@@ -3136,6 +3155,7 @@ export function SingleCatPlusClient({
       genOptions: {
         experimentalColourMode: string | string[];
         includeBaseColours: boolean;
+        includeNewSprites: boolean;
       },
       token: number,
     ) => {
@@ -3183,6 +3203,7 @@ export function SingleCatPlusClient({
           exactLayerCounts: true,
           experimentalColourMode: genOptions.experimentalColourMode,
           includeBaseColours: genOptions.includeBaseColours,
+          includeNewSprites: genOptions.includeNewSprites,
         });
         if (generationIdRef.current !== token) return;
 
@@ -3350,6 +3371,7 @@ export function SingleCatPlusClient({
         experimentalColourMode: experimentalMode,
         whitePatchColourMode: "default",
         includeBaseColours,
+        includeNewSprites,
       });
 
       if (generationIdRef.current !== token) return;
@@ -3461,6 +3483,7 @@ export function SingleCatPlusClient({
           {
             experimentalColourMode: experimentalMode,
             includeBaseColours,
+            includeNewSprites,
           },
           token,
         );
@@ -3932,6 +3955,7 @@ export function SingleCatPlusClient({
     ensureMapperReady,
     extendedModesArray,
     includeBaseColours,
+    includeNewSprites,
     afterlifeMode,
     drawCanvas,
     renderCat,
@@ -4751,6 +4775,7 @@ export function SingleCatPlusClient({
                 exactLayerCounts={exactLayerCounts}
                 afterlifeMode={afterlifeMode}
                 includeBaseColours={includeBaseColours}
+                includeNewSprites={includeNewSprites}
                 extendedModes={extendedModes}
                 onApply={(portable) => {
                   setAccessoryRange(portable.accessoryRange);
@@ -4759,6 +4784,7 @@ export function SingleCatPlusClient({
                   setExactLayerCounts(portable.exactLayerCounts);
                   setAfterlifeMode(portable.afterlifeMode);
                   setIncludeBaseColours(portable.includeBaseColours);
+                  setIncludeNewSprites(portable.includeNewSprites);
                   setExtendedModes(new Set(portable.extendedModes));
                 }}
               />

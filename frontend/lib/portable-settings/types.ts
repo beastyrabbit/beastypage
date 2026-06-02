@@ -18,5 +18,6 @@ export interface SingleCatPortableSettings {
   exactLayerCounts: boolean;
   afterlifeMode: AfterlifeOption;
   includeBaseColours: boolean;
+  includeNewSprites: boolean;
   extendedModes: ExtendedMode[];
 }

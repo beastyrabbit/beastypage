@@ -98,6 +98,7 @@ function AfterlifeComparison({
         exactLayerCounts: settings.exactLayerCounts,
         experimentalColourMode,
         includeBaseColours: settings.includeBaseColours,
+        includeNewSprites: settings.includeNewSprites,
       });
 
       for (let i = 0; i < VARIANTS.length; i++) {

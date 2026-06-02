@@ -57,7 +57,11 @@ const AFTERLIFE_INDEX = new Map<string, number>(
 
 const MAX_RANGE_VALUE = 4;
 const PALETTE_LOW_BITS = 27;
-const PALETTE_BIT_CAPACITY = 74;
+const PALETTE_RAW_BIT_CAPACITY = 74;
+const INCLUDE_NEW_SPRITES_PALETTE_BIT = 70;
+const CUSTOM_PALETTE_BITS = new Set([INCLUDE_NEW_SPRITES_PALETTE_BIT]);
+const PALETTE_BIT_CAPACITY =
+  PALETTE_RAW_BIT_CAPACITY - CUSTOM_PALETTE_BITS.size;
 
 function isRangeValue(value: number): boolean {
   return Number.isInteger(value) && value >= 0 && value <= MAX_RANGE_VALUE;
@@ -85,63 +89,78 @@ function decodeRange(index: number): LayerRange {
   return { min: entry[0], max: entry[1] };
 }
 
+function paletteIndexToPayloadBit(index: number): number {
+  let payloadBit = index;
+  for (const customBit of CUSTOM_PALETTE_BITS) {
+    if (payloadBit >= customBit) payloadBit += 1;
+  }
+  return payloadBit;
+}
+
+function hasPalettePayloadBit(low: number, high: number, bit: number): boolean {
+  if (bit < PALETTE_LOW_BITS) {
+    return Math.floor(low / 2 ** bit) % 2 === 1;
+  }
+  return Math.floor(high / 2 ** (bit - PALETTE_LOW_BITS)) % 2 === 1;
+}
+
 /**
  * Encode palette selections into [low27, high47] pair.
  *
- * Palette bitmask starts at bit 21 of the 96-bit value. It straddles the
+ * Palette/custom flag bitmask starts at bit 21 of the 96-bit value. It straddles the
  * lower/upper boundary:
  *   paletteLow  = bits 21-47 -> 27 bits
  *   paletteHigh = bits 48-94 -> 47 bits
+ *
+ * Payload bit 70 is reserved for includeNewSprites, so palette registry index
+ * 70 and later are mapped to the next available payload bits.
  */
 function encodePaletteMask(modes: readonly ExtendedMode[]): [number, number] {
   let low = 0;
   let high = 0;
   const modeSet = new Set(modes);
-  const len = Math.min(PORTABLE_PALETTE_REGISTRY.length, 74);
+  const len = Math.min(PORTABLE_PALETTE_REGISTRY.length, PALETTE_BIT_CAPACITY);
 
-  for (let i = 0; i < Math.min(len, 27); i++) {
-    if (modeSet.has(PORTABLE_PALETTE_REGISTRY[i])) low += 2 ** i;
-  }
-  for (let i = 27; i < len; i++) {
-    if (modeSet.has(PORTABLE_PALETTE_REGISTRY[i])) high += 2 ** (i - 27);
+  for (let i = 0; i < len; i++) {
+    if (!modeSet.has(PORTABLE_PALETTE_REGISTRY[i])) continue;
+    const payloadBit = paletteIndexToPayloadBit(i);
+    if (payloadBit < PALETTE_LOW_BITS) {
+      low += 2 ** payloadBit;
+    } else {
+      high += 2 ** (payloadBit - PALETTE_LOW_BITS);
+    }
   }
   return [low, high];
 }
 
 function decodePaletteMask(low: number, high: number): ExtendedMode[] {
   const modes: ExtendedMode[] = [];
-  const len = Math.min(PORTABLE_PALETTE_REGISTRY.length, 74);
+  const len = Math.min(PORTABLE_PALETTE_REGISTRY.length, PALETTE_BIT_CAPACITY);
 
-  for (let i = 0; i < Math.min(len, 27); i++) {
-    if (Math.floor(low / 2 ** i) % 2 === 1) {
-      modes.push(PORTABLE_PALETTE_REGISTRY[i]);
-    }
-  }
-  for (let i = 27; i < len; i++) {
-    if (Math.floor(high / 2 ** (i - 27)) % 2 === 1) {
+  for (let i = 0; i < len; i++) {
+    if (hasPalettePayloadBit(low, high, paletteIndexToPayloadBit(i))) {
       modes.push(PORTABLE_PALETTE_REGISTRY[i]);
     }
   }
   return modes;
 }
 
-function hasBitsAtOrAbove(value: number, startBit: number): boolean {
-  if (startBit <= 0) return value !== 0;
-  return Math.floor(value / 2 ** startBit) > 0;
-}
-
 function hasUnusedPaletteBits(low: number, high: number): boolean {
-  const usedBits = Math.min(
+  const allowedBits = new Set<number>(CUSTOM_PALETTE_BITS);
+  const usedPaletteBits = Math.min(
     PORTABLE_PALETTE_REGISTRY.length,
     PALETTE_BIT_CAPACITY,
   );
-
-  if (usedBits < PALETTE_LOW_BITS && hasBitsAtOrAbove(low, usedBits)) {
-    return true;
+  for (let i = 0; i < usedPaletteBits; i++) {
+    allowedBits.add(paletteIndexToPayloadBit(i));
   }
 
-  const usedHighBits = Math.max(0, usedBits - PALETTE_LOW_BITS);
-  return hasBitsAtOrAbove(high, usedHighBits);
+  for (let bit = 0; bit < PALETTE_RAW_BIT_CAPACITY; bit++) {
+    if (hasPalettePayloadBit(low, high, bit) && !allowedBits.has(bit)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // 6 words x 16 bits = 96 bits. The value is split into two safe 48-bit halves.
@@ -165,6 +184,9 @@ export function packPayload(
   const afterlifeIdx = (AFTERLIFE_INDEX.get(settings.afterlifeMode) ?? 0) & 0xf;
   const baseBit = settings.includeBaseColours ? 1 : 0;
   const reservedModeBit = settings.exactLayerCounts ? 0 : 1;
+  const includeNewSpritesBit = settings.includeNewSprites
+    ? 2 ** (INCLUDE_NEW_SPRITES_PALETTE_BIT - PALETTE_LOW_BITS)
+    : 0;
 
   const [paletteLow, paletteHigh] = encodePaletteMask(settings.extendedModes);
 
@@ -177,7 +199,8 @@ export function packPayload(
     baseBit * POW20 +
     paletteLow * POW21;
 
-  const upper = paletteHigh + reservedModeBit * 2 ** 47;
+  const upper =
+    paletteHigh + includeNewSpritesBit + reservedModeBit * 2 ** 47;
 
   return [
     lower % W,
@@ -217,6 +240,11 @@ export function unpackPayload(
   const paletteLow = Math.floor(lower / POW21);
   const reservedModeBit = Math.floor(upper / 2 ** 47) % 2;
   const paletteHigh = upper % 2 ** 47;
+  const includeNewSprites = hasPalettePayloadBit(
+    paletteLow,
+    paletteHigh,
+    INCLUDE_NEW_SPRITES_PALETTE_BIT,
+  );
 
   if (hasUnusedPaletteBits(paletteLow, paletteHigh)) return null;
 
@@ -227,6 +255,7 @@ export function unpackPayload(
     exactLayerCounts: reservedModeBit === 0,
     afterlifeMode: AFTERLIFE_TABLE[afterlifeIdx],
     includeBaseColours: includeBase,
+    includeNewSprites,
     extendedModes: decodePaletteMask(paletteLow, paletteHigh),
   };
 }

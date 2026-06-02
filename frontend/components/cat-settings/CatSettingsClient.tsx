@@ -32,6 +32,7 @@ const DEFAULTS: SingleCatPortableSettings = {
   exactLayerCounts: DEFAULT_SINGLE_CAT_SETTINGS.exactLayerCounts,
   afterlifeMode: DEFAULT_SINGLE_CAT_SETTINGS.afterlifeMode,
   includeBaseColours: DEFAULT_SINGLE_CAT_SETTINGS.includeBaseColours,
+  includeNewSprites: DEFAULT_SINGLE_CAT_SETTINGS.includeNewSprites,
   extendedModes: [...DEFAULT_SINGLE_CAT_SETTINGS.extendedModes],
 };
 
@@ -66,6 +67,9 @@ export function CatSettingsClient({
   const [includeBaseColours, setIncludeBaseColours] = useState(
     init.includeBaseColours,
   );
+  const [includeNewSprites, setIncludeNewSprites] = useState(
+    init.includeNewSprites,
+  );
   const [extendedModes, setExtendedModes] = useState<ExtendedMode[]>(
     init.extendedModes,
   );
@@ -85,6 +89,7 @@ export function CatSettingsClient({
       exactLayerCounts,
       afterlifeMode,
       includeBaseColours,
+      includeNewSprites,
       extendedModes,
     }),
     [
@@ -94,6 +99,7 @@ export function CatSettingsClient({
       exactLayerCounts,
       afterlifeMode,
       includeBaseColours,
+      includeNewSprites,
       extendedModes,
     ],
   );
@@ -147,6 +153,7 @@ export function CatSettingsClient({
     setExactLayerCounts(decoded.exactLayerCounts);
     setAfterlifeMode(decoded.afterlifeMode);
     setIncludeBaseColours(decoded.includeBaseColours);
+    setIncludeNewSprites(decoded.includeNewSprites);
     setExtendedModes(decoded.extendedModes);
     setCodeInput("");
   }, [codeInput]);
@@ -295,6 +302,19 @@ export function CatSettingsClient({
             </option>
           ))}
         </select>
+      </section>
+
+      {/* ─── New Sprites ─── */}
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
+        <label className="flex cursor-pointer items-center gap-2.5">
+          <input
+            type="checkbox"
+            checked={includeNewSprites}
+            onChange={(e) => setIncludeNewSprites(e.target.checked)}
+            className="size-4 rounded border-border accent-primary"
+          />
+          <span className="text-sm text-foreground">Include new sprites</span>
+        </label>
       </section>
 
       {/* ─── Colour Palettes ─── */}

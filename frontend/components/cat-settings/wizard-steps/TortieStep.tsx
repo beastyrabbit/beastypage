@@ -51,6 +51,7 @@ function TortieComparison({
         exactLayerCounts: settings.exactLayerCounts,
         experimentalColourMode,
         includeBaseColours: settings.includeBaseColours,
+        includeNewSprites: settings.includeNewSprites,
       });
 
       // Force tortie on
