@@ -37,6 +37,10 @@ export interface CatParams {
 }
 
 export interface RandomGenerationOptions {
+  /**
+   * @deprecated Legacy numeric-sprite flag retained for older callers. Pose
+   * filtering is now controlled by includeNewSprites.
+   */
   ignoreForbiddenSprites?: boolean;
   experimentalColourMode?: string | string[];
   includeBaseColours?: boolean;

@@ -97,14 +97,16 @@ class SpriteMapper {
                 '/sprite-data/poseData.json'
             ]);
 
+            if (!poseJson) {
+                throw new Error('Failed to load poseData via all paths');
+            }
+
             if (indexJson) {
                 this.spritesIndex = indexJson;
                 this.extractNamesFromIndex();
             }
-            if (poseJson) {
-                this.poseData = poseJson;
-                this.extractPoseData();
-            }
+            this.poseData = poseJson;
+            this.extractPoseData();
             if (peltJson) {
                 this.peltInfo = peltJson;
                 this.extractNamesFromPeltInfo();

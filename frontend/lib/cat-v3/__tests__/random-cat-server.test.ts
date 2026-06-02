@@ -114,10 +114,10 @@ describe("generateRandomParamsServer", () => {
     }
   });
 
-  it("keeps sprite override as numeric fallback only", async () => {
+  it("maps sprite override to the matching legacy pose", async () => {
     const params = await generateRandomParamsServer({ sprite: 7 });
     expect(params.spriteNumber).toBe(7);
-    expect(DEFAULT_VALID_POSES).toContain(params.poseName);
+    expect(params.poseName).toBe("adult_short1");
   });
 
   it("applies pose name override", async () => {
@@ -212,6 +212,7 @@ describe("generateRandomParamsServer", () => {
 
   it("ignores invalid sprite override", async () => {
     const params = await generateRandomParamsServer({ sprite: 999 });
+    expect(params.spriteNumber).not.toBe(999);
     expect(DEFAULT_VALID_POSES).toContain(params.poseName);
   });
 

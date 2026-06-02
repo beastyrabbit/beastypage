@@ -4,7 +4,14 @@ import { useMutation } from "convex/react";
 import { ArrowUpRight, Download, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
@@ -536,6 +543,48 @@ function wait(ms: number) {
   return new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+const DIALOG_FOCUS_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",");
+
+function handleManagedDialogKeyDown(
+  event: ReactKeyboardEvent<HTMLElement>,
+  closeDialog: () => void,
+) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeDialog();
+    return;
+  }
+
+  if (event.key !== "Tab") return;
+
+  const focusable = Array.from(
+    event.currentTarget.querySelectorAll<HTMLElement>(DIALOG_FOCUS_SELECTOR),
+  ).filter((element) => element.offsetParent !== null);
+
+  if (focusable.length === 0) {
+    event.preventDefault();
+    event.currentTarget.focus();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function formatValue(value: unknown): string {
@@ -1783,11 +1832,16 @@ export function SingleCatPlusClient({
   const [spriteVariations, setSpriteVariations] = useState<SpriteVariation[]>(
     [],
   );
+  const [spritePreviewLoading, setSpritePreviewLoading] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [hasTint, setHasTint] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [rollerExpanded, setRollerExpanded] = useState(false);
   const [spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
+  const spriteGalleryCloseRef = useRef<HTMLButtonElement | null>(null);
+  const spritePreviewTokenRef = useRef(0);
+  const timingTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const timingCloseRef = useRef<HTMLButtonElement | null>(null);
   const defaultCreatorName = useDefaultCreatorName();
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
   const [creatorNameDraft, setCreatorNameDraft] = useState(
@@ -1804,6 +1858,36 @@ export function SingleCatPlusClient({
       creatorFilledRef.current = true;
     }
   }, [defaultCreatorName, creatorNameDraft]);
+
+  useEffect(() => {
+    if (!spriteGalleryOpen) return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const focusTimer = window.setTimeout(() => {
+      spriteGalleryCloseRef.current?.focus();
+    }, 0);
+    return () => {
+      window.clearTimeout(focusTimer);
+      previousFocus?.focus();
+    };
+  }, [spriteGalleryOpen]);
+
+  useEffect(() => {
+    if (!timingModalOpen) return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const focusTimer = window.setTimeout(() => {
+      timingCloseRef.current?.focus();
+    }, 0);
+    return () => {
+      window.clearTimeout(focusTimer);
+      previousFocus?.focus();
+    };
+  }, [timingModalOpen]);
 
   const rollerValueClass = useMemo(() => {
     if (!rollerActiveValue) {
@@ -3338,7 +3422,9 @@ export function SingleCatPlusClient({
 
     setError(null);
     setShareLink(null);
+    spritePreviewTokenRef.current += 1;
     setSpriteVariations([]);
+    setSpritePreviewLoading(false);
     setParamRows([]);
     setRollerLabel(null);
     setRollerActiveValue(null);
@@ -3737,52 +3823,6 @@ export function SingleCatPlusClient({
 
       const catUrl = generator.buildCatURL?.(builderParams) ?? "";
 
-      const poseChoices = getAvailablePoseNames(mapper).map((poseName) => ({
-        id: `pose-${poseName}`,
-        poseName,
-        spriteNumber: params.spriteNumber ?? DEFAULT_SPRITE_NUMBER,
-        name: formatPoseName(poseName),
-      }));
-
-      const spritePreview = (
-        await Promise.all(
-          poseChoices.map(
-            async (poseChoice): Promise<SpriteVariation | null> => {
-              if (generationIdRef.current !== token) return null;
-              const spriteParams = {
-                ...params,
-                spriteNumber: poseChoice.spriteNumber,
-                poseName: poseChoice.poseName,
-              };
-              const result = await generator.generateCat(spriteParams);
-              const previewCanvas = document.createElement("canvas");
-              previewCanvas.width = 120;
-              previewCanvas.height = 120;
-              const previewCtx = previewCanvas.getContext("2d");
-              if (previewCtx) {
-                previewCtx.imageSmoothingEnabled = false;
-                previewCtx.drawImage(
-                  result.canvas as HTMLCanvasElement,
-                  0,
-                  0,
-                  120,
-                  120,
-                );
-              }
-              return {
-                id: poseChoice.id,
-                spriteNumber: poseChoice.spriteNumber,
-                poseName: poseChoice.poseName,
-                name: poseChoice.name,
-                dataUrl: previewCanvas.toDataURL("image/png"),
-              };
-            },
-          ),
-        )
-      ).filter((variation): variation is SpriteVariation => variation !== null);
-      if (generationIdRef.current !== token) return;
-      setSpriteVariations(spritePreview);
-
       // Persist refs/state for actions
       const nextState: CatState = {
         params,
@@ -4087,6 +4127,87 @@ export function SingleCatPlusClient({
     },
     [showToast],
   );
+
+  const closeSpriteGallery = useCallback(() => {
+    spritePreviewTokenRef.current += 1;
+    setSpritePreviewLoading(false);
+    setSpriteGalleryOpen(false);
+  }, []);
+
+  const generateSpritePreviews = useCallback(async () => {
+    const state = catStateRef.current;
+    const generator = generatorRef.current;
+    if (!state || !generator) return;
+
+    const mapper = await ensureMapperReady();
+    if (!mapper) return;
+
+    const previewToken = ++spritePreviewTokenRef.current;
+    setSpritePreviewLoading(true);
+    setSpriteVariations([]);
+
+    try {
+      const poseChoices = getAvailablePoseNames(mapper).map((poseName) => ({
+        id: `pose-${poseName}`,
+        poseName,
+        spriteNumber: state.params.spriteNumber ?? DEFAULT_SPRITE_NUMBER,
+        name: formatPoseName(poseName),
+      }));
+      const nextPreviews: SpriteVariation[] = [];
+
+      for (const poseChoice of poseChoices) {
+        if (spritePreviewTokenRef.current !== previewToken) return;
+        const spriteParams = {
+          ...state.params,
+          spriteNumber: poseChoice.spriteNumber,
+          poseName: poseChoice.poseName,
+        };
+        const result = await generator.generateCat(spriteParams);
+        if (spritePreviewTokenRef.current !== previewToken) return;
+        const previewCanvas = document.createElement("canvas");
+        previewCanvas.width = 120;
+        previewCanvas.height = 120;
+        const previewCtx = previewCanvas.getContext("2d");
+        if (previewCtx) {
+          previewCtx.imageSmoothingEnabled = false;
+          previewCtx.drawImage(
+            result.canvas as HTMLCanvasElement,
+            0,
+            0,
+            120,
+            120,
+          );
+        }
+        nextPreviews.push({
+          id: poseChoice.id,
+          spriteNumber: poseChoice.spriteNumber,
+          poseName: poseChoice.poseName,
+          name: poseChoice.name,
+          dataUrl: previewCanvas.toDataURL("image/png"),
+        });
+      }
+
+      if (spritePreviewTokenRef.current === previewToken) {
+        setSpriteVariations(nextPreviews);
+      }
+    } catch (error) {
+      console.error("Failed to generate sprite previews", error);
+      if (spritePreviewTokenRef.current === previewToken) {
+        setError("Failed to generate sprite previews. Please try again.");
+      }
+    } finally {
+      if (spritePreviewTokenRef.current === previewToken) {
+        setSpritePreviewLoading(false);
+      }
+    }
+  }, [ensureMapperReady]);
+
+  const handleOpenSpriteGallery = useCallback(() => {
+    setSpriteGalleryOpen(true);
+    if (spriteVariations.length === 0 && !spritePreviewLoading) {
+      void generateSpritePreviews();
+    }
+  }, [generateSpritePreviews, spritePreviewLoading, spriteVariations.length]);
 
   const buildShareUrl = useCallback(async () => {
     const state = catStateRef.current;
@@ -4645,6 +4766,7 @@ export function SingleCatPlusClient({
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <button
+                        ref={timingTriggerRef}
                         type="button"
                         onClick={() => setTimingModalOpen(true)}
                         className="flex-1 inline-flex items-center gap-2 rounded-full border border-border/60 px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:border-primary/60 hover:text-foreground"
@@ -4836,8 +4958,8 @@ export function SingleCatPlusClient({
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-60"
-              onClick={() => setSpriteGalleryOpen(true)}
-              disabled={spriteVariations.length === 0}
+              onClick={handleOpenSpriteGallery}
+              disabled={!canCopySprite}
             >
               View Sprite Gallery
             </button>
@@ -4848,104 +4970,114 @@ export function SingleCatPlusClient({
       {spriteGalleryOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setSpriteGalleryOpen(false);
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              setSpriteGalleryOpen(false);
-            }
-          }}
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
-          aria-label="Close sprite gallery"
-        >
-          <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setSpriteGalleryOpen(false)}
-              aria-label="Close sprite gallery"
-              className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) {
+                  closeSpriteGallery();
+                }
+              }}
+              onKeyDown={(event) =>
+                handleManagedDialogKeyDown(event, closeSpriteGallery)
+              }
+              role="dialog"
+              aria-modal="true"
+              tabIndex={-1}
+              aria-labelledby="sprite-gallery-title"
             >
-              <XIcon size={16} />
-            </button>
-            <div className="flex flex-col gap-6">
-              <div>
-                <h2 className="text-xl font-semibold text-foreground">
-                  Sprite Gallery
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Browse every sprite rendered for this cat and copy quick
-                  exports.
-                </p>
-              </div>
-              {spriteVariations.length === 0 ? (
-                <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
-                  Roll a cat to generate sprite previews.
-                </div>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {spriteVariations.map((variation) => (
-                    <div
-                      key={variation.id}
-                      className="rounded-2xl border border-border/40 bg-background/70 p-4"
+              <div className="relative flex max-h-[85vh] w-full max-w-5xl flex-col rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
+                <button
+                  ref={spriteGalleryCloseRef}
+                  type="button"
+                  onClick={closeSpriteGallery}
+                  aria-label="Close sprite gallery"
+                  className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
+                >
+                  <XIcon size={16} />
+                </button>
+                <div className="flex min-h-0 flex-col gap-6">
+                  <div>
+                    <h2
+                      id="sprite-gallery-title"
+                      className="text-xl font-semibold text-foreground"
                     >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-foreground">
-                          {variation.name}
-                        </p>
-                        <span className="text-xs text-muted-foreground">
-                          Named pose
-                        </span>
-                      </div>
-                      <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
-                        <Image
-                          src={variation.dataUrl}
-                          alt={variation.name}
-                          width={120}
-                          height={120}
-                          unoptimized
-                          className="mx-auto block h-28 w-28 image-render-pixel"
-                        />
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                          onClick={() =>
-                            handleCopySprite(
-                              variation.spriteNumber,
-                              120,
-                              variation.poseName ?? null,
-                              variation.name,
-                            )
-                          }
-                        >
-                          Copy 120×120
-                        </button>
-                        <button
-                          type="button"
-                          className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                          onClick={() =>
-                            handleCopySprite(
-                              variation.spriteNumber,
-                              FULL_EXPORT_SIZE,
-                              variation.poseName ?? null,
-                              variation.name,
-                            )
-                          }
-                        >
-                          Copy 700×700
-                        </button>
+                      Sprite Gallery
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Browse every sprite rendered for this cat and copy quick
+                      exports.
+                    </p>
+                  </div>
+                  {spritePreviewLoading ? (
+                    <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+                      Generating sprite previews...
+                    </div>
+                  ) : spriteVariations.length === 0 ? (
+                    <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+                      No sprite previews available.
+                    </div>
+                  ) : (
+                    <div className="min-h-0 overflow-y-auto pr-1">
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {spriteVariations.map((variation) => (
+                          <div
+                            key={variation.id}
+                            className="rounded-2xl border border-border/40 bg-background/70 p-4"
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-semibold text-foreground">
+                                {variation.name}
+                              </p>
+                              <span className="text-xs text-muted-foreground">
+                                Named pose
+                              </span>
+                            </div>
+                            <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
+                              <Image
+                                src={variation.dataUrl}
+                                alt={variation.name}
+                                width={120}
+                                height={120}
+                                unoptimized
+                                className="mx-auto block h-28 w-28 image-render-pixel"
+                              />
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                aria-label={`Copy ${variation.name} at 120 by 120 pixels`}
+                                className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
+                                onClick={() =>
+                                  handleCopySprite(
+                                    variation.spriteNumber,
+                                    120,
+                                    variation.poseName ?? null,
+                                    variation.name,
+                                  )
+                                }
+                              >
+                                Copy 120×120
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Copy ${variation.name} at ${FULL_EXPORT_SIZE} by ${FULL_EXPORT_SIZE} pixels`}
+                                className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
+                                onClick={() =>
+                                  handleCopySprite(
+                                    variation.spriteNumber,
+                                    FULL_EXPORT_SIZE,
+                                    variation.poseName ?? null,
+                                    variation.name,
+                                  )
+                                }
+                              >
+                                Copy 700×700
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </div>
           </div>
         </div>
       )}
@@ -4953,26 +5085,25 @@ export function SingleCatPlusClient({
       {timingModalOpen && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 py-10"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setTimingModalOpen(false);
-            }
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              setTimingModalOpen(false);
-            }
-          }}
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
-          aria-label="Close timing settings"
-        >
-          <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setTimingModalOpen(false)}
-              className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) {
+                  setTimingModalOpen(false);
+                }
+              }}
+              onKeyDown={(event) =>
+                handleManagedDialogKeyDown(event, () => setTimingModalOpen(false))
+              }
+              role="dialog"
+              aria-modal="true"
+              tabIndex={-1}
+              aria-labelledby="spin-timing-title"
+            >
+              <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
+                <button
+                  ref={timingCloseRef}
+                  type="button"
+                  onClick={() => setTimingModalOpen(false)}
+                  className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
               aria-label="Close timing settings"
             >
               <XIcon size={16} />
@@ -4980,7 +5111,10 @@ export function SingleCatPlusClient({
             <div className="max-h-[80vh] overflow-y-auto px-6 pb-8 pt-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-foreground">
+                  <h2
+                    id="spin-timing-title"
+                    className="text-lg font-semibold text-foreground"
+                  >
                     Spin Timing
                   </h2>
                   <p className="text-sm text-muted-foreground">

@@ -4,6 +4,14 @@
  * Loads combined sprite sheets instead of individual files
  */
 
+const SPECIAL_LEGACY_POSE_OFFSETS = {
+    para_adult_short0: { x: 0, y: 5 },
+    para_adult_long0: { x: 1, y: 5 },
+    para_young0: { x: 2, y: 5 },
+    sick_adult0: { x: 0, y: 6 },
+    sick_young0: { x: 1, y: 6 },
+};
+
 class SpriteSheetLoader {
     constructor() {
         // Cache loaded sprite sheets
@@ -48,7 +56,7 @@ class SpriteSheetLoader {
         };
 
         try {
-            if (this.spritesIndex && this.spritesOffsetMap) {
+            if (this.spritesIndex && this.spritesOffsetMap && this.poseData) {
                 return true;
             }
             // Try absolute then relative paths
@@ -64,18 +72,25 @@ class SpriteSheetLoader {
 
             if (!indexJson || !offsetJson) {
                 console.warn('Could not load sprite indices, falling back to individual files');
+                this.spritesIndex = null;
+                this.spritesOffsetMap = null;
+                this.normalizedIndex = null;
+                this.poseData = null;
+                return false;
+            }
+
+            if (!poseJson) {
+                console.warn('Could not load sprite pose data; all sprite rendering may be degraded (pose names unresolvable)');
+                this.spritesIndex = null;
+                this.spritesOffsetMap = null;
+                this.normalizedIndex = null;
+                this.poseData = null;
                 return false;
             }
 
             this.spritesIndex = indexJson;
             this.spritesOffsetMap = offsetJson;
             this.normalizedIndex = new Map(Object.keys(this.spritesIndex || {}).map(key => [key.toLowerCase(), key]));
-
-            if (!poseJson) {
-                console.warn('Could not load sprite pose data; all sprite rendering may be degraded (pose names unresolvable)');
-                return false;
-            }
-
             this.poseData = poseJson;
             
             console.log(`Loaded sprite sheet index with ${Object.keys(this.spritesIndex).length} sprite groups`);
@@ -152,10 +167,7 @@ class SpriteSheetLoader {
     legacyOffsetForPoseName(poseName) {
         const match = String(poseName || '').match(/^(newborn|kitten|adolescent_short|adult_short|adult_long|senior)([0-2])$/);
         if (!match) {
-            if (poseName === 'para_adult_short0') return { x: 0, y: 5 };
-            if (poseName === 'para_adult_long0') return { x: 1, y: 5 };
-            if (poseName === 'sick_adult0') return { x: 0, y: 6 };
-            return null;
+            return SPECIAL_LEGACY_POSE_OFFSETS[poseName] ?? null;
         }
 
         const [, group, variant] = match;

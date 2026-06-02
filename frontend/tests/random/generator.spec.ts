@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { legacySpriteNumberForPoseName } from "@/lib/cat-v3/poseOptions";
 import {
   generateRandomParamsV3,
   generateRandomParamsV3Detailed,
@@ -91,6 +92,27 @@ describe("random generator", () => {
     expect(params.colour).toEqual(expect.any(String));
     expect(params.eyeColour).toEqual(expect.any(String));
     expect(params.skinColour).toEqual(expect.any(String));
+  });
+
+  it("keeps generated pose names and sprite numbers coherent", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.15);
+    try {
+      const defaultResult = await generateRandomParamsV3Detailed();
+      expect(defaultResult.params.poseName).not.toMatch(/^adolescent_long/);
+      expect(defaultResult.params.spriteNumber).toBe(
+        legacySpriteNumberForPoseName(defaultResult.params.poseName) ?? 0,
+      );
+
+      const newSpriteResult = await generateRandomParamsV3Detailed({
+        includeNewSprites: true,
+      });
+      expect(newSpriteResult.params.poseName).toMatch(/^adolescent_long/);
+      expect(newSpriteResult.params.spriteNumber).toBe(
+        legacySpriteNumberForPoseName(newSpriteResult.params.poseName) ?? 0,
+      );
+    } finally {
+      randomSpy.mockRestore();
+    }
   });
 
   it("honors exact V3 slot overrides", async () => {

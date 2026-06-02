@@ -14,7 +14,11 @@ import {
   materializeStringSlots,
   materializeTortieSlots,
 } from "./slotMaterializer";
-import { isRandomSelectablePoseName } from "./poseOptions";
+import {
+  isRandomSelectablePoseName,
+  legacySpriteNumberForPoseName,
+  poseNameForLegacySpriteNumber,
+} from "./poseOptions";
 import { filterRandomAccessoryPool } from "./randomAccessories";
 import type { CatParams, RandomGenerationOptions } from "./types";
 
@@ -593,14 +597,15 @@ export async function generateRandomParamsServer(
   );
   if (!posePool.length) throw new Error("Pose pool is empty");
 
-  const poseName =
+  const poseNameOverride =
     overrides.poseName && posePool.includes(overrides.poseName)
       ? overrides.poseName
-      : pickOne(posePool);
-  const spriteNumber =
-    typeof overrides.sprite === "number" && Number.isFinite(overrides.sprite)
-      ? overrides.sprite
-      : 0;
+      : null;
+  const spritePoseName = poseNameForLegacySpriteNumber(overrides.sprite);
+  const spritePoseNameOverride =
+    spritePoseName && posePool.includes(spritePoseName) ? spritePoseName : null;
+  const poseName = poseNameOverride ?? spritePoseNameOverride ?? pickOne(posePool);
+  const spriteNumber = legacySpriteNumberForPoseName(poseName) ?? 0;
 
   const pelts = data.peltNames.filter((p) => p !== "Tortie" && p !== "Calico");
 

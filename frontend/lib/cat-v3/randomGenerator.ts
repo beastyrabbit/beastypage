@@ -3,7 +3,10 @@ import {
   materializeStringSlots,
   materializeTortieSlots,
 } from "./slotMaterializer";
-import { getRandomSelectablePoseNames } from "./poseOptions";
+import {
+  getRandomSelectablePoseNames,
+  legacySpriteNumberForPoseName,
+} from "./poseOptions";
 import { getRandomAccessoryPool } from "./randomAccessories";
 import type {
   CatParams,
@@ -286,7 +289,7 @@ export async function generateRandomParamsV3Detailed(
     throw new Error("Pose pool is empty; check poseData.json");
   }
   const poseName = pickOne(posePool);
-  const spriteNumber = 0;
+  const spriteNumber = legacySpriteNumberForPoseName(poseName) ?? 0;
 
   const experimentalMode = options.experimentalColourMode ?? "off";
   const colourPools = buildColourPools(

@@ -30,7 +30,6 @@ import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import {
   DEFAULT_POSE_NAME,
   formatPoseName,
-  getAvailablePoseNames,
   getRandomSelectablePoseNames,
 } from "@/lib/cat-v3/poseOptions";
 import { getRandomAccessoryPool } from "@/lib/cat-v3/randomAccessories";
@@ -110,14 +109,6 @@ const LAYER_PARAM_IDS = new Set([
   "tortiePattern",
   "tortieColour",
 ]);
-
-interface SpriteVariation {
-  id: string;
-  spriteNumber: number;
-  poseName: string;
-  name: string;
-  dataUrl: string;
-}
 
 interface VariationOption {
   raw: unknown;
@@ -1799,16 +1790,12 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     torties: [],
   });
   const [_rollSummary, setRollSummary] = useState<string | null>(null);
-  const [_spriteVariations, setSpriteVariations] = useState<SpriteVariation[]>(
-    [],
-  );
   const [_shareLink, setShareLink] = useState<string | null>(null);
   const [_hasTint, setHasTint] = useState(false);
   const [_toast, setToast] = useState<string | null>(null);
   const [flashParamId, setFlashParamId] = useState<ParamId | null>(null);
   const [flashLayerKey, setFlashLayerKey] = useState<string | null>(null);
   const [_rollerExpanded, setRollerExpanded] = useState(false);
-  const [_spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
   const defaultCreatorName = sessionSettings?.creatorName ?? "";
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
   const [creatorNameDraft, setCreatorNameDraft] = useState(
@@ -3675,7 +3662,6 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
 
     setError(null);
     setShareLink(null);
-    setSpriteVariations([]);
     initBoardRows();
     setRollerLabel(null);
     setRollerActiveValue(null);
@@ -3787,7 +3773,6 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         `Rolled → Accessories: ${countsResult.accessories} • Scars: ${countsResult.scars} • Tortie layers: ${countsResult.tortie}`,
       );
       setHasTint(Boolean(params.darkForest || params.dead));
-      setSpriteGalleryOpen(false);
 
       const uniqueAccessories: string[] = Array.from(
         new Set(
@@ -4124,52 +4109,6 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       builderParams.poseName = DEFAULT_POSE_NAME;
 
       const catUrl = generator.buildCatURL?.(builderParams) ?? "";
-
-      const poseChoices = getAvailablePoseNames(mapper).map((poseName) => ({
-        id: `pose-${poseName}`,
-        poseName,
-        spriteNumber: params.spriteNumber ?? DEFAULT_SPRITE_NUMBER,
-        name: formatPoseName(poseName),
-      }));
-
-      const spritePreview = (
-        await Promise.all(
-          poseChoices.map(
-            async (poseChoice): Promise<SpriteVariation | null> => {
-              if (generationIdRef.current !== token) return null;
-              const spriteParams = {
-                ...params,
-                spriteNumber: poseChoice.spriteNumber,
-                poseName: poseChoice.poseName,
-              };
-              const result = await generator.generateCat(spriteParams);
-              const previewCanvas = document.createElement("canvas");
-              previewCanvas.width = 120;
-              previewCanvas.height = 120;
-              const previewCtx = previewCanvas.getContext("2d");
-              if (previewCtx) {
-                previewCtx.imageSmoothingEnabled = false;
-                previewCtx.drawImage(
-                  result.canvas as HTMLCanvasElement,
-                  0,
-                  0,
-                  120,
-                  120,
-                );
-              }
-              return {
-                id: poseChoice.id,
-                spriteNumber: poseChoice.spriteNumber,
-                poseName: poseChoice.poseName,
-                name: poseChoice.name,
-                dataUrl: previewCanvas.toDataURL("image/png"),
-              };
-            },
-          ),
-        )
-      ).filter((variation): variation is SpriteVariation => variation !== null);
-      if (generationIdRef.current !== token) return;
-      setSpriteVariations(spritePreview);
 
       // Persist refs/state for actions
       const nextState: CatState = {
