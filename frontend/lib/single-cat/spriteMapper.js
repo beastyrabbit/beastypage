@@ -131,7 +131,11 @@ class SpriteMapper {
         this.poseNames = Array.isArray(this.poseData.poses) ? [...this.poseData.poses] : [];
         this.renderablePoseNames = Array.isArray(this.poseData.renderablePoseNames)
             ? [...this.poseData.renderablePoseNames]
-            : this.poseNames.filter(name => !String(name).startsWith('newborn') && !String(name).startsWith('kitten'));
+            : this.poseNames.filter(name =>
+                !String(name).startsWith('newborn')
+                && !String(name).startsWith('kitten')
+                && !String(name).startsWith('adolescent_long')
+            );
     }
     
     /**

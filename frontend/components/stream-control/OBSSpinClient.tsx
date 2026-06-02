@@ -4102,37 +4102,50 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
 
       const catUrl = generator.buildCatURL?.(builderParams) ?? "";
 
-      const spritePreview: SpriteVariation[] = [];
-      for (const poseName of getAvailablePoseNames(mapper)) {
-        if (generationIdRef.current !== token) return;
-        const spriteParams = {
-          ...params,
-          spriteNumber: params.spriteNumber ?? DEFAULT_SPRITE_NUMBER,
-          poseName,
-        };
-        const result = await generator.generateCat(spriteParams);
-        const previewCanvas = document.createElement("canvas");
-        previewCanvas.width = 120;
-        previewCanvas.height = 120;
-        const previewCtx = previewCanvas.getContext("2d");
-        if (previewCtx) {
-          previewCtx.imageSmoothingEnabled = false;
-          previewCtx.drawImage(
-            result.canvas as HTMLCanvasElement,
-            0,
-            0,
-            120,
-            120,
-          );
-        }
-        spritePreview.push({
-          id: `pose-${poseName}`,
-          spriteNumber: spriteParams.spriteNumber,
-          poseName,
-          name: formatPoseName(poseName),
-          dataUrl: previewCanvas.toDataURL("image/png"),
-        });
-      }
+      const poseChoices = getAvailablePoseNames(mapper).map((poseName) => ({
+        id: `pose-${poseName}`,
+        poseName,
+        spriteNumber: params.spriteNumber ?? DEFAULT_SPRITE_NUMBER,
+        name: formatPoseName(poseName),
+      }));
+
+      const spritePreview = (
+        await Promise.all(
+          poseChoices.map(
+            async (poseChoice): Promise<SpriteVariation | null> => {
+              if (generationIdRef.current !== token) return null;
+              const spriteParams = {
+                ...params,
+                spriteNumber: poseChoice.spriteNumber,
+                poseName: poseChoice.poseName,
+              };
+              const result = await generator.generateCat(spriteParams);
+              const previewCanvas = document.createElement("canvas");
+              previewCanvas.width = 120;
+              previewCanvas.height = 120;
+              const previewCtx = previewCanvas.getContext("2d");
+              if (previewCtx) {
+                previewCtx.imageSmoothingEnabled = false;
+                previewCtx.drawImage(
+                  result.canvas as HTMLCanvasElement,
+                  0,
+                  0,
+                  120,
+                  120,
+                );
+              }
+              return {
+                id: poseChoice.id,
+                spriteNumber: poseChoice.spriteNumber,
+                poseName: poseChoice.poseName,
+                name: poseChoice.name,
+                dataUrl: previewCanvas.toDataURL("image/png"),
+              };
+            },
+          ),
+        )
+      ).filter((variation): variation is SpriteVariation => variation !== null);
+      if (generationIdRef.current !== token) return;
       setSpriteVariations(spritePreview);
 
       // Persist refs/state for actions
