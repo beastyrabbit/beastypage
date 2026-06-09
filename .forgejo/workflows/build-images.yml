@@ -33,7 +33,7 @@ permissions:
   contents: read
 
 env:
-  REGISTRY: ghcr.io
+  REGISTRY: git.heerlab.com
   OWNER: ${{ github.repository_owner }}
 
 jobs:
