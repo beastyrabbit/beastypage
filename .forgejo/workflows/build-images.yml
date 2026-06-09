@@ -55,20 +55,43 @@ jobs:
       discord_bot: ${{ steps.filter.outputs.discord_bot }}
     steps:
       - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v4
-        id: filter
         with:
-          filters: |
-            frontend:
-              - 'frontend/**'
-            convex:
-              - 'frontend/convex/**'
-            renderer:
-              - 'backend/renderer_service/**'
-            image_processing:
-              - 'backend/image_processing_service/**'
-            discord_bot:
-              - 'backend/discord-bot/**'
+          fetch-depth: 0
+      - name: Detect changed paths
+        id: filter
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          base="$BEFORE_SHA"
+          head="$HEAD_SHA"
+          if [ -z "$base" ] || [ "$base" = "null" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-list --max-parents=0 "$head")"
+          fi
+
+          changed="$(git diff --name-only "$base" "$head" || git diff --name-only HEAD~1 HEAD || true)"
+
+          has_changed() {
+            printf '%s\n' "$changed" | grep -Eq "$1"
+          }
+
+          set_output() {
+            name="$1"
+            pattern="$2"
+            if has_changed "$pattern"; then
+              echo "$name=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$name=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          set_output frontend '^frontend/'
+          set_output convex '^frontend/convex/'
+          set_output renderer '^backend/renderer_service/'
+          set_output image_processing '^backend/image_processing_service/'
+          set_output discord_bot '^backend/discord-bot/'
 
   # Tags don't have path-filter outputs, so compute whether Convex changed
   # since the previous release tag before deciding to deploy.
