@@ -29,12 +29,18 @@ on:
         type: boolean
         default: false
 
+enable-openid-connect: true
+
 permissions:
   contents: read
 
 env:
   REGISTRY: git.heerlab.com
   OWNER: ${{ github.repository_owner }}
+  INFISICAL_API_URL: ${{ vars.INFISICAL_API_URL }}
+  INFISICAL_PROJECT_ID: ${{ vars.INFISICAL_PROJECT_ID }}
+  INFISICAL_ENV: ${{ vars.INFISICAL_ENV }}
+  INFISICAL_MACHINE_IDENTITY_ID: ${{ vars.INFISICAL_MACHINE_IDENTITY_ID }}
 
 jobs:
   # Only run path filtering on main branch pushes, not on tags
@@ -133,9 +139,61 @@ jobs:
 
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Fetch Convex deploy secret from Infisical
+        id: ci-secrets
+        env:
+          REQUIRED_KEYS: CONVEX_DEPLOY_KEY
+        run: |
+          set -euo pipefail
+          : "${INFISICAL_API_URL:?Missing INFISICAL_API_URL Forgejo variable}"
+          : "${INFISICAL_PROJECT_ID:?Missing INFISICAL_PROJECT_ID Forgejo variable}"
+          : "${INFISICAL_ENV:?Missing INFISICAL_ENV Forgejo variable}"
+          : "${INFISICAL_MACHINE_IDENTITY_ID:?Missing INFISICAL_MACHINE_IDENTITY_ID Forgejo variable}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?Missing Forgejo OIDC request token}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?Missing Forgejo OIDC request URL}"
+
+          export npm_config_prefix="$RUNNER_TEMP/npm-global"
+          mkdir -p "$npm_config_prefix"
+          npm install --global @infisical/cli@0.43.91
+          export PATH="$npm_config_prefix/bin:$PATH"
+
+          oidc_response="$(curl -fsS \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://git.heerlab.com/beasty")"
+          forgejo_jwt="$(node -e 'const fs = require("fs"); const body = JSON.parse(fs.readFileSync(0, "utf8")); process.stdout.write(body.value || "");' <<< "$oidc_response")"
+          : "${forgejo_jwt:?Forgejo OIDC response did not include a token}"
+
+          infisical_token="$(infisical login \
+            --method oidc-auth \
+            --machine-identity-id "$INFISICAL_MACHINE_IDENTITY_ID" \
+            --jwt "$forgejo_jwt" \
+            --domain "$INFISICAL_API_URL" \
+            --plain \
+            --silent)"
+          : "${infisical_token:?Infisical OIDC login returned an empty token}"
+          echo "::add-mask::$infisical_token"
+
+          for key in $REQUIRED_KEYS; do
+            value="$(infisical secrets get "$key" \
+              --domain "$INFISICAL_API_URL" \
+              --token "$infisical_token" \
+              --projectId "$INFISICAL_PROJECT_ID" \
+              --env "$INFISICAL_ENV" \
+              --path /ci \
+              --plain \
+              --silent)"
+            : "${value:?Missing $key in Infisical prod /ci}"
+            echo "::add-mask::$value"
+            {
+              echo "$key<<EOF"
+              printf '%s\n' "$value"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          done
+
       - run: pnpm exec convex deploy
         env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          CONVEX_DEPLOY_KEY: ${{ steps.ci-secrets.outputs.CONVEX_DEPLOY_KEY }}
 
   build-frontend:
     needs: changes
@@ -152,16 +210,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install Docker CLI
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates docker.io
+          docker --version
+
       - uses: docker/setup-buildx-action@v4
         with:
           driver: remote
-          endpoint: tcp://buildkitd.arc-runners.svc.cluster.local:1234
+          endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
 
       - name: Extract metadata
         id: meta
@@ -174,6 +235,58 @@ jobs:
             type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Fetch frontend CI secrets from Infisical
+        id: ci-secrets
+        env:
+          REQUIRED_KEYS: CONVEX_DEPLOYMENT NEXT_PUBLIC_POSTHOG_KEY NEXT_PUBLIC_POSTHOG_HOST NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        run: |
+          set -euo pipefail
+          : "${INFISICAL_API_URL:?Missing INFISICAL_API_URL Forgejo variable}"
+          : "${INFISICAL_PROJECT_ID:?Missing INFISICAL_PROJECT_ID Forgejo variable}"
+          : "${INFISICAL_ENV:?Missing INFISICAL_ENV Forgejo variable}"
+          : "${INFISICAL_MACHINE_IDENTITY_ID:?Missing INFISICAL_MACHINE_IDENTITY_ID Forgejo variable}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?Missing Forgejo OIDC request token}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?Missing Forgejo OIDC request URL}"
+
+          export npm_config_prefix="$RUNNER_TEMP/npm-global"
+          mkdir -p "$npm_config_prefix"
+          npm install --global @infisical/cli@0.43.91
+          export PATH="$npm_config_prefix/bin:$PATH"
+
+          oidc_response="$(curl -fsS \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://git.heerlab.com/beasty")"
+          forgejo_jwt="$(node -e 'const fs = require("fs"); const body = JSON.parse(fs.readFileSync(0, "utf8")); process.stdout.write(body.value || "");' <<< "$oidc_response")"
+          : "${forgejo_jwt:?Forgejo OIDC response did not include a token}"
+
+          infisical_token="$(infisical login \
+            --method oidc-auth \
+            --machine-identity-id "$INFISICAL_MACHINE_IDENTITY_ID" \
+            --jwt "$forgejo_jwt" \
+            --domain "$INFISICAL_API_URL" \
+            --plain \
+            --silent)"
+          : "${infisical_token:?Infisical OIDC login returned an empty token}"
+          echo "::add-mask::$infisical_token"
+
+          for key in $REQUIRED_KEYS; do
+            value="$(infisical secrets get "$key" \
+              --domain "$INFISICAL_API_URL" \
+              --token "$infisical_token" \
+              --projectId "$INFISICAL_PROJECT_ID" \
+              --env "$INFISICAL_ENV" \
+              --path /ci \
+              --plain \
+              --silent)"
+            : "${value:?Missing $key in Infisical prod /ci}"
+            echo "::add-mask::$value"
+            {
+              echo "$key<<EOF"
+              printf '%s\n' "$value"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          done
+
       # Note: NEXT_PUBLIC_CONVEX_URL uses a placeholder at build time
       # and is injected at runtime via docker-entrypoint.sh
       - uses: docker/build-push-action@v7
@@ -183,10 +296,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
-            CONVEX_DEPLOYMENT=${{ secrets.CONVEX_DEPLOYMENT }}
-            NEXT_PUBLIC_POSTHOG_KEY=${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
-            NEXT_PUBLIC_POSTHOG_HOST=${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
-            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+            CONVEX_DEPLOYMENT=${{ steps.ci-secrets.outputs.CONVEX_DEPLOYMENT }}
+            NEXT_PUBLIC_POSTHOG_KEY=${{ steps.ci-secrets.outputs.NEXT_PUBLIC_POSTHOG_KEY }}
+            NEXT_PUBLIC_POSTHOG_HOST=${{ steps.ci-secrets.outputs.NEXT_PUBLIC_POSTHOG_HOST }}
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ steps.ci-secrets.outputs.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
             APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
 
   build-renderer:
@@ -204,16 +317,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install Docker CLI
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates docker.io
+          docker --version
+
       - uses: docker/setup-buildx-action@v4
         with:
           driver: remote
-          endpoint: tcp://buildkitd.arc-runners.svc.cluster.local:1234
+          endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
 
       - name: Extract metadata
         id: meta
@@ -247,16 +363,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install Docker CLI
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates docker.io
+          docker --version
+
       - uses: docker/setup-buildx-action@v4
         with:
           driver: remote
-          endpoint: tcp://buildkitd.arc-runners.svc.cluster.local:1234
+          endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
 
       - name: Extract metadata
         id: meta
@@ -290,16 +409,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install Docker CLI
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates docker.io
+          docker --version
+
       - uses: docker/setup-buildx-action@v4
         with:
           driver: remote
-          endpoint: tcp://buildkitd.arc-runners.svc.cluster.local:1234
+          endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
 
       - name: Extract metadata
         id: meta
