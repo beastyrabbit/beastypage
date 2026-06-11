@@ -1,0 +1,70 @@
+import type { PaletteCategory } from "../types";
+
+export const roseclanPalette: PaletteCategory = {
+  id: "roseclan",
+  label: "RoseClan",
+  description:
+    "Signature palette of RoseClan — thorn wine through raspberry and petal pink to pearl blossom, with coral and pollen accents",
+  colors: {
+    RSC_THORNWINE: { multiply: [54, 16, 30] },
+    RSC_ROSEWINE: { multiply: [86, 24, 46] },
+    RSC_MULBERRY: { multiply: [120, 34, 64] },
+    RSC_ROSESHADOW: { multiply: [120, 70, 95] },
+    RSC_DEEPROSE: { multiply: [152, 44, 84] },
+    RSC_LILACROSE: { multiply: [170, 120, 160] },
+    RSC_RASPBERRY: { multiply: [184, 54, 100] },
+    RSC_MAUVEBLOOM: { multiply: [196, 140, 170] },
+    RSC_FUCHSIAROSE: { multiply: [210, 66, 120] },
+    RSC_PINKBLOOM: { multiply: [228, 88, 140] },
+    RSC_PETALPINK: { multiply: [240, 116, 160] },
+    RSC_CORALKISS: { multiply: [246, 140, 130] },
+    RSC_BLOSSOMGLOW: { multiply: [246, 142, 178] },
+    RSC_PEACHROSE: { multiply: [248, 170, 150] },
+    RSC_SAKURAPINK: { multiply: [250, 168, 194] },
+    RSC_GOLDENPOLLEN: { multiply: [240, 200, 120] },
+    RSC_BLUSHPETAL: { multiply: [252, 192, 208] },
+    RSC_PALEPETAL: { multiply: [253, 214, 222] },
+    RSC_ROSEMIST: { multiply: [252, 230, 234] },
+    RSC_PEARLROSE: { multiply: [250, 240, 242] },
+    RSC_PETALDOT: {
+      pattern: {
+        type: "polkadot",
+        tileSize: 7,
+        background: [252, 192, 208],
+        foreground: [210, 66, 120],
+      },
+    },
+    RSC_SAKURAKANOKO: {
+      pattern: {
+        type: "kanoko",
+        tileSize: 8,
+        background: [152, 44, 84],
+        foreground: [250, 168, 194],
+      },
+    },
+    RSC_ROSEGINGHAM: {
+      pattern: {
+        type: "gingham",
+        tileSize: 8,
+        background: [253, 214, 222],
+        foreground: [184, 54, 100],
+      },
+    },
+    RSC_BLOOMQUATREFOIL: {
+      pattern: {
+        type: "quatrefoil",
+        tileSize: 10,
+        background: [250, 240, 242],
+        foreground: [228, 88, 140],
+      },
+    },
+    RSC_THORNSTRIPE: {
+      pattern: {
+        type: "pinstripe",
+        tileSize: 8,
+        background: [54, 16, 30],
+        foreground: [246, 142, 178],
+      },
+    },
+  },
+};

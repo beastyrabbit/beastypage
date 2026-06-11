@@ -1,0 +1,70 @@
+import type { PaletteCategory } from "../types";
+
+export const moonclanPalette: PaletteCategory = {
+  id: "moonclan",
+  label: "MoonClan",
+  description:
+    "Signature palette of MoonClan — eclipse night through slate-blue shadow to pearl moonlight and starglint",
+  colors: {
+    MNC_ECLIPSENIGHT: { multiply: [14, 16, 24] },
+    MNC_NIGHTSLATE: { multiply: [28, 32, 44] },
+    MNC_DUSKINDIGO: { multiply: [42, 48, 66] },
+    MNC_SHADOWBLUE: { multiply: [58, 66, 88] },
+    MNC_MOONSLATE: { multiply: [78, 88, 110] },
+    MNC_BLUEHOUR: { multiply: [86, 104, 140] },
+    MNC_TWILITGREY: { multiply: [100, 110, 130] },
+    MNC_CRATERGREY: { multiply: [110, 112, 118] },
+    MNC_SILVERBLUE: { multiply: [124, 134, 152] },
+    MNC_NIGHTLILAC: { multiply: [130, 128, 160] },
+    MNC_MOONSILVER: { multiply: [148, 158, 174] },
+    MNC_LUNARDUST: { multiply: [160, 158, 150] },
+    MNC_PALEMOON: { multiply: [174, 182, 196] },
+    MNC_GLOWSILVER: { multiply: [198, 206, 216] },
+    MNC_FROSTHALO: { multiply: [206, 216, 226] },
+    MNC_MOONMIST: { multiply: [218, 224, 232] },
+    MNC_GHOSTGLOW: { multiply: [226, 232, 240] },
+    MNC_PEARLLIGHT: { multiply: [234, 238, 242] },
+    MNC_STARGLINT: { multiply: [240, 242, 230] },
+    MNC_MOONWHITE: { multiply: [246, 248, 250] },
+    MNC_STARFIELD: {
+      pattern: {
+        type: "polkadot",
+        tileSize: 9,
+        background: [14, 16, 24],
+        foreground: [240, 242, 230],
+      },
+    },
+    MNC_MOONPINSTRIPE: {
+      pattern: {
+        type: "pinstripe",
+        tileSize: 8,
+        background: [28, 32, 44],
+        foreground: [198, 206, 216],
+      },
+    },
+    MNC_MISTWAKE: {
+      pattern: {
+        type: "tachiwaki",
+        tileSize: 10,
+        background: [42, 48, 66],
+        foreground: [174, 182, 196],
+      },
+    },
+    MNC_FROSTFLAKE: {
+      pattern: {
+        type: "nordic_snowflake",
+        tileSize: 11,
+        background: [58, 66, 88],
+        foreground: [234, 238, 242],
+      },
+    },
+    MNC_NIGHTPANE: {
+      pattern: {
+        type: "windowpane",
+        tileSize: 10,
+        background: [14, 16, 24],
+        foreground: [124, 134, 152],
+      },
+    },
+  },
+};

@@ -1,0 +1,70 @@
+import type { PaletteCategory } from "../types";
+
+export const steelclanPalette: PaletteCategory = {
+  id: "steelclan",
+  label: "SteelClan",
+  description:
+    "Signature palette of SteelClan — iron black to mirror chrome, with brass, copper, verdigris, and tempered-blue accents",
+  colors: {
+    STC_IRONBLACK: { multiply: [22, 24, 26] },
+    STC_FORGEDARK: { multiply: [38, 40, 44] },
+    STC_ANVILSHADOW: { multiply: [45, 50, 60] },
+    STC_GUNMETAL: { multiply: [56, 60, 66] },
+    STC_IRONGREY: { multiply: [78, 82, 90] },
+    STC_BLUEDSTEEL: { multiply: [70, 85, 110] },
+    STC_TEMPEREDBLUE: { multiply: [95, 115, 145] },
+    STC_STEELGREY: { multiply: [102, 108, 116] },
+    STC_MACHINEGREY: { multiply: [128, 134, 142] },
+    STC_POLISHEDSTEEL: { multiply: [156, 162, 170] },
+    STC_CHROMELIGHT: { multiply: [186, 192, 198] },
+    STC_SILVERPLATE: { multiply: [212, 216, 222] },
+    STC_MIRRORSHINE: { multiply: [236, 240, 244] },
+    STC_BRONZEDEEP: { multiply: [120, 80, 45] },
+    STC_RUSTPATINA: { multiply: [140, 75, 50] },
+    STC_COPPERWARM: { multiply: [165, 105, 65] },
+    STC_BRASSGLOW: { multiply: [180, 140, 70] },
+    STC_OXIDETEAL: { multiply: [70, 130, 125] },
+    STC_VERDIGRIS: { multiply: [100, 165, 150] },
+    STC_MOLTENCORE: { multiply: [220, 120, 50] },
+    STC_CHAINMAIL: {
+      pattern: {
+        type: "chainmail",
+        tileSize: 8,
+        background: [56, 60, 66],
+        foreground: [156, 162, 170],
+      },
+    },
+    STC_RIVETDOT: {
+      pattern: {
+        type: "polkadot",
+        tileSize: 7,
+        background: [38, 40, 44],
+        foreground: [186, 192, 198],
+      },
+    },
+    STC_GIRDERWEAVE: {
+      pattern: {
+        type: "herringbone",
+        tileSize: 8,
+        background: [78, 82, 90],
+        foreground: [128, 134, 142],
+      },
+    },
+    STC_PLATECHECK: {
+      pattern: {
+        type: "houndstooth",
+        tileSize: 8,
+        background: [212, 216, 222],
+        foreground: [45, 50, 60],
+      },
+    },
+    STC_COPPERPANE: {
+      pattern: {
+        type: "windowpane",
+        tileSize: 10,
+        background: [22, 24, 26],
+        foreground: [165, 105, 65],
+      },
+    },
+  },
+};

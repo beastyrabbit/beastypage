@@ -1,0 +1,74 @@
+import type { PaletteCategory } from "../types";
+
+export const flareclanPalette: PaletteCategory = {
+  id: "flareclan",
+  label: "FlareClan",
+  description:
+    "Signature palette of FlareClan — coal and ash through molten lava to white-hot sparks",
+  colors: {
+    FLC_COALHEART: { multiply: [18, 12, 10] },
+    FLC_CHARBLACK: { multiply: [32, 22, 16] },
+    FLC_ASHSMOKE: { multiply: [78, 64, 58] },
+    FLC_CINDERGREY: { multiply: [120, 100, 90] },
+    FLC_EMBERDEEP: { multiply: [96, 28, 14] },
+    FLC_EMBERCORE: { multiply: [140, 40, 16] },
+    FLC_RUSTFLAME: { multiply: [120, 55, 30] },
+    FLC_BURNTCOPPER: { multiply: [150, 70, 40] },
+    FLC_LAVAFLOW: { multiply: [180, 52, 18] },
+    FLC_DRAGONRED: { multiply: [190, 30, 30] },
+    FLC_MOLTENRED: { multiply: [205, 62, 24] },
+    FLC_FLAMEORANGE: { multiply: [228, 92, 30] },
+    FLC_BLAZEGOLD: { multiply: [240, 130, 40] },
+    FLC_FIREAMBER: { multiply: [246, 160, 56] },
+    FLC_PHOENIXGOLD: { multiply: [235, 175, 60] },
+    FLC_SUNSPARK: { multiply: [250, 186, 80] },
+    FLC_HEATGLOW: { multiply: [252, 206, 110] },
+    FLC_SMOKEROSE: { multiply: [180, 110, 92] },
+    FLC_WHITEHOT: { multiply: [250, 228, 170] },
+    FLC_SPARKLIGHT: { multiply: [248, 240, 210] },
+    FLC_FLAMECHEVRON: {
+      pattern: {
+        type: "chevron",
+        tileSize: 10,
+        background: [32, 22, 16],
+        foreground: [228, 92, 30],
+        spacing: 2,
+      },
+    },
+    FLC_EMBERSTRIPE: {
+      pattern: {
+        type: "diagonal",
+        tileSize: 8,
+        background: [96, 28, 14],
+        foreground: [240, 130, 40],
+      },
+    },
+    FLC_SPARKDOT: {
+      pattern: {
+        type: "polkadot",
+        tileSize: 7,
+        background: [18, 12, 10],
+        foreground: [250, 186, 80],
+      },
+    },
+    FLC_FORGETARTAN: {
+      pattern: {
+        type: "tartan",
+        tileSize: 10,
+        background: [140, 40, 16],
+        stripes: [
+          { color: [250, 186, 80], width: 2, offset: 0 },
+          { color: [32, 22, 16], width: 1, offset: 5 },
+        ],
+      },
+    },
+    FLC_ASHWEAVE: {
+      pattern: {
+        type: "basketweave",
+        tileSize: 8,
+        background: [78, 64, 58],
+        foreground: [205, 62, 24],
+      },
+    },
+  },
+};

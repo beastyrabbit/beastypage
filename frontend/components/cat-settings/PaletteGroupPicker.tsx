@@ -25,6 +25,7 @@ const FILTER_PILLS: { value: FilterValue; label: string }[] = [
   { value: "ornate", label: "Ornate" },
   { value: "heritage", label: "World Heritage" },
   { value: "flags", label: "Flags" },
+  { value: "clans", label: "Clan Signatures" },
 ];
 
 // ---------------------------------------------------------------------------

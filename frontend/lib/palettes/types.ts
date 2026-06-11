@@ -176,7 +176,18 @@ export type PaletteId =
   | "scandinavian-patterns"
   | "medieval-patterns"
   | "american-patterns"
-  | "famous-patterns";
+  | "famous-patterns"
+  // Clan signature palettes (evolution lines)
+  | "flareclan"
+  | "aquaclan"
+  | "leafclan"
+  | "sunclan"
+  | "roseclan"
+  | "moonclan"
+  | "voltclan"
+  | "crystalclan"
+  | "voidclan"
+  | "steelclan";
 
 /**
  * PaletteMode is 'off' (classic/original colours) or a specific palette ID
@@ -189,7 +200,8 @@ export type PaletteGroup =
   | "textile"
   | "ornate"
   | "heritage"
-  | "flags";
+  | "flags"
+  | "clans";
 
 export interface PaletteCategory {
   id: PaletteId;

@@ -12,6 +12,7 @@ import type { EvolutionArchetype } from "./evolutionGenerator";
 export const CLAN_PALETTES: Record<EvolutionArchetype, PaletteId[]> = {
   // ── controlled ──────────────────────────────────────────────────────
   flare: [
+    "flareclan",
     "crimson-flame",
     "ember-glow",
     "demonslayer",
@@ -21,6 +22,7 @@ export const CLAN_PALETTES: Record<EvolutionArchetype, PaletteId[]> = {
     "chinese-patterns",
   ],
   aqua: [
+    "aquaclan",
     "ocean-depths",
     "arctic-waters",
     "tropical-lagoon",
@@ -30,6 +32,7 @@ export const CLAN_PALETTES: Record<EvolutionArchetype, PaletteId[]> = {
     "scandinavian-patterns",
   ],
   leaf: [
+    "leafclan",
     "emerald-forest",
     "jade-mist",
     "mononoke",
@@ -40,6 +43,7 @@ export const CLAN_PALETTES: Record<EvolutionArchetype, PaletteId[]> = {
     "tartan-patterns",
   ],
   sun: [
+    "sunclan",
     "golden-hour",
     "desert-sand",
     "peach-sorbet",
@@ -49,6 +53,7 @@ export const CLAN_PALETTES: Record<EvolutionArchetype, PaletteId[]> = {
     "african-patterns",
   ],
   rose: [
+    "roseclan",
     "rose-garden",
     "coral-reef",
     "neon-blossom",
@@ -57,6 +62,7 @@ export const CLAN_PALETTES: Record<EvolutionArchetype, PaletteId[]> = {
     "gingham-patterns",
   ],
   moon: [
+    "moonclan",
     "greyscale",
     "storm-cloud",
     "ink-wash",
@@ -67,6 +73,7 @@ export const CLAN_PALETTES: Record<EvolutionArchetype, PaletteId[]> = {
   ],
   // ── wild ────────────────────────────────────────────────────────────
   volt: [
+    "voltclan",
     "electric-grass",
     "bold",
     "chevron-patterns",
@@ -75,6 +82,7 @@ export const CLAN_PALETTES: Record<EvolutionArchetype, PaletteId[]> = {
     "famous-patterns",
   ],
   crystal: [
+    "crystalclan",
     "mood",
     "howl",
     "royal-amethyst",
@@ -85,6 +93,7 @@ export const CLAN_PALETTES: Record<EvolutionArchetype, PaletteId[]> = {
     "indonesian-patterns",
   ],
   void: [
+    "voidclan",
     "blackout",
     "darker",
     "deathnote",
@@ -93,6 +102,7 @@ export const CLAN_PALETTES: Record<EvolutionArchetype, PaletteId[]> = {
     "medieval-patterns",
   ],
   steel: [
+    "steelclan",
     "cold-steel",
     "ghostintheshell",
     "savile-row",
