@@ -235,6 +235,9 @@ export function isWildArchetype(archetype: EvolutionArchetype): boolean {
 /** Chance that a wild clan ignores its palettes and rolls the full pool. */
 const WILD_OPEN_CHANCE = 0.5;
 
+/** Warrior rank per level, used for generated cat labels. */
+const STAGE_RANK_LABELS = ["Kit", "Apprentice", "Warrior", "Leader"] as const;
+
 const BASE_COLOUR_RGB: Record<string, [number, number, number]> = {
   WHITE: [238, 238, 232],
   PALEGREY: [190, 196, 198],
@@ -982,7 +985,7 @@ export function generateEvolutionBatch(
   }
   const starter: EvolutionGeneratedCat = {
     key: "starter",
-    label: "Starter",
+    label: "The Kit",
     branchIndex: null,
     branchLabel: null,
     level: 0,
@@ -1246,7 +1249,7 @@ export function generateEvolutionBatch(
       );
       cats.push({
         key: `branch-${branchIndex}-level-${level}`,
-        label: `Branch ${label} Evolution ${level}`,
+        label: `Line ${label} ${STAGE_RANK_LABELS[typedLevel]}`,
         branchIndex,
         branchLabel: label,
         level: typedLevel,

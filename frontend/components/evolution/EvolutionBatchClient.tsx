@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { ArrowUpRight, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   type AdoptionMetadata,
   AdoptionMetadataPanel,
@@ -19,8 +19,10 @@ import {
   isEvolutionBatchSettings,
 } from "@/lib/evolution/evolutionGenerator";
 import { cn } from "@/lib/utils";
+import { getArchetypeTheme, STARTER_THEME, withAlpha } from "./archetypes";
 import { EvolutionTree, type EvolutionTreeCat } from "./EvolutionTree";
-import { pixelFontClass } from "./evolutionDisplay";
+import { pixelFontClass, stageRank } from "./evolutionDisplay";
+import { NameField } from "./NameField";
 
 type EvolutionBatchClientProps = {
   slug: string;
@@ -304,6 +306,10 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
   );
 }
 
+function storedName(cat: EvolutionTreeCat) {
+  return cat.name === cat.label ? "" : cat.name;
+}
+
 function CatNameEditor({
   cats,
   onSave,
@@ -314,17 +320,63 @@ function CatNameEditor({
   onAutoname?: () => Promise<void>;
 }) {
   const [autonaming, setAutonaming] = useState(false);
+  const [savingAll, setSavingAll] = useState(false);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   if (!cats.length) return null;
+
+  const draftFor = (cat: EvolutionTreeCat) =>
+    drafts[cat.key] ?? storedName(cat);
+  const isDirty = (cat: EvolutionTreeCat) =>
+    draftFor(cat).trim() !== storedName(cat).trim();
+  const dirtyCats = cats.filter(isDirty);
+
+  const starter = cats.find((cat) => cat.level === 0) ?? null;
+  const lines: Array<{
+    branchLabel: string;
+    archetype: string | null;
+    cats: EvolutionTreeCat[];
+  }> = [];
+  for (const cat of cats) {
+    if (cat.level === 0 || !cat.branchLabel) continue;
+    let line = lines.find((entry) => entry.branchLabel === cat.branchLabel);
+    if (!line) {
+      line = {
+        branchLabel: cat.branchLabel,
+        archetype: cat.archetype,
+        cats: [],
+      };
+      lines.push(line);
+    }
+    line.cats.push(cat);
+  }
+  for (const line of lines) {
+    line.cats.sort((a, b) => a.level - b.level);
+  }
 
   const runAutoname = async () => {
     if (!onAutoname) return;
     try {
       setAutonaming(true);
       await onAutoname();
+      setDrafts({});
     } catch (error) {
       console.error("Failed to autoname lineage", error);
     } finally {
       setAutonaming(false);
+    }
+  };
+
+  const saveAll = async () => {
+    setSavingAll(true);
+    try {
+      for (const cat of dirtyCats) {
+        await onSave(cat, draftFor(cat));
+      }
+      setDrafts({});
+    } catch (error) {
+      console.error("Failed to save all names", error);
+    } finally {
+      setSavingAll(false);
     }
   };
 
@@ -334,82 +386,91 @@ function CatNameEditor({
         <span className="text-sm font-semibold text-foreground">
           Name the lineage
         </span>
-        {onAutoname ? (
+        <div className="flex items-center gap-2">
+          {onAutoname ? (
+            <button
+              type="button"
+              onClick={runAutoname}
+              disabled={autonaming || savingAll}
+              className="inline-flex items-center gap-2 rounded-lg border border-amber-300/50 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {autonaming ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <span aria-hidden>✨</span>
+              )}
+              Autoname
+            </button>
+          ) : null}
           <button
             type="button"
-            onClick={runAutoname}
-            disabled={autonaming}
-            className="inline-flex items-center gap-2 rounded-lg border border-amber-300/50 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={saveAll}
+            disabled={dirtyCats.length === 0 || savingAll || autonaming}
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-300/50 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-400/25 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {autonaming ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <span aria-hidden>✨</span>
-            )}
-            Autoname
+            {savingAll ? <Loader2 className="size-3.5 animate-spin" /> : null}
+            Save all
+            {dirtyCats.length > 0 ? ` (${dirtyCats.length})` : ""}
           </button>
-        ) : null}
+        </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {cats.map((cat) => (
-          <CatNameRow key={cat.key} cat={cat} onSave={onSave} />
-        ))}
+      <div className="flex flex-col gap-2">
+        {starter ? (
+          <div className="flex items-center gap-2">
+            <span
+              className="flex size-9 shrink-0 items-center justify-center rounded-lg border text-base"
+              style={{
+                borderColor: withAlpha(STARTER_THEME.from, 0.5),
+                background: withAlpha(STARTER_THEME.to, 0.15),
+              }}
+              title="The Kit"
+              aria-hidden
+            >
+              {STARTER_THEME.glyph}
+            </span>
+            <NameField
+              value={draftFor(starter)}
+              placeholder="Kit"
+              previewUrl={starter.previewUrl}
+              onChange={(value) =>
+                setDrafts((previous) => ({ ...previous, [starter.key]: value }))
+              }
+            />
+          </div>
+        ) : null}
+        {lines.map((line) => {
+          const theme = getArchetypeTheme(line.archetype);
+          return (
+            <div key={line.branchLabel} className="flex items-center gap-2">
+              <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg border text-base"
+                style={{
+                  borderColor: withAlpha(theme.from, 0.5),
+                  background: withAlpha(theme.to, 0.15),
+                }}
+                title={`${theme.label}Clan — Line ${line.branchLabel}`}
+                aria-hidden
+              >
+                {theme.glyph}
+              </span>
+              {line.cats.map((cat) => (
+                <NameField
+                  key={cat.key}
+                  value={draftFor(cat)}
+                  placeholder={stageRank(cat.level)}
+                  previewUrl={cat.previewUrl}
+                  onChange={(value) =>
+                    setDrafts((previous) => ({
+                      ...previous,
+                      [cat.key]: value,
+                    }))
+                  }
+                />
+              ))}
+            </div>
+          );
+        })}
       </div>
     </section>
-  );
-}
-
-function CatNameRow({
-  cat,
-  onSave,
-}: {
-  cat: EvolutionTreeCat;
-  onSave: (cat: EvolutionTreeCat, catName: string) => Promise<void>;
-}) {
-  const initial = cat.name === cat.label ? "" : cat.name;
-  const [name, setName] = useState(initial);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const dirty = name.trim() !== initial.trim();
-
-  // Keep the input in sync when names change elsewhere (e.g. autoname).
-  useEffect(() => {
-    setName(initial);
-  }, [initial]);
-
-  const submit = async () => {
-    try {
-      setSaving(true);
-      setMessage(null);
-      await onSave(cat, name);
-      setMessage("Saved");
-      window.setTimeout(() => setMessage(null), 1800);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <label className="flex flex-col gap-2 text-xs text-muted-foreground">
-      {cat.label}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Cat name"
-          className="min-w-0 flex-1 rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!dirty || saving}
-          className="inline-flex w-20 items-center justify-center rounded-lg border border-border/60 px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-foreground hover:text-background disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saving ? <Loader2 className="size-3 animate-spin" /> : "Save"}
-        </button>
-      </div>
-      {message ? <span className="text-emerald-300">{message}</span> : null}
-    </label>
   );
 }
