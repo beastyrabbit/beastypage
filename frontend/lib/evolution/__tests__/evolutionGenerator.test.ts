@@ -129,6 +129,20 @@ describe("evolution generation", () => {
     expect(wrapped).toEqual(flat);
   });
 
+  it("normalizes legacy flat tortie fields without tortie arrays", () => {
+    const legacy: CatParams = { ...starterParams };
+    delete legacy.tortie;
+
+    const normalized = normalizeEvolutionStarter(legacy);
+
+    expect(normalized.tortieSlots).toEqual([
+      { mask: "ONE", pattern: "SingleColour", colour: "BLACK" },
+    ]);
+    expect(normalized.params.tortie).toEqual([
+      { mask: "ONE", pattern: "SingleColour", colour: "BLACK" },
+    ]);
+  });
+
   it("preserves starter params and existing layers while appending cumulatively", () => {
     const original = JSON.stringify(starterParams);
     const result = generateEvolutionBatch(

@@ -1435,7 +1435,7 @@ class CatGenerator {
     /**
      * Method to generate random params with all sprites (including forbidden ones)
      */
-    async generateRandomParamsAllSprites() {
+    async generateRandomParamsAllSprites(options = {}) {
         // Ensure spriteMapper is initialized
         if (!spriteMapper.loaded) {
             console.warn('SpriteMapper not loaded, initializing...');
@@ -1449,7 +1449,18 @@ class CatGenerator {
         // Get data from spriteMapper including TwoColour
         const pelts = spriteMapper.getPeltNames()
             .filter(p => p !== 'Tortie' && p !== 'Calico');
-        const colours = spriteMapper.getColours();
+        let experimentalMode = options.experimentalColourMode;
+        if (experimentalMode === undefined) {
+            experimentalMode = options.experimentalColours ? ['bold'] : 'off';
+        }
+        if (Array.isArray(experimentalMode)) {
+            experimentalMode = experimentalMode.filter(Boolean);
+            if (experimentalMode.length === 0) {
+                experimentalMode = 'off';
+            }
+        }
+
+        const colours = spriteMapper.getColourOptions?.(experimentalMode) || spriteMapper.getColours();
         const eyeColours = spriteMapper.getEyeColours();
         const skinColours = spriteMapper.getSkinColours();
         const tints = spriteMapper.getTints(); // Includes 'none'
@@ -1529,10 +1540,10 @@ class CatGenerator {
             }
             
             // White patches tint - ALWAYS set in this branch
-        const whitePatchesTints = spriteMapper.getWhitePatchColourOptions(
-            options.whitePatchColourMode || 'default',
-            experimentalMode && experimentalMode !== 'off' ? experimentalMode : null
-        );
+            const whitePatchesTints = spriteMapper.getWhitePatchColourOptions(
+                options.whitePatchColourMode || 'default',
+                experimentalMode && experimentalMode !== 'off' ? experimentalMode : null
+            );
             const selectedTint = this.randomSelect(whitePatchesTints);
             if (selectedTint && selectedTint !== 'none') {
                 params.whitePatchesTint = selectedTint;
@@ -1675,8 +1686,7 @@ class CatGenerator {
         
         // Send to telemetry if configured
         if (this.config.telemetry) {
-            const stats = this.resources.spriteCache.getStats();
-            console.log(`Render completed in ${duration}ms, Cache hit rate: ${(stats.hitRate * 100).toFixed(1)}%`);
+            console.log(`Render completed in ${duration}ms`);
         }
     }
     
@@ -1756,8 +1766,7 @@ class CatGenerator {
     getMetrics() {
         return {
             totalGenerated: this.stats.totalGenerated,
-            averageTime: this.stats.averageTime,
-            cacheStats: this.resources?.spriteCache?.getStats() || {}
+            averageTime: this.stats.averageTime
         };
     }
     
@@ -1853,7 +1862,6 @@ class Telemetry {
     static metrics = {
         generationCount: 0,
         averageTime: 0,
-        cacheHitRate: 0,
         memoryPeaks: [],
         errors: []
     };
@@ -1863,12 +1871,11 @@ class Telemetry {
         setInterval(() => this.report(), 5 * 60 * 1000);
     }
     
-    static trackGeneration(duration, cacheStats) {
+    static trackGeneration(duration) {
         this.metrics.generationCount++;
         this.metrics.averageTime = 
             (this.metrics.averageTime * (this.metrics.generationCount - 1) + duration) 
             / this.metrics.generationCount;
-        this.metrics.cacheHitRate = cacheStats.hitRate;
         
         // Track memory
         if (performance.memory) {

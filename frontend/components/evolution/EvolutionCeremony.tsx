@@ -431,9 +431,28 @@ export function EvolutionCeremony({
           <span className={cn(pixelFontClass, "text-[9px] text-white/50")}>
             {autoPlay ? "TAP TO SKIP AHEAD" : "TAP TO ADVANCE"}
           </span>
-          <span className={cn(pixelFontClass, "text-[9px] text-white/50")}>
-            {revealedCount}/{totalCount}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                if (step.kind === "finale") onFinish();
+                else advance();
+              }}
+              className={cn(
+                pixelFontClass,
+                "rounded-md border border-white/15 bg-black/35 px-2 py-1 text-[8px] text-white/70 transition hover:border-white/40 hover:text-white",
+              )}
+              aria-label={
+                step.kind === "finale" ? "View the lineage" : "Advance ceremony"
+              }
+            >
+              {step.kind === "finale" ? "VIEW" : "ADVANCE"}
+            </button>
+            <span className={cn(pixelFontClass, "text-[9px] text-white/50")}>
+              {revealedCount}/{totalCount}
+            </span>
+          </div>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
           <motion.div

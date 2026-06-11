@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getPaletteIds } from "@/lib/palettes";
+import { getPaletteById, getPaletteIds } from "@/lib/palettes";
 import { buildClanColourSets, CLAN_PALETTES } from "../clanPalettes";
 import { CONTROLLED_ARCHETYPES, WILD_ARCHETYPES } from "../evolutionGenerator";
 
@@ -27,6 +27,25 @@ describe("clan palette assignment", () => {
     const colourSets = buildClanColourSets();
     for (const [clan, colours] of Object.entries(colourSets)) {
       expect(colours.length, `clan ${clan} has no colours`).toBeGreaterThan(10);
+    }
+  });
+
+  it("marks all clan palettes with the clan group", () => {
+    const clanPaletteIds = [
+      "flareclan",
+      "aquaclan",
+      "leafclan",
+      "sunclan",
+      "roseclan",
+      "moonclan",
+      "voltclan",
+      "crystalclan",
+      "voidclan",
+      "steelclan",
+    ] as const;
+
+    for (const id of clanPaletteIds) {
+      expect(getPaletteById(id)?.group, `${id} group`).toBe("clans");
     }
   });
 });

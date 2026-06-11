@@ -96,6 +96,8 @@ export default defineSchema({
     catData: v.any(),
     catName: v.optional(v.string()),
     creatorName: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
+    editToken: v.optional(v.string()),
     adoptionBatchId: v.optional(v.id("adoption_batch")),
     previewsUpdatedAt: v.optional(v.number()),
     createdAt: v.number(),

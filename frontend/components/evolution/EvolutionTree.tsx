@@ -3,7 +3,7 @@
 import { ArrowUpRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import XIcon from "@/components/ui/x-icon";
 import type {
   EvolutionAddition,
@@ -43,6 +43,26 @@ type EvolutionTreeProps = {
   /** Staggered entrance animation (used right after the ceremony). */
   animateIn?: boolean;
 };
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function trapDialogFocus(event: KeyboardEvent, container: HTMLElement | null) {
+  if (event.key !== "Tab" || !container) return;
+  const focusable = Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  );
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
 
 export function EvolutionTree({ cats, animateIn = false }: EvolutionTreeProps) {
   const [focused, setFocused] = useState<EvolutionTreeCat | null>(null);
@@ -359,6 +379,27 @@ function CatDetailModal({
     cat.additions,
     `${cat.key}-modal`,
   );
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const titleId = `${cat.key}-preview-title`;
+
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      trapDialogFocus(event, dialogRef.current);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-8 sm:px-6">
@@ -369,10 +410,15 @@ function CatDetailModal({
         onClick={onClose}
       />
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="relative flex max-h-full w-full max-w-3xl flex-col gap-5 overflow-y-auto rounded-2xl border bg-slate-950/95 p-6 shadow-2xl sm:p-8"
         style={{ borderColor: withAlpha(theme.from, 0.4) }}
       >
         <button
+          ref={closeButtonRef}
           type="button"
           onClick={onClose}
           aria-label="Close preview"
@@ -389,7 +435,7 @@ function CatDetailModal({
               ? "★ THE KIT ★"
               : `${theme.glyph} LINE ${cat.branchLabel ?? "?"} · ${stageRank(cat.level).toUpperCase()}`}
           </span>
-          <h2 className="text-xl font-semibold text-foreground">
+          <h2 id={titleId} className="text-xl font-semibold text-foreground">
             {displayTitle(cat)}
           </h2>
         </header>

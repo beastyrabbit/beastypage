@@ -10,6 +10,7 @@ from renderer_service.renderer.repository import SpriteRepository
 from renderer_service.models import LayerIdentifier
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+CLAN_PALETTE_DIR = Path(__file__).parents[1] / "renderer_service" / "data" / "palettes"
 
 
 def load_fixture(name: str) -> dict:
@@ -17,7 +18,9 @@ def load_fixture(name: str) -> dict:
         return json.load(fh)
 
 
-def render_layer_ids(pipeline: RenderPipeline, params: dict) -> tuple[list[LayerIdentifier], list[list[str]]]:
+def render_layer_ids(
+    pipeline: RenderPipeline, params: dict
+) -> tuple[list[LayerIdentifier], list[list[str]]]:
     result = pipeline.render(params, collect_layers=True)
     layer_ids = [layer.id for layer in result.layers]
     diagnostics = [layer.diagnostics for layer in result.layers]
@@ -105,14 +108,42 @@ def test_reference_cat_complex_layers():
     # make sure we drew something visible
     assert result.composed.getbbox() is not None
 
-    accessories_layer = next(layer for layer in result.layers if layer.id == LayerIdentifier.accessories)
+    accessories_layer = next(
+        layer for layer in result.layers if layer.id == LayerIdentifier.accessories
+    )
     assert any("MAPLE" in note.upper() for note in accessories_layer.diagnostics)
 
-    scars_layer = next(layer for layer in result.layers if layer.id == LayerIdentifier.scars_primary)
+    scars_layer = next(
+        layer for layer in result.layers if layer.id == LayerIdentifier.scars_primary
+    )
     assert any("FROSTSOCK" in note.upper() for note in scars_layer.diagnostics)
 
-    tint_layer = next(layer for layer in result.layers if layer.id == LayerIdentifier.tint)
+    tint_layer = next(
+        layer for layer in result.layers if layer.id == LayerIdentifier.tint
+    )
     assert any(note.startswith("tint") for note in tint_layer.diagnostics)
+
+
+def test_clan_palette_colours_render():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    for palette_path in sorted(CLAN_PALETTE_DIR.glob("*clan.json")):
+        palette = json.loads(palette_path.read_text(encoding="utf-8"))
+        colour_name = next(
+            name
+            for name, definition in palette["colors"].items()
+            if "multiply" in definition
+        )
+        result = pipeline.render(
+            {
+                "spriteNumber": 5,
+                "peltName": "SingleColour",
+                "colour": colour_name,
+            },
+            collect_layers=False,
+        )
+        assert result.composed.getbbox() is not None, palette_path.name
 
 
 def test_missing_scar_masks_do_not_blank_sprite():
@@ -162,22 +193,26 @@ def test_reverse_preserves_missing_scar_orientation():
     mirrored_expected = ImageOps.mirror(forward)
 
     params["reverse"] = True
-    reversed_img = pipeline.render(params, collect_layers=False).composed.convert("RGBA")
+    reversed_img = pipeline.render(params, collect_layers=False).composed.convert(
+        "RGBA"
+    )
 
     assert reversed_img.tobytes() == mirrored_expected.tobytes()
 
 
 def test_fastapi_health():
     app = create_app()
-    client = TestClient(app)
-    response = client.get("/health")
+    with TestClient(app) as client:
+        response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["metrics"]["queue_size"] == 0
+    assert data["metrics"]["worker_count"] > 0
 
 
 def test_render_batch_endpoint():
     app = create_app()
-    client = TestClient(app)
 
     payload = {
         "payload": {
@@ -206,7 +241,8 @@ def test_render_batch_endpoint():
         },
     }
 
-    response = client.post("/render/batch", json=payload)
+    with TestClient(app) as client:
+        response = client.post("/render/batch", json=payload)
     assert response.status_code == 200
 
     data = response.json()
@@ -220,7 +256,6 @@ def test_render_batch_endpoint():
 
 def test_render_batch_layer_mode():
     app = create_app()
-    client = TestClient(app)
 
     payload = {
         "payload": {
@@ -247,7 +282,8 @@ def test_render_batch_layer_mode():
         },
     }
 
-    response = client.post("/render/batch", json=payload)
+    with TestClient(app) as client:
+        response = client.post("/render/batch", json=payload)
     assert response.status_code == 200
 
     data = response.json()

@@ -112,6 +112,26 @@ function getPreviewUrl(
   return null;
 }
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function trapDialogFocus(event: KeyboardEvent, container: HTMLElement | null) {
+  if (event.key !== "Tab" || !container) return;
+  const focusable = Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  );
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
 export function HistoryClient() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
@@ -121,10 +141,32 @@ export function HistoryClient() {
   } | null>(null);
   const hasTrackedView = useRef(false);
   const searchDebounceRef = useRef<number | null>(null);
+  const previewDialogRef = useRef<HTMLDivElement>(null);
+  const previewCloseRef = useRef<HTMLButtonElement>(null);
 
   const profilesQuery = useQuery(api.mapper.listHistory, { limit: 200 });
   const batchesQuery = useQuery(api.adoption.listBatches, { limit: 120 });
   const treesQuery = useQuery(api.ancestryTree.list, { limit: 50 });
+  const closeFocusedPreview = useCallback(() => setFocusedPreview(null), []);
+
+  useEffect(() => {
+    if (!focusedPreview) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    previewCloseRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeFocusedPreview();
+        return;
+      }
+      trapDialogFocus(event, previewDialogRef.current);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [focusedPreview, closeFocusedPreview]);
 
   // Track page view once data is loaded
   useEffect(() => {
@@ -406,19 +448,29 @@ export function HistoryClient() {
             type="button"
             aria-label="Close preview"
             className="absolute inset-0 cursor-default"
-            onClick={() => setFocusedPreview(null)}
+            onClick={closeFocusedPreview}
           />
-          <div className="relative w-full max-w-4xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
+          <div
+            ref={previewDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-preview-title"
+            className="relative w-full max-w-4xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl"
+          >
             <button
+              ref={previewCloseRef}
               type="button"
-              onClick={() => setFocusedPreview(null)}
+              onClick={closeFocusedPreview}
               aria-label="Close preview"
               className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
             >
               <XIcon size={16} />
             </button>
             <div className="flex flex-col items-center gap-6">
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2
+                id="history-preview-title"
+                className="text-xl font-semibold text-foreground"
+              >
                 {focusedPreview.title}
               </h2>
               <div className="w-full overflow-hidden rounded-2xl border border-border/40 bg-background/80">

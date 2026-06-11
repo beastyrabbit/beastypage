@@ -1418,12 +1418,34 @@ export function isEvolutionBatchSettings(settings: unknown): boolean {
   );
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isEvolutionMetaRecord(meta: Record<string, unknown>) {
+  const role = meta.role;
+  const level = meta.level;
+  const branchIndex = meta.branchIndex;
+  const branchLabel = meta.branchLabel;
+  const archetype = meta.archetype;
+  return (
+    (role === "starter" || role === "branch") &&
+    (level === 0 || level === 1 || level === 2 || level === 3) &&
+    (branchIndex === null || typeof branchIndex === "number") &&
+    (branchLabel === null || typeof branchLabel === "string") &&
+    (archetype === null || isEvolutionArchetype(archetype)) &&
+    Array.isArray(meta.additions) &&
+    Array.isArray(meta.rolls)
+  );
+}
+
 export function getEvolutionMeta(catData: unknown): EvolutionCatMeta | null {
-  if (!catData || typeof catData !== "object") return null;
-  const meta = (catData as Record<string, unknown>).evolution;
-  if (!meta || typeof meta !== "object") return null;
-  const source = (meta as Record<string, unknown>).source;
-  const policy = (meta as Record<string, unknown>).policy;
+  if (!isRecord(catData)) return null;
+  const meta = catData.evolution;
+  if (!isRecord(meta)) return null;
+  const source = meta.source;
+  const policy = meta.policy;
   if (source !== EVOLUTION_SOURCE || policy !== EVOLUTION_POLICY) return null;
+  if (!isEvolutionMetaRecord(meta)) return null;
   return meta as EvolutionCatMeta;
 }

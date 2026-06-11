@@ -10,7 +10,7 @@ class BoundMethodMapper {
     wild: ["FEATHER"],
     collars: ["RED"],
     scars: ["CATBITE"],
-    experimental: ["AQUA"],
+    experimental: ["FLC_OBSIDIAN", "NOT_RENDERABLE"],
   };
 
   getTortieMasks() {
@@ -59,5 +59,10 @@ describe("evolution pool builder", () => {
     expect(pools.baseColours).toEqual(["WHITE", "BLACK"]);
     expect(pools.accessories).toEqual(["FLOWER", "FEATHER", "RED"]);
     expect(pools.scars).toEqual(["CATBITE"]);
+    expect(pools.experimentalColours).toEqual([
+      "FLC_OBSIDIAN",
+      "NOT_RENDERABLE",
+    ]);
+    expect(pools.clanColours?.flare).toEqual(["FLC_OBSIDIAN"]);
   });
 });

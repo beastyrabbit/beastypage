@@ -195,7 +195,9 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
     const source = record.cats.find(
       (item) => `${item.index}-${item.label}` === cat.key,
     );
-    if (!source?.profileId) return;
+    if (!source?.profileId) {
+      throw new Error("This cat has no saved profile.");
+    }
     await updateProfileMeta({
       id: toId("cat_profile", source.profileId),
       catName,
@@ -211,16 +213,21 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
         archetype: cat.archetype,
       })),
     );
-    for (const cat of treeCats) {
+    const updates = treeCats.flatMap((cat) => {
       const name = names.get(cat.key);
-      if (!name) continue;
+      if (!name) return [];
       const source = record.cats.find(
         (item) => `${item.index}-${item.label}` === cat.key,
       );
-      if (!source?.profileId) continue;
+      if (!source?.profileId) {
+        throw new Error("One or more cats have no saved profile.");
+      }
+      return [{ profileId: source.profileId, name }];
+    });
+    for (const update of updates) {
       await updateProfileMeta({
-        id: toId("cat_profile", source.profileId),
-        catName: name,
+        id: toId("cat_profile", update.profileId),
+        catName: update.name,
       });
     }
   };
@@ -322,6 +329,7 @@ function CatNameEditor({
   const [autonaming, setAutonaming] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [nameError, setNameError] = useState<string | null>(null);
   if (!cats.length) return null;
 
   const draftFor = (cat: EvolutionTreeCat) =>
@@ -355,18 +363,21 @@ function CatNameEditor({
 
   const runAutoname = async () => {
     if (!onAutoname) return;
+    setNameError(null);
     try {
       setAutonaming(true);
       await onAutoname();
       setDrafts({});
     } catch (error) {
       console.error("Failed to autoname lineage", error);
+      setNameError("Failed to autoname lineage. Drafts were kept.");
     } finally {
       setAutonaming(false);
     }
   };
 
   const saveAll = async () => {
+    setNameError(null);
     setSavingAll(true);
     try {
       for (const cat of dirtyCats) {
@@ -375,6 +386,7 @@ function CatNameEditor({
       setDrafts({});
     } catch (error) {
       console.error("Failed to save all names", error);
+      setNameError("Failed to save names. Drafts were kept.");
     } finally {
       setSavingAll(false);
     }
@@ -414,6 +426,14 @@ function CatNameEditor({
           </button>
         </div>
       </div>
+      {nameError ? (
+        <p
+          role="alert"
+          className="mb-3 flex items-center gap-2 text-xs text-red-300"
+        >
+          <TriangleAlertIcon size={14} /> {nameError}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-2">
         {starter ? (
           <div className="flex items-center gap-2">
@@ -430,11 +450,16 @@ function CatNameEditor({
             </span>
             <NameField
               value={draftFor(starter)}
+              label="Name the kit"
               placeholder="Kit"
               previewUrl={starter.previewUrl}
-              onChange={(value) =>
-                setDrafts((previous) => ({ ...previous, [starter.key]: value }))
-              }
+              onChange={(value) => {
+                setNameError(null);
+                setDrafts((previous) => ({
+                  ...previous,
+                  [starter.key]: value,
+                }));
+              }}
             />
           </div>
         ) : null}
@@ -457,14 +482,16 @@ function CatNameEditor({
                 <NameField
                   key={cat.key}
                   value={draftFor(cat)}
+                  label={`Name ${getArchetypeTheme(cat.archetype).label}Clan ${stageRank(cat.level)} in line ${line.branchLabel}`}
                   placeholder={stageRank(cat.level)}
                   previewUrl={cat.previewUrl}
-                  onChange={(value) =>
+                  onChange={(value) => {
+                    setNameError(null);
                     setDrafts((previous) => ({
                       ...previous,
                       [cat.key]: value,
-                    }))
-                  }
+                    }));
+                  }}
                 />
               ))}
             </div>

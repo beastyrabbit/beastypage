@@ -5,11 +5,13 @@ import Image from "next/image";
 /** Name input with a sprite preview pop-up on hover/focus. */
 export function NameField({
   value,
+  label,
   placeholder,
   previewUrl,
   onChange,
 }: {
   value: string;
+  label: string;
   placeholder: string;
   previewUrl: string | null;
   onChange: (value: string) => void;
@@ -19,6 +21,7 @@ export function NameField({
       <input
         type="text"
         value={value}
+        aria-label={label}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         className="w-full rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"

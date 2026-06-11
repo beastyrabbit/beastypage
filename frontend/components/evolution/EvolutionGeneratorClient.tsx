@@ -69,12 +69,14 @@ type MapperRecord = {
   cat_data?: unknown;
   catName?: string | null;
   creatorName?: string | null;
+  editToken?: string | null;
 };
 
 type UiEvolutionCat = EvolutionGeneratedCat & {
   previewUrl: string | null;
   profileId?: string | null;
   shareToken?: string | null;
+  editToken?: string | null;
   catName?: string | null;
 };
 
@@ -82,6 +84,7 @@ type PersistedCatInfo = {
   key: string;
   profileId: string;
   shareToken: string;
+  editToken?: string | null;
 };
 
 const DEFAULT_METADATA: AdoptionMetadata = {
@@ -325,6 +328,7 @@ export function EvolutionGeneratorClient() {
         ),
       profileId: null,
       shareToken: null,
+      editToken: null,
       catName: null,
     } satisfies UiEvolutionCat;
   }, []);
@@ -385,7 +389,12 @@ export function EvolutionGeneratorClient() {
             const profileId = mapperResult.id;
             const shareToken =
               mapperResult.shareToken ?? mapperResult.slug ?? mapperResult.id;
-            persistedCats.push({ key: cat.key, profileId, shareToken });
+            persistedCats.push({
+              key: cat.key,
+              profileId,
+              shareToken,
+              editToken: mapperResult.editToken ?? null,
+            });
             return {
               label: cat.label || `Evolution ${index + 1}`,
               catData: cat.catData,
@@ -594,10 +603,13 @@ export function EvolutionGeneratorClient() {
 
   const handleCatNameSave = useCallback(
     async (record: UiEvolutionCat, catName: string) => {
-      if (!record.profileId) return;
+      if (!record.profileId) {
+        throw new Error("This cat has not been saved yet.");
+      }
       await updateProfileMeta({
         id: toId("cat_profile", record.profileId),
         catName,
+        editToken: record.editToken ?? undefined,
       });
       setRecords((previous) =>
         previous.map((item) =>
@@ -622,10 +634,14 @@ export function EvolutionGeneratorClient() {
     try {
       for (const record of recordsRef.current) {
         const name = names.get(record.key);
-        if (!name || !record.profileId) continue;
+        if (!name) continue;
+        if (!record.profileId) {
+          throw new Error("One or more cats have not been saved yet.");
+        }
         await updateProfileMeta({
           id: toId("cat_profile", record.profileId),
           catName: name,
+          editToken: record.editToken ?? undefined,
         });
       }
       setRecords((previous) =>
@@ -638,6 +654,7 @@ export function EvolutionGeneratorClient() {
       );
     } catch (autonameError) {
       console.error("Failed to autoname lineage", autonameError);
+      throw autonameError;
     } finally {
       setAutonaming(false);
     }
@@ -836,6 +853,7 @@ export function EvolutionGeneratorClient() {
                   key={mode}
                   type="button"
                   onClick={() => setStarterMode(mode)}
+                  aria-pressed={starterMode === mode}
                   className={cn(
                     "rounded-lg border px-3 py-2 text-sm font-semibold transition",
                     starterMode === mode
@@ -887,6 +905,7 @@ export function EvolutionGeneratorClient() {
                   key={option.id}
                   type="button"
                   onClick={() => setHairSprite(option.id)}
+                  aria-pressed={hairSprite === option.id}
                   className={cn(
                     "rounded-lg border px-2 py-2 text-xs font-semibold transition sm:text-sm",
                     hairSprite === option.id
@@ -979,6 +998,7 @@ export function EvolutionGeneratorClient() {
                         }),
                       )
                     }
+                    aria-pressed={controls.targetLevel === level}
                     className={cn(
                       "rounded-lg border px-2 py-2.5 text-xs font-semibold transition",
                       controls.targetLevel === level
@@ -1002,6 +1022,7 @@ export function EvolutionGeneratorClient() {
                     key={seconds}
                     type="button"
                     onClick={() => setSpinSeconds(seconds)}
+                    aria-pressed={spinSeconds === seconds}
                     className={cn(
                       "rounded-lg border px-1 py-2.5 text-xs font-semibold transition",
                       spinSeconds === seconds
@@ -1191,6 +1212,7 @@ function RangeControl({
                 type="button"
                 disabled={disabled}
                 onClick={() => onChange({ ...range, [field]: step })}
+                aria-pressed={range[field] === step}
                 className={cn(
                   "rounded-md border px-2 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed",
                   range[field] === step
@@ -1221,6 +1243,7 @@ function CatNameEditor({
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingAll, setSavingAll] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
   const editable = records.filter((record) => record.profileId);
   if (editable.length === 0) return null;
 
@@ -1254,6 +1277,7 @@ function CatNameEditor({
   }
 
   const saveAll = async () => {
+    setNameError(null);
     setSavingAll(true);
     try {
       for (const record of dirtyRecords) {
@@ -1262,6 +1286,7 @@ function CatNameEditor({
       setDrafts({});
     } catch (saveAllError) {
       console.error("Failed to save all names", saveAllError);
+      setNameError("Failed to save names. Drafts were kept.");
     } finally {
       setSavingAll(false);
     }
@@ -1269,8 +1294,14 @@ function CatNameEditor({
 
   const runAutoname = async () => {
     if (!onAutoname) return;
-    await onAutoname();
-    setDrafts({});
+    setNameError(null);
+    try {
+      await onAutoname();
+      setDrafts({});
+    } catch (autonameError) {
+      console.error("Failed to autoname lineage", autonameError);
+      setNameError("Failed to autoname lineage. Drafts were kept.");
+    }
   };
 
   return (
@@ -1307,6 +1338,14 @@ function CatNameEditor({
           </button>
         </div>
       </div>
+      {nameError ? (
+        <p
+          role="alert"
+          className="mb-3 flex items-center gap-2 text-xs text-red-300"
+        >
+          <TriangleAlertIcon size={14} /> {nameError}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-2">
         {starter ? (
           <div className="flex items-center gap-2">
@@ -1323,11 +1362,16 @@ function CatNameEditor({
             </span>
             <NameField
               value={draftFor(starter)}
+              label="Name the kit"
               placeholder="Kit"
               previewUrl={starter.previewUrl}
-              onChange={(value) =>
-                setDrafts((previous) => ({ ...previous, [starter.key]: value }))
-              }
+              onChange={(value) => {
+                setNameError(null);
+                setDrafts((previous) => ({
+                  ...previous,
+                  [starter.key]: value,
+                }));
+              }}
             />
           </div>
         ) : null}
@@ -1350,14 +1394,16 @@ function CatNameEditor({
                 <NameField
                   key={record.key}
                   value={draftFor(record)}
+                  label={`Name ${getArchetypeTheme(record.archetype).label}Clan ${stageRank(Number(record.level))} in line ${line.branchLabel}`}
                   placeholder={stageRank(Number(record.level))}
                   previewUrl={record.previewUrl}
-                  onChange={(value) =>
+                  onChange={(value) => {
+                    setNameError(null);
                     setDrafts((previous) => ({
                       ...previous,
                       [record.key]: value,
-                    }))
-                  }
+                    }));
+                  }}
                 />
               ))}
             </div>

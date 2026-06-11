@@ -22,12 +22,8 @@ export function readMapperArray(
 ) {
   const fn = mapper[method];
   if (typeof fn !== "function") return [];
-  try {
-    const value = Reflect.apply(fn, mapper, args) as unknown;
-    return Array.isArray(value) ? value.map(String) : [];
-  } catch (_error) {
-    return [];
-  }
+  const value = Reflect.apply(fn, mapper, args) as unknown;
+  return Array.isArray(value) ? value.map(String) : [];
 }
 
 function buildColourDefinitions() {
@@ -47,11 +43,11 @@ export function buildEvolutionPools(
   const plantAccessories = readMapperArray(mapper, "getPlantAccessories");
   const wildAccessories = readMapperArray(mapper, "getWildAccessories");
   const collarAccessories = readMapperArray(mapper, "getCollars");
-  const allAccessories = mapper.getAccessories?.() ?? [
-    ...plantAccessories,
-    ...wildAccessories,
-    ...collarAccessories,
-  ];
+  const mapperAccessories = readMapperArray(mapper, "getAccessories");
+  const allAccessories =
+    mapperAccessories.length > 0
+      ? mapperAccessories
+      : [...plantAccessories, ...wildAccessories, ...collarAccessories];
   const knownAccessories = new Set([
     ...plantAccessories,
     ...wildAccessories,
@@ -60,14 +56,24 @@ export function buildEvolutionPools(
   const extraAccessories = allAccessories.filter(
     (accessory) => !knownAccessories.has(accessory),
   );
-  const scars = mapper.getScars?.() ?? [
-    ...readMapperArray(mapper, "getScarsByCategory", 1),
-    ...readMapperArray(mapper, "getScarsByCategory", 2),
-    ...readMapperArray(mapper, "getScarsByCategory", 3),
-  ];
+  const mapperScars = readMapperArray(mapper, "getScars");
+  const scars =
+    mapperScars.length > 0
+      ? mapperScars
+      : [
+          ...readMapperArray(mapper, "getScarsByCategory", 1),
+          ...readMapperArray(mapper, "getScarsByCategory", 2),
+          ...readMapperArray(mapper, "getScarsByCategory", 3),
+        ];
 
+  const mapperExperimentalColours = readMapperArray(
+    mapper,
+    "getExperimentalColours",
+  );
   const experimentalColours =
-    mapper.getExperimentalColours?.() ?? Object.keys(getAllColorDefs());
+    mapperExperimentalColours.length > 0
+      ? mapperExperimentalColours
+      : Object.keys(getAllColorDefs());
   const renderable = new Set(
     experimentalColours.map((colour) => colour.toUpperCase()),
   );
