@@ -431,9 +431,9 @@ describe("evolution generation", () => {
     });
     expect(evolution?.catData.accessorySlots).toHaveLength(1);
     expect(evolution?.catData.accessorySlots[0]).not.toBe("MAPLE LEAF");
-    expect(
-      evolution?.rolls.some((roll) => roll.kind === "replacement"),
-    ).toBe(true);
+    expect(evolution?.rolls.some((roll) => roll.kind === "replacement")).toBe(
+      true,
+    );
   });
 
   it("can roll colours outside the archetype preferred subset", () => {

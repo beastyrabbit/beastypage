@@ -300,10 +300,16 @@ const ARCHETYPE_CONFIG: Record<
 };
 
 const EXPERIMENTAL_CHANCE: Record<EvolutionLevel, number> = {
-  1: 0.12,
-  2: 0.22,
-  3: 0.32,
+  1: 0.35,
+  2: 0.5,
+  3: 0.65,
 };
+
+/**
+ * How often a colour pick favours the archetype's preferred list. Kept
+ * moderate so lines stay thematic without every layer looking the same.
+ */
+const PREFERRED_COLOUR_BIAS = 0.5;
 
 /**
  * Chance per evolution that one already-owned tortie/accessory/scar is
@@ -735,8 +741,13 @@ function pickArchetypeWeightedColour(
   const preferred = uniqueClean([...preferredPool]).filter((value) =>
     available.has(value.toUpperCase()),
   );
-  const usePreferred = preferred.length > 0 && random() < 0.65;
+  const usePreferred = preferred.length > 0 && random() < PREFERRED_COLOUR_BIAS;
   return pickOne(usePreferred ? preferred : fullPool, random);
+}
+
+function withoutUsedColours(pool: string[], used: Set<string>) {
+  const fresh = pool.filter((value) => !used.has(value.toUpperCase()));
+  return fresh.length > 0 ? fresh : pool;
 }
 
 function pickEvolutionColour(
@@ -745,6 +756,7 @@ function pickEvolutionColour(
   level: EvolutionLevel,
   pools: EvolutionPools,
   random: RandomFn,
+  usedColours: Set<string> = new Set(),
 ) {
   const definitions = pools.colourDefinitions;
   const config = ARCHETYPE_CONFIG[archetype];
@@ -756,17 +768,18 @@ function pickEvolutionColour(
   );
   const useExperimental = random() < EXPERIMENTAL_CHANCE[level];
 
-  const experimentalPool = filterRenderable(
-    pools.experimentalColours,
-    experimentalSet,
-    starterColour,
-    definitions,
+  const experimentalPool = withoutUsedColours(
+    filterRenderable(
+      pools.experimentalColours,
+      experimentalSet,
+      starterColour,
+      definitions,
+    ),
+    usedColours,
   );
-  const basePool = filterRenderable(
-    pools.baseColours,
-    baseSet,
-    starterColour,
-    definitions,
+  const basePool = withoutUsedColours(
+    filterRenderable(pools.baseColours, baseSet, starterColour, definitions),
+    usedColours,
   );
 
   const orderedPools = useExperimental
@@ -951,6 +964,11 @@ export function generateEvolutionBatch(
         .torties.map((layer) => layer.mask)
         .filter((mask): mask is string => Boolean(mask)),
     );
+    const usedColours = new Set(
+      splitSlots(parent)
+        .torties.map((layer) => layer.colour?.toUpperCase())
+        .filter((colour): colour is string => Boolean(colour)),
+    );
 
     for (let level = 1; level <= controls.targetLevel; level += 1) {
       const typedLevel = level as EvolutionLevel;
@@ -1008,7 +1026,9 @@ export function generateEvolutionBatch(
               typedLevel,
               pools,
               random,
+              usedColours,
             );
+            usedColours.add(colour.toUpperCase());
             const previous = formatTortieLayer(nextTorties[target.index]);
             const layer: TortieLayer = { mask, pattern, colour };
             nextTorties[target.index] = layer;
@@ -1094,7 +1114,9 @@ export function generateEvolutionBatch(
           typedLevel,
           pools,
           random,
+          usedColours,
         );
+        usedColours.add(colour.toUpperCase());
         const layer: TortieLayer = { mask, pattern, colour };
         const parts = getTortieLayerParts(layer);
         for (const part of parts) {

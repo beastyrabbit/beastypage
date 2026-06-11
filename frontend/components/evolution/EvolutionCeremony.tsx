@@ -20,7 +20,6 @@ import {
 } from "./archetypes";
 import {
   buildAdditionChips,
-  formatValue,
   pixelFontClass,
   stageRank,
 } from "./evolutionDisplay";
@@ -224,6 +223,17 @@ export function EvolutionCeremony({
     return `LINE ${activeCat.branchLabel ?? "?"} · ${stageRank(activeCat.level).toUpperCase()}`;
   })();
 
+  // Other cats from this batch, used as slot-machine frames while charging.
+  const teaserCandidates = useMemo(() => {
+    if (step.kind !== "charge") return [];
+    return cats
+      .filter(
+        (cat, index) =>
+          index !== step.index && cat.level > 0 && Boolean(cat.previewUrl),
+      )
+      .map((cat) => cat.previewUrl as string);
+  }, [cats, step]);
+
   return (
     <motion.section
       ref={sectionRef}
@@ -322,8 +332,8 @@ export function EvolutionCeremony({
                   ? (cats[0] ?? null)
                   : (cats[step.index - 1] ?? null)
               }
+              candidates={teaserCandidates}
               upcoming={cats[step.index] ?? null}
-              pools={pools}
               theme={theme}
               reduced={Boolean(prefersReducedMotion)}
             />
@@ -481,129 +491,56 @@ function BannerScene({
   );
 }
 
-type TeaseTrack = {
-  id: string;
-  kind: EvolutionAddition["kind"];
+/**
+ * Slot-machine sprite for the charge phase: rapidly flickers through other
+ * cats from this batch with shifting hues, so the sprite itself teases what
+ * the ceremony could produce before the real form is revealed.
+ */
+function TeaserSprite({
+  parentUrl,
+  candidates,
+  reduced,
+}: {
+  parentUrl: string | null;
   candidates: string[];
-};
-
-function sampleFrom(pool: string[], count: number, seed: number): string[] {
-  if (pool.length === 0) return [];
-  const picks: string[] = [];
-  for (let i = 0; i < count; i += 1) {
-    picks.push(pool[(seed + i * 7 + i * i * 3) % pool.length]);
-  }
-  return picks;
-}
-
-function buildTeaseTracks(
-  cat: CeremonyCat | null,
-  pools: EvolutionPools | null | undefined,
-): TeaseTrack[] {
-  if (!cat || !pools) return [];
-  const colours = [...pools.baseColours, ...pools.experimentalColours];
-  return cat.additions.slice(0, 4).map((addition, index) => {
-    const seed = cat.key.length * 13 + index * 29;
-    let candidates: string[] = [];
-    switch (addition.kind) {
-      case "tortie": {
-        const masks = sampleFrom(pools.tortieMasks, 12, seed);
-        const patterns = sampleFrom(pools.tortiePatterns, 12, seed + 5);
-        const layerColours = sampleFrom(colours, 12, seed + 11);
-        candidates = masks.map(
-          (mask, i) =>
-            `${formatValue(mask)} / ${formatValue(patterns[i] ?? "")} / ${formatValue(layerColours[i] ?? "")}`,
-        );
-        break;
-      }
-      case "accessory":
-        candidates = sampleFrom(pools.accessories, 12, seed).map(formatValue);
-        break;
-      case "scar":
-        candidates = sampleFrom(pools.scars, 12, seed).map(formatValue);
-        break;
-      case "coat":
-        candidates = ["Short Hair", "Long Hair"];
-        break;
-      case "replacement": {
-        const source =
-          addition.slot === "tortie"
-            ? colours
-            : addition.slot === "accessory"
-              ? pools.accessories
-              : pools.scars;
-        candidates = sampleFrom(source, 12, seed).map(
-          (value) =>
-            `${formatValue(addition.previous)} ➜ ${formatValue(value)}`,
-        );
-        break;
-      }
-    }
-    return {
-      id: `${cat.key}-tease-${index}`,
-      kind: addition.kind,
-      candidates: candidates.filter(Boolean),
-    };
-  });
-}
-
-const TEASE_KIND_LABEL: Record<EvolutionAddition["kind"], string> = {
-  tortie: "Tortie",
-  accessory: "Accessory",
-  scar: "Scar",
-  coat: "Coat",
-  replacement: "Reroll",
-};
-
-function TeaserChips({ tracks }: { tracks: TeaseTrack[] }) {
-  const [tick, setTick] = useState(0);
+  reduced: boolean;
+}) {
+  const [frame, setFrame] = useState(0);
 
   useEffect(() => {
-    if (tracks.length === 0) return;
-    const timer = window.setInterval(() => setTick((value) => value + 1), 90);
+    if (reduced) return;
+    const timer = window.setInterval(() => setFrame((value) => value + 1), 110);
     return () => window.clearInterval(timer);
-  }, [tracks.length]);
+  }, [reduced]);
 
-  if (tracks.length === 0) return null;
+  const frames = candidates.length > 0 ? candidates : null;
+  const url = frames ? frames[frame % frames.length] : parentUrl;
+  const hue = reduced ? 0 : (frame * 67) % 360;
 
   return (
-    <div className="flex max-w-xl flex-wrap items-center justify-center gap-2">
-      {tracks.map((track, index) => {
-        const value =
-          track.candidates.length > 0
-            ? track.candidates[(tick + index * 3) % track.candidates.length]
-            : "…";
-        return (
-          <span
-            key={track.id}
-            className="rounded-full border border-dashed border-white/25 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/70"
-          >
-            ? {TEASE_KIND_LABEL[track.kind]} ·{" "}
-            <span className="tabular-nums">{value}</span>
-          </span>
-        );
-      })}
+    <div
+      style={
+        reduced ? undefined : { filter: `hue-rotate(${hue}deg) saturate(1.5)` }
+      }
+    >
+      <SpriteOnAura url={url ?? null} alt="A possible evolution" />
     </div>
   );
 }
 
 function ChargeScene({
   parent,
+  candidates,
   upcoming,
-  pools,
   theme,
   reduced,
 }: {
   parent: CeremonyCat | null;
+  candidates: string[];
   upcoming: CeremonyCat | null;
-  pools?: EvolutionPools | null;
   theme: ArchetypeTheme;
   reduced: boolean;
 }) {
-  const tracks = useMemo(
-    () => buildTeaseTracks(upcoming, pools),
-    [upcoming, pools],
-  );
   const rank = stageRank(upcoming?.level ?? 1).toUpperCase();
 
   return (
@@ -639,17 +576,20 @@ function ChargeScene({
             reduced
               ? { filter: ["brightness(1)", "brightness(2)"] }
               : {
-                  x: [0, -3, 4, -5, 6, -6, 7, -7, 8, 0],
                   filter: [
-                    "brightness(1) saturate(1)",
-                    "brightness(1.4) saturate(0.7)",
-                    "brightness(2.4) saturate(0.2)",
+                    "brightness(1)",
+                    "brightness(1)",
+                    "brightness(2.4) saturate(0.3)",
                   ],
                 }
           }
-          transition={{ duration: 2.0, ease: "easeIn" }}
+          transition={{ duration: 2.1, times: [0, 0.7, 1], ease: "easeIn" }}
         >
-          <SpriteOnAura url={parent?.previewUrl ?? null} alt="Evolving cat" />
+          <TeaserSprite
+            parentUrl={parent?.previewUrl ?? null}
+            candidates={candidates}
+            reduced={reduced}
+          />
         </motion.div>
       </div>
       <motion.span
@@ -659,7 +599,6 @@ function ChargeScene({
       >
         THE {rank} CEREMONY BEGINS…
       </motion.span>
-      <TeaserChips tracks={tracks} />
     </motion.div>
   );
 }
