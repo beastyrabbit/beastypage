@@ -1,225 +1,270 @@
 {
   "id": "aquaclan",
   "label": "AquaClan",
-  "description": "Signature palette of AquaClan — abyssal trenches through tide and surf to pearl foam, with kelp and storm accents",
+  "description": "The bioluminescent deep — midnight-zone blues lit by glowing plankton, jellyfish violet, and anglerfish gold",
   "colors": {
-    "AQC_ABYSSDEEP": {
+    "AQC_MIDNIGHTZONE": {
+      "multiply": [
+        4,
+        12,
+        28
+      ]
+    },
+    "AQC_ABYSSAL": {
       "multiply": [
         8,
-        20,
-        34
+        24,
+        48
       ]
     },
-    "AQC_TRENCHBLUE": {
+    "AQC_DEEPWATER": {
       "multiply": [
-        12,
-        34,
-        56
+        14,
+        42,
+        76
       ]
     },
-    "AQC_DEEPCURRENT": {
+    "AQC_TWILIGHTBLUE": {
       "multiply": [
-        16,
-        50,
-        80
+        24,
+        64,
+        108
       ]
     },
-    "AQC_OCEANNIGHT": {
+    "AQC_CURRENTBLUE": {
       "multiply": [
-        20,
-        66,
-        104
+        36,
+        92,
+        142
       ]
     },
-    "AQC_STORMSEA": {
+    "AQC_CLEARWATER": {
       "multiply": [
-        52,
-        78,
-        98
+        56,
+        128,
+        172
       ]
     },
-    "AQC_TIDEBLUE": {
-      "multiply": [
-        26,
-        86,
-        130
-      ]
-    },
-    "AQC_DUSKTIDE": {
-      "multiply": [
-        70,
-        100,
-        128
-      ]
-    },
-    "AQC_CURRENTTEAL": {
+    "AQC_KELPSHADOW": {
       "multiply": [
         30,
-        106,
-        140
+        80,
+        70
       ]
     },
-    "AQC_REEFBLUE": {
+    "AQC_BIOLUME": {
       "multiply": [
-        38,
-        128,
-        160
+        40,
+        230,
+        210
       ]
     },
-    "AQC_KELPGREEN": {
+    "AQC_GLOWCYAN": {
       "multiply": [
-        44,
         110,
-        92
+        245,
+        225
       ]
     },
-    "AQC_SEAGRASS": {
+    "AQC_PLANKTONLIGHT": {
       "multiply": [
-        70,
-        140,
-        110
+        180,
+        250,
+        235
       ]
     },
-    "AQC_LAGOONTEAL": {
-      "multiply": [
-        48,
-        150,
-        170
-      ]
-    },
-    "AQC_SURFCYAN": {
-      "multiply": [
-        64,
-        172,
-        184
-      ]
-    },
-    "AQC_SHALLOWAQUA": {
-      "multiply": [
-        90,
-        194,
-        198
-      ]
-    },
-    "AQC_FOAMTEAL": {
-      "multiply": [
-        124,
-        212,
-        210
-      ]
-    },
-    "AQC_SEAGLASS": {
-      "multiply": [
-        158,
-        224,
-        216
-      ]
-    },
-    "AQC_MOONPOOL": {
+    "AQC_JELLYVIOLET": {
       "multiply": [
         150,
-        190,
-        210
+        110,
+        220
       ]
     },
-    "AQC_MISTSPRAY": {
+    "AQC_JELLYGLOW": {
       "multiply": [
-        192,
-        234,
-        228
+        195,
+        160,
+        245
       ]
     },
-    "AQC_FOAMWHITE": {
+    "AQC_ANGLERGOLD": {
       "multiply": [
-        222,
-        242,
-        238
+        250,
+        215,
+        120
       ]
     },
-    "AQC_PEARLWAVE": {
+    "AQC_SEAFOAM": {
       "multiply": [
+        205,
         238,
-        248,
-        246
+        230
       ]
     },
-    "AQC_WAVECREST": {
+    "AQC_PEARLABYSS": {
+      "multiply": [
+        232,
+        244,
+        244
+      ]
+    },
+    "AQC_GLOWWAVES": {
       "pattern": {
         "type": "seigaiha",
         "tileSize": 9,
         "background": [
-          16,
-          50,
-          80
+          8,
+          24,
+          48
         ],
         "foreground": [
-          158,
-          224,
-          216
-        ]
-      }
-    },
-    "AQC_BUBBLEDOT": {
-      "pattern": {
-        "type": "polkadot",
-        "tileSize": 7,
-        "background": [
-          26,
-          86,
-          130
-        ],
-        "foreground": [
-          222,
-          242,
-          238
-        ]
-      }
-    },
-    "AQC_TIDEWEAVE": {
-      "pattern": {
-        "type": "basketweave",
-        "tileSize": 8,
-        "background": [
-          30,
-          106,
-          140
-        ],
-        "foreground": [
-          124,
-          212,
+          40,
+          230,
           210
         ]
       }
     },
-    "AQC_CURRENTSTRIPE": {
+    "AQC_JELLYBLOOM": {
       "pattern": {
-        "type": "diagonal",
+        "type": "polkadot",
         "tileSize": 8,
         "background": [
+          4,
           12,
-          34,
-          56
+          28
         ],
         "foreground": [
-          64,
-          172,
-          184
+          150,
+          110,
+          220
         ]
       }
     },
-    "AQC_SHOALCHECK": {
+    "AQC_PLANKTONSPARK": {
+      "pattern": {
+        "type": "kanoko",
+        "tileSize": 8,
+        "background": [
+          14,
+          42,
+          76
+        ],
+        "foreground": [
+          110,
+          245,
+          225
+        ]
+      }
+    },
+    "AQC_DEEPCURRENT": {
+      "pattern": {
+        "type": "tachiwaki",
+        "tileSize": 10,
+        "background": [
+          4,
+          12,
+          28
+        ],
+        "foreground": [
+          36,
+          92,
+          142
+        ]
+      }
+    },
+    "AQC_SCALESHIMMER": {
+      "pattern": {
+        "type": "shippo",
+        "tileSize": 9,
+        "background": [
+          24,
+          64,
+          108
+        ],
+        "foreground": [
+          110,
+          245,
+          225
+        ]
+      }
+    },
+    "AQC_RIPPLEGLASS": {
       "pattern": {
         "type": "gingham",
         "tileSize": 8,
         "background": [
-          222,
-          242,
-          238
+          205,
+          238,
+          230
         ],
         "foreground": [
-          38,
+          36,
+          92,
+          142
+        ]
+      }
+    },
+    "AQC_TIDALWEAVE": {
+      "pattern": {
+        "type": "basketweave",
+        "tileSize": 8,
+        "background": [
+          14,
+          42,
+          76
+        ],
+        "foreground": [
+          56,
           128,
-          160
+          172
+        ]
+      }
+    },
+    "AQC_LANTERNDOT": {
+      "pattern": {
+        "type": "polkadot",
+        "tileSize": 9,
+        "background": [
+          8,
+          24,
+          48
+        ],
+        "foreground": [
+          250,
+          215,
+          120
+        ]
+      }
+    },
+    "AQC_CORALMAZE": {
+      "pattern": {
+        "type": "greek_key",
+        "tileSize": 10,
+        "background": [
+          4,
+          12,
+          28
+        ],
+        "foreground": [
+          40,
+          230,
+          210
+        ]
+      }
+    },
+    "AQC_DIVESTRIPE": {
+      "pattern": {
+        "type": "diagonal",
+        "tileSize": 8,
+        "background": [
+          8,
+          24,
+          48
+        ],
+        "foreground": [
+          110,
+          245,
+          225
         ]
       }
     }

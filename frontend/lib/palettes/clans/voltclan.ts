@@ -4,67 +4,102 @@ export const voltclanPalette: PaletteCategory = {
   id: "voltclan",
   label: "VoltClan",
   description:
-    "Signature palette of VoltClan — storm blackout split by neon lime, lightning gold, plasma cyan, and surge magenta",
+    "Arcade overdrive — CRT black blasted with every neon: laser lemon, glitch cyan, ultraviolet, and hot magenta",
   colors: {
-    VTC_BLACKOUT: { multiply: [12, 14, 10] },
-    VTC_STORMNIGHT: { multiply: [30, 34, 26] },
-    VTC_THUNDERGREY: { multiply: [90, 100, 105] },
-    VTC_VOLTOLIVE: { multiply: [70, 84, 20] },
-    VTC_CHARGEGREEN: { multiply: [104, 140, 24] },
-    VTC_VOLTGREEN: { multiply: [140, 190, 30] },
-    VTC_NEONLIME: { multiply: [176, 225, 40] },
-    VTC_ELECTRICLIME: { multiply: [205, 245, 60] },
-    VTC_FLASHYELLOW: { multiply: [235, 250, 90] },
-    VTC_SPARKYELLOW: { multiply: [250, 240, 70] },
-    VTC_LIGHTNINGGOLD: { multiply: [255, 220, 50] },
-    VTC_CURRENTTEAL: { multiply: [40, 200, 180] },
-    VTC_PLASMACYAN: { multiply: [70, 220, 230] },
-    VTC_ELECTRICBLUE: { multiply: [50, 170, 240] },
-    VTC_IONBLUE: { multiply: [80, 130, 250] },
-    VTC_PLASMAVIOLET: { multiply: [150, 90, 240] },
-    VTC_NEONMAGENTA: { multiply: [220, 70, 220] },
-    VTC_SURGEPINK: { multiply: [250, 90, 170] },
-    VTC_OZONEPALE: { multiply: [210, 240, 220] },
-    VTC_STATICWHITE: { multiply: [240, 250, 240] },
+    VTC_CRTBLACK: { multiply: [10, 10, 14] },
+    VTC_SCANLINE: { multiply: [35, 38, 45] },
+    VTC_STATICGREY: { multiply: [120, 130, 135] },
+    VTC_NEONLIME: { multiply: [170, 255, 40] },
+    VTC_LASERLEMON: { multiply: [240, 255, 80] },
+    VTC_VOLTYELLOW: { multiply: [255, 225, 40] },
+    VTC_PLASMAORANGE: { multiply: [255, 140, 40] },
+    VTC_HOTCORAL: { multiply: [255, 80, 90] },
+    VTC_NEONMAGENTA: { multiply: [255, 50, 200] },
+    VTC_ULTRAVIOLET: { multiply: [170, 70, 255] },
+    VTC_ELECTRICINDIGO: { multiply: [100, 80, 255] },
+    VTC_CYBERBLUE: { multiply: [50, 140, 255] },
+    VTC_GLITCHCYAN: { multiply: [40, 240, 255] },
+    VTC_TERMINALGREEN: { multiply: [60, 255, 140] },
+    VTC_PIXELWHITE: { multiply: [245, 250, 250] },
+    VTC_GLITCHCHECK: {
+      pattern: {
+        type: "checkerboard",
+        tileSize: 8,
+        background: [255, 50, 200],
+        foreground: [40, 240, 255],
+      },
+    },
     VTC_BOLTCHEVRON: {
       pattern: {
         type: "chevron",
         tileSize: 10,
-        background: [12, 14, 10],
-        foreground: [255, 220, 50],
+        background: [10, 10, 14],
+        foreground: [255, 225, 40],
         spacing: 2,
       },
     },
-    VTC_CIRCUITPANE: {
+    VTC_CIRCUITKEY: {
+      pattern: {
+        type: "greek_key",
+        tileSize: 10,
+        background: [10, 10, 14],
+        foreground: [60, 255, 140],
+      },
+    },
+    VTC_LASERGRID: {
       pattern: {
         type: "windowpane",
         tileSize: 9,
-        background: [30, 34, 26],
-        foreground: [70, 220, 230],
+        background: [10, 10, 14],
+        foreground: [255, 50, 200],
       },
     },
-    VTC_STATICDOT: {
+    VTC_NEONCAMO: {
+      pattern: {
+        type: "camouflage",
+        tileSize: 12,
+        background: [35, 38, 45],
+        foreground: [170, 255, 40],
+      },
+    },
+    VTC_PIXELDOT: {
       pattern: {
         type: "polkadot",
         tileSize: 6,
-        background: [70, 84, 20],
-        foreground: [205, 245, 60],
+        background: [10, 10, 14],
+        foreground: [40, 240, 255],
       },
     },
-    VTC_SURGESTRIPE: {
+    VTC_SYNTHSTRIPE: {
       pattern: {
         type: "diagonal",
         tileSize: 8,
-        background: [12, 14, 10],
-        foreground: [220, 70, 220],
+        background: [35, 38, 45],
+        foreground: [255, 80, 90],
       },
     },
-    VTC_PLASMACHECK: {
+    VTC_ARCADESTAR: {
       pattern: {
-        type: "buffalo",
+        type: "eight_point_star",
+        tileSize: 11,
+        background: [10, 10, 14],
+        foreground: [255, 225, 40],
+      },
+    },
+    VTC_DATAWEAVE: {
+      pattern: {
+        type: "basketweave",
         tileSize: 8,
-        background: [140, 190, 30],
-        foreground: [12, 14, 10],
+        background: [10, 10, 14],
+        foreground: [100, 80, 255],
+      },
+    },
+    VTC_VAPORCHECK: {
+      pattern: {
+        type: "gingham",
+        tileSize: 8,
+        background: [40, 240, 255],
+        foreground: [255, 50, 200],
       },
     },
   },

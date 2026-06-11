@@ -4,69 +4,104 @@ export const leafclanPalette: PaletteCategory = {
   id: "leafclan",
   label: "LeafClan",
   description:
-    "Signature palette of LeafClan — loam and bark through moss and canopy to sunlit fern",
+    "Ancient forest spirits — deep grove greens and wild bark, lit by fireflies, pale kodama, and toadstool red",
   colors: {
-    LFC_LOAMDARK: { multiply: [26, 20, 12] },
-    LFC_BARKBROWN: { multiply: [52, 38, 24] },
-    LFC_ROOTUMBER: { multiply: [78, 56, 34] },
-    LFC_TRUNKTAN: { multiply: [110, 82, 52] },
-    LFC_ACORNGOLD: { multiply: [176, 134, 72] },
-    LFC_FORESTNIGHT: { multiply: [18, 34, 22] },
-    LFC_PINEDEEP: { multiply: [28, 52, 32] },
-    LFC_HOLLYGREEN: { multiply: [38, 72, 42] },
-    LFC_IVYSHADOW: { multiply: [60, 84, 60] },
-    LFC_CANOPYGREEN: { multiply: [50, 94, 52] },
-    LFC_MOSSGREEN: { multiply: [70, 114, 58] },
-    LFC_OLIVEHUSH: { multiply: [104, 110, 62] },
-    LFC_THICKETGREY: { multiply: [96, 104, 88] },
-    LFC_FERNLEAF: { multiply: [92, 136, 66] },
-    LFC_LEAFBRIGHT: { multiply: [116, 158, 76] },
-    LFC_SPRINGLEAF: { multiply: [142, 180, 90] },
-    LFC_SAGEWHISPER: { multiply: [150, 164, 120] },
-    LFC_SUNLEAF: { multiply: [170, 200, 110] },
-    LFC_LICHENPALE: { multiply: [198, 216, 150] },
-    LFC_BIRCHLIGHT: { multiply: [224, 230, 190] },
-    LFC_LEAFVEIN: {
-      pattern: {
-        type: "herringbone",
-        tileSize: 8,
-        background: [50, 94, 52],
-        foreground: [142, 180, 90],
-      },
-    },
+    LFC_FORESTFLOOR: { multiply: [20, 16, 10] },
+    LFC_DARKBARK: { multiply: [44, 32, 20] },
+    LFC_WILDROOT: { multiply: [76, 54, 32] },
+    LFC_MUSHROOMTAN: { multiply: [142, 108, 72] },
+    LFC_SPIRITNIGHT: { multiply: [14, 30, 20] },
+    LFC_DEEPGROVE: { multiply: [26, 52, 32] },
+    LFC_WILDMOSS: { multiply: [52, 88, 46] },
+    LFC_FERNGREEN: { multiply: [86, 124, 58] },
+    LFC_NEWGROWTH: { multiply: [128, 164, 80] },
+    LFC_KODAMAPALE: { multiply: [196, 220, 170] },
+    LFC_SPOREGLOW: { multiply: [225, 240, 150] },
+    LFC_FIREFLYGOLD: { multiply: [245, 215, 95] },
+    LFC_TOADSTOOLRED: { multiply: [188, 52, 38] },
+    LFC_BERRYDARK: { multiply: [120, 30, 40] },
+    LFC_MISTGREY: { multiply: [170, 184, 168] },
     LFC_HEMPLEAF: {
       pattern: {
         type: "asanoha",
         tileSize: 10,
-        background: [28, 52, 32],
-        foreground: [116, 158, 76],
+        background: [26, 52, 32],
+        foreground: [128, 164, 80],
       },
     },
-    LFC_VINETRELLIS: {
+    LFC_FIREFLYNIGHT: {
       pattern: {
-        type: "trellis",
-        tileSize: 9,
-        background: [224, 230, 190],
-        foreground: [60, 84, 60],
+        type: "polkadot",
+        tileSize: 8,
+        background: [14, 30, 20],
+        foreground: [245, 215, 95],
       },
     },
-    LFC_MOSSDOT: {
+    LFC_KODAMADOTS: {
+      pattern: {
+        type: "kanoko",
+        tileSize: 8,
+        background: [26, 52, 32],
+        foreground: [196, 220, 170],
+      },
+    },
+    LFC_VINESCROLL: {
+      pattern: {
+        type: "karakusa",
+        tileSize: 11,
+        background: [20, 16, 10],
+        foreground: [86, 124, 58],
+      },
+    },
+    LFC_TOADSTOOLDOT: {
       pattern: {
         type: "polkadot",
         tileSize: 7,
-        background: [38, 72, 42],
-        foreground: [170, 200, 110],
+        background: [188, 52, 38],
+        foreground: [236, 230, 215],
       },
     },
-    LFC_FORESTTARTAN: {
+    LFC_WILDTRELLIS: {
+      pattern: {
+        type: "trellis",
+        tileSize: 9,
+        background: [196, 220, 170],
+        foreground: [44, 32, 20],
+      },
+    },
+    LFC_ROOTWEAVE: {
+      pattern: {
+        type: "basketweave",
+        tileSize: 8,
+        background: [44, 32, 20],
+        foreground: [86, 124, 58],
+      },
+    },
+    LFC_LEAFVEIN: {
+      pattern: {
+        type: "herringbone",
+        tileSize: 8,
+        background: [52, 88, 46],
+        foreground: [128, 164, 80],
+      },
+    },
+    LFC_GROVETARTAN: {
       pattern: {
         type: "tartan",
         tileSize: 10,
-        background: [28, 52, 32],
+        background: [26, 52, 32],
         stripes: [
-          { color: [110, 82, 52], width: 2, offset: 0 },
-          { color: [142, 180, 90], width: 1, offset: 5 },
+          { color: [142, 108, 72], width: 2, offset: 0 },
+          { color: [245, 215, 95], width: 1, offset: 5 },
         ],
+      },
+    },
+    LFC_SPIRITSNOW: {
+      pattern: {
+        type: "nordic_snowflake",
+        tileSize: 11,
+        background: [14, 30, 20],
+        foreground: [196, 220, 170],
       },
     },
   },

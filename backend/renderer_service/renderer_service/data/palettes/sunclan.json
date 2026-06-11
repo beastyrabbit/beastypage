@@ -1,161 +1,142 @@
 {
   "id": "sunclan",
   "label": "SunClan",
-  "description": "Signature palette of SunClan — deep amber and honey through noon gold to dawn cream and apricot light",
+  "description": "The gilded dawn — temple gold and desert rose set against royal lapis and turquoise sky",
   "colors": {
-    "SNC_DUSKAMBER": {
+    "SNC_TEMPLEBRONZE": {
       "multiply": [
-        88,
-        52,
-        18
+        96,
+        62,
+        22
       ]
     },
-    "SNC_HONEYDEEP": {
-      "multiply": [
-        126,
-        78,
-        24
-      ]
-    },
-    "SNC_HARVESTBROWN": {
+    "SNC_OLDGOLD": {
       "multiply": [
         150,
-        96,
-        48
-      ]
-    },
-    "SNC_AMBERCORE": {
-      "multiply": [
-        160,
         104,
-        30
+        32
       ]
     },
-    "SNC_GOLDENORE": {
+    "SNC_ROYALGOLD": {
       "multiply": [
-        192,
-        132,
-        36
-      ]
-    },
-    "SNC_SAFFRONWARM": {
-      "multiply": [
-        210,
-        120,
+        205,
+        150,
         40
       ]
     },
-    "SNC_SUNGOLD": {
-      "multiply": [
-        218,
-        158,
-        44
-      ]
-    },
-    "SNC_MARIGOLD": {
-      "multiply": [
-        232,
-        148,
-        60
-      ]
-    },
-    "SNC_RAYGOLD": {
-      "multiply": [
-        236,
-        180,
-        56
-      ]
-    },
-    "SNC_APRICOTSUN": {
+    "SNC_PUREGOLD": {
       "multiply": [
         240,
-        170,
-        110
+        185,
+        50
       ]
     },
-    "SNC_NOONGLOW": {
+    "SNC_SUNBURST": {
       "multiply": [
-        248,
-        200,
-        74
-      ]
-    },
-    "SNC_SOLARFLARE": {
-      "multiply": [
-        255,
+        252,
         210,
+        80
+      ]
+    },
+    "SNC_LIGHTGOLD": {
+      "multiply": [
+        253,
+        230,
+        130
+      ]
+    },
+    "SNC_IVORYSUN": {
+      "multiply": [
+        250,
+        242,
+        205
+      ]
+    },
+    "SNC_SANDSTONE": {
+      "multiply": [
+        225,
+        185,
+        135
+      ]
+    },
+    "SNC_LAPISBLUE": {
+      "multiply": [
+        28,
+        62,
+        140
+      ]
+    },
+    "SNC_ROYALLAPIS": {
+      "multiply": [
+        40,
+        86,
+        180
+      ]
+    },
+    "SNC_SKYTURQUOISE": {
+      "multiply": [
+        70,
+        180,
+        200
+      ]
+    },
+    "SNC_DAWNCORAL": {
+      "multiply": [
+        240,
+        130,
         90
       ]
     },
-    "SNC_PEACHDAWN": {
+    "SNC_DESERTROSE": {
       "multiply": [
-        246,
-        196,
-        140
+        205,
+        110,
+        80
       ]
     },
-    "SNC_DAYLIGHT": {
+    "SNC_PHARAOHRED": {
       "multiply": [
-        252,
-        216,
-        104
+        165,
+        52,
+        38
       ]
     },
-    "SNC_WHEATFIELD": {
+    "SNC_DUSKPLUM": {
       "multiply": [
-        222,
-        196,
-        140
+        110,
+        60,
+        90
       ]
     },
-    "SNC_HONEYLIGHT": {
-      "multiply": [
-        253,
-        228,
-        140
-      ]
-    },
-    "SNC_CREAMGLOW": {
-      "multiply": [
-        252,
-        238,
-        178
-      ]
-    },
-    "SNC_SKYWARM": {
-      "multiply": [
-        250,
-        222,
-        190
-      ]
-    },
-    "SNC_DAWNCREAM": {
-      "multiply": [
-        250,
-        244,
-        210
-      ]
-    },
-    "SNC_MORNINGMILK": {
-      "multiply": [
-        248,
-        246,
-        230
-      ]
-    },
-    "SNC_SUNRAYS": {
+    "SNC_GILDEDKEY": {
       "pattern": {
-        "type": "diagonal",
-        "tileSize": 8,
+        "type": "greek_key",
+        "tileSize": 10,
         "background": [
-          248,
-          200,
-          74
+          28,
+          62,
+          140
         ],
         "foreground": [
+          240,
+          185,
+          50
+        ]
+      }
+    },
+    "SNC_SUNDISC": {
+      "pattern": {
+        "type": "polkadot",
+        "tileSize": 8,
+        "background": [
+          40,
+          86,
+          180
+        ],
+        "foreground": [
+          252,
           210,
-          120,
-          40
+          80
         ]
       }
     },
@@ -164,14 +145,46 @@
         "type": "kikko",
         "tileSize": 10,
         "background": [
-          218,
-          158,
-          44
+          205,
+          150,
+          40
         ],
         "foreground": [
-          126,
-          78,
-          24
+          96,
+          62,
+          22
+        ]
+      }
+    },
+    "SNC_RADIANTSTAR": {
+      "pattern": {
+        "type": "eight_point_star",
+        "tileSize": 11,
+        "background": [
+          28,
+          62,
+          140
+        ],
+        "foreground": [
+          253,
+          230,
+          130
+        ]
+      }
+    },
+    "SNC_KENTEGLOW": {
+      "pattern": {
+        "type": "kente",
+        "tileSize": 12,
+        "background": [
+          240,
+          185,
+          50
+        ],
+        "foreground": [
+          96,
+          62,
+          22
         ]
       }
     },
@@ -181,46 +194,78 @@
         "tileSize": 10,
         "background": [
           250,
-          222,
-          190
+          242,
+          205
         ],
         "foreground": [
-          232,
-          148,
-          60
+          240,
+          130,
+          90
         ],
         "spacing": 2
       }
     },
-    "SNC_SOLARDOT": {
+    "SNC_RAYSTRIPE": {
       "pattern": {
-        "type": "polkadot",
-        "tileSize": 7,
+        "type": "diagonal",
+        "tileSize": 8,
         "background": [
-          126,
-          78,
-          24
+          252,
+          210,
+          80
         ],
         "foreground": [
-          255,
-          210,
-          90
+          205,
+          110,
+          80
         ]
       }
     },
-    "SNC_GOLDDAMASK": {
+    "SNC_TEMPLEDAMASK": {
       "pattern": {
         "type": "damask",
         "tileSize": 12,
         "background": [
-          252,
-          238,
-          178
+          250,
+          242,
+          205
         ],
         "foreground": [
-          192,
-          132,
-          36
+          205,
+          150,
+          40
+        ]
+      }
+    },
+    "SNC_SCARABCHECK": {
+      "pattern": {
+        "type": "checkerboard",
+        "tileSize": 8,
+        "background": [
+          28,
+          62,
+          140
+        ],
+        "foreground": [
+          240,
+          185,
+          50
+        ]
+      }
+    },
+    "SNC_NILEWAVE": {
+      "pattern": {
+        "type": "seigaiha",
+        "tileSize": 9,
+        "background": [
+          40,
+          86,
+          180
+        ],
+        "foreground": [
+          253,
+          230,
+          130
         ]
       }
     }

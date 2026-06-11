@@ -1,177 +1,142 @@
 {
   "id": "voidclan",
   "label": "VoidClan",
-  "description": "Signature palette of VoidClan — absolute dark through umbral purples and abyss navy, lit by spectral ghost-glints",
+  "description": "The eldritch rift — true void and umbral purple torn by eerie green glow, cursed crimson, and watching eyes",
   "colors": {
-    "VDC_ABSOLUTEVOID": {
+    "VDC_TRUEVOID": {
       "multiply": [
-        8,
         6,
+        4,
         10
       ]
     },
-    "VDC_NIGHTPITCH": {
-      "multiply": [
-        16,
-        12,
-        20
-      ]
-    },
-    "VDC_INKHEART": {
+    "VDC_RIFTBLACK": {
       "multiply": [
         14,
-        18,
-        28
+        10,
+        22
       ]
     },
-    "VDC_OBSIDIAN": {
+    "VDC_DARKBELOW": {
       "multiply": [
         24,
-        26,
-        30
-      ]
-    },
-    "VDC_ABYSSNAVY": {
-      "multiply": [
-        20,
-        28,
-        46
-      ]
-    },
-    "VDC_SHADOWPLUM": {
-      "multiply": [
-        28,
         18,
         38
       ]
     },
-    "VDC_DEEPECLIPSE": {
+    "VDC_UMBRA": {
       "multiply": [
-        30,
-        42,
-        64
-      ]
-    },
-    "VDC_DARKMATTER": {
-      "multiply": [
-        40,
-        28,
-        54
-      ]
-    },
-    "VDC_BLOODSHADE": {
-      "multiply": [
-        50,
-        14,
-        22
-      ]
-    },
-    "VDC_WITCHGREEN": {
-      "multiply": [
-        26,
-        44,
-        36
-      ]
-    },
-    "VDC_VOIDVIOLET": {
-      "multiply": [
-        56,
         38,
-        78
+        28,
+        58
       ]
     },
-    "VDC_PHANTOMGREY": {
+    "VDC_RIFTPURPLE": {
       "multiply": [
         60,
-        58,
-        70
+        40,
+        95
       ]
     },
-    "VDC_DARKCRIMSON": {
-      "multiply": [
-        74,
-        20,
-        30
-      ]
-    },
-    "VDC_UMBRALPURPLE": {
-      "multiply": [
-        74,
-        50,
-        100
-      ]
-    },
-    "VDC_DUSKSPECTRE": {
-      "multiply": [
-        94,
-        68,
-        122
-      ]
-    },
-    "VDC_WRAITHBLUE": {
+    "VDC_ELDRITCHVIOLET": {
       "multiply": [
         95,
-        110,
-        145
+        60,
+        150
       ]
     },
-    "VDC_SPECTRALGLOW": {
-      "multiply": [
-        120,
-        150,
-        140
-      ]
-    },
-    "VDC_GHOSTVIOLET": {
+    "VDC_WITCHGLOW": {
       "multiply": [
         140,
-        120,
+        95,
+        200
+      ]
+    },
+    "VDC_ABYSSTEAL": {
+      "multiply": [
+        25,
+        55,
+        65
+      ]
+    },
+    "VDC_GHASTGREEN": {
+      "multiply": [
+        55,
+        110,
+        80
+      ]
+    },
+    "VDC_ELDRITCHGREEN": {
+      "multiply": [
+        60,
+        180,
+        110
+      ]
+    },
+    "VDC_SPECTRALMINT": {
+      "multiply": [
+        140,
+        230,
+        180
+      ]
+    },
+    "VDC_BLOODECLIPSE": {
+      "multiply": [
+        85,
+        18,
+        35
+      ]
+    },
+    "VDC_CURSEDCRIMSON": {
+      "multiply": [
+        140,
+        30,
+        55
+      ]
+    },
+    "VDC_BONEGREY": {
+      "multiply": [
+        185,
+        180,
         170
       ]
     },
-    "VDC_SOULEMBER": {
+    "VDC_PALEWRAITH": {
       "multiply": [
-        160,
-        90,
-        70
+        215,
+        215,
+        225
       ]
     },
-    "VDC_PALESPIRIT": {
-      "multiply": [
-        200,
-        200,
-        210
-      ]
-    },
-    "VDC_GOTHICDAMASK": {
+    "VDC_RIFTSLASH": {
       "pattern": {
-        "type": "damask",
-        "tileSize": 12,
+        "type": "diagonal",
+        "tileSize": 8,
         "background": [
-          16,
-          12,
-          20
+          6,
+          4,
+          10
         ],
         "foreground": [
-          74,
-          50,
-          100
+          95,
+          60,
+          150
         ]
       }
     },
-    "VDC_SHADOWCAMO": {
+    "VDC_ELDRITCHEYES": {
       "pattern": {
-        "type": "camouflage",
-        "tileSize": 12,
+        "type": "kanoko",
+        "tileSize": 8,
         "background": [
-          24,
-          26,
-          30
+          14,
+          10,
+          22
         ],
         "foreground": [
-          40,
-          28,
-          54
+          60,
+          180,
+          110
         ]
       }
     },
@@ -180,14 +145,94 @@
         "type": "celtic_knot",
         "tileSize": 11,
         "background": [
-          8,
           6,
+          4,
           10
         ],
         "foreground": [
-          94,
-          68,
-          122
+          60,
+          40,
+          95
+        ]
+      }
+    },
+    "VDC_VOIDCAMO": {
+      "pattern": {
+        "type": "camouflage",
+        "tileSize": 12,
+        "background": [
+          14,
+          10,
+          22
+        ],
+        "foreground": [
+          38,
+          28,
+          58
+        ]
+      }
+    },
+    "VDC_CURSEDDAMASK": {
+      "pattern": {
+        "type": "damask",
+        "tileSize": 12,
+        "background": [
+          6,
+          4,
+          10
+        ],
+        "foreground": [
+          85,
+          18,
+          35
+        ]
+      }
+    },
+    "VDC_SPIRITDOT": {
+      "pattern": {
+        "type": "polkadot",
+        "tileSize": 8,
+        "background": [
+          14,
+          10,
+          22
+        ],
+        "foreground": [
+          140,
+          230,
+          180
+        ]
+      }
+    },
+    "VDC_OMENSTAR": {
+      "pattern": {
+        "type": "eight_point_star",
+        "tileSize": 11,
+        "background": [
+          6,
+          4,
+          10
+        ],
+        "foreground": [
+          140,
+          95,
+          200
+        ]
+      }
+    },
+    "VDC_HEXLATTICE": {
+      "pattern": {
+        "type": "bishamon_kikko",
+        "tileSize": 10,
+        "background": [
+          14,
+          10,
+          22
+        ],
+        "foreground": [
+          60,
+          40,
+          95
         ]
       }
     },
@@ -196,30 +241,30 @@
         "type": "pinstripe",
         "tileSize": 8,
         "background": [
-          16,
-          12,
-          20
+          14,
+          10,
+          22
         ],
         "foreground": [
-          140,
-          120,
+          185,
+          180,
           170
         ]
       }
     },
-    "VDC_VOIDCHECKER": {
+    "VDC_RUNECHECK": {
       "pattern": {
         "type": "checkerboard",
         "tileSize": 8,
         "background": [
-          8,
           6,
+          4,
           10
         ],
         "foreground": [
-          30,
-          42,
-          64
+          25,
+          55,
+          65
         ]
       }
     }

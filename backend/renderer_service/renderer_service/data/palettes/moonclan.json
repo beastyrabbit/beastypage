@@ -1,193 +1,158 @@
 {
   "id": "moonclan",
   "label": "MoonClan",
-  "description": "Signature palette of MoonClan — eclipse night through slate-blue shadow to pearl moonlight and starglint",
+  "description": "The aurora night — polar dark and moonlit silver swept by curtains of aurora teal, violet, and ice",
   "colors": {
-    "MNC_ECLIPSENIGHT": {
+    "MNC_POLARNIGHT": {
       "multiply": [
+        10,
         14,
-        16,
-        24
+        26
       ]
     },
-    "MNC_NIGHTSLATE": {
+    "MNC_NIGHTSKY": {
       "multiply": [
-        28,
-        32,
-        44
+        22,
+        30,
+        52
       ]
     },
-    "MNC_DUSKINDIGO": {
+    "MNC_STARLITSLATE": {
       "multiply": [
-        42,
-        48,
-        66
+        44,
+        56,
+        86
       ]
     },
-    "MNC_SHADOWBLUE": {
+    "MNC_HORIZONBLUE": {
       "multiply": [
-        58,
-        66,
-        88
-      ]
-    },
-    "MNC_MOONSLATE": {
-      "multiply": [
-        78,
-        88,
-        110
-      ]
-    },
-    "MNC_BLUEHOUR": {
-      "multiply": [
-        86,
-        104,
-        140
-      ]
-    },
-    "MNC_TWILITGREY": {
-      "multiply": [
-        100,
-        110,
+        70,
+        92,
         130
       ]
     },
-    "MNC_CRATERGREY": {
+    "MNC_MOONSTEEL": {
       "multiply": [
-        110,
-        112,
-        118
-      ]
-    },
-    "MNC_SILVERBLUE": {
-      "multiply": [
+        108,
         124,
-        134,
-        152
-      ]
-    },
-    "MNC_NIGHTLILAC": {
-      "multiply": [
-        130,
-        128,
-        160
-      ]
-    },
-    "MNC_MOONSILVER": {
-      "multiply": [
-        148,
-        158,
-        174
-      ]
-    },
-    "MNC_LUNARDUST": {
-      "multiply": [
-        160,
-        158,
         150
       ]
     },
-    "MNC_PALEMOON": {
+    "MNC_SILVERLIGHT": {
       "multiply": [
-        174,
-        182,
-        196
+        160,
+        172,
+        190
       ]
     },
-    "MNC_GLOWSILVER": {
+    "MNC_MOONGLOW": {
       "multiply": [
-        198,
-        206,
-        216
-      ]
-    },
-    "MNC_FROSTHALO": {
-      "multiply": [
-        206,
-        216,
-        226
-      ]
-    },
-    "MNC_MOONMIST": {
-      "multiply": [
+        210,
         218,
-        224,
-        232
-      ]
-    },
-    "MNC_GHOSTGLOW": {
-      "multiply": [
-        226,
-        232,
-        240
-      ]
-    },
-    "MNC_PEARLLIGHT": {
-      "multiply": [
-        234,
-        238,
-        242
-      ]
-    },
-    "MNC_STARGLINT": {
-      "multiply": [
-        240,
-        242,
         230
       ]
     },
-    "MNC_MOONWHITE": {
+    "MNC_SNOWWHITE": {
       "multiply": [
-        246,
+        244,
         248,
-        250
+        252
       ]
+    },
+    "MNC_AURORATEAL": {
+      "multiply": [
+        60,
+        210,
+        170
+      ]
+    },
+    "MNC_AURORAGREEN": {
+      "multiply": [
+        120,
+        235,
+        150
+      ]
+    },
+    "MNC_AURORAVIOLET": {
+      "multiply": [
+        150,
+        110,
+        230
+      ]
+    },
+    "MNC_AURORAPINK": {
+      "multiply": [
+        225,
+        130,
+        200
+      ]
+    },
+    "MNC_ICEBLUE": {
+      "multiply": [
+        150,
+        210,
+        240
+      ]
+    },
+    "MNC_COMETGOLD": {
+      "multiply": [
+        240,
+        225,
+        160
+      ]
+    },
+    "MNC_FROSTLILAC": {
+      "multiply": [
+        195,
+        185,
+        225
+      ]
+    },
+    "MNC_AURORAVEIL": {
+      "pattern": {
+        "type": "tachiwaki",
+        "tileSize": 10,
+        "background": [
+          10,
+          14,
+          26
+        ],
+        "foreground": [
+          60,
+          210,
+          170
+        ]
+      }
     },
     "MNC_STARFIELD": {
       "pattern": {
         "type": "polkadot",
         "tileSize": 9,
         "background": [
+          10,
           14,
-          16,
-          24
+          26
+        ],
+        "foreground": [
+          244,
+          248,
+          252
+        ]
+      }
+    },
+    "MNC_NORTHSTAR": {
+      "pattern": {
+        "type": "eight_point_star",
+        "tileSize": 11,
+        "background": [
+          22,
+          30,
+          52
         ],
         "foreground": [
           240,
-          242,
-          230
-        ]
-      }
-    },
-    "MNC_MOONPINSTRIPE": {
-      "pattern": {
-        "type": "pinstripe",
-        "tileSize": 8,
-        "background": [
-          28,
-          32,
-          44
-        ],
-        "foreground": [
-          198,
-          206,
-          216
-        ]
-      }
-    },
-    "MNC_MISTWAKE": {
-      "pattern": {
-        "type": "tachiwaki",
-        "tileSize": 10,
-        "background": [
-          42,
-          48,
-          66
-        ],
-        "foreground": [
-          174,
-          182,
-          196
+          225,
+          160
         ]
       }
     },
@@ -196,14 +161,47 @@
         "type": "nordic_snowflake",
         "tileSize": 11,
         "background": [
-          58,
-          66,
-          88
+          44,
+          56,
+          86
         ],
         "foreground": [
-          234,
-          238,
-          242
+          150,
+          210,
+          240
+        ]
+      }
+    },
+    "MNC_AURORACHEVRON": {
+      "pattern": {
+        "type": "chevron",
+        "tileSize": 10,
+        "background": [
+          10,
+          14,
+          26
+        ],
+        "foreground": [
+          150,
+          110,
+          230
+        ],
+        "spacing": 2
+      }
+    },
+    "MNC_MOONPHASE": {
+      "pattern": {
+        "type": "shippo",
+        "tileSize": 9,
+        "background": [
+          22,
+          30,
+          52
+        ],
+        "foreground": [
+          210,
+          218,
+          230
         ]
       }
     },
@@ -212,14 +210,62 @@
         "type": "windowpane",
         "tileSize": 10,
         "background": [
+          10,
           14,
-          16,
-          24
+          26
         ],
         "foreground": [
+          108,
           124,
-          134,
-          152
+          150
+        ]
+      }
+    },
+    "MNC_GLACIERDIAMOND": {
+      "pattern": {
+        "type": "nordic_diamond",
+        "tileSize": 10,
+        "background": [
+          44,
+          56,
+          86
+        ],
+        "foreground": [
+          150,
+          210,
+          240
+        ]
+      }
+    },
+    "MNC_TWILIGHTSTRIPE": {
+      "pattern": {
+        "type": "pinstripe",
+        "tileSize": 8,
+        "background": [
+          22,
+          30,
+          52
+        ],
+        "foreground": [
+          160,
+          172,
+          190
+        ]
+      }
+    },
+    "MNC_POLARMIST": {
+      "pattern": {
+        "type": "kanoko",
+        "tileSize": 8,
+        "background": [
+          44,
+          56,
+          86
+        ],
+        "foreground": [
+          210,
+          218,
+          230
         ]
       }
     }

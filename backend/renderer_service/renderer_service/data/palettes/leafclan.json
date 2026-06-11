@@ -1,240 +1,285 @@
 {
   "id": "leafclan",
   "label": "LeafClan",
-  "description": "Signature palette of LeafClan — loam and bark through moss and canopy to sunlit fern",
+  "description": "Ancient forest spirits — deep grove greens and wild bark, lit by fireflies, pale kodama, and toadstool red",
   "colors": {
-    "LFC_LOAMDARK": {
+    "LFC_FORESTFLOOR": {
       "multiply": [
-        26,
         20,
-        12
+        16,
+        10
       ]
     },
-    "LFC_BARKBROWN": {
+    "LFC_DARKBARK": {
       "multiply": [
-        52,
-        38,
-        24
+        44,
+        32,
+        20
       ]
     },
-    "LFC_ROOTUMBER": {
+    "LFC_WILDROOT": {
       "multiply": [
-        78,
-        56,
-        34
+        76,
+        54,
+        32
       ]
     },
-    "LFC_TRUNKTAN": {
+    "LFC_MUSHROOMTAN": {
       "multiply": [
-        110,
-        82,
-        52
-      ]
-    },
-    "LFC_ACORNGOLD": {
-      "multiply": [
-        176,
-        134,
+        142,
+        108,
         72
       ]
     },
-    "LFC_FORESTNIGHT": {
+    "LFC_SPIRITNIGHT": {
       "multiply": [
-        18,
-        34,
-        22
+        14,
+        30,
+        20
       ]
     },
-    "LFC_PINEDEEP": {
+    "LFC_DEEPGROVE": {
       "multiply": [
-        28,
+        26,
         52,
         32
       ]
     },
-    "LFC_HOLLYGREEN": {
+    "LFC_WILDMOSS": {
       "multiply": [
-        38,
-        72,
-        42
+        52,
+        88,
+        46
       ]
     },
-    "LFC_IVYSHADOW": {
+    "LFC_FERNGREEN": {
       "multiply": [
-        60,
-        84,
-        60
-      ]
-    },
-    "LFC_CANOPYGREEN": {
-      "multiply": [
-        50,
-        94,
-        52
-      ]
-    },
-    "LFC_MOSSGREEN": {
-      "multiply": [
-        70,
-        114,
+        86,
+        124,
         58
       ]
     },
-    "LFC_OLIVEHUSH": {
+    "LFC_NEWGROWTH": {
       "multiply": [
-        104,
-        110,
-        62
-      ]
-    },
-    "LFC_THICKETGREY": {
-      "multiply": [
-        96,
-        104,
-        88
-      ]
-    },
-    "LFC_FERNLEAF": {
-      "multiply": [
-        92,
-        136,
-        66
-      ]
-    },
-    "LFC_LEAFBRIGHT": {
-      "multiply": [
-        116,
-        158,
-        76
-      ]
-    },
-    "LFC_SPRINGLEAF": {
-      "multiply": [
-        142,
-        180,
-        90
-      ]
-    },
-    "LFC_SAGEWHISPER": {
-      "multiply": [
-        150,
+        128,
         164,
-        120
+        80
       ]
     },
-    "LFC_SUNLEAF": {
+    "LFC_KODAMAPALE": {
       "multiply": [
-        170,
-        200,
-        110
+        196,
+        220,
+        170
       ]
     },
-    "LFC_LICHENPALE": {
+    "LFC_SPOREGLOW": {
       "multiply": [
-        198,
-        216,
+        225,
+        240,
         150
       ]
     },
-    "LFC_BIRCHLIGHT": {
+    "LFC_FIREFLYGOLD": {
       "multiply": [
-        224,
-        230,
-        190
+        245,
+        215,
+        95
       ]
     },
-    "LFC_LEAFVEIN": {
-      "pattern": {
-        "type": "herringbone",
-        "tileSize": 8,
-        "background": [
-          50,
-          94,
-          52
-        ],
-        "foreground": [
-          142,
-          180,
-          90
-        ]
-      }
+    "LFC_TOADSTOOLRED": {
+      "multiply": [
+        188,
+        52,
+        38
+      ]
+    },
+    "LFC_BERRYDARK": {
+      "multiply": [
+        120,
+        30,
+        40
+      ]
+    },
+    "LFC_MISTGREY": {
+      "multiply": [
+        170,
+        184,
+        168
+      ]
     },
     "LFC_HEMPLEAF": {
       "pattern": {
         "type": "asanoha",
         "tileSize": 10,
         "background": [
-          28,
+          26,
           52,
           32
         ],
         "foreground": [
-          116,
-          158,
-          76
+          128,
+          164,
+          80
         ]
       }
     },
-    "LFC_VINETRELLIS": {
+    "LFC_FIREFLYNIGHT": {
       "pattern": {
-        "type": "trellis",
-        "tileSize": 9,
+        "type": "polkadot",
+        "tileSize": 8,
         "background": [
-          224,
-          230,
-          190
+          14,
+          30,
+          20
         ],
         "foreground": [
-          60,
-          84,
-          60
+          245,
+          215,
+          95
         ]
       }
     },
-    "LFC_MOSSDOT": {
+    "LFC_KODAMADOTS": {
+      "pattern": {
+        "type": "kanoko",
+        "tileSize": 8,
+        "background": [
+          26,
+          52,
+          32
+        ],
+        "foreground": [
+          196,
+          220,
+          170
+        ]
+      }
+    },
+    "LFC_VINESCROLL": {
+      "pattern": {
+        "type": "karakusa",
+        "tileSize": 11,
+        "background": [
+          20,
+          16,
+          10
+        ],
+        "foreground": [
+          86,
+          124,
+          58
+        ]
+      }
+    },
+    "LFC_TOADSTOOLDOT": {
       "pattern": {
         "type": "polkadot",
         "tileSize": 7,
         "background": [
-          38,
-          72,
-          42
+          188,
+          52,
+          38
         ],
         "foreground": [
-          170,
-          200,
-          110
+          236,
+          230,
+          215
         ]
       }
     },
-    "LFC_FORESTTARTAN": {
+    "LFC_WILDTRELLIS": {
+      "pattern": {
+        "type": "trellis",
+        "tileSize": 9,
+        "background": [
+          196,
+          220,
+          170
+        ],
+        "foreground": [
+          44,
+          32,
+          20
+        ]
+      }
+    },
+    "LFC_ROOTWEAVE": {
+      "pattern": {
+        "type": "basketweave",
+        "tileSize": 8,
+        "background": [
+          44,
+          32,
+          20
+        ],
+        "foreground": [
+          86,
+          124,
+          58
+        ]
+      }
+    },
+    "LFC_LEAFVEIN": {
+      "pattern": {
+        "type": "herringbone",
+        "tileSize": 8,
+        "background": [
+          52,
+          88,
+          46
+        ],
+        "foreground": [
+          128,
+          164,
+          80
+        ]
+      }
+    },
+    "LFC_GROVETARTAN": {
       "pattern": {
         "type": "tartan",
         "tileSize": 10,
         "background": [
-          28,
+          26,
           52,
           32
         ],
         "stripes": [
           {
             "color": [
-              110,
-              82,
-              52
+              142,
+              108,
+              72
             ],
             "width": 2,
             "offset": 0
           },
           {
             "color": [
-              142,
-              180,
-              90
+              245,
+              215,
+              95
             ],
             "width": 1,
             "offset": 5
           }
+        ]
+      }
+    },
+    "LFC_SPIRITSNOW": {
+      "pattern": {
+        "type": "nordic_snowflake",
+        "tileSize": 11,
+        "background": [
+          14,
+          30,
+          20
+        ],
+        "foreground": [
+          196,
+          220,
+          170
         ]
       }
     }

@@ -1,161 +1,126 @@
 {
   "id": "roseclan",
   "label": "RoseClan",
-  "description": "Signature palette of RoseClan — thorn wine through raspberry and petal pink to pearl blossom, with coral and pollen accents",
+  "description": "The poison garden — nightshade wine and wild fuchsia blooms wound through with viper-green thorns",
   "colors": {
+    "RSC_NIGHTSHADE": {
+      "multiply": [
+        40,
+        14,
+        32
+      ]
+    },
     "RSC_THORNWINE": {
       "multiply": [
-        54,
-        16,
-        30
+        76,
+        20,
+        44
       ]
     },
-    "RSC_ROSEWINE": {
+    "RSC_INKROSE": {
       "multiply": [
-        86,
-        24,
-        46
+        90,
+        45,
+        70
       ]
     },
-    "RSC_MULBERRY": {
-      "multiply": [
-        120,
-        34,
-        64
-      ]
-    },
-    "RSC_ROSESHADOW": {
+    "RSC_TOXICMAUVE": {
       "multiply": [
         120,
-        70,
+        40,
+        80
+      ]
+    },
+    "RSC_VENOMROSE": {
+      "multiply": [
+        170,
+        40,
         95
       ]
     },
-    "RSC_DEEPROSE": {
+    "RSC_WILDFUCHSIA": {
       "multiply": [
-        152,
-        44,
-        84
-      ]
-    },
-    "RSC_LILACROSE": {
-      "multiply": [
-        170,
-        120,
-        160
-      ]
-    },
-    "RSC_RASPBERRY": {
-      "multiply": [
-        184,
-        54,
-        100
-      ]
-    },
-    "RSC_MAUVEBLOOM": {
-      "multiply": [
-        196,
-        140,
-        170
-      ]
-    },
-    "RSC_FUCHSIAROSE": {
-      "multiply": [
-        210,
-        66,
-        120
-      ]
-    },
-    "RSC_PINKBLOOM": {
-      "multiply": [
-        228,
-        88,
-        140
-      ]
-    },
-    "RSC_PETALPINK": {
-      "multiply": [
-        240,
-        116,
-        160
-      ]
-    },
-    "RSC_CORALKISS": {
-      "multiply": [
-        246,
-        140,
+        215,
+        55,
         130
       ]
     },
-    "RSC_BLOSSOMGLOW": {
-      "multiply": [
-        246,
-        142,
-        178
-      ]
-    },
-    "RSC_PEACHROSE": {
-      "multiply": [
-        248,
-        170,
-        150
-      ]
-    },
-    "RSC_SAKURAPINK": {
-      "multiply": [
-        250,
-        168,
-        194
-      ]
-    },
-    "RSC_GOLDENPOLLEN": {
+    "RSC_BRIGHTPETAL": {
       "multiply": [
         240,
+        95,
+        160
+      ]
+    },
+    "RSC_SOFTPINK": {
+      "multiply": [
+        250,
+        155,
+        190
+      ]
+    },
+    "RSC_BLUSHLIGHT": {
+      "multiply": [
+        252,
         200,
-        120
+        215
       ]
     },
-    "RSC_BLUSHPETAL": {
+    "RSC_PALEBLOOM": {
       "multiply": [
         252,
-        192,
-        208
+        232,
+        236
       ]
     },
-    "RSC_PALEPETAL": {
+    "RSC_VIPERGREEN": {
       "multiply": [
-        253,
-        214,
-        222
+        70,
+        130,
+        55
       ]
     },
-    "RSC_ROSEMIST": {
+    "RSC_LEAFVENOM": {
       "multiply": [
-        252,
-        230,
-        234
+        105,
+        165,
+        70
       ]
     },
-    "RSC_PEARLROSE": {
+    "RSC_POISONGLOW": {
       "multiply": [
-        250,
-        240,
-        242
+        165,
+        210,
+        90
       ]
     },
-    "RSC_PETALDOT": {
+    "RSC_DUSKLILAC": {
+      "multiply": [
+        175,
+        130,
+        185
+      ]
+    },
+    "RSC_BRAMBLEGOLD": {
+      "multiply": [
+        220,
+        170,
+        90
+      ]
+    },
+    "RSC_THORNSTRIPE": {
       "pattern": {
-        "type": "polkadot",
-        "tileSize": 7,
+        "type": "diagonal",
+        "tileSize": 8,
         "background": [
-          252,
-          192,
-          208
+          76,
+          20,
+          44
         ],
         "foreground": [
-          210,
-          66,
-          120
+          105,
+          165,
+          70
         ]
       }
     },
@@ -164,62 +129,142 @@
         "type": "kanoko",
         "tileSize": 8,
         "background": [
-          152,
-          44,
-          84
+          170,
+          40,
+          95
         ],
         "foreground": [
-          250,
-          168,
-          194
+          252,
+          200,
+          215
         ]
       }
     },
-    "RSC_ROSEGINGHAM": {
+    "RSC_POISONDOT": {
       "pattern": {
-        "type": "gingham",
-        "tileSize": 8,
+        "type": "polkadot",
+        "tileSize": 7,
         "background": [
-          253,
-          214,
-          222
+          40,
+          14,
+          32
         ],
         "foreground": [
-          184,
-          54,
-          100
+          165,
+          210,
+          90
         ]
       }
     },
-    "RSC_BLOOMQUATREFOIL": {
+    "RSC_BLOOMPAISLEY": {
+      "pattern": {
+        "type": "paisley",
+        "tileSize": 12,
+        "background": [
+          252,
+          232,
+          236
+        ],
+        "foreground": [
+          215,
+          55,
+          130
+        ]
+      }
+    },
+    "RSC_GARDENQUATREFOIL": {
       "pattern": {
         "type": "quatrefoil",
         "tileSize": 10,
         "background": [
           250,
-          240,
-          242
+          155,
+          190
         ],
         "foreground": [
-          228,
-          88,
-          140
+          76,
+          20,
+          44
         ]
       }
     },
-    "RSC_THORNSTRIPE": {
+    "RSC_BRIARKNOT": {
       "pattern": {
-        "type": "pinstripe",
-        "tileSize": 8,
+        "type": "celtic_knot",
+        "tileSize": 11,
         "background": [
-          54,
-          16,
-          30
+          40,
+          14,
+          32
         ],
         "foreground": [
-          246,
-          142,
-          178
+          240,
+          95,
+          160
+        ]
+      }
+    },
+    "RSC_PETALGINGHAM": {
+      "pattern": {
+        "type": "gingham",
+        "tileSize": 8,
+        "background": [
+          252,
+          232,
+          236
+        ],
+        "foreground": [
+          240,
+          95,
+          160
+        ]
+      }
+    },
+    "RSC_VINEDAMASK": {
+      "pattern": {
+        "type": "damask",
+        "tileSize": 12,
+        "background": [
+          76,
+          20,
+          44
+        ],
+        "foreground": [
+          250,
+          155,
+          190
+        ]
+      }
+    },
+    "RSC_ROSESTAR": {
+      "pattern": {
+        "type": "eight_point_star",
+        "tileSize": 11,
+        "background": [
+          170,
+          40,
+          95
+        ],
+        "foreground": [
+          252,
+          232,
+          236
+        ]
+      }
+    },
+    "RSC_NECTARCHECK": {
+      "pattern": {
+        "type": "buffalo",
+        "tileSize": 8,
+        "background": [
+          215,
+          55,
+          130
+        ],
+        "foreground": [
+          40,
+          14,
+          32
         ]
       }
     }

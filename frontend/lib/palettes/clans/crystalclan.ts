@@ -4,66 +4,101 @@ export const crystalclanPalette: PaletteCategory = {
   id: "crystalclan",
   label: "CrystalClan",
   description:
-    "Signature palette of CrystalClan — amethyst depths refracting through prism pastels, opal, citrine, and diamond light",
+    "The geode cavern — dull stone shells cracked open to amethyst, aquamarine, citrine, and clear quartz light",
   colors: {
-    CRC_DEEPAMETHYST: { multiply: [70, 40, 110] },
-    CRC_VIOLETFACET: { multiply: [105, 65, 150] },
-    CRC_SMOKYQUARTZ: { multiply: [120, 100, 95] },
-    CRC_LAVENDERGLOW: { multiply: [150, 110, 200] },
-    CRC_PRISMVIOLET: { multiply: [175, 130, 235] },
-    CRC_LILACSHINE: { multiply: [185, 150, 225] },
-    CRC_PASTELVIOLET: { multiply: [210, 185, 240] },
-    CRC_SAPPHIRELIGHT: { multiply: [90, 140, 220] },
-    CRC_SKYFACET: { multiply: [120, 180, 240] },
-    CRC_GLACIERBLUE: { multiply: [160, 210, 245] },
-    CRC_EMERALDFACET: { multiply: [80, 180, 140] },
-    CRC_AURORAGREEN: { multiply: [150, 230, 200] },
-    CRC_MINTPRISM: { multiply: [185, 240, 215] },
-    CRC_ROSEQUARTZ: { multiply: [245, 175, 200] },
-    CRC_OPALPINK: { multiply: [240, 195, 225] },
-    CRC_PRISMPINK: { multiply: [250, 200, 215] },
-    CRC_AMBERFACET: { multiply: [240, 200, 120] },
-    CRC_CITRINEGLOW: { multiply: [250, 225, 150] },
-    CRC_PEARLOPAL: { multiply: [245, 240, 235] },
-    CRC_DIAMONDWHITE: { multiply: [250, 250, 252] },
+    CRC_GEODESHELL: { multiply: [38, 34, 44] },
+    CRC_STONECRUST: { multiply: [70, 64, 80] },
+    CRC_DUSKROCK: { multiply: [105, 95, 115] },
+    CRC_AMETHYSTDEEP: { multiply: [88, 42, 140] },
+    CRC_AMETHYST: { multiply: [130, 75, 195] },
+    CRC_VIOLETGLOW: { multiply: [170, 120, 235] },
+    CRC_LILACFACET: { multiply: [205, 170, 245] },
+    CRC_ROSEQUARTZ: { multiply: [240, 170, 200] },
+    CRC_MORGANITE: { multiply: [250, 205, 220] },
+    CRC_CELESTITE: { multiply: [130, 185, 240] },
+    CRC_AQUAMARINE: { multiply: [110, 220, 225] },
+    CRC_FLUORITE: { multiply: [90, 225, 170] },
+    CRC_CITRINE: { multiply: [250, 210, 110] },
+    CRC_OPALSHEEN: { multiply: [225, 215, 235] },
+    CRC_CLEARQUARTZ: { multiply: [240, 240, 248] },
+    CRC_GEODEDOT: {
+      pattern: {
+        type: "polkadot",
+        tileSize: 8,
+        background: [38, 34, 44],
+        foreground: [170, 120, 235],
+      },
+    },
     CRC_FACETARGYLE: {
       pattern: {
         type: "argyle",
         tileSize: 12,
-        background: [210, 185, 240],
-        foreground: [105, 65, 150],
+        background: [88, 42, 140],
+        foreground: [205, 170, 245],
       },
     },
-    CRC_DIAMONDHISHI: {
+    CRC_PRISMHISHI: {
       pattern: {
         type: "hishi",
         tileSize: 9,
-        background: [160, 210, 245],
-        foreground: [90, 140, 220],
+        background: [38, 34, 44],
+        foreground: [110, 220, 225],
       },
     },
-    CRC_PRISMSTAR: {
+    CRC_CRYSTALFAN: {
+      pattern: {
+        type: "art_deco_fan",
+        tileSize: 11,
+        background: [38, 34, 44],
+        foreground: [130, 75, 195],
+      },
+    },
+    CRC_STARFACET: {
       pattern: {
         type: "eight_point_star",
         tileSize: 11,
-        background: [245, 240, 235],
-        foreground: [175, 130, 235],
+        background: [70, 64, 80],
+        foreground: [250, 210, 110],
       },
     },
-    CRC_SHIPPOGLASS: {
+    CRC_SHARDSTRIPE: {
+      pattern: {
+        type: "diagonal",
+        tileSize: 8,
+        background: [38, 34, 44],
+        foreground: [170, 120, 235],
+      },
+    },
+    CRC_GLASSSHIPPO: {
       pattern: {
         type: "shippo",
-        tileSize: 10,
-        background: [185, 240, 215],
-        foreground: [120, 180, 240],
+        tileSize: 9,
+        background: [130, 185, 240],
+        foreground: [240, 240, 248],
       },
     },
-    CRC_OPALCHECK: {
+    CRC_GEMCHECKER: {
       pattern: {
         type: "checkerboard",
         tileSize: 8,
-        background: [240, 195, 225],
-        foreground: [150, 230, 200],
+        background: [130, 75, 195],
+        foreground: [110, 220, 225],
+      },
+    },
+    CRC_CAVELATTICE: {
+      pattern: {
+        type: "chinese_lattice",
+        tileSize: 10,
+        background: [38, 34, 44],
+        foreground: [205, 170, 245],
+      },
+    },
+    CRC_DRUZYKANOKO: {
+      pattern: {
+        type: "kanoko",
+        tileSize: 8,
+        background: [88, 42, 140],
+        foreground: [240, 240, 248],
       },
     },
   },

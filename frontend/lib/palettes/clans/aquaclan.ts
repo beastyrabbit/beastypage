@@ -4,66 +4,101 @@ export const aquaclanPalette: PaletteCategory = {
   id: "aquaclan",
   label: "AquaClan",
   description:
-    "Signature palette of AquaClan — abyssal trenches through tide and surf to pearl foam, with kelp and storm accents",
+    "The bioluminescent deep — midnight-zone blues lit by glowing plankton, jellyfish violet, and anglerfish gold",
   colors: {
-    AQC_ABYSSDEEP: { multiply: [8, 20, 34] },
-    AQC_TRENCHBLUE: { multiply: [12, 34, 56] },
-    AQC_DEEPCURRENT: { multiply: [16, 50, 80] },
-    AQC_OCEANNIGHT: { multiply: [20, 66, 104] },
-    AQC_STORMSEA: { multiply: [52, 78, 98] },
-    AQC_TIDEBLUE: { multiply: [26, 86, 130] },
-    AQC_DUSKTIDE: { multiply: [70, 100, 128] },
-    AQC_CURRENTTEAL: { multiply: [30, 106, 140] },
-    AQC_REEFBLUE: { multiply: [38, 128, 160] },
-    AQC_KELPGREEN: { multiply: [44, 110, 92] },
-    AQC_SEAGRASS: { multiply: [70, 140, 110] },
-    AQC_LAGOONTEAL: { multiply: [48, 150, 170] },
-    AQC_SURFCYAN: { multiply: [64, 172, 184] },
-    AQC_SHALLOWAQUA: { multiply: [90, 194, 198] },
-    AQC_FOAMTEAL: { multiply: [124, 212, 210] },
-    AQC_SEAGLASS: { multiply: [158, 224, 216] },
-    AQC_MOONPOOL: { multiply: [150, 190, 210] },
-    AQC_MISTSPRAY: { multiply: [192, 234, 228] },
-    AQC_FOAMWHITE: { multiply: [222, 242, 238] },
-    AQC_PEARLWAVE: { multiply: [238, 248, 246] },
-    AQC_WAVECREST: {
+    AQC_MIDNIGHTZONE: { multiply: [4, 12, 28] },
+    AQC_ABYSSAL: { multiply: [8, 24, 48] },
+    AQC_DEEPWATER: { multiply: [14, 42, 76] },
+    AQC_TWILIGHTBLUE: { multiply: [24, 64, 108] },
+    AQC_CURRENTBLUE: { multiply: [36, 92, 142] },
+    AQC_CLEARWATER: { multiply: [56, 128, 172] },
+    AQC_KELPSHADOW: { multiply: [30, 80, 70] },
+    AQC_BIOLUME: { multiply: [40, 230, 210] },
+    AQC_GLOWCYAN: { multiply: [110, 245, 225] },
+    AQC_PLANKTONLIGHT: { multiply: [180, 250, 235] },
+    AQC_JELLYVIOLET: { multiply: [150, 110, 220] },
+    AQC_JELLYGLOW: { multiply: [195, 160, 245] },
+    AQC_ANGLERGOLD: { multiply: [250, 215, 120] },
+    AQC_SEAFOAM: { multiply: [205, 238, 230] },
+    AQC_PEARLABYSS: { multiply: [232, 244, 244] },
+    AQC_GLOWWAVES: {
       pattern: {
         type: "seigaiha",
         tileSize: 9,
-        background: [16, 50, 80],
-        foreground: [158, 224, 216],
+        background: [8, 24, 48],
+        foreground: [40, 230, 210],
       },
     },
-    AQC_BUBBLEDOT: {
+    AQC_JELLYBLOOM: {
       pattern: {
         type: "polkadot",
-        tileSize: 7,
-        background: [26, 86, 130],
-        foreground: [222, 242, 238],
-      },
-    },
-    AQC_TIDEWEAVE: {
-      pattern: {
-        type: "basketweave",
         tileSize: 8,
-        background: [30, 106, 140],
-        foreground: [124, 212, 210],
+        background: [4, 12, 28],
+        foreground: [150, 110, 220],
       },
     },
-    AQC_CURRENTSTRIPE: {
+    AQC_PLANKTONSPARK: {
       pattern: {
-        type: "diagonal",
+        type: "kanoko",
         tileSize: 8,
-        background: [12, 34, 56],
-        foreground: [64, 172, 184],
+        background: [14, 42, 76],
+        foreground: [110, 245, 225],
       },
     },
-    AQC_SHOALCHECK: {
+    AQC_DEEPCURRENT: {
+      pattern: {
+        type: "tachiwaki",
+        tileSize: 10,
+        background: [4, 12, 28],
+        foreground: [36, 92, 142],
+      },
+    },
+    AQC_SCALESHIMMER: {
+      pattern: {
+        type: "shippo",
+        tileSize: 9,
+        background: [24, 64, 108],
+        foreground: [110, 245, 225],
+      },
+    },
+    AQC_RIPPLEGLASS: {
       pattern: {
         type: "gingham",
         tileSize: 8,
-        background: [222, 242, 238],
-        foreground: [38, 128, 160],
+        background: [205, 238, 230],
+        foreground: [36, 92, 142],
+      },
+    },
+    AQC_TIDALWEAVE: {
+      pattern: {
+        type: "basketweave",
+        tileSize: 8,
+        background: [14, 42, 76],
+        foreground: [56, 128, 172],
+      },
+    },
+    AQC_LANTERNDOT: {
+      pattern: {
+        type: "polkadot",
+        tileSize: 9,
+        background: [8, 24, 48],
+        foreground: [250, 215, 120],
+      },
+    },
+    AQC_CORALMAZE: {
+      pattern: {
+        type: "greek_key",
+        tileSize: 10,
+        background: [4, 12, 28],
+        foreground: [40, 230, 210],
+      },
+    },
+    AQC_DIVESTRIPE: {
+      pattern: {
+        type: "diagonal",
+        tileSize: 8,
+        background: [8, 24, 48],
+        foreground: [110, 245, 225],
       },
     },
   },
