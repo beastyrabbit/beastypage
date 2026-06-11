@@ -3,7 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { ArrowUpRight, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   type AdoptionMetadata,
   AdoptionMetadataPanel,
@@ -13,6 +13,7 @@ import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
 import { encodeCatShare } from "@/lib/catShare";
+import { generateLineageNames } from "@/lib/evolution/clanNames";
 import {
   getEvolutionMeta,
   isEvolutionBatchSettings,
@@ -199,6 +200,29 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
     });
   };
 
+  const handleAutoname = async () => {
+    const names = generateLineageNames(
+      treeCats.map((cat) => ({
+        key: cat.key,
+        level: cat.level,
+        branchLabel: cat.branchLabel,
+        archetype: cat.archetype,
+      })),
+    );
+    for (const cat of treeCats) {
+      const name = names.get(cat.key);
+      if (!name) continue;
+      const source = record.cats.find(
+        (item) => `${item.index}-${item.label}` === cat.key,
+      );
+      if (!source?.profileId) continue;
+      await updateProfileMeta({
+        id: toId("cat_profile", source.profileId),
+        catName: name,
+      });
+    }
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-12 sm:px-6 lg:px-8">
       <section className="relative overflow-hidden rounded-3xl border border-violet-500/25 bg-slate-950 p-6 sm:p-8">
@@ -271,7 +295,11 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
         canSave
       />
 
-      <CatNameEditor cats={treeCats} onSave={handleCatNameSave} />
+      <CatNameEditor
+        cats={treeCats}
+        onSave={handleCatNameSave}
+        onAutoname={handleAutoname}
+      />
     </div>
   );
 }
@@ -279,16 +307,48 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
 function CatNameEditor({
   cats,
   onSave,
+  onAutoname,
 }: {
   cats: EvolutionTreeCat[];
   onSave: (cat: EvolutionTreeCat, catName: string) => Promise<void>;
+  onAutoname?: () => Promise<void>;
 }) {
+  const [autonaming, setAutonaming] = useState(false);
   if (!cats.length) return null;
+
+  const runAutoname = async () => {
+    if (!onAutoname) return;
+    try {
+      setAutonaming(true);
+      await onAutoname();
+    } catch (error) {
+      console.error("Failed to autoname lineage", error);
+    } finally {
+      setAutonaming(false);
+    }
+  };
 
   return (
     <section className="rounded-2xl border border-border/40 bg-background/70 p-4">
-      <div className="mb-3 text-sm font-semibold text-foreground">
-        Name the lineage
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-foreground">
+          Name the lineage
+        </span>
+        {onAutoname ? (
+          <button
+            type="button"
+            onClick={runAutoname}
+            disabled={autonaming}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-300/50 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {autonaming ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <span aria-hidden>✨</span>
+            )}
+            Autoname
+          </button>
+        ) : null}
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {cats.map((cat) => (
@@ -311,6 +371,11 @@ function CatNameRow({
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const dirty = name.trim() !== initial.trim();
+
+  // Keep the input in sync when names change elsewhere (e.g. autoname).
+  useEffect(() => {
+    setName(initial);
+  }, [initial]);
 
   const submit = async () => {
     try {

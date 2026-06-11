@@ -26,6 +26,7 @@ import { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { encodeCatShare } from "@/lib/catShare";
+import { generateLineageNames } from "@/lib/evolution/clanNames";
 import {
   buildEvolutionBatchSettings,
   CONTROLLED_ARCHETYPES,
@@ -601,6 +602,41 @@ export function EvolutionGeneratorClient() {
     [updateProfileMeta],
   );
 
+  const [autonaming, setAutonaming] = useState(false);
+  const handleAutoname = useCallback(async () => {
+    const names = generateLineageNames(
+      recordsRef.current.map((record) => ({
+        key: record.key,
+        level: Number(record.level),
+        branchLabel: record.branchLabel,
+        archetype: record.archetype,
+      })),
+    );
+    setAutonaming(true);
+    try {
+      for (const record of recordsRef.current) {
+        const name = names.get(record.key);
+        if (!name || !record.profileId) continue;
+        await updateProfileMeta({
+          id: toId("cat_profile", record.profileId),
+          catName: name,
+        });
+      }
+      setRecords((previous) =>
+        previous.map((record) => {
+          const name = names.get(record.key);
+          return name && record.profileId
+            ? { ...record, catName: name }
+            : record;
+        }),
+      );
+    } catch (autonameError) {
+      console.error("Failed to autoname lineage", autonameError);
+    } finally {
+      setAutonaming(false);
+    }
+  }, [updateProfileMeta]);
+
   const treeCats = useMemo<EvolutionTreeCat[]>(
     () =>
       records.map((record) => ({
@@ -696,7 +732,12 @@ export function EvolutionGeneratorClient() {
             canSave={!!lastSavedId}
           />
           {lastSavedId ? (
-            <CatNameEditor records={records} onSave={handleCatNameSave} />
+            <CatNameEditor
+              records={records}
+              onSave={handleCatNameSave}
+              onAutoname={handleAutoname}
+              autonaming={autonaming}
+            />
           ) : null}
           <div className="flex flex-wrap gap-2">
             {lastSavedToken ? (
@@ -1164,17 +1205,38 @@ function RangeControl({
 function CatNameEditor({
   records,
   onSave,
+  onAutoname,
+  autonaming = false,
 }: {
   records: UiEvolutionCat[];
   onSave: (record: UiEvolutionCat, catName: string) => Promise<void>;
+  onAutoname?: () => Promise<void>;
+  autonaming?: boolean;
 }) {
   const editable = records.filter((record) => record.profileId);
   if (editable.length === 0) return null;
 
   return (
     <section className="rounded-2xl border border-border/40 bg-background/70 p-4">
-      <div className="mb-3 text-sm font-semibold text-foreground">
-        Name the lineage
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-foreground">
+          Name the lineage
+        </span>
+        {onAutoname ? (
+          <button
+            type="button"
+            onClick={onAutoname}
+            disabled={autonaming}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-300/50 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {autonaming ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <span aria-hidden>✨</span>
+            )}
+            Autoname
+          </button>
+        ) : null}
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {editable.map((record) => (
