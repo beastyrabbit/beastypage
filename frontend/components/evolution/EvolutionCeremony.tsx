@@ -71,6 +71,12 @@ const STEP_DURATIONS: Record<CeremonyStep["kind"], number> = {
 };
 
 const SPEEDS = [0.25, 0.5, 1, 2, 5] as const;
+const CEREMONY_SPRITE_FRAME_SIZE =
+  "clamp(230px, min(68vw, calc(100vh - 24rem)), 1020px)";
+const SUMMON_GLOW_SIZE = "clamp(300px, min(92vw, calc(100vh - 17rem)), 1120px)";
+const CHARGE_RING_SIZE = "clamp(300px, min(88vw, calc(100vh - 18rem)), 1040px)";
+const REVEAL_GLOW_SIZE = "clamp(300px, min(86vw, calc(100vh - 19rem)), 1060px)";
+const REVEAL_RING_SIZE = "clamp(320px, min(98vw, calc(100vh - 16rem)), 1180px)";
 
 const AMBIENT_PARTICLES = Array.from({ length: 14 }, (_, index) => ({
   id: `particle-${index}`,
@@ -286,7 +292,8 @@ export function EvolutionCeremony({
       ref={sectionRef}
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="relative isolate flex aspect-square max-h-[85vh] min-h-[520px] w-full cursor-pointer select-none flex-col overflow-hidden rounded-3xl border border-border/40 bg-slate-950"
+      className="relative isolate mx-auto flex aspect-square max-h-[85vh] w-full max-w-[min(100%,85vh)] cursor-pointer select-none flex-col overflow-hidden rounded-3xl border border-border/40 bg-slate-950"
+      style={{ minHeight: "min(620px, calc(100vh - 7rem))" }}
       onClick={step.kind === "finale" ? onFinish : advance}
       aria-live="polite"
     >
@@ -382,7 +389,7 @@ export function EvolutionCeremony({
       </div>
 
       {/* Stage */}
-      <div className="relative z-10 flex flex-1 items-center justify-center px-6 py-4">
+      <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-4 py-2 sm:px-6 sm:py-4">
         <AnimatePresence mode="wait">
           {step.kind === "summon" ? (
             <SummonScene key="summon" cat={cats[0] ?? null} />
@@ -471,50 +478,56 @@ function SpriteOnAura({
   url,
   alt,
   size = 340,
+  displaySize = CEREMONY_SPRITE_FRAME_SIZE,
 }: {
   url: string | null;
   alt: string;
   size?: number;
+  displaySize?: string;
 }) {
   if (!url) {
     return (
       <div
-        className="flex items-center justify-center text-xs text-white/50"
-        style={{ width: size, height: size }}
+        className="relative z-10 flex items-center justify-center text-xs text-white/50"
+        style={{ width: displaySize, height: displaySize }}
       >
         Rendering…
       </div>
     );
   }
   return (
-    <Image
-      src={url}
-      alt={alt}
-      width={size}
-      height={size}
-      unoptimized
-      priority
-      className="image-render-pixel object-contain drop-shadow-[0_10px_30px_rgba(0,0,0,0.6)]"
-      style={{ width: size, height: size }}
-    />
+    <div
+      className="relative z-10 flex items-center justify-center"
+      style={{ width: displaySize, height: displaySize }}
+    >
+      <Image
+        src={url}
+        alt={alt}
+        width={size}
+        height={size}
+        unoptimized
+        priority
+        className="image-render-pixel size-full object-contain drop-shadow-[0_10px_30px_rgba(0,0,0,0.6)]"
+      />
+    </div>
   );
 }
 
 function SummonScene({ cat }: { cat: CeremonyCat | null }) {
   return (
     <motion.div
-      className="flex flex-col items-center gap-5 text-center"
+      className="grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_auto] items-center justify-items-center gap-3 text-center sm:gap-4"
       initial={{ opacity: 0, y: 28, scale: 0.92 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96 }}
       transition={{ duration: 0.55, ease: "easeOut" }}
     >
-      <div className="relative flex items-center justify-center">
+      <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden">
         <motion.div
           className="absolute rounded-full"
           style={{
-            width: 400,
-            height: 400,
+            width: SUMMON_GLOW_SIZE,
+            height: SUMMON_GLOW_SIZE,
             background: `radial-gradient(circle, ${withAlpha(STARTER_THEME.from, 0.3)}, transparent 70%)`,
           }}
           animate={{ scale: [0.9, 1.08, 0.9], opacity: [0.6, 1, 0.6] }}
@@ -522,7 +535,7 @@ function SummonScene({ cat }: { cat: CeremonyCat | null }) {
         />
         <SpriteOnAura url={cat?.previewUrl ?? null} alt="Starter cat" />
       </div>
-      <div className="flex flex-col items-center gap-2">
+      <div className="relative z-30 flex flex-col items-center gap-2">
         <span
           className={cn(pixelFontClass, "text-sm text-amber-200 sm:text-base")}
         >
@@ -626,22 +639,25 @@ function ChargeScene({
 
   return (
     <motion.div
-      className="flex flex-col items-center gap-5 text-center"
+      className="grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_auto] items-center justify-items-center gap-3 text-center sm:gap-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
     >
-      <div className="relative flex items-center justify-center">
+      <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden">
         {[0, 1].map((ring) => (
           <motion.div
             key={ring}
             className="absolute rounded-full border-2"
-            style={{ borderColor: withAlpha(theme.from, 0.55) }}
-            initial={{ width: 210, height: 210, opacity: 0 }}
+            style={{
+              width: CHARGE_RING_SIZE,
+              height: CHARGE_RING_SIZE,
+              borderColor: withAlpha(theme.from, 0.55),
+            }}
+            initial={{ scale: 0.36, opacity: 0 }}
             animate={{
-              width: [210, 440],
-              height: [210, 440],
+              scale: [0.36, 1.12],
               opacity: [0.8, 0],
             }}
             transition={{
@@ -680,7 +696,10 @@ function ChargeScene({
         </motion.div>
       </div>
       <motion.span
-        className={cn(pixelFontClass, "text-xs text-white sm:text-sm")}
+        className={cn(
+          pixelFontClass,
+          "relative z-30 text-xs text-white sm:text-sm",
+        )}
         animate={{ opacity: [1, 0.4, 1] }}
         transition={{ duration: 0.8, repeat: Number.POSITIVE_INFINITY }}
       >
@@ -714,7 +733,7 @@ function RevealScene({
 
   return (
     <motion.div
-      className="flex w-full flex-col items-center gap-5 text-center"
+      className="grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_auto] items-center justify-items-center gap-3 text-center sm:gap-4"
       initial={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
@@ -728,12 +747,12 @@ function RevealScene({
           transition={{ duration: 0.5, ease: "easeOut" }}
         />
       ) : null}
-      <div className="relative flex items-center justify-center">
+      <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden">
         <motion.div
           className="absolute rounded-full"
           style={{
-            width: 440,
-            height: 440,
+            width: REVEAL_GLOW_SIZE,
+            height: REVEAL_GLOW_SIZE,
             background: `radial-gradient(circle, ${withAlpha(colours.from, 0.35)}, ${withAlpha(colours.to, 0.12)} 55%, transparent 75%)`,
           }}
           initial={{ scale: 0.4, opacity: 1 }}
@@ -747,11 +766,13 @@ function RevealScene({
                 key={wave}
                 className="pointer-events-none absolute rounded-full border-2"
                 style={{
+                  width: REVEAL_RING_SIZE,
+                  height: REVEAL_RING_SIZE,
                   borderColor:
                     wave === 0 ? "rgba(255,255,255,0.85)" : colours.from,
                 }}
-                initial={{ width: 180, height: 180, opacity: 0.9 }}
-                animate={{ width: 660, height: 660, opacity: 0 }}
+                initial={{ scale: 0.22, opacity: 0.9 }}
+                animate={{ scale: 1.08, opacity: 0 }}
                 transition={{
                   duration: 0.75,
                   delay: wave * 0.12,
@@ -765,7 +786,7 @@ function RevealScene({
             reduced
               ? { opacity: 0 }
               : {
-                  scale: 1.45,
+                  scale: 1.22,
                   filter:
                     "brightness(0) invert(1) drop-shadow(0 0 32px rgba(255,255,255,1))",
                 }
@@ -795,7 +816,7 @@ function RevealScene({
         </motion.div>
       </div>
       <motion.div
-        className="flex flex-col items-center gap-2"
+        className="relative z-30 flex flex-col items-center gap-2"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25 }}
@@ -811,12 +832,12 @@ function RevealScene({
         >
           RISEN TO {stageRank(cat?.level ?? 1).toUpperCase()}
         </span>
-        <div className="flex max-w-xl flex-wrap items-center justify-center gap-2">
+        <div className="flex max-w-xl flex-wrap items-center justify-center gap-1.5 px-2 sm:gap-2 sm:px-0">
           {chips.map((chip, index) => (
             <motion.span
               key={chip.id}
               className={cn(
-                "rounded-full border px-3 py-1 text-[11px] font-semibold",
+                "rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-tight sm:px-3 sm:py-1 sm:text-[11px]",
                 CHIP_KIND_STYLE[chip.kind],
               )}
               initial={{ opacity: 0, y: 8, scale: 0.9 }}

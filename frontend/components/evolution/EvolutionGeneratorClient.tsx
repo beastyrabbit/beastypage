@@ -28,8 +28,11 @@ import type { CatParams } from "@/lib/cat-v3/types";
 import { encodeCatShare } from "@/lib/catShare";
 import { generateLineageNames } from "@/lib/evolution/clanNames";
 import {
+  applyEvolutionStarterHairToParams,
+  applyEvolutionStarterHairToPayload,
   buildEvolutionBatchSettings,
   CONTROLLED_ARCHETYPES,
+  type EvolutionStarterHair,
   type EvolutionArchetype,
   type EvolutionBatchResult,
   type EvolutionControls,
@@ -41,6 +44,7 @@ import {
   generateTeaserVariant,
   isWildArchetype,
   normalizeEvolutionControls,
+  resolveEvolutionStarterHair,
   WILD_ARCHETYPES,
 } from "@/lib/evolution/evolutionGenerator";
 import { buildEvolutionPools } from "@/lib/evolution/evolutionPools";
@@ -59,7 +63,6 @@ import { NameField } from "./NameField";
 
 type StarterMode = "random" | "history";
 type SaveState = "idle" | "saving" | "saved" | "error";
-type HairSprite = "random" | "long" | "short";
 type ChamberPhase = "setup" | "ceremony" | "tree";
 
 type MapperRecord = {
@@ -96,20 +99,13 @@ const TARGET_LEVELS: EvolutionLevel[] = [1, 2, 3];
 const LAYER_STEPS = [0, 1, 2] as const;
 const TORTIE_STEPS = [0, 1, 2, 3, 4] as const;
 const HAIR_SPRITES: Array<{
-  id: HairSprite;
+  id: EvolutionStarterHair;
   label: string;
-  spriteNumber: 8 | 9 | null;
 }> = [
-  { id: "random", label: "Random", spriteNumber: null },
-  { id: "short", label: "Short hair", spriteNumber: 8 },
-  { id: "long", label: "Long hair", spriteNumber: 9 },
+  { id: "random", label: "Random" },
+  { id: "short", label: "Short hair" },
+  { id: "long", label: "Long hair" },
 ];
-
-function resolveHairSprite(hair: HairSprite): 8 | 9 {
-  const option = HAIR_SPRITES.find((entry) => entry.id === hair);
-  if (option?.spriteNumber) return option.spriteNumber;
-  return Math.random() < 0.5 ? 8 : 9;
-}
 
 const SPIN_TIMES = [5, 8, 15, 30, 90] as const;
 
@@ -167,19 +163,6 @@ function cleanRandomStarterLayers(params: CatParams): CatParams {
   return next;
 }
 
-function applySpriteToStarterPayload(input: unknown, spriteNumber: number) {
-  if (!input || typeof input !== "object") return input;
-  const raw = structuredClone(input) as Record<string, unknown>;
-  if (raw.params && typeof raw.params === "object") {
-    raw.params = {
-      ...(raw.params as Record<string, unknown>),
-      spriteNumber,
-    };
-    return raw;
-  }
-  return { ...raw, spriteNumber };
-}
-
 export function EvolutionGeneratorClient() {
   const createBatch = useMutation(api.adoption.createBatch);
   const createMapper = useMutation(api.mapper.create);
@@ -195,7 +178,7 @@ export function EvolutionGeneratorClient() {
   const [expectedCount, setExpectedCount] = useState(0);
   const [modulesReady, setModulesReady] = useState(false);
   const [starterMode, setStarterMode] = useState<StarterMode>("random");
-  const [hairSprite, setHairSprite] = useState<HairSprite>("random");
+  const [hairSprite, setHairSprite] = useState<EvolutionStarterHair>("random");
   const [historySlug, setHistorySlug] = useState("");
   const [starterPreview, setStarterPreview] = useState<string | null>(null);
   const [ceremonyPools, setCeremonyPools] = useState<EvolutionPools | null>(
@@ -286,16 +269,10 @@ export function EvolutionGeneratorClient() {
     let cancelled = false;
     (async () => {
       try {
-        const selectedHair = HAIR_SPRITES.find(
-          (option) => option.id === hairSprite,
-        );
-        const payload = (
-          selectedHair?.spriteNumber
-            ? applySpriteToStarterPayload(
-                historyRecord.cat_data,
-                selectedHair.spriteNumber,
-              )
-            : historyRecord.cat_data
+        const starterHair = resolveEvolutionStarterHair(hairSprite);
+        const payload = applyEvolutionStarterHairToPayload(
+          historyRecord.cat_data,
+          starterHair,
         ) as Record<string, unknown>;
         const params = (payload.params ?? payload) as CatParams;
         const rendered = await generatorRef.current?.generateCat(params);
@@ -461,7 +438,7 @@ export function EvolutionGeneratorClient() {
 
       let starterPayload: unknown;
       let starterSource: Parameters<typeof buildEvolutionBatchSettings>[1];
-      const starterSprite = resolveHairSprite(hairSprite);
+      const starterHair = resolveEvolutionStarterHair(hairSprite);
 
       if (starterMode === "history") {
         if (!trimmedHistorySlug) {
@@ -473,9 +450,9 @@ export function EvolutionGeneratorClient() {
         if (!historyRecord?.cat_data) {
           throw new Error("No saved cat was found for that slug");
         }
-        starterPayload = applySpriteToStarterPayload(
+        starterPayload = applyEvolutionStarterHairToPayload(
           historyRecord.cat_data,
-          starterSprite,
+          starterHair,
         );
         starterSource = {
           type: "history",
@@ -497,10 +474,10 @@ export function EvolutionGeneratorClient() {
           },
         });
         starterPayload = {
-          params: cleanRandomStarterLayers({
-            ...randomStarter.params,
-            spriteNumber: starterSprite,
-          } satisfies CatParams),
+          params: applyEvolutionStarterHairToParams(
+            cleanRandomStarterLayers(randomStarter.params),
+            starterHair,
+          ),
           accessorySlots: [],
           scarSlots: [],
           tortieSlots: [],

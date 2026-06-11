@@ -376,8 +376,24 @@ const REPLACEMENT_CHANCE = 0.16;
 
 /** Chance per evolution that a shorthair coat grows out. One-way: 8 -> 9. */
 const COAT_GROWTH_CHANCE = 0.12;
-const SHORT_HAIR_SPRITE = 8;
-const LONG_HAIR_SPRITE = 9;
+export const SHORT_HAIR_SPRITE = 8;
+export const LONG_HAIR_SPRITE = 9;
+export const SHORT_HAIR_POSE = "adult_short2";
+export const LONG_HAIR_POSE = "adult_long0";
+
+export type EvolutionStarterHair = "random" | "short" | "long";
+export type EvolutionStarterHairStyle = {
+  spriteNumber: typeof SHORT_HAIR_SPRITE | typeof LONG_HAIR_SPRITE;
+  poseName: typeof SHORT_HAIR_POSE | typeof LONG_HAIR_POSE;
+};
+
+export const EVOLUTION_STARTER_HAIR_STYLES = {
+  short: { spriteNumber: SHORT_HAIR_SPRITE, poseName: SHORT_HAIR_POSE },
+  long: { spriteNumber: LONG_HAIR_SPRITE, poseName: LONG_HAIR_POSE },
+} as const satisfies Record<
+  Exclude<EvolutionStarterHair, "random">,
+  EvolutionStarterHairStyle
+>;
 
 export const MAX_TORTIE_PER_STAGE = 4;
 export const MAX_LAYERS_PER_STAGE = 2;
@@ -464,6 +480,65 @@ export function normalizeEvolutionControls(
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+export function resolveEvolutionStarterHair(
+  hair: EvolutionStarterHair,
+  random: RandomFn = Math.random,
+): EvolutionStarterHairStyle {
+  if (hair === "short") return EVOLUTION_STARTER_HAIR_STYLES.short;
+  if (hair === "long") return EVOLUTION_STARTER_HAIR_STYLES.long;
+  return random() < 0.5
+    ? EVOLUTION_STARTER_HAIR_STYLES.short
+    : EVOLUTION_STARTER_HAIR_STYLES.long;
+}
+
+export function applyEvolutionStarterHairToParams(
+  params: CatParams,
+  hair: EvolutionStarterHairStyle,
+): CatParams {
+  return {
+    ...params,
+    spriteNumber: hair.spriteNumber,
+    poseName: hair.poseName,
+  };
+}
+
+export function applyEvolutionStarterHairToPayload(
+  input: unknown,
+  hair: EvolutionStarterHairStyle,
+): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  const raw = clone(input as Record<string, unknown>);
+  if (
+    raw.params &&
+    typeof raw.params === "object" &&
+    !Array.isArray(raw.params)
+  ) {
+    raw.params = applyEvolutionStarterHairToParams(
+      raw.params as unknown as CatParams,
+      hair,
+    );
+    return raw;
+  }
+  return applyEvolutionStarterHairToParams(raw as unknown as CatParams, hair);
+}
+
+function applyCanonicalStarterHair(params: CatParams): CatParams {
+  const spriteNumber = Number(params.spriteNumber);
+  if (spriteNumber === SHORT_HAIR_SPRITE) {
+    return applyEvolutionStarterHairToParams(
+      params,
+      EVOLUTION_STARTER_HAIR_STYLES.short,
+    );
+  }
+  if (spriteNumber === LONG_HAIR_SPRITE) {
+    return applyEvolutionStarterHairToParams(
+      params,
+      EVOLUTION_STARTER_HAIR_STYLES.long,
+    );
+  }
+  return params;
 }
 
 function cleanString(value: unknown): string | null {
@@ -592,11 +667,8 @@ export function normalizeEvolutionStarter(input: unknown): EvolutionCatData {
     ...params,
     tortieSlots: raw.tortieSlots,
   });
-  const normalizedParams = applySlotsToParams(
-    params,
-    accessories,
-    scars,
-    torties,
+  const normalizedParams = applyCanonicalStarterHair(
+    applySlotsToParams(params, accessories, scars, torties),
   );
 
   return {
@@ -1262,7 +1334,10 @@ export function generateEvolutionBatch(
         rolls,
       };
       const nextParams = coatGrew
-        ? { ...clone(parent.params), spriteNumber: LONG_HAIR_SPRITE }
+        ? applyEvolutionStarterHairToParams(
+            clone(parent.params),
+            EVOLUTION_STARTER_HAIR_STYLES.long,
+          )
         : parent.params;
       const catData = createCatData(
         nextParams,
@@ -1405,7 +1480,10 @@ export function generateTeaserVariant(
 
   const params = applySlotsToParams(parent.params, accessories, scars, torties);
   if (countOf("coat") > 0 && random() < 0.5) {
-    params.spriteNumber = LONG_HAIR_SPRITE;
+    return applyEvolutionStarterHairToParams(
+      params,
+      EVOLUTION_STARTER_HAIR_STYLES.long,
+    );
   }
   return params;
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
+  applyEvolutionStarterHairToPayload,
+  EVOLUTION_STARTER_HAIR_STYLES,
   type EvolutionAddition,
   type EvolutionPools,
   generateEvolutionBatch,
@@ -9,6 +11,7 @@ import {
   isNearStarterColour,
   normalizeEvolutionControls,
   normalizeEvolutionStarter,
+  resolveEvolutionStarterHair,
 } from "../evolutionGenerator";
 
 const starterParams: CatParams = {
@@ -141,6 +144,60 @@ describe("evolution generation", () => {
     expect(normalized.params.tortie).toEqual([
       { mask: "ONE", pattern: "SingleColour", colour: "BLACK" },
     ]);
+  });
+
+  it("resolves random starter hair only to canonical short or long hair", () => {
+    expect(resolveEvolutionStarterHair("short")).toEqual(
+      EVOLUTION_STARTER_HAIR_STYLES.short,
+    );
+    expect(resolveEvolutionStarterHair("long")).toEqual(
+      EVOLUTION_STARTER_HAIR_STYLES.long,
+    );
+    expect(resolveEvolutionStarterHair("random", () => 0.49)).toEqual(
+      EVOLUTION_STARTER_HAIR_STYLES.short,
+    );
+    expect(resolveEvolutionStarterHair("random", () => 0.5)).toEqual(
+      EVOLUTION_STARTER_HAIR_STYLES.long,
+    );
+  });
+
+  it("overwrites stale saved starter poses while preserving the payload", () => {
+    const payload = {
+      params: {
+        ...starterParams,
+        spriteNumber: 4,
+        poseName: "adolescent_short1",
+      },
+      accessorySlots: ["MAPLE LEAF"],
+      scarSlots: ["ONE"],
+      note: "keep me",
+    };
+
+    const normalized = applyEvolutionStarterHairToPayload(
+      payload,
+      EVOLUTION_STARTER_HAIR_STYLES.long,
+    ) as typeof payload;
+
+    expect(normalized.params.spriteNumber).toBe(9);
+    expect(normalized.params.poseName).toBe("adult_long0");
+    expect(normalized.params.peltName).toBe(starterParams.peltName);
+    expect(normalized.params.colour).toBe(starterParams.colour);
+    expect(normalized.accessorySlots).toEqual(["MAPLE LEAF"]);
+    expect(normalized.scarSlots).toEqual(["ONE"]);
+    expect(normalized.note).toBe("keep me");
+  });
+
+  it("canonicalizes starter hair poses during starter normalization", () => {
+    const normalized = normalizeEvolutionStarter({
+      ...starterParams,
+      spriteNumber: 8,
+      poseName: "adult_long2",
+    });
+
+    expect(normalized.params.spriteNumber).toBe(8);
+    expect(normalized.params.poseName).toBe("adult_short2");
+    expect(normalized.params.peltName).toBe(starterParams.peltName);
+    expect(normalized.params.colour).toBe(starterParams.colour);
   });
 
   it("preserves starter params and existing layers while appending cumulatively", () => {
@@ -372,8 +429,12 @@ describe("evolution generation", () => {
     expect(evolution?.catData.tortieSlots).toHaveLength(4);
   });
 
-  it("grows a shorthair coat one-way and keeps it long", () => {
-    const shorthair: CatParams = { ...cleanStarter(), spriteNumber: 8 };
+  it("grows a shorthair coat one-way and keeps its long-hair pose", () => {
+    const shorthair: CatParams = {
+      ...cleanStarter(),
+      spriteNumber: 8,
+      poseName: "adult_short2",
+    };
     // First random call per stage is the coat-growth check (< 0.12 grows).
     const result = generateEvolutionBatch(
       { params: shorthair },
@@ -395,21 +456,35 @@ describe("evolution generation", () => {
     expect(levels[0].catData.params.spriteNumber).toBe(9);
     expect(levels[1].catData.params.spriteNumber).toBe(9);
     expect(levels[2].catData.params.spriteNumber).toBe(9);
+    expect(levels[0].catData.params.poseName).toBe("adult_long0");
+    expect(levels[1].catData.params.poseName).toBe("adult_long0");
+    expect(levels[2].catData.params.poseName).toBe("adult_long0");
     expect(coatAdditions).toHaveLength(1);
     expect(levels[0].rolls.some((roll) => roll.kind === "coat")).toBe(true);
   });
 
-  it("never changes the coat of a longhair starter", () => {
-    const longhair: CatParams = { ...cleanStarter(), spriteNumber: 9 };
+  it("keeps longhair starters on the canonical long-hair pose", () => {
+    const longhair: CatParams = {
+      ...cleanStarter(),
+      spriteNumber: 9,
+      poseName: "adult_short1",
+    };
     const result = generateEvolutionBatch(
       { params: longhair },
-      { branchCount: 2, targetLevel: 3 },
+      {
+        branchCount: 2,
+        targetLevel: 3,
+        torties: { min: 0, max: 0 },
+        accessories: { min: 0, max: 0 },
+        scars: { min: 0, max: 0 },
+      },
       pools,
       { random: sequenceRandom([0.01, 0.3, 0.6]) },
     );
 
     for (const cat of result.cats) {
       expect(cat.catData.params.spriteNumber).toBe(9);
+      expect(cat.catData.params.poseName).toBe("adult_long0");
       expect(cat.additions.some((addition) => addition.kind === "coat")).toBe(
         false,
       );
@@ -569,6 +644,24 @@ describe("evolution generation", () => {
     expect(params.tortie ?? []).toHaveLength(0);
     expect(params.accessories ?? []).toHaveLength(0);
     expect(params.scars ?? []).toHaveLength(0);
+  });
+
+  it("uses the canonical long-hair pose for teaser coat changes", () => {
+    const params = generateTeaserVariant(
+      {
+        params: {
+          ...cleanStarter(),
+          spriteNumber: 8,
+          poseName: "adult_short2",
+        },
+      },
+      [{ kind: "coat", label: "Coat grew long", value: "Long hair" }],
+      pools,
+      { random: sequenceRandom([0.1]) },
+    );
+
+    expect(params.spriteNumber).toBe(9);
+    expect(params.poseName).toBe("adult_long0");
   });
 
   it("can roll colours outside the archetype preferred subset", () => {
