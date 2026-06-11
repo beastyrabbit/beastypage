@@ -42,6 +42,8 @@ export type EvolutionPools = {
   extraAccessories?: string[];
   scars: string[];
   colourDefinitions?: Record<string, [number, number, number]>;
+  /** Colour names each clan may roll; controlled clans stay inside theirs. */
+  clanColours?: Partial<Record<EvolutionArchetype, string[]>>;
 };
 
 export type EvolutionTortiePart = {
@@ -205,6 +207,33 @@ const ARCHETYPE_RING: EvolutionArchetype[] = [
   "void",
   "sun",
 ];
+
+/** Hue-coherent clans that only roll colours from their assigned palettes. */
+export const CONTROLLED_ARCHETYPES: EvolutionArchetype[] = [
+  "flare",
+  "aqua",
+  "leaf",
+  "sun",
+  "rose",
+  "moon",
+];
+
+/** Eclectic clans that may also roll from the entire colour pool. */
+export const WILD_ARCHETYPES: EvolutionArchetype[] = [
+  "volt",
+  "crystal",
+  "void",
+  "steel",
+];
+
+const WILD_ARCHETYPE_SET = new Set<EvolutionArchetype>(WILD_ARCHETYPES);
+
+export function isWildArchetype(archetype: EvolutionArchetype): boolean {
+  return WILD_ARCHETYPE_SET.has(archetype);
+}
+
+/** Chance that a wild clan ignores its palettes and rolls the full pool. */
+const WILD_OPEN_CHANCE = 0.5;
 
 const BASE_COLOUR_RGB: Record<string, [number, number, number]> = {
   WHITE: [238, 238, 232],
@@ -768,9 +797,23 @@ function pickEvolutionColour(
   );
   const useExperimental = random() < EXPERIMENTAL_CHANCE[level];
 
+  // Clan palette assignment: controlled clans stay inside their own colour
+  // set; wild clans may open up to the full pool.
+  const clanPool = pools.clanColours?.[archetype];
+  let experimentalSource = pools.experimentalColours;
+  let clanRestricted = false;
+  if (clanPool && clanPool.length > 0) {
+    const rollOpen =
+      WILD_ARCHETYPE_SET.has(archetype) && random() < WILD_OPEN_CHANCE;
+    if (!rollOpen) {
+      experimentalSource = clanPool;
+      clanRestricted = true;
+    }
+  }
+
   const experimentalPool = withoutUsedColours(
     filterRenderable(
-      pools.experimentalColours,
+      experimentalSource,
       experimentalSet,
       starterColour,
       definitions,
@@ -805,11 +848,12 @@ function pickEvolutionColour(
       ];
 
   for (const pool of orderedPools) {
-    const picked = pickArchetypeWeightedColour(
-      pool.full,
-      pool.preferred,
-      random,
-    );
+    // Inside an assigned clan pool every palette colour is equally fair
+    // game; the preferred-list bias only applies to the legacy open pool.
+    const picked =
+      clanRestricted && pool.full === experimentalPool
+        ? pickOne(pool.full, random)
+        : pickArchetypeWeightedColour(pool.full, pool.preferred, random);
     if (picked) return picked;
   }
 
@@ -925,11 +969,17 @@ export function generateEvolutionBatch(
   starterInput: unknown,
   controlsInput: Partial<EvolutionControls>,
   pools: EvolutionPools,
-  options: { random?: RandomFn } = {},
+  options: { random?: RandomFn; archetypes?: EvolutionArchetype[] } = {},
 ): EvolutionBatchResult {
   const random = options.random ?? Math.random;
   const controls = normalizeEvolutionControls(controlsInput);
   const starterData = normalizeEvolutionStarter(starterInput);
+  const requestedArchetypes = (options.archetypes ?? [])
+    .filter((archetype) => ARCHETYPE_RING.includes(archetype))
+    .slice(0, 12);
+  if (requestedArchetypes.length > 0) {
+    controls.branchCount = requestedArchetypes.length;
+  }
   const starter: EvolutionGeneratedCat = {
     key: "starter",
     label: "Starter",
@@ -942,11 +992,14 @@ export function generateEvolutionBatch(
     catData: starterData,
   };
 
-  const branchArchetypes = chooseBranchArchetypes(
-    starterData.params.colour,
-    controls.branchCount,
-    pools.colourDefinitions,
-  );
+  const branchArchetypes =
+    requestedArchetypes.length > 0
+      ? requestedArchetypes
+      : chooseBranchArchetypes(
+          starterData.params.colour,
+          controls.branchCount,
+          pools.colourDefinitions,
+        );
   const cats: EvolutionGeneratedCat[] = [starter];
 
   for (

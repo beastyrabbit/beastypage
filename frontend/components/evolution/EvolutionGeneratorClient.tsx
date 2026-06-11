@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import { ArrowUpRight, Loader2, Minus, Plus, RotateCcw } from "lucide-react";
+import { ArrowUpRight, Loader2, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -28,6 +28,8 @@ import type { CatParams } from "@/lib/cat-v3/types";
 import { encodeCatShare } from "@/lib/catShare";
 import {
   buildEvolutionBatchSettings,
+  CONTROLLED_ARCHETYPES,
+  type EvolutionArchetype,
   type EvolutionBatchResult,
   type EvolutionControls,
   type EvolutionGeneratedCat,
@@ -36,7 +38,9 @@ import {
   type EvolutionRange,
   generateEvolutionBatch,
   generateTeaserVariant,
+  isWildArchetype,
   normalizeEvolutionControls,
+  WILD_ARCHETYPES,
 } from "@/lib/evolution/evolutionGenerator";
 import { buildEvolutionPools } from "@/lib/evolution/evolutionPools";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
@@ -99,6 +103,12 @@ function resolveHairSprite(hair: HairSprite): 8 | 9 {
 
 const SPIN_TIMES = [5, 8, 15, 30, 90] as const;
 
+/** Controlled clans first, wild clans behind them. */
+const CLAN_ORDER: EvolutionArchetype[] = [
+  ...CONTROLLED_ARCHETYPES,
+  ...WILD_ARCHETYPES,
+];
+
 /** Rough per-step costs (seconds at 1x) used for the ceremony estimate. */
 const ESTIMATE_SUMMON = 5;
 const ESTIMATE_BANNER = 3.5;
@@ -112,13 +122,14 @@ function formatDuration(totalSeconds: number) {
 }
 
 function estimateCeremonySeconds(
-  controls: EvolutionControls,
+  clanCount: number,
+  targetLevel: number,
   spinSeconds: number,
 ) {
-  const evolutions = controls.branchCount * controls.targetLevel;
+  const evolutions = clanCount * targetLevel;
   return (
     ESTIMATE_SUMMON +
-    controls.branchCount * ESTIMATE_BANNER +
+    clanCount * ESTIMATE_BANNER +
     evolutions * (spinSeconds + ESTIMATE_REVEAL)
   );
 }
@@ -182,6 +193,9 @@ export function EvolutionGeneratorClient() {
   );
   const [spinSeconds, setSpinSeconds] =
     useState<(typeof SPIN_TIMES)[number]>(8);
+  const [selectedClans, setSelectedClans] = useState<EvolutionArchetype[]>(
+    () => [...CONTROLLED_ARCHETYPES],
+  );
   const [controls, setControls] = useState<EvolutionControls>(() =>
     normalizeEvolutionControls(),
   );
@@ -414,7 +428,7 @@ export function EvolutionGeneratorClient() {
     setLastSavedId(null);
     setLastSavedToken(null);
     setRecords([]);
-    setExpectedCount(controls.branchCount * controls.targetLevel + 1);
+    setExpectedCount(selectedClans.length * controls.targetLevel + 1);
     setCeremonyKey((value) => value + 1);
     setPhase("ceremony");
     setIsGenerating(true);
@@ -479,7 +493,9 @@ export function EvolutionGeneratorClient() {
 
       const pools = buildEvolutionPools(mapperRef.current);
       setCeremonyPools(pools);
-      const result = generateEvolutionBatch(starterPayload, controls, pools);
+      const result = generateEvolutionBatch(starterPayload, controls, pools, {
+        archetypes: selectedClans,
+      });
       const orderedCats = [
         result.starter,
         ...result.cats.filter((cat) => cat.level !== 0),
@@ -515,6 +531,7 @@ export function EvolutionGeneratorClient() {
     historyRecord,
     persistResult,
     renderRecord,
+    selectedClans,
     starterMode,
     trimmedHistorySlug,
   ]);
@@ -716,6 +733,7 @@ export function EvolutionGeneratorClient() {
   const canGenerate =
     modulesReady &&
     !isGenerating &&
+    selectedClans.length > 0 &&
     (starterMode === "random" ||
       Boolean(trimmedHistorySlug && historyRecord?.cat_data));
 
@@ -846,53 +864,56 @@ export function EvolutionGeneratorClient() {
             THE RITUAL
           </span>
 
-          <div className="grid gap-5 sm:grid-cols-3">
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                Evolution lines
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  aria-label="Fewer lines"
-                  onClick={() =>
-                    setControls((current) =>
-                      normalizeEvolutionControls({
-                        ...current,
-                        branchCount: current.branchCount - 1,
-                      }),
-                    )
-                  }
-                  className="flex size-9 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition hover:text-foreground"
-                >
-                  <Minus className="size-4" />
-                </button>
-                <span
-                  className={cn(
-                    pixelFontClass,
-                    "w-10 text-center text-lg text-foreground",
-                  )}
-                >
-                  {controls.branchCount}
-                </span>
-                <button
-                  type="button"
-                  aria-label="More lines"
-                  onClick={() =>
-                    setControls((current) =>
-                      normalizeEvolutionControls({
-                        ...current,
-                        branchCount: current.branchCount + 1,
-                      }),
-                    )
-                  }
-                  className="flex size-9 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition hover:text-foreground"
-                >
-                  <Plus className="size-4" />
-                </button>
-              </div>
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+              Clans to roll · {selectedClans.length} selected
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {CLAN_ORDER.map((archetype) => {
+                const theme = ARCHETYPE_THEMES[archetype];
+                const selected = selectedClans.includes(archetype);
+                const wild = isWildArchetype(archetype);
+                return (
+                  <button
+                    key={archetype}
+                    type="button"
+                    onClick={() =>
+                      setSelectedClans((current) =>
+                        current.includes(archetype)
+                          ? current.filter((clan) => clan !== archetype)
+                          : CLAN_ORDER.filter(
+                              (clan) =>
+                                current.includes(clan) || clan === archetype,
+                            ),
+                      )
+                    }
+                    title={`${theme.label}Clan — ${theme.blurb}${wild ? " (wild: may roll any palette)" : ""}`}
+                    aria-label={`${theme.label}Clan${wild ? " (wild)" : ""}`}
+                    aria-pressed={selected}
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-lg border text-base transition",
+                      wild && "border-dashed",
+                      selected
+                        ? "scale-105"
+                        : "border-border/60 bg-background opacity-50 grayscale hover:opacity-100 hover:grayscale-0",
+                    )}
+                    style={
+                      selected
+                        ? {
+                            borderColor: withAlpha(theme.from, 0.7),
+                            background: withAlpha(theme.to, 0.18),
+                          }
+                        : undefined
+                    }
+                  >
+                    <span aria-hidden>{theme.glyph}</span>
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
+          <div className="grid gap-5 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
                 Final rank
@@ -1000,11 +1021,17 @@ export function EvolutionGeneratorClient() {
 
           <div className="mt-auto flex flex-col gap-3 border-t border-border/30 pt-4">
             <p className="text-xs text-muted-foreground">
-              {controls.branchCount}{" "}
-              {controls.branchCount === 1 ? "line" : "lines"} ·{" "}
-              {controls.branchCount * controls.targetLevel + 1} cats · ranks up
+              {selectedClans.length}{" "}
+              {selectedClans.length === 1 ? "clan" : "clans"} ·{" "}
+              {selectedClans.length * controls.targetLevel + 1} cats · ranks up
               to {stageRank(controls.targetLevel)} · ceremony ≈{" "}
-              {formatDuration(estimateCeremonySeconds(controls, spinSeconds))}{" "}
+              {formatDuration(
+                estimateCeremonySeconds(
+                  selectedClans.length,
+                  controls.targetLevel,
+                  spinSeconds,
+                ),
+              )}{" "}
               at 1×
             </p>
             <button
@@ -1071,21 +1098,6 @@ function ChamberHero() {
           across elemental clans — every ceremony rolled live with new coats,
           accessories, and battle scars.
         </p>
-        <div className="flex flex-wrap gap-2" aria-hidden>
-          {Object.values(ARCHETYPE_THEMES).map((theme) => (
-            <span
-              key={theme.label}
-              className="flex size-8 items-center justify-center rounded-lg border text-sm"
-              style={{
-                borderColor: withAlpha(theme.from, 0.3),
-                background: withAlpha(theme.to, 0.15),
-              }}
-              title={`${theme.label} — ${theme.blurb}`}
-            >
-              {theme.glyph}
-            </span>
-          ))}
-        </div>
       </div>
     </header>
   );

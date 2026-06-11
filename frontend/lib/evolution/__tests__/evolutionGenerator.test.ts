@@ -438,6 +438,49 @@ describe("evolution generation", () => {
     );
   });
 
+  it("uses explicitly selected clans as the branch archetypes", () => {
+    const result = generateEvolutionBatch(
+      { params: cleanStarter() },
+      { branchCount: 6, targetLevel: 2 },
+      pools,
+      {
+        random: sequenceRandom([0.3, 0.6, 0.9]),
+        archetypes: ["void", "rose", "rose"],
+      },
+    );
+
+    expect(result.branchArchetypes).toEqual(["void", "rose", "rose"]);
+    expect(result.controls.branchCount).toBe(3);
+    expect(result.cats).toHaveLength(1 + 3 * 2);
+    expect(result.cats.filter((cat) => cat.archetype === "void")).toHaveLength(
+      2,
+    );
+  });
+
+  it("keeps controlled clans inside their assigned colour pool", () => {
+    const clanPools: EvolutionPools = {
+      ...pools,
+      clanColours: { flare: ["AQUA"] },
+    };
+    // 0.1 < experimental chance, so the clan-restricted pool is used.
+    const result = generateEvolutionBatch(
+      { params: cleanStarter() },
+      {
+        branchCount: 1,
+        targetLevel: 1,
+        torties: { min: 1, max: 1 },
+        accessories: { min: 0, max: 0 },
+        scars: { min: 0, max: 0 },
+      },
+      clanPools,
+      { random: sequenceRandom([0.1]), archetypes: ["flare"] },
+    );
+    const evolution = result.cats.find((cat) => cat.level === 1);
+
+    expect(evolution?.archetype).toBe("flare");
+    expect(evolution?.catData.tortieSlots[0]?.colour).toBe("AQUA");
+  });
+
   it("bounds teaser variants by the real evolution's trait shape", () => {
     const tortieAddition: EvolutionAddition = {
       kind: "tortie",

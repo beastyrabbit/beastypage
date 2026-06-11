@@ -1,5 +1,6 @@
 import { getAllColorDefs } from "@/lib/palettes";
-import type { EvolutionPools } from "./evolutionGenerator";
+import { buildClanColourSets } from "./clanPalettes";
+import type { EvolutionArchetype, EvolutionPools } from "./evolutionGenerator";
 
 export type EvolutionPoolMapper = {
   getTortieMasks(): string[];
@@ -65,14 +66,25 @@ export function buildEvolutionPools(
     ...readMapperArray(mapper, "getScarsByCategory", 3),
   ];
 
+  const experimentalColours =
+    mapper.getExperimentalColours?.() ?? Object.keys(getAllColorDefs());
+  const renderable = new Set(
+    experimentalColours.map((colour) => colour.toUpperCase()),
+  );
+  const clanColours = Object.fromEntries(
+    Object.entries(buildClanColourSets()).map(([clan, colours]) => [
+      clan,
+      colours.filter((colour) => renderable.has(colour.toUpperCase())),
+    ]),
+  ) as Partial<Record<EvolutionArchetype, string[]>>;
+
   return {
     tortieMasks: readMapperArray(mapper, "getTortieMasks"),
     tortiePatterns: readMapperArray(mapper, "getPeltNames").filter(
       (name) => name !== "Tortie" && name !== "Calico",
     ),
     baseColours: readMapperArray(mapper, "getColours"),
-    experimentalColours:
-      mapper.getExperimentalColours?.() ?? Object.keys(getAllColorDefs()),
+    experimentalColours,
     accessories: allAccessories,
     plantAccessories,
     wildAccessories,
@@ -80,5 +92,6 @@ export function buildEvolutionPools(
     extraAccessories,
     scars,
     colourDefinitions: buildColourDefinitions(),
+    clanColours,
   };
 }
