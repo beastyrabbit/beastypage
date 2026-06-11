@@ -63,6 +63,8 @@ export type EvolutionCatData = {
   evolution: EvolutionCatMeta;
 };
 
+export type EvolutionReplacementSlot = "tortie" | "accessory" | "scar";
+
 export type EvolutionAddition =
   | {
       kind: "tortie";
@@ -73,6 +75,18 @@ export type EvolutionAddition =
   | {
       kind: "accessory" | "scar";
       label: string;
+      value: string;
+    }
+  | {
+      kind: "coat";
+      label: string;
+      value: string;
+    }
+  | {
+      kind: "replacement";
+      slot: EvolutionReplacementSlot;
+      label: string;
+      previous: string;
       value: string;
     };
 
@@ -93,6 +107,17 @@ export type EvolutionRoll =
   | {
       kind: "accessory" | "scar";
       label: "Accessory" | "Scar";
+      value: string;
+    }
+  | {
+      kind: "coat";
+      label: "Coat";
+      value: string;
+    }
+  | {
+      kind: "replacement";
+      label: "Replacement";
+      slot: EvolutionReplacementSlot;
       value: string;
     };
 
@@ -280,10 +305,27 @@ const EXPERIMENTAL_CHANCE: Record<EvolutionLevel, number> = {
   3: 0.32,
 };
 
+/**
+ * Chance per evolution that one already-owned tortie/accessory/scar is
+ * rerolled instead of kept. ~0.16 means roughly two replacements across a
+ * default 6-line × 3-stage run (only stages that own traits are eligible).
+ */
+const REPLACEMENT_CHANCE = 0.16;
+
+/** Chance per evolution that a shorthair coat grows out. One-way: 8 -> 9. */
+const COAT_GROWTH_CHANCE = 0.12;
+const SHORT_HAIR_SPRITE = 8;
+const LONG_HAIR_SPRITE = 9;
+
+export const MAX_TORTIE_PER_STAGE = 4;
+export const MAX_LAYERS_PER_STAGE = 2;
+
 const TORTIE_COUNT_WEIGHTS: Record<number, number> = {
   0: 0.1,
   1: 0.65,
   2: 0.35,
+  3: 0.16,
+  4: 0.08,
 };
 
 const ACCESSORY_COUNT_WEIGHTS: Record<number, number> = {
@@ -313,9 +355,13 @@ function clampInt(value: unknown, min: number, max: number, fallback: number) {
   return Math.min(max, Math.max(min, Math.trunc(numeric)));
 }
 
-function clampRange(value: Partial<EvolutionRange> | undefined, fallback: EvolutionRange) {
-  const min = clampInt(value?.min, 0, 2, fallback.min);
-  const max = clampInt(value?.max, 0, 2, fallback.max);
+function clampRange(
+  value: Partial<EvolutionRange> | undefined,
+  fallback: EvolutionRange,
+  limit: number,
+) {
+  const min = clampInt(value?.min, 0, limit, fallback.min);
+  const max = clampInt(value?.max, 0, limit, fallback.max);
   return min <= max ? { min, max } : { min: max, max: min };
 }
 
@@ -323,16 +369,33 @@ export function normalizeEvolutionControls(
   value: Partial<EvolutionControls> = {},
 ): EvolutionControls {
   return {
-    branchCount: clampInt(value.branchCount, 1, 12, DEFAULT_CONTROLS.branchCount),
+    branchCount: clampInt(
+      value.branchCount,
+      1,
+      12,
+      DEFAULT_CONTROLS.branchCount,
+    ),
     targetLevel: clampInt(
       value.targetLevel,
       1,
       3,
       DEFAULT_CONTROLS.targetLevel,
     ) as EvolutionLevel,
-    torties: clampRange(value.torties, DEFAULT_CONTROLS.torties),
-    accessories: clampRange(value.accessories, DEFAULT_CONTROLS.accessories),
-    scars: clampRange(value.scars, DEFAULT_CONTROLS.scars),
+    torties: clampRange(
+      value.torties,
+      DEFAULT_CONTROLS.torties,
+      MAX_TORTIE_PER_STAGE,
+    ),
+    accessories: clampRange(
+      value.accessories,
+      DEFAULT_CONTROLS.accessories,
+      MAX_LAYERS_PER_STAGE,
+    ),
+    scars: clampRange(
+      value.scars,
+      DEFAULT_CONTROLS.scars,
+      MAX_LAYERS_PER_STAGE,
+    ),
     scarsEnabled: value.scarsEnabled ?? DEFAULT_CONTROLS.scarsEnabled,
   };
 }
@@ -463,8 +526,16 @@ export function normalizeEvolutionStarter(input: unknown): EvolutionCatData {
     params.accessory,
   );
   const scars = normalizeStringSlots(raw.scarSlots, params.scars, params.scar);
-  const torties = normalizeTortieSlots({ ...params, tortieSlots: raw.tortieSlots });
-  const normalizedParams = applySlotsToParams(params, accessories, scars, torties);
+  const torties = normalizeTortieSlots({
+    ...params,
+    tortieSlots: raw.tortieSlots,
+  });
+  const normalizedParams = applySlotsToParams(
+    params,
+    accessories,
+    scars,
+    torties,
+  );
 
   return {
     params: normalizedParams,
@@ -533,15 +604,15 @@ function pickUniqueString(
   const cleanPool = uniqueClean([...pool]);
   if (!cleanPool.length) return null;
   const available = cleanPool.filter((value) => !used.has(value));
-  const selected = pickOne(available.length > 0 ? available : cleanPool, random);
+  const selected = pickOne(
+    available.length > 0 ? available : cleanPool,
+    random,
+  );
   if (selected) used.add(selected);
   return selected;
 }
 
-function rgbDistance(
-  a: [number, number, number],
-  b: [number, number, number],
-) {
+function rgbDistance(a: [number, number, number], b: [number, number, number]) {
   return Math.sqrt(
     (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2,
   );
@@ -562,7 +633,8 @@ export function isNearStarterColour(
   definitions?: Record<string, [number, number, number]>,
 ) {
   if (!starterColour) return false;
-  if (starterColour.toUpperCase() === candidateColour.toUpperCase()) return true;
+  if (starterColour.toUpperCase() === candidateColour.toUpperCase())
+    return true;
   const starterRgb = getColourRgb(starterColour, definitions);
   const candidateRgb = getColourRgb(candidateColour, definitions);
   if (!starterRgb || !candidateRgb) return false;
@@ -584,13 +656,19 @@ function inferStarterArchetype(
     return "sun";
   }
 
-  return ARCHETYPE_RING.reduce((best, current) => {
-    const distance = rgbDistance(starterRgb, ARCHETYPE_CONFIG[current].anchor);
-    return distance < best.distance ? { archetype: current, distance } : best;
-  }, {
-    archetype: "sun" as EvolutionArchetype,
-    distance: Number.POSITIVE_INFINITY,
-  }).archetype;
+  return ARCHETYPE_RING.reduce(
+    (best, current) => {
+      const distance = rgbDistance(
+        starterRgb,
+        ARCHETYPE_CONFIG[current].anchor,
+      );
+      return distance < best.distance ? { archetype: current, distance } : best;
+    },
+    {
+      archetype: "sun" as EvolutionArchetype,
+      distance: Number.POSITIVE_INFINITY,
+    },
+  ).archetype;
 }
 
 function isArchetypeNearStarter(
@@ -608,7 +686,12 @@ export function chooseBranchArchetypes(
   branchCount: number,
   definitions?: Record<string, [number, number, number]>,
 ): EvolutionArchetype[] {
-  const normalizedCount = clampInt(branchCount, 1, 12, DEFAULT_CONTROLS.branchCount);
+  const normalizedCount = clampInt(
+    branchCount,
+    1,
+    12,
+    DEFAULT_CONTROLS.branchCount,
+  );
   const startArchetype = inferStarterArchetype(starterColour, definitions);
   const startIndex = ARCHETYPE_RING.indexOf(startArchetype);
   const order: EvolutionArchetype[] = [];
@@ -665,7 +748,9 @@ function pickEvolutionColour(
 ) {
   const definitions = pools.colourDefinitions;
   const config = ARCHETYPE_CONFIG[archetype];
-  const baseSet = new Set(pools.baseColours.map((value) => value.toUpperCase()));
+  const baseSet = new Set(
+    pools.baseColours.map((value) => value.toUpperCase()),
+  );
   const experimentalSet = new Set(
     pools.experimentalColours.map((value) => value.toUpperCase()),
   );
@@ -727,9 +812,7 @@ function branchLabel(index: number) {
 }
 
 function formatTortieLayer(layer: TortieLayer) {
-  return [layer.mask, layer.pattern, layer.colour]
-    .filter(Boolean)
-    .join(" / ");
+  return [layer.mask, layer.pattern, layer.colour].filter(Boolean).join(" / ");
 }
 
 export function getTortieLayerParts(
@@ -756,7 +839,12 @@ function createCatData(
   torties: TortieLayer[],
   meta: EvolutionCatMeta,
 ): EvolutionCatData {
-  const normalizedParams = applySlotsToParams(params, accessories, scars, torties);
+  const normalizedParams = applySlotsToParams(
+    params,
+    accessories,
+    scars,
+    torties,
+  );
   return {
     params: normalizedParams,
     accessorySlots: [...accessories],
@@ -801,9 +889,9 @@ function pickAccessory(
 ) {
   const byCategory = getAccessoryCategoryPools(pools);
   const weights = ACCESSORY_CATEGORY_WEIGHTS[level];
-  const categories = (Object.keys(weights) as Array<keyof typeof weights>).filter(
-    (category) => byCategory[category].length > 0,
-  );
+  const categories = (
+    Object.keys(weights) as Array<keyof typeof weights>
+  ).filter((category) => byCategory[category].length > 0);
   const availableCategories = categories.filter((category) =>
     byCategory[category].some((value) => !used.has(value)),
   );
@@ -848,7 +936,11 @@ export function generateEvolutionBatch(
   );
   const cats: EvolutionGeneratedCat[] = [starter];
 
-  for (let branchIndex = 0; branchIndex < controls.branchCount; branchIndex += 1) {
+  for (
+    let branchIndex = 0;
+    branchIndex < controls.branchCount;
+    branchIndex += 1
+  ) {
     const label = branchLabel(branchIndex);
     const archetype = branchArchetypes[branchIndex];
     let parent = clone(starterData);
@@ -868,6 +960,118 @@ export function generateEvolutionBatch(
       const nextTorties = parentSlots.torties.map((layer) => ({ ...layer }));
       const additions: EvolutionAddition[] = [];
       const rolls: EvolutionRoll[] = [];
+
+      // One-way coat growth: a shorthair line can grow out and stays long.
+      let coatGrew = false;
+      if (
+        Number(parent.params.spriteNumber) === SHORT_HAIR_SPRITE &&
+        random() < COAT_GROWTH_CHANCE
+      ) {
+        coatGrew = true;
+        rolls.push({ kind: "coat", label: "Coat", value: "Long hair" });
+        additions.push({
+          kind: "coat",
+          label: "Coat grew long",
+          value: "Long hair",
+        });
+      }
+
+      // Rare replacement: reroll one trait the cat already owns.
+      const replaceable: Array<{
+        slot: EvolutionReplacementSlot;
+        index: number;
+      }> = [
+        ...nextTorties.map((_, index) => ({ slot: "tortie" as const, index })),
+        ...nextAccessories.map((_, index) => ({
+          slot: "accessory" as const,
+          index,
+        })),
+        ...(controls.scarsEnabled
+          ? nextScars.map((_, index) => ({ slot: "scar" as const, index }))
+          : []),
+      ];
+      if (replaceable.length > 0 && random() < REPLACEMENT_CHANCE) {
+        const target =
+          replaceable[
+            Math.min(
+              Math.floor(random() * replaceable.length),
+              replaceable.length - 1,
+            )
+          ];
+        if (target.slot === "tortie") {
+          const mask = pickUniqueString(pools.tortieMasks, usedMasks, random);
+          const pattern = pickOne(pools.tortiePatterns, random);
+          if (mask && pattern) {
+            const colour = pickEvolutionColour(
+              starterData.params.colour,
+              archetype,
+              typedLevel,
+              pools,
+              random,
+            );
+            const previous = formatTortieLayer(nextTorties[target.index]);
+            const layer: TortieLayer = { mask, pattern, colour };
+            nextTorties[target.index] = layer;
+            const value = formatTortieLayer(layer);
+            rolls.push({
+              kind: "replacement",
+              label: "Replacement",
+              slot: "tortie",
+              value: `${previous} → ${value}`,
+            });
+            additions.push({
+              kind: "replacement",
+              slot: "tortie",
+              label: `Replaced tortie ${previous}`,
+              previous,
+              value,
+            });
+          }
+        } else if (target.slot === "accessory") {
+          const accessory = pickAccessory(
+            typedLevel,
+            pools,
+            usedAccessories,
+            random,
+          );
+          if (accessory) {
+            const previous = nextAccessories[target.index];
+            nextAccessories[target.index] = accessory;
+            rolls.push({
+              kind: "replacement",
+              label: "Replacement",
+              slot: "accessory",
+              value: `${previous} → ${accessory}`,
+            });
+            additions.push({
+              kind: "replacement",
+              slot: "accessory",
+              label: `Replaced accessory ${previous}`,
+              previous,
+              value: accessory,
+            });
+          }
+        } else {
+          const scar = pickUniqueString(pools.scars, usedScars, random);
+          if (scar) {
+            const previous = nextScars[target.index];
+            nextScars[target.index] = scar;
+            rolls.push({
+              kind: "replacement",
+              label: "Replacement",
+              slot: "scar",
+              value: `${previous} → ${scar}`,
+            });
+            additions.push({
+              kind: "replacement",
+              slot: "scar",
+              label: `Replaced scar ${previous}`,
+              previous,
+              value: scar,
+            });
+          }
+        }
+      }
 
       const tortieCount = pickCount(
         controls.torties,
@@ -928,7 +1132,12 @@ export function generateEvolutionBatch(
         random,
       );
       for (let i = 0; i < accessoryCount; i += 1) {
-        const accessory = pickAccessory(typedLevel, pools, usedAccessories, random);
+        const accessory = pickAccessory(
+          typedLevel,
+          pools,
+          usedAccessories,
+          random,
+        );
         if (!accessory) continue;
         nextAccessories.push(accessory);
         rolls.push({ kind: "accessory", label: "Accessory", value: accessory });
@@ -950,8 +1159,11 @@ export function generateEvolutionBatch(
         additions,
         rolls,
       };
+      const nextParams = coatGrew
+        ? { ...clone(parent.params), spriteNumber: LONG_HAIR_SPRITE }
+        : parent.params;
       const catData = createCatData(
-        parent.params,
+        nextParams,
         nextAccessories,
         nextScars,
         nextTorties,

@@ -110,3 +110,26 @@ export function withAlpha(hex: string, alpha: number): string {
 export function archetypeGradient(theme: ArchetypeTheme): string {
   return `linear-gradient(135deg, ${theme.from}, ${theme.to})`;
 }
+
+export function rgbToHex([r, g, b]: [number, number, number]): string {
+  const channel = (value: number) =>
+    Math.max(0, Math.min(255, Math.round(value)))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${channel(r)}${channel(g)}${channel(b)}`;
+}
+
+/**
+ * Brighten a colour until its strongest channel reaches `floor`, so very
+ * dark pelt colours (black, chocolate) still read as a visible glow.
+ */
+export function glowReady(
+  rgb: [number, number, number],
+  floor = 130,
+): [number, number, number] {
+  const max = Math.max(...rgb);
+  if (max >= floor) return rgb;
+  if (max === 0) return [floor, floor, floor];
+  const scale = floor / max;
+  return [rgb[0] * scale, rgb[1] * scale, rgb[2] * scale];
+}

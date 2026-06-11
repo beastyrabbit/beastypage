@@ -40,13 +40,17 @@ function buildColourDefinitions() {
   );
 }
 
-export function buildEvolutionPools(mapper: EvolutionPoolMapper): EvolutionPools {
+export function buildEvolutionPools(
+  mapper: EvolutionPoolMapper,
+): EvolutionPools {
   const plantAccessories = readMapperArray(mapper, "getPlantAccessories");
   const wildAccessories = readMapperArray(mapper, "getWildAccessories");
   const collarAccessories = readMapperArray(mapper, "getCollars");
-  const allAccessories =
-    mapper.getAccessories?.() ??
-    [...plantAccessories, ...wildAccessories, ...collarAccessories];
+  const allAccessories = mapper.getAccessories?.() ?? [
+    ...plantAccessories,
+    ...wildAccessories,
+    ...collarAccessories,
+  ];
   const knownAccessories = new Set([
     ...plantAccessories,
     ...wildAccessories,
@@ -55,12 +59,11 @@ export function buildEvolutionPools(mapper: EvolutionPoolMapper): EvolutionPools
   const extraAccessories = allAccessories.filter(
     (accessory) => !knownAccessories.has(accessory),
   );
-  const scars =
-    mapper.getScars?.() ?? [
-      ...readMapperArray(mapper, "getScarsByCategory", 1),
-      ...readMapperArray(mapper, "getScarsByCategory", 2),
-      ...readMapperArray(mapper, "getScarsByCategory", 3),
-    ];
+  const scars = mapper.getScars?.() ?? [
+    ...readMapperArray(mapper, "getScarsByCategory", 1),
+    ...readMapperArray(mapper, "getScarsByCategory", 2),
+    ...readMapperArray(mapper, "getScarsByCategory", 3),
+  ];
 
   return {
     tortieMasks: readMapperArray(mapper, "getTortieMasks"),

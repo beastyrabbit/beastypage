@@ -21,7 +21,7 @@ import {
   buildAdditionChips,
   buildRollDisplayRows,
   pixelFontClass,
-  stageNumeral,
+  stageRank,
 } from "./evolutionDisplay";
 
 export type EvolutionTreeCat = {
@@ -127,7 +127,7 @@ export function EvolutionTree({ cats, animateIn = false }: EvolutionTreeProps) {
                     className="bg-clip-text text-sm font-bold text-transparent"
                     style={{ backgroundImage: archetypeGradient(theme) }}
                   >
-                    {theme.label}
+                    {theme.label}Clan
                   </span>
                 </div>
                 <span className="ml-auto text-xs text-muted-foreground">
@@ -198,7 +198,7 @@ function StarterCard({
       }}
     >
       <span className={cn(pixelFontClass, "text-[10px] text-amber-200")}>
-        ★ ORIGIN ★
+        ★ THE KIT ★
       </span>
       <button
         type="button"
@@ -243,14 +243,16 @@ const CHIP_KIND_STYLE: Record<EvolutionAddition["kind"], string> = {
   tortie: "border-fuchsia-300/30 bg-fuchsia-500/10 text-fuchsia-200",
   accessory: "border-sky-300/30 bg-sky-500/10 text-sky-200",
   scar: "border-red-300/30 bg-red-500/10 text-red-200",
+  coat: "border-amber-300/30 bg-amber-500/10 text-amber-200",
+  replacement: "border-violet-300/30 bg-violet-500/10 text-violet-200",
 };
 
 const MAX_VISIBLE_CHIPS = 3;
 
-/** Custom name when set, otherwise a clean stage title instead of the raw label. */
+/** Custom name when set, otherwise the warrior rank instead of the raw label. */
 function displayTitle(cat: EvolutionTreeCat) {
   if (cat.name !== cat.label || cat.level === 0) return cat.name;
-  return `Stage ${stageNumeral(cat.level)}`;
+  return stageRank(cat.level);
 }
 
 function TreeCard({
@@ -295,11 +297,11 @@ function TreeCard({
         <span
           className={cn(
             pixelFontClass,
-            "absolute left-2 top-2 rounded-md px-2 py-1 text-[9px] text-white",
+            "absolute left-2 top-2 rounded-md px-2 py-1 text-[8px] uppercase text-white",
           )}
           style={{ background: withAlpha(theme.to, 0.75) }}
         >
-          {stageNumeral(cat.level)}
+          {stageRank(cat.level)}
         </span>
       </button>
       <div className="flex min-w-0 flex-col gap-1.5">
@@ -384,8 +386,8 @@ function CatDetailModal({
             style={{ color: theme.from }}
           >
             {cat.level === 0
-              ? "★ ORIGIN ★"
-              : `${theme.glyph} LINE ${cat.branchLabel ?? "?"} · STAGE ${stageNumeral(cat.level)}`}
+              ? "★ THE KIT ★"
+              : `${theme.glyph} LINE ${cat.branchLabel ?? "?"} · ${stageRank(cat.level).toUpperCase()}`}
           </span>
           <h2 className="text-xl font-semibold text-foreground">
             {displayTitle(cat)}

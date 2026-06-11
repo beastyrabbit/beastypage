@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
+  type EvolutionPools,
   generateEvolutionBatch,
   getTortieLayerParts,
   isNearStarterColour,
+  normalizeEvolutionControls,
   normalizeEvolutionStarter,
-  type EvolutionPools,
 } from "../evolutionGenerator";
 
 const starterParams: CatParams = {
@@ -221,9 +222,9 @@ describe("evolution generation", () => {
         value: 2,
         range: { min: 2, max: 2 },
       });
-      expect(level.rolls.filter((roll) => roll.kind === "tortie-part")).toHaveLength(
-        6,
-      );
+      expect(
+        level.rolls.filter((roll) => roll.kind === "tortie-part"),
+      ).toHaveLength(6);
     }
   });
 
@@ -251,7 +252,9 @@ describe("evolution generation", () => {
     expect(layer?.pattern).toBeTruthy();
     expect(layer?.colour).toBeTruthy();
     expect(evolution?.catData.params.isTortie).toBe(true);
-    expect(evolution?.catData.params.tortie).toEqual(evolution?.catData.tortieSlots);
+    expect(evolution?.catData.params.tortie).toEqual(
+      evolution?.catData.tortieSlots,
+    );
     expect(evolution?.catData.params.tortieMask).toBe(layer?.mask);
     expect(evolution?.catData.params.tortiePattern).toBe(layer?.pattern);
     expect(evolution?.catData.params.tortieColour).toBe(layer?.colour);
@@ -287,7 +290,8 @@ describe("evolution generation", () => {
       { random: sequenceRandom([0.1, 0.1, 0.1]) },
     );
     const final = result.cats.find((cat) => cat.level === 3);
-    const finalMasks = final?.catData.tortieSlots.map((layer) => layer?.mask) ?? [];
+    const finalMasks =
+      final?.catData.tortieSlots.map((layer) => layer?.mask) ?? [];
     const finalAccessories = final?.catData.accessorySlots ?? [];
     const finalScars = final?.catData.scarSlots ?? [];
 
@@ -298,7 +302,10 @@ describe("evolution generation", () => {
   });
 
   it("uses renderable evolution colours that are not near the starter colour", () => {
-    const available = new Set([...pools.baseColours, ...pools.experimentalColours]);
+    const available = new Set([
+      ...pools.baseColours,
+      ...pools.experimentalColours,
+    ]);
     const result = generateEvolutionBatch(
       { params: cleanStarter() },
       {
@@ -319,6 +326,114 @@ describe("evolution generation", () => {
         expect(isNearStarterColour("GINGER", layer?.colour ?? "")).toBe(false);
       }
     }
+  });
+
+  it("allows up to four tortie layers per stage while other slots cap at two", () => {
+    const controls = normalizeEvolutionControls({
+      torties: { min: 4, max: 4 },
+      accessories: { min: 4, max: 4 },
+      scars: { min: 4, max: 4 },
+    });
+
+    expect(controls.torties).toEqual({ min: 4, max: 4 });
+    expect(controls.accessories).toEqual({ min: 2, max: 2 });
+    expect(controls.scars).toEqual({ min: 2, max: 2 });
+
+    const result = generateEvolutionBatch(
+      { params: cleanStarter() },
+      {
+        branchCount: 1,
+        targetLevel: 1,
+        torties: { min: 4, max: 4 },
+        accessories: { min: 0, max: 0 },
+        scars: { min: 0, max: 0 },
+      },
+      pools,
+      { random: sequenceRandom([0.3, 0.55, 0.8]) },
+    );
+    const evolution = result.cats.find((cat) => cat.level === 1);
+
+    expect(evolution?.catData.tortieSlots).toHaveLength(4);
+  });
+
+  it("grows a shorthair coat one-way and keeps it long", () => {
+    const shorthair: CatParams = { ...cleanStarter(), spriteNumber: 8 };
+    // First random call per stage is the coat-growth check (< 0.12 grows).
+    const result = generateEvolutionBatch(
+      { params: shorthair },
+      {
+        branchCount: 1,
+        targetLevel: 3,
+        torties: { min: 0, max: 0 },
+        accessories: { min: 0, max: 0 },
+        scars: { min: 0, max: 0 },
+      },
+      pools,
+      { random: sequenceRandom([0.05, 0.5, 0.9]) },
+    );
+    const levels = result.cats.filter((cat) => cat.level !== 0);
+    const coatAdditions = levels.flatMap((cat) =>
+      cat.additions.filter((addition) => addition.kind === "coat"),
+    );
+
+    expect(levels[0].catData.params.spriteNumber).toBe(9);
+    expect(levels[1].catData.params.spriteNumber).toBe(9);
+    expect(levels[2].catData.params.spriteNumber).toBe(9);
+    expect(coatAdditions).toHaveLength(1);
+    expect(levels[0].rolls.some((roll) => roll.kind === "coat")).toBe(true);
+  });
+
+  it("never changes the coat of a longhair starter", () => {
+    const longhair: CatParams = { ...cleanStarter(), spriteNumber: 9 };
+    const result = generateEvolutionBatch(
+      { params: longhair },
+      { branchCount: 2, targetLevel: 3 },
+      pools,
+      { random: sequenceRandom([0.01, 0.3, 0.6]) },
+    );
+
+    for (const cat of result.cats) {
+      expect(cat.catData.params.spriteNumber).toBe(9);
+      expect(cat.additions.some((addition) => addition.kind === "coat")).toBe(
+        false,
+      );
+    }
+  });
+
+  it("can replace an existing trait instead of only adding", () => {
+    const starter: CatParams = {
+      ...cleanStarter(),
+      accessories: ["MAPLE LEAF"],
+      accessory: "MAPLE LEAF",
+    };
+    // Replacement check is the first consumed roll here (< 0.16 triggers).
+    const result = generateEvolutionBatch(
+      { params: starter },
+      {
+        branchCount: 1,
+        targetLevel: 1,
+        torties: { min: 0, max: 0 },
+        accessories: { min: 0, max: 0 },
+        scars: { min: 0, max: 0 },
+      },
+      pools,
+      { random: sequenceRandom([0.1, 0.0, 0.4, 0.7]) },
+    );
+    const evolution = result.cats.find((cat) => cat.level === 1);
+    const replacement = evolution?.additions.find(
+      (addition) => addition.kind === "replacement",
+    );
+
+    expect(replacement).toMatchObject({
+      kind: "replacement",
+      slot: "accessory",
+      previous: "MAPLE LEAF",
+    });
+    expect(evolution?.catData.accessorySlots).toHaveLength(1);
+    expect(evolution?.catData.accessorySlots[0]).not.toBe("MAPLE LEAF");
+    expect(
+      evolution?.rolls.some((roll) => roll.kind === "replacement"),
+    ).toBe(true);
   });
 
   it("can roll colours outside the archetype preferred subset", () => {

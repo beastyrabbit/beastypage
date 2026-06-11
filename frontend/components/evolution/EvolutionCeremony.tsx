@@ -4,19 +4,25 @@ import confetti from "canvas-confetti";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { EvolutionAddition } from "@/lib/evolution/evolutionGenerator";
+import type {
+  EvolutionAddition,
+  EvolutionPools,
+} from "@/lib/evolution/evolutionGenerator";
 import { cn } from "@/lib/utils";
 import {
   type ArchetypeTheme,
   archetypeGradient,
   getArchetypeTheme,
+  glowReady,
+  rgbToHex,
   STARTER_THEME,
   withAlpha,
 } from "./archetypes";
 import {
   buildAdditionChips,
+  formatValue,
   pixelFontClass,
-  stageNumeral,
+  stageRank,
 } from "./evolutionDisplay";
 
 export type CeremonyCat = {
@@ -43,16 +49,20 @@ type EvolutionCeremonyProps = {
   /** Total number of cats expected, including the starter. */
   totalCount: number;
   onFinish: () => void;
+  /** Trait pools — powers the charge-phase teaser and result colours. */
+  pools?: EvolutionPools | null;
 };
 
 const STEP_DURATIONS: Record<CeremonyStep["kind"], number> = {
   summon: 1900,
   banner: 1400,
-  charge: 1700,
+  charge: 2100,
   reveal: 2300,
   waiting: 0,
   finale: 0,
 };
+
+const SPEEDS = [0.25, 0.5, 1, 2, 5] as const;
 
 const AMBIENT_PARTICLES = Array.from({ length: 14 }, (_, index) => ({
   id: `particle-${index}`,
@@ -99,20 +109,50 @@ function nextStep(
   }
 }
 
+/**
+ * Glow colours for a reveal, taken from the colours the cat actually rolled
+ * (tortie layer pelts), falling back to the clan theme.
+ */
+function revealColours(
+  cat: CeremonyCat | null,
+  pools: EvolutionPools | null | undefined,
+  theme: ArchetypeTheme,
+): { from: string; to: string } {
+  const definitions = pools?.colourDefinitions;
+  if (!cat || !definitions) return { from: theme.from, to: theme.to };
+  const hexes: string[] = [];
+  for (const addition of cat.additions) {
+    if (addition.kind !== "tortie" || !addition.value.colour) continue;
+    const rgb = definitions[addition.value.colour.toUpperCase()];
+    if (Array.isArray(rgb)) hexes.push(rgbToHex(glowReady(rgb)));
+  }
+  if (hexes.length === 0) return { from: theme.from, to: theme.to };
+  return { from: hexes[0], to: hexes[1] ?? theme.to };
+}
+
 export function EvolutionCeremony({
   cats,
   totalCount,
   onFinish,
+  pools,
 }: EvolutionCeremonyProps) {
   const prefersReducedMotion = useReducedMotion();
+  const sectionRef = useRef<HTMLElement | null>(null);
   const [step, setStep] = useState<CeremonyStep>({ kind: "summon" });
-  const [fast, setFast] = useState(false);
+  const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const catsRef = useRef(cats);
   catsRef.current = cats;
 
   const advance = useCallback(() => {
     setStep((current) => nextStep(current, catsRef.current, totalCount));
   }, [totalCount]);
+
+  const cycleSpeed = useCallback(() => {
+    setSpeed((current) => {
+      const index = SPEEDS.indexOf(current);
+      return SPEEDS[(index + 1) % SPEEDS.length];
+    });
+  }, []);
 
   // Timed auto-advance for every animated step.
   useEffect(() => {
@@ -122,10 +162,10 @@ export function EvolutionCeremony({
       step.kind === "reveal"
         ? (catsRef.current[step.index]?.additions.length ?? 0)
         : 0;
-    const total = (duration + chipCount * 180) / (fast ? 2 : 1);
+    const total = (duration + chipCount * 180) / speed;
     const timer = window.setTimeout(advance, total);
     return () => window.clearTimeout(timer);
-  }, [step, fast, advance]);
+  }, [step, speed, advance]);
 
   // Resume from the waiting state as soon as the next cat is rendered.
   useEffect(() => {
@@ -134,22 +174,31 @@ export function EvolutionCeremony({
     }
   }, [step, cats, advance]);
 
-  // Element-coloured confetti burst on each reveal.
+  // Confetti burst on each reveal, centred on the ceremony panel and tinted
+  // with the colours the cat actually rolled.
   useEffect(() => {
     if (step.kind !== "reveal" || prefersReducedMotion) return;
     const cat = catsRef.current[step.index];
     const theme = getArchetypeTheme(cat?.archetype);
+    const colours = revealColours(cat ?? null, pools, theme);
+    const rect = sectionRef.current?.getBoundingClientRect();
+    const origin = rect
+      ? {
+          x: (rect.left + rect.width / 2) / window.innerWidth,
+          y: (rect.top + rect.height * 0.55) / window.innerHeight,
+        }
+      : { y: 0.6 };
     confetti({
       particleCount: 48,
       spread: 75,
       startVelocity: 26,
       scalar: 0.9,
-      colors: [theme.from, theme.to, "#ffffff"],
-      origin: { y: 0.6 },
+      colors: [colours.from, colours.to, "#ffffff"],
+      origin,
       disableForReducedMotion: true,
       zIndex: 40,
     });
-  }, [step, prefersReducedMotion]);
+  }, [step, prefersReducedMotion, pools]);
 
   const activeCat =
     step.kind === "summon"
@@ -169,14 +218,15 @@ export function EvolutionCeremony({
   const progress = Math.min(1, revealedCount / Math.max(1, totalCount));
 
   const hudLabel = (() => {
-    if (step.kind === "summon") return "ORIGIN";
+    if (step.kind === "summon") return "THE KIT";
     if (step.kind === "finale") return "COMPLETE";
-    if (!activeCat) return "CHANNELLING";
-    return `LINE ${activeCat.branchLabel ?? "?"} · STAGE ${stageNumeral(activeCat.level)}`;
+    if (!activeCat) return "STARCLAN IS CHOOSING";
+    return `LINE ${activeCat.branchLabel ?? "?"} · ${stageRank(activeCat.level).toUpperCase()}`;
   })();
 
   return (
     <motion.section
+      ref={sectionRef}
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       className="relative isolate flex min-h-[520px] cursor-pointer select-none flex-col overflow-hidden rounded-3xl border border-border/40 bg-slate-950"
@@ -227,14 +277,15 @@ export function EvolutionCeremony({
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              setFast((value) => !value);
+              cycleSpeed();
             }}
             className={cn(
               pixelFontClass,
-              "rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[9px] text-white/80 transition hover:border-white/40 hover:text-white",
+              "min-w-16 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[9px] text-white/80 transition hover:border-white/40 hover:text-white",
             )}
+            aria-label="Cycle ceremony speed"
           >
-            {fast ? "2X" : "1X"}
+            {speed}X
           </button>
           <button
             type="button"
@@ -271,6 +322,8 @@ export function EvolutionCeremony({
                   ? (cats[0] ?? null)
                   : (cats[step.index - 1] ?? null)
               }
+              upcoming={cats[step.index] ?? null}
+              pools={pools}
               theme={theme}
               reduced={Boolean(prefersReducedMotion)}
             />
@@ -278,7 +331,7 @@ export function EvolutionCeremony({
             <RevealScene
               key={`reveal-${step.index}`}
               cat={cats[step.index] ?? null}
-              theme={theme}
+              colours={revealColours(cats[step.index] ?? null, pools, theme)}
               reduced={Boolean(prefersReducedMotion)}
             />
           ) : step.kind === "waiting" ? (
@@ -375,10 +428,10 @@ function SummonScene({ cat }: { cat: CeremonyCat | null }) {
         <span
           className={cn(pixelFontClass, "text-sm text-amber-200 sm:text-base")}
         >
-          A STARTER APPEARS
+          A KIT APPEARS
         </span>
         <span className="text-xs text-white/60">
-          Its descendants are stirring…
+          StarClan has plans for this one…
         </span>
       </div>
     </motion.div>
@@ -410,17 +463,17 @@ function BannerScene({
         {theme.glyph}
       </motion.span>
       <div className="flex flex-col items-center gap-3">
-        <span className={cn(pixelFontClass, "text-lg text-white sm:text-2xl")}>
-          LINE {branchLabel}
-        </span>
         <span
           className={cn(
             pixelFontClass,
-            "bg-clip-text text-sm text-transparent sm:text-base",
+            "bg-clip-text text-lg text-transparent sm:text-2xl",
           )}
           style={{ backgroundImage: archetypeGradient(theme) }}
         >
-          {theme.label.toUpperCase()}
+          {theme.label.toUpperCase()}CLAN
+        </span>
+        <span className={cn(pixelFontClass, "text-xs text-white/80")}>
+          LINE {branchLabel}
         </span>
         <span className="text-xs text-white/60">{theme.blurb}</span>
       </div>
@@ -428,15 +481,131 @@ function BannerScene({
   );
 }
 
+type TeaseTrack = {
+  id: string;
+  kind: EvolutionAddition["kind"];
+  candidates: string[];
+};
+
+function sampleFrom(pool: string[], count: number, seed: number): string[] {
+  if (pool.length === 0) return [];
+  const picks: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    picks.push(pool[(seed + i * 7 + i * i * 3) % pool.length]);
+  }
+  return picks;
+}
+
+function buildTeaseTracks(
+  cat: CeremonyCat | null,
+  pools: EvolutionPools | null | undefined,
+): TeaseTrack[] {
+  if (!cat || !pools) return [];
+  const colours = [...pools.baseColours, ...pools.experimentalColours];
+  return cat.additions.slice(0, 4).map((addition, index) => {
+    const seed = cat.key.length * 13 + index * 29;
+    let candidates: string[] = [];
+    switch (addition.kind) {
+      case "tortie": {
+        const masks = sampleFrom(pools.tortieMasks, 12, seed);
+        const patterns = sampleFrom(pools.tortiePatterns, 12, seed + 5);
+        const layerColours = sampleFrom(colours, 12, seed + 11);
+        candidates = masks.map(
+          (mask, i) =>
+            `${formatValue(mask)} / ${formatValue(patterns[i] ?? "")} / ${formatValue(layerColours[i] ?? "")}`,
+        );
+        break;
+      }
+      case "accessory":
+        candidates = sampleFrom(pools.accessories, 12, seed).map(formatValue);
+        break;
+      case "scar":
+        candidates = sampleFrom(pools.scars, 12, seed).map(formatValue);
+        break;
+      case "coat":
+        candidates = ["Short Hair", "Long Hair"];
+        break;
+      case "replacement": {
+        const source =
+          addition.slot === "tortie"
+            ? colours
+            : addition.slot === "accessory"
+              ? pools.accessories
+              : pools.scars;
+        candidates = sampleFrom(source, 12, seed).map(
+          (value) =>
+            `${formatValue(addition.previous)} ➜ ${formatValue(value)}`,
+        );
+        break;
+      }
+    }
+    return {
+      id: `${cat.key}-tease-${index}`,
+      kind: addition.kind,
+      candidates: candidates.filter(Boolean),
+    };
+  });
+}
+
+const TEASE_KIND_LABEL: Record<EvolutionAddition["kind"], string> = {
+  tortie: "Tortie",
+  accessory: "Accessory",
+  scar: "Scar",
+  coat: "Coat",
+  replacement: "Reroll",
+};
+
+function TeaserChips({ tracks }: { tracks: TeaseTrack[] }) {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (tracks.length === 0) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), 90);
+    return () => window.clearInterval(timer);
+  }, [tracks.length]);
+
+  if (tracks.length === 0) return null;
+
+  return (
+    <div className="flex max-w-xl flex-wrap items-center justify-center gap-2">
+      {tracks.map((track, index) => {
+        const value =
+          track.candidates.length > 0
+            ? track.candidates[(tick + index * 3) % track.candidates.length]
+            : "…";
+        return (
+          <span
+            key={track.id}
+            className="rounded-full border border-dashed border-white/25 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/70"
+          >
+            ? {TEASE_KIND_LABEL[track.kind]} ·{" "}
+            <span className="tabular-nums">{value}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function ChargeScene({
   parent,
+  upcoming,
+  pools,
   theme,
   reduced,
 }: {
   parent: CeremonyCat | null;
+  upcoming: CeremonyCat | null;
+  pools?: EvolutionPools | null;
   theme: ArchetypeTheme;
   reduced: boolean;
 }) {
+  const tracks = useMemo(
+    () => buildTeaseTracks(upcoming, pools),
+    [upcoming, pools],
+  );
+  const rank = stageRank(upcoming?.level ?? 1).toUpperCase();
+
   return (
     <motion.div
       className="flex flex-col items-center gap-5 text-center"
@@ -468,17 +637,17 @@ function ChargeScene({
         <motion.div
           animate={
             reduced
-              ? { filter: ["brightness(1)", "brightness(2.4)"] }
+              ? { filter: ["brightness(1)", "brightness(2)"] }
               : {
                   x: [0, -3, 4, -5, 6, -6, 7, -7, 8, 0],
                   filter: [
                     "brightness(1) saturate(1)",
                     "brightness(1.4) saturate(0.7)",
-                    "brightness(2.6) saturate(0.2)",
+                    "brightness(2.4) saturate(0.2)",
                   ],
                 }
           }
-          transition={{ duration: 1.6, ease: "easeIn" }}
+          transition={{ duration: 2.0, ease: "easeIn" }}
         >
           <SpriteOnAura url={parent?.previewUrl ?? null} alt="Evolving cat" />
         </motion.div>
@@ -488,8 +657,9 @@ function ChargeScene({
         animate={{ opacity: [1, 0.4, 1] }}
         transition={{ duration: 0.8, repeat: Number.POSITIVE_INFINITY }}
       >
-        WHAT? IT&apos;S EVOLVING…
+        THE {rank} CEREMONY BEGINS…
       </motion.span>
+      <TeaserChips tracks={tracks} />
     </motion.div>
   );
 }
@@ -498,15 +668,17 @@ const CHIP_KIND_STYLE: Record<EvolutionAddition["kind"], string> = {
   tortie: "border-fuchsia-300/40 bg-fuchsia-500/15 text-fuchsia-100",
   accessory: "border-sky-300/40 bg-sky-500/15 text-sky-100",
   scar: "border-red-300/40 bg-red-500/15 text-red-100",
+  coat: "border-amber-300/40 bg-amber-500/15 text-amber-100",
+  replacement: "border-violet-300/40 bg-violet-500/15 text-violet-100",
 };
 
 function RevealScene({
   cat,
-  theme,
+  colours,
   reduced,
 }: {
   cat: CeremonyCat | null;
-  theme: ArchetypeTheme;
+  colours: { from: string; to: string };
   reduced: boolean;
 }) {
   const chips = useMemo(
@@ -516,16 +688,16 @@ function RevealScene({
 
   return (
     <motion.div
-      className="relative flex w-full flex-col items-center gap-5 text-center"
+      className="flex w-full flex-col items-center gap-5 text-center"
       initial={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
     >
-      {/* Evolution flash */}
+      {/* Evolution flash — scoped to the ceremony panel only */}
       {!reduced ? (
         <motion.div
-          className="pointer-events-none fixed inset-0 z-20 bg-white"
-          initial={{ opacity: 0.95 }}
+          className="pointer-events-none absolute inset-0 z-20 bg-white"
+          initial={{ opacity: 0.55 }}
           animate={{ opacity: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         />
@@ -536,7 +708,7 @@ function RevealScene({
           style={{
             width: 300,
             height: 300,
-            background: `radial-gradient(circle, ${withAlpha(theme.from, 0.35)}, transparent 70%)`,
+            background: `radial-gradient(circle, ${withAlpha(colours.from, 0.35)}, ${withAlpha(colours.to, 0.12)} 55%, transparent 75%)`,
           }}
           initial={{ scale: 0.4, opacity: 1 }}
           animate={{ scale: 1.15, opacity: [1, 0.55] }}
@@ -564,9 +736,11 @@ function RevealScene({
             pixelFontClass,
             "bg-clip-text text-sm text-transparent sm:text-base",
           )}
-          style={{ backgroundImage: archetypeGradient(theme) }}
+          style={{
+            backgroundImage: `linear-gradient(135deg, ${colours.from}, ${colours.to})`,
+          }}
         >
-          {theme.glyph} STAGE {stageNumeral(cat?.level ?? 1)} REACHED
+          RISEN TO {stageRank(cat?.level ?? 1).toUpperCase()}
         </span>
         <div className="flex max-w-xl flex-wrap items-center justify-center gap-2">
           {chips.map((chip, index) => (
@@ -607,9 +781,9 @@ function WaitingScene() {
         animate={{ opacity: [1, 0.35, 1] }}
         transition={{ duration: 1.2, repeat: Number.POSITIVE_INFINITY }}
       >
-        CHANNELLING…
+        STARCLAN IS CHOOSING…
       </motion.span>
-      <span className="text-xs text-white/50">summoning the next form</span>
+      <span className="text-xs text-white/50">the next form takes shape</span>
     </motion.div>
   );
 }
@@ -631,9 +805,11 @@ function FinaleScene({
         ✨
       </span>
       <span className={cn(pixelFontClass, "text-lg text-white sm:text-xl")}>
-        EVOLUTION COMPLETE
+        ALL CEREMONIES HELD
       </span>
-      <span className="text-sm text-white/60">{totalCount} forms revealed</span>
+      <span className="text-sm text-white/60">
+        StarClan honours {totalCount} cats
+      </span>
       <button
         type="button"
         onClick={(event) => {
@@ -645,7 +821,7 @@ function FinaleScene({
           "rounded-xl border border-amber-300/50 bg-amber-400/15 px-6 py-3 text-[11px] text-amber-100 transition hover:bg-amber-400/30",
         )}
       >
-        VIEW THE EVOLUTION TREE ▸
+        VIEW THE LINEAGE ▸
       </button>
     </motion.div>
   );

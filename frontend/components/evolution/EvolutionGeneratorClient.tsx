@@ -32,6 +32,7 @@ import {
   type EvolutionControls,
   type EvolutionGeneratedCat,
   type EvolutionLevel,
+  type EvolutionPools,
   type EvolutionRange,
   generateEvolutionBatch,
   normalizeEvolutionControls,
@@ -42,11 +43,11 @@ import { cn } from "@/lib/utils";
 import { ARCHETYPE_THEMES, withAlpha } from "./archetypes";
 import { EvolutionCeremony } from "./EvolutionCeremony";
 import { EvolutionTree, type EvolutionTreeCat } from "./EvolutionTree";
-import { pixelFontClass, stageNumeral } from "./evolutionDisplay";
+import { pixelFontClass, stageRank } from "./evolutionDisplay";
 
 type StarterMode = "random" | "history";
 type SaveState = "idle" | "saving" | "saved" | "error";
-type HairSprite = "long" | "short";
+type HairSprite = "random" | "long" | "short";
 type ChamberPhase = "setup" | "ceremony" | "tree";
 
 type MapperRecord = {
@@ -77,15 +78,23 @@ const DEFAULT_METADATA: AdoptionMetadata = {
 };
 
 const TARGET_LEVELS: EvolutionLevel[] = [1, 2, 3];
-const RANGE_STEPS = [0, 1, 2] as const;
+const LAYER_STEPS = [0, 1, 2] as const;
+const TORTIE_STEPS = [0, 1, 2, 3, 4] as const;
 const HAIR_SPRITES: Array<{
   id: HairSprite;
   label: string;
-  spriteNumber: 8 | 9;
+  spriteNumber: 8 | 9 | null;
 }> = [
+  { id: "random", label: "Random", spriteNumber: null },
   { id: "short", label: "Short hair", spriteNumber: 8 },
   { id: "long", label: "Long hair", spriteNumber: 9 },
 ];
+
+function resolveHairSprite(hair: HairSprite): 8 | 9 {
+  const option = HAIR_SPRITES.find((entry) => entry.id === hair);
+  if (option?.spriteNumber) return option.spriteNumber;
+  return Math.random() < 0.5 ? 8 : 9;
+}
 
 function imageDataFromCanvas(
   canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -138,9 +147,12 @@ export function EvolutionGeneratorClient() {
   const [expectedCount, setExpectedCount] = useState(0);
   const [modulesReady, setModulesReady] = useState(false);
   const [starterMode, setStarterMode] = useState<StarterMode>("random");
-  const [hairSprite, setHairSprite] = useState<HairSprite>("short");
+  const [hairSprite, setHairSprite] = useState<HairSprite>("random");
   const [historySlug, setHistorySlug] = useState("");
   const [starterPreview, setStarterPreview] = useState<string | null>(null);
+  const [ceremonyPools, setCeremonyPools] = useState<EvolutionPools | null>(
+    null,
+  );
   const [controls, setControls] = useState<EvolutionControls>(() =>
     normalizeEvolutionControls(),
   );
@@ -219,12 +231,16 @@ export function EvolutionGeneratorClient() {
     let cancelled = false;
     (async () => {
       try {
-        const selectedHair =
-          HAIR_SPRITES.find((option) => option.id === hairSprite) ??
-          HAIR_SPRITES[0];
-        const payload = applySpriteToStarterPayload(
-          historyRecord.cat_data,
-          selectedHair.spriteNumber,
+        const selectedHair = HAIR_SPRITES.find(
+          (option) => option.id === hairSprite,
+        );
+        const payload = (
+          selectedHair?.spriteNumber
+            ? applySpriteToStarterPayload(
+                historyRecord.cat_data,
+                selectedHair.spriteNumber,
+              )
+            : historyRecord.cat_data
         ) as Record<string, unknown>;
         const params = (payload.params ?? payload) as CatParams;
         const rendered = await generatorRef.current?.generateCat(params);
@@ -349,9 +365,7 @@ export function EvolutionGeneratorClient() {
 
       let starterPayload: unknown;
       let starterSource: Parameters<typeof buildEvolutionBatchSettings>[1];
-      const selectedHair =
-        HAIR_SPRITES.find((option) => option.id === hairSprite) ??
-        HAIR_SPRITES[0];
+      const starterSprite = resolveHairSprite(hairSprite);
 
       if (starterMode === "history") {
         if (!trimmedHistorySlug) {
@@ -365,7 +379,7 @@ export function EvolutionGeneratorClient() {
         }
         starterPayload = applySpriteToStarterPayload(
           historyRecord.cat_data,
-          selectedHair.spriteNumber,
+          starterSprite,
         );
         starterSource = {
           type: "history",
@@ -389,7 +403,7 @@ export function EvolutionGeneratorClient() {
         starterPayload = {
           params: cleanRandomStarterLayers({
             ...randomStarter.params,
-            spriteNumber: selectedHair.spriteNumber,
+            spriteNumber: starterSprite,
           } satisfies CatParams),
           accessorySlots: [],
           scarSlots: [],
@@ -400,6 +414,7 @@ export function EvolutionGeneratorClient() {
       }
 
       const pools = buildEvolutionPools(mapperRef.current);
+      setCeremonyPools(pools);
       const result = generateEvolutionBatch(starterPayload, controls, pools);
       const orderedCats = [
         result.starter,
@@ -563,6 +578,7 @@ export function EvolutionGeneratorClient() {
           cats={records}
           totalCount={expectedCount}
           onFinish={() => setPhase("tree")}
+          pools={ceremonyPools}
         />
         {saveStatusNode ? (
           <div className="flex justify-center">{saveStatusNode}</div>
@@ -576,7 +592,7 @@ export function EvolutionGeneratorClient() {
       <div className="flex flex-col gap-6">
         <header className="flex flex-col items-center gap-3 text-center">
           <span className={cn(pixelFontClass, "text-xs text-amber-200")}>
-            ✨ EVOLUTION COMPLETE ✨
+            ✨ ALL CEREMONIES HELD ✨
           </span>
           <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
             The {savedMetadata.title || "Evolution"} lineage
@@ -731,16 +747,16 @@ export function EvolutionGeneratorClient() {
 
           <fieldset className="flex flex-col gap-2">
             <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-              Coat
+              Starting coat
             </legend>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {HAIR_SPRITES.map((option) => (
                 <button
                   key={option.id}
                   type="button"
                   onClick={() => setHairSprite(option.id)}
                   className={cn(
-                    "rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                    "rounded-lg border px-2 py-2 text-xs font-semibold transition sm:text-sm",
                     hairSprite === option.id
                       ? "border-amber-300/60 bg-amber-400/15 text-foreground"
                       : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
@@ -750,6 +766,9 @@ export function EvolutionGeneratorClient() {
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-muted-foreground">
+              Shorthair lines can grow out a long coat mid-line — and it stays.
+            </p>
           </fieldset>
         </section>
 
@@ -810,7 +829,7 @@ export function EvolutionGeneratorClient() {
 
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                Final stage
+                Final rank
               </span>
               <div className="grid grid-cols-3 gap-2">
                 {TARGET_LEVELS.map((level) => (
@@ -826,14 +845,13 @@ export function EvolutionGeneratorClient() {
                       )
                     }
                     className={cn(
-                      pixelFontClass,
-                      "rounded-lg border px-3 py-2.5 text-xs transition",
+                      "rounded-lg border px-2 py-2.5 text-xs font-semibold transition",
                       controls.targetLevel === level
                         ? "border-violet-300/60 bg-violet-500/15 text-foreground"
                         : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    {stageNumeral(level)}
+                    {stageRank(level)}
                   </button>
                 ))}
               </div>
@@ -844,6 +862,7 @@ export function EvolutionGeneratorClient() {
             <RangeControl
               label="Torties / stage"
               range={controls.torties}
+              steps={TORTIE_STEPS}
               onChange={(range) =>
                 setControls((current) =>
                   normalizeEvolutionControls({ ...current, torties: range }),
@@ -894,8 +913,8 @@ export function EvolutionGeneratorClient() {
             <p className="text-xs text-muted-foreground">
               {controls.branchCount}{" "}
               {controls.branchCount === 1 ? "line" : "lines"} ·{" "}
-              {controls.branchCount * controls.targetLevel + 1} forms · stages
-              up to {stageNumeral(controls.targetLevel)}
+              {controls.branchCount * controls.targetLevel + 1} cats · ranks up
+              to {stageRank(controls.targetLevel)}
             </p>
             <button
               type="button"
@@ -957,9 +976,9 @@ function ChamberHero() {
           </span>
         </h1>
         <p className="max-w-2xl text-sm text-neutral-200/85">
-          Place one starter on the altar and watch its descendants branch into
-          elemental lines — every stage rolled live with new coats, accessories,
-          and battle scars.
+          Place one kit on the altar and watch its descendants earn their ranks
+          across elemental clans — every ceremony rolled live with new coats,
+          accessories, and battle scars.
         </p>
         <div className="flex flex-wrap gap-2" aria-hidden>
           {Object.values(ARCHETYPE_THEMES).map((theme) => (
@@ -985,12 +1004,14 @@ function RangeControl({
   label,
   range,
   onChange,
+  steps = LAYER_STEPS,
   disabled = false,
   trailing,
 }: {
   label: string;
   range: EvolutionRange;
   onChange: (range: EvolutionRange) => void;
+  steps?: readonly number[];
   disabled?: boolean;
   trailing?: React.ReactNode;
 }) {
@@ -1007,8 +1028,13 @@ function RangeControl({
           <span className="w-7 text-[10px] uppercase text-muted-foreground">
             {field}
           </span>
-          <div className="grid flex-1 grid-cols-3 gap-1">
-            {RANGE_STEPS.map((step) => (
+          <div
+            className="grid flex-1 gap-1"
+            style={{
+              gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))`,
+            }}
+          >
+            {steps.map((step) => (
               <button
                 key={step}
                 type="button"
