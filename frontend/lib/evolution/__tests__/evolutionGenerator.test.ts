@@ -513,6 +513,37 @@ describe("evolution generation", () => {
     }
   });
 
+  it("keeps teaser colours inside a controlled clan's palette", () => {
+    const clanPools: EvolutionPools = {
+      ...pools,
+      clanColours: { flare: ["AQUA", "NEONPINK"] },
+    };
+    const tortieAddition: EvolutionAddition = {
+      kind: "tortie",
+      label: "Tortie ONE / Tabby / AQUA",
+      value: { mask: "ONE", pattern: "Tabby", colour: "AQUA" },
+      parts: [],
+    };
+    const allowed = new Set(
+      ["AQUA", "NEONPINK", ...pools.baseColours].map((colour) =>
+        colour.toUpperCase(),
+      ),
+    );
+
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const params = generateTeaserVariant(
+        { params: cleanStarter() },
+        [tortieAddition, tortieAddition],
+        clanPools,
+        { archetype: "flare" },
+      );
+      for (const layer of params.tortie ?? []) {
+        const colour = layer?.colour ?? "";
+        expect(allowed.has(colour.toUpperCase())).toBe(true);
+      }
+    }
+  });
+
   it("never adds teaser traits the evolution did not roll", () => {
     const params = generateTeaserVariant(
       { params: cleanStarter() },

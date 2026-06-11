@@ -1302,7 +1302,7 @@ export function generateTeaserVariant(
   parentInput: unknown,
   additions: EvolutionAddition[],
   pools: EvolutionPools,
-  options: { random?: RandomFn } = {},
+  options: { random?: RandomFn; archetype?: EvolutionArchetype | null } = {},
 ): CatParams {
   const random = options.random ?? Math.random;
   const parent = normalizeEvolutionStarter(parentInput);
@@ -1311,10 +1311,26 @@ export function generateTeaserVariant(
   const torties = parent.tortieSlots
     .map((layer) => normalizeTortieLayer(layer))
     .filter((layer): layer is TortieLayer => Boolean(layer));
-  const colours = uniqueClean([
+  const fullColours = uniqueClean([
     ...pools.baseColours,
     ...pools.experimentalColours,
   ]);
+  // Teased colours respect the clan's palette assignment, just like the
+  // real roll: controlled clans stay inside their palettes (+ naturals),
+  // wild clans may open up to the whole pool.
+  const archetype = options.archetype ?? null;
+  const clanAssigned = archetype ? pools.clanColours?.[archetype] : undefined;
+  const clanColours =
+    clanAssigned && clanAssigned.length > 0
+      ? uniqueClean([...clanAssigned, ...pools.baseColours])
+      : null;
+  const wild = archetype ? WILD_ARCHETYPE_SET.has(archetype) : false;
+  const teaseColour = () => {
+    if (!clanColours) return pickOne(fullColours, random);
+    if (wild && random() < WILD_OPEN_CHANCE)
+      return pickOne(fullColours, random);
+    return pickOne(clanColours, random);
+  };
 
   const randomIndex = (length: number) =>
     Math.min(Math.floor(random() * length), length - 1);
@@ -1323,7 +1339,7 @@ export function generateTeaserVariant(
   const randomLayer = (): TortieLayer | null => {
     const mask = pickOne(pools.tortieMasks, random);
     const pattern = pickOne(pools.tortiePatterns, random);
-    const colour = pickOne(colours, random);
+    const colour = teaseColour();
     return mask && pattern && colour ? { mask, pattern, colour } : null;
   };
   const countOf = (kind: EvolutionAddition["kind"]) =>

@@ -339,6 +339,7 @@ export function EvolutionGeneratorClient() {
           parent.catData,
           upcoming.additions,
           ceremonyPools,
+          { archetype: upcoming.archetype },
         );
         const rendered = await generator.generateCat(params);
         return (
