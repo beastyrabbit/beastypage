@@ -197,6 +197,20 @@ export function EvolutionCeremony({
       disableForReducedMotion: true,
       zIndex: 40,
     });
+    // Second, wider burst right as the shockwave lands.
+    const encore = window.setTimeout(() => {
+      confetti({
+        particleCount: 72,
+        spread: 110,
+        startVelocity: 34,
+        scalar: 0.85,
+        colors: [colours.from, colours.to, "#ffffff"],
+        origin,
+        disableForReducedMotion: true,
+        zIndex: 40,
+      });
+    }, 200);
+    return () => window.clearTimeout(encore);
   }, [step, prefersReducedMotion, pools]);
 
   const activeCat =
@@ -576,14 +590,20 @@ function ChargeScene({
             reduced
               ? { filter: ["brightness(1)", "brightness(2)"] }
               : {
+                  // Flicker, then wash out into a glowing white silhouette.
                   filter: [
-                    "brightness(1)",
-                    "brightness(1)",
-                    "brightness(2.4) saturate(0.3)",
+                    "brightness(1) invert(0) drop-shadow(0 0 0px rgba(255,255,255,0))",
+                    "brightness(1) invert(0) drop-shadow(0 0 0px rgba(255,255,255,0))",
+                    "brightness(0) invert(1) drop-shadow(0 0 16px rgba(255,255,255,0.85))",
+                    "brightness(0) invert(1) drop-shadow(0 0 32px rgba(255,255,255,1))",
                   ],
                 }
           }
-          transition={{ duration: 2.1, times: [0, 0.7, 1], ease: "easeIn" }}
+          transition={{
+            duration: 2.1,
+            times: [0, 0.5, 0.82, 1],
+            ease: "easeIn",
+          }}
         >
           <TeaserSprite
             parentUrl={parent?.previewUrl ?? null}
@@ -653,10 +673,53 @@ function RevealScene({
           animate={{ scale: 1.15, opacity: [1, 0.55] }}
           transition={{ duration: 0.8, ease: "easeOut" }}
         />
+        {/* Shockwave rings punched out by the transformation */}
+        {!reduced
+          ? [0, 1].map((wave) => (
+              <motion.div
+                key={wave}
+                className="pointer-events-none absolute rounded-full border-2"
+                style={{
+                  borderColor:
+                    wave === 0 ? "rgba(255,255,255,0.85)" : colours.from,
+                }}
+                initial={{ width: 130, height: 130, opacity: 0.9 }}
+                animate={{ width: 460, height: 460, opacity: 0 }}
+                transition={{
+                  duration: 0.75,
+                  delay: wave * 0.12,
+                  ease: "easeOut",
+                }}
+              />
+            ))
+          : null}
         <motion.div
-          initial={{ scale: reduced ? 1 : 1.25, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 180, damping: 16 }}
+          initial={
+            reduced
+              ? { opacity: 0 }
+              : {
+                  scale: 1.45,
+                  filter:
+                    "brightness(0) invert(1) drop-shadow(0 0 32px rgba(255,255,255,1))",
+                }
+          }
+          animate={
+            reduced
+              ? { opacity: 1 }
+              : {
+                  scale: 1,
+                  filter:
+                    "brightness(1) invert(0) drop-shadow(0 0 0px rgba(255,255,255,0))",
+                }
+          }
+          transition={
+            reduced
+              ? { duration: 0.4 }
+              : {
+                  scale: { type: "spring", stiffness: 240, damping: 14 },
+                  filter: { duration: 0.55, ease: "easeOut", delay: 0.08 },
+                }
+          }
         >
           <SpriteOnAura
             url={cat?.previewUrl ?? null}
