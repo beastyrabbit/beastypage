@@ -52,11 +52,13 @@ type EvolutionCeremonyProps = {
   pools?: EvolutionPools | null;
 };
 
+// Base pacing at 1x — deliberately slow so each ceremony can breathe
+// (the charge matches what used to be the 0.25x pace).
 const STEP_DURATIONS: Record<CeremonyStep["kind"], number> = {
-  summon: 1900,
-  banner: 1400,
-  charge: 2100,
-  reveal: 2300,
+  summon: 5000,
+  banner: 3500,
+  charge: 8400,
+  reveal: 6000,
   waiting: 0,
   finale: 0,
 };
@@ -139,6 +141,7 @@ export function EvolutionCeremony({
   const sectionRef = useRef<HTMLElement | null>(null);
   const [step, setStep] = useState<CeremonyStep>({ kind: "summon" });
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
+  const [autoPlay, setAutoPlay] = useState(true);
   const catsRef = useRef(cats);
   catsRef.current = cats;
 
@@ -153,8 +156,9 @@ export function EvolutionCeremony({
     });
   }, []);
 
-  // Timed auto-advance for every animated step.
+  // Timed auto-advance for every animated step (paused in tap mode).
   useEffect(() => {
+    if (!autoPlay) return;
     const duration = STEP_DURATIONS[step.kind];
     if (duration <= 0) return;
     const chipCount =
@@ -164,7 +168,7 @@ export function EvolutionCeremony({
     const total = (duration + chipCount * 180) / speed;
     const timer = window.setTimeout(advance, total);
     return () => window.clearTimeout(timer);
-  }, [step, speed, advance]);
+  }, [step, speed, autoPlay, advance]);
 
   // Resume from the waiting state as soon as the next cat is rendered.
   useEffect(() => {
@@ -253,7 +257,7 @@ export function EvolutionCeremony({
       ref={sectionRef}
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="relative isolate flex min-h-[520px] cursor-pointer select-none flex-col overflow-hidden rounded-3xl border border-border/40 bg-slate-950"
+      className="relative isolate flex aspect-square max-h-[85vh] min-h-[520px] w-full cursor-pointer select-none flex-col overflow-hidden rounded-3xl border border-border/40 bg-slate-950"
       onClick={step.kind === "finale" ? onFinish : advance}
       aria-live="polite"
     >
@@ -301,6 +305,27 @@ export function EvolutionCeremony({
             type="button"
             onClick={(event) => {
               event.stopPropagation();
+              setAutoPlay((value) => !value);
+            }}
+            className={cn(
+              pixelFontClass,
+              "rounded-lg border px-3 py-2 text-[9px] transition",
+              autoPlay
+                ? "border-emerald-300/40 bg-emerald-500/15 text-emerald-100 hover:border-emerald-200"
+                : "border-amber-300/40 bg-amber-500/15 text-amber-100 hover:border-amber-200",
+            )}
+            aria-label={
+              autoPlay
+                ? "Switch to tap-to-advance mode"
+                : "Switch to auto-play mode"
+            }
+          >
+            {autoPlay ? "▶ AUTO" : "✋ TAP"}
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
               cycleSpeed();
             }}
             className={cn(
@@ -340,7 +365,7 @@ export function EvolutionCeremony({
             />
           ) : step.kind === "charge" ? (
             <ChargeScene
-              key={`charge-${step.index}`}
+              key={`charge-${step.index}-${speed}`}
               parent={
                 (cats[step.index]?.level ?? 1) <= 1
                   ? (cats[0] ?? null)
@@ -349,6 +374,7 @@ export function EvolutionCeremony({
               candidates={teaserCandidates}
               upcoming={cats[step.index] ?? null}
               theme={theme}
+              durationSeconds={STEP_DURATIONS.charge / speed / 1000}
               reduced={Boolean(prefersReducedMotion)}
             />
           ) : step.kind === "reveal" ? (
@@ -374,7 +400,7 @@ export function EvolutionCeremony({
       <div className="relative z-10 flex flex-col gap-2 px-5 pb-5">
         <div className="flex items-center justify-between">
           <span className={cn(pixelFontClass, "text-[9px] text-white/50")}>
-            TAP TO ADVANCE
+            {autoPlay ? "TAP TO SKIP AHEAD" : "TAP TO ADVANCE"}
           </span>
           <span className={cn(pixelFontClass, "text-[9px] text-white/50")}>
             {revealedCount}/{totalCount}
@@ -396,7 +422,7 @@ export function EvolutionCeremony({
 function SpriteOnAura({
   url,
   alt,
-  size = 240,
+  size = 340,
 }: {
   url: string | null;
   alt: string;
@@ -439,8 +465,8 @@ function SummonScene({ cat }: { cat: CeremonyCat | null }) {
         <motion.div
           className="absolute rounded-full"
           style={{
-            width: 280,
-            height: 280,
+            width: 400,
+            height: 400,
             background: `radial-gradient(circle, ${withAlpha(STARTER_THEME.from, 0.3)}, transparent 70%)`,
           }}
           animate={{ scale: [0.9, 1.08, 0.9], opacity: [0.6, 1, 0.6] }}
@@ -547,12 +573,15 @@ function ChargeScene({
   candidates,
   upcoming,
   theme,
+  durationSeconds,
   reduced,
 }: {
   parent: CeremonyCat | null;
   candidates: string[];
   upcoming: CeremonyCat | null;
   theme: ArchetypeTheme;
+  /** Real charge length at the current speed — the white-out scales to it. */
+  durationSeconds: number;
   reduced: boolean;
 }) {
   const rank = stageRank(upcoming?.level ?? 1).toUpperCase();
@@ -571,10 +600,10 @@ function ChargeScene({
             key={ring}
             className="absolute rounded-full border-2"
             style={{ borderColor: withAlpha(theme.from, 0.55) }}
-            initial={{ width: 150, height: 150, opacity: 0 }}
+            initial={{ width: 210, height: 210, opacity: 0 }}
             animate={{
-              width: [150, 300],
-              height: [150, 300],
+              width: [210, 440],
+              height: [210, 440],
               opacity: [0.8, 0],
             }}
             transition={{
@@ -600,8 +629,8 @@ function ChargeScene({
                 }
           }
           transition={{
-            duration: 2.1,
-            times: [0, 0.5, 0.82, 1],
+            duration: durationSeconds,
+            times: [0, 0.6, 0.88, 1],
             ease: "easeIn",
           }}
         >
@@ -665,8 +694,8 @@ function RevealScene({
         <motion.div
           className="absolute rounded-full"
           style={{
-            width: 300,
-            height: 300,
+            width: 440,
+            height: 440,
             background: `radial-gradient(circle, ${withAlpha(colours.from, 0.35)}, ${withAlpha(colours.to, 0.12)} 55%, transparent 75%)`,
           }}
           initial={{ scale: 0.4, opacity: 1 }}
@@ -683,8 +712,8 @@ function RevealScene({
                   borderColor:
                     wave === 0 ? "rgba(255,255,255,0.85)" : colours.from,
                 }}
-                initial={{ width: 130, height: 130, opacity: 0.9 }}
-                animate={{ width: 460, height: 460, opacity: 0 }}
+                initial={{ width: 180, height: 180, opacity: 0.9 }}
+                animate={{ width: 660, height: 660, opacity: 0 }}
                 transition={{
                   duration: 0.75,
                   delay: wave * 0.12,
