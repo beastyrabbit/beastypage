@@ -10,7 +10,7 @@ const pixelFont = Press_Start_2P({
 
 export const metadata: Metadata = {
   title: "Evolution Lineage | BeastyPage",
-  description: "View a saved cat evolution lineage and edit its display names.",
+  description: "View a saved cat evolution lineage.",
 };
 
 type EvolutionBatchPageProps = {

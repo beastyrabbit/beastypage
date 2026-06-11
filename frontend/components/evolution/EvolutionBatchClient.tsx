@@ -1,28 +1,20 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { ArrowUpRight, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import {
-  type AdoptionMetadata,
-  AdoptionMetadataPanel,
-} from "@/components/adoption/AdoptionMetadataPanel";
+import { useMemo } from "react";
 import ArrowBackIcon from "@/components/ui/arrow-back-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import { api } from "@/convex/_generated/api";
-import { toId } from "@/convex/utils";
 import { encodeCatShare } from "@/lib/catShare";
-import { generateLineageNames } from "@/lib/evolution/clanNames";
 import {
   getEvolutionMeta,
   isEvolutionBatchSettings,
 } from "@/lib/evolution/evolutionGenerator";
 import { cn } from "@/lib/utils";
-import { getArchetypeTheme, STARTER_THEME, withAlpha } from "./archetypes";
 import { EvolutionTree, type EvolutionTreeCat } from "./EvolutionTree";
-import { pixelFontClass, stageRank } from "./evolutionDisplay";
-import { NameField } from "./NameField";
+import { pixelFontClass } from "./evolutionDisplay";
 
 type EvolutionBatchClientProps = {
   slug: string;
@@ -88,15 +80,10 @@ function formatTimestamp(value?: number | null) {
 }
 
 export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
-  const updateBatchMeta = useMutation(api.adoption.updateBatchMeta);
-  const updateProfileMeta = useMutation(api.mapper.updateMeta);
   const record = useQuery(api.adoption.getBySlug, { slugOrId: slug }) as
     | EvolutionBatchRecord
     | null
     | undefined;
-  const [metadataMessage, setMetadataMessage] = useState<string | null>(null);
-  const [metadataError, setMetadataError] = useState<string | null>(null);
-  const [metadataSaving, setMetadataSaving] = useState(false);
 
   const treeCats = useMemo<EvolutionTreeCat[]>(() => {
     if (!record?.cats?.length) return [];
@@ -168,78 +155,6 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
   const lineCount = new Set(
     treeCats.map((cat) => cat.branchLabel).filter(Boolean),
   ).size;
-  const metadataValue: AdoptionMetadata = {
-    title: record.title ?? "",
-    creator: record.creatorName ?? "",
-  };
-
-  const handleMetadataSave = async (nextMetadata: AdoptionMetadata) => {
-    try {
-      setMetadataSaving(true);
-      setMetadataError(null);
-      setMetadataMessage(null);
-      await updateBatchMeta({
-        id: toId("adoption_batch", record.id),
-        title: nextMetadata.title,
-        creatorName: nextMetadata.creator,
-      });
-      setMetadataMessage("Saved");
-    } catch (error) {
-      console.error("Failed to update evolution batch metadata", error);
-      setMetadataError("Failed to save metadata.");
-    } finally {
-      setMetadataSaving(false);
-    }
-  };
-
-  const handleCatNameSave = async (cat: EvolutionTreeCat, catName: string) => {
-    const source = record.cats.find(
-      (item) => `${item.index}-${item.label}` === cat.key,
-    );
-    if (!source?.profileId) {
-      throw new Error("This cat has no saved profile.");
-    }
-    await updateProfileMeta({
-      id: toId("cat_profile", source.profileId),
-      catName,
-      editToken: source.editToken ?? undefined,
-    });
-  };
-
-  const handleAutoname = async () => {
-    const names = generateLineageNames(
-      treeCats.map((cat) => ({
-        key: cat.key,
-        level: cat.level,
-        branchLabel: cat.branchLabel,
-        archetype: cat.archetype,
-      })),
-    );
-    const updates = treeCats.flatMap((cat) => {
-      const name = names.get(cat.key);
-      if (!name) return [];
-      const source = record.cats.find(
-        (item) => `${item.index}-${item.label}` === cat.key,
-      );
-      if (!source?.profileId) {
-        throw new Error("One or more cats have no saved profile.");
-      }
-      return [
-        {
-          profileId: source.profileId,
-          name,
-          editToken: source.editToken ?? undefined,
-        },
-      ];
-    });
-    for (const update of updates) {
-      await updateProfileMeta({
-        id: toId("cat_profile", update.profileId),
-        catName: update.name,
-        editToken: update.editToken,
-      });
-    }
-  };
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-12 sm:px-6 lg:px-8">
@@ -303,210 +218,6 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
       </section>
 
       <EvolutionTree cats={treeCats} />
-
-      <AdoptionMetadataPanel
-        savedValue={metadataValue}
-        onSave={handleMetadataSave}
-        busy={metadataSaving}
-        message={metadataMessage}
-        error={metadataError}
-        canSave
-      />
-
-      <CatNameEditor
-        cats={treeCats}
-        onSave={handleCatNameSave}
-        onAutoname={handleAutoname}
-      />
     </div>
-  );
-}
-
-function storedName(cat: EvolutionTreeCat) {
-  return cat.name === cat.label ? "" : cat.name;
-}
-
-function CatNameEditor({
-  cats,
-  onSave,
-  onAutoname,
-}: {
-  cats: EvolutionTreeCat[];
-  onSave: (cat: EvolutionTreeCat, catName: string) => Promise<void>;
-  onAutoname?: () => Promise<void>;
-}) {
-  const [autonaming, setAutonaming] = useState(false);
-  const [savingAll, setSavingAll] = useState(false);
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [nameError, setNameError] = useState<string | null>(null);
-  if (!cats.length) return null;
-
-  const draftFor = (cat: EvolutionTreeCat) =>
-    drafts[cat.key] ?? storedName(cat);
-  const isDirty = (cat: EvolutionTreeCat) =>
-    draftFor(cat).trim() !== storedName(cat).trim();
-  const dirtyCats = cats.filter(isDirty);
-
-  const starter = cats.find((cat) => cat.level === 0) ?? null;
-  const lines: Array<{
-    branchLabel: string;
-    archetype: string | null;
-    cats: EvolutionTreeCat[];
-  }> = [];
-  for (const cat of cats) {
-    if (cat.level === 0 || !cat.branchLabel) continue;
-    let line = lines.find((entry) => entry.branchLabel === cat.branchLabel);
-    if (!line) {
-      line = {
-        branchLabel: cat.branchLabel,
-        archetype: cat.archetype,
-        cats: [],
-      };
-      lines.push(line);
-    }
-    line.cats.push(cat);
-  }
-  for (const line of lines) {
-    line.cats.sort((a, b) => a.level - b.level);
-  }
-
-  const runAutoname = async () => {
-    if (!onAutoname) return;
-    setNameError(null);
-    try {
-      setAutonaming(true);
-      await onAutoname();
-      setDrafts({});
-    } catch (error) {
-      console.error("Failed to autoname lineage", error);
-      setNameError("Failed to autoname lineage. Drafts were kept.");
-    } finally {
-      setAutonaming(false);
-    }
-  };
-
-  const saveAll = async () => {
-    setNameError(null);
-    setSavingAll(true);
-    try {
-      for (const cat of dirtyCats) {
-        await onSave(cat, draftFor(cat));
-      }
-      setDrafts({});
-    } catch (error) {
-      console.error("Failed to save all names", error);
-      setNameError("Failed to save names. Drafts were kept.");
-    } finally {
-      setSavingAll(false);
-    }
-  };
-
-  return (
-    <section className="rounded-2xl border border-border/40 bg-background/70 p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold text-foreground">
-          Name the lineage
-        </span>
-        <div className="flex items-center gap-2">
-          {onAutoname ? (
-            <button
-              type="button"
-              onClick={runAutoname}
-              disabled={autonaming || savingAll}
-              className="inline-flex items-center gap-2 rounded-lg border border-amber-300/50 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {autonaming ? (
-                <Loader2 className="size-3.5 animate-spin" />
-              ) : (
-                <span aria-hidden>✨</span>
-              )}
-              Autoname
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={saveAll}
-            disabled={dirtyCats.length === 0 || savingAll || autonaming}
-            className="inline-flex items-center gap-2 rounded-lg border border-emerald-300/50 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-400/25 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {savingAll ? <Loader2 className="size-3.5 animate-spin" /> : null}
-            Save all
-            {dirtyCats.length > 0 ? ` (${dirtyCats.length})` : ""}
-          </button>
-        </div>
-      </div>
-      {nameError ? (
-        <p
-          role="alert"
-          className="mb-3 flex items-center gap-2 text-xs text-red-300"
-        >
-          <TriangleAlertIcon size={14} /> {nameError}
-        </p>
-      ) : null}
-      <div className="flex flex-col gap-2">
-        {starter ? (
-          <div className="flex items-center gap-2">
-            <span
-              className="flex size-9 shrink-0 items-center justify-center rounded-lg border text-base"
-              style={{
-                borderColor: withAlpha(STARTER_THEME.from, 0.5),
-                background: withAlpha(STARTER_THEME.to, 0.15),
-              }}
-              title="The Kit"
-              aria-hidden
-            >
-              {STARTER_THEME.glyph}
-            </span>
-            <NameField
-              value={draftFor(starter)}
-              label="Name the kit"
-              placeholder="Kit"
-              previewUrl={starter.previewUrl}
-              onChange={(value) => {
-                setNameError(null);
-                setDrafts((previous) => ({
-                  ...previous,
-                  [starter.key]: value,
-                }));
-              }}
-            />
-          </div>
-        ) : null}
-        {lines.map((line) => {
-          const theme = getArchetypeTheme(line.archetype);
-          return (
-            <div key={line.branchLabel} className="flex items-center gap-2">
-              <span
-                className="flex size-9 shrink-0 items-center justify-center rounded-lg border text-base"
-                style={{
-                  borderColor: withAlpha(theme.from, 0.5),
-                  background: withAlpha(theme.to, 0.15),
-                }}
-                title={`${theme.label}Clan — Line ${line.branchLabel}`}
-                aria-hidden
-              >
-                {theme.glyph}
-              </span>
-              {line.cats.map((cat) => (
-                <NameField
-                  key={cat.key}
-                  value={draftFor(cat)}
-                  label={`Name ${getArchetypeTheme(cat.archetype).label}Clan ${stageRank(cat.level)} in line ${line.branchLabel}`}
-                  placeholder={stageRank(cat.level)}
-                  previewUrl={cat.previewUrl}
-                  onChange={(value) => {
-                    setNameError(null);
-                    setDrafts((previous) => ({
-                      ...previous,
-                      [cat.key]: value,
-                    }));
-                  }}
-                />
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
