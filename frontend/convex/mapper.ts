@@ -1,12 +1,13 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
-import { mutation, query } from "./_generated/server.js";
+import { internalMutation, mutation, query } from "./_generated/server.js";
 import { docIdToString, toId } from "./utils.js";
 
 const SLUG_ALPHABET =
   "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const SLUG_LENGTH = 8;
+const EDIT_TOKEN_LENGTH = 32;
 
 type ProfileDoc = Doc<"cat_profile">;
 type ProfileInsert = Omit<ProfileDoc, "_id" | "_creationTime">;
@@ -20,6 +21,15 @@ function randomSlug(): string {
     slug += SLUG_ALPHABET[index];
   }
   return slug;
+}
+
+function randomEditToken(): string {
+  const bytes = new Uint8Array(EDIT_TOKEN_LENGTH);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(
+    bytes,
+    (byte) => SLUG_ALPHABET[byte % SLUG_ALPHABET.length],
+  ).join("");
 }
 
 async function generateUniqueSlug(ctx: MutationCtx): Promise<string> {
@@ -36,11 +46,49 @@ async function generateUniqueSlug(ctx: MutationCtx): Promise<string> {
   throw new Error("Failed to generate unique slug after several attempts");
 }
 
+async function getAuthenticatedUser(ctx: MutationCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  return identity;
+}
+
+async function requireProfileEditor(
+  ctx: MutationCtx,
+  doc: ProfileDoc,
+  editToken: string | undefined,
+) {
+  const identity = await getAuthenticatedUser(ctx);
+  if (
+    doc.ownerTokenIdentifier &&
+    identity?.tokenIdentifier === doc.ownerTokenIdentifier
+  ) {
+    return;
+  }
+  if (doc.editToken && editToken === doc.editToken) {
+    return;
+  }
+  throw new Error("Not authorized to edit this profile");
+}
+
 function sanitizeOptionalString(value: string | undefined | null) {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   if (!trimmed) return undefined;
   return trimmed.slice(0, 80);
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validateCatDataPayload(value: unknown) {
+  if (!isPlainRecord(value)) {
+    throw new Error("Cat data must be an object");
+  }
+  const params = value.params ?? value.finalParams;
+  if (params !== undefined && !isPlainRecord(params)) {
+    throw new Error("Cat data params must be an object");
+  }
+  return value;
 }
 
 export const create = mutation({
@@ -50,18 +98,25 @@ export const create = mutation({
     creatorName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const catData = validateCatDataPayload(args.catData);
+    const identity = await getAuthenticatedUser(ctx);
     const now = Date.now();
     const slug = await generateUniqueSlug(ctx);
+    const editToken = randomEditToken();
 
     const base: ProfileInsert = {
       slug,
       catData: {
-        ...args.catData,
-        metaLocked: args.catData?.metaLocked ?? false,
+        ...catData,
+        metaLocked: catData.metaLocked ?? false,
       },
+      editToken,
       createdAt: now,
       updatedAt: now,
     };
+    if (identity?.tokenIdentifier) {
+      base.ownerTokenIdentifier = identity.tokenIdentifier;
+    }
 
     const catName = sanitizeOptionalString(args.catName);
     const creatorName = sanitizeOptionalString(args.creatorName);
@@ -70,7 +125,7 @@ export const create = mutation({
 
     const id = await ctx.db.insert("cat_profile", base);
 
-    return { id: docIdToString(id), shareToken: slug, slug };
+    return { id: docIdToString(id), shareToken: slug, slug, editToken };
   },
 });
 
@@ -107,20 +162,28 @@ export const updateMeta = mutation({
     id: v.id("cat_profile"),
     catName: v.optional(v.string()),
     creatorName: v.optional(v.string()),
+    editToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
     if (!doc) throw new Error("Profile not found");
+    await requireProfileEditor(ctx, doc, args.editToken);
 
-    await ctx.db.patch(args.id, {
-      catName: sanitizeOptionalString(args.catName),
-      creatorName: sanitizeOptionalString(args.creatorName),
+    const patch = {
       catData: {
         ...doc.catData,
         metaLocked: true,
       },
       updatedAt: Date.now(),
-    });
+      ...("catName" in args
+        ? { catName: sanitizeOptionalString(args.catName) }
+        : {}),
+      ...("creatorName" in args
+        ? { creatorName: sanitizeOptionalString(args.creatorName) }
+        : {}),
+    };
+
+    await ctx.db.patch(args.id, patch);
 
     const updated = await ctx.db.get(args.id);
     return updated ? await profileToClient(ctx, updated) : null;
@@ -177,11 +240,13 @@ export const listForPreview = query({
 export const getPreviewRefs = query({
   args: { id: v.id("cat_profile") },
   handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.id);
+    if (!doc) return null;
     return await loadImageRefs(ctx, args.id);
   },
 });
 
-export const applyPreviewUpdates = mutation({
+export const applyPreviewUpdates = internalMutation({
   args: {
     id: v.id("cat_profile"),
     previewsUpdatedAt: v.number(),
@@ -388,7 +453,7 @@ async function safeGetUrl(
     const url = await ctx.storage.getUrl(id);
     return url ?? null;
   } catch (error) {
-    console.warn("Failed to obtain storage URL", error);
-    return null;
+    console.error("Failed to obtain storage URL", error);
+    throw new Error("Failed to obtain storage URL");
   }
 }

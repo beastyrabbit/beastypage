@@ -1,8 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-export const RENDERER_BASE = (
-  process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001"
-).replace(/\/$/, "");
+function normalizeRendererBase(url: string) {
+  const trimmed = url.replace(/\/$/, "");
+  if (/^http:\/\/[^/]+\.localhost:1355$/i.test(trimmed)) {
+    return trimmed.replace(/^http:/i, "https:");
+  }
+  return trimmed;
+}
+
+export const RENDERER_BASE = normalizeRendererBase(
+  process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001",
+);
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -24,9 +32,6 @@ function selectHeaders(request: NextRequest): Headers {
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("content-type", contentType);
 
-  const authorization = request.headers.get("authorization");
-  if (authorization) headers.set("authorization", authorization);
-
   const requestId = request.headers.get("x-request-id");
   if (requestId) headers.set("x-request-id", requestId);
 
@@ -37,6 +42,18 @@ function selectHeaders(request: NextRequest): Headers {
 
   const userAgent = request.headers.get("user-agent");
   headers.set("user-agent", userAgent || "gatcha-web/renderer-proxy");
+  return headers;
+}
+
+function selectResponseHeaders(upstream: Response): Headers {
+  const headers = new Headers();
+  const contentType = upstream.headers.get("content-type");
+  if (contentType) headers.set("content-type", contentType);
+
+  const contentLength = upstream.headers.get("content-length");
+  if (contentLength) headers.set("content-length", contentLength);
+
+  headers.set("cache-control", "no-store");
   return headers;
 }
 
@@ -180,8 +197,7 @@ export async function proxyRendererJson(
       );
     }
 
-    const headers = new Headers(upstream.headers);
-    headers.set("cache-control", "no-store");
+    const headers = selectResponseHeaders(upstream);
 
     const proxiedBody = streamWithFinalizer(upstream.body, clear);
 

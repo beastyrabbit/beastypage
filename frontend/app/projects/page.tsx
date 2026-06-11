@@ -31,6 +31,7 @@ const CATEGORY_TOOLS = {
     { title: "Classic Wheel", icon: "🎡" },
     { title: "Single Cat Gen", icon: "✨" },
     { title: "Adoption Gen", icon: "🐾" },
+    { title: "Evolution Lines", icon: "🌿" },
     { title: "Streamer Voting", icon: "📺" },
   ],
   artist: [

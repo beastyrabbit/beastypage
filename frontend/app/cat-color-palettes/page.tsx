@@ -35,6 +35,7 @@ const PALETTE_GROUP_LABELS: Record<PaletteGroup, string> = {
   ornate: "Ornate",
   heritage: "World Heritage",
   flags: "Flags",
+  clans: "Clan Signatures",
 };
 
 const PALETTE_GROUPS: PaletteGroup[] = [
@@ -44,6 +45,7 @@ const PALETTE_GROUPS: PaletteGroup[] = [
   "ornate",
   "heritage",
   "flags",
+  "clans",
 ];
 
 function formatColor(

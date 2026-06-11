@@ -75,6 +75,13 @@ const LEGACY_MODE_CARDS: LegacyCard[] = [
     href: "/adoption-generator",
   },
   {
+    title: "Evolution Lines",
+    icon: "🌿",
+    description:
+      "Start with one cat, then branch it into evolution forms with cumulative torties, scars, and accessories.",
+    href: "/evolution-generator",
+  },
+  {
     title: "Mood Board",
     icon: "🎞️",
     description:

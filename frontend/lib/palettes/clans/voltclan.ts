@@ -1,0 +1,106 @@
+import type { PaletteCategory } from "../types";
+
+export const voltclanPalette: PaletteCategory = {
+  id: "voltclan",
+  label: "VoltClan",
+  description:
+    "Arcade overdrive — CRT black blasted with every neon: laser lemon, glitch cyan, ultraviolet, and hot magenta",
+  colors: {
+    VTC_CRTBLACK: { multiply: [10, 10, 14] },
+    VTC_SCANLINE: { multiply: [35, 38, 45] },
+    VTC_STATICGREY: { multiply: [120, 130, 135] },
+    VTC_NEONLIME: { multiply: [170, 255, 40] },
+    VTC_LASERLEMON: { multiply: [240, 255, 80] },
+    VTC_VOLTYELLOW: { multiply: [255, 225, 40] },
+    VTC_PLASMAORANGE: { multiply: [255, 140, 40] },
+    VTC_HOTCORAL: { multiply: [255, 80, 90] },
+    VTC_NEONMAGENTA: { multiply: [255, 50, 200] },
+    VTC_ULTRAVIOLET: { multiply: [170, 70, 255] },
+    VTC_ELECTRICINDIGO: { multiply: [100, 80, 255] },
+    VTC_CYBERBLUE: { multiply: [50, 140, 255] },
+    VTC_GLITCHCYAN: { multiply: [40, 240, 255] },
+    VTC_TERMINALGREEN: { multiply: [60, 255, 140] },
+    VTC_PIXELWHITE: { multiply: [245, 250, 250] },
+    VTC_GLITCHCHECK: {
+      pattern: {
+        type: "checkerboard",
+        tileSize: 8,
+        background: [255, 50, 200],
+        foreground: [40, 240, 255],
+      },
+    },
+    VTC_BOLTCHEVRON: {
+      pattern: {
+        type: "chevron",
+        tileSize: 10,
+        background: [10, 10, 14],
+        foreground: [255, 225, 40],
+        spacing: 2,
+      },
+    },
+    VTC_CIRCUITKEY: {
+      pattern: {
+        type: "greek_key",
+        tileSize: 10,
+        background: [10, 10, 14],
+        foreground: [60, 255, 140],
+      },
+    },
+    VTC_LASERGRID: {
+      pattern: {
+        type: "windowpane",
+        tileSize: 9,
+        background: [10, 10, 14],
+        foreground: [255, 50, 200],
+      },
+    },
+    VTC_NEONCAMO: {
+      pattern: {
+        type: "camouflage",
+        tileSize: 12,
+        background: [35, 38, 45],
+        foreground: [170, 255, 40],
+      },
+    },
+    VTC_PIXELDOT: {
+      pattern: {
+        type: "polkadot",
+        tileSize: 6,
+        background: [10, 10, 14],
+        foreground: [40, 240, 255],
+      },
+    },
+    VTC_SYNTHSTRIPE: {
+      pattern: {
+        type: "diagonal",
+        tileSize: 8,
+        background: [35, 38, 45],
+        foreground: [255, 80, 90],
+      },
+    },
+    VTC_ARCADESTAR: {
+      pattern: {
+        type: "eight_point_star",
+        tileSize: 11,
+        background: [10, 10, 14],
+        foreground: [255, 225, 40],
+      },
+    },
+    VTC_DATAWEAVE: {
+      pattern: {
+        type: "basketweave",
+        tileSize: 8,
+        background: [10, 10, 14],
+        foreground: [100, 80, 255],
+      },
+    },
+    VTC_VAPORCHECK: {
+      pattern: {
+        type: "gingham",
+        tileSize: 8,
+        background: [40, 240, 255],
+        foreground: [255, 50, 200],
+      },
+    },
+  },
+};

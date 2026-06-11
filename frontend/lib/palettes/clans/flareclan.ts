@@ -1,0 +1,109 @@
+import type { PaletteCategory } from "../types";
+
+export const flareclanPalette: PaletteCategory = {
+  id: "flareclan",
+  label: "FlareClan",
+  description:
+    "The volcano's heart — obsidian rock split by glowing magma, eruption gold, and rare blue flame",
+  colors: {
+    FLC_OBSIDIAN: { multiply: [16, 12, 14] },
+    FLC_BASALT: { multiply: [42, 32, 34] },
+    FLC_CHARREDROCK: { multiply: [70, 52, 48] },
+    FLC_SMOKEVEIL: { multiply: [110, 92, 88] },
+    FLC_MAGMACORE: { multiply: [120, 24, 12] },
+    FLC_DEEPLAVA: { multiply: [168, 42, 14] },
+    FLC_LAVABRIGHT: { multiply: [215, 72, 20] },
+    FLC_ERUPTION: { multiply: [240, 104, 28] },
+    FLC_FIRESTORM: { multiply: [248, 140, 40] },
+    FLC_EMBERGOLD: { multiply: [252, 178, 60] },
+    FLC_SULFURGLOW: { multiply: [235, 210, 95] },
+    FLC_WHITEFLASH: { multiply: [252, 225, 170] },
+    FLC_CINDERROSE: { multiply: [196, 98, 80] },
+    FLC_BLUEFLAME: { multiply: [60, 120, 220] },
+    FLC_BLUECORE: { multiply: [120, 180, 240] },
+    FLC_MAGMACRACK: {
+      pattern: {
+        type: "diagonal",
+        tileSize: 8,
+        background: [16, 12, 14],
+        foreground: [240, 104, 28],
+      },
+    },
+    FLC_BLUEFLAMECHEVRON: {
+      pattern: {
+        type: "chevron",
+        tileSize: 10,
+        background: [16, 12, 14],
+        foreground: [60, 120, 220],
+        spacing: 2,
+      },
+    },
+    FLC_EMBERRAIN: {
+      pattern: {
+        type: "polkadot",
+        tileSize: 7,
+        background: [42, 32, 34],
+        foreground: [252, 178, 60],
+      },
+    },
+    FLC_RISINGFLAME: {
+      pattern: {
+        type: "tachiwaki",
+        tileSize: 10,
+        background: [16, 12, 14],
+        foreground: [215, 72, 20],
+      },
+    },
+    FLC_PHOENIXTARTAN: {
+      pattern: {
+        type: "tartan",
+        tileSize: 10,
+        background: [168, 42, 14],
+        stripes: [
+          { color: [252, 178, 60], width: 2, offset: 0 },
+          { color: [60, 120, 220], width: 1, offset: 5 },
+        ],
+      },
+    },
+    FLC_VOLCANICCAMO: {
+      pattern: {
+        type: "camouflage",
+        tileSize: 12,
+        background: [42, 32, 34],
+        foreground: [120, 24, 12],
+      },
+    },
+    FLC_FIREDANCE: {
+      pattern: {
+        type: "art_deco_fan",
+        tileSize: 11,
+        background: [16, 12, 14],
+        foreground: [248, 140, 40],
+      },
+    },
+    FLC_COALCHECK: {
+      pattern: {
+        type: "buffalo",
+        tileSize: 8,
+        background: [16, 12, 14],
+        foreground: [120, 24, 12],
+      },
+    },
+    FLC_SPARKSTAR: {
+      pattern: {
+        type: "eight_point_star",
+        tileSize: 11,
+        background: [42, 32, 34],
+        foreground: [252, 178, 60],
+      },
+    },
+    FLC_HEATWAVE: {
+      pattern: {
+        type: "herringbone",
+        tileSize: 8,
+        background: [120, 24, 12],
+        foreground: [240, 104, 28],
+      },
+    },
+  },
+};

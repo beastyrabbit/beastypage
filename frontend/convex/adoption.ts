@@ -52,6 +52,7 @@ export const createBatch = mutation({
         profileId: v.optional(v.id("cat_profile")),
         encoded: v.optional(v.string()),
         shareToken: v.optional(v.string()),
+        editToken: v.optional(v.string()),
         catName: v.optional(v.string()),
         creatorName: v.optional(v.string()),
       }),
@@ -86,6 +87,10 @@ export const createBatch = mutation({
       const shareToken =
         typeof cat.shareToken === "string" ? cat.shareToken.trim() : "";
       if (shareToken) entry.shareToken = shareToken;
+
+      const editToken =
+        typeof cat.editToken === "string" ? cat.editToken.trim() : "";
+      if (editToken) entry.editToken = editToken;
 
       const catName = sanitizeOptionalString(cat.catName);
       if (catName) entry.catName = catName;
@@ -140,12 +145,14 @@ export const getBySlug = query({
       .withIndex("bySlug", (q) => q.eq("slug", args.slugOrId))
       .unique();
     if (bySlug) {
-      return batchRecordToClient(ctx, bySlug);
+      return batchRecordToClient(ctx, bySlug, { includeEditTokens: true });
     }
 
     try {
       const asId = await ctx.db.get(toId("adoption_batch", args.slugOrId));
-      return asId ? await batchRecordToClient(ctx, asId) : null;
+      return asId
+        ? await batchRecordToClient(ctx, asId, { includeEditTokens: true })
+        : null;
     } catch (_error) {
       return null;
     }
@@ -195,7 +202,9 @@ export const updateBatchMeta = mutation({
 async function batchRecordToClient(
   ctx: QueryCtx | MutationCtx,
   doc: AdoptionBatchDoc,
+  options: { includeEditTokens?: boolean } = {},
 ) {
+  const includeEditTokens = options.includeEditTokens === true;
   return {
     id: docIdToString(doc._id),
     slug: doc.slug ?? docIdToString(doc._id),
@@ -205,7 +214,9 @@ async function batchRecordToClient(
     cats: await Promise.all(
       (doc.cats ?? []).map(async (cat, index) => {
         const profileInfo = cat.profileId
-          ? await resolveProfilePreview(ctx, cat.profileId)
+          ? await resolveProfilePreview(ctx, cat.profileId, {
+              includeEditToken: includeEditTokens,
+            })
           : null;
         return {
           index,
@@ -216,6 +227,9 @@ async function batchRecordToClient(
             : (profileInfo?.id ?? null),
           encoded: cat.encoded ?? null,
           shareToken: cat.shareToken ?? profileInfo?.slug ?? null,
+          editToken: includeEditTokens
+            ? (cat.editToken ?? profileInfo?.editToken ?? null)
+            : null,
           catName: cat.catName ?? profileInfo?.catName ?? null,
           creatorName: cat.creatorName ?? profileInfo?.creatorName ?? null,
           previews: profileInfo?.previews ?? {
@@ -240,6 +254,7 @@ async function batchRecordToClient(
 async function resolveProfilePreview(
   ctx: QueryCtx | MutationCtx,
   profileId: Id<"cat_profile">,
+  options: { includeEditToken?: boolean } = {},
 ) {
   const profile = await ctx.db.get(profileId);
   if (!profile) return null;
@@ -270,6 +285,7 @@ async function resolveProfilePreview(
   return {
     id: profileIdString,
     slug: profile.slug,
+    editToken: options.includeEditToken ? (profile.editToken ?? null) : null,
     catName: profile.catName ?? null,
     creatorName: profile.creatorName ?? null,
     previews: {

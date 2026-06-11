@@ -5,6 +5,7 @@
 import { blackoutPalette } from "./blackout";
 import { boldPalette } from "./bold";
 import { chisweethomePalette } from "./chisweethome";
+import { CLAN_SIGNATURE_PALETTES } from "./clans";
 import { darkerPalette } from "./darker";
 import { deathnotePalette } from "./deathnote";
 import { demonslayerPalette } from "./demonslayer";
@@ -132,6 +133,19 @@ const HERITAGE_IDS = new Set<PaletteId>([
 
 const FLAG_IDS = new Set<PaletteId>(["flag-patterns"]);
 
+const CLAN_IDS = new Set<PaletteId>([
+  "flareclan",
+  "aquaclan",
+  "leafclan",
+  "sunclan",
+  "roseclan",
+  "moonclan",
+  "voltclan",
+  "crystalclan",
+  "voidclan",
+  "steelclan",
+]);
+
 function inferGroup(id: PaletteId): PaletteGroup {
   if (SOLID_IDS.has(id)) return "solid";
   if (ANIME_IDS.has(id)) return "anime";
@@ -139,6 +153,7 @@ function inferGroup(id: PaletteId): PaletteGroup {
   if (ORNATE_IDS.has(id)) return "ornate";
   if (HERITAGE_IDS.has(id)) return "heritage";
   if (FLAG_IDS.has(id)) return "flags";
+  if (CLAN_IDS.has(id)) return "clans";
   if (process.env.NODE_ENV === "development") {
     console.warn(
       `[palettes] palette "${id}" has no group assignment — defaulting to 'solid'`,
@@ -171,6 +186,8 @@ export const ADDITIONAL_PALETTES: PaletteCategory[] = [
   ...PURE_PALETTES,
   // Textile-inspired palettes
   ...TEXTILE_PALETTES,
+  // Clan signature palettes (evolution lines)
+  ...CLAN_SIGNATURE_PALETTES,
 ].map((p) => withGroup(p, inferGroup(p.id)));
 
 /**

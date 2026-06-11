@@ -10,6 +10,7 @@ from renderer_service.renderer.repository import SpriteRepository
 from renderer_service.models import LayerIdentifier
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+CLAN_PALETTE_DIR = Path(__file__).parents[1] / "renderer_service" / "data" / "palettes"
 
 
 def load_fixture(name: str) -> dict:
@@ -209,6 +210,28 @@ def test_reference_cat_complex_layers():
     assert any(note.startswith("tint") for note in tint_layer.diagnostics)
 
 
+def test_clan_palette_colours_render():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+
+    for palette_path in sorted(CLAN_PALETTE_DIR.glob("*clan.json")):
+        palette = json.loads(palette_path.read_text(encoding="utf-8"))
+        colour_name = next(
+            name
+            for name, definition in palette["colors"].items()
+            if "multiply" in definition
+        )
+        result = pipeline.render(
+            {
+                "spriteNumber": 5,
+                "peltName": "SingleColour",
+                "colour": colour_name,
+            },
+            collect_layers=False,
+        )
+        assert result.composed.getbbox() is not None, palette_path.name
+
+
 def test_missing_scar_masks_do_not_blank_sprite():
     repo = SpriteRepository()
     pipeline = RenderPipeline(repository=repo)
@@ -332,6 +355,8 @@ def test_fastapi_health():
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
+    assert body["metrics"]["queue_size"] == 0
+    assert body["metrics"]["worker_count"] > 0
     assert body["metrics"]["circuit_open"] is False
 
 

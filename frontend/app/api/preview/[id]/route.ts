@@ -3,18 +3,42 @@ import { type NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { getServerConvexUrl } from "@/lib/convexUrl";
 
-const RENDERER_BASE = (
-  process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001"
-).replace(/\/$/, "");
-const PREVIEW_SIZE = 360;
-
-function dataUrlToBuffer(dataUrl: string): Buffer {
-  const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  if (!matches) {
-    throw new Error("Invalid data URL format");
+function normalizeRendererBase(url: string) {
+  const trimmed = url.replace(/\/$/, "");
+  if (/^http:\/\/[^/]+\.localhost:1355$/i.test(trimmed)) {
+    return trimmed.replace(/^http:/i, "https:");
   }
-  const base64 = matches[2].replace(/\s+/g, "");
-  return Buffer.from(base64, "base64");
+  return trimmed;
+}
+
+const RENDERER_BASE = normalizeRendererBase(
+  process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001",
+);
+const PREVIEW_SIZE = 360;
+const RENDER_TIMEOUT_MS = 30_000;
+const PNG_DATA_URL_REGEX = /^data:image\/png;base64,([A-Za-z0-9+/=\s]+)$/;
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isAbortError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: string }).name === "AbortError"
+  );
+}
+
+function dataUrlToPngBuffer(dataUrl: string): Buffer | null {
+  const matches = dataUrl.match(PNG_DATA_URL_REGEX);
+  if (!matches) {
+    return null;
+  }
+  const base64 = matches[1].replace(/\s+/g, "");
+  const buffer = Buffer.from(base64, "base64");
+  return buffer.length > 0 ? buffer : null;
 }
 
 function fromBase64(encoded: string): string {
@@ -23,7 +47,11 @@ function fromBase64(encoded: string): string {
 
 function decodeEncodedCatData(encoded: string): Record<string, unknown> | null {
   try {
-    return JSON.parse(fromBase64(encoded));
+    const parsed: unknown = JSON.parse(fromBase64(encoded));
+    if (!isPlainRecord(parsed)) return null;
+    const params = parsed.params ?? parsed.finalParams;
+    if (params !== undefined && !isPlainRecord(params)) return null;
+    return parsed;
   } catch {
     return null;
   }
@@ -52,11 +80,31 @@ async function renderCatData(
     },
   };
 
-  const renderResponse = await fetch(`${RENDERER_BASE}/render/batch`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(renderPayload),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), RENDER_TIMEOUT_MS);
+  let renderResponse: Response;
+  try {
+    renderResponse = await fetch(`${RENDERER_BASE}/render/batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(renderPayload),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    console.error("Renderer request failed", error);
+    if (isAbortError(error)) {
+      return NextResponse.json(
+        { error: "Renderer request timed out" },
+        { status: 504 },
+      );
+    }
+    return NextResponse.json(
+      { error: "Renderer service unavailable" },
+      { status: 502 },
+    );
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!renderResponse.ok) {
     const errorText = await renderResponse.text();
@@ -67,16 +115,22 @@ async function renderCatData(
     );
   }
 
-  const renderData = await renderResponse.json();
-  const imageDataUrl = renderData?.sheet ?? null;
-  if (!imageDataUrl) {
+  const renderData: unknown = await renderResponse.json();
+  const imageDataUrl = isPlainRecord(renderData) ? renderData.sheet : null;
+  if (typeof imageDataUrl !== "string") {
     return NextResponse.json(
       { error: "Renderer returned no image" },
       { status: 502 },
     );
   }
 
-  const buffer = dataUrlToBuffer(imageDataUrl);
+  const buffer = dataUrlToPngBuffer(imageDataUrl);
+  if (!buffer) {
+    return NextResponse.json(
+      { error: "Renderer returned invalid image data" },
+      { status: 502 },
+    );
+  }
   const uint8Array = new Uint8Array(buffer);
 
   return new NextResponse(uint8Array, {
@@ -117,7 +171,7 @@ export async function GET(
     } catch (error) {
       console.error("Failed to render from encoded data", error);
       return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Failed to render" },
+        { error: "Failed to render preview" },
         { status: 500 },
       );
     }
@@ -147,21 +201,18 @@ export async function GET(
     }
 
     const catData = profile.cat_data;
-    if (!catData) {
+    if (!isPlainRecord(catData)) {
       return NextResponse.json(
         { error: "Cat data not found" },
         { status: 400 },
       );
     }
 
-    return await renderCatData(catData as Record<string, unknown>);
+    return await renderCatData(catData);
   } catch (error) {
     console.error("Failed to generate preview", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Failed to generate preview",
-      },
+      { error: "Failed to generate preview" },
       { status: 500 },
     );
   }

@@ -56,6 +56,16 @@ systemd/
 # Test scripts (may contain credentials)
 test-*.sh
 
+# Local reference checkouts and agent state
+.codex
+.codex/
+.ref/
+.pi/
+frontend/.pi/
+
+# Screenshots belong in .playwright-mcp/
+/*.png
+
 # Temporary/cache directories
 .tmp/
 .serena/
@@ -72,7 +82,10 @@ test-*.sh
 plans/
 
 # Convex generated files
-convex/_generated/
+convex/_generated/*
+!convex/_generated/
+!convex/_generated/ai/
+!convex/_generated/ai/**
 
 # Skills lock
 skills-lock.json
