@@ -42,7 +42,11 @@ export type EvolutionPools = {
   extraAccessories?: string[];
   scars: string[];
   colourDefinitions?: Record<string, [number, number, number]>;
-  /** Colour names each clan may roll; controlled clans stay inside theirs. */
+  /**
+   * Colour names each clan may roll. Controlled clans draw experimental
+   * colours only from their set (natural base colours stay in play); wild
+   * clans may additionally open up to the full experimental pool.
+   */
   clanColours?: Partial<Record<EvolutionArchetype, string[]>>;
 };
 
@@ -208,7 +212,10 @@ const ARCHETYPE_RING: EvolutionArchetype[] = [
   "sun",
 ];
 
-/** Hue-coherent clans that only roll colours from their assigned palettes. */
+/**
+ * Hue-coherent clans whose experimental colours come only from their
+ * assigned palettes (the natural base colours always remain in play).
+ */
 export const CONTROLLED_ARCHETYPES: EvolutionArchetype[] = [
   "flare",
   "aqua",
@@ -227,16 +234,33 @@ export const WILD_ARCHETYPES: EvolutionArchetype[] = [
 ];
 
 const WILD_ARCHETYPE_SET = new Set<EvolutionArchetype>(WILD_ARCHETYPES);
+const ARCHETYPE_SET = new Set<string>([
+  ...CONTROLLED_ARCHETYPES,
+  ...WILD_ARCHETYPES,
+]);
 
 export function isWildArchetype(archetype: EvolutionArchetype): boolean {
   return WILD_ARCHETYPE_SET.has(archetype);
 }
 
+export function isEvolutionArchetype(
+  value: unknown,
+): value is EvolutionArchetype {
+  return typeof value === "string" && ARCHETYPE_SET.has(value);
+}
+
+export const MAX_BRANCH_COUNT = 12;
+
 /** Chance that a wild clan ignores its palettes and rolls the full pool. */
 const WILD_OPEN_CHANCE = 0.5;
 
-/** Warrior rank per level, used for generated cat labels. */
-const STAGE_RANK_LABELS = ["Kit", "Apprentice", "Warrior", "Leader"] as const;
+/** Warrior rank per level — also the source for UI rank display. */
+export const STAGE_RANK_LABELS = [
+  "Kit",
+  "Apprentice",
+  "Warrior",
+  "Leader",
+] as const;
 
 const BASE_COLOUR_RGB: Record<string, [number, number, number]> = {
   WHITE: [238, 238, 232],
