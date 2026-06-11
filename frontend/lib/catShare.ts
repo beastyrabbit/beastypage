@@ -28,6 +28,7 @@ function fromBase64(str: string): string {
 
 const PARAM_KEYS = [
   "spriteNumber",
+  "poseName",
   "peltName",
   "colour",
   "eyeColour",

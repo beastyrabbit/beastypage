@@ -39,6 +39,7 @@ export interface SingleCatSettings {
   afterlifeMode: AfterlifeOption;
   extendedModes: ExtendedMode[];
   includeBaseColours: boolean;
+  includeNewSprites: boolean;
   catName: string;
   creatorName: string;
 }
@@ -59,6 +60,7 @@ export const DEFAULT_SINGLE_CAT_SETTINGS: SingleCatSettings = {
   afterlifeMode: "off",
   extendedModes: [],
   includeBaseColours: true,
+  includeNewSprites: false,
   catName: "",
   creatorName: "",
 };
@@ -308,6 +310,10 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
         typeof data.includeBaseColours === "boolean"
           ? data.includeBaseColours
           : true,
+      includeNewSprites:
+        typeof data.includeNewSprites === "boolean"
+          ? data.includeNewSprites
+          : false,
       catName:
         typeof data.catName === "string" ? data.catName.slice(0, 100) : "",
       creatorName:

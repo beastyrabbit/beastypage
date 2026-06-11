@@ -31,6 +31,7 @@ import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
 import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
+import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import type { PaletteMode } from "@/lib/palettes";
 import { getPaletteMetadata } from "@/lib/palettes";
@@ -218,6 +219,7 @@ const MAX_TORTIE_LAYERS = TORTIE_LAYER_STEPS.length;
 
 const DEFAULT_PARAMS: CatParams = {
   spriteNumber: 8,
+  poseName: DEFAULT_POSE_NAME,
   peltName: "SingleColour",
   colour: "WHITE",
   isTortie: false,
@@ -231,6 +233,13 @@ const DEFAULT_PARAMS: CatParams = {
   scars: [],
   whitePatchesTint: "none",
 };
+
+function getPoseCacheKey(params: Partial<CatParams>): string {
+  return (
+    params.poseName ??
+    `sprite-${params.spriteNumber ?? DEFAULT_PARAMS.spriteNumber}`
+  );
+}
 
 const PALETTE_CONTROLS: { id: PaletteMode; label: string }[] = [
   { id: "off", label: "Classic" },
@@ -435,10 +444,11 @@ export function GuidedBuilderClient() {
         next.skinColour = options.skinColours[0] ?? next.skinColour;
       }
       if (
-        options.sprites.length > 0 &&
-        !options.sprites.includes(next.spriteNumber)
+        next.poseName &&
+        options.poseNames.length > 0 &&
+        !options.poseNames.includes(next.poseName)
       ) {
-        next.spriteNumber = options.sprites[0] ?? next.spriteNumber;
+        next.poseName = options.poseNames[0];
       }
       return next;
     });
@@ -783,8 +793,12 @@ export function GuidedBuilderClient() {
         }
         case "pose":
           return {
-            complete: typeof snapshot.spriteNumber === "number",
-            summary: `Pose ${snapshot.spriteNumber}`,
+            complete:
+              Boolean(snapshot.poseName) ||
+              typeof snapshot.spriteNumber === "number",
+            summary: snapshot.poseName
+              ? formatName(snapshot.poseName)
+              : `Pose ${snapshot.spriteNumber}`,
           };
         default: {
           const layerMatch = /^tortie-layer-(\d+)$/.exec(stepId);
@@ -966,9 +980,9 @@ export function GuidedBuilderClient() {
   );
 
   const handlePoseSelect = useCallback(
-    (spriteNumber: number) => {
+    (poseName: string) => {
       updateParams((draft) => {
-        draft.spriteNumber = spriteNumber;
+        draft.poseName = poseName;
       }, "pose");
     },
     [updateParams],
@@ -1239,7 +1253,7 @@ export function GuidedBuilderClient() {
   const renderPatternStep = () => (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
       {options?.pelts.map((pelt) => {
-        const previewKey = `pattern-${pelt}-${params.colour}-${params.spriteNumber}-${params.tint}-${params.whitePatches}`;
+        const previewKey = `pattern-${pelt}-${params.colour}-${getPoseCacheKey(params)}-${params.tint}-${params.whitePatches}`;
         const label = formatName(pelt);
         return (
           <button
@@ -1390,7 +1404,7 @@ export function GuidedBuilderClient() {
           <h3 className="text-sm font-semibold text-neutral-200">Pattern</h3>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {options?.pelts.map((pelt) => {
-              const previewKey = `tortie-${layerIndex}-pattern-${pelt}-${tortiePaletteMode}-${layer.colour ?? params.colour}-${layer.mask ?? "MASK"}`;
+              const previewKey = `tortie-${getPoseCacheKey(params)}-${layerIndex}-pattern-${pelt}-${tortiePaletteMode}-${layer.colour ?? params.colour}-${layer.mask ?? "MASK"}`;
               const label = formatName(pelt);
               const selected = layer.pattern === pelt;
               return (
@@ -1463,7 +1477,7 @@ export function GuidedBuilderClient() {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {tortiePalette.map((colour) => {
-              const previewKey = `tortie-${layerIndex}-colour-${colour}-${tortiePaletteMode}-${layer.pattern ?? params.peltName}-${layer.mask ?? "MASK"}`;
+              const previewKey = `tortie-${getPoseCacheKey(params)}-${layerIndex}-colour-${colour}-${tortiePaletteMode}-${layer.pattern ?? params.peltName}-${layer.mask ?? "MASK"}`;
               const label = formatName(colour);
               const selected = layer.colour === colour;
               return (
@@ -1511,7 +1525,7 @@ export function GuidedBuilderClient() {
           <h3 className="text-sm font-semibold text-neutral-200">Mask</h3>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {options?.tortieMasks.map((mask) => {
-              const previewKey = `tortie-${layerIndex}-mask-${mask}-${tortiePaletteMode}-${layer.pattern ?? params.peltName}-${layer.colour ?? params.colour}`;
+              const previewKey = `tortie-${getPoseCacheKey(params)}-${layerIndex}-mask-${mask}-${tortiePaletteMode}-${layer.pattern ?? params.peltName}-${layer.colour ?? params.colour}`;
               const label = formatName(mask);
               const selected = layer.mask === mask;
               return (
@@ -1622,7 +1636,7 @@ export function GuidedBuilderClient() {
       "all",
       experimentalColourMode,
     ) ?? ["none"];
-    const baseKey = `${params.spriteNumber}-${params.peltName}-${params.colour}-${params.eyeColour}-${params.skinColour}-${params.tint ?? "none"}`;
+    const baseKey = `${getPoseCacheKey(params)}-${params.peltName}-${params.colour}-${params.eyeColour}-${params.skinColour}-${params.tint ?? "none"}`;
 
     const renderPreviewOption = (
       key: string,
@@ -1886,17 +1900,17 @@ export function GuidedBuilderClient() {
               </button>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {Array.from(new Set(group.options)).map((option, optionIndex) => {
+              {Array.from(new Set(group.options)).map((option) => {
                 const selected = chosen.has(option);
                 const currentAccessories = params.accessories ?? [];
                 const accessoryKey = [...currentAccessories, option]
                   .sort()
                   .join("_");
-                const previewKey = `accessory-${group.label}-${option}-${accessoryKey}-${params.spriteNumber}`;
+                const previewKey = `accessory-${group.label}-${option}-${accessoryKey}-${getPoseCacheKey(params)}`;
                 const label = formatName(option);
                 return (
                   <button
-                    key={`${group.label}:${option}-${optionIndex}`}
+                    key={`${group.label}:${option}`}
                     type="button"
                     className={cn(
                       "block aspect-square w-full max-w-[220px] rounded-2xl border bg-slate-900/60 p-0 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300",
@@ -1998,27 +2012,41 @@ export function GuidedBuilderClient() {
     );
   };
 
-  const renderPoseStep = () => (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-      {options?.sprites.map((sprite) => (
-        <button
-          key={sprite}
-          type="button"
-          className={cn(
-            "rounded-xl border border-slate-700/60 bg-slate-900/60 p-4 text-left transition hover:border-amber-400/60",
-            params.spriteNumber === sprite &&
-              "border-amber-400 bg-amber-500/10 text-amber-100",
-          )}
-          onClick={() => handlePoseSelect(sprite)}
-        >
-          <div className="text-sm font-semibold">Pose {sprite}</div>
-          <p className="mt-1 text-xs text-neutral-300/80">
-            Changes age/body posture.
-          </p>
-        </button>
-      ))}
-    </div>
-  );
+  const renderPoseStep = () => {
+    if (!options) return null;
+
+    const poseChoices =
+      options.poseNames.length > 0
+        ? options.poseNames.map((poseName) => ({
+            poseName,
+            label: formatName(poseName),
+          }))
+        : [];
+
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        {poseChoices.map(({ poseName, label }) => {
+          const selected = params.poseName === poseName;
+          return (
+            <button
+              key={poseName}
+              type="button"
+              className={cn(
+                "rounded-xl border border-slate-700/60 bg-slate-900/60 p-4 text-left transition hover:border-amber-400/60",
+                selected && "border-amber-400 bg-amber-500/10 text-amber-100",
+              )}
+              onClick={() => handlePoseSelect(poseName)}
+            >
+              <div className="text-sm font-semibold">{label}</div>
+              <p className="mt-1 text-xs text-neutral-300/80">
+                Changes age/body posture.
+              </p>
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
 
   const goToPreviousStep = useCallback(() => {
     const index = unlockedSteps.indexOf(activeStep);

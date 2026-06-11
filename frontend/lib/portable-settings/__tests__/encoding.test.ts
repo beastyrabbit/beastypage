@@ -29,6 +29,7 @@ function makeSettings(
     exactLayerCounts: true,
     afterlifeMode: "dark10",
     includeBaseColours: true,
+    includeNewSprites: false,
     extendedModes: [],
     ...overrides,
   };
@@ -44,6 +45,7 @@ function assertRoundTrip(settings: SingleCatPortableSettings) {
   expect(decoded?.exactLayerCounts).toBe(settings.exactLayerCounts);
   expect(decoded?.afterlifeMode).toBe(settings.afterlifeMode);
   expect(decoded?.includeBaseColours).toBe(settings.includeBaseColours);
+  expect(decoded?.includeNewSprites).toBe(settings.includeNewSprites);
   expect([...(decoded?.extendedModes ?? [])].sort()).toEqual(
     [...settings.extendedModes].sort(),
   );
@@ -134,6 +136,23 @@ describe("encodePortableSettings / decodePortableSettings", () => {
   it("round-trips with all palettes selected", () => {
     assertRoundTrip(
       makeSettings({ extendedModes: [...PORTABLE_PALETTE_REGISTRY] }),
+    );
+  });
+
+  it("round-trips includeNewSprites = false", () => {
+    assertRoundTrip(makeSettings({ includeNewSprites: false }));
+  });
+
+  it("round-trips includeNewSprites = true", () => {
+    assertRoundTrip(makeSettings({ includeNewSprites: true }));
+  });
+
+  it("round-trips includeNewSprites with all palettes selected", () => {
+    assertRoundTrip(
+      makeSettings({
+        includeNewSprites: true,
+        extendedModes: [...PORTABLE_PALETTE_REGISTRY],
+      }),
     );
   });
 
@@ -298,8 +317,20 @@ describe("encodePortableSettings / decodePortableSettings", () => {
     ).toBeNull();
   });
 
+  it("accepts the custom includeNewSprites flag bit", () => {
+    const includeNewSpritesPayloadPosition = 70;
+    const lower = 3;
+    const upper = 2 ** (includeNewSpritesPayloadPosition - 27);
+    const code = formatRawCodeWords(splitPayloadHalves(lower, upper));
+
+    const decoded = decodePortableSettings(code);
+    expect(decoded).not.toBeNull();
+    expect(decoded?.includeNewSprites).toBe(true);
+    expect(normalizePortableSettingsCode(code)).not.toBeNull();
+  });
+
   it("rejects V3 payloads with currently unused palette bits set", () => {
-    const sparePalettePosition = PORTABLE_PALETTE_REGISTRY.length;
+    const sparePalettePosition = PORTABLE_PALETTE_REGISTRY.length + 1;
     expect(sparePalettePosition).toBeLessThan(74);
 
     const lower =
@@ -503,6 +534,7 @@ describe("append-compatibility", () => {
     expect(decoded.exactLayerCounts).toBe(true);
     expect(decoded.afterlifeMode).toBe("both10");
     expect(decoded.includeBaseColours).toBe(true);
+    expect(decoded.includeNewSprites).toBe(false);
   });
 });
 
@@ -537,6 +569,7 @@ describe("extractPortableSettings / applyPortableSettings", () => {
       exactLayerCounts: false,
       afterlifeMode: "starForce",
       includeBaseColours: false,
+      includeNewSprites: true,
       extendedModes: ["howl"],
     };
     const result = applyPortableSettings(full, portable);
@@ -545,6 +578,7 @@ describe("extractPortableSettings / applyPortableSettings", () => {
     expect(result.exactLayerCounts).toBe(false);
     expect(result.afterlifeMode).toBe("starForce");
     expect(result.extendedModes).toEqual(["howl"]);
+    expect(result.includeNewSprites).toBe(true);
     expect(result.mode).toBe("calm");
     expect(result.speedMultiplier).toBe(2.5);
     expect(result.catName).toBe("TestCat");

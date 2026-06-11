@@ -37,6 +37,7 @@ import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
+import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import { createCatShare } from "@/lib/catShare";
 import type { PaletteMode } from "@/lib/palettes";
@@ -48,6 +49,7 @@ export const VALID_PALETTE_IDS: PaletteMode[] = ["off", ...getPaletteIds()];
 
 export const DEFAULT_PARAMS: CatParams = {
   spriteNumber: 8,
+  poseName: DEFAULT_POSE_NAME,
   peltName: "SingleColour",
   colour: "WHITE",
   isTortie: false,
@@ -64,7 +66,13 @@ export const DEFAULT_PARAMS: CatParams = {
 
 const MAX_TORTIE_LAYERS = 6;
 const DISPLAY_CANVAS_SIZE = 540;
-const LEGACY_SPRITE_RANGE = Array.from({ length: 21 }, (_, index) => index);
+
+function getPoseCacheKey(params: Partial<CatParams>): string {
+  return (
+    params.poseName ??
+    `sprite-${params.spriteNumber ?? DEFAULT_PARAMS.spriteNumber}`
+  );
+}
 
 type SectionId =
   | "pose"
@@ -124,6 +132,7 @@ type VisualBuilderPreviewSpriteProps = {
   mutate: (draft: CatParams) => void;
   size?: number;
   label?: string;
+  labelOverlay?: boolean;
   badge?: ReactNode;
   selected?: boolean;
   rendererReady: boolean;
@@ -140,6 +149,7 @@ function VisualBuilderPreviewSprite({
   mutate,
   size = 280,
   label,
+  labelOverlay = false,
   badge,
   selected,
   rendererReady,
@@ -216,6 +226,11 @@ function VisualBuilderPreviewSprite({
           {badge}
         </div>
       )}
+      {labelOverlay && label && (
+        <div className="absolute inset-x-2 bottom-2 rounded-md border border-black/40 bg-slate-950/85 px-2 py-1 text-center text-xs font-medium text-white shadow-sm">
+          {label}
+        </div>
+      )}
     </div>
   );
 }
@@ -229,9 +244,6 @@ export function VisualBuilderClient({
     useState<PaletteMode>("off");
   const [tortiePaletteMode, setTortiePaletteMode] =
     useState<PaletteMode>("off");
-  const [initialSpriteNumber, setInitialSpriteNumber] = useState<number | null>(
-    null,
-  );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -318,18 +330,11 @@ export function VisualBuilderClient({
   const deferredParams = useDeferredValue(params);
   const normalizedOptions = useMemo(() => {
     if (!options) return null;
-    const sprites = new Set<number>([
-      ...options.sprites,
-      ...LEGACY_SPRITE_RANGE,
-    ]);
-    if (initialSpriteNumber !== null) {
-      sprites.add(initialSpriteNumber);
-    }
     return {
       ...options,
-      sprites: Array.from(sprites).sort((a, b) => a - b),
+      poseNames: options.poseNames,
     } satisfies BuilderOptions;
-  }, [options, initialSpriteNumber]);
+  }, [options]);
   const deferredOptions = useDeferredValue(normalizedOptions);
   const viewParams = deferredParams ?? params;
   const viewOptions = deferredOptions ?? normalizedOptions;
@@ -366,7 +371,6 @@ export function VisualBuilderClient({
     new Map(),
   );
   const previewRequestRef = useRef(0);
-  const initialSpriteNumberRef = useRef<number | null>(null);
 
   const createMapperRecord = useMutation(api.mapper.create);
 
@@ -387,10 +391,14 @@ export function VisualBuilderClient({
   useEffect(() => {
     if (!initialCat || initialisedRef.current) return;
     initialisedRef.current = true;
-    const mergedParams = cloneParams({
+    const initialParams = {
       ...DEFAULT_PARAMS,
       ...initialCat.params,
-    });
+    };
+    if (initialCat.params.poseName === undefined) {
+      delete initialParams.poseName;
+    }
+    const mergedParams = cloneParams(initialParams);
     const incomingTortie = (
       initialCat.tortie ??
       mergedParams.tortie ??
@@ -403,7 +411,6 @@ export function VisualBuilderClient({
         (layer): layer is TortieLayer => layer !== null,
       ),
     );
-    initialSpriteNumberRef.current = synced.spriteNumber ?? null;
     setExpandedTortieSub(() => {
       const mapping: Record<number, "pattern" | "colour" | "mask" | null> = {};
       (synced.tortie ?? []).forEach((_, idx) => {
@@ -413,7 +420,6 @@ export function VisualBuilderClient({
     });
     setExperimentalColourMode(initialCat.paletteMode ?? "off");
     setTortiePaletteMode(initialCat.tortiePaletteMode ?? "off");
-    setInitialSpriteNumber(synced.spriteNumber ?? null);
     setCatName(initialCat.catName ?? "");
     setCreatorName(initialCat.creatorName || defaultCreatorName);
     console.log("[visual-builder] load slug", {
@@ -457,25 +463,17 @@ export function VisualBuilderClient({
     if (!normalizedOptions) return;
     setParams((prev) => {
       let needsUpdate = false;
-      const initialSpriteNumber = initialSpriteNumberRef.current;
-      const spriteAllowed = normalizedOptions.sprites.includes(
-        prev.spriteNumber,
-      );
+      const poseAllowed =
+        !prev.poseName ||
+        normalizedOptions.poseNames.length === 0 ||
+        normalizedOptions.poseNames.includes(prev.poseName);
 
       if (!normalizedOptions.pelts.includes(prev.peltName)) needsUpdate = true;
       if (!normalizedOptions.eyeColours.includes(prev.eyeColour))
         needsUpdate = true;
       if (!normalizedOptions.skinColours.includes(prev.skinColour))
         needsUpdate = true;
-      if (
-        !spriteAllowed &&
-        !(
-          initialSpriteNumber !== null &&
-          prev.spriteNumber === initialSpriteNumber
-        )
-      ) {
-        needsUpdate = true;
-      }
+      if (!poseAllowed) needsUpdate = true;
 
       if (!needsUpdate) return prev;
 
@@ -489,17 +487,12 @@ export function VisualBuilderClient({
       if (!normalizedOptions.skinColours.includes(next.skinColour)) {
         next.skinColour = normalizedOptions.skinColours[0] ?? next.skinColour;
       }
-      if (!normalizedOptions.sprites.includes(next.spriteNumber)) {
-        const preferred =
-          initialSpriteNumber !== null ? initialSpriteNumber : undefined;
-        if (
-          preferred !== undefined &&
-          normalizedOptions.sprites.includes(preferred)
-        ) {
-          next.spriteNumber = preferred;
-        } else {
-          next.spriteNumber = normalizedOptions.sprites[0] ?? next.spriteNumber;
-        }
+      if (
+        next.poseName &&
+        normalizedOptions.poseNames.length > 0 &&
+        !normalizedOptions.poseNames.includes(next.poseName)
+      ) {
+        next.poseName = normalizedOptions.poseNames[0];
       }
       return next;
     });
@@ -787,7 +780,7 @@ export function VisualBuilderClient({
       </header>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {paletteColours.map((colour) => {
-          const previewKey = `colour-${colour}-${experimentalColourMode}-${params.spriteNumber}-${params.peltName}`;
+          const previewKey = `colour-${colour}-${experimentalColourMode}-${getPoseCacheKey(params)}-${params.peltName}`;
           const selected = params.colour === colour;
           const badgeColour = getColourSwatch(colour, spriteMapperRef.current);
           return (
@@ -849,7 +842,7 @@ export function VisualBuilderClient({
       </header>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {(options?.pelts ?? []).map((pelt) => {
-          const previewKey = `pelt-${pelt}-${params.colour}-${params.spriteNumber}`;
+          const previewKey = `pelt-${pelt}-${params.colour}-${getPoseCacheKey(params)}`;
           const selected = params.peltName === pelt;
           return (
             <button
@@ -1015,7 +1008,7 @@ export function VisualBuilderClient({
           <div className="space-y-6">
             {currentLayers.map((layer, layerIndex) => {
               const label = `Layer ${layerIndex + 1}`;
-              const layerPrefix = `tortie-${layerIndex}`;
+              const layerPrefix = `tortie-${getPoseCacheKey(currentParams)}-${layerIndex}`;
               const expanded = expandedLayer === layerIndex;
 
               let detailContent: ReactNode | null = null;
@@ -1417,7 +1410,7 @@ export function VisualBuilderClient({
       "all",
       experimentalColourMode,
     ) ?? ["none"];
-    const baseKey = `${currentParams.spriteNumber}-${currentParams.peltName}-${currentParams.colour}-${currentParams.eyeColour}-${currentParams.skinColour}-${currentParams.tint ?? "none"}`;
+    const baseKey = `${getPoseCacheKey(currentParams)}-${currentParams.peltName}-${currentParams.colour}-${currentParams.eyeColour}-${currentParams.skinColour}-${currentParams.tint ?? "none"}`;
 
     const whitePatchChoices = [
       { value: null, label: "None" },
@@ -1674,8 +1667,8 @@ export function VisualBuilderClient({
     [markingsSection],
   );
   const renderSkinSection = () => {
-    const skinKeyBase = `${params.spriteNumber}-${params.peltName}-${params.colour}-${params.eyeColour}-${params.tint ?? "none"}`;
-    const tintKeyBase = `${params.spriteNumber}-${params.peltName}-${params.colour}-${params.eyeColour}`;
+    const skinKeyBase = `${getPoseCacheKey(params)}-${params.peltName}-${params.colour}-${params.eyeColour}-${params.tint ?? "none"}`;
+    const tintKeyBase = `${getPoseCacheKey(params)}-${params.peltName}-${params.colour}-${params.eyeColour}`;
     const tintChoices = Array.from(new Set(options?.tints ?? [])).filter(
       (entry) => entry !== "none",
     );
@@ -2046,7 +2039,7 @@ export function VisualBuilderClient({
                   {group.options.map((option) => {
                     const label = formatName(option);
                     const selected = chosen.has(option);
-                    const previewKey = `accessory-${group.label}-${option}-${currentParams.spriteNumber}-${currentParams.colour}-${currentParams.peltName}`;
+                    const previewKey = `accessory-${group.label}-${option}-${getPoseCacheKey(currentParams)}-${currentParams.colour}-${currentParams.peltName}`;
                     return (
                       <button
                         key={`${group.label}:${option}`}
@@ -2164,7 +2157,7 @@ export function VisualBuilderClient({
                   {group.options.map((option) => {
                     const label = formatName(option);
                     const selected = chosen.has(option);
-                    const previewKey = `scar-${group.label}-${option}-${currentParams.spriteNumber}-${currentParams.colour}-${currentParams.peltName}`;
+                    const previewKey = `scar-${group.label}-${option}-${getPoseCacheKey(currentParams)}-${currentParams.colour}-${currentParams.peltName}`;
                     return (
                       <button
                         key={`${group.label}:${option}`}
@@ -2207,8 +2200,16 @@ export function VisualBuilderClient({
   ]);
 
   const renderScarsSection = useCallback(() => scarsSection, [scarsSection]);
-  const poseSection = useMemo(
-    () => (
+  const poseSection = useMemo(() => {
+    const poseChoices =
+      viewOptions?.poseNames && viewOptions.poseNames.length > 0
+        ? viewOptions.poseNames.map((poseName) => ({
+            poseName,
+            label: formatName(poseName),
+          }))
+        : [];
+
+    return (
       <section
         id="pose"
         className="scroll-mt-40 space-y-4 rounded-3xl border border-slate-800 bg-slate-950/60 p-6"
@@ -2220,46 +2221,51 @@ export function VisualBuilderClient({
           </p>
         </header>
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {(viewOptions?.sprites ?? []).map((sprite) => (
-            <button
-              key={sprite}
-              type="button"
-              className={cn(
-                "rounded-xl border border-slate-700/60 bg-slate-900/60 p-0 transition hover:border-amber-400/60",
-                params.spriteNumber === sprite &&
-                  "border-amber-400 bg-amber-500/10 text-amber-100",
-              )}
-              onClick={() =>
-                updateParams(
-                  (draft) => {
-                    draft.spriteNumber = sprite;
-                  },
-                  { trait_type: "pose", value: String(sprite) },
-                )
-              }
-            >
-              <VisualBuilderPreviewSprite
-                {...previewSpriteSharedProps}
-                cacheKey={`pose-option-${sprite}`}
-                mutate={(draft) => {
-                  draft.spriteNumber = sprite;
-                }}
-                selected={params.spriteNumber === sprite}
-                label={`Pose ${sprite}`}
-                size={180}
-              />
-            </button>
-          ))}
+          {poseChoices.map(({ poseName, label }) => {
+            const selected = params.poseName === poseName;
+            return (
+              <button
+                key={poseName}
+                type="button"
+                className={cn(
+                  "rounded-xl border border-slate-700/60 bg-slate-900/60 p-0 transition hover:border-amber-400/60",
+                  selected && "border-amber-400 bg-amber-500/10 text-amber-100",
+                )}
+                onClick={() =>
+                  updateParams(
+                    (draft) => {
+                      draft.poseName = poseName;
+                    },
+                    {
+                      trait_type: "pose",
+                      value: poseName,
+                    },
+                  )
+                }
+              >
+                <VisualBuilderPreviewSprite
+                  {...previewSpriteSharedProps}
+                  cacheKey={`pose-option-${poseName}`}
+                  mutate={(draft) => {
+                    draft.poseName = poseName;
+                  }}
+                  selected={selected}
+                  label={label}
+                  labelOverlay
+                  size={180}
+                />
+              </button>
+            );
+          })}
         </div>
       </section>
-    ),
-    [
-      params.spriteNumber,
-      updateParams,
-      viewOptions?.sprites,
-      previewSpriteSharedProps,
-    ],
-  );
+    );
+  }, [
+    params.poseName,
+    updateParams,
+    viewOptions?.poseNames,
+    previewSpriteSharedProps,
+  ]);
 
   const renderPoseSection = useCallback(() => poseSection, [poseSection]);
 
@@ -2454,8 +2460,6 @@ export function VisualBuilderClient({
     setStatusMessage(null);
     setParams(DEFAULT_PARAMS);
     setTortieLayers([]);
-    initialSpriteNumberRef.current = null;
-    setInitialSpriteNumber(null);
     setExperimentalColourMode("off");
     setTortiePaletteMode("off");
     setCatName("");
@@ -2532,8 +2536,6 @@ export function VisualBuilderClient({
       );
       setExperimentalColourMode(nextPaletteMode);
       setTortiePaletteMode(nextTortiePaletteMode);
-      initialSpriteNumberRef.current = combined.spriteNumber ?? null;
-      setInitialSpriteNumber(combined.spriteNumber ?? null);
       setParams(combined);
       setTortieLayers(tortie);
       setExpandedLayer(null);

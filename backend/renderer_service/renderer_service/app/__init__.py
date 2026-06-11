@@ -12,8 +12,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ..config import settings
 from ..models import (
-    DiffResponse,
-    DiffRequest,
     RenderRequest,
     RenderResponse,
     BatchRenderRequest,
@@ -173,8 +171,7 @@ def create_app() -> FastAPI:
         version="1.3.3",
         description=(
             "Composites ClanGen pixel-art sprites into cat card images. "
-            "Supports single renders, batch spritesheets, palette listing, "
-            "and V2-vs-V3 visual diffs."
+            "Supports single renders, batch spritesheets, and palette listing."
         ),
         servers=[
             {"url": "http://localhost:8001", "description": "Local dev"},
@@ -272,15 +269,6 @@ def create_app() -> FastAPI:
                 detail="Renderer recovering from failures. Please retry.",
             ) from None
 
-    @app.post(
-        "/diff",
-        response_model=DiffResponse,
-        tags=["rendering"],
-        summary="V2 vs V3 visual diff (not yet implemented)",
-    )
-    def diff(_: DiffRequest) -> DiffResponse:  # pragma: no cover - placeholder
-        raise NotImplementedError("V2 vs V3 diffing is not implemented yet")
-
     @app.get("/palettes", tags=["palettes"], summary="List available color palettes")
     def get_palettes() -> list[dict]:
         """Return all available color palettes with their metadata and colors."""
@@ -292,7 +280,10 @@ def create_app() -> FastAPI:
 def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderResponse:
     payload = request.payload
     params = {**payload.params}
-    params.setdefault("spriteNumber", payload.spriteNumber)
+    if payload.poseName is not None:
+        params["poseName"] = payload.poseName
+    if payload.spriteNumber is not None:
+        params.setdefault("spriteNumber", payload.spriteNumber)
     collect_layers = request.options.collect_layers if request.options else False
     include_layer_images = (
         request.options.include_layer_images if request.options else False
@@ -325,7 +316,10 @@ def _render_batch(
     pipeline: RenderPipeline, request: BatchRenderRequest
 ) -> BatchRenderResponse:
     base_params = {**request.payload.params}
-    base_params.setdefault("spriteNumber", request.payload.spriteNumber)
+    if request.payload.poseName is not None:
+        base_params["poseName"] = request.payload.poseName
+    if request.payload.spriteNumber is not None:
+        base_params.setdefault("spriteNumber", request.payload.spriteNumber)
 
     options = request.options
     frame_mode = options.frame_mode if options else "composed"

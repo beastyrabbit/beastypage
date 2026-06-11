@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "./types";
-import { FORBIDDEN_SPRITES } from "./types";
+import { getAvailablePoseNames } from "@/lib/cat-v3/poseOptions";
 
 export function useSpriteMapperOptions() {
   const [mapper, setMapper] = useState<SpriteMapperApi | null>(null);
@@ -28,11 +28,9 @@ export function useSpriteMapperOptions() {
 
         setMapper(spriteMapper);
 
-        const spriteNumbers = spriteMapper
-          .getSprites()
-          .filter((value) => !FORBIDDEN_SPRITES.has(value));
+        const poseNames = getAvailablePoseNames(spriteMapper);
         const builderOptions: BuilderOptions = {
-          sprites: spriteNumbers,
+          poseNames,
           pelts: spriteMapper.getPeltNames(),
           points: spriteMapper.getPoints(),
           vitiligo: spriteMapper.getVitiligo(),

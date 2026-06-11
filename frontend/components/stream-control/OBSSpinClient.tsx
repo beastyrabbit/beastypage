@@ -27,6 +27,12 @@ import "react-split-flap-effect/extras/themes.css";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { api } from "@/convex/_generated/api";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
+import {
+  DEFAULT_POSE_NAME,
+  formatPoseName,
+  getRandomSelectablePoseNames,
+} from "@/lib/cat-v3/poseOptions";
+import { getRandomAccessoryPool } from "@/lib/cat-v3/randomAccessories";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { decodePortableSettings } from "@/lib/portable-settings";
 import {
@@ -104,12 +110,6 @@ const LAYER_PARAM_IDS = new Set([
   "tortieColour",
 ]);
 
-interface SpriteVariation {
-  spriteNumber: number;
-  name: string;
-  dataUrl: string;
-}
-
 interface VariationOption {
   raw: unknown;
   display: string;
@@ -181,7 +181,7 @@ interface WheelRewardState {
 }
 
 interface ParameterOptions {
-  sprite: number[];
+  sprite: (number | string)[];
   pelt: string[];
   colour: string[];
   tortie: boolean[];
@@ -314,7 +314,6 @@ function _formatMs(ms: number): string {
 interface SpriteMapperApi {
   loaded: boolean;
   init: () => Promise<boolean>;
-  sprites?: number[];
   getColours?: () => string[];
   getExperimentalColoursByMode?: (...args: unknown[]) => string[];
   getWhitePatchColourOptions?: (...args: unknown[]) => string[];
@@ -327,7 +326,10 @@ interface SpriteMapperApi {
   getPoints?: () => string[];
   getVitiligo?: () => string[];
   getAccessories?: () => string[];
+  getExtraAccessories?: () => string[];
   getScars?: () => string[];
+  getPoseNames?: () => string[];
+  getRenderablePoseNames?: () => string[];
 }
 
 type ParamId =
@@ -512,36 +514,10 @@ function getSpeedSettings(durationMs: number) {
   return scaleProfile(SPEED_PRESETS.slow, ratio, duration);
 }
 
-const VALID_SPRITES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
-
 const _layerGroupLabels: Record<LayerGroup, string> = {
   accessories: "Accessories",
   scars: "Scars",
   torties: "Tortie Layers",
-};
-
-const SPRITE_NAMES: Record<number, string> = {
-  0: "Kitten (0)",
-  1: "Kitten (1)",
-  2: "Kitten (2)",
-  3: "Adolescent (3)",
-  4: "Adolescent (4)",
-  5: "Adolescent (5)",
-  6: "Adult (6)",
-  7: "Adult (7)",
-  8: "Adult (8)",
-  9: "Longhair Adult (9)",
-  10: "Longhair Adult (10)",
-  11: "Longhair Adult (11)",
-  12: "Senior (12)",
-  13: "Senior (13)",
-  14: "Senior (14)",
-  15: "Paralyzed Adult (15)",
-  16: "Paralyzed Longhair Adult (16)",
-  17: "Paralyzed Young (17)",
-  18: "Sick Adult (18)",
-  19: "Sick Young (19)",
-  20: "Newborn (20)",
 };
 
 const PARAM_SEQUENCE: ParamDefinition[] = [
@@ -949,7 +925,7 @@ function getParameterRawValue(
 ): unknown {
   switch (paramId) {
     case "sprite":
-      return params.spriteNumber;
+      return params.poseName ?? params.spriteNumber;
     case "pelt":
       return params.peltName;
     case "colour":
@@ -989,9 +965,12 @@ function getParameterRawValue(
 
 function formatOptionDisplay(paramId: ParamId, raw: unknown): string {
   if (paramId === "sprite") {
+    if (typeof raw === "string" && !/^-?\d+$/.test(raw.trim())) {
+      return formatPoseName(raw);
+    }
     const spriteNumber = coerceSpriteNumber(raw);
     if (spriteNumber !== undefined) {
-      return SPRITE_NAMES[spriteNumber] ?? `Sprite ${spriteNumber}`;
+      return `Sprite ${spriteNumber}`;
     }
   }
 
@@ -1094,9 +1073,14 @@ function applyParamValue(
       params.reverse = value as boolean;
       break;
     case "sprite": {
-      const parsed = coerceSpriteNumber(value);
-      if (parsed !== undefined) {
-        params.spriteNumber = parsed;
+      if (typeof value === "string" && !/^-?\d+$/.test(value.trim())) {
+        params.poseName = value;
+      } else {
+        const parsed = coerceSpriteNumber(value);
+        if (parsed !== undefined) {
+          params.spriteNumber = parsed;
+          params.poseName = undefined;
+        }
       }
       break;
     }
@@ -1144,10 +1128,9 @@ function getParameterValueForDisplay(
     case "reverse":
       return params.reverse ? "Yes" : "No";
     case "sprite":
-      return (
-        SPRITE_NAMES[Number(params.spriteNumber)] ??
-        `Sprite ${params.spriteNumber}`
-      );
+      return params.poseName
+        ? formatPoseName(params.poseName)
+        : `Sprite ${params.spriteNumber}`;
     default:
       return "";
   }
@@ -1342,6 +1325,7 @@ async function buildParameterOptions(
   mapper: SpriteMapperApi,
   includeBaseColours: boolean,
   extendedModes: ExtendedMode[],
+  includeNewSprites: boolean,
 ): Promise<ParameterOptions> {
   if (!mapper.loaded) {
     await mapper.init();
@@ -1382,11 +1366,14 @@ async function buildParameterOptions(
   const whitePatches = invokeMapperArray(mapper, mapper.getWhitePatches);
   const points = invokeMapperArray(mapper, mapper.getPoints);
   const vitiligo = invokeMapperArray(mapper, mapper.getVitiligo);
-  const accessories = invokeMapperArray(mapper, mapper.getAccessories);
+  const accessories = getRandomAccessoryPool(mapper, includeNewSprites);
   const scars = invokeMapperArray(mapper, mapper.getScars);
+  const poseNames = getRandomSelectablePoseNames(mapper, {
+    includeNewSprites,
+  });
 
   return {
-    sprite: mapper.sprites ?? VALID_SPRITES,
+    sprite: poseNames,
     pelt: peltNames,
     colour: colourList,
     tortie: [true, false],
@@ -1586,6 +1573,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         exactLayerCounts: initialCodeSettings.exactLayerCounts,
         afterlifeMode: initialCodeSettings.afterlifeMode,
         includeBaseColours: initialCodeSettings.includeBaseColours,
+        includeNewSprites: initialCodeSettings.includeNewSprites,
         extendedModes: [...initialCodeSettings.extendedModes],
       };
     }
@@ -1728,6 +1716,9 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   const [includeBaseColours, setIncludeBaseColours] = useState(
     initialSettings.includeBaseColours,
   );
+  const [includeNewSprites, setIncludeNewSprites] = useState(
+    initialSettings.includeNewSprites,
+  );
   const [extendedModes, setExtendedModes] = useState<Set<ExtendedMode>>(
     () => new Set(initialSettings.extendedModes),
   );
@@ -1757,6 +1748,10 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     setIncludeBaseColours(
       sessionSettings.includeBaseColours ??
         DEFAULT_SINGLE_CAT_SETTINGS.includeBaseColours,
+    );
+    setIncludeNewSprites(
+      sessionSettings.includeNewSprites ??
+        DEFAULT_SINGLE_CAT_SETTINGS.includeNewSprites,
     );
     setExtendedModes(
       new Set(
@@ -1795,16 +1790,12 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     torties: [],
   });
   const [_rollSummary, setRollSummary] = useState<string | null>(null);
-  const [_spriteVariations, setSpriteVariations] = useState<SpriteVariation[]>(
-    [],
-  );
   const [_shareLink, setShareLink] = useState<string | null>(null);
   const [_hasTint, setHasTint] = useState(false);
   const [_toast, setToast] = useState<string | null>(null);
   const [flashParamId, setFlashParamId] = useState<ParamId | null>(null);
   const [flashLayerKey, setFlashLayerKey] = useState<string | null>(null);
   const [_rollerExpanded, setRollerExpanded] = useState(false);
-  const [_spriteGalleryOpen, setSpriteGalleryOpen] = useState(false);
   const defaultCreatorName = sessionSettings?.creatorName ?? "";
   const [catNameDraft, setCatNameDraft] = useState(initialSettings.catName);
   const [creatorNameDraft, setCreatorNameDraft] = useState(
@@ -1901,6 +1892,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       afterlifeMode,
       extendedModes: [...extendedModes].sort(),
       includeBaseColours,
+      includeNewSprites,
       catName: catNameDraft,
       creatorName: creatorNameDraft,
     }),
@@ -1915,6 +1907,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       afterlifeMode,
       extendedModes,
       includeBaseColours,
+      includeNewSprites,
       catNameDraft,
       creatorNameDraft,
     ],
@@ -1932,6 +1925,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       setAfterlifeMode(settings.afterlifeMode);
       setExtendedModes(new Set(settings.extendedModes));
       setIncludeBaseColours(settings.includeBaseColours);
+      setIncludeNewSprites(settings.includeNewSprites ?? false);
       setCatNameDraft(settings.catName);
       setCreatorNameDraft(settings.creatorName || defaultCreatorName);
     },
@@ -3357,6 +3351,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
             mapperRef.current,
             includeBaseColours,
             extendedModesArray,
+            includeNewSprites,
           );
           const counts = deriveOptionCounts(parameterOptionsRef.current);
           optionCountsRef.current = counts;
@@ -3379,7 +3374,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     return () => {
       cancelled = true;
     };
-  }, [drawPlaceholder, includeBaseColours, extendedModesArray]);
+  }, [drawPlaceholder, includeBaseColours, extendedModesArray, includeNewSprites]);
 
   useEffect(() => {
     const mapper = mapperRef.current;
@@ -3390,6 +3385,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         mapper,
         includeBaseColours,
         extendedModesArray,
+        includeNewSprites,
       );
       if (!cancelled) {
         parameterOptionsRef.current = options;
@@ -3401,7 +3397,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     return () => {
       cancelled = true;
     };
-  }, [includeBaseColours, extendedModesArray]);
+  }, [includeBaseColours, extendedModesArray, includeNewSprites]);
 
   useEffect(() => {
     return () => {
@@ -3456,13 +3452,14 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           mapperRef.current,
           includeBaseColours,
           extendedModesArray,
+          includeNewSprites,
         );
         const counts = deriveOptionCounts(parameterOptionsRef.current);
         optionCountsRef.current = counts;
         setOptionCounts(counts);
       }
       return mapperRef.current;
-    }, [includeBaseColours, extendedModesArray]);
+    }, [includeBaseColours, extendedModesArray, includeNewSprites]);
 
   // -------------------------------------------------------------------
   // Layer count spinner — reveals accessory/scar/tortie counts visually
@@ -3479,6 +3476,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       genOptions: {
         experimentalColourMode: string | string[];
         includeBaseColours: boolean;
+        includeNewSprites: boolean;
       },
       token: number,
     ) => {
@@ -3526,11 +3524,13 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           exactLayerCounts: true,
           experimentalColourMode: genOptions.experimentalColourMode,
           includeBaseColours: genOptions.includeBaseColours,
+          includeNewSprites: genOptions.includeNewSprites,
         });
         if (generationIdRef.current !== token) return;
 
         const baseParams = catResult.params;
-        baseParams.spriteNumber = 9; // always use longhair adult for count previews
+        baseParams.spriteNumber = 9; // legacy fallback for old render paths
+        baseParams.poseName = "adult_long0";
         const slots = catResult.slotSelections;
 
         // Pre-render a frame for each possible count (0 to max), building up
@@ -3662,7 +3662,6 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
 
     setError(null);
     setShareLink(null);
-    setSpriteVariations([]);
     initBoardRows();
     setRollerLabel(null);
     setRollerActiveValue(null);
@@ -3712,6 +3711,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           experimentalColourMode: experimentalMode,
           whitePatchColourMode: "default",
           includeBaseColours,
+          includeNewSprites,
         });
       }
 
@@ -3773,7 +3773,6 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         `Rolled → Accessories: ${countsResult.accessories} • Scars: ${countsResult.scars} • Tortie layers: ${countsResult.tortie}`,
       );
       setHasTint(Boolean(params.darkForest || params.dead));
-      setSpriteGalleryOpen(false);
 
       const uniqueAccessories: string[] = Array.from(
         new Set(
@@ -3835,6 +3834,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           {
             experimentalColourMode: experimentalMode,
             includeBaseColours,
+            includeNewSprites,
           },
           token,
         );
@@ -4106,35 +4106,9 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         tortie: builderPrimaryTortie,
       });
       builderParams.spriteNumber = DEFAULT_SPRITE_NUMBER;
+      builderParams.poseName = DEFAULT_POSE_NAME;
 
       const catUrl = generator.buildCatURL?.(builderParams) ?? "";
-
-      const spritePreview: SpriteVariation[] = [];
-      for (const spriteNumber of VALID_SPRITES) {
-        if (generationIdRef.current !== token) return;
-        const spriteParams = { ...params, spriteNumber };
-        const result = await generator.generateCat(spriteParams);
-        const previewCanvas = document.createElement("canvas");
-        previewCanvas.width = 120;
-        previewCanvas.height = 120;
-        const previewCtx = previewCanvas.getContext("2d");
-        if (previewCtx) {
-          previewCtx.imageSmoothingEnabled = false;
-          previewCtx.drawImage(
-            result.canvas as HTMLCanvasElement,
-            0,
-            0,
-            120,
-            120,
-          );
-        }
-        spritePreview.push({
-          spriteNumber,
-          name: SPRITE_NAMES[spriteNumber] ?? `Sprite ${spriteNumber}`,
-          dataUrl: previewCanvas.toDataURL("image/png"),
-        });
-      }
-      setSpriteVariations(spritePreview);
 
       // Persist refs/state for actions
       const nextState: CatState = {
@@ -4364,6 +4338,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     ensureMapperReady,
     extendedModesArray,
     includeBaseColours,
+    includeNewSprites,
     afterlifeMode,
     drawCanvas,
     renderCat,
@@ -4454,12 +4429,21 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   );
 
   const _handleCopySprite = useCallback(
-    async (spriteNumber: number, size: 120 | typeof FULL_EXPORT_SIZE) => {
+    async (
+      spriteNumber: number,
+      size: 120 | typeof FULL_EXPORT_SIZE,
+      poseName?: string,
+    ) => {
       const state = catStateRef.current;
       const generator = generatorRef.current;
       if (!state || !generator) return;
-      const spriteName = SPRITE_NAMES[spriteNumber] ?? `Sprite ${spriteNumber}`;
+      const spriteName = poseName
+        ? formatPoseName(poseName)
+        : `Sprite ${spriteNumber}`;
       const params = { ...state.params, spriteNumber };
+      if (poseName) {
+        params.poseName = poseName;
+      }
       const result = await generator.generateCat(params);
       const exportCanvas = document.createElement("canvas");
       exportCanvas.width = size;
@@ -4677,7 +4661,11 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       : DEFAULT_SPRITE_NUMBER;
   const canCopySprite = Boolean(currentState && generatorRef.current);
   const _spriteToolsSubtitle = canCopySprite
-    ? `Current sprite #${currentSpriteNumber}`
+    ? `Current pose: ${
+        currentState?.params.poseName
+          ? formatPoseName(currentState.params.poseName)
+          : `Sprite ${currentSpriteNumber}`
+      }`
     : "Roll a cat to unlock sprite tools";
   const existingCatName = (currentState?.catName ?? "").trim();
   const existingCreatorName = (currentState?.creatorName ?? "").trim();
@@ -5061,6 +5049,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
                         ? extendedModesArray
                         : undefined,
                     includeBaseColours,
+                    includeNewSprites,
                   });
                   if (
                     generationIdRef.current === commandToken &&
@@ -5179,6 +5168,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     extendedModesArray,
     scarRange,
     includeBaseColours,
+    includeNewSprites,
     accessoryRange,
   ]);
 
@@ -5212,6 +5202,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       tortieRange,
       afterlifeMode,
       includeBaseColours,
+      includeNewSprites,
       extendedModes: extendedModesArray,
       exactLayerCounts,
       lobbyMode:
@@ -5232,6 +5223,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       tortieRange,
       afterlifeMode,
       includeBaseColours,
+      includeNewSprites,
       extendedModesArray,
       exactLayerCounts,
       rawSession,
@@ -5255,6 +5247,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
             exactLayerCounts: brbPortableSettings.exactLayerCounts,
             afterlifeMode: brbPortableSettings.afterlifeMode,
             includeBaseColours: brbPortableSettings.includeBaseColours,
+            includeNewSprites: brbPortableSettings.includeNewSprites,
             extendedModes: brbPortableSettings.extendedModes,
           }
         : lobbySettings,

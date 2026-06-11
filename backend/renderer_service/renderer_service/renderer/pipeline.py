@@ -11,7 +11,6 @@ from PIL import Image
 
 from ..models import (
     LayerIdentifier,
-    LayerDiagnostic,
     RenderMeta,
     BatchVariant,
 )
@@ -62,7 +61,9 @@ class BatchPipelineResult:
 class RenderPipeline:
     """Wrapper around the CatRendererV3 that prepares API responses."""
 
-    def __init__(self, canvas_size: int = 50, repository: SpriteRepository | None = None) -> None:
+    def __init__(
+        self, canvas_size: int = 50, repository: SpriteRepository | None = None
+    ) -> None:
         self.canvas_size = canvas_size
         self.repository = repository or SpriteRepository(tile_size=canvas_size)
         data_dir = Path(__file__).resolve().parents[1] / "data"
@@ -70,8 +71,7 @@ class RenderPipeline:
         self.renderer = CatRendererV3(self.repository, self.mapper)
 
     def render(self, params: dict, collect_layers: bool = False) -> PipelineResult:
-        params = {**params}  # shallow copy to avoid side-effects
-        params.setdefault("spriteNumber", params.get("sprite_number", 0))
+        params = self._normalize_params(params)
 
         layer_results: List[LayerResult] = []
         start_time = time.perf_counter()
@@ -191,12 +191,25 @@ class RenderPipeline:
                 )
             )
 
-        return BatchPipelineResult(sheet=sheet, frames=frames, sources=sources, tile_size=sheet_tile)
+        return BatchPipelineResult(
+            sheet=sheet, frames=frames, sources=sources, tile_size=sheet_tile
+        )
 
     # ------------------------------------------------------------------
     def _normalize_params(self, params: dict) -> dict:
         normalized = deepcopy(params)
-        normalized.setdefault("spriteNumber", normalized.get("sprite_number", 0))
+        pose_name = normalized.get("poseName") or normalized.get("pose_name")
+        sprite_number = normalized.get(
+            "spriteNumber", normalized.get("sprite_number", 0)
+        )
+        if not pose_name:
+            pose_name = self.repository.pose_name_for_sprite_number(sprite_number)
+        normalized["spriteNumber"] = self.repository.sprite_number_for_pose(
+            str(pose_name) if pose_name else None,
+            sprite_number,
+        )
+        if pose_name:
+            normalized["poseName"] = str(pose_name)
         return normalized
 
     # ------------------------------------------------------------------
@@ -206,14 +219,17 @@ class RenderPipeline:
             params.update(deepcopy(variant.params))
         if variant.overrides:
             params.update(deepcopy(variant.overrides))
+        if variant.pose_name is not None:
+            params["poseName"] = variant.pose_name
         if variant.sprite_number is not None:
             params["spriteNumber"] = variant.sprite_number
-        params.setdefault("spriteNumber", base_params.get("spriteNumber", 0))
-        return params
+        return self._normalize_params(params)
 
     # ------------------------------------------------------------------
     @staticmethod
-    def _extract_layer_image(stage_infos: List[StageInfo], target: LayerIdentifier) -> Image.Image | None:
+    def _extract_layer_image(
+        stage_infos: List[StageInfo], target: LayerIdentifier
+    ) -> Image.Image | None:
         for info in stage_infos:
             if info.identifier == target and info.image is not None:
                 return info.image.copy()

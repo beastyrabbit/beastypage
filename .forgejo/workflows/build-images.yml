@@ -1,0 +1,461 @@
+name: Build and Push Container Images
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_frontend:
+        description: 'Build frontend image'
+        type: boolean
+        default: true
+      build_renderer:
+        description: 'Build renderer service image'
+        type: boolean
+        default: true
+      build_image_processing:
+        description: 'Build image processing service image'
+        type: boolean
+        default: true
+      build_discord_bot:
+        description: 'Build Discord bot image'
+        type: boolean
+        default: true
+      deploy_convex:
+        description: 'Deploy Convex backend (main branch only)'
+        type: boolean
+        default: false
+
+enable-openid-connect: true
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: git.heerlab.com
+  OWNER: ${{ github.repository_owner }}
+  INFISICAL_API_URL: ${{ vars.INFISICAL_API_URL }}
+  INFISICAL_PROJECT_ID: ${{ vars.INFISICAL_PROJECT_ID }}
+  INFISICAL_ENV: ${{ vars.INFISICAL_ENV }}
+  INFISICAL_MACHINE_IDENTITY_ID: ${{ vars.INFISICAL_MACHINE_IDENTITY_ID }}
+
+jobs:
+  # Only run path filtering on main branch pushes, not on tags
+  changes:
+    runs-on: personal
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      convex: ${{ steps.filter.outputs.convex }}
+      renderer: ${{ steps.filter.outputs.renderer }}
+      image_processing: ${{ steps.filter.outputs.image_processing }}
+      discord_bot: ${{ steps.filter.outputs.discord_bot }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Detect changed paths
+        id: filter
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          base="$BEFORE_SHA"
+          head="$HEAD_SHA"
+          if [ -z "$base" ] || [ "$base" = "null" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-list --max-parents=0 "$head")"
+          fi
+
+          changed="$(git diff --name-only "$base" "$head" || git diff --name-only HEAD~1 HEAD || true)"
+
+          has_changed() {
+            printf '%s\n' "$changed" | grep -Eq "$1"
+          }
+
+          set_output() {
+            name="$1"
+            pattern="$2"
+            if has_changed "$pattern"; then
+              echo "$name=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$name=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          set_output frontend '^frontend/'
+          set_output convex '^frontend/convex/'
+          set_output renderer '^backend/renderer_service/'
+          set_output image_processing '^backend/image_processing_service/'
+          set_output discord_bot '^backend/discord-bot/'
+
+  # Tags don't have path-filter outputs, so compute whether Convex changed
+  # since the previous release tag before deciding to deploy.
+  tag-convex-changes:
+    runs-on: personal
+    if: startsWith(github.ref, 'refs/tags/v')
+    outputs:
+      convex: ${{ steps.diff.outputs.convex }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - id: diff
+        env:
+          CURRENT_TAG: ${{ github.ref_name }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          previous_tag=$(
+            git tag --sort=-version:refname \
+              | grep -Fxv "$CURRENT_TAG" \
+              | head -n 1
+          )
+
+          if [ -z "$previous_tag" ]; then
+            echo "No previous release tag found; deploying Convex by default."
+            echo "convex=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Comparing frontend/convex changes from $previous_tag to $CURRENT_SHA"
+
+          if git diff --quiet "$previous_tag..$CURRENT_SHA" -- frontend/convex; then
+            echo "convex=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "convex=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy-convex:
+    needs: [changes, tag-convex-changes]
+    if: |
+      always() &&
+      ((github.ref == 'refs/heads/main' && needs.changes.outputs.convex == 'true') ||
+       (startsWith(github.ref, 'refs/tags/v') && needs.tag-convex-changes.outputs.convex == 'true') ||
+       github.event.inputs.deploy_convex == 'true')
+    runs-on: personal
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Fetch Convex deploy secret from Infisical
+        id: ci-secrets
+        env:
+          REQUIRED_KEYS: CONVEX_DEPLOY_KEY
+        run: |
+          set -euo pipefail
+          : "${INFISICAL_API_URL:?Missing INFISICAL_API_URL Forgejo variable}"
+          : "${INFISICAL_PROJECT_ID:?Missing INFISICAL_PROJECT_ID Forgejo variable}"
+          : "${INFISICAL_ENV:?Missing INFISICAL_ENV Forgejo variable}"
+          : "${INFISICAL_MACHINE_IDENTITY_ID:?Missing INFISICAL_MACHINE_IDENTITY_ID Forgejo variable}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?Missing Forgejo OIDC request token}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?Missing Forgejo OIDC request URL}"
+
+          export npm_config_prefix="$RUNNER_TEMP/npm-global"
+          mkdir -p "$npm_config_prefix"
+          npm install --global @infisical/cli@0.43.91
+          export PATH="$npm_config_prefix/bin:$PATH"
+
+          oidc_response="$(curl -fsS \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://git.heerlab.com/beasty")"
+          forgejo_jwt="$(node -e 'const fs = require("fs"); const body = JSON.parse(fs.readFileSync(0, "utf8")); process.stdout.write(body.value || "");' <<< "$oidc_response")"
+          : "${forgejo_jwt:?Forgejo OIDC response did not include a token}"
+
+          infisical_token="$(infisical login \
+            --method oidc-auth \
+            --machine-identity-id "$INFISICAL_MACHINE_IDENTITY_ID" \
+            --jwt "$forgejo_jwt" \
+            --domain "$INFISICAL_API_URL" \
+            --plain \
+            --silent)"
+          : "${infisical_token:?Infisical OIDC login returned an empty token}"
+          echo "::add-mask::$infisical_token"
+
+          for key in $REQUIRED_KEYS; do
+            value="$(infisical secrets get "$key" \
+              --domain "$INFISICAL_API_URL" \
+              --token "$infisical_token" \
+              --projectId "$INFISICAL_PROJECT_ID" \
+              --env "$INFISICAL_ENV" \
+              --path /ci \
+              --plain \
+              --silent)"
+            : "${value:?Missing $key in Infisical prod /ci}"
+            echo "::add-mask::$value"
+            {
+              echo "$key<<EOF"
+              printf '%s\n' "$value"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          done
+
+      - run: pnpm exec convex deploy
+        env:
+          CONVEX_DEPLOY_KEY: ${{ steps.ci-secrets.outputs.CONVEX_DEPLOY_KEY }}
+
+  build-frontend:
+    needs: changes
+    # Build if: tag push, frontend files changed on main, or manual trigger
+    if: |
+      always() &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       needs.changes.outputs.frontend == 'true' ||
+       github.event.inputs.build_frontend == 'true')
+    runs-on: personal
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Docker CLI
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates docker.io
+          docker --version
+
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
+
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-frontend
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Fetch frontend CI secrets from Infisical
+        id: ci-secrets
+        env:
+          REQUIRED_KEYS: CONVEX_DEPLOYMENT NEXT_PUBLIC_POSTHOG_KEY NEXT_PUBLIC_POSTHOG_HOST NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        run: |
+          set -euo pipefail
+          : "${INFISICAL_API_URL:?Missing INFISICAL_API_URL Forgejo variable}"
+          : "${INFISICAL_PROJECT_ID:?Missing INFISICAL_PROJECT_ID Forgejo variable}"
+          : "${INFISICAL_ENV:?Missing INFISICAL_ENV Forgejo variable}"
+          : "${INFISICAL_MACHINE_IDENTITY_ID:?Missing INFISICAL_MACHINE_IDENTITY_ID Forgejo variable}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:?Missing Forgejo OIDC request token}"
+          : "${ACTIONS_ID_TOKEN_REQUEST_URL:?Missing Forgejo OIDC request URL}"
+
+          export npm_config_prefix="$RUNNER_TEMP/npm-global"
+          mkdir -p "$npm_config_prefix"
+          npm install --global @infisical/cli@0.43.91
+          export PATH="$npm_config_prefix/bin:$PATH"
+
+          oidc_response="$(curl -fsS \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://git.heerlab.com/beasty")"
+          forgejo_jwt="$(node -e 'const fs = require("fs"); const body = JSON.parse(fs.readFileSync(0, "utf8")); process.stdout.write(body.value || "");' <<< "$oidc_response")"
+          : "${forgejo_jwt:?Forgejo OIDC response did not include a token}"
+
+          infisical_token="$(infisical login \
+            --method oidc-auth \
+            --machine-identity-id "$INFISICAL_MACHINE_IDENTITY_ID" \
+            --jwt "$forgejo_jwt" \
+            --domain "$INFISICAL_API_URL" \
+            --plain \
+            --silent)"
+          : "${infisical_token:?Infisical OIDC login returned an empty token}"
+          echo "::add-mask::$infisical_token"
+
+          for key in $REQUIRED_KEYS; do
+            value="$(infisical secrets get "$key" \
+              --domain "$INFISICAL_API_URL" \
+              --token "$infisical_token" \
+              --projectId "$INFISICAL_PROJECT_ID" \
+              --env "$INFISICAL_ENV" \
+              --path /ci \
+              --plain \
+              --silent)"
+            : "${value:?Missing $key in Infisical prod /ci}"
+            echo "::add-mask::$value"
+            {
+              echo "$key<<EOF"
+              printf '%s\n' "$value"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          done
+
+      # Note: NEXT_PUBLIC_CONVEX_URL uses a placeholder at build time
+      # and is injected at runtime via docker-entrypoint.sh
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            CONVEX_DEPLOYMENT=${{ steps.ci-secrets.outputs.CONVEX_DEPLOYMENT }}
+            NEXT_PUBLIC_POSTHOG_KEY=${{ steps.ci-secrets.outputs.NEXT_PUBLIC_POSTHOG_KEY }}
+            NEXT_PUBLIC_POSTHOG_HOST=${{ steps.ci-secrets.outputs.NEXT_PUBLIC_POSTHOG_HOST }}
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ steps.ci-secrets.outputs.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+            APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
+
+  build-renderer:
+    needs: changes
+    # Build if: tag push, renderer files changed on main, or manual trigger
+    if: |
+      always() &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       needs.changes.outputs.renderer == 'true' ||
+       github.event.inputs.build_renderer == 'true')
+    runs-on: personal
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Docker CLI
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates docker.io
+          docker --version
+
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
+
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-renderer
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./backend/renderer_service
+          file: ./backend/renderer_service/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+  build-image-processing:
+    needs: changes
+    if: |
+      always() &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       needs.changes.outputs.image_processing == 'true' ||
+       github.event.inputs.build_image_processing == 'true')
+    runs-on: personal
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Docker CLI
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates docker.io
+          docker --version
+
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
+
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-image-processing
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./backend/image_processing_service
+          file: ./backend/image_processing_service/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+  build-discord-bot:
+    needs: changes
+    if: |
+      always() &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       needs.changes.outputs.discord_bot == 'true' ||
+       github.event.inputs.build_discord_bot == 'true')
+    runs-on: personal
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Docker CLI
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates docker.io
+          docker --version
+
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
+
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-discord-bot
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./backend/discord-bot
+          file: ./backend/discord-bot/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}

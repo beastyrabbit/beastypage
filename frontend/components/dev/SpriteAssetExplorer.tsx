@@ -138,6 +138,7 @@ const CATEGORIES: Array<{
 ];
 
 const EXCLUSIVE_FILES = (exclusiveManifest as { files?: string[] }).files ?? [];
+const EXCLUSIVE_TOTAL = EXCLUSIVE_FILES.length;
 
 interface ExclusiveGroup {
   group: string;
@@ -195,10 +196,9 @@ export function SpriteAssetExplorer() {
   const [error, setError] = useState<string | null>(null);
   const loadTokenRef = useRef(0);
   const filterInputId = useId();
-  const exclusiveTotal = EXCLUSIVE_FILES.length;
 
   const exclusiveGroups = useMemo<ExclusiveGroup[]>(() => {
-    if (!exclusiveTotal) return [];
+    if (!EXCLUSIVE_TOTAL) return [];
     const groups = new Map<string, ExclusiveGroup>();
     for (const rel of EXCLUSIVE_FILES) {
       const parts = rel.split("/");
@@ -305,8 +305,8 @@ export function SpriteAssetExplorer() {
                 Backend-only sprite sheets
               </h2>
               <p className="text-xs text-neutral-400">
-                {exclusiveTotal} PNGs live in the FastAPI renderer bundle but
-                aren’t in the legacy V2 sprites folder yet. These cover seasonal
+                {EXCLUSIVE_TOTAL} PNGs live in the FastAPI renderer bundle but
+                aren’t in the public web sprite folder yet. These cover seasonal
                 accessories, raincoats, crowns, fruit/flower sets, small
                 animals, new genemod bases, and the paralyzed lineart variants.
               </p>
@@ -344,7 +344,7 @@ export function SpriteAssetExplorer() {
             <code className="ml-1 rounded bg-slate-800 px-1 py-0.5 text-[10px] text-neutral-200">
               frontend/public/sprites
             </code>
-            . No bread/toast/blanket accessories showed up in this drop—the new
+            . No bread/toast/blanket accessories showed up in this drop, the new
             material is mostly crowns, rain gear, fruit/flower sets, snakes,
             insects, and genemod overlays.
           </p>
@@ -465,7 +465,7 @@ export function SpriteAssetExplorer() {
                 <div className="text-xs text-neutral-400">
                   #{preview.spriteNumber}
                 </div>
-                <div className="mt-2 h-20 w-20 rounded-md border border-slate-800 bg-slate-900/80">
+                <div className="mt-2 size-20 rounded-md border border-slate-800 bg-slate-900/80">
                   {preview.dataUrl ? (
                     <Image
                       src={preview.dataUrl}
@@ -473,12 +473,12 @@ export function SpriteAssetExplorer() {
                       width={80}
                       height={80}
                       unoptimized
-                      className="h-20 w-20"
+                      className="size-20"
                       style={{ imageRendering: "pixelated" }}
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-[10px] text-neutral-500">
-                      —
+                      -
                     </div>
                   )}
                 </div>

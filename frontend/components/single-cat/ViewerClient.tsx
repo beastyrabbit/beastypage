@@ -13,6 +13,10 @@ import PaintIcon from "@/components/ui/paint-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import { api } from "@/convex/_generated/api";
+import {
+  formatPoseName,
+  getAvailablePoseNames,
+} from "@/lib/cat-v3/poseOptions";
 import type { TortieLayer } from "@/lib/cat-v3/types";
 import { createCatShare, decodeCatShare, encodeCatShare } from "@/lib/catShare";
 import { cn } from "@/lib/utils";
@@ -60,6 +64,7 @@ interface MapperRecord {
 interface SpriteVariantPreview {
   id: string;
   spriteNumber: number;
+  poseName: string;
   name: string;
   dataUrl: string;
 }
@@ -101,7 +106,6 @@ function normalizeCatPayload(data: Record<string, unknown>): CatSharePayload {
   };
 }
 
-const VALID_SPRITES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18];
 const DISPLAY_CANVAS_SIZE = 900;
 const PREVIEW_CANVAS_SIZE = 360;
 
@@ -444,34 +448,69 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
 
     (async () => {
       const previews: SpriteVariantPreview[] = [];
-      for (const spriteNumber of VALID_SPRITES) {
-        if (cancelled) return;
-        try {
-          const params = { ...catPayload.params, spriteNumber };
-          const result = await generator.generateCat(params);
-          const previewCanvas = document.createElement("canvas");
-          previewCanvas.width = PREVIEW_CANVAS_SIZE;
-          previewCanvas.height = PREVIEW_CANVAS_SIZE;
-          const ctx = previewCanvas.getContext("2d");
-          if (!ctx) continue;
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(
-            result.canvas as HTMLCanvasElement,
-            0,
-            0,
-            PREVIEW_CANVAS_SIZE,
-            PREVIEW_CANVAS_SIZE,
-          );
-          previews.push({
-            id: `sprite-${spriteNumber}`,
-            spriteNumber,
-            name: `Sprite ${spriteNumber}`,
-            dataUrl: previewCanvas.toDataURL("image/png"),
-          });
-        } catch (err) {
-          console.warn("Failed to render sprite variant", err);
-        }
+      const { default: spriteMapper } = await import(
+        "@/lib/single-cat/spriteMapper"
+      );
+      if (!spriteMapper.loaded) {
+        await spriteMapper.init();
       }
+      const fallbackSpriteNumber =
+        typeof catPayload.params.spriteNumber === "number"
+          ? catPayload.params.spriteNumber
+          : 0;
+      const poseChoices = getAvailablePoseNames(spriteMapper).map(
+        (poseName: string) => ({
+          id: `pose-${poseName}`,
+          poseName,
+          spriteNumber: fallbackSpriteNumber,
+          name: formatPoseName(poseName),
+        }),
+      );
+
+      previews.push(
+        ...(
+          await Promise.all(
+            poseChoices.map(
+              async (poseChoice): Promise<SpriteVariantPreview | null> => {
+                if (cancelled) return null;
+                try {
+                  const params = {
+                    ...catPayload.params,
+                    spriteNumber: poseChoice.spriteNumber,
+                    poseName: poseChoice.poseName,
+                  };
+                  const result = await generator.generateCat(params);
+                  const previewCanvas = document.createElement("canvas");
+                  previewCanvas.width = PREVIEW_CANVAS_SIZE;
+                  previewCanvas.height = PREVIEW_CANVAS_SIZE;
+                  const ctx = previewCanvas.getContext("2d");
+                  if (!ctx) return null;
+                  ctx.imageSmoothingEnabled = false;
+                  ctx.drawImage(
+                    result.canvas as HTMLCanvasElement,
+                    0,
+                    0,
+                    PREVIEW_CANVAS_SIZE,
+                    PREVIEW_CANVAS_SIZE,
+                  );
+                  return {
+                    id: poseChoice.id,
+                    spriteNumber: poseChoice.spriteNumber,
+                    poseName: poseChoice.poseName,
+                    name: poseChoice.name,
+                    dataUrl: previewCanvas.toDataURL("image/png"),
+                  };
+                } catch (err) {
+                  console.warn("Failed to render sprite variant", err);
+                  return null;
+                }
+              },
+            ),
+          )
+        ).filter(
+          (preview): preview is SpriteVariantPreview => preview !== null,
+        ),
+      );
       if (!cancelled) {
         setSpriteVariants(previews);
         setSpriteVariantsLoading(false);
@@ -934,7 +973,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                           {variant.name}
                         </p>
                         <span className="text-xs text-muted-foreground">
-                          #{variant.spriteNumber}
+                          Named pose
                         </span>
                       </div>
                       <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">

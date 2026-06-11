@@ -287,7 +287,11 @@ export function GuidedTimelineViewer({
     const entries: Array<[string, string]> = [
       [
         "Pose",
-        params.spriteNumber !== undefined ? `Pose ${params.spriteNumber}` : "—",
+        params.poseName
+          ? formatName(params.poseName)
+          : params.spriteNumber !== undefined
+            ? `Pose ${params.spriteNumber}`
+            : "—",
       ],
       ["Pattern", params.peltName ?? "—"],
       ["Base Colour", params.colour ?? "—"],

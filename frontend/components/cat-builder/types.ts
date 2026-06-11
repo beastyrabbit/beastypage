@@ -8,7 +8,8 @@ import type {
 export interface SpriteMapperApi {
   loaded: boolean;
   init(): Promise<boolean>;
-  getSprites(): number[];
+  getPoseNames(): string[];
+  getRenderablePoseNames(): string[];
   getPeltNames(): string[];
   getColourOptions(mode?: unknown, includeBase?: boolean): string[];
   getExperimentalColoursByMode?(mode: string): string[];
@@ -28,6 +29,7 @@ export interface SpriteMapperApi {
   getPlantAccessories(): string[];
   getWildAccessories(): string[];
   getCollars(): string[];
+  getExtraAccessories?(): string[];
   getAccessories?(): string[];
   getScarsByCategory(category: number): string[];
   getExperimentalColourDefinition?(
@@ -63,7 +65,7 @@ export interface CatGeneratorApi {
 }
 
 export interface BuilderOptions {
-  sprites: number[];
+  poseNames: string[];
   pelts: string[];
   points: string[];
   vitiligo: string[];
@@ -80,5 +82,3 @@ export interface BuilderOptions {
   scarMissing: string[];
   scarEnvironmental: string[];
 }
-
-export const FORBIDDEN_SPRITES = new Set([0, 1, 2, 3, 4, 19, 20]);

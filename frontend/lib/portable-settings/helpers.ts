@@ -15,6 +15,7 @@ export function extractPortableSettings(
     exactLayerCounts: full.exactLayerCounts,
     afterlifeMode: full.afterlifeMode,
     includeBaseColours: full.includeBaseColours,
+    includeNewSprites: full.includeNewSprites,
     extendedModes: [...full.extendedModes],
   };
 }
@@ -35,6 +36,7 @@ export function applyPortableSettings(
     exactLayerCounts: portable.exactLayerCounts,
     afterlifeMode: portable.afterlifeMode,
     includeBaseColours: portable.includeBaseColours,
+    includeNewSprites: portable.includeNewSprites,
     extendedModes: [...portable.extendedModes],
   };
 }

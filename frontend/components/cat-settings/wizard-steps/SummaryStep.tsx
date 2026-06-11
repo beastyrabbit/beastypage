@@ -127,6 +127,12 @@ export function SummaryStep(props: WizardStepProps) {
               {settings.extendedModes.length}
             </dd>
           </div>
+          {settings.includeNewSprites && (
+            <div>
+              <dt className="text-xs text-muted-foreground/60">New Sprites</dt>
+              <dd className="font-mono text-foreground">Yes</dd>
+            </div>
+          )}
         </dl>
       </section>
 

@@ -31,7 +31,7 @@ class RenderOptions(BaseModel):
     )
     collect_layers: bool = Field(
         False,
-        description="Return intermediate layers for parity diagnostics",
+        description="Return intermediate layers for renderer diagnostics",
         alias="collectLayers",
     )
     diagnostics: bool = Field(
@@ -51,7 +51,8 @@ class RenderOptions(BaseModel):
 
 
 class RenderParams(BaseModel):
-    spriteNumber: int
+    spriteNumber: Optional[int] = None
+    poseName: Optional[str] = None
     params: Dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(populate_by_name=True)
@@ -84,25 +85,6 @@ class RenderResponse(BaseModel):
     layers: Optional[List[LayerDiagnostic]] = None
 
 
-class DiffRequest(BaseModel):
-    v2: RenderParams
-    v3: RenderParams
-    epsilon: int = Field(0, ge=0, description="Allowed per-channel pixel difference")
-    collect_layers: bool = False
-
-
-class DiffLayerResult(BaseModel):
-    id: LayerIdentifier
-    mismatch_pixels: int
-    total_pixels: int
-    mismatch_ratio: float
-
-
-class DiffResponse(BaseModel):
-    composed: DiffLayerResult
-    layers: List[DiffLayerResult]
-
-
 class BatchVariant(BaseModel):
     id: str = Field(..., description="Unique identifier for the variant frame")
     label: Optional[str] = Field(
@@ -117,6 +99,11 @@ class BatchVariant(BaseModel):
         default=None,
         alias="spriteNumber",
         description="Override sprite number for this variant",
+    )
+    pose_name: Optional[str] = Field(
+        default=None,
+        alias="poseName",
+        description="Override named pose for this variant",
     )
     overrides: Optional[Dict[str, Any]] = Field(
         default=None,

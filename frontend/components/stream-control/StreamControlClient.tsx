@@ -104,6 +104,7 @@ function encodePortableCodeFromSettings(settings: SingleCatSettings): string {
     exactLayerCounts: settings.exactLayerCounts,
     afterlifeMode: settings.afterlifeMode,
     includeBaseColours: settings.includeBaseColours,
+    includeNewSprites: settings.includeNewSprites,
     extendedModes: settings.extendedModes,
   });
 }
@@ -412,6 +413,7 @@ export function StreamControlClient() {
             ? settings.extendedModes.filter((m) => m !== "base")
             : undefined,
         includeBaseColours: settings.includeBaseColours,
+        includeNewSprites: settings.includeNewSprites,
         exactLayerCounts: settings.exactLayerCounts,
         accessoryCount: computeLayerCount(settings.accessoryRange),
         scarCount: computeLayerCount(settings.scarRange),
@@ -1702,6 +1704,7 @@ function SettingsCode({
       exactLayerCounts: decoded.exactLayerCounts,
       afterlifeMode: decoded.afterlifeMode,
       includeBaseColours: decoded.includeBaseColours,
+      includeNewSprites: decoded.includeNewSprites,
       extendedModes: decoded.extendedModes,
     });
     setCodeInput("");

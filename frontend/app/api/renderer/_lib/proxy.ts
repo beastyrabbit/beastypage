@@ -72,6 +72,10 @@ function ensureJson(contentType: string | null): string | null {
   return null;
 }
 
+function isManualRedirect(response: Response): boolean {
+  return response.status >= 300 && response.status < 400;
+}
+
 function streamWithFinalizer(
   body: ReadableStream<Uint8Array>,
   finalize: () => void,
@@ -150,12 +154,39 @@ export async function proxyRendererJson(
   const clear = () => clearTimeout(timeout);
 
   try {
-    const upstream = await fetch(buildTargetUrl(path), {
+    const targetUrl = buildTargetUrl(path);
+    const upstream = await fetch(targetUrl, {
       method: "POST",
       headers: selectHeaders(request),
       body: rawBody,
       signal: controller.signal,
+      redirect: "manual",
     });
+
+    if (!upstream.ok) {
+      console.error(
+        "[renderer-proxy] upstream %s %s returned %d",
+        "POST",
+        targetUrl,
+        upstream.status,
+      );
+    }
+
+    if (isManualRedirect(upstream)) {
+      clear();
+      const location = upstream.headers.get("location");
+      console.error(
+        "[renderer-proxy] upstream redirect for %s %s returned %d%s",
+        "POST",
+        targetUrl,
+        upstream.status,
+        location ? " with location header" : "",
+      );
+      return NextResponse.json(
+        { error: "Renderer request was redirected" },
+        { status: 502 },
+      );
+    }
 
     if (!upstream.body) {
       clear();
