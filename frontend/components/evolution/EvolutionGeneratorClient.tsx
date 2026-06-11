@@ -35,6 +35,7 @@ import {
   type EvolutionPools,
   type EvolutionRange,
   generateEvolutionBatch,
+  generateTeaserVariant,
   normalizeEvolutionControls,
 } from "@/lib/evolution/evolutionGenerator";
 import { buildEvolutionPools } from "@/lib/evolution/evolutionPools";
@@ -96,6 +97,32 @@ function resolveHairSprite(hair: HairSprite): 8 | 9 {
   return Math.random() < 0.5 ? 8 : 9;
 }
 
+const SPIN_TIMES = [5, 8, 15, 30, 90] as const;
+
+/** Rough per-step costs (seconds at 1x) used for the ceremony estimate. */
+const ESTIMATE_SUMMON = 5;
+const ESTIMATE_BANNER = 3.5;
+const ESTIMATE_REVEAL = 6.7;
+
+function formatDuration(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.round(totalSeconds % 60);
+  if (minutes <= 0) return `${seconds}s`;
+  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function estimateCeremonySeconds(
+  controls: EvolutionControls,
+  spinSeconds: number,
+) {
+  const evolutions = controls.branchCount * controls.targetLevel;
+  return (
+    ESTIMATE_SUMMON +
+    controls.branchCount * ESTIMATE_BANNER +
+    evolutions * (spinSeconds + ESTIMATE_REVEAL)
+  );
+}
+
 function imageDataFromCanvas(
   canvas: HTMLCanvasElement | OffscreenCanvas,
 ): string | null {
@@ -153,10 +180,14 @@ export function EvolutionGeneratorClient() {
   const [ceremonyPools, setCeremonyPools] = useState<EvolutionPools | null>(
     null,
   );
+  const [spinSeconds, setSpinSeconds] =
+    useState<(typeof SPIN_TIMES)[number]>(8);
   const [controls, setControls] = useState<EvolutionControls>(() =>
     normalizeEvolutionControls(),
   );
   const [records, setRecords] = useState<UiEvolutionCat[]>([]);
+  const recordsRef = useRef<UiEvolutionCat[]>([]);
+  recordsRef.current = records;
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -276,6 +307,39 @@ export function EvolutionGeneratorClient() {
       catName: null,
     } satisfies UiEvolutionCat;
   }, []);
+
+  // Renders one slot-machine tease frame: a variant of the upcoming cat with
+  // the same trait shape as the real roll but random values.
+  const requestTeaserFrame = useCallback(
+    async (index: number) => {
+      const generator = generatorRef.current;
+      const upcoming = recordsRef.current[index];
+      if (!generator || !upcoming || !ceremonyPools) return null;
+      const parent =
+        Number(upcoming.level) <= 1
+          ? recordsRef.current[0]
+          : recordsRef.current[index - 1];
+      if (!parent) return null;
+      try {
+        const params = generateTeaserVariant(
+          parent.catData,
+          upcoming.additions,
+          ceremonyPools,
+        );
+        const rendered = await generator.generateCat(params);
+        return (
+          rendered.imageDataUrl ??
+          imageDataFromCanvas(
+            rendered.canvas as HTMLCanvasElement | OffscreenCanvas,
+          )
+        );
+      } catch (teaserError) {
+        console.warn("Failed to render teaser frame", teaserError);
+        return null;
+      }
+    },
+    [ceremonyPools],
+  );
 
   const persistResult = useCallback(
     async (
@@ -579,6 +643,8 @@ export function EvolutionGeneratorClient() {
           totalCount={expectedCount}
           onFinish={() => setPhase("tree")}
           pools={ceremonyPools}
+          chargeDurationMs={spinSeconds * 1000}
+          requestTeaserFrame={requestTeaserFrame}
         />
         {saveStatusNode ? (
           <div className="flex justify-center">{saveStatusNode}</div>
@@ -780,7 +846,7 @@ export function EvolutionGeneratorClient() {
             THE RITUAL
           </span>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-3">
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
                 Evolution lines
@@ -856,6 +922,29 @@ export function EvolutionGeneratorClient() {
                 ))}
               </div>
             </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+                Spin time
+              </span>
+              <div className="grid grid-cols-5 gap-1">
+                {SPIN_TIMES.map((seconds) => (
+                  <button
+                    key={seconds}
+                    type="button"
+                    onClick={() => setSpinSeconds(seconds)}
+                    className={cn(
+                      "rounded-lg border px-1 py-2.5 text-xs font-semibold transition",
+                      spinSeconds === seconds
+                        ? "border-violet-300/60 bg-violet-500/15 text-foreground"
+                        : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {seconds}s
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -914,7 +1003,9 @@ export function EvolutionGeneratorClient() {
               {controls.branchCount}{" "}
               {controls.branchCount === 1 ? "line" : "lines"} ·{" "}
               {controls.branchCount * controls.targetLevel + 1} cats · ranks up
-              to {stageRank(controls.targetLevel)}
+              to {stageRank(controls.targetLevel)} · ceremony ≈{" "}
+              {formatDuration(estimateCeremonySeconds(controls, spinSeconds))}{" "}
+              at 1×
             </p>
             <button
               type="button"

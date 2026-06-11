@@ -1236,6 +1236,84 @@ export function buildEvolutionBatchSettings(
   };
 }
 
+/**
+ * Build a plausible "could have been" variant of an upcoming evolution for
+ * the ceremony's slot-machine tease. The variant starts from the parent cat
+ * and adds randomly-valued traits whose counts are bounded by what the real
+ * evolution actually rolled: 0..N new torties when the result gained N, no
+ * teased scars when none were gained, a possible coat flip only when the
+ * result changed coat, and so on. Values are fully random — only the shape
+ * follows the result.
+ */
+export function generateTeaserVariant(
+  parentInput: unknown,
+  additions: EvolutionAddition[],
+  pools: EvolutionPools,
+  options: { random?: RandomFn } = {},
+): CatParams {
+  const random = options.random ?? Math.random;
+  const parent = normalizeEvolutionStarter(parentInput);
+  const accessories = [...parent.accessorySlots];
+  const scars = [...parent.scarSlots];
+  const torties = parent.tortieSlots
+    .map((layer) => normalizeTortieLayer(layer))
+    .filter((layer): layer is TortieLayer => Boolean(layer));
+  const colours = uniqueClean([
+    ...pools.baseColours,
+    ...pools.experimentalColours,
+  ]);
+
+  const randomIndex = (length: number) =>
+    Math.min(Math.floor(random() * length), length - 1);
+  const rollCount = (max: number) =>
+    max <= 0 ? 0 : Math.min(max, Math.floor(random() * (max + 1)));
+  const randomLayer = (): TortieLayer | null => {
+    const mask = pickOne(pools.tortieMasks, random);
+    const pattern = pickOne(pools.tortiePatterns, random);
+    const colour = pickOne(colours, random);
+    return mask && pattern && colour ? { mask, pattern, colour } : null;
+  };
+  const countOf = (kind: EvolutionAddition["kind"]) =>
+    additions.filter((addition) => addition.kind === kind).length;
+
+  // Tease replacements as a coin-flip reroll of one owned trait.
+  for (const addition of additions) {
+    if (addition.kind !== "replacement" || random() < 0.5) continue;
+    if (addition.slot === "tortie" && torties.length > 0) {
+      const layer = randomLayer();
+      if (layer) torties[randomIndex(torties.length)] = layer;
+    } else if (addition.slot === "accessory" && accessories.length > 0) {
+      const accessory = pickOne(pools.accessories, random);
+      if (accessory) accessories[randomIndex(accessories.length)] = accessory;
+    } else if (addition.slot === "scar" && scars.length > 0) {
+      const scar = pickOne(pools.scars, random);
+      if (scar) scars[randomIndex(scars.length)] = scar;
+    }
+  }
+
+  const tortieAdds = rollCount(countOf("tortie"));
+  for (let i = 0; i < tortieAdds; i += 1) {
+    const layer = randomLayer();
+    if (layer) torties.push(layer);
+  }
+  const accessoryAdds = rollCount(countOf("accessory"));
+  for (let i = 0; i < accessoryAdds; i += 1) {
+    const accessory = pickOne(pools.accessories, random);
+    if (accessory) accessories.push(accessory);
+  }
+  const scarAdds = rollCount(countOf("scar"));
+  for (let i = 0; i < scarAdds; i += 1) {
+    const scar = pickOne(pools.scars, random);
+    if (scar) scars.push(scar);
+  }
+
+  const params = applySlotsToParams(parent.params, accessories, scars, torties);
+  if (countOf("coat") > 0 && random() < 0.5) {
+    params.spriteNumber = LONG_HAIR_SPRITE;
+  }
+  return params;
+}
+
 export function isEvolutionBatchSettings(settings: unknown): boolean {
   return (
     Boolean(settings) &&

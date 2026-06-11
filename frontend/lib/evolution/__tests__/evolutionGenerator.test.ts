@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
+  type EvolutionAddition,
   type EvolutionPools,
   generateEvolutionBatch,
+  generateTeaserVariant,
   getTortieLayerParts,
   isNearStarterColour,
   normalizeEvolutionControls,
@@ -434,6 +436,51 @@ describe("evolution generation", () => {
     expect(evolution?.rolls.some((roll) => roll.kind === "replacement")).toBe(
       true,
     );
+  });
+
+  it("bounds teaser variants by the real evolution's trait shape", () => {
+    const tortieAddition: EvolutionAddition = {
+      kind: "tortie",
+      label: "Tortie ONE / Tabby / AQUA",
+      value: { mask: "ONE", pattern: "Tabby", colour: "AQUA" },
+      parts: [],
+    };
+    const additions: EvolutionAddition[] = [
+      tortieAddition,
+      tortieAddition,
+      { kind: "accessory", label: "Accessory HOLLY", value: "HOLLY" },
+    ];
+
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const params = generateTeaserVariant(
+        { params: cleanStarter() },
+        additions,
+        pools,
+      );
+      const tortieCount = params.tortie?.length ?? 0;
+      const accessoryCount = params.accessories?.length ?? 0;
+      const scarCount = params.scars?.length ?? 0;
+
+      expect(tortieCount).toBeGreaterThanOrEqual(0);
+      expect(tortieCount).toBeLessThanOrEqual(2);
+      expect(accessoryCount).toBeLessThanOrEqual(1);
+      // The real roll gained no scars or coat change, so neither may the tease.
+      expect(scarCount).toBe(0);
+      expect(params.spriteNumber).toBe(cleanStarter().spriteNumber);
+    }
+  });
+
+  it("never adds teaser traits the evolution did not roll", () => {
+    const params = generateTeaserVariant(
+      { params: cleanStarter() },
+      [],
+      pools,
+      { random: sequenceRandom([0.99, 0.5, 0.01]) },
+    );
+
+    expect(params.tortie ?? []).toHaveLength(0);
+    expect(params.accessories ?? []).toHaveLength(0);
+    expect(params.scars ?? []).toHaveLength(0);
   });
 
   it("can roll colours outside the archetype preferred subset", () => {

@@ -50,6 +50,13 @@ type EvolutionCeremonyProps = {
   onFinish: () => void;
   /** Trait pools — powers the charge-phase teaser and result colours. */
   pools?: EvolutionPools | null;
+  /** Spin length of the charge phase at 1x speed. */
+  chargeDurationMs?: number;
+  /**
+   * Renders one teaser variant of the upcoming cat (same trait shape as the
+   * real result, random values). Called repeatedly while a charge spins.
+   */
+  requestTeaserFrame?: (index: number) => Promise<string | null>;
 };
 
 // Base pacing at 1x — deliberately slow so each ceremony can breathe
@@ -136,6 +143,8 @@ export function EvolutionCeremony({
   totalCount,
   onFinish,
   pools,
+  chargeDurationMs = 8400,
+  requestTeaserFrame,
 }: EvolutionCeremonyProps) {
   const prefersReducedMotion = useReducedMotion();
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -159,7 +168,8 @@ export function EvolutionCeremony({
   // Timed auto-advance for every animated step (paused in tap mode).
   useEffect(() => {
     if (!autoPlay) return;
-    const duration = STEP_DURATIONS[step.kind];
+    const duration =
+      step.kind === "charge" ? chargeDurationMs : STEP_DURATIONS[step.kind];
     if (duration <= 0) return;
     const chipCount =
       step.kind === "reveal"
@@ -168,7 +178,7 @@ export function EvolutionCeremony({
     const total = (duration + chipCount * 180) / speed;
     const timer = window.setTimeout(advance, total);
     return () => window.clearTimeout(timer);
-  }, [step, speed, autoPlay, advance]);
+  }, [step, speed, autoPlay, chargeDurationMs, advance]);
 
   // Resume from the waiting state as soon as the next cat is rendered.
   useEffect(() => {
@@ -241,16 +251,35 @@ export function EvolutionCeremony({
     return `LINE ${activeCat.branchLabel ?? "?"} · ${stageRank(activeCat.level).toUpperCase()}`;
   })();
 
-  // Other cats from this batch, used as slot-machine frames while charging.
-  const teaserCandidates = useMemo(() => {
-    if (step.kind !== "charge") return [];
-    return cats
-      .filter(
-        (cat, index) =>
-          index !== step.index && cat.level > 0 && Boolean(cat.previewUrl),
-      )
-      .map((cat) => cat.previewUrl as string);
-  }, [cats, step]);
+  // Live-rendered "could have been" variants of the upcoming cat, generated
+  // while the charge spins. Counts mirror the real result; values are random.
+  const [teaserFrames, setTeaserFrames] = useState<string[]>([]);
+  useEffect(() => {
+    setTeaserFrames([]);
+    if (step.kind !== "charge" || !requestTeaserFrame) return;
+    const chargeIndex = step.index;
+    // Frame budget scales with the spin length; renders run sequentially.
+    const frameCap = Math.min(
+      36,
+      Math.max(6, Math.floor(chargeDurationMs / speed / 320)),
+    );
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < frameCap; i += 1) {
+        if (cancelled) return;
+        try {
+          const frame = await requestTeaserFrame(chargeIndex);
+          if (cancelled) return;
+          if (frame) setTeaserFrames((previous) => [...previous, frame]);
+        } catch {
+          return;
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [step, requestTeaserFrame, chargeDurationMs, speed]);
 
   return (
     <motion.section
@@ -371,10 +400,10 @@ export function EvolutionCeremony({
                   ? (cats[0] ?? null)
                   : (cats[step.index - 1] ?? null)
               }
-              candidates={teaserCandidates}
+              frames={teaserFrames}
               upcoming={cats[step.index] ?? null}
               theme={theme}
-              durationSeconds={STEP_DURATIONS.charge / speed / 1000}
+              durationSeconds={chargeDurationMs / speed / 1000}
               reduced={Boolean(prefersReducedMotion)}
             />
           ) : step.kind === "reveal" ? (
@@ -532,52 +561,42 @@ function BannerScene({
 }
 
 /**
- * Slot-machine sprite for the charge phase: rapidly flickers through other
- * cats from this batch with shifting hues, so the sprite itself teases what
- * the ceremony could produce before the real form is revealed.
+ * Slot-machine sprite for the charge phase: flickers through live-rendered
+ * variants that share the real result's trait shape, so the sprite itself
+ * teases what the ceremony could produce before the true form is revealed.
  */
 function TeaserSprite({
   parentUrl,
-  candidates,
+  frames,
   reduced,
 }: {
   parentUrl: string | null;
-  candidates: string[];
+  frames: string[];
   reduced: boolean;
 }) {
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
-    if (reduced) return;
-    const timer = window.setInterval(() => setFrame((value) => value + 1), 110);
+    if (reduced || frames.length <= 1) return;
+    const timer = window.setInterval(() => setFrame((value) => value + 1), 160);
     return () => window.clearInterval(timer);
-  }, [reduced]);
+  }, [reduced, frames.length]);
 
-  const frames = candidates.length > 0 ? candidates : null;
-  const url = frames ? frames[frame % frames.length] : parentUrl;
-  const hue = reduced ? 0 : (frame * 67) % 360;
+  const url = frames.length > 0 ? frames[frame % frames.length] : parentUrl;
 
-  return (
-    <div
-      style={
-        reduced ? undefined : { filter: `hue-rotate(${hue}deg) saturate(1.5)` }
-      }
-    >
-      <SpriteOnAura url={url ?? null} alt="A possible evolution" />
-    </div>
-  );
+  return <SpriteOnAura url={url ?? null} alt="A possible evolution" />;
 }
 
 function ChargeScene({
   parent,
-  candidates,
+  frames,
   upcoming,
   theme,
   durationSeconds,
   reduced,
 }: {
   parent: CeremonyCat | null;
-  candidates: string[];
+  frames: string[];
   upcoming: CeremonyCat | null;
   theme: ArchetypeTheme;
   /** Real charge length at the current speed — the white-out scales to it. */
@@ -636,7 +655,7 @@ function ChargeScene({
         >
           <TeaserSprite
             parentUrl={parent?.previewUrl ?? null}
-            candidates={candidates}
+            frames={frames}
             reduced={reduced}
           />
         </motion.div>
