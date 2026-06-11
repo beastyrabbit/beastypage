@@ -46,6 +46,7 @@ type EvolutionCatRecord = {
   profileId?: string | null;
   encoded?: string | null;
   shareToken?: string | null;
+  editToken?: string | null;
   catName?: string | null;
   creatorName?: string | null;
   previews?: {
@@ -201,6 +202,7 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
     await updateProfileMeta({
       id: toId("cat_profile", source.profileId),
       catName,
+      editToken: source.editToken ?? undefined,
     });
   };
 
@@ -222,12 +224,19 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
       if (!source?.profileId) {
         throw new Error("One or more cats have no saved profile.");
       }
-      return [{ profileId: source.profileId, name }];
+      return [
+        {
+          profileId: source.profileId,
+          name,
+          editToken: source.editToken ?? undefined,
+        },
+      ];
     });
     for (const update of updates) {
       await updateProfileMeta({
         id: toId("cat_profile", update.profileId),
         catName: update.name,
+        editToken: update.editToken,
       });
     }
   };

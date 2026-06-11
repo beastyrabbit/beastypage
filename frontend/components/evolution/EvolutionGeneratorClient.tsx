@@ -401,6 +401,7 @@ export function EvolutionGeneratorClient() {
               profileId: toId("cat_profile", profileId),
               encoded,
               shareToken,
+              editToken: mapperResult.editToken ?? undefined,
             };
           }),
         );

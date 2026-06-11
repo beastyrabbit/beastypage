@@ -154,6 +154,7 @@ export default defineSchema({
         profileId: v.optional(v.id("cat_profile")),
         encoded: v.optional(v.string()),
         shareToken: v.optional(v.string()),
+        editToken: v.optional(v.string()),
         catName: v.optional(v.string()),
         creatorName: v.optional(v.string()),
       }),
