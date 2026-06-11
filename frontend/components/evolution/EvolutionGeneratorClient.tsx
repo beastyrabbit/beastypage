@@ -1,14 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
-import {
-  ArrowUpRight,
-  GitBranch,
-  Loader2,
-  RotateCcw,
-  Save,
-  Sparkles,
-} from "lucide-react";
+import { ArrowUpRight, Loader2, Minus, Plus, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -23,33 +16,38 @@ import {
   type AdoptionMetadata,
   AdoptionMetadataPanel,
 } from "@/components/adoption/AdoptionMetadataPanel";
-import type { CatGeneratorApi, SpriteMapperApi } from "@/components/cat-builder/types";
+import type {
+  CatGeneratorApi,
+  SpriteMapperApi,
+} from "@/components/cat-builder/types";
 import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
-import { encodeCatShare } from "@/lib/catShare";
 import type { CatParams } from "@/lib/cat-v3/types";
+import { encodeCatShare } from "@/lib/catShare";
 import {
   buildEvolutionBatchSettings,
-  type EvolutionAddition,
   type EvolutionBatchResult,
   type EvolutionControls,
   type EvolutionGeneratedCat,
   type EvolutionLevel,
   type EvolutionRange,
-  type EvolutionRoll,
   generateEvolutionBatch,
-  getTortieLayerParts,
   normalizeEvolutionControls,
 } from "@/lib/evolution/evolutionGenerator";
 import { buildEvolutionPools } from "@/lib/evolution/evolutionPools";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { cn } from "@/lib/utils";
+import { ARCHETYPE_THEMES, withAlpha } from "./archetypes";
+import { EvolutionCeremony } from "./EvolutionCeremony";
+import { EvolutionTree, type EvolutionTreeCat } from "./EvolutionTree";
+import { pixelFontClass, stageNumeral } from "./evolutionDisplay";
 
 type StarterMode = "random" | "history";
 type SaveState = "idle" | "saving" | "saved" | "error";
 type HairSprite = "long" | "short";
+type ChamberPhase = "setup" | "ceremony" | "tree";
 
 type MapperRecord = {
   id: string;
@@ -67,17 +65,6 @@ type UiEvolutionCat = EvolutionGeneratedCat & {
   catName?: string | null;
 };
 
-type AdditionDisplayRow = {
-  id: string;
-  label: string;
-  value: string;
-};
-
-type EvolutionRollRow = AdditionDisplayRow & {
-  branch: string;
-  level: number;
-};
-
 type PersistedCatInfo = {
   key: string;
   profileId: string;
@@ -90,6 +77,7 @@ const DEFAULT_METADATA: AdoptionMetadata = {
 };
 
 const TARGET_LEVELS: EvolutionLevel[] = [1, 2, 3];
+const RANGE_STEPS = [0, 1, 2] as const;
 const HAIR_SPRITES: Array<{
   id: HairSprite;
   label: string;
@@ -98,82 +86,6 @@ const HAIR_SPRITES: Array<{
   { id: "short", label: "Short hair", spriteNumber: 8 },
   { id: "long", label: "Long hair", spriteNumber: 9 },
 ];
-
-function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function formatValue(value: string) {
-  return value
-    .replace(/[_-]+/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (match) => match.toUpperCase());
-}
-
-function formatAddition(addition: EvolutionAddition) {
-  if (addition.kind === "tortie") {
-    return addition.value.colour
-      ? `${formatValue(addition.value.mask ?? "")} / ${formatValue(addition.value.pattern ?? "")} / ${formatValue(addition.value.colour)}`
-      : addition.label;
-  }
-  return formatValue(addition.value);
-}
-
-function getTortieParts(addition: Extract<EvolutionAddition, { kind: "tortie" }>) {
-  return addition.parts?.length > 0
-    ? addition.parts
-    : getTortieLayerParts(addition.value);
-}
-
-function buildAdditionDisplayRows(
-  additions: EvolutionAddition[],
-  idPrefix: string,
-): AdditionDisplayRow[] {
-  let tortieLayerIndex = 0;
-  return additions.flatMap((addition, additionIndex) => {
-    if (addition.kind === "tortie") {
-      tortieLayerIndex += 1;
-      const layerLabel = `Tortie ${tortieLayerIndex}`;
-      return getTortieParts(addition).map((part) => ({
-        id: `${idPrefix}-${additionIndex}-${part.kind}`,
-        label: `${layerLabel} ${part.label}`,
-        value: formatValue(part.value),
-      }));
-    }
-    return [
-      {
-        id: `${idPrefix}-${additionIndex}-${addition.kind}`,
-        label: addition.kind === "accessory" ? "Accessory" : "Scar",
-        value: formatAddition(addition),
-      },
-    ];
-  });
-}
-
-function buildRollDisplayRows(
-  rolls: EvolutionRoll[] | undefined,
-  additions: EvolutionAddition[],
-  idPrefix: string,
-): AdditionDisplayRow[] {
-  if (!rolls?.length) return buildAdditionDisplayRows(additions, idPrefix);
-  return rolls.map((roll, index) => {
-    if (roll.kind === "tortie-count") {
-      return {
-        id: `${idPrefix}-roll-${index}`,
-        label: roll.label,
-        value:
-          roll.range.min === roll.range.max
-            ? String(roll.value)
-            : `${roll.value} from ${roll.range.min}-${roll.range.max}`,
-      };
-    }
-    return {
-      id: `${idPrefix}-roll-${index}`,
-      label: roll.label,
-      value: formatValue(String(roll.value)),
-    };
-  });
-}
 
 function imageDataFromCanvas(
   canvas: HTMLCanvasElement | OffscreenCanvas,
@@ -211,61 +123,6 @@ function applySpriteToStarterPayload(input: unknown, spriteNumber: number) {
   return { ...raw, spriteNumber };
 }
 
-function controlRangeText(range: EvolutionRange) {
-  return range.min === range.max ? String(range.min) : `${range.min}-${range.max}`;
-}
-
-function RangeInputs({
-  label,
-  range,
-  onChange,
-}: {
-  label: string;
-  range: EvolutionRange;
-  onChange: (range: EvolutionRange) => void;
-}) {
-  const update = (field: keyof EvolutionRange, value: string) => {
-    const numeric = Number.parseInt(value, 10);
-    const next = { ...range, [field]: Number.isFinite(numeric) ? numeric : 0 };
-    onChange({
-      min: Math.min(Math.max(next.min, 0), 2),
-      max: Math.min(Math.max(next.max, 0), 2),
-    });
-  };
-
-  return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-        {label}
-      </legend>
-      <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Min
-          <input
-            type="number"
-            min={0}
-            max={2}
-            value={range.min}
-            onChange={(event) => update("min", event.target.value)}
-            className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Max
-          <input
-            type="number"
-            min={0}
-            max={2}
-            value={range.max}
-            onChange={(event) => update("max", event.target.value)}
-            className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-          />
-        </label>
-      </div>
-    </fieldset>
-  );
-}
-
 export function EvolutionGeneratorClient() {
   const createBatch = useMutation(api.adoption.createBatch);
   const createMapper = useMutation(api.mapper.create);
@@ -276,17 +133,19 @@ export function EvolutionGeneratorClient() {
   const mapperRef = useRef<SpriteMapperApi | null>(null);
   const metadataRef = useRef<AdoptionMetadata>(DEFAULT_METADATA);
   const generationTokenRef = useRef(0);
+  const [phase, setPhase] = useState<ChamberPhase>("setup");
+  const [ceremonyKey, setCeremonyKey] = useState(0);
+  const [expectedCount, setExpectedCount] = useState(0);
+  const [modulesReady, setModulesReady] = useState(false);
   const [starterMode, setStarterMode] = useState<StarterMode>("random");
   const [hairSprite, setHairSprite] = useState<HairSprite>("short");
   const [historySlug, setHistorySlug] = useState("");
+  const [starterPreview, setStarterPreview] = useState<string | null>(null);
   const [controls, setControls] = useState<EvolutionControls>(() =>
     normalizeEvolutionControls(),
   );
   const [records, setRecords] = useState<UiEvolutionCat[]>([]);
-  const [rollRows, setRollRows] = useState<EvolutionRollRow[]>([]);
-  const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationComplete, setGenerationComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSavedToken, setLastSavedToken] = useState<string | null>(null);
@@ -333,6 +192,7 @@ export function EvolutionGeneratorClient() {
         if (!mapperRef.current.loaded) {
           await mapperRef.current.init();
         }
+        if (!cancelled) setModulesReady(true);
       } catch (loadError) {
         console.error("Failed to load evolution generator modules", loadError);
         if (!cancelled) {
@@ -346,23 +206,43 @@ export function EvolutionGeneratorClient() {
     };
   }, []);
 
-  const groupedRecords = useMemo(() => {
-    const starter = records.find((record) => record.level === 0) ?? null;
-    const branches = new Map<string, UiEvolutionCat[]>();
-    for (const record of records) {
-      if (record.level === 0 || !record.branchLabel) continue;
-      const list = branches.get(record.branchLabel) ?? [];
-      list.push(record);
-      branches.set(record.branchLabel, list);
+  // Live altar preview for a history starter (respects the hair choice).
+  useEffect(() => {
+    setStarterPreview(null);
+    if (
+      starterMode !== "history" ||
+      !historyRecord?.cat_data ||
+      !modulesReady
+    ) {
+      return;
     }
-    return {
-      starter,
-      branches: Array.from(branches.entries()).map(([branch, cats]) => ({
-        branch,
-        cats: cats.sort((a, b) => a.level - b.level),
-      })),
+    let cancelled = false;
+    (async () => {
+      try {
+        const selectedHair =
+          HAIR_SPRITES.find((option) => option.id === hairSprite) ??
+          HAIR_SPRITES[0];
+        const payload = applySpriteToStarterPayload(
+          historyRecord.cat_data,
+          selectedHair.spriteNumber,
+        ) as Record<string, unknown>;
+        const params = (payload.params ?? payload) as CatParams;
+        const rendered = await generatorRef.current?.generateCat(params);
+        if (cancelled || !rendered) return;
+        setStarterPreview(
+          rendered.imageDataUrl ??
+            imageDataFromCanvas(
+              rendered.canvas as HTMLCanvasElement | OffscreenCanvas,
+            ),
+        );
+      } catch (previewError) {
+        console.warn("Failed to render starter preview", previewError);
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-  }, [records]);
+  }, [starterMode, historyRecord, hairSprite, modulesReady]);
 
   const renderRecord = useCallback(async (cat: EvolutionGeneratedCat) => {
     const generator = generatorRef.current;
@@ -372,7 +252,9 @@ export function EvolutionGeneratorClient() {
       ...cat,
       previewUrl:
         rendered.imageDataUrl ??
-        imageDataFromCanvas(rendered.canvas as HTMLCanvasElement | OffscreenCanvas),
+        imageDataFromCanvas(
+          rendered.canvas as HTMLCanvasElement | OffscreenCanvas,
+        ),
       profileId: null,
       shareToken: null,
       catName: null,
@@ -424,7 +306,9 @@ export function EvolutionGeneratorClient() {
         });
         setRecords((previous) =>
           previous.map((record) => {
-            const persisted = persistedCats.find((item) => item.key === record.key);
+            const persisted = persistedCats.find(
+              (item) => item.key === record.key,
+            );
             return persisted ? { ...record, ...persisted } : record;
           }),
         );
@@ -449,9 +333,10 @@ export function EvolutionGeneratorClient() {
     setMetadataMessage(null);
     setLastSavedId(null);
     setLastSavedToken(null);
-    setGenerationComplete(false);
     setRecords([]);
-    setRollRows([]);
+    setExpectedCount(controls.branchCount * controls.targetLevel + 1);
+    setCeremonyKey((value) => value + 1);
+    setPhase("ceremony");
     setIsGenerating(true);
 
     try {
@@ -465,7 +350,8 @@ export function EvolutionGeneratorClient() {
       let starterPayload: unknown;
       let starterSource: Parameters<typeof buildEvolutionBatchSettings>[1];
       const selectedHair =
-        HAIR_SPRITES.find((option) => option.id === hairSprite) ?? HAIR_SPRITES[0];
+        HAIR_SPRITES.find((option) => option.id === hairSprite) ??
+        HAIR_SPRITES[0];
 
       if (starterMode === "history") {
         if (!trimmedHistorySlug) {
@@ -523,29 +409,12 @@ export function EvolutionGeneratorClient() {
 
       for (const cat of orderedCats) {
         if (generationTokenRef.current !== token) return;
-        setActiveLabel(cat.label);
         const rendered = await renderRecord(cat);
         renderedRecords.push(rendered);
         setRecords([...renderedRecords]);
-
-        if (cat.additions.length > 0) {
-          setRollRows((previous) => [
-            ...previous,
-            ...buildRollDisplayRows(cat.rolls, cat.additions, cat.key).map(
-              (row) => ({
-                ...row,
-                branch: cat.branchLabel ?? "Starter",
-                level: Number(cat.level),
-              }),
-            ),
-          ]);
-        }
-        await wait(cat.level === 0 ? 220 : 130);
       }
 
       if (generationTokenRef.current !== token) return;
-      setActiveLabel(null);
-      setGenerationComplete(true);
       await persistResult(result, starterSource);
     } catch (generationError) {
       console.error("Failed to generate evolution batch", generationError);
@@ -555,10 +424,10 @@ export function EvolutionGeneratorClient() {
           : "Evolution generation failed.",
       );
       setSaveState("error");
+      setPhase("setup");
     } finally {
       if (generationTokenRef.current === token) {
         setIsGenerating(false);
-        setActiveLabel(null);
       }
     }
   }, [
@@ -570,6 +439,19 @@ export function EvolutionGeneratorClient() {
     starterMode,
     trimmedHistorySlug,
   ]);
+
+  const handleReset = useCallback(() => {
+    generationTokenRef.current += 1;
+    setRecords([]);
+    setPhase("setup");
+    setSaveState("idle");
+    setIsGenerating(false);
+    setError(null);
+    setMetadataError(null);
+    setMetadataMessage(null);
+    setLastSavedId(null);
+    setLastSavedToken(null);
+  }, []);
 
   const handleMetadataSave = useCallback(
     async (nextMetadata: AdoptionMetadata) => {
@@ -622,19 +504,28 @@ export function EvolutionGeneratorClient() {
     [updateProfileMeta],
   );
 
-  const statusNode = (() => {
-    if (isGenerating) {
-      return (
-        <span className="inline-flex items-center gap-2 text-sm text-amber-200">
-          <Loader2 className="size-4 animate-spin" />
-          {activeLabel ? `Revealing ${activeLabel}` : "Generating evolution"}
-        </span>
-      );
-    }
+  const treeCats = useMemo<EvolutionTreeCat[]>(
+    () =>
+      records.map((record) => ({
+        key: record.key,
+        label: record.label,
+        name: record.catName?.trim() || record.label,
+        level: Number(record.level),
+        branchLabel: record.branchLabel,
+        archetype: record.archetype,
+        additions: record.additions,
+        rolls: record.rolls,
+        previewUrl: record.previewUrl,
+        href: record.shareToken ? `/view/${record.shareToken}` : null,
+      })),
+    [records],
+  );
+
+  const saveStatusNode = (() => {
     if (saveState === "saving") {
       return (
         <span className="inline-flex items-center gap-2 text-sm text-amber-200">
-          <Loader2 className="size-4 animate-spin" /> Saving evolution batch
+          <Loader2 className="size-4 animate-spin" /> Saving evolution batch…
         </span>
       );
     }
@@ -664,268 +555,37 @@ export function EvolutionGeneratorClient() {
     return null;
   })();
 
-  return (
-    <div className="flex flex-col gap-6">
-      <section className="rounded-2xl border border-border/40 bg-background/70 p-4">
-        <fieldset className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-            Hair
-          </legend>
-          <div className="grid gap-2 sm:w-auto sm:grid-cols-2">
-            {HAIR_SPRITES.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setHairSprite(option.id)}
-                className={cn(
-                  "flex min-w-36 items-center justify-center rounded-lg border px-3 py-2 text-center text-sm font-semibold transition",
-                  hairSprite === option.id
-                    ? "border-primary/60 bg-primary/15 text-foreground"
-                    : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-      </section>
+  if (phase === "ceremony") {
+    return (
+      <div className="flex flex-col gap-3">
+        <EvolutionCeremony
+          key={ceremonyKey}
+          cats={records}
+          totalCount={expectedCount}
+          onFinish={() => setPhase("tree")}
+        />
+        {saveStatusNode ? (
+          <div className="flex justify-center">{saveStatusNode}</div>
+        ) : null}
+      </div>
+    );
+  }
 
-      <section className="grid gap-4 rounded-2xl border border-border/40 bg-background/70 p-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <fieldset className="flex flex-col gap-3">
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-              Starter
-            </legend>
-            <div className="grid grid-cols-2 gap-2">
-              {(["random", "history"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setStarterMode(mode)}
-                  className={cn(
-                    "rounded-lg border px-3 py-2 text-sm font-semibold transition",
-                    starterMode === mode
-                      ? "border-primary/60 bg-primary/15 text-foreground"
-                      : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {mode === "random" ? "Random" : "History"}
-                </button>
-              ))}
-            </div>
-            {starterMode === "history" ? (
-              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                Slug
-                <input
-                  type="text"
-                  value={historySlug}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                    setHistorySlug(event.target.value)
-                  }
-                  placeholder="Saved cat slug"
-                  className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-                />
-                {trimmedHistorySlug && historyRecord === undefined ? (
-                  <span className="text-[11px] text-amber-200">Loading cat</span>
-                ) : null}
-                {trimmedHistorySlug && historyRecord === null ? (
-                  <span className="text-[11px] text-red-300">
-                    No cat found for that slug
-                  </span>
-                ) : null}
-              </label>
-            ) : null}
-          </fieldset>
+  if (phase === "tree") {
+    return (
+      <div className="flex flex-col gap-6">
+        <header className="flex flex-col items-center gap-3 text-center">
+          <span className={cn(pixelFontClass, "text-xs text-amber-200")}>
+            ✨ EVOLUTION COMPLETE ✨
+          </span>
+          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+            The {savedMetadata.title || "Evolution"} lineage
+          </h1>
+          {saveStatusNode}
+        </header>
 
-          <fieldset className="flex flex-col gap-3">
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-              Shape
-            </legend>
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-              Branches
-              <input
-                type="number"
-                min={1}
-                max={12}
-                value={controls.branchCount}
-                onChange={(event) =>
-                  setControls((current) =>
-                    normalizeEvolutionControls({
-                      ...current,
-                      branchCount: Number.parseInt(event.target.value, 10),
-                    }),
-                  )
-                }
-                className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-              />
-            </label>
-            <div className="flex flex-col gap-2">
-              <span className="text-xs text-muted-foreground">Evolutions</span>
-              <div className="grid grid-cols-3 gap-2">
-                {TARGET_LEVELS.map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() =>
-                      setControls((current) =>
-                        normalizeEvolutionControls({ ...current, targetLevel: level }),
-                      )
-                    }
-                    className={cn(
-                      "rounded-lg border px-3 py-2 text-sm font-semibold transition",
-                      controls.targetLevel === level
-                        ? "border-primary/60 bg-primary/15 text-foreground"
-                        : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </fieldset>
+        <EvolutionTree cats={treeCats} animateIn />
 
-          <div className="grid gap-3">
-            <RangeInputs
-              label="Torties per evolution"
-              range={controls.torties}
-              onChange={(range) =>
-                setControls((current) =>
-                  normalizeEvolutionControls({ ...current, torties: range }),
-                )
-              }
-            />
-            <RangeInputs
-              label="Accessories per evolution"
-              range={controls.accessories}
-              onChange={(range) =>
-                setControls((current) =>
-                  normalizeEvolutionControls({ ...current, accessories: range }),
-                )
-              }
-            />
-          </div>
-
-          <div className="grid gap-3 sm:col-span-2 xl:col-span-1">
-            <RangeInputs
-              label="Scars per evolution"
-              range={controls.scars}
-              onChange={(range) =>
-                setControls((current) =>
-                  normalizeEvolutionControls({ ...current, scars: range }),
-                )
-              }
-            />
-            <label className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-muted-foreground">
-              <span>Scars enabled</span>
-              <input
-                type="checkbox"
-                checked={controls.scarsEnabled}
-                onChange={(event) =>
-                  setControls((current) => ({
-                    ...current,
-                    scarsEnabled: event.target.checked,
-                  }))
-                }
-                className="size-4 accent-primary"
-              />
-            </label>
-          </div>
-        </div>
-
-        <aside className="flex flex-col justify-between gap-4 rounded-xl border border-border/40 bg-slate-950/50 p-4">
-          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-            <span className="rounded-lg border border-border/30 bg-background/50 px-3 py-2">
-              {controls.branchCount} branches
-            </span>
-            <span className="rounded-lg border border-border/30 bg-background/50 px-3 py-2">
-              {controls.targetLevel}{" "}
-              {controls.targetLevel === 1 ? "evolution" : "evolutions"}
-            </span>
-            <span className="rounded-lg border border-border/30 bg-background/50 px-3 py-2">
-              Sprite{" "}
-              {HAIR_SPRITES.find((option) => option.id === hairSprite)
-                ?.spriteNumber ?? 9}
-            </span>
-            <span className="rounded-lg border border-border/30 bg-background/50 px-3 py-2">
-              Torties {controlRangeText(controls.torties)}
-            </span>
-            <span className="rounded-lg border border-border/30 bg-background/50 px-3 py-2">
-              Scars {controls.scarsEnabled ? controlRangeText(controls.scars) : "off"}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={isGenerating || saveState === "saving"}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isGenerating ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Sparkles className="size-4" />
-            )}
-            Generate Evolution
-          </button>
-          {statusNode}
-        </aside>
-      </section>
-
-      {rollRows.length > 0 ? (
-        <section className="rounded-2xl border border-border/40 bg-background/70 p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-            <GitBranch className="size-4 text-primary" /> Evolution rolls
-          </div>
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {rollRows.slice(-18).map((row) => (
-              <div
-                key={row.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border/40 bg-background px-3 py-2 text-xs"
-              >
-                <span className="font-semibold text-muted-foreground">
-                  {row.branch} E{row.level}
-                </span>
-                <span className="truncate text-foreground">
-                  {row.label}: {row.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {records.length > 0 ? (
-        <section className="flex flex-col gap-5">
-          {groupedRecords.starter ? (
-            <EvolutionCatCard record={groupedRecords.starter} prominent />
-          ) : null}
-          <div className="grid gap-5 lg:grid-cols-2">
-            {groupedRecords.branches.map((branch) => (
-              <div
-                key={branch.branch}
-                className="rounded-2xl border border-border/40 bg-background/70 p-4"
-              >
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold text-foreground">
-                    Branch {branch.branch}
-                  </h2>
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                    {branch.cats[0]?.archetype ?? "evolution"}
-                  </span>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {branch.cats.map((cat) => (
-                    <EvolutionCatCard key={cat.key} record={cat} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {generationComplete ? (
         <section className="flex flex-col gap-3">
           <AdoptionMetadataPanel
             savedValue={savedMetadata}
@@ -944,101 +604,430 @@ export function EvolutionGeneratorClient() {
                 href={`/evolution/${lastSavedToken}`}
                 className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
               >
-                <ArrowUpRight className="size-4" /> Open evolution
+                <ArrowUpRight className="size-4" /> Open share page
               </Link>
             ) : null}
             <button
               type="button"
               onClick={() => {
-                generationTokenRef.current += 1;
-                setRecords([]);
-                setRollRows([]);
-                setGenerationComplete(false);
-                setSaveState("idle");
+                setCeremonyKey((value) => value + 1);
+                setPhase("ceremony");
               }}
+              disabled={isGenerating}
+              className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background disabled:opacity-60"
+            >
+              ▶ Replay ceremony
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
               className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
             >
-              <RotateCcw className="size-4" /> Clear
+              <RotateCcw className="size-4" /> Evolve another
             </button>
           </div>
         </section>
-      ) : null}
+      </div>
+    );
+  }
+
+  const canGenerate =
+    modulesReady &&
+    !isGenerating &&
+    (starterMode === "random" ||
+      Boolean(trimmedHistorySlug && historyRecord?.cat_data));
+
+  return (
+    <div className="flex flex-col gap-6">
+      <ChamberHero />
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        {/* The altar */}
+        <section className="flex flex-col gap-5 rounded-3xl border border-border/40 bg-slate-950/70 p-5">
+          <span className={cn(pixelFontClass, "text-[10px] text-amber-200/90")}>
+            THE ALTAR
+          </span>
+          <div className="relative mx-auto flex size-48 items-center justify-center">
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: `radial-gradient(circle, ${withAlpha("#fbbf24", 0.14)}, transparent 70%)`,
+              }}
+              aria-hidden
+            />
+            <div className="absolute inset-2 animate-pulse-soft rounded-full border border-amber-300/25" />
+            {starterMode === "history" && starterPreview ? (
+              <Image
+                src={starterPreview}
+                alt="Starter cat preview"
+                width={320}
+                height={320}
+                unoptimized
+                className="image-render-pixel relative size-40 object-contain"
+              />
+            ) : (
+              <span
+                className={cn(
+                  pixelFontClass,
+                  "relative text-4xl text-amber-200/60",
+                )}
+                aria-hidden
+              >
+                ?
+              </span>
+            )}
+          </div>
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+              Starter
+            </legend>
+            <div className="grid grid-cols-2 gap-2">
+              {(["random", "history"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setStarterMode(mode)}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                    starterMode === mode
+                      ? "border-amber-300/60 bg-amber-400/15 text-foreground"
+                      : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {mode === "random" ? "Mystery egg" : "Saved cat"}
+                </button>
+              ))}
+            </div>
+            {starterMode === "history" ? (
+              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                Slug
+                <input
+                  type="text"
+                  value={historySlug}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                    setHistorySlug(event.target.value)
+                  }
+                  placeholder="Saved cat slug"
+                  className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+                />
+                {trimmedHistorySlug && historyRecord === undefined ? (
+                  <span className="text-[11px] text-amber-200">
+                    Loading cat…
+                  </span>
+                ) : null}
+                {trimmedHistorySlug && historyRecord === null ? (
+                  <span className="text-[11px] text-red-300">
+                    No cat found for that slug
+                  </span>
+                ) : null}
+              </label>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                A clean random cat is summoned when the ritual begins.
+              </p>
+            )}
+          </fieldset>
+
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+              Coat
+            </legend>
+            <div className="grid grid-cols-2 gap-2">
+              {HAIR_SPRITES.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setHairSprite(option.id)}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                    hairSprite === option.id
+                      ? "border-amber-300/60 bg-amber-400/15 text-foreground"
+                      : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+        </section>
+
+        {/* The ritual */}
+        <section className="flex flex-col gap-5 rounded-3xl border border-border/40 bg-slate-950/70 p-5">
+          <span
+            className={cn(pixelFontClass, "text-[10px] text-violet-300/90")}
+          >
+            THE RITUAL
+          </span>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+                Evolution lines
+              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  aria-label="Fewer lines"
+                  onClick={() =>
+                    setControls((current) =>
+                      normalizeEvolutionControls({
+                        ...current,
+                        branchCount: current.branchCount - 1,
+                      }),
+                    )
+                  }
+                  className="flex size-9 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition hover:text-foreground"
+                >
+                  <Minus className="size-4" />
+                </button>
+                <span
+                  className={cn(
+                    pixelFontClass,
+                    "w-10 text-center text-lg text-foreground",
+                  )}
+                >
+                  {controls.branchCount}
+                </span>
+                <button
+                  type="button"
+                  aria-label="More lines"
+                  onClick={() =>
+                    setControls((current) =>
+                      normalizeEvolutionControls({
+                        ...current,
+                        branchCount: current.branchCount + 1,
+                      }),
+                    )
+                  }
+                  className="flex size-9 items-center justify-center rounded-lg border border-border/60 text-muted-foreground transition hover:text-foreground"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+                Final stage
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {TARGET_LEVELS.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() =>
+                      setControls((current) =>
+                        normalizeEvolutionControls({
+                          ...current,
+                          targetLevel: level,
+                        }),
+                      )
+                    }
+                    className={cn(
+                      pixelFontClass,
+                      "rounded-lg border px-3 py-2.5 text-xs transition",
+                      controls.targetLevel === level
+                        ? "border-violet-300/60 bg-violet-500/15 text-foreground"
+                        : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {stageNumeral(level)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <RangeControl
+              label="Torties / stage"
+              range={controls.torties}
+              onChange={(range) =>
+                setControls((current) =>
+                  normalizeEvolutionControls({ ...current, torties: range }),
+                )
+              }
+            />
+            <RangeControl
+              label="Accessories / stage"
+              range={controls.accessories}
+              onChange={(range) =>
+                setControls((current) =>
+                  normalizeEvolutionControls({
+                    ...current,
+                    accessories: range,
+                  }),
+                )
+              }
+            />
+            <RangeControl
+              label="Scars / stage"
+              range={controls.scars}
+              onChange={(range) =>
+                setControls((current) =>
+                  normalizeEvolutionControls({ ...current, scars: range }),
+                )
+              }
+              disabled={!controls.scarsEnabled}
+              trailing={
+                <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={controls.scarsEnabled}
+                    onChange={(event) =>
+                      setControls((current) => ({
+                        ...current,
+                        scarsEnabled: event.target.checked,
+                      }))
+                    }
+                    className="size-3.5 accent-primary"
+                  />
+                  enabled
+                </label>
+              }
+            />
+          </div>
+
+          <div className="mt-auto flex flex-col gap-3 border-t border-border/30 pt-4">
+            <p className="text-xs text-muted-foreground">
+              {controls.branchCount}{" "}
+              {controls.branchCount === 1 ? "line" : "lines"} ·{" "}
+              {controls.branchCount * controls.targetLevel + 1} forms · stages
+              up to {stageNumeral(controls.targetLevel)}
+            </p>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={!canGenerate}
+              className={cn(
+                pixelFontClass,
+                "group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl border border-amber-300/50 bg-gradient-to-r from-amber-500/25 via-orange-500/25 to-rose-500/25 px-6 py-4 text-xs text-amber-100 transition hover:border-amber-200 hover:from-amber-500/40 hover:via-orange-500/40 hover:to-rose-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm",
+              )}
+            >
+              {isGenerating ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <span aria-hidden>⚡</span>
+              )}
+              BEGIN EVOLUTION
+            </button>
+            {!modulesReady && !error ? (
+              <span className="text-center text-[11px] text-muted-foreground">
+                Warming up the chamber…
+              </span>
+            ) : null}
+            {error ? (
+              <span className="inline-flex items-center justify-center gap-2 text-sm text-red-200">
+                <TriangleAlertIcon size={16} /> {error}
+              </span>
+            ) : null}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
 
-function EvolutionCatCard({
-  record,
-  prominent = false,
-}: {
-  record: UiEvolutionCat;
-  prominent?: boolean;
-}) {
-  const name = record.catName?.trim() || record.label;
-  const href = record.shareToken ? `/view/${record.shareToken}` : null;
-  const additionRows = buildRollDisplayRows(
-    record.rolls,
-    record.additions,
-    `${record.key}-summary`,
-  );
-
+function ChamberHero() {
   return (
-    <article
-      className={cn(
-        "flex flex-col gap-3 rounded-xl border border-border/40 bg-background p-3",
-        prominent && "sm:grid sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center",
-      )}
-    >
-      <div className="relative aspect-square overflow-hidden rounded-lg border border-border/30 bg-slate-950/40">
-        {record.previewUrl ? (
-          <Image
-            src={record.previewUrl}
-            alt={name}
-            width={420}
-            height={420}
-            unoptimized
-            className="h-full w-full object-contain image-render-pixel"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-            Rendering
-          </div>
-        )}
-        <span className="absolute left-2 top-2 rounded-md bg-black/65 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-          {record.level === 0 ? "Starter" : `E${record.level}`}
-        </span>
+    <header className="relative overflow-hidden rounded-3xl border border-violet-500/25 bg-slate-950 p-8 sm:p-10">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 70% at 15% 0%, rgba(168, 85, 247, 0.18), transparent 60%), radial-gradient(ellipse 55% 65% at 85% 10%, rgba(251, 146, 60, 0.15), transparent 60%), radial-gradient(ellipse 70% 60% at 50% 110%, rgba(34, 211, 238, 0.12), transparent 65%)",
+        }}
+        aria-hidden
+      />
+      <div className="relative flex flex-col gap-4">
+        <p className={cn(pixelFontClass, "text-[10px] text-violet-300")}>
+          CAT GACHA · EVOLUTION
+        </p>
+        <h1
+          className={cn(
+            pixelFontClass,
+            "text-xl leading-relaxed text-white sm:text-3xl",
+          )}
+        >
+          THE EVOLUTION{" "}
+          <span className="bg-gradient-to-r from-amber-300 via-rose-300 to-violet-300 bg-clip-text text-transparent">
+            CHAMBER
+          </span>
+        </h1>
+        <p className="max-w-2xl text-sm text-neutral-200/85">
+          Place one starter on the altar and watch its descendants branch into
+          elemental lines — every stage rolled live with new coats, accessories,
+          and battle scars.
+        </p>
+        <div className="flex flex-wrap gap-2" aria-hidden>
+          {Object.values(ARCHETYPE_THEMES).map((theme) => (
+            <span
+              key={theme.label}
+              className="flex size-8 items-center justify-center rounded-lg border text-sm"
+              style={{
+                borderColor: withAlpha(theme.from, 0.3),
+                background: withAlpha(theme.to, 0.15),
+              }}
+              title={`${theme.label} — ${theme.blurb}`}
+            >
+              {theme.glyph}
+            </span>
+          ))}
+        </div>
       </div>
-      <div className="flex min-w-0 flex-col gap-2">
-        <h3 className="truncate text-sm font-semibold text-foreground">{name}</h3>
-        {record.archetype ? (
-          <p className="text-xs text-muted-foreground">
-            {formatValue(record.archetype)}
-          </p>
-        ) : null}
-        {additionRows.length > 0 ? (
-          <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-            {additionRows.slice(0, 6).map((row) => (
-              <span
-                key={row.id}
-                className="truncate"
+    </header>
+  );
+}
+
+function RangeControl({
+  label,
+  range,
+  onChange,
+  disabled = false,
+  trailing,
+}: {
+  label: string;
+  range: EvolutionRange;
+  onChange: (range: EvolutionRange) => void;
+  disabled?: boolean;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <fieldset
+      className={cn("flex flex-col gap-2 transition", disabled && "opacity-50")}
+    >
+      <legend className="flex w-full items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+        {label}
+        {trailing}
+      </legend>
+      {(["min", "max"] as const).map((field) => (
+        <div key={field} className="flex items-center gap-2">
+          <span className="w-7 text-[10px] uppercase text-muted-foreground">
+            {field}
+          </span>
+          <div className="grid flex-1 grid-cols-3 gap-1">
+            {RANGE_STEPS.map((step) => (
+              <button
+                key={step}
+                type="button"
+                disabled={disabled}
+                onClick={() => onChange({ ...range, [field]: step })}
+                className={cn(
+                  "rounded-md border px-2 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed",
+                  range[field] === step
+                    ? "border-violet-300/60 bg-violet-500/15 text-foreground"
+                    : "border-border/50 bg-background text-muted-foreground hover:text-foreground",
+                )}
               >
-                {row.label}: {row.value}
-              </span>
+                {step}
+              </button>
             ))}
           </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">Base form</p>
-        )}
-        {href ? (
-          <Link
-            href={href}
-            className="mt-auto inline-flex items-center gap-2 text-xs font-semibold text-primary"
-          >
-            View cat <ArrowUpRight className="size-3" />
-          </Link>
-        ) : null}
-      </div>
-    </article>
+        </div>
+      ))}
+    </fieldset>
   );
 }
 
@@ -1054,8 +1043,8 @@ function CatNameEditor({
 
   return (
     <section className="rounded-2xl border border-border/40 bg-background/70 p-4">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-        <Save className="size-4 text-primary" /> Cat names
+      <div className="mb-3 text-sm font-semibold text-foreground">
+        Name the lineage
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {editable.map((record) => (
