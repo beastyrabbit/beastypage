@@ -223,9 +223,7 @@ export const searchByUsername = query({
       .collect();
 
     return candidates
-      .filter(
-        (u) => u.username && u.username.toLowerCase().startsWith(trimmed),
-      )
+      .filter((u) => u.username && u.username.toLowerCase().startsWith(trimmed))
       .slice(0, 10)
       .map((u) => ({
         userId: clerkUserId(u.tokenIdentifier),

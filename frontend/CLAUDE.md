@@ -64,6 +64,7 @@ pnpm exec convex deploy  # Deploy to production
 - Use `pnpm install` for dependency management
 - Use `pnpm exec tsx <file>` to run TypeScript scripts
 - Use `pnpm run test` (vitest) for testing
+- If `pnpm add` fails with "Unexpected store location" (store v10 vs v11 mismatch), use `pnpm dlx pnpm@10 add <pkg>`
 
 ### Component Patterns
 
@@ -79,6 +80,15 @@ pnpm exec convex deploy  # Deploy to production
 - Mutations modify data, use `mutation()`
 - Actions for external API calls, use `action()`
 - Use `useQuery()` and `useMutation()` hooks in components
+- Relative imports inside `convex/` need explicit `.js` extensions (node16 module resolution)
+- Temporary `convex/*.ts` test helpers leak into `convex/_generated/api.d.ts` — delete the file and run `pnpm exec convex dev --once` before committing generated files
+- Inspect dev data from the CLI: `pnpm exec convex data <table>`; run internal mutations: `pnpm exec convex run file:fn '{...json args}'`
+
+### Stream Overlay (single-cat-stream)
+
+- `cat_stream_sessions.currentCommand` payloads must be params-only (slug + cat params, never rendered images) — the session document is capped at Convex's 1 MiB limit; the overlay re-renders sprites locally
+- Generation + persistence happen on the control page (authed); the overlay (`?key=<apiKey>`) only renders
+- `attachViewSlug`-style patches that don't bump `seq` are ignored by the overlay's dispatch guard (`components/stream-control/obs/commandPolicy.ts`)
 
 ### Sprite Assets
 

@@ -1,40 +1,34 @@
 "use client";
 
 /**
- * OBSSpinClient — forked from SingleCatPlusClient.tsx
+ * ObsOverlayClient — the OBS browser-source overlay (formerly OBSSpinClient,
+ * forked from SingleCatPlusClient.tsx).
  *
- * Core spin logic (generateCatPlus, flip sequences, timing) originated from
- * that component but has diverged. Key differences:
- * - Props: accepts apiKey, reads settings from Convex session
- * - JSX: OBS overlay layout instead of full page UI
- * - Trigger: Convex subscription instead of button click
- * - Adds wheel reward overlay system (spin/settle/banner)
- * - Auto-clear timer moved to shared scheduleAutoClear helper
+ * Subscribes to the stream session by API key and dispatches
+ * `currentCommand` updates (spin, wheel, countdown, clear, lobby, brb, test)
+ * onto the scene components in ./scenes. The spin engine (generateCatPlus,
+ * flip sequences, timing) lives here because it runs across scene changes;
+ * pure helpers live in ./spinSupport, dispatch decisions in ./commandPolicy.
  */
 
-import { useQuery } from "convex/react";
-import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlapDisplay, Presets } from "react-split-flap-effect";
-import { cn } from "@/lib/utils";
+import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import {
-  CLASSIC_WHEEL_PRIZES,
-  type ClassicWheelSelection,
+  type BatchStreamCommand,
+  parseBatchStreamCommand,
+} from "@/lib/adoption/streamBatch";
+import { DEFAULT_POSE_NAME, formatPoseName } from "@/lib/cat-v3/poseOptions";
+import type { CatParams } from "@/lib/cat-v3/types";
+import {
+  type EvolutionStreamCommand,
+  estimateEvolutionCommandMs,
+  parseEvolutionStreamCommand,
+} from "@/lib/evolution/streamEvolution";
+import { decodePortableSettings } from "@/lib/portable-settings";
+import {
   type StreamWheelSpin,
   WHEEL_SPIN_DURATION_MS,
 } from "@/lib/wheel/classicWheel";
-import "react-split-flap-effect/extras/themes.css";
-import type { CatGeneratorApi } from "@/components/cat-builder/types";
-import { api } from "@/convex/_generated/api";
-import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
-import {
-  DEFAULT_POSE_NAME,
-  formatPoseName,
-  getRandomSelectablePoseNames,
-} from "@/lib/cat-v3/poseOptions";
-import { getRandomAccessoryPool } from "@/lib/cat-v3/randomAccessories";
-import type { CatParams } from "@/lib/cat-v3/types";
-import { decodePortableSettings } from "@/lib/portable-settings";
 import {
   computeLayerCount,
   resolveAfterlife,
@@ -46,9 +40,8 @@ import {
   type LayerRange,
   type SingleCatSettings,
   singleCatSettingsEqual,
-} from "../../utils/singleCatVariants";
+} from "@/utils/singleCatVariants";
 import {
-  ABSOLUTE_MIN_STEP_MS,
   clampDelay,
   computeDefaultTotal,
   computeTimingTotals,
@@ -58,1453 +51,94 @@ import {
   isParamTimingKey,
   MIN_SAFE_STEP_MS,
   PARAM_DEFAULT_STEP_COUNTS,
-  PARAM_TIMING_LABELS,
   PARAM_TIMING_ORDER,
   PARAM_TIMING_PRESETS,
   type ParamTimingKey,
   type SpinTimingConfig,
   stepCountsToMetrics,
   type TimingPresetSet,
-} from "../../utils/spinTiming";
-import { OBSClassicWheel, type OBSClassicWheelHandle } from "./OBSClassicWheel";
-import { type LobbySettings, OBSLobby } from "./OBSLobby";
-
-// OBS stubs — functions referenced by the spin logic but not needed for overlay
-const track = (..._args: unknown[]) => {};
-const encodeCatShare = (..._args: unknown[]) => "";
-const createCatShare = async (
-  ..._args: unknown[]
-): Promise<{ slug: string; id: string; shareToken?: string }> => ({
-  slug: "",
-  id: "",
-});
-type SingleCatPortableSettings = SingleCatSettings;
-type Id<T extends string> = string & { __tableName: T };
-
-interface TortieSlot {
-  mask: string;
-  pattern: string;
-  colour: string;
-}
-
-interface GenerationCounts {
-  accessories: number;
-  scars: number;
-  tortie: number;
-}
-
-interface ParamRow {
-  id: ParamId;
-  label: string;
-  value: string;
-  status: "pending" | "active" | "revealed";
-}
-
-/** Param IDs that map to layer-panel rows rather than the main param board. */
-const LAYER_PARAM_IDS = new Set([
-  "accessory",
-  "scar",
-  "tortie",
-  "tortieMask",
-  "tortiePattern",
-  "tortieColour",
-]);
-
-interface VariationOption {
-  raw: unknown;
-  display: string;
-}
-
-interface VariationFrame {
-  option: VariationOption;
-  canvas: HTMLCanvasElement;
-}
-
-interface VariantSheetRequest {
-  id: string;
-  params: Partial<CatParams>;
-  label?: string;
-  group?: string;
-}
-
-interface VariantDescriptor extends VariantSheetRequest {
-  option: VariationOption;
-}
-
-interface TimingSnapshot {
-  counts: Record<ParamTimingKey, number>;
-  estimated: Partial<Record<ParamTimingKey, number>>;
-  estimatedTotal: number;
-  actual: Partial<Record<ParamTimingKey, number>>;
-  actualTotal: number;
-  timestamp: number;
-}
-
-type FetchPriority = "high" | "low" | "auto";
-
-const MAX_LAYER_VARIATIONS = 12;
-const MAX_SPINNY_VARIATIONS = Number.MAX_SAFE_INTEGER;
-const MAX_SPINNY_LAYER_VARIATIONS = Number.MAX_SAFE_INTEGER;
-const DEFAULT_SPRITE_NUMBER = 8;
-const PLACEHOLDER_COLOUR = "GINGER";
-const GLOBAL_PRESETS: Array<keyof TimingPresetSet> = ["slow", "normal", "fast"];
-const SUBSET_LIMIT = 20;
-
-type LayerGroup = "accessories" | "scars" | "torties";
-
-interface LayerRowState {
-  label: string;
-  value: string;
-  status: "idle" | "active" | "revealed";
-}
-
-interface CatState {
-  params: Partial<CatParams>;
-  accessorySlots: string[];
-  scarSlots: string[];
-  tortieSlots: (TortieSlot | null)[];
-  counts: GenerationCounts;
-  shareUrl?: string | null;
-  catUrl?: string | null;
-  builderParams?: Partial<CatParams>;
-  profileId?: string | null;
-  mapperSlug?: string | null;
-  legacyEncoded?: string | null;
-  catName?: string | null;
-  creatorName?: string | null;
-  catShareSlug?: string | null;
-}
-
-interface WheelRewardState {
-  status: "hidden" | "spinning" | "settled";
-  prize: StreamWheelSpin | null;
-}
-
-interface ParameterOptions {
-  sprite: (number | string)[];
-  pelt: string[];
-  colour: string[];
-  tortie: boolean[];
-  tortieMask: string[];
-  tortiePattern: string[];
-  tortieColour: string[];
-  tint: string[];
-  eyeColour: string[];
-  eyeColour2: (string | "none")[];
-  skinColour: string[];
-  whitePatches: (string | "none")[];
-  points: (string | "none")[];
-  whitePatchesTint: (string | "none")[];
-  vitiligo: (string | "none")[];
-  accessory: (string | "none")[];
-  scar: (string | "none")[];
-  shading: boolean[];
-  reverse: boolean[];
-}
-
-function countOptions(
-  list: unknown[] | undefined,
-  { includeNone = false }: { includeNone?: boolean } = {},
-) {
-  if (!Array.isArray(list)) return 0;
-  const normalized = list
-    .filter(
-      (value) =>
-        value !== undefined &&
-        value !== null &&
-        (includeNone || value !== "none"),
-    )
-    .map((value) =>
-      typeof value === "string" || typeof value === "number"
-        ? String(value)
-        : JSON.stringify(value),
-    );
-  return new Set(normalized).size;
-}
-
-function deriveOptionCounts(
-  options: ParameterOptions | null,
-): Record<ParamTimingKey, number> {
-  const counts: Record<ParamTimingKey, number> = Object.fromEntries(
-    PARAM_TIMING_ORDER.map((key) => [key, PARAM_DEFAULT_STEP_COUNTS[key] ?? 0]),
-  ) as Record<ParamTimingKey, number>;
-  if (!options) return counts;
-
-  const assign = (
-    key: ParamTimingKey,
-    list: unknown[] | undefined,
-    opts?: { includeNone?: boolean },
-  ) => {
-    const total = countOptions(list, opts ?? {});
-    if (total > 0) counts[key] = total;
-  };
-
-  assign("sprite", options.sprite as unknown[]);
-  assign("pelt", options.pelt);
-  assign("colour", options.colour);
-  assign("eyeColour", options.eyeColour);
-  assign("eyeColour2", options.eyeColour2, { includeNone: false });
-  assign("tint", options.tint, { includeNone: false });
-  assign("skinColour", options.skinColour);
-  assign("whitePatches", options.whitePatches, { includeNone: false });
-  assign("points", options.points, { includeNone: false });
-  assign("whitePatchesTint", options.whitePatchesTint, { includeNone: false });
-  assign("vitiligo", options.vitiligo, { includeNone: false });
-  assign("accessory", options.accessory);
-  assign("scar", options.scar);
-  assign("tortie", options.tortie as unknown[]);
-  assign("tortieMask", options.tortieMask);
-  assign("tortiePattern", options.tortiePattern);
-  assign("tortieColour", options.tortieColour);
-  assign("shading", options.shading as unknown[], { includeNone: true });
-  assign("reverse", options.reverse as unknown[], { includeNone: true });
-
-  return counts;
-}
-
-function logTimingReport(
-  context: string,
-  profile: SpinTimingConfig,
-  optionCounts: Record<ParamTimingKey, number>,
-  estimatedTotals: {
-    perKey: Partial<Record<ParamTimingKey, number>>;
-    total: number;
-  },
-  actualDurations: Partial<Record<ParamTimingKey, number>>,
-  actualTotalMs: number,
-) {
-  const estimatedSeconds = (estimatedTotals.total / 1000).toFixed(2);
-  const actualSeconds = (actualTotalMs / 1000).toFixed(2);
-  const groupLabel = `[timing] ${context} → est ${estimatedSeconds}s vs actual ${actualSeconds}s`;
-  const openedGroup = typeof console.group === "function";
-  if (openedGroup) {
-    console.group(groupLabel);
-  } else if (typeof console.groupCollapsed === "function") {
-    console.groupCollapsed(groupLabel);
-  } else {
-    console.log(groupLabel);
-  }
-  try {
-    PARAM_TIMING_ORDER.forEach((key) => {
-      const delay = getDelayForKey(profile, key);
-      const options = optionCounts[key] ?? 0;
-      const estimated = estimatedTotals.perKey[key] ?? delay * options;
-      const actual = actualDurations[key] ?? 0;
-      const label = PARAM_TIMING_LABELS[key] ?? key;
-      console.log(
-        `${label}: options=${options}, delay=${delay}ms, est=${(estimated / 1000).toFixed(2)}s, actual=${(actual / 1000).toFixed(2)}s`,
-      );
-    });
-  } finally {
-    if (
-      (openedGroup || typeof console.groupCollapsed === "function") &&
-      typeof console.groupEnd === "function"
-    ) {
-      console.groupEnd();
-    }
-  }
-}
-
-function _formatMs(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return "0.00 s";
-  if (ms >= 1000) return `${(ms / 1000).toFixed(2)} s`;
-  return `${ms.toFixed(0)} ms`;
-}
-
-interface SpriteMapperApi {
-  loaded: boolean;
-  init: () => Promise<boolean>;
-  getColours?: () => string[];
-  getExperimentalColoursByMode?: (...args: unknown[]) => string[];
-  getWhitePatchColourOptions?: (...args: unknown[]) => string[];
-  getPeltNames?: () => string[];
-  getTortieMasks?: () => string[];
-  getTints?: () => string[];
-  getEyeColours?: () => string[];
-  getSkinColours?: () => string[];
-  getWhitePatches?: () => string[];
-  getPoints?: () => string[];
-  getVitiligo?: () => string[];
-  getAccessories?: () => string[];
-  getExtraAccessories?: () => string[];
-  getScars?: () => string[];
-  getPoseNames?: () => string[];
-  getRenderablePoseNames?: () => string[];
-}
-
-type ParamId =
-  | "colour"
-  | "pelt"
-  | "eyeColour"
-  | "eyeColour2"
-  | "tortie"
-  | "tortieMask"
-  | "tortiePattern"
-  | "tortieColour"
-  | "tint"
-  | "skinColour"
-  | "whitePatches"
-  | "points"
-  | "whitePatchesTint"
-  | "vitiligo"
-  | "shading"
-  | "reverse"
-  | "accessory"
-  | "scar"
-  | "sprite";
-
-interface ParamDefinition {
-  id: ParamId;
-  label: string;
-  optional?: boolean;
-  requiresTortie?: boolean;
-}
-
-const DISPLAY_SIZE = 720;
-const FULL_EXPORT_SIZE = 700;
-const INSTANT_PARAMS: ParamId[] = ["whitePatchesTint"];
-const MIN_FRAME_DURATION = 45;
-
-function computeStepDurations(
-  sequence: { delay: number }[],
-  baseDelay: number,
-  allowFast: boolean,
-  minimum: number = MIN_FRAME_DURATION,
-): number[] {
-  if (sequence.length === 0) {
-    return [];
-  }
-  const safeBase = clampDelay(baseDelay, allowFast);
-  return sequence.map((step) => {
-    const scaled = safeBase * Math.max(step.delay, 1);
-    return Math.max(
-      scaled,
-      allowFast ? ABSOLUTE_MIN_STEP_MS : Math.max(MIN_SAFE_STEP_MS, minimum),
-    );
-  });
-}
-
-function getBaseFrameDuration(speed: { baseFrameDuration: number }): number {
-  return Math.max(speed.baseFrameDuration, MIN_FRAME_DURATION);
-}
-
-function invokeMapper<T>(
-  mapper: SpriteMapperApi,
-  fn: ((...args: unknown[]) => T) | undefined,
-  fallback: T,
-  ...args: unknown[]
-): T {
-  if (typeof fn === "function") {
-    try {
-      return fn.apply(mapper, args as never[]);
-    } catch (error) {
-      console.warn("SpriteMapper method failed", error);
-    }
-  }
-  return fallback;
-}
-
-function invokeMapperArray(
-  mapper: SpriteMapperApi,
-  fn: ((...args: unknown[]) => unknown) | undefined,
-  ...args: unknown[]
-): string[] {
-  const result = invokeMapper(
-    mapper,
-    fn as (...args: unknown[]) => unknown,
-    [],
-    ...args,
-  );
-  return Array.isArray(result) ? [...result] : [];
-}
-
-const SPEED_PRESETS = {
-  slow: {
-    paramPause: 1040,
-    calmParamPause: 820,
-    targetSpinDuration: 20000,
-    baseFrameDuration: 775,
-  },
-  normal: {
-    paramPause: 520,
-    calmParamPause: 420,
-    targetSpinDuration: 10000,
-    baseFrameDuration: 385,
-  },
-  fast: {
-    paramPause: 260,
-    calmParamPause: 220,
-    targetSpinDuration: 5000,
-    baseFrameDuration: 190,
-  },
-} as const;
-
-function interpolate(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
-
-const ROLLER_REVEAL_HOLD = 500;
-const PRE_SPIN_DELAY = 120;
-const PARAM_REVEAL_PAUSE = 500;
-
-function mixProfiles(
-  a: (typeof SPEED_PRESETS)[keyof typeof SPEED_PRESETS],
-  b: (typeof SPEED_PRESETS)[keyof typeof SPEED_PRESETS],
-  t: number,
-  targetDuration: number,
-) {
-  const paramPause = interpolate(a.paramPause, b.paramPause, t);
-  const calmParamPause = interpolate(a.calmParamPause, b.calmParamPause, t);
-  const baseFrameDuration = Math.max(
-    interpolate(a.baseFrameDuration, b.baseFrameDuration, t),
-    MIN_FRAME_DURATION,
-  );
-  return {
-    paramPause,
-    calmParamPause,
-    baseFrameDuration,
-    targetSpinDuration: targetDuration,
-    flipSpeed: baseFrameDuration,
-  };
-}
-
-function scaleProfile(
-  preset: (typeof SPEED_PRESETS)[keyof typeof SPEED_PRESETS],
-  ratio: number,
-  targetDuration: number,
-) {
-  const scale = Math.max(ratio, 0.05);
-  return {
-    paramPause: Math.max(preset.paramPause * scale, 60),
-    calmParamPause: Math.max(preset.calmParamPause * scale, 60),
-    baseFrameDuration: Math.max(
-      preset.baseFrameDuration * scale,
-      MIN_FRAME_DURATION,
-    ),
-    targetSpinDuration: targetDuration,
-    flipSpeed: Math.max(preset.baseFrameDuration * scale, MIN_FRAME_DURATION),
-  };
-}
-
-function getSpeedSettings(durationMs: number) {
-  const duration = Math.max(1000, durationMs);
-
-  if (duration <= SPEED_PRESETS.fast.targetSpinDuration) {
-    const ratio = duration / SPEED_PRESETS.fast.targetSpinDuration;
-    return scaleProfile(SPEED_PRESETS.fast, ratio, duration);
-  }
-
-  if (duration <= SPEED_PRESETS.normal.targetSpinDuration) {
-    const t =
-      (duration - SPEED_PRESETS.fast.targetSpinDuration) /
-      (SPEED_PRESETS.normal.targetSpinDuration -
-        SPEED_PRESETS.fast.targetSpinDuration);
-    return mixProfiles(SPEED_PRESETS.fast, SPEED_PRESETS.normal, t, duration);
-  }
-
-  if (duration <= SPEED_PRESETS.slow.targetSpinDuration) {
-    const t =
-      (duration - SPEED_PRESETS.normal.targetSpinDuration) /
-      (SPEED_PRESETS.slow.targetSpinDuration -
-        SPEED_PRESETS.normal.targetSpinDuration);
-    return mixProfiles(SPEED_PRESETS.normal, SPEED_PRESETS.slow, t, duration);
-  }
-
-  const ratio = duration / SPEED_PRESETS.slow.targetSpinDuration;
-  return scaleProfile(SPEED_PRESETS.slow, ratio, duration);
-}
-
-const _layerGroupLabels: Record<LayerGroup, string> = {
-  accessories: "Accessories",
-  scars: "Scars",
-  torties: "Tortie Layers",
-};
-
-const PARAM_SEQUENCE: ParamDefinition[] = [
-  { id: "colour", label: "Colour" },
-  { id: "pelt", label: "Pelt" },
-  { id: "eyeColour", label: "Eyes" },
-  { id: "eyeColour2", label: "Eye Colour 2", optional: true },
-  { id: "tortie", label: "Tortie", optional: true },
-  { id: "tortieMask", label: "Tortie Mask", requiresTortie: true },
-  { id: "tortiePattern", label: "Tortie Pelt", requiresTortie: true },
-  { id: "tortieColour", label: "Tortie Colour", requiresTortie: true },
-  { id: "tint", label: "Tint", optional: true },
-  { id: "skinColour", label: "Skin" },
-  { id: "whitePatches", label: "White Patches", optional: true },
-  { id: "points", label: "Points", optional: true },
-  { id: "whitePatchesTint", label: "White Patch Tint", optional: true },
-  { id: "vitiligo", label: "Vitiligo", optional: true },
-  { id: "accessory", label: "Accessory", optional: true },
-  { id: "scar", label: "Scar", optional: true },
-  { id: "sprite", label: "Sprite" },
-];
-
-// AFTERLIFE_OPTIONS imported from @/utils/catSettingsHelpers
-
-function wait(ms: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
-function formatValue(value: unknown): string {
-  if (
-    value === undefined ||
-    value === null ||
-    value === "" ||
-    value === "none"
-  ) {
-    return "None";
-  }
-  const str = String(value)
-    .replace(/_/g, " ")
-    .replace(/^[0-9]+\s*-\s*/, "")
-    .toLowerCase();
-  return str.replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function coerceSpriteNumber(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const match = value.match(/(-?\d+)/);
-    if (match) {
-      const parsed = Number.parseInt(match[1], 10);
-      if (Number.isFinite(parsed)) {
-        return parsed;
-      }
-    }
-  }
-  return undefined;
-}
-
-function cloneParams<T>(params: T): T {
-  if (typeof structuredClone === "function") {
-    try {
-      return structuredClone(params);
-    } catch (error) {
-      console.warn("structuredClone failed, falling back to JSON clone", error);
-    }
-  }
-  return JSON.parse(JSON.stringify(params));
-}
-
-function cloneSourceCanvas(
-  source: HTMLCanvasElement | OffscreenCanvas,
-  width = DISPLAY_SIZE,
-  height = DISPLAY_SIZE,
-): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) {
-    throw new Error("Unable to clone canvas – 2D context not available");
-  }
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(source as CanvasImageSource, 0, 0, width, height);
-  return canvas;
-}
-
-function waitForIdle(): Promise<void> {
-  if (typeof requestIdleCallback === "function") {
-    return new Promise((resolve) => {
-      requestIdleCallback(() => resolve());
-    });
-  }
-  return Promise.resolve();
-}
-
-async function preRenderVariationFrames(
-  generator: CatGeneratorApi,
-  baseParams: Partial<CatParams>,
-  paramId: ParamId,
-  variationOptions: VariationOption[],
-): Promise<VariationFrame[]> {
-  const descriptors: VariantDescriptor[] = variationOptions.map(
-    (option, index) => {
-      const previewParams = cloneParams(baseParams);
-      applyParamValue(previewParams, paramId, option.raw);
-      return {
-        id: `param-${paramId}-${index}`,
-        option,
-        params: previewParams,
-      };
-    },
-  );
-
-  return renderVariantFrames(generator, baseParams, descriptors, {
-    priority: "high",
-  });
-}
-
-async function renderVariantFrames(
-  generator: CatGeneratorApi,
-  baseParams: Partial<CatParams>,
-  descriptors: VariantDescriptor[],
-  options?: {
-    layerId?: string;
-    baseCanvas?: HTMLCanvasElement;
-    priority?: FetchPriority;
-  },
-): Promise<VariationFrame[]> {
-  if (descriptors.length === 0) {
-    return [];
-  }
-
-  if (generator.generateVariantSheet) {
-    try {
-      const sheet = await generator.generateVariantSheet(
-        baseParams,
-        descriptors.map(({ id, params, label, group }) => ({
-          id,
-          params,
-          label,
-          group,
-        })),
-        {
-          includeSources: false,
-          includeBase: false,
-        },
-      );
-      if (sheet.frames.length >= descriptors.length) {
-        const sheetCanvas = await decodeImageFromDataUrl(sheet.sheetDataUrl);
-        await waitForIdle();
-        const frameMap = new Map(
-          sheet.frames.map((frame) => [frame.id, frame]),
-        );
-
-        return descriptors.map((descriptor) => {
-          const meta = frameMap.get(descriptor.id);
-          if (!meta) {
-            throw new Error(
-              `Missing frame metadata for variant ${descriptor.id}`,
-            );
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = DISPLAY_SIZE;
-          canvas.height = DISPLAY_SIZE;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            throw new Error("Unable to acquire 2D context for variant frame");
-          }
-          ctx.imageSmoothingEnabled = false;
-          if (options?.baseCanvas) {
-            ctx.drawImage(options.baseCanvas, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
-          }
-          ctx.drawImage(
-            sheetCanvas,
-            meta.x,
-            meta.y,
-            meta.width,
-            meta.height,
-            0,
-            0,
-            DISPLAY_SIZE,
-            DISPLAY_SIZE,
-          );
-          return {
-            option: descriptor.option,
-            canvas,
-          };
-        });
-      }
-    } catch (error) {
-      console.warn(
-        "generateVariantSheet failed, falling back to sequential renders",
-        error,
-      );
-    }
-  }
-
-  const frames: VariationFrame[] = [];
-  for (const descriptor of descriptors) {
-    const result = await generator.generateCat(descriptor.params);
-    let canvas: HTMLCanvasElement;
-    if (options?.layerId && options.baseCanvas) {
-      canvas = cloneSourceCanvas(
-        options.baseCanvas,
-        DISPLAY_SIZE,
-        DISPLAY_SIZE,
-      );
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-          result.canvas as CanvasImageSource,
-          0,
-          0,
-          DISPLAY_SIZE,
-          DISPLAY_SIZE,
-        );
-      }
-    } else {
-      canvas = cloneSourceCanvas(
-        result.canvas as HTMLCanvasElement | OffscreenCanvas,
-      );
-    }
-    frames.push({
-      option: descriptor.option,
-      canvas,
-    });
-  }
-  return frames;
-}
-
-function buildFlipSequence(
-  frames: VariationFrame[],
-): { frame: VariationFrame; delay: number; isFinal: boolean }[] {
-  if (frames.length === 0) {
-    return [];
-  }
-
-  const targetFrame = frames[frames.length - 1];
-  const cycleFrames = frames.slice();
-  const sequence: { frame: VariationFrame; delay: number; isFinal: boolean }[] =
-    [];
-
-  // Two fast cycles preserving sampled order (legacy behaviour).
-  for (let cycle = 0; cycle < 2; cycle += 1) {
-    for (const frame of cycleFrames) {
-      sequence.push({ frame, delay: 1, isFinal: false });
-    }
-  }
-
-  const randomPool = cycleFrames.length > 0 ? cycleFrames : [targetFrame];
-  for (let i = 0; i < 5; i += 1) {
-    const frame = randomPool[Math.floor(Math.random() * randomPool.length)];
-    sequence.push({ frame, delay: 1 + i * 0.3, isFinal: false });
-  }
-
-  sequence.push({ frame: targetFrame, delay: 2, isFinal: true });
-
-  return sequence;
-}
-
-/**
- * Composite a layer count frame: large number in the cat's dominant colour
- * behind a semi-transparent cat sprite.
- */
-function compositeCountFrame(
-  catCanvas: HTMLCanvasElement,
-  count: number,
-): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  canvas.width = DISPLAY_SIZE;
-  canvas.height = DISPLAY_SIZE;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return catCanvas;
-  ctx.imageSmoothingEnabled = false;
-
-  // Sample the centre pixel of the cat to get a representative colour
-  const srcCtx = catCanvas.getContext("2d");
-  let numberColour = "rgba(200, 160, 80, 0.6)";
-  if (srcCtx) {
-    const px = srcCtx.getImageData(
-      Math.floor(DISPLAY_SIZE / 2),
-      Math.floor(DISPLAY_SIZE / 2),
-      1,
-      1,
-    ).data;
-    if (px[3] > 20) {
-      numberColour = `rgba(${px[0]}, ${px[1]}, ${px[2]}, 0.5)`;
-    }
-  }
-
-  // Draw large number
-  ctx.fillStyle = numberColour;
-  ctx.font = `bold ${Math.round(DISPLAY_SIZE * 0.7)}px sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(String(count), DISPLAY_SIZE / 2, DISPLAY_SIZE / 2);
-
-  // Draw cat on top, semi-transparent
-  ctx.globalAlpha = 0.6;
-  ctx.drawImage(catCanvas, 0, 0, DISPLAY_SIZE, DISPLAY_SIZE);
-  ctx.globalAlpha = 1.0;
-
-  return canvas;
-}
-
-function buildLayerOptionStrings(
-  allValuesInput: string[] | null | undefined,
-  target: string | null | undefined,
-  includeNone = true,
-  options?: { spinny?: boolean; limit?: number },
-): VariationOption[] {
-  const spinnyMode = options?.spinny ?? false;
-  const allValues = Array.isArray(allValuesInput) ? allValuesInput : [];
-  const normalizedTarget = target && target !== "" ? target : "none";
-  const baseLimit = spinnyMode
-    ? MAX_SPINNY_LAYER_VARIATIONS
-    : MAX_LAYER_VARIATIONS;
-  const variationLimit = Math.max(
-    1,
-    Math.min(baseLimit, options?.limit ?? baseLimit),
-  );
-  const results: string[] = [];
-
-  if (includeNone) {
-    results.push("none");
-  }
-
-  const dedup = new Set<string>();
-  for (const value of allValues) {
-    if (!value) continue;
-    if (!dedup.has(value)) {
-      dedup.add(value);
-    }
-  }
-
-  const nonTargetValues = Array.from(dedup).filter(
-    (value) => value !== normalizedTarget && value !== "none",
-  );
-  const remainingSlots = Math.max(0, variationLimit - results.length - 1);
-
-  if (remainingSlots > 0) {
-    const step = Math.max(
-      1,
-      Math.floor(nonTargetValues.length / remainingSlots),
-    );
-    for (
-      let index = 0;
-      index < nonTargetValues.length && results.length < variationLimit - 1;
-      index += step
-    ) {
-      results.push(nonTargetValues[index]);
-    }
-
-    let fallbackIndex = 0;
-    while (
-      results.length < variationLimit - 1 &&
-      fallbackIndex < nonTargetValues.length
-    ) {
-      const candidate = nonTargetValues[fallbackIndex++];
-      if (!results.includes(candidate)) {
-        results.push(candidate);
-      }
-    }
-  }
-
-  const hasTarget =
-    results.includes(normalizedTarget) ||
-    (!includeNone && normalizedTarget === "none");
-  if (!hasTarget) {
-    results.push(normalizedTarget);
-  } else {
-    // ensure target is final entry to align with downstream assumptions
-    const targetIndex = results.indexOf(normalizedTarget);
-    if (targetIndex !== -1 && targetIndex !== results.length - 1) {
-      results.splice(targetIndex, 1);
-      results.push(normalizedTarget);
-    }
-  }
-
-  if (!results.length) {
-    results.push(normalizedTarget);
-  }
-
-  return results.map((value) => ({
-    raw: value,
-    display: formatValue(value),
-  }));
-}
-
-function formatTortieLayer(layer: TortieSlot | null): string {
-  if (!layer) return "None";
-  return [layer.mask, layer.pattern, layer.colour]
-    .map((part) => formatValue(part ?? "none"))
-    .join(" • ");
-}
-
-function getParameterRawValue(
-  paramId: ParamId,
-  params: Partial<CatParams>,
-): unknown {
-  switch (paramId) {
-    case "sprite":
-      return params.poseName ?? params.spriteNumber;
-    case "pelt":
-      return params.peltName;
-    case "colour":
-      return params.colour;
-    case "eyeColour":
-      return params.eyeColour;
-    case "eyeColour2":
-      return params.eyeColour2 ?? "none";
-    case "tortie":
-      return params.isTortie ?? false;
-    case "tortieMask":
-      return params.tortieMask ?? "none";
-    case "tortiePattern":
-      return params.tortiePattern ?? "none";
-    case "tortieColour":
-      return params.tortieColour ?? "none";
-    case "tint":
-      return params.tint ?? "none";
-    case "skinColour":
-      return params.skinColour;
-    case "whitePatches":
-      return params.whitePatches ?? "none";
-    case "points":
-      return params.points ?? "none";
-    case "whitePatchesTint":
-      return params.whitePatchesTint ?? "none";
-    case "vitiligo":
-      return params.vitiligo ?? "none";
-    case "shading":
-      return params.shading ?? false;
-    case "reverse":
-      return params.reverse ?? false;
-    default:
-      return undefined;
-  }
-}
-
-function formatOptionDisplay(paramId: ParamId, raw: unknown): string {
-  if (paramId === "sprite") {
-    if (typeof raw === "string" && !/^-?\d+$/.test(raw.trim())) {
-      return formatPoseName(raw);
-    }
-    const spriteNumber = coerceSpriteNumber(raw);
-    if (spriteNumber !== undefined) {
-      return `Sprite ${spriteNumber}`;
-    }
-  }
-
-  if (typeof raw === "boolean") {
-    return raw ? "Yes" : "No";
-  }
-
-  if (raw === undefined || raw === null || raw === "") {
-    return "None";
-  }
-
-  if (typeof raw === "string" && raw.toLowerCase() === "none") {
-    return "None";
-  }
-
-  return formatValue(raw);
-}
-
-function applyParamValue(
-  params: Partial<CatParams>,
-  paramId: ParamId,
-  value: unknown,
-) {
-  switch (paramId) {
-    case "colour":
-      params.colour = value as string;
-      break;
-    case "pelt":
-      params.peltName = value as string;
-      break;
-    case "eyeColour":
-      params.eyeColour = value as string;
-      break;
-    case "eyeColour2":
-      params.eyeColour2 = value === "None" ? undefined : (value as string);
-      break;
-    case "tortie":
-      params.isTortie = Boolean(value);
-      if (!value) {
-        params.tortie = [];
-        params.tortieMask = undefined;
-        params.tortieColour = undefined;
-        params.tortiePattern = undefined;
-      }
-      break;
-    case "tortieMask":
-      params.tortieMask = value as string;
-      break;
-    case "tortiePattern":
-      params.tortiePattern = value as string;
-      break;
-    case "tortieColour":
-      params.tortieColour = value as string;
-      break;
-    case "tint":
-      params.tint = value as string;
-      break;
-    case "skinColour":
-      params.skinColour = value as string;
-      break;
-    case "whitePatches":
-      params.whitePatches = value === "None" ? undefined : (value as string);
-      break;
-    case "points":
-      params.points = value === "None" ? undefined : (value as string);
-      break;
-    case "whitePatchesTint":
-      params.whitePatchesTint =
-        value === "None" ? undefined : (value as string);
-      break;
-    case "vitiligo":
-      params.vitiligo = value === "None" ? undefined : (value as string);
-      break;
-    case "accessory": {
-      const accessoryValue =
-        typeof value === "string" && value !== "none" ? value : undefined;
-      params.accessory = accessoryValue;
-      if (accessoryValue) {
-        params.accessories = [accessoryValue];
-      } else {
-        params.accessories = [];
-      }
-      break;
-    }
-    case "scar": {
-      const scarValue =
-        typeof value === "string" && value !== "none" ? value : undefined;
-      params.scar = scarValue;
-      if (scarValue) {
-        params.scars = [scarValue];
-      } else {
-        params.scars = [];
-      }
-      break;
-    }
-    case "shading":
-      params.shading = value as boolean;
-      break;
-    case "reverse":
-      params.reverse = value as boolean;
-      break;
-    case "sprite": {
-      if (typeof value === "string" && !/^-?\d+$/.test(value.trim())) {
-        params.poseName = value;
-      } else {
-        const parsed = coerceSpriteNumber(value);
-        if (parsed !== undefined) {
-          params.spriteNumber = parsed;
-          params.poseName = undefined;
-        }
-      }
-      break;
-    }
-  }
-}
-
-function getParameterValueForDisplay(
-  paramId: ParamId,
-  params: Partial<CatParams>,
-): string {
-  switch (paramId) {
-    case "colour":
-      return formatValue(params.colour);
-    case "pelt":
-      return formatValue(params.peltName);
-    case "eyeColour":
-      return formatValue(params.eyeColour);
-    case "eyeColour2":
-      if (!params.eyeColour2 || params.eyeColour2 === params.eyeColour) {
-        return "None";
-      }
-      return formatValue(params.eyeColour2);
-    case "tortie":
-      return params.isTortie ? "Yes" : "No";
-    case "tortieMask":
-      return formatValue(params.tortieMask);
-    case "tortiePattern":
-      return formatValue(params.tortiePattern);
-    case "tortieColour":
-      return formatValue(params.tortieColour);
-    case "tint":
-      return formatValue(params.tint ?? "None");
-    case "skinColour":
-      return formatValue(params.skinColour);
-    case "whitePatches":
-      return formatValue(params.whitePatches ?? "None");
-    case "points":
-      return formatValue(params.points ?? "None");
-    case "whitePatchesTint":
-      return formatValue(params.whitePatchesTint ?? "None");
-    case "vitiligo":
-      return formatValue(params.vitiligo ?? "None");
-    case "shading":
-      return params.shading ? "Yes" : "No";
-    case "reverse":
-      return params.reverse ? "Yes" : "No";
-    case "sprite":
-      return params.poseName
-        ? formatPoseName(params.poseName)
-        : `Sprite ${params.spriteNumber}`;
-    default:
-      return "";
-  }
-}
-
-function parseStreamWheelSpin(value: unknown): StreamWheelSpin | null {
-  if (!value || typeof value !== "object") {
-    console.error(
-      "[OBSSpinClient] Invalid wheelSpin data — not an object",
-      value,
-    );
-    return null;
-  }
-  const spin = value as Partial<StreamWheelSpin>;
-  if (
-    typeof spin.prizeIndex !== "number" ||
-    !Number.isInteger(spin.prizeIndex) ||
-    spin.prizeIndex < 0 ||
-    spin.prizeIndex >= CLASSIC_WHEEL_PRIZES.length ||
-    typeof spin.forced !== "boolean"
-  ) {
-    console.error(
-      "[OBSSpinClient] Invalid wheelSpin data — missing or wrong fields",
-      value,
-    );
-    return null;
-  }
-  const prize = CLASSIC_WHEEL_PRIZES[spin.prizeIndex];
-  if (
-    spin.prizeName !== prize.name ||
-    spin.color !== prize.color ||
-    spin.chance !== prize.chance
-  ) {
-    console.error(
-      "[OBSSpinClient] Invalid wheelSpin data - prize fields do not match index",
-      value,
-    );
-    return null;
-  }
-  const randomBucket =
-    typeof spin.randomBucket === "number" &&
-    Number.isFinite(spin.randomBucket) &&
-    Number.isInteger(spin.randomBucket) &&
-    spin.randomBucket >= 0 &&
-    spin.randomBucket < 100
-      ? spin.randomBucket
-      : undefined;
-  return {
-    prizeName: prize.name,
-    prizeIndex: spin.prizeIndex,
-    color: prize.color,
-    chance: prize.chance,
-    randomBucket,
-    forced: spin.forced,
-  };
-}
-
-function toClassicWheelSelection(
-  wheelSpin: StreamWheelSpin,
-): ClassicWheelSelection {
-  const index =
-    Number.isInteger(wheelSpin.prizeIndex) &&
-    wheelSpin.prizeIndex >= 0 &&
-    wheelSpin.prizeIndex < CLASSIC_WHEEL_PRIZES.length
-      ? wheelSpin.prizeIndex
-      : CLASSIC_WHEEL_PRIZES.length - 1;
-  const prize = CLASSIC_WHEEL_PRIZES[index];
-  return {
-    prize,
-    index,
-    random: wheelSpin.randomBucket,
-  };
-}
-
-function _randomFrom<T>(list: T[]): T {
-  return list[Math.floor(Math.random() * list.length)];
-}
-
-function buildSharePayload(state: CatState) {
-  return {
-    params: state.params,
-    accessorySlots: [...state.accessorySlots],
-    scarSlots: [...state.scarSlots],
-    tortieSlots: state.tortieSlots.map((slot) => (slot ? { ...slot } : null)),
-    counts: { ...state.counts },
-  };
-}
-
-function sanitizeForBuilder(
-  baseParams: Partial<CatParams>,
-  overrides?: {
-    accessory?: string | null;
-    scar?: string | null;
-    tortie?: TortieSlot | null;
-  },
-): Partial<CatParams> {
-  const next = cloneParams(baseParams ?? {});
-
-  const accessoryValue =
-    overrides?.accessory ??
-    (Array.isArray(next.accessories) && next.accessories.length > 0
-      ? (next.accessories[0] as string)
-      : typeof next.accessory === "string"
-        ? (next.accessory as string)
-        : null);
-
-  if (accessoryValue) {
-    next.accessory = accessoryValue;
-    next.accessories = [accessoryValue];
-  } else {
-    next.accessory = undefined;
-    next.accessories = [];
-  }
-
-  const scarValue =
-    overrides?.scar ??
-    (Array.isArray(next.scars) && next.scars.length > 0
-      ? (next.scars[0] as string)
-      : typeof next.scar === "string"
-        ? (next.scar as string)
-        : null);
-
-  if (scarValue) {
-    next.scar = scarValue;
-    next.scars = [scarValue];
-  } else {
-    next.scar = undefined;
-    next.scars = [];
-  }
-
-  const tortieValue =
-    overrides?.tortie ??
-    (Array.isArray(next.tortie) && next.tortie.length > 0
-      ? (next.tortie[0] as TortieSlot)
-      : null);
-
-  if (tortieValue) {
-    next.tortie = [tortieValue];
-    next.isTortie = true;
-    next.tortieMask = tortieValue.mask;
-    next.tortiePattern = tortieValue.pattern;
-    next.tortieColour = tortieValue.colour;
-  } else {
-    next.tortie = [];
-    next.isTortie = false;
-    next.tortieMask = undefined;
-    next.tortiePattern = undefined;
-    next.tortieColour = undefined;
-  }
-
-  return next;
-}
-
-async function copyCanvasToClipboard(
-  canvas: HTMLCanvasElement,
-  successMessage: string,
-  fallbackFilename: string,
-  onSuccess: (message: string) => void,
-  onError: (message: string) => void,
-) {
-  try {
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((result) => {
-        if (result) resolve(result);
-        else reject(new Error("toBlob failed"));
-      }, "image/png");
-    });
-
-    if (navigator.clipboard && "write" in navigator.clipboard) {
-      const item = new ClipboardItem({ "image/png": blob });
-      await navigator.clipboard.write([item]);
-      onSuccess(successMessage);
-      return;
-    }
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${fallbackFilename}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    onSuccess("Image downloaded.");
-  } catch (error) {
-    console.error("Failed to copy canvas", error);
-    onError("Failed to copy image. Please try again.");
-  }
-}
-
-async function buildParameterOptions(
-  mapper: SpriteMapperApi,
-  includeBaseColours: boolean,
-  extendedModes: ExtendedMode[],
-  includeNewSprites: boolean,
-): Promise<ParameterOptions> {
-  if (!mapper.loaded) {
-    await mapper.init();
-  }
-
-  const colourModes = extendedModes.length === 0 ? "off" : extendedModes;
-
-  const baseColours: string[] = includeBaseColours
-    ? invokeMapperArray(mapper, mapper.getColours)
-    : [];
-
-  const experimental = invokeMapperArray(
-    mapper,
-    mapper.getExperimentalColoursByMode,
-    colourModes,
-  );
-
-  const colourSet = new Set<string>();
-  for (const colour of baseColours) colourSet.add(colour);
-  for (const colour of experimental) colourSet.add(colour);
-  const colourList = Array.from(colourSet);
-
-  const whitePatchTints = invokeMapperArray(
-    mapper,
-    mapper.getWhitePatchColourOptions,
-    "default",
-    colourModes === "off" ? null : colourModes,
-  );
-  if (whitePatchTints.length === 0) {
-    whitePatchTints.push("none");
-  }
-
-  const peltNames = invokeMapperArray(mapper, mapper.getPeltNames);
-  const tortieMasks = invokeMapperArray(mapper, mapper.getTortieMasks);
-  const tints = invokeMapperArray(mapper, mapper.getTints);
-  const eyeColours = invokeMapperArray(mapper, mapper.getEyeColours);
-  const skinColours = invokeMapperArray(mapper, mapper.getSkinColours);
-  const whitePatches = invokeMapperArray(mapper, mapper.getWhitePatches);
-  const points = invokeMapperArray(mapper, mapper.getPoints);
-  const vitiligo = invokeMapperArray(mapper, mapper.getVitiligo);
-  const accessories = getRandomAccessoryPool(mapper, includeNewSprites);
-  const scars = invokeMapperArray(mapper, mapper.getScars);
-  const poseNames = getRandomSelectablePoseNames(mapper, {
-    includeNewSprites,
-  });
-
-  return {
-    sprite: poseNames,
-    pelt: peltNames,
-    colour: colourList,
-    tortie: [true, false],
-    tortieMask: tortieMasks,
-    tortiePattern: peltNames,
-    tortieColour: colourList,
-    tint: tints.length > 0 ? tints : ["none"],
-    eyeColour: eyeColours,
-    eyeColour2: [...eyeColours, "none"],
-    skinColour: skinColours,
-    whitePatches: ["none", ...whitePatches],
-    points: ["none", ...points],
-    whitePatchesTint: whitePatchTints.length > 0 ? whitePatchTints : ["none"],
-    vitiligo: ["none", ...vitiligo],
-    accessory: ["none", ...accessories],
-    scar: ["none", ...scars],
-    shading: [true, false],
-    reverse: [true, false],
-  };
-}
-
-function sampleValues(
-  options: ParameterOptions | null,
-  id: ParamId,
-  finalRawValue: unknown,
-  finalDisplay: string,
-  limit = 8,
-): VariationOption[] {
-  if (!options || !(id in options)) {
-    return [{ raw: finalRawValue, display: finalDisplay }];
-  }
-
-  const rawList = ((options as Record<ParamId, unknown[]>)[id] ?? []).filter(
-    (entry) => entry !== undefined && entry !== null,
-  );
-
-  const dedup = new Map<string, VariationOption>();
-  for (const entry of rawList) {
-    const display = formatOptionDisplay(id, entry);
-    const key = `${display}|${typeof entry === "object" ? JSON.stringify(entry) : String(entry)}`;
-    if (!dedup.has(key)) {
-      dedup.set(key, { raw: entry, display });
-    }
-  }
-
-  const finalOption: VariationOption = {
-    raw: finalRawValue,
-    display: finalDisplay,
-  };
-
-  const optionKey = (option: VariationOption) =>
-    `${option.display}|${typeof option.raw === "object" ? JSON.stringify(option.raw) : String(option.raw)}`;
-
-  const finalKey = optionKey(finalOption);
-  const normalized = Array.from(dedup.values());
-  const nonTarget = normalized.filter(
-    (option) => optionKey(option) !== finalKey,
-  );
-
-  const effectiveLimit = Number.isFinite(limit)
-    ? Math.max(1, limit)
-    : normalized.length + 1;
-  const maxNonTarget = Math.max(
-    0,
-    Math.min(effectiveLimit - 1, nonTarget.length),
-  );
-
-  const sampled: VariationOption[] = [];
-  if (maxNonTarget > 0) {
-    const step = Math.max(1, Math.floor(nonTarget.length / maxNonTarget));
-    for (
-      let index = 0;
-      index < nonTarget.length && sampled.length < maxNonTarget;
-      index += step
-    ) {
-      sampled.push(nonTarget[index]);
-    }
-    let fallbackIndex = 0;
-    while (sampled.length < maxNonTarget && fallbackIndex < nonTarget.length) {
-      const candidate = nonTarget[fallbackIndex++];
-      if (!sampled.includes(candidate)) {
-        sampled.push(candidate);
-      }
-    }
-  }
-
-  if (sampled.length === 0) {
-    sampled.push(finalOption);
-  } else {
-    const hasFinalAlready = sampled.some(
-      (option) => optionKey(option) === finalKey,
-    );
-    if (!hasFinalAlready) {
-      if (sampled.length >= effectiveLimit) {
-        sampled[sampled.length - 1] = finalOption;
-      } else {
-        sampled.push(finalOption);
-      }
-    } else {
-      sampled.push(finalOption);
-    }
-  }
-
-  const result = sampled.filter((option) => optionKey(option) !== finalKey);
-  result.push(finalOption);
-  return result;
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
-export function OBSSpinClient({ apiKey }: { apiKey: string }) {
-  // Convex subscription — get session data by API key
-  const session = useQuery(api.catStream.getSessionByApiKey, { apiKey });
-  const sessionSettingsRecord = session?.settings as
-    | Record<string, unknown>
-    | undefined;
-  const sessionSettings = sessionSettingsRecord as
-    | SingleCatSettings
-    | undefined;
-
-  // Derive settings from session (or defaults)
-  const defaultMode = sessionSettings?.mode ?? "flashy";
-  const defaultAccessoryRange = sessionSettings?.accessoryRange ?? {
-    min: 1,
-    max: 4,
-  };
-  const defaultScarRange = sessionSettings?.scarRange ?? { min: 1, max: 1 };
-  const defaultTortieRange = sessionSettings?.tortieRange ?? { min: 1, max: 4 };
-  const defaultAfterlife = sessionSettings?.afterlifeMode ?? "dark10";
+} from "@/utils/spinTiming";
+import type { OBSClassicWheelHandle } from "../OBSClassicWheel";
+import type { LobbySettings } from "../OBSLobby";
+import { decideCommandAction } from "./commandPolicy";
+import { BatchScene } from "./scenes/BatchScene";
+import { BrbScene } from "./scenes/BrbScene";
+import { EvolutionScene } from "./scenes/EvolutionScene";
+import { LobbyCountdownScene } from "./scenes/LobbyCountdownScene";
+import { SpinBoard } from "./scenes/SpinBoard";
+import { TestCard } from "./scenes/TestCard";
+import {
+  applyParamValue,
+  buildFlipSequence,
+  buildLayerOptionStrings,
+  buildParameterOptions,
+  buildSharePayload,
+  type CatState,
+  cloneParams,
+  cloneSourceCanvas,
+  compositeCountFrame,
+  computeStepDurations,
+  copyCanvasToClipboard,
+  createCatShare,
+  DEFAULT_SPRITE_NUMBER,
+  DISPLAY_SIZE,
+  deriveOptionCounts,
+  encodeCatShare,
+  FULL_EXPORT_SIZE,
+  formatTortieLayer,
+  formatValue,
+  type GenerationCounts,
+  GLOBAL_PRESETS,
+  getBaseFrameDuration,
+  getParameterRawValue,
+  getParameterValueForDisplay,
+  getSpeedSettings,
+  type Id,
+  INSTANT_PARAMS,
+  invokeMapperArray,
+  LAYER_PARAM_IDS,
+  type LayerGroup,
+  type LayerRowState,
+  logTimingReport,
+  MAX_SPINNY_VARIATIONS,
+  PARAM_REVEAL_PAUSE,
+  PARAM_SEQUENCE,
+  type ParameterOptions,
+  type ParamId,
+  type ParamRow,
+  PLACEHOLDER_COLOUR,
+  PRE_SPIN_DELAY,
+  parseStreamWheelSpin,
+  preRenderVariationFrames,
+  ROLLER_REVEAL_HOLD,
+  renderVariantFrames,
+  type SingleCatPortableSettings,
+  type SpriteMapperApi,
+  SUBSET_LIMIT,
+  sampleValues,
+  sanitizeForBuilder,
+  type TimingSnapshot,
+  type TortieSlot,
+  toClassicWheelSelection,
+  track,
+  type VariantDescriptor,
+  type VariationFrame,
+  type WheelRewardState,
+  wait,
+} from "./spinSupport";
+import { useObsSession } from "./useObsSession";
+
+export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
+  const {
+    session,
+    sessionSettingsRecord,
+    sessionSettings,
+    initialSettings,
+    resolvedResultAutoClear,
+    resolvedResultAutoClearEnabled,
+  } = useObsSession(apiKey);
+
+  // OBS: no variant URL/code entry points — settings come from the session
   const variantSlug = undefined;
   const initialVariantSettings = sessionSettings ?? null;
   const initialVariantLoadError = null as string | null;
@@ -1523,70 +157,6 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   const [initialError, setInitialError] = useState<string | null>(null);
   const [_isGenerating, setIsGenerating] = useState(false);
   const [_error, setError] = useState<string | null>(null);
-
-  const initialSettings = useMemo<SingleCatSettings>(() => {
-    let base: SingleCatSettings;
-    if (initialVariantSettings) {
-      base = {
-        ...DEFAULT_SINGLE_CAT_SETTINGS,
-        ...initialVariantSettings,
-        accessoryRange:
-          initialVariantSettings.accessoryRange ??
-          DEFAULT_SINGLE_CAT_SETTINGS.accessoryRange,
-        scarRange:
-          initialVariantSettings.scarRange ??
-          DEFAULT_SINGLE_CAT_SETTINGS.scarRange,
-        tortieRange:
-          initialVariantSettings.tortieRange ??
-          DEFAULT_SINGLE_CAT_SETTINGS.tortieRange,
-        timing:
-          initialVariantSettings.timing ?? DEFAULT_SINGLE_CAT_SETTINGS.timing,
-      };
-    } else {
-      base = {
-        ...DEFAULT_SINGLE_CAT_SETTINGS,
-        mode: defaultMode,
-        accessoryRange: { ...defaultAccessoryRange },
-        scarRange: { ...defaultScarRange },
-        tortieRange: { ...defaultTortieRange },
-        afterlifeMode: defaultAfterlife,
-        timing: {
-          ...DEFAULT_TIMING_CONFIG,
-          delays: { ...DEFAULT_TIMING_CONFIG.delays },
-          subsetLimits: { ...(DEFAULT_TIMING_CONFIG.subsetLimits ?? {}) },
-          pauseDelays: DEFAULT_TIMING_CONFIG.pauseDelays
-            ? {
-                flashyMs: DEFAULT_TIMING_CONFIG.pauseDelays.flashyMs,
-                calmMs: DEFAULT_TIMING_CONFIG.pauseDelays.calmMs,
-              }
-            : undefined,
-        },
-      };
-    }
-    // Portable code overrides portable fields only (never timing/mode/speed)
-    if (initialCodeSettings) {
-      base = {
-        ...base,
-        accessoryRange: { ...initialCodeSettings.accessoryRange },
-        scarRange: { ...initialCodeSettings.scarRange },
-        tortieRange: { ...initialCodeSettings.tortieRange },
-        exactLayerCounts: initialCodeSettings.exactLayerCounts,
-        afterlifeMode: initialCodeSettings.afterlifeMode,
-        includeBaseColours: initialCodeSettings.includeBaseColours,
-        includeNewSprites: initialCodeSettings.includeNewSprites,
-        extendedModes: [...initialCodeSettings.extendedModes],
-      };
-    }
-    return base;
-  }, [
-    defaultAccessoryRange,
-    defaultAfterlife,
-    defaultMode,
-    defaultScarRange,
-    defaultTortieRange,
-    initialVariantSettings,
-    initialCodeSettings,
-  ]);
 
   const [mode, setMode] = useState<"flashy" | "calm">(initialSettings.mode);
   const [accessoryRange, setAccessoryRange] = useState<LayerRange>(
@@ -2572,7 +1142,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         await wheelRef.current.spinTo(wheelSelection);
       } else {
         console.warn(
-          "[OBSSpinClient] Wheel ref not available after 1s polling — falling back to timed delay",
+          "[ObsOverlayClient] Wheel ref not available after 1s polling — falling back to timed delay",
         );
         await wait(WHEEL_SPIN_DURATION_MS);
       }
@@ -3374,7 +1944,12 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     return () => {
       cancelled = true;
     };
-  }, [drawPlaceholder, includeBaseColours, extendedModesArray, includeNewSprites]);
+  }, [
+    drawPlaceholder,
+    includeBaseColours,
+    extendedModesArray,
+    includeNewSprites,
+  ]);
 
   useEffect(() => {
     const mapper = mapperRef.current;
@@ -3885,7 +2460,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           }
           // Fallback: append if not found (shouldn't happen with prefill)
           console.warn(
-            `[OBSSpinClient] Param row for "${definition.id}" not found in prefilled board — appending as fallback`,
+            `[ObsOverlayClient] Param row for "${definition.id}" not found in prefilled board — appending as fallback`,
           );
           rowIndex = prev.length;
           return [
@@ -4682,20 +3257,39 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   const generationDisabled = initializing || !!initialError;
 
   // =======================================================================
-  // OBS: Hide header/footer, transparent background
+  // OBS: Hide header/footer; background follows the Settings tab
+  // (transparent for OBS, dev art in the browser, or a solid colour for
+  // chroma keying / custom looks).
   // =======================================================================
+  const obsBgMode =
+    sessionSettingsRecord?.obsBgMode === "colour" ? "colour" : "transparent";
+  const obsBgColour =
+    typeof sessionSettingsRecord?.obsBgColour === "string"
+      ? sessionSettingsRecord.obsBgColour
+      : "#00ff00";
+  const obsBgOpacity =
+    typeof sessionSettingsRecord?.obsBgOpacity === "number"
+      ? sessionSettingsRecord.obsBgOpacity
+      : 100;
+  const obsLayoutSpread = sessionSettingsRecord?.obsLayoutMode === "spread";
   useEffect(() => {
-    // Dev preview shows background art — OBS uses transparent
     const isOBS = typeof window !== "undefined" && "obsstudio" in window;
-    if (isOBS) {
-      document.documentElement.style.background = "transparent";
-      document.body.style.background = "transparent";
+    let background: string;
+    if (obsBgMode === "colour" && /^#[0-9a-fA-F]{6}$/.test(obsBgColour)) {
+      const alpha = Math.max(0, Math.min(1, obsBgOpacity / 100));
+      const r = Number.parseInt(obsBgColour.slice(1, 3), 16);
+      const g = Number.parseInt(obsBgColour.slice(3, 5), 16);
+      const b = Number.parseInt(obsBgColour.slice(5, 7), 16);
+      background = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    } else if (isOBS) {
+      background = "transparent";
     } else {
-      document.documentElement.style.background =
-        "url(/assets/stream-bg.jpg) 0 0/1920px 1080px no-repeat fixed #000";
-      document.body.style.background =
+      // Dev preview shows background art — OBS uses transparent
+      background =
         "url(/assets/stream-bg.jpg) 0 0/1920px 1080px no-repeat fixed #000";
     }
+    document.documentElement.style.background = background;
+    document.body.style.background = background;
     const header = document.querySelector("header");
     const footer = document.querySelector("footer");
     if (header instanceof HTMLElement) header.style.display = "none";
@@ -4706,7 +3300,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
       if (header instanceof HTMLElement) header.style.display = "";
       if (footer instanceof HTMLElement) footer.style.display = "";
     };
-  }, []);
+  }, [obsBgMode, obsBgColour, obsBgOpacity]);
 
   // =======================================================================
   // OBS: Command dispatch — spin, wheel, countdown, clear, lobby, brb, test
@@ -4719,26 +3313,28 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     slots?: unknown;
   } | null>(null);
   const [obsPhase, setObsPhase] = useState<
-    "idle" | "lobby" | "brb" | "active" | "countdown" | "fading"
+    | "idle"
+    | "lobby"
+    | "brb"
+    | "active"
+    | "countdown"
+    | "fading"
+    | "evolution"
+    | "batch"
   >("idle");
   const [countdownValue, setCountdownValue] = useState(0);
   const [countdownPreview, setCountdownPreview] = useState<string | null>(null);
   const [spinDone, setSpinDone] = useState(false);
+  const [evolutionCommand, setEvolutionCommand] = useState<
+    (EvolutionStreamCommand & { seq: number }) | null
+  >(null);
+  const [evolutionInitialPhase, setEvolutionInitialPhase] = useState<
+    "ceremony" | "tree"
+  >("ceremony");
+  const [batchCommand, setBatchCommand] = useState<
+    (BatchStreamCommand & { seq: number }) | null
+  >(null);
   const autoClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const resolvedResultAutoClear =
-    typeof sessionSettingsRecord?.resultAutoClearSeconds === "number" &&
-    sessionSettingsRecord.resultAutoClearSeconds > 0
-      ? sessionSettingsRecord.resultAutoClearSeconds
-      : typeof sessionSettingsRecord?.autoClearSeconds === "number" &&
-          sessionSettingsRecord.autoClearSeconds > 0
-        ? sessionSettingsRecord.autoClearSeconds
-        : 30;
-  const resolvedResultAutoClearEnabled =
-    typeof sessionSettingsRecord?.resultAutoClearEnabled === "boolean"
-      ? sessionSettingsRecord.resultAutoClearEnabled
-      : typeof sessionSettingsRecord?.autoClearEnabled === "boolean"
-        ? sessionSettingsRecord.autoClearEnabled
-        : resolvedResultAutoClear > 0;
   const resultAutoClearEnabledRef = useRef(resolvedResultAutoClearEnabled);
   resultAutoClearEnabledRef.current = resolvedResultAutoClearEnabled;
   const resultAutoClearSecondsRef = useRef(resolvedResultAutoClear);
@@ -4777,6 +3373,8 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     setCountdownValue(0);
     setSpinBoardVisible(false);
     setSpinDone(false);
+    setEvolutionCommand(null);
+    setBatchCommand(null);
     resetWheelOverlay();
   }, [resetWheelOverlay]);
 
@@ -4821,7 +3419,7 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           }
         } else {
           console.warn(
-            "[OBSSpinClient] Wheel command received but no cat state or params available",
+            "[ObsOverlayClient] Wheel command received but no cat state or params available",
           );
           resetWheelOverlay();
           drawPlaceholder();
@@ -4870,73 +3468,75 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     if (!session?.currentCommand) return;
     const cmd = session.currentCommand;
     const cmdSeq = typeof cmd.seq === "number" ? cmd.seq : 0;
-    const isTransientCommand = cmd.type === "spin" || cmd.type === "wheel";
-    const isInitialCommand = !initializedSeqRef.current;
 
-    if (lastSeqRef.current !== null && cmdSeq <= lastSeqRef.current) return;
+    const decision = decideCommandAction({
+      type: cmd.type,
+      seq: cmdSeq,
+      timestamp: cmd.timestamp,
+      lastSeq: lastSeqRef.current,
+      initialized: initializedSeqRef.current,
+      generationDisabled,
+      initializing,
+      resultAutoClearEnabled: resultAutoClearEnabledRef.current,
+      resultAutoClearSeconds: resultAutoClearSecondsRef.current,
+      now: Date.now(),
+    });
 
-    if (isTransientCommand && generationDisabled) {
-      if (!initializing) {
-        lastSeqRef.current = cmdSeq;
-        initializedSeqRef.current = true;
-      }
-      return;
-    }
+    if (decision === "ignore" || decision === "defer") return;
 
-    if (isInitialCommand) {
-      initializedSeqRef.current = true;
-      if (isTransientCommand && !resultAutoClearEnabledRef.current) {
-        lastSeqRef.current = cmdSeq;
-        resetCommandState();
-        if (!cmd.params) {
-          setObsPhase("idle");
-          drawPlaceholder();
-          return;
-        }
-        const restoredWheelSpin =
-          cmd.type === "wheel"
-            ? parseStreamWheelSpin((cmd as Record<string, unknown>).wheelSpin)
-            : null;
-        if (cmd.type === "wheel" && !restoredWheelSpin) {
-          setObsPhase("idle");
-          drawPlaceholder();
-          return;
-        }
-        const restoreToken = generationIdRef.current;
-        setObsPhase("active");
-        primeOverlayFromCommand(cmd.params, cmd.slots)
-          .then(() => {
-            if (generationIdRef.current !== restoreToken) return;
-            setSpinDone(true);
-            if (restoredWheelSpin) {
-              setWheelReward({ status: "settled", prize: restoredWheelSpin });
-              setWheelBannerVisible(true);
-            }
-          })
-          .catch((err) => {
-            if (generationIdRef.current !== restoreToken) return;
-            console.error("[OBSSpinClient] Failed to restore OBS command", err);
-            resetCommandState();
-            setObsPhase("idle");
-            drawPlaceholder();
-          });
+    initializedSeqRef.current = true;
+    lastSeqRef.current = cmdSeq;
+
+    if (decision === "skip") return;
+
+    if (decision === "restore") {
+      // Overlay (re)loaded with auto-clear off — show the final result
+      // without replaying the spin animation.
+      resetCommandState();
+      if (!cmd.params) {
+        setObsPhase("idle");
+        drawPlaceholder();
         return;
       }
-
-      if (isTransientCommand) {
-        const commandAgeMs = Date.now() - cmd.timestamp;
-        const staleAfterMs = resultAutoClearSecondsRef.current * 1000 + 1500;
-        if (Number.isFinite(commandAgeMs) && commandAgeMs > staleAfterMs) {
-          lastSeqRef.current = cmdSeq;
+      const restoredWheelSpin =
+        cmd.type === "wheel"
+          ? parseStreamWheelSpin((cmd as Record<string, unknown>).wheelSpin)
+          : null;
+      if (cmd.type === "wheel" && !restoredWheelSpin) {
+        setObsPhase("idle");
+        drawPlaceholder();
+        return;
+      }
+      const restoreToken = generationIdRef.current;
+      setObsPhase("active");
+      primeOverlayFromCommand(cmd.params, cmd.slots)
+        .then(() => {
+          if (generationIdRef.current !== restoreToken) return;
+          setSpinDone(true);
+          if (restoredWheelSpin) {
+            setWheelReward({ status: "settled", prize: restoredWheelSpin });
+            setWheelBannerVisible(true);
+          }
+        })
+        .catch((err) => {
+          if (generationIdRef.current !== restoreToken) return;
+          console.error(
+            "[ObsOverlayClient] Failed to restore OBS command",
+            err,
+          );
           resetCommandState();
           setObsPhase("idle");
           drawPlaceholder();
-          return;
-        }
-      }
+        });
+      return;
     }
 
-    lastSeqRef.current = cmdSeq;
+    if (decision === "discard-stale") {
+      resetCommandState();
+      setObsPhase("idle");
+      drawPlaceholder();
+      return;
+    }
 
     switch (cmd.type) {
       case "spin":
@@ -5122,10 +3722,45 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
           break;
         }
         handleWheelCommand(wheelSpin, cmd.params, cmd.slots).catch((err) => {
-          console.error("[OBSSpinClient] Wheel command failed", err);
+          console.error("[ObsOverlayClient] Wheel command failed", err);
           resetCommandState();
           drawPlaceholder();
         });
+        break;
+      }
+      case "evolution": {
+        const evolution = parseEvolutionStreamCommand(
+          (cmd as Record<string, unknown>).evolution,
+        );
+        if (!evolution) {
+          break;
+        }
+        resetCommandState();
+        // After an overlay reload the ceremony may already be over — jump
+        // straight to the lineage + QR instead of replaying it.
+        const commandAgeMs = Date.now() - cmd.timestamp;
+        setEvolutionInitialPhase(
+          Number.isFinite(commandAgeMs) &&
+            commandAgeMs > estimateEvolutionCommandMs(evolution)
+            ? "tree"
+            : "ceremony",
+        );
+        setEvolutionCommand({ ...evolution, seq: cmdSeq });
+        setObsPhase("evolution");
+        break;
+      }
+      case "batch": {
+        const batch = parseBatchStreamCommand(
+          (cmd as Record<string, unknown>).batch,
+        );
+        if (!batch) {
+          break;
+        }
+        resetCommandState();
+        // Elimination progress lives in session.batchState, so the scene
+        // resumes mid-show on its own after an overlay reload.
+        setBatchCommand({ ...batch, seq: cmdSeq });
+        setObsPhase("batch");
         break;
       }
       case "clear":
@@ -5133,7 +3768,9 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         if (
           obsPhase === "active" ||
           obsPhase === "countdown" ||
-          obsPhase === "brb"
+          obsPhase === "brb" ||
+          obsPhase === "evolution" ||
+          obsPhase === "batch"
         ) {
           setObsPhase("fading");
         } else {
@@ -5172,26 +3809,6 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
     accessoryRange,
   ]);
 
-  // =======================================================================
-  // OBS: Fixed-position overlay — nothing moves, everything anchored
-  // =======================================================================
-  const flapChars = `${Presets.ALPHANUM} .-()_/•–:`;
-
-  // Build a map of revealed params for the fixed board
-  const revealedMap = useMemo(() => {
-    const map = new Map<string, ParamRow>();
-    for (const row of paramRows) {
-      map.set(row.id, row);
-    }
-    return map;
-  }, [paramRows]);
-
-  // The fixed board slots — exclude all layer params (accessory, scar, tortie sub-params)
-  // Those have their own bottom panel
-  const boardSlots = PARAM_SEQUENCE.filter(
-    (def) => !LAYER_PARAM_IDS.has(def.id),
-  );
-
   // Memoize lobby settings so OBSLobby doesn't restart animations on every render
   const rawSession = sessionSettings as Record<string, unknown> | undefined;
   const lobbySettings = useMemo(
@@ -5215,6 +3832,11 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
         (rawSession?.paletteDisplayMode as "cycle" | "all") ?? "cycle",
       lobbyCatMinSize: (rawSession?.lobbyCatMinSize as number) ?? 1,
       lobbyCatMaxSize: (rawSession?.lobbyCatMaxSize as number) ?? 2,
+      lobbyInfoMode:
+        (rawSession?.lobbyInfoMode as LobbySettings["lobbyInfoMode"]) ?? "spin",
+      evolutionInfo:
+        rawSession?.evolutionInfo as LobbySettings["evolutionInfo"],
+      batchInfo: rawSession?.batchInfo as LobbySettings["batchInfo"],
     }),
     [
       mode,
@@ -5255,277 +3877,18 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   );
 
   const showCountdownLayer = obsPhase === "countdown";
-  const showWheelOverlay = wheelReward.status !== "hidden";
-  const wheelOverlayOpacity = wheelReward.status === "spinning" ? 1 : 0;
-  const catCanvasOpacity = wheelReward.status === "spinning" ? 0.14 : 1;
-  const wheelPrizeName =
-    wheelReward.status === "spinning"
-      ? "???"
-      : (wheelReward.prize?.prizeName ?? "");
-  const wheelPrizeColor = wheelReward.prize?.color ?? "#f59e0b";
+
+  // Share QR for the current result — the slug is stamped onto the command
+  // by the control page after the history save (same seq, no re-dispatch).
+  const commandViewSlug = session?.currentCommand?.viewSlug;
+  const viewUrl =
+    typeof commandViewSlug === "string" && typeof window !== "undefined"
+      ? `${window.location.origin}/view/${commandViewSlug}`
+      : null;
 
   // Test mode — layout guide for OBS positioning
   if (session?.testMode) {
-    return (
-      <div
-        className="relative"
-        style={{
-          width: "1920px",
-          height: "1080px",
-          background:
-            "repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 0 0 / 40px 40px",
-          border: "3px solid rgba(245, 158, 11, 0.6)",
-          overflow: "hidden",
-        }}
-      >
-        <style>{`
-          @keyframes obs-dot-pulse {
-            0%, 100% { opacity: 0.4; transform: scale(0.8); }
-            50% { opacity: 1; transform: scale(1); }
-          }
-        `}</style>
-        {/* Full-screen dimension label */}
-        <div
-          className="absolute flex items-center justify-center"
-          style={{ inset: 0, pointerEvents: "none" }}
-        >
-          <span
-            style={{
-              fontSize: "80px",
-              fontWeight: 900,
-              color: "rgba(245, 158, 11, 0.08)",
-              letterSpacing: "0.05em",
-              fontFamily: "monospace",
-            }}
-          >
-            1920 x 1080
-          </span>
-        </div>
-
-        {/* Corner markers */}
-        {[
-          [0, 0],
-          [1, 0],
-          [0, 1],
-          [1, 1],
-        ].map(([x, y]) => (
-          <div
-            key={`corner-${x}-${y}`}
-            className="absolute"
-            style={{
-              left: x ? undefined : 0,
-              right: x ? 0 : undefined,
-              top: y ? undefined : 0,
-              bottom: y ? 0 : undefined,
-              width: "30px",
-              height: "30px",
-              borderLeft: !x ? "3px solid rgba(245,158,11,0.5)" : undefined,
-              borderRight: x ? "3px solid rgba(245,158,11,0.5)" : undefined,
-              borderTop: !y ? "3px solid rgba(245,158,11,0.5)" : undefined,
-              borderBottom: y ? "3px solid rgba(245,158,11,0.5)" : undefined,
-            }}
-          />
-        ))}
-
-        {/* ── Lobby: Settings table ── */}
-        <div
-          className="absolute flex flex-col items-center justify-center"
-          style={{
-            left: "40px",
-            top: "40px",
-            width: "900px",
-            height: "600px",
-            border: "2px dashed rgba(59, 130, 246, 0.5)",
-            borderRadius: "20px",
-            background: "rgba(59, 130, 246, 0.03)",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "16px",
-              fontWeight: 700,
-              color: "rgba(59, 130, 246, 0.6)",
-              fontFamily: "monospace",
-            }}
-          >
-            LOBBY — Settings Table
-          </span>
-          <span
-            style={{
-              fontSize: "12px",
-              color: "rgba(59, 130, 246, 0.4)",
-              fontFamily: "monospace",
-              marginTop: "4px",
-            }}
-          >
-            900 x ~600 &middot; top-left
-          </span>
-        </div>
-
-        {/* ── Spin: Cat canvas ── */}
-        <div
-          className="absolute flex flex-col items-center justify-center"
-          style={{
-            left: "0px",
-            top: "0px",
-            width: "750px",
-            height: "780px",
-            border: "2px dashed rgba(34, 197, 94, 0.5)",
-            borderRadius: "8px",
-            background: "rgba(34, 197, 94, 0.03)",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "16px",
-              fontWeight: 700,
-              color: "rgba(34, 197, 94, 0.6)",
-              fontFamily: "monospace",
-            }}
-          >
-            SPIN — Cat Canvas
-          </span>
-          <span
-            style={{
-              fontSize: "12px",
-              color: "rgba(34, 197, 94, 0.4)",
-              fontFamily: "monospace",
-              marginTop: "4px",
-            }}
-          >
-            750 x 780 &middot; top-left
-          </span>
-        </div>
-
-        {/* ── Spin: Param board (right column) ── */}
-        <div
-          className="absolute flex flex-col items-center justify-center"
-          style={{
-            left: "750px",
-            top: "20px",
-            width: "510px",
-            bottom: "220px",
-            border: "2px dashed rgba(245, 158, 11, 0.5)",
-            borderRadius: "20px",
-            background: "rgba(245, 158, 11, 0.03)",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "16px",
-              fontWeight: 700,
-              color: "rgba(245, 158, 11, 0.6)",
-              fontFamily: "monospace",
-            }}
-          >
-            SPIN — Param Board
-          </span>
-          <span
-            style={{
-              fontSize: "12px",
-              color: "rgba(245, 158, 11, 0.4)",
-              fontFamily: "monospace",
-              marginTop: "4px",
-            }}
-          >
-            510 x ~840 &middot; right
-          </span>
-        </div>
-
-        {/* ── Spin: Layer details (bottom bar) ── */}
-        <div
-          className="absolute flex flex-col items-center justify-center"
-          style={{
-            left: "20px",
-            bottom: "20px",
-            right: "660px",
-            height: "180px",
-            border: "2px dashed rgba(168, 85, 247, 0.5)",
-            borderRadius: "16px",
-            background: "rgba(168, 85, 247, 0.03)",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "14px",
-              fontWeight: 700,
-              color: "rgba(168, 85, 247, 0.6)",
-              fontFamily: "monospace",
-            }}
-          >
-            SPIN — Layer Details
-          </span>
-          <span
-            style={{
-              fontSize: "12px",
-              color: "rgba(168, 85, 247, 0.4)",
-              fontFamily: "monospace",
-              marginTop: "4px",
-            }}
-          >
-            ~1240 x 180 &middot; bottom
-          </span>
-        </div>
-
-        {/* ── Flying cats area indicator ── */}
-        <div
-          className="absolute"
-          style={{
-            inset: "4px",
-            border: "1px dotted rgba(255, 255, 255, 0.1)",
-            borderRadius: "4px",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          className="absolute"
-          style={{
-            right: "12px",
-            top: "12px",
-            fontSize: "11px",
-            color: "rgba(255,255,255,0.2)",
-            fontFamily: "monospace",
-          }}
-        >
-          Flying cats: full 1920x1080
-        </div>
-
-        {/* TEST MODE badge */}
-        <div
-          className="absolute flex items-center gap-2"
-          style={{
-            left: "50%",
-            bottom: "30px",
-            transform: "translateX(-50%)",
-            background: "rgba(245, 158, 11, 0.15)",
-            border: "1px solid rgba(245, 158, 11, 0.3)",
-            borderRadius: "8px",
-            padding: "8px 20px",
-          }}
-        >
-          <div
-            style={{
-              width: "8px",
-              height: "8px",
-              borderRadius: "50%",
-              background: "#f59e0b",
-              animation: "obs-dot-pulse 1s ease-in-out infinite",
-            }}
-          />
-          <span
-            style={{
-              fontSize: "13px",
-              fontWeight: 700,
-              color: "#f59e0b",
-              fontFamily: "monospace",
-              letterSpacing: "0.1em",
-            }}
-          >
-            TEST MODE — Position this source in OBS
-          </span>
-        </div>
-      </div>
-    );
+    return <TestCard spread={obsLayoutSpread} />;
   }
 
   // When idle (after clear), show nothing — fully transparent
@@ -5536,603 +3899,74 @@ export function OBSSpinClient({ apiKey }: { apiKey: string }) {
   // BRB mode — lobby cats without the settings panel
   if (obsPhase === "brb") {
     return (
-      <div className="relative" style={{ width: "1920px", height: "1080px" }}>
-        <OBSLobby
-          settings={brbLobbySettings}
-          generator={generatorRef.current}
-          hideSettings
-        />
-      </div>
+      <BrbScene settings={brbLobbySettings} generator={generatorRef.current} />
     );
   }
 
-  // Lobby + Countdown crossfade: both render as overlapping layers.
-  // Lobby fades out over 3s while countdown fades in over 3s.
+  // Evolution ceremony → lineage + QR
+  if (obsPhase === "evolution" && evolutionCommand) {
+    return (
+      <EvolutionScene
+        key={`evolution-${evolutionCommand.seq}`}
+        command={evolutionCommand}
+        initialPhase={evolutionInitialPhase}
+      />
+    );
+  }
+
+  // Batch elimination show → final grid + QR
+  if (obsPhase === "batch" && batchCommand) {
+    // The saved slug is patched onto the live command without a seq bump —
+    // read it from the session so the QR appears as soon as the save lands.
+    const liveCommand = session?.currentCommand;
+    const liveBatchSlug =
+      liveCommand?.type === "batch" && liveCommand.seq === batchCommand.seq
+        ? liveCommand.batch?.slug
+        : undefined;
+    return (
+      <BatchScene
+        key={`batch-${batchCommand.seq}`}
+        command={
+          liveBatchSlug
+            ? { ...batchCommand, slug: liveBatchSlug }
+            : batchCommand
+        }
+        liveState={session?.batchState ?? null}
+        apiKey={apiKey}
+      />
+    );
+  }
+
   if (obsPhase === "lobby" || obsPhase === "countdown") {
     return (
-      <div className="relative" style={{ width: "1920px", height: "1080px" }}>
-        {/* Lobby layer — fades out when countdown starts */}
-        <div
-          className="absolute inset-0"
-          style={{
-            opacity: showCountdownLayer ? 0 : 1,
-            transition: "opacity 3s ease-in-out",
-            pointerEvents: showCountdownLayer ? "none" : "auto",
-          }}
-        >
-          <OBSLobby settings={lobbySettings} generator={generatorRef.current} />
-        </div>
-
-        {/* Countdown layer — fades in when countdown starts */}
-        {showCountdownLayer && (
-          <div
-            className="absolute inset-0"
-            style={{
-              opacity: 1,
-              animation: "countdown-fade-in 3s ease-in-out",
-            }}
-          >
-            <div
-              className="relative"
-              style={{ width: "1280px", height: "1080px" }}
-            >
-              <style>{`
-                @keyframes countdown-pop {
-                  0% { transform: scale(1.4); opacity: 0.3; }
-                  30% { transform: scale(0.95); opacity: 1; }
-                  100% { transform: scale(1); opacity: 1; }
-                }
-                @keyframes countdown-go {
-                  0% { transform: scale(0.5); opacity: 0; }
-                  40% { transform: scale(1.2); opacity: 1; }
-                  100% { transform: scale(1); opacity: 1; }
-                }
-                @keyframes countdown-fade-in {
-                  0% { opacity: 0; }
-                  100% { opacity: 1; }
-                }
-              `}</style>
-
-              {/* Cat preview cycling behind the number — in the cat canvas area */}
-              <div
-                className="absolute flex items-center justify-center"
-                style={{
-                  left: "0px",
-                  top: "0px",
-                  width: "750px",
-                  height: "780px",
-                }}
-              >
-                {countdownPreview && (
-                  // biome-ignore lint/performance/noImgElement: renders base64/dynamic src
-                  <img
-                    src={countdownPreview}
-                    alt=""
-                    style={{
-                      width: "720px",
-                      height: "720px",
-                      imageRendering: "pixelated",
-                      opacity: 0.2,
-                      filter: "blur(2px) saturate(1.3)",
-                      transition: "opacity 0.15s",
-                    }}
-                  />
-                )}
-              </div>
-
-              {/* Countdown number / GO — centered over cat canvas area */}
-              <div
-                className="absolute flex items-center justify-center"
-                style={{
-                  left: "0px",
-                  top: "0px",
-                  width: "750px",
-                  height: "780px",
-                }}
-              >
-                <div
-                  key={countdownValue}
-                  style={{
-                    fontSize: countdownValue === 0 ? "220px" : "300px",
-                    fontWeight: 900,
-                    color: countdownValue === 0 ? "#22c55e" : "#fbbf24",
-                    textShadow:
-                      countdownValue === 0
-                        ? "0 0 100px rgba(34,197,94,0.6), 0 4px 30px rgba(0,0,0,0.7)"
-                        : "0 0 80px rgba(251,191,36,0.5), 0 4px 30px rgba(0,0,0,0.7)",
-                    lineHeight: 1,
-                    animation:
-                      countdownValue === 0
-                        ? "countdown-go 0.6s ease-out"
-                        : "countdown-pop 0.8s ease-out",
-                    fontFamily: "'Geist Mono', ui-monospace, monospace",
-                  }}
-                >
-                  {countdownValue === 0 ? "GO!" : countdownValue}
-                </div>
-              </div>
-
-              {/* Spin board preview — fades in 3s before GO */}
-              <div
-                className="absolute flex flex-col overflow-hidden"
-                style={{
-                  left: "750px",
-                  top: "20px",
-                  width: "510px",
-                  bottom: "220px",
-                  background:
-                    "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
-                  borderRadius: "20px",
-                  border: "2px solid rgba(245, 158, 11, 0.2)",
-                  boxShadow:
-                    "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
-                  opacity: spinBoardVisible ? 1 : 0,
-                  transition: "opacity 3s ease-in-out",
-                }}
-              >
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    height: "100px",
-                    borderBottom: "1px solid rgba(245, 158, 11, 0.1)",
-                    padding: "20px 28px",
-                  }}
-                >
-                  <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
-                    Ready
-                  </span>
-                </div>
-              </div>
-
-              {/* Bottom layer bar preview — fades in with the board */}
-              <div
-                className="absolute overflow-hidden"
-                style={{
-                  left: "20px",
-                  bottom: "20px",
-                  right: "20px",
-                  background:
-                    "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 50%, rgba(10,10,10,0.92) 100%)",
-                  borderRadius: "16px",
-                  border: "2px solid rgba(245, 158, 11, 0.2)",
-                  boxShadow:
-                    "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
-                  padding: "14px 32px",
-                  opacity: spinBoardVisible ? 1 : 0,
-                  transition: "opacity 3s ease-in-out",
-                }}
-              >
-                <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
-                  Layers
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <LobbyCountdownScene
+        lobbySettings={lobbySettings}
+        generator={generatorRef.current}
+        showCountdown={showCountdownLayer}
+        countdownPreview={countdownPreview}
+        countdownValue={countdownValue}
+        spinBoardVisible={spinBoardVisible}
+      />
     );
   }
 
   return (
-    <div
-      className="relative"
-      style={{
-        width: "1280px",
-        height: "1080px",
-        opacity: spinVisible ? 1 : 0,
-        transition: "opacity 1.5s ease-in-out",
-      }}
-    >
-      <style>{`
-        @keyframes obs-dot-pulse {
-          0%, 100% { opacity: 0.4; transform: scale(0.8); }
-          50% { opacity: 1; transform: scale(1); }
-        }
-        @keyframes obs-done-pulse {
-          0%, 100% { opacity: 0.8; text-shadow: 0 0 12px rgba(245,158,11,0.5), 0 0 24px rgba(245,158,11,0.25); }
-          50% { opacity: 1; text-shadow: 0 0 20px rgba(245,158,11,0.7), 0 0 40px rgba(245,158,11,0.4); }
-        }
-        /* Split-flap overrides — clean dark tiles, single line */
-        .obs-flap { white-space: nowrap !important; flex-wrap: nowrap !important; }
-        .obs-flap [data-kind="digit"] {
-          color: #e4e4e7 !important;
-          background: #18181b !important;
-          border: 1px solid #27272a !important;
-          border-radius: 4px !important;
-          margin-right: 2px !important;
-          font-family: 'Geist Mono', ui-monospace, monospace !important;
-          font-weight: 700 !important;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
-          text-shadow: 0 1px 2px rgba(0,0,0,0.8), 0 0 4px rgba(0,0,0,0.5) !important;
-        }
-        .obs-flap-active [data-kind="digit"] {
-          color: #fbbf24 !important;
-          background: #1c1a0a !important;
-          border-color: #44400a !important;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(251,191,36,0.3) !important;
-        }
-        .obs-flap-done [data-kind="digit"] {
-          color: #a1a1aa !important;
-          background: #111113 !important;
-          border-color: #1e1e22 !important;
-        }
-        .obs-flap-pending [data-kind="digit"] {
-          color: #3f3f46 !important;
-          background: #0f0f10 !important;
-          border-color: #1a1a1e !important;
-        }
-        @keyframes obs-row-flash {
-          0% { background: transparent; }
-          40% { background: rgba(245, 158, 11, 0.15); box-shadow: inset 0 0 20px rgba(245, 158, 11, 0.08); }
-          100% { background: transparent; }
-        }
-        .obs-row-flash { animation: obs-row-flash 350ms ease-out; }
-      `}</style>
-
-      {showWheelOverlay && (
-        <div
-          className="absolute z-20 flex items-center justify-center"
-          style={{
-            left: "0px",
-            top: "0px",
-            width: "750px",
-            height: "780px",
-            opacity: wheelOverlayOpacity,
-            transition: "opacity 360ms ease",
-            pointerEvents: "none",
-          }}
-        >
-          <OBSClassicWheel ref={wheelRef} size={640} className="opacity-95" />
-        </div>
-      )}
-
-      {/* ═══ Cat canvas — absolute, never moves ═══ */}
-      <div
-        className="absolute z-10 flex items-center justify-center"
-        style={{
-          left: "0px",
-          top: "0px",
-          width: "750px",
-          height: "780px",
-          opacity: catCanvasOpacity,
-          transition: "opacity 360ms ease",
-        }}
-      >
-        <canvas
-          ref={canvasRef}
-          width={DISPLAY_SIZE}
-          height={DISPLAY_SIZE}
-          style={{
-            width: "720px",
-            height: "720px",
-            imageRendering: "pixelated",
-          }}
-        />
-      </div>
-
-      {wheelReward.prize && (
-        <div
-          className="absolute z-20 flex items-center justify-center"
-          style={{
-            left: "0px",
-            top: "560px",
-            width: "750px",
-            opacity: wheelBannerVisible ? 1 : 0,
-            transform: wheelBannerVisible
-              ? "translateY(0)"
-              : "translateY(10px)",
-            transition: "opacity 280ms ease, transform 280ms ease",
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            className="flex min-w-[320px] items-center justify-center gap-3 rounded-2xl border px-5 py-3"
-            style={{
-              background: "rgba(12, 10, 6, 0.92)",
-              borderColor: "rgba(245, 158, 11, 0.28)",
-              boxShadow:
-                "0 14px 40px rgba(0,0,0,0.45), 0 0 30px rgba(245,158,11,0.08)",
-            }}
-          >
-            <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-400">
-              Wheel Reward
-            </span>
-            <span
-              className="text-2xl font-black tracking-[0.08em]"
-              style={{
-                color: wheelPrizeColor,
-                textShadow: "0 0 18px rgba(0,0,0,0.55)",
-              }}
-            >
-              {wheelPrizeName}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ LAYER DETAILS — full width bottom bar, always visible at fixed size ═══ */}
-      <div
-        className="absolute z-10 overflow-hidden"
-        style={{
-          left: "20px",
-          bottom: "20px",
-          right: "20px",
-          height: "180px",
-          background:
-            "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 50%, rgba(10,10,10,0.92) 100%)",
-          borderRadius: "16px",
-          border: "2px solid rgba(245, 158, 11, 0.2)",
-          boxShadow:
-            "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
-          padding: "14px 0",
-        }}
-      >
-        <div className="flex h-full">
-          {[
-            { group: "torties" as const, label: "Tortie Layers", width: "50%" },
-            {
-              group: "accessories" as const,
-              label: "Accessories",
-              width: "25%",
-            },
-            { group: "scars" as const, label: "Scars", width: "25%" },
-          ].map(({ group, label, width }) => {
-            const rows = layerRows[group];
-            return (
-              <div
-                key={group}
-                className="flex flex-col overflow-hidden px-5"
-                style={{ width, flexShrink: 0 }}
-              >
-                <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-                  {label}
-                </div>
-                <div className="flex-1 overflow-hidden">
-                  {rows.map((row, i) => {
-                    const layerKey = `${group}-${i}`;
-                    const isFlashing = flashLayerKey === layerKey;
-                    return (
-                      <div
-                        key={layerKey}
-                        className={cn(
-                          "flex items-center border-l-2 py-1 pl-3",
-                          isFlashing && "obs-row-flash",
-                        )}
-                        style={{
-                          borderColor:
-                            row.status === "active"
-                              ? "#f59e0b"
-                              : row.status === "revealed"
-                                ? "#3f3f46"
-                                : "rgba(113,113,122,0.3)",
-                        }}
-                      >
-                        <span
-                          className={cn(
-                            "w-[80px] shrink-0 text-sm",
-                            row.status === "active"
-                              ? "font-semibold text-amber-400"
-                              : row.status === "revealed"
-                                ? "text-zinc-300"
-                                : "text-zinc-600",
-                          )}
-                        >
-                          {row.label}
-                        </span>
-                        <span
-                          className={cn(
-                            "truncate font-mono text-sm font-bold",
-                            row.status === "active"
-                              ? "text-white"
-                              : row.status === "revealed"
-                                ? "text-white"
-                                : "text-zinc-600",
-                          )}
-                        >
-                          {row.value}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ═══ RIGHT COLUMN: Roller + Param board — always leaves room for bottom bar ═══ */}
-      <div
-        className="absolute flex flex-col overflow-hidden"
-        style={{
-          left: "750px",
-          top: "20px",
-          width: "510px",
-          bottom: "220px",
-          background:
-            "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
-          borderRadius: "20px",
-          border: "2px solid rgba(245, 158, 11, 0.2)",
-          boxShadow:
-            "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
-        }}
-      >
-        {/* Roller — current spinning param */}
-        <div
-          style={{
-            height: "100px",
-            borderBottom: "1px solid rgba(245, 158, 11, 0.1)",
-            padding: "20px 28px",
-          }}
-        >
-          {rollerLabel ? (
-            <>
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="size-2 rounded-full bg-amber-500"
-                  style={{ animation: "obs-dot-pulse 1s ease-in-out infinite" }}
-                />
-                <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-500/60">
-                  {rollerLabel}
-                </span>
-              </div>
-              {rollerActiveValue && (
-                <div className="mt-2 truncate font-mono text-3xl font-bold text-white">
-                  {rollerActiveValue}
-                </div>
-              )}
-            </>
-          ) : spinDone ? (
-            <div className="flex items-center gap-2.5">
-              <span
-                className="text-lg font-black uppercase tracking-[0.3em]"
-                style={{
-                  color: "#f59e0b",
-                  textShadow:
-                    "0 0 12px rgba(245,158,11,0.5), 0 0 24px rgba(245,158,11,0.25)",
-                  animation: "obs-done-pulse 2s ease-in-out infinite",
-                }}
-              >
-                Done
-              </span>
-            </div>
-          ) : (
-            <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
-              Ready
-            </span>
-          )}
-        </div>
-
-        {/* Param board — all slots, always visible */}
-        <div className="flex-1 overflow-hidden" style={{ padding: "12px 0" }}>
-          {boardSlots.map((def) => {
-            const row = revealedMap.get(def.id);
-            const isActive = row?.status === "active";
-            const isRevealed = row?.status === "revealed";
-            const isPending = row?.status === "pending";
-            const isNone = isRevealed && row?.value?.toLowerCase() === "none";
-            const isFlashing = flashParamId === def.id;
-            const valueLen = row?.value?.length ?? 0;
-            // Use S size for long values (>12 chars), M for normal
-            const sizeClass = valueLen > 12 ? "S" : "M";
-
-            // Hide "None" rows after reveal (fade out)
-            if (isNone) return null;
-
-            // Safety: skip if row is somehow missing (shouldn't happen with prefill)
-            if (!row) return null;
-
-            let flapClass: string;
-            if (isPending) {
-              flapClass = "obs-flap-pending";
-            } else if (isActive) {
-              flapClass = "obs-flap-active";
-            } else {
-              flapClass = "obs-flap-done";
-            }
-
-            let flapValue: string;
-            if (isPending) {
-              flapValue = "???";
-            } else if (isActive) {
-              flapValue = "?".repeat(row.value.length);
-            } else {
-              flapValue = row.value.toUpperCase();
-            }
-
-            return (
-              <div
-                key={def.id}
-                className={cn(
-                  "flex items-center transition-all duration-200",
-                  isFlashing && "obs-row-flash",
-                )}
-                style={{
-                  padding: "8px 24px",
-                  borderLeft: isActive
-                    ? "3px solid #f59e0b"
-                    : isPending
-                      ? "3px solid rgba(113,113,122,0.3)"
-                      : "3px solid transparent",
-                  background: isActive
-                    ? "rgba(245,158,11,0.05)"
-                    : "transparent",
-                }}
-              >
-                <span
-                  className={cn(
-                    "w-[130px] shrink-0 text-sm font-bold uppercase tracking-wide",
-                    isActive
-                      ? "text-amber-400"
-                      : isPending
-                        ? "text-zinc-600"
-                        : "text-zinc-400",
-                  )}
-                >
-                  {def.label}
-                </span>
-
-                <div className="flex-1 overflow-hidden">
-                  <FlapDisplay
-                    className={cn("obs-flap", sizeClass, flapClass)}
-                    chars={flapChars}
-                    length={isPending ? 3 : row.value.length}
-                    value={flapValue}
-                    timing={80}
-                    padMode="end"
-                  />
-                </div>
-              </div>
-            );
-          })}
-          {showWheelOverlay && (
-            <div
-              className="mt-2 flex items-center border-t pt-3 transition-all duration-200"
-              style={{
-                marginInline: "24px",
-                paddingInline: "0px",
-                borderColor: "rgba(245, 158, 11, 0.12)",
-              }}
-            >
-              <span
-                className={cn(
-                  "w-[130px] shrink-0 text-sm font-bold uppercase tracking-wide",
-                  wheelReward.status === "spinning"
-                    ? "text-amber-400"
-                    : "text-zinc-400",
-                )}
-              >
-                Wheel Reward
-              </span>
-              <div className="flex-1 overflow-hidden">
-                <span
-                  className={cn(
-                    "block truncate font-mono text-xl font-bold text-white",
-                  )}
-                  style={{
-                    color:
-                      wheelReward.status === "settled"
-                        ? wheelPrizeColor
-                        : undefined,
-                  }}
-                >
-                  {wheelPrizeName}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Loading */}
-      {initializing && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="flex items-center gap-3 bg-black/90 px-6 py-4 rounded-lg">
-            <Loader2 className="size-5 animate-spin text-amber-500" />
-            <span className="text-sm text-zinc-400">Loading…</span>
-          </div>
-        </div>
-      )}
-    </div>
+    <SpinBoard
+      canvasRef={canvasRef}
+      wheelRef={wheelRef}
+      spinVisible={spinVisible}
+      initializing={initializing}
+      wheelReward={wheelReward}
+      wheelBannerVisible={wheelBannerVisible}
+      paramRows={paramRows}
+      layerRows={layerRows}
+      flashParamId={flashParamId}
+      flashLayerKey={flashLayerKey}
+      rollerLabel={rollerLabel}
+      rollerActiveValue={rollerActiveValue}
+      spinDone={spinDone}
+      viewUrl={viewUrl}
+      spread={obsLayoutSpread}
+    />
   );
 }

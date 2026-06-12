@@ -10,6 +10,75 @@ export const wheelSpinValidator = v.object({
   forced: v.boolean(),
 });
 
+/**
+ * Evolution ceremony payload for the OBS overlay. Carries the saved batch
+ * slug plus params-only cat data (never rendered images — the session
+ * document is capped at 1 MiB); the overlay re-renders sprites locally.
+ * Shape mirrors EvolutionStreamCommand in lib/evolution/streamEvolution.ts.
+ */
+export const evolutionCommandValidator = v.object({
+  slug: v.string(),
+  totalCount: v.number(),
+  chargeDurationMs: v.optional(v.number()),
+  cats: v.array(
+    v.object({
+      key: v.string(),
+      label: v.string(),
+      level: v.number(),
+      branchLabel: v.union(v.string(), v.null()),
+      archetype: v.union(v.string(), v.null()),
+      additions: v.any(),
+      catData: v.any(),
+    }),
+  ),
+});
+
+/**
+ * Batch elimination payload for the OBS overlay — the full starting pool
+ * (params-only cat data), the layer config that defines the reveal stages,
+ * and the final survivor count. `slug` is attached later, once the
+ * finalists are culled and saved. Shape mirrors BatchStreamCommand in
+ * lib/adoption/streamBatch.ts.
+ */
+export const batchCommandValidator = v.object({
+  slug: v.optional(v.string()),
+  title: v.optional(v.string()),
+  finalCount: v.number(),
+  config: v.object({
+    accessoryCount: v.number(),
+    scarCount: v.number(),
+    tortieCount: v.number(),
+  }),
+  cats: v.array(
+    v.object({
+      id: v.string(),
+      label: v.string(),
+      catData: v.any(),
+    }),
+  ),
+});
+
+/**
+ * Live elimination state for a running batch show: the overlay reports the
+ * stage it is revealing and when it waits for a cull; the control page
+ * appends eliminated cat ids. Mirrors BatchLiveState in
+ * lib/adoption/streamBatch.ts.
+ */
+export const batchStateValidator = v.object({
+  seq: v.number(),
+  stageIndex: v.number(),
+  awaitingCull: v.boolean(),
+  eliminatedIds: v.array(v.string()),
+  /** Cat the streamer has marked as the removal candidate (shown to viewers). */
+  markedId: v.optional(v.string()),
+  /** "Maybe leaves next" picks — shown yellow; reset after every cull. */
+  potentialIds: v.optional(v.array(v.string())),
+  /** Crowd favourites — persist across culls. */
+  favoriteIds: v.optional(v.array(v.string())),
+  /** Cat shown enlarged on the overlay and control board. */
+  spotlightId: v.optional(v.string()),
+});
+
 export default defineSchema({
   card_season: defineTable({
     seasonName: v.string(),
@@ -366,17 +435,24 @@ export default defineSchema({
           v.literal("test"),
           v.literal("lobby"),
           v.literal("brb"),
+          v.literal("evolution"),
+          v.literal("batch"),
         ),
         seq: v.number(),
         params: v.optional(v.any()),
         slots: v.optional(v.any()),
         wheelSpin: v.optional(wheelSpinValidator),
+        evolution: v.optional(evolutionCommandValidator),
+        batch: v.optional(batchCommandValidator),
         countdownSeconds: v.optional(v.number()),
+        /** Share slug of the saved result, attached after the spin command. */
+        viewSlug: v.optional(v.string()),
         timestamp: v.number(),
       }),
     ),
     testMode: v.boolean(),
     lastWheelSpinForSeq: v.optional(v.number()),
+    batchState: v.optional(batchStateValidator),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("byUserId", ["userId"]),

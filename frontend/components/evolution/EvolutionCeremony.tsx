@@ -4,6 +4,7 @@ import confetti from "canvas-confetti";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type {
   EvolutionAddition,
   EvolutionPools,
@@ -57,6 +58,11 @@ type EvolutionCeremonyProps = {
    * real result, random values). Called repeatedly while a charge spins.
    */
   requestTeaserFrame?: (index: number) => Promise<string | null>;
+  /**
+   * Hands-off mode for the OBS overlay: hides the speed/skip/advance
+   * controls, ignores taps, and auto-finishes shortly after the finale.
+   */
+  hideControls?: boolean;
 };
 
 // Base pacing at 1x — deliberately slow so each ceremony can breathe
@@ -151,6 +157,7 @@ export function EvolutionCeremony({
   pools,
   chargeDurationMs = 8400,
   requestTeaserFrame,
+  hideControls = false,
 }: EvolutionCeremonyProps) {
   const prefersReducedMotion = useReducedMotion();
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -192,6 +199,13 @@ export function EvolutionCeremony({
       advance();
     }
   }, [step, cats, advance]);
+
+  // Hands-off mode has no VIEW button — leave the finale automatically.
+  useEffect(() => {
+    if (!hideControls || step.kind !== "finale") return;
+    const timer = window.setTimeout(onFinish, 3500);
+    return () => window.clearTimeout(timer);
+  }, [hideControls, step, onFinish]);
 
   // Confetti burst on each reveal, centred on the ceremony panel and tinted
   // with the colours the cat actually rolled.
@@ -265,9 +279,10 @@ export function EvolutionCeremony({
     if (step.kind !== "charge" || !requestTeaserFrame) return;
     const chargeIndex = step.index;
     // Frame budget scales with the spin length; renders run sequentially.
+    // Generous cap — the contender swarm wants lots of distinct styles.
     const frameCap = Math.min(
-      36,
-      Math.max(6, Math.floor(chargeDurationMs / speed / 320)),
+      60,
+      Math.max(10, Math.floor(chargeDurationMs / speed / 220)),
     );
     let cancelled = false;
     (async () => {
@@ -292,9 +307,14 @@ export function EvolutionCeremony({
       ref={sectionRef}
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="relative isolate mx-auto flex aspect-square max-h-[85vh] w-full max-w-[min(100%,85vh)] cursor-pointer select-none flex-col overflow-hidden rounded-3xl border border-border/40 bg-slate-950"
+      className={cn(
+        "relative isolate mx-auto flex aspect-square max-h-[85vh] w-full max-w-[min(100%,85vh)] select-none flex-col overflow-hidden rounded-3xl border border-border/40 bg-slate-950",
+        !hideControls && "cursor-pointer",
+      )}
       style={{ minHeight: "min(620px, calc(100vh - 7rem))" }}
-      onClick={step.kind === "finale" ? onFinish : advance}
+      onClick={
+        hideControls ? undefined : step.kind === "finale" ? onFinish : advance
+      }
       aria-live="polite"
     >
       {/* Atmosphere */}
@@ -336,56 +356,58 @@ export function EvolutionCeremony({
         >
           {hudLabel}
         </span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              setAutoPlay((value) => !value);
-            }}
-            className={cn(
-              pixelFontClass,
-              "rounded-lg border px-3 py-2 text-[9px] transition",
-              autoPlay
-                ? "border-emerald-300/40 bg-emerald-500/15 text-emerald-100 hover:border-emerald-200"
-                : "border-amber-300/40 bg-amber-500/15 text-amber-100 hover:border-amber-200",
-            )}
-            aria-label={
-              autoPlay
-                ? "Switch to tap-to-advance mode"
-                : "Switch to auto-play mode"
-            }
-          >
-            {autoPlay ? "▶ AUTO" : "✋ TAP"}
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              cycleSpeed();
-            }}
-            className={cn(
-              pixelFontClass,
-              "min-w-16 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[9px] text-white/80 transition hover:border-white/40 hover:text-white",
-            )}
-            aria-label="Cycle ceremony speed"
-          >
-            {speed}X
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onFinish();
-            }}
-            className={cn(
-              pixelFontClass,
-              "rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[9px] text-white/80 transition hover:border-white/40 hover:text-white",
-            )}
-          >
-            SKIP ▸▸
-          </button>
-        </div>
+        {!hideControls && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setAutoPlay((value) => !value);
+              }}
+              className={cn(
+                pixelFontClass,
+                "rounded-lg border px-3 py-2 text-[9px] transition",
+                autoPlay
+                  ? "border-emerald-300/40 bg-emerald-500/15 text-emerald-100 hover:border-emerald-200"
+                  : "border-amber-300/40 bg-amber-500/15 text-amber-100 hover:border-amber-200",
+              )}
+              aria-label={
+                autoPlay
+                  ? "Switch to tap-to-advance mode"
+                  : "Switch to auto-play mode"
+              }
+            >
+              {autoPlay ? "▶ AUTO" : "✋ TAP"}
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                cycleSpeed();
+              }}
+              className={cn(
+                pixelFontClass,
+                "min-w-16 rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[9px] text-white/80 transition hover:border-white/40 hover:text-white",
+              )}
+              aria-label="Cycle ceremony speed"
+            >
+              {speed}X
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onFinish();
+              }}
+              className={cn(
+                pixelFontClass,
+                "rounded-lg border border-white/15 bg-black/40 px-3 py-2 text-[9px] text-white/80 transition hover:border-white/40 hover:text-white",
+              )}
+            >
+              SKIP ▸▸
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Stage */}
@@ -427,6 +449,7 @@ export function EvolutionCeremony({
               key="finale"
               totalCount={totalCount}
               onFinish={onFinish}
+              hideButton={hideControls}
             />
           )}
         </AnimatePresence>
@@ -436,26 +459,34 @@ export function EvolutionCeremony({
       <div className="relative z-10 flex flex-col gap-2 px-5 pb-5">
         <div className="flex items-center justify-between">
           <span className={cn(pixelFontClass, "text-[9px] text-white/50")}>
-            {autoPlay ? "TAP TO SKIP AHEAD" : "TAP TO ADVANCE"}
+            {hideControls
+              ? "EVOLUTION CEREMONY"
+              : autoPlay
+                ? "TAP TO SKIP AHEAD"
+                : "TAP TO ADVANCE"}
           </span>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                if (step.kind === "finale") onFinish();
-                else advance();
-              }}
-              className={cn(
-                pixelFontClass,
-                "rounded-md border border-white/15 bg-black/35 px-2 py-1 text-[8px] text-white/70 transition hover:border-white/40 hover:text-white",
-              )}
-              aria-label={
-                step.kind === "finale" ? "View the lineage" : "Advance ceremony"
-              }
-            >
-              {step.kind === "finale" ? "VIEW" : "ADVANCE"}
-            </button>
+            {!hideControls && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (step.kind === "finale") onFinish();
+                  else advance();
+                }}
+                className={cn(
+                  pixelFontClass,
+                  "rounded-md border border-white/15 bg-black/35 px-2 py-1 text-[8px] text-white/70 transition hover:border-white/40 hover:text-white",
+                )}
+                aria-label={
+                  step.kind === "finale"
+                    ? "View the lineage"
+                    : "Advance ceremony"
+                }
+              >
+                {step.kind === "finale" ? "VIEW" : "ADVANCE"}
+              </button>
+            )}
             <span className={cn(pixelFontClass, "text-[9px] text-white/50")}>
               {revealedCount}/{totalCount}
             </span>
@@ -593,30 +624,346 @@ function BannerScene({
 }
 
 /**
- * Slot-machine sprite for the charge phase: flickers through live-rendered
- * variants that share the real result's trait shape, so the sprite itself
- * teases what the ceremony could produce before the true form is revealed.
+ * Pokémon-style contender gathering: possible evolutions drift in from
+ * random points beyond the screen edge — all at the same speed — and keep
+ * arriving for the whole charge, hovering around the ceremony point and
+ * hoping to claim the role. The REAL final form sneaks in early (1–12 s)
+ * and hovers anonymously among the crowd; on selection it rises to the
+ * top, glows and grows, while every failed contender tumbles off the
+ * bottom of the screen with gravity. All theatre — the outcome is
+ * predetermined.
  */
-function TeaserSprite({
-  parentUrl,
+const CONTENDER_SPAWN_MS = 1200;
+/** Every cat approaches at the same pace. */
+const CONTENDER_APPROACH_MS = 9000;
+const CONTENDER_FALL_MS = 1700;
+/** How long before the charge ends the chosen one is selected. */
+const CHOSEN_LEAD_MS = 1200;
+/** The chosen one departs at a random point inside this window. */
+const CHOSEN_DEPART_MIN_MS = 1000;
+const CHOSEN_DEPART_MAX_MS = 12000;
+
+type ContenderSpec = {
+  id: number;
+  /** Random entry direction (radians). */
+  angle: number;
+  /** Random sprite size, independent of the direction. */
+  size: number;
+  /** Hover offset around the ceremony point. */
+  missX: number;
+  missY: number;
+  /** Sideways drift + tumble while falling off the bottom. */
+  driftX: number;
+  tumble: number;
+};
+
+function makeContenderSpec(id: number): ContenderSpec {
+  return {
+    id,
+    angle: Math.random() * Math.PI * 2,
+    size: 170 + Math.random() * 130,
+    missX: (Math.random() - 0.5) * 480,
+    missY: (Math.random() - 0.5) * 300,
+    driftX: (Math.random() - 0.5) * 700,
+    tumble: (Math.random() - 0.5) * 300,
+  };
+}
+
+function ContenderSwarm({
   frames,
   reduced,
+  anchorRef,
+  durationSeconds,
+  glowColour,
+  chosenUrl,
 }: {
-  parentUrl: string | null;
   frames: string[];
   reduced: boolean;
+  /** Element whose centre the contenders aim for (the ceremony stage). */
+  anchorRef: React.RefObject<HTMLDivElement | null>;
+  /** Charge length — schedules when the chosen one claims the spot. */
+  durationSeconds: number;
+  glowColour: string;
+  /** The REAL final form's sprite — what actually claims the spot. */
+  chosenUrl: string | null;
 }) {
-  const [frame, setFrame] = useState(0);
+  const [mounted, setMounted] = useState(false);
+  const [contenders, setContenders] = useState<ContenderSpec[]>([]);
+  const [chosen, setChosen] = useState<ContenderSpec | null>(null);
+  const [falling, setFalling] = useState(false);
+  const nextIdRef = useRef(0);
+  const hasFrames = frames.length > 0;
 
   useEffect(() => {
-    if (reduced || frames.length <= 1) return;
-    const timer = window.setInterval(() => setFrame((value) => value + 1), 160);
+    setMounted(true);
+  }, []);
+
+  // Keep gathering contenders for the entire charge — late arrivals are
+  // still mid-flight when the selection happens and fall with the rest.
+  useEffect(() => {
+    if (reduced || !hasFrames || falling) return;
+    const spawn = () => {
+      setContenders((previous) => [
+        ...previous,
+        makeContenderSpec(nextIdRef.current++),
+      ]);
+    };
+    spawn();
+    const timer = window.setInterval(spawn, CONTENDER_SPAWN_MS);
     return () => window.clearInterval(timer);
-  }, [reduced, frames.length]);
+  }, [reduced, hasFrames, falling]);
 
-  const url = frames.length > 0 ? frames[frame % frames.length] : parentUrl;
+  // The chosen one sneaks in at a random early moment and hovers among the
+  // crowd; the selection itself fires just before the charge resolves.
+  useEffect(() => {
+    if (reduced) return;
+    const durMs = durationSeconds * 1000;
+    const approachMs = Math.min(
+      CONTENDER_APPROACH_MS,
+      Math.max(1800, durMs * 0.55),
+    );
+    // Late enough to feel random, early enough to have landed by selection.
+    const latestDepart = Math.max(300, durMs - CHOSEN_LEAD_MS - approachMs);
+    const departAt = Math.max(
+      300,
+      Math.min(
+        CHOSEN_DEPART_MIN_MS +
+          Math.random() * (CHOSEN_DEPART_MAX_MS - CHOSEN_DEPART_MIN_MS),
+        latestDepart,
+      ),
+    );
+    const departTimer = window.setTimeout(() => {
+      setChosen(makeContenderSpec(nextIdRef.current++));
+    }, departAt);
+    const selectTimer = window.setTimeout(
+      () => {
+        setFalling(true);
+      },
+      Math.max(departAt + 600, durMs - CHOSEN_LEAD_MS),
+    );
+    return () => {
+      window.clearTimeout(departTimer);
+      window.clearTimeout(selectTimer);
+    };
+  }, [reduced, durationSeconds]);
 
-  return <SpriteOnAura url={url ?? null} alt="A possible evolution" />;
+  if (!mounted || reduced || !hasFrames) return null;
+
+  const durMs = durationSeconds * 1000;
+  const chosenApproachMs = Math.min(
+    CONTENDER_APPROACH_MS,
+    Math.max(1800, durMs * 0.55),
+  );
+
+  return createPortal(
+    <div className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden">
+      {contenders.map((spec) => (
+        <ContenderFlight
+          key={spec.id}
+          spec={spec}
+          url={frames[spec.id % frames.length]}
+          anchorRef={anchorRef}
+          falling={falling}
+        />
+      ))}
+      {chosen && (
+        <ChosenContender
+          spec={chosen}
+          url={chosenUrl ?? frames[chosen.id % frames.length]}
+          anchorRef={anchorRef}
+          glowColour={glowColour}
+          approachMs={chosenApproachMs}
+          selected={falling}
+        />
+      )}
+    </div>,
+    document.body,
+  );
+}
+
+function flightGeometry(
+  spec: ContenderSpec,
+  anchorRef: React.RefObject<HTMLDivElement | null>,
+) {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const rect = anchorRef.current?.getBoundingClientRect();
+  const cx = rect ? rect.left + rect.width / 2 : vw / 2;
+  const cy = rect ? rect.top + rect.height * 0.46 : vh / 2;
+  const radius = Math.hypot(vw, vh) / 2 + spec.size;
+  return {
+    vh,
+    fromX: cx + Math.cos(spec.angle) * radius,
+    fromY: cy + Math.sin(spec.angle) * radius,
+    cx,
+    cy,
+  };
+}
+
+function ContenderFlight({
+  spec,
+  url,
+  anchorRef,
+  falling,
+}: {
+  spec: ContenderSpec;
+  url: string;
+  anchorRef: React.RefObject<HTMLDivElement | null>;
+  falling: boolean;
+}) {
+  const [geo] = useState(() => flightGeometry(spec, anchorRef));
+  const half = spec.size / 2;
+  const holdX = geo.cx + spec.missX;
+  const holdY = geo.cy + spec.missY;
+
+  return (
+    <motion.div
+      className="absolute left-0 top-0"
+      style={{ marginLeft: -half, marginTop: -half }}
+      initial={{ x: geo.fromX, y: geo.fromY, opacity: 0, rotate: 0 }}
+      animate={
+        falling
+          ? {
+              // The role is taken — drop off the bottom with gravity.
+              x: holdX + spec.driftX,
+              y: geo.vh + spec.size * 2,
+              opacity: 1,
+              rotate: spec.tumble,
+            }
+          : { x: holdX, y: holdY, opacity: 1, rotate: 0 }
+      }
+      transition={
+        falling
+          ? { duration: CONTENDER_FALL_MS / 1000, ease: "easeIn" }
+          : {
+              duration: CONTENDER_APPROACH_MS / 1000,
+              ease: "easeOut",
+              opacity: { duration: 0.6 },
+            }
+      }
+    >
+      {/* Gentle hover bob, independent of the flight position */}
+      <motion.div
+        animate={{ y: [-8, 8] }}
+        transition={{
+          duration: 2.4,
+          repeat: Number.POSITIVE_INFINITY,
+          repeatType: "mirror",
+          ease: "easeInOut",
+        }}
+      >
+        <Image
+          src={url}
+          alt="A contender for the evolution"
+          width={Math.round(spec.size)}
+          height={Math.round(spec.size)}
+          unoptimized
+          className="image-render-pixel object-contain drop-shadow-[0_10px_28px_rgba(0,0,0,0.6)]"
+          style={{ width: spec.size, height: spec.size }}
+        />
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/**
+ * The real final form: flies in like any other contender and hovers
+ * anonymously among the crowd. On selection it rises to the top of the
+ * swarm, moves to the exact ceremony point, grows and glows until the
+ * reveal flash takes over.
+ */
+function ChosenContender({
+  spec,
+  url,
+  anchorRef,
+  glowColour,
+  approachMs,
+  selected,
+}: {
+  spec: ContenderSpec;
+  url: string;
+  anchorRef: React.RefObject<HTMLDivElement | null>;
+  glowColour: string;
+  approachMs: number;
+  selected: boolean;
+}) {
+  const [geo] = useState(() => flightGeometry(spec, anchorRef));
+  const half = spec.size / 2;
+  // Grow to a hero size on selection, whatever was rolled for the flight.
+  const selectedScale = Math.max(1.2, 280 / spec.size);
+
+  return (
+    <motion.div
+      className="absolute left-0 top-0"
+      style={{ marginLeft: -half, marginTop: -half, zIndex: selected ? 50 : 0 }}
+      initial={{ x: geo.fromX, y: geo.fromY, opacity: 0, scale: 1 }}
+      animate={
+        selected
+          ? {
+              x: geo.cx,
+              y: geo.cy,
+              opacity: 1,
+              scale: selectedScale,
+            }
+          : {
+              x: geo.cx + spec.missX,
+              y: geo.cy + spec.missY,
+              opacity: 1,
+              scale: 1,
+            }
+      }
+      transition={
+        selected
+          ? { duration: 0.7, ease: "easeOut" }
+          : {
+              duration: approachMs / 1000,
+              ease: "easeOut",
+              opacity: { duration: 0.6 },
+            }
+      }
+    >
+      <motion.div
+        animate={
+          selected
+            ? {
+                y: 0,
+                scale: [1, 1.12, 1.05],
+                filter: [
+                  `drop-shadow(0 0 10px ${withAlpha(glowColour, 0.4)})`,
+                  `drop-shadow(0 0 36px ${withAlpha(glowColour, 0.95)}) drop-shadow(0 0 80px ${withAlpha(glowColour, 0.5)})`,
+                  `drop-shadow(0 0 26px ${withAlpha(glowColour, 0.8)})`,
+                ],
+              }
+            : { y: [-8, 8] }
+        }
+        transition={
+          selected
+            ? {
+                duration: 1.2,
+                repeat: Number.POSITIVE_INFINITY,
+                repeatType: "mirror",
+                ease: "easeInOut",
+              }
+            : {
+                duration: 2.4,
+                repeat: Number.POSITIVE_INFINITY,
+                repeatType: "mirror",
+                ease: "easeInOut",
+              }
+        }
+      >
+        <Image
+          src={url}
+          alt="The chosen evolution"
+          width={Math.round(spec.size)}
+          height={Math.round(spec.size)}
+          unoptimized
+          className="image-render-pixel object-contain drop-shadow-[0_10px_28px_rgba(0,0,0,0.6)]"
+          style={{ width: spec.size, height: spec.size }}
+        />
+      </motion.div>
+    </motion.div>
+  );
 }
 
 function ChargeScene({
@@ -636,6 +983,7 @@ function ChargeScene({
   reduced: boolean;
 }) {
   const rank = stageRank(upcoming?.level ?? 1).toUpperCase();
+  const stageRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <motion.div
@@ -645,7 +993,10 @@ function ChargeScene({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
     >
-      <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden">
+      <div
+        ref={stageRef}
+        className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden"
+      >
         {[0, 1].map((ring) => (
           <motion.div
             key={ring}
@@ -673,7 +1024,8 @@ function ChargeScene({
             reduced
               ? { filter: ["brightness(1)", "brightness(2)"] }
               : {
-                  // Flicker, then wash out into a glowing white silhouette.
+                  // The evolving cat washes out into a glowing white
+                  // silhouette while the contenders fail to claim the spot.
                   filter: [
                     "brightness(1) invert(0) drop-shadow(0 0 0px rgba(255,255,255,0))",
                     "brightness(1) invert(0) drop-shadow(0 0 0px rgba(255,255,255,0))",
@@ -688,13 +1040,20 @@ function ChargeScene({
             ease: "easeIn",
           }}
         >
-          <TeaserSprite
-            parentUrl={parent?.previewUrl ?? null}
-            frames={frames}
-            reduced={reduced}
+          <SpriteOnAura
+            url={parent?.previewUrl ?? null}
+            alt="The evolving cat"
           />
         </motion.div>
       </div>
+      <ContenderSwarm
+        frames={frames}
+        reduced={reduced}
+        anchorRef={stageRef}
+        durationSeconds={durationSeconds}
+        glowColour={theme.from}
+        chosenUrl={upcoming?.previewUrl ?? null}
+      />
       <motion.span
         className={cn(
           pixelFontClass,
@@ -881,9 +1240,11 @@ function WaitingScene() {
 function FinaleScene({
   totalCount,
   onFinish,
+  hideButton = false,
 }: {
   totalCount: number;
   onFinish: () => void;
+  hideButton?: boolean;
 }) {
   return (
     <motion.div
@@ -900,19 +1261,21 @@ function FinaleScene({
       <span className="text-sm text-white/60">
         StarClan honours {totalCount} cats
       </span>
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onFinish();
-        }}
-        className={cn(
-          pixelFontClass,
-          "rounded-xl border border-amber-300/50 bg-amber-400/15 px-6 py-3 text-[11px] text-amber-100 transition hover:bg-amber-400/30",
-        )}
-      >
-        VIEW THE LINEAGE ▸
-      </button>
+      {!hideButton && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onFinish();
+          }}
+          className={cn(
+            pixelFontClass,
+            "rounded-xl border border-amber-300/50 bg-amber-400/15 px-6 py-3 text-[11px] text-amber-100 transition hover:bg-amber-400/30",
+          )}
+        >
+          VIEW THE LINEAGE ▸
+        </button>
+      )}
     </motion.div>
   );
 }

@@ -29,6 +29,7 @@ export type StreamWheelSourceCommand = {
   seq?: number;
   params?: unknown;
   slots?: unknown;
+  viewSlug?: string;
 };
 
 export type StreamWheelSessionSnapshot = {
@@ -56,7 +57,9 @@ function validateBucket(randomBucket: number) {
     randomBucket < 0 ||
     randomBucket >= BUCKET_COUNT
   ) {
-    throw new RangeError("Wheel random bucket must be an integer from 0 to 99.");
+    throw new RangeError(
+      "Wheel random bucket must be an integer from 0 to 99.",
+    );
   }
   return randomBucket;
 }
@@ -121,6 +124,7 @@ export function buildStreamWheelUpdate(
     params: unknown;
     slots?: unknown;
     wheelSpin: StreamWheelSpin;
+    viewSlug?: string;
     timestamp: number;
   } = {
     type: "wheel",
@@ -131,6 +135,10 @@ export function buildStreamWheelUpdate(
   };
   if (sourceCommand.slots !== undefined) {
     currentCommand.slots = sourceCommand.slots;
+  }
+  // Keep the share QR on screen through the wheel reveal.
+  if (sourceCommand.viewSlug !== undefined) {
+    currentCommand.viewSlug = sourceCommand.viewSlug;
   }
 
   return {

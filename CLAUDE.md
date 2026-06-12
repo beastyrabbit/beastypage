@@ -118,6 +118,17 @@ Hooks defined in `lefthook.yml`:
 4. **After merging, create a version tag** (check latest with `git tag --sort=-v:refname | head -1`)
 5. Push the tag to trigger a release (e.g., `git tag v1.7.0 && git push origin v1.7.0`)
 
+## Git Hosting (Forgejo)
+
+The repo lives on self-hosted Forgejo (`git.heerlab.com`), not GitHub. Use the `fj` CLI for PRs:
+
+```bash
+fj pr create "title" --base main --head feature/my-branch --body "..."
+fj pr list
+```
+
+The `gh` CLI does not work against this remote.
+
 ## Local Docker Builds
 
 Build and push frontend locally (faster than GitHub Actions):

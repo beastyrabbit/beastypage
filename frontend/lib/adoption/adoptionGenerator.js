@@ -1,9 +1,9 @@
-import { createCatShare, encodeCatShare } from "../catShare";
 import {
   DEFAULT_POSE_NAME,
   formatPoseName,
   getUserSelectablePoseNames,
 } from "../cat-v3/poseOptions";
+import { createCatShare, encodeCatShare } from "../catShare";
 import catGenerator from "../single-cat/catGeneratorV3";
 import spriteMapper from "../single-cat/spriteMapper.js";
 

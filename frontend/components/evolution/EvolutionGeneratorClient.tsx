@@ -25,14 +25,15 @@ import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
 import type { CatParams } from "@/lib/cat-v3/types";
-import { encodeCatShare } from "@/lib/catShare";
+import {
+  estimateCeremonySeconds,
+  formatDuration,
+} from "@/lib/evolution/ceremonyEstimate";
 import { generateLineageNames } from "@/lib/evolution/clanNames";
 import {
-  applyEvolutionStarterHairToParams,
   applyEvolutionStarterHairToPayload,
-  buildEvolutionBatchSettings,
+  type buildEvolutionBatchSettings,
   CONTROLLED_ARCHETYPES,
-  type EvolutionStarterHair,
   type EvolutionArchetype,
   type EvolutionBatchResult,
   type EvolutionControls,
@@ -40,6 +41,7 @@ import {
   type EvolutionLevel,
   type EvolutionPools,
   type EvolutionRange,
+  type EvolutionStarterHair,
   generateEvolutionBatch,
   generateTeaserVariant,
   isWildArchetype,
@@ -48,6 +50,8 @@ import {
   WILD_ARCHETYPES,
 } from "@/lib/evolution/evolutionGenerator";
 import { buildEvolutionPools } from "@/lib/evolution/evolutionPools";
+import { persistEvolutionBatch } from "@/lib/evolution/persistEvolutionBatch";
+import { buildRandomEvolutionStarter } from "@/lib/evolution/randomStarter";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { cn } from "@/lib/utils";
 import {
@@ -83,13 +87,6 @@ type UiEvolutionCat = EvolutionGeneratedCat & {
   catName?: string | null;
 };
 
-type PersistedCatInfo = {
-  key: string;
-  profileId: string;
-  shareToken: string;
-  editToken?: string | null;
-};
-
 const DEFAULT_METADATA: AdoptionMetadata = {
   title: "Evolution Batch",
   creator: "",
@@ -115,31 +112,6 @@ const CLAN_ORDER: EvolutionArchetype[] = [
   ...WILD_ARCHETYPES,
 ];
 
-/** Rough per-step costs (seconds at 1x) used for the ceremony estimate. */
-const ESTIMATE_SUMMON = 5;
-const ESTIMATE_BANNER = 3.5;
-const ESTIMATE_REVEAL = 6.7;
-
-function formatDuration(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.round(totalSeconds % 60);
-  if (minutes <= 0) return `${seconds}s`;
-  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
-}
-
-function estimateCeremonySeconds(
-  clanCount: number,
-  targetLevel: number,
-  spinSeconds: number,
-) {
-  const evolutions = clanCount * targetLevel;
-  return (
-    ESTIMATE_SUMMON +
-    clanCount * ESTIMATE_BANNER +
-    evolutions * (spinSeconds + ESTIMATE_REVEAL)
-  );
-}
-
 function imageDataFromCanvas(
   canvas: HTMLCanvasElement | OffscreenCanvas,
 ): string | null {
@@ -147,20 +119,6 @@ function imageDataFromCanvas(
     return canvas.toDataURL("image/png");
   }
   return null;
-}
-
-function cleanRandomStarterLayers(params: CatParams): CatParams {
-  const next = { ...params };
-  next.accessories = [];
-  next.scars = [];
-  next.tortie = [];
-  next.isTortie = false;
-  delete next.accessory;
-  delete next.scar;
-  delete next.tortieMask;
-  delete next.tortiePattern;
-  delete next.tortieColour;
-  return next;
 }
 
 export function EvolutionGeneratorClient() {
@@ -354,55 +312,24 @@ export function EvolutionGeneratorClient() {
       setLastSavedId(null);
       const currentMeta = metadataRef.current;
       try {
-        const persistedCats: PersistedCatInfo[] = [];
-        const catsPayload = await Promise.all(
-          result.cats.map(async (cat, index) => {
-            const encoded = encodeCatShare(
-              cat.catData as unknown as Parameters<typeof encodeCatShare>[0],
-            );
-            const mapperResult = await createMapper({
-              catData: cat.catData,
-            });
-            const profileId = mapperResult.id;
-            const shareToken =
-              mapperResult.shareToken ?? mapperResult.slug ?? mapperResult.id;
-            persistedCats.push({
-              key: cat.key,
-              profileId,
-              shareToken,
-              editToken: mapperResult.editToken ?? null,
-            });
-            return {
-              label: cat.label || `Evolution ${index + 1}`,
-              catData: cat.catData,
-              profileId: toId("cat_profile", profileId),
-              encoded,
-              shareToken,
-              editToken: mapperResult.editToken ?? undefined,
-            };
-          }),
-        );
-        const settings = buildEvolutionBatchSettings(result, starterSource);
-        const batch = await createBatch({
-          cats: catsPayload,
-          settings: {
-            ...settings,
-            batchTitle: currentMeta.title,
-            batchCreator: currentMeta.creator,
-          },
+        const saved = await persistEvolutionBatch({
+          result,
+          starterSource,
           title: currentMeta.title,
-          creatorName: currentMeta.creator,
+          creator: currentMeta.creator,
+          createMapper,
+          createBatch,
         });
         setRecords((previous) =>
           previous.map((record) => {
-            const persisted = persistedCats.find(
+            const persisted = saved.persistedCats.find(
               (item) => item.key === record.key,
             );
             return persisted ? { ...record, ...persisted } : record;
           }),
         );
-        setLastSavedId(batch.id ?? null);
-        setLastSavedToken(batch.slug ?? batch.shareToken ?? null);
+        setLastSavedId(saved.batchId);
+        setLastSavedToken(saved.batchSlug);
         setSaveState("saved");
       } catch (saveError) {
         console.error("Failed to save evolution batch", saveError);
@@ -462,27 +389,7 @@ export function EvolutionGeneratorClient() {
           creatorName: historyRecord.creatorName ?? null,
         };
       } else {
-        const { generateRandomParamsV3Detailed } = await import(
-          "@/lib/cat-v3/randomGenerator"
-        );
-        const randomStarter = await generateRandomParamsV3Detailed({
-          exactLayerCounts: true,
-          slotOverrides: {
-            accessories: 0,
-            scars: 0,
-            tortie: 0,
-          },
-        });
-        starterPayload = {
-          params: applyEvolutionStarterHairToParams(
-            cleanRandomStarterLayers(randomStarter.params),
-            starterHair,
-          ),
-          accessorySlots: [],
-          scarSlots: [],
-          tortieSlots: [],
-          counts: { accessories: 0, scars: 0, tortie: 0 },
-        };
+        starterPayload = await buildRandomEvolutionStarter(hairSprite);
         starterSource = { type: "random" };
       }
 

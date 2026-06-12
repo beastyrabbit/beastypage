@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  STREAM_WHEEL_PRIZES,
   buildStreamWheelUpdate,
   pickStreamWheelSpin,
+  STREAM_WHEEL_PRIZES,
 } from "@/convex/streamWheel";
 import { CLASSIC_WHEEL_PRIZES } from "@/lib/wheel/classicWheel";
 
@@ -49,12 +49,14 @@ describe("pickStreamWheelSpin", () => {
     });
   });
 
-  it.each([-1, 100, 0.5, Number.NaN])(
-    "rejects invalid bucket %s",
-    (randomBucket) => {
-      expect(() => pickStreamWheelSpin(randomBucket)).toThrow(RangeError);
-    },
-  );
+  it.each([
+    -1,
+    100,
+    0.5,
+    Number.NaN,
+  ])("rejects invalid bucket %s", (randomBucket) => {
+    expect(() => pickStreamWheelSpin(randomBucket)).toThrow(RangeError);
+  });
 });
 
 describe("buildStreamWheelUpdate", () => {
@@ -126,5 +128,36 @@ describe("buildStreamWheelUpdate", () => {
       randomBucket: 99,
       createdAt: 123,
     });
+  });
+
+  it("carries the share viewSlug through to the wheel command", () => {
+    const wheelSpin = pickStreamWheelSpin(99);
+    const update = buildStreamWheelUpdate(
+      {
+        currentCommand: {
+          type: "spin",
+          seq: 7,
+          params: { colour: "BLACK" },
+          viewSlug: "AbCd1234",
+        },
+      },
+      wheelSpin,
+      123,
+    );
+
+    expect(update.patch.currentCommand.viewSlug).toBe("AbCd1234");
+  });
+
+  it("omits viewSlug when the source spin has none", () => {
+    const wheelSpin = pickStreamWheelSpin(99);
+    const update = buildStreamWheelUpdate(
+      {
+        currentCommand: { type: "spin", seq: 7, params: { colour: "BLACK" } },
+      },
+      wheelSpin,
+      123,
+    );
+
+    expect("viewSlug" in update.patch.currentCommand).toBe(false);
   });
 });

@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { OBSSpinClient } from "@/components/stream-control/OBSSpinClient";
+import { ObsOverlayClient } from "@/components/stream-control/obs/ObsOverlayClient";
 
 function OBSOverlayInner() {
   const searchParams = useSearchParams();
@@ -16,7 +16,7 @@ function OBSOverlayInner() {
     );
   }
 
-  return <OBSSpinClient apiKey={apiKey} />;
+  return <ObsOverlayClient apiKey={apiKey} />;
 }
 
 export default function OBSOverlayPage() {
