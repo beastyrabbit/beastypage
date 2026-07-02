@@ -73,7 +73,11 @@ function ensureJson(contentType: string | null): string | null {
 }
 
 function isManualRedirect(response: Response): boolean {
-  return response.status >= 300 && response.status < 400;
+  return (
+    response.type === "opaqueredirect" ||
+    response.status === 0 ||
+    (response.status >= 300 && response.status < 400)
+  );
 }
 
 function streamWithFinalizer(
