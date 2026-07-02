@@ -69,7 +69,7 @@ export default function TestsLanding() {
           </p>
           <div className="mt-auto flex gap-2 text-xs">
             <Link
-              href="/gatcha"
+              href="/projects/gacha"
               className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 font-semibold text-foreground transition hover:bg-foreground hover:text-background"
             >
               Back to Gacha
@@ -104,6 +104,7 @@ export default function TestsLanding() {
             </Link>
           </div>
         </div>
+
       </section>
     </main>
   );

@@ -1016,7 +1016,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
         </div>
         <div className="flex gap-2">
           <Link
-            href="/gatcha"
+            href="/projects/gacha"
             className="rounded-full border border-border/60 px-3 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
           >
             Back to Generator

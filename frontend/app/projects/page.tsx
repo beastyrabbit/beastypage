@@ -27,9 +27,11 @@ const CATEGORY_TOOLS = {
   ],
   gacha: [
     { title: "Single Cat Plus", icon: "💫" },
+    { title: "Single Cat Gen", icon: "✨" },
+    { title: "Less Spin", icon: "🎯" },
+    { title: "Cat Settings", icon: "⚙️" },
     { title: "CatGen History", icon: "🗂️" },
     { title: "Classic Wheel", icon: "🎡" },
-    { title: "Single Cat Gen", icon: "✨" },
     { title: "Adoption Gen", icon: "🐾" },
     { title: "Evolution Lines", icon: "🌿" },
     { title: "Streamer Voting", icon: "📺" },

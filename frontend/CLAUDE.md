@@ -24,7 +24,7 @@ A pixel cat gacha platform featuring:
 ```
 frontend/
 ├── app/                    # Next.js App Router pages
-│   ├── gatcha/             # Main gacha landing
+│   ├── projects/           # Category hubs (gacha, games, tools, artist, warrior-cats)
 │   ├── single-cat-plus/    # Cat generator
 │   ├── catdex/             # Cat collection browser
 │   ├── wheel/              # Gacha wheel

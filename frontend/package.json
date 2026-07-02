@@ -2,6 +2,7 @@
   "name": "frontend",
   "version": "1.6.2",
   "private": true,
+  "portless": "beastypage",
   "scripts": {
     "dev": "portless run next dev",
     "test": "vitest",

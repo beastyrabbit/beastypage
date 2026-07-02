@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Collection Focus Test",
-  description:
-    "Internal testing route for collection focus behavior in gatcha.",
+  description: "Internal testing route for collection focus behavior.",
 };
 
 export default function CollectionFocusLayout({

@@ -109,10 +109,27 @@ const nextConfig = {
         destination: "https://moddrop.live/:path*/",
         permanent: true,
       },
-      // Redirect old /gatcha to new /projects
+      // Redirect old /gatcha hub to its successor category page
+      // (:path* also matches zero segments, covering bare /gatcha;
+      // explicit trailing-slash variants needed with skipTrailingSlashRedirect)
       {
-        source: "/gatcha",
-        destination: "/projects",
+        source: "/gatcha/testing/collection-focus",
+        destination: "/tests/collection-focus",
+        permanent: true,
+      },
+      {
+        source: "/gatcha/testing/collection-focus/",
+        destination: "/tests/collection-focus",
+        permanent: true,
+      },
+      {
+        source: "/gatcha/:path*",
+        destination: "/projects/gacha",
+        permanent: true,
+      },
+      {
+        source: "/gatcha/:path*/",
+        destination: "/projects/gacha",
         permanent: true,
       },
       // Redirect /personal to / (home)
