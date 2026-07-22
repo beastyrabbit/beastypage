@@ -10,13 +10,13 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^2.0.0
-        version: 2.0.11(hono@4.12.10)
+        version: 2.0.11(hono@4.12.27)
       '@hono/zod-validator':
         specifier: ^0.7.6
-        version: 0.7.6(hono@4.12.10)(zod@4.3.6)
+        version: 0.7.6(hono@4.12.27)(zod@4.3.6)
       hono:
         specifier: ^4.11.7
-        version: 4.12.10
+        version: 4.12.27
       sharp:
         specifier: 0.33.5
         version: 0.33.5
@@ -381,8 +381,8 @@ packages:
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
     os: [darwin]
 
-  hono@4.12.10:
-    resolution: {integrity: sha512-mx/p18PLy5og9ufies2GOSUqep98Td9q4i/EF6X7yJgAiIopxqdfIO3jbqsi3jRgTgw88jMDEzVKi+V2EF+27w==}
+  hono@4.12.27:
+    resolution: {integrity: sha512-1yrb/+w6HWQJrUCLkJ2IF5jNIPvvFkblV5RNOYl6bV+OA6p9GLcMpHFFGTosSvHvcAUibuUukRqhlYI4z32C7Q==}
     engines: {node: '>=16.9.0'}
 
   is-arrayish@0.3.4:
@@ -647,13 +647,13 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@hono/node-server@2.0.11(hono@4.12.10)':
+  '@hono/node-server@2.0.11(hono@4.12.27)':
     dependencies:
-      hono: 4.12.10
+      hono: 4.12.27
 
-  '@hono/zod-validator@0.7.6(hono@4.12.10)(zod@4.3.6)':
+  '@hono/zod-validator@0.7.6(hono@4.12.27)(zod@4.3.6)':
     dependencies:
-      hono: 4.12.10
+      hono: 4.12.27
       zod: 4.3.6
 
   '@img/sharp-darwin-arm64@0.33.5':
@@ -895,7 +895,7 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
-  hono@4.12.10: {}
+  hono@4.12.27: {}
 
   is-arrayish@0.3.4: {}
 
