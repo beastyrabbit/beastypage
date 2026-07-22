@@ -9,6 +9,7 @@
     "test": "vitest"
   },
   "devDependencies": {
+    "@types/node": "^25.9.5",
     "typescript": "^6.0.2",
     "vitest": "^4.1.2"
   },
@@ -16,7 +17,7 @@
     "@hono/node-server": "^2.0.0",
     "@hono/zod-validator": "^0.7.6",
     "hono": "^4.11.7",
-    "sharp": "0.33.5",
+    "sharp": "0.35.3",
     "zod": "^4.3.6"
   }
 }

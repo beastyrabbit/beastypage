@@ -27,7 +27,7 @@ export async function executePipeline(
   const results = new Map<string, Buffer>();
   results.set("original", original);
 
-  let lastResult = original;
+  let lastResult: Buffer = original;
   let stepsProcessed = 0;
 
   for (const step of steps) {
