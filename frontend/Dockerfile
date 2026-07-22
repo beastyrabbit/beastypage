@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.6
+# syntax=docker/dockerfile:1.25
 
 # Stage 1: Install dependencies
 FROM node:22-alpine AS deps

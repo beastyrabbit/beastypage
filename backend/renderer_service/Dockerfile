@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.6
+# syntax=docker/dockerfile:1.25
 
 # Stage 1: Build with uv
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
@@ -17,7 +17,7 @@ COPY renderer_service ./renderer_service
 COPY sprites ./sprites
 
 # Stage 2: Production image
-FROM python:3.11-slim-bookworm AS runner
+FROM python:3.14-slim-bookworm AS runner
 WORKDIR /app
 
 # Install OS dependencies for pygame and pillow
