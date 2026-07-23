@@ -5,6 +5,7 @@ scripts:
     trap 'printf "failed\n" > "$setup_status"' EXIT
     printf "running\n" > "$setup_status"
     corepack pnpm@10.33.0 install
+    pnpm rebuild sharp
     lefthook install
     pnpm env:check
     printf "ready\n" > "$setup_status"
