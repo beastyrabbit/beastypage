@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import {
   AlertTriangle,
   Check,
+  ClipboardPaste,
   Clock3,
   Copy,
   FileUp,
@@ -21,6 +22,10 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
+import {
+  imageFromPaste,
+  readClipboardImage,
+} from "@/lib/quick-share-clipboard";
 import { cn } from "@/lib/utils";
 
 type Policy = {
@@ -147,8 +152,12 @@ function normalizeShare<T extends ShareStatus>(item: T): T {
 export function QuickShareClient() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [mode, setMode] = useState<"file" | "url">("file");
+  const clipboardPasteRef = useRef<HTMLTextAreaElement>(null);
+  const [mode, setMode] = useState<"file" | "url" | "clipboard">("file");
   const [file, setFile] = useState<File | null>(null);
+  const [fileSource, setFileSource] = useState<"file" | "clipboard" | null>(
+    null,
+  );
   const [remoteUrl, setRemoteUrl] = useState("");
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [work, setWork] = useState<WorkState>({ kind: "idle" });
@@ -157,6 +166,17 @@ export function QuickShareClient() {
   const [history, setHistory] = useState<ShareStatus[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [now, setNow] = useState(0);
+
+  const selectFile = useCallback(
+    (nextFile: File | null, source: "file" | "clipboard") => {
+      setFile(nextFile);
+      setFileSource(nextFile ? source : null);
+      setActiveUpload(null);
+      setCurrent(null);
+      setWork({ kind: "idle" });
+    },
+    [],
+  );
 
   const apiFetch = useCallback(
     async <T,>(
@@ -347,10 +367,10 @@ export function QuickShareClient() {
     [apiFetch, waitForProcessing],
   );
 
-  async function startFileUpload(event: FormEvent) {
+  async function startFileUpload(event: FormEvent, selectedFile: File | null) {
     event.preventDefault();
-    if (!file || !policy) return;
-    if (file.size > policy.maxBytes) {
+    if (!selectedFile || !policy) return;
+    if (selectedFile.size > policy.maxBytes) {
       setWork({
         kind: "error",
         label: `This file is larger than the current ${formatBytes(
@@ -372,20 +392,20 @@ export function QuickShareClient() {
       }>("/i/api/uploads", {
         method: "POST",
         body: JSON.stringify({
-          name: file.name,
-          mime: file.type || undefined,
-          size: file.size,
+          name: selectedFile.name,
+          mime: selectedFile.type || undefined,
+          size: selectedFile.size,
         }),
       });
       const upload: ActiveUpload = {
         ...created,
         url: shareUrl(created.slug, created.url),
-        name: file.name,
-        size: file.size,
+        name: selectedFile.name,
+        size: selectedFile.size,
         createdAt: Date.now(),
       };
       remember(upload);
-      await uploadParts(file, upload);
+      await uploadParts(selectedFile, upload);
     } catch (error) {
       setWork({ kind: "error", label: errorMessage(error) });
     }
@@ -472,6 +492,65 @@ export function QuickShareClient() {
     work.kind === "preparing" ||
     work.kind === "uploading" ||
     work.kind === "processing";
+  const deviceFile = fileSource === "file" ? file : null;
+  const pastedFile = fileSource === "clipboard" ? file : null;
+
+  const acceptPastedImage = useCallback(
+    (clipboardData: Pick<DataTransfer, "files" | "items">) => {
+      const pasted = imageFromPaste(clipboardData);
+      if (!pasted) {
+        setWork({
+          kind: "error",
+          label: "No image was found in the clipboard.",
+        });
+        return;
+      }
+      selectFile(pasted, "clipboard");
+    },
+    [selectFile],
+  );
+
+  useEffect(() => {
+    if (mode !== "clipboard" || busy) return;
+    const handlePaste = (event: ClipboardEvent) => {
+      if (!event.clipboardData) return;
+      event.preventDefault();
+      acceptPastedImage(event.clipboardData);
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [acceptPastedImage, busy, mode]);
+
+  async function pasteFromClipboard() {
+    if (!navigator.clipboard?.read) {
+      clipboardPasteRef.current?.focus();
+      setWork({
+        kind: "error",
+        label:
+          "Direct clipboard access is unavailable here. Tap the paste area and use your browser’s Paste command.",
+      });
+      return;
+    }
+    try {
+      const pasted = await readClipboardImage(navigator.clipboard);
+      if (!pasted) {
+        setWork({
+          kind: "error",
+          label: "No image was found in the clipboard.",
+        });
+        return;
+      }
+      selectFile(pasted, "clipboard");
+    } catch {
+      clipboardPasteRef.current?.focus();
+      setWork({
+        kind: "error",
+        label:
+          "Clipboard access was blocked. Tap the paste area and use your browser’s Paste command.",
+      });
+    }
+  }
+
   const currentLimit = useMemo(
     () =>
       policy
@@ -487,7 +566,7 @@ export function QuickShareClient() {
           Quick Share
         </h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">
-          Pick a photo or video and get a short link that opens the media
+          Pick or paste a photo or video and get a short link that opens it
           directly.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">{currentLimit}</p>
@@ -501,21 +580,21 @@ export function QuickShareClient() {
               role="tab"
               aria-selected={mode === "file"}
               className={cn(
-                "flex-1 border-b-2 px-4 py-3 text-sm font-medium transition",
+                "flex-1 border-b-2 px-2 py-3 text-xs font-medium transition sm:px-4 sm:text-sm",
                 mode === "file"
                   ? "border-amber-500 text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",
               )}
               onClick={() => setMode("file")}
             >
-              Photo or video
+              Photo/video
             </button>
             <button
               type="button"
               role="tab"
               aria-selected={mode === "url"}
               className={cn(
-                "flex-1 border-b-2 px-4 py-3 text-sm font-medium transition",
+                "flex-1 border-b-2 px-2 py-3 text-xs font-medium transition sm:px-4 sm:text-sm",
                 mode === "url"
                   ? "border-amber-500 text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground",
@@ -524,21 +603,35 @@ export function QuickShareClient() {
             >
               From a link
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "clipboard"}
+              className={cn(
+                "flex-1 border-b-2 px-2 py-3 text-xs font-medium transition sm:px-4 sm:text-sm",
+                mode === "clipboard"
+                  ? "border-amber-500 text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setMode("clipboard")}
+            >
+              Clipboard
+            </button>
           </div>
 
           <div className="p-4 sm:p-6">
             {mode === "file" ? (
-              <form onSubmit={startFileUpload} className="space-y-5">
+              <form
+                onSubmit={(event) => startFileUpload(event, deviceFile)}
+                className="space-y-5"
+              >
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*,video/*,.heic,.heif,.avif,.tif,.tiff,.mkv,.avi"
                   className="sr-only"
                   onChange={(event) => {
-                    setFile(event.target.files?.[0] ?? null);
-                    setActiveUpload(null);
-                    setCurrent(null);
-                    setWork({ kind: "idle" });
+                    selectFile(event.target.files?.[0] ?? null, "file");
                   }}
                 />
                 <button
@@ -548,17 +641,17 @@ export function QuickShareClient() {
                 >
                   <FileUp className="mb-4 size-7 text-amber-400" />
                   <span className="font-medium">
-                    {file ? file.name : "Choose photo or video"}
+                    {deviceFile ? deviceFile.name : "Choose photo or video"}
                   </span>
                   <span className="mt-2 text-xs text-muted-foreground">
-                    {file
-                      ? `${formatBytes(file.size)} · tap to choose another`
+                    {deviceFile
+                      ? `${formatBytes(deviceFile.size)} · tap to choose another`
                       : "Camera, photo library, or files"}
                   </span>
                 </button>
                 <button
                   type="submit"
-                  disabled={!file || !policy || busy}
+                  disabled={!deviceFile || !policy || busy}
                   className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {busy ? (
@@ -567,7 +660,7 @@ export function QuickShareClient() {
                   Create link
                 </button>
               </form>
-            ) : (
+            ) : mode === "url" ? (
               <form onSubmit={startImport} className="space-y-5">
                 <label
                   className="block text-sm font-medium"
@@ -595,6 +688,56 @@ export function QuickShareClient() {
                 <button
                   type="submit"
                   disabled={!remoteUrl.trim() || !policy || busy}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busy ? (
+                    <LoaderCircle className="size-4 animate-spin" />
+                  ) : null}
+                  Create link
+                </button>
+              </form>
+            ) : (
+              <form
+                onSubmit={(event) => startFileUpload(event, pastedFile)}
+                className="space-y-5"
+              >
+                <div className="relative min-h-44 overflow-hidden rounded-lg border border-dashed border-border transition focus-within:border-amber-500 focus-within:bg-amber-500/5 focus-within:ring-2 focus-within:ring-amber-500">
+                  <textarea
+                    ref={clipboardPasteRef}
+                    value=""
+                    inputMode="none"
+                    aria-label="Paste an image from the clipboard"
+                    className="absolute inset-0 z-10 size-full cursor-text resize-none bg-transparent text-transparent caret-transparent outline-none"
+                    onChange={() => {}}
+                  />
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 py-8 text-center">
+                    <ClipboardPaste className="mb-4 size-7 text-amber-400" />
+                    <span className="font-medium">
+                      {pastedFile ? pastedFile.name : "Paste an image here"}
+                    </span>
+                    <span className="mt-2 text-xs text-muted-foreground">
+                      {pastedFile
+                        ? `${formatBytes(pastedFile.size)} · paste again to replace`
+                        : "Tap and choose Paste, or press Ctrl/⌘+V"}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-semibold transition hover:border-amber-500/50 hover:bg-amber-500/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => void pasteFromClipboard()}
+                >
+                  <ClipboardPaste className="size-4" />
+                  {pastedFile ? "Replace from clipboard" : "Read clipboard"}
+                </button>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Clipboard access depends on your browser. The paste area works
+                  when direct access is unavailable.
+                </p>
+                <button
+                  type="submit"
+                  disabled={!pastedFile || !policy || busy}
                   className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {busy ? (
