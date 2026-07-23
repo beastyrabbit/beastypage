@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import {
   imageFromPaste,
+  imageFromPastedMarkup,
   readClipboardImage,
 } from "@/lib/quick-share-clipboard";
 import { cn } from "@/lib/utils";
@@ -152,7 +153,7 @@ function normalizeShare<T extends ShareStatus>(item: T): T {
 export function QuickShareClient() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const clipboardPasteRef = useRef<HTMLTextAreaElement>(null);
+  const clipboardPasteRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"file" | "url" | "clipboard">("file");
   const [file, setFile] = useState<File | null>(null);
   const [fileSource, setFileSource] = useState<"file" | "clipboard" | null>(
@@ -498,24 +499,60 @@ export function QuickShareClient() {
   const acceptPastedImage = useCallback(
     (clipboardData: Pick<DataTransfer, "files" | "items">) => {
       const pasted = imageFromPaste(clipboardData);
-      if (!pasted) {
-        setWork({
-          kind: "error",
-          label: "No image was found in the clipboard.",
-        });
-        return;
-      }
+      if (!pasted) return false;
       selectFile(pasted, "clipboard");
+      return true;
     },
     [selectFile],
   );
+
+  const acceptPastedMarkup = useCallback(async () => {
+    const target = clipboardPasteRef.current;
+    if (!target) return;
+    try {
+      const pasted = await imageFromPastedMarkup(target);
+      target.replaceChildren();
+      if (pasted) {
+        selectFile(pasted, "clipboard");
+        return;
+      }
+      setWork({
+        kind: "error",
+        label: "Safari did not provide image data for that paste.",
+      });
+    } catch {
+      target.replaceChildren();
+      setWork({
+        kind: "error",
+        label: "Safari could not read the pasted image.",
+      });
+    }
+  }, [selectFile]);
 
   useEffect(() => {
     if (mode !== "clipboard" || busy) return;
     const handlePaste = (event: ClipboardEvent) => {
       if (!event.clipboardData) return;
+      if (acceptPastedImage(event.clipboardData)) {
+        event.preventDefault();
+        return;
+      }
+
+      const target = clipboardPasteRef.current;
+      if (target?.contains(event.target as Node)) {
+        // WebKit exposes some iOS images only by inserting an <img> with a
+        // temporary blob URL into a rich editable target. Let that default
+        // paste happen, then extract the blob in the input event.
+        return;
+      }
+
       event.preventDefault();
-      acceptPastedImage(event.clipboardData);
+      target?.focus();
+      setWork({
+        kind: "error",
+        label:
+          "Safari did not expose the image directly. Tap and hold the paste area, then choose Paste.",
+      });
     };
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
@@ -534,9 +571,11 @@ export function QuickShareClient() {
     try {
       const pasted = await readClipboardImage(navigator.clipboard);
       if (!pasted) {
+        clipboardPasteRef.current?.focus();
         setWork({
           kind: "error",
-          label: "No image was found in the clipboard.",
+          label:
+            "Safari did not expose the image directly. Tap and hold the paste area, then choose Paste.",
         });
         return;
       }
@@ -702,13 +741,18 @@ export function QuickShareClient() {
                 className="space-y-5"
               >
                 <div className="relative min-h-44 overflow-hidden rounded-lg border border-dashed border-border transition focus-within:border-amber-500 focus-within:bg-amber-500/5 focus-within:ring-2 focus-within:ring-amber-500">
-                  <textarea
+                  {/* WebKit requires a rich editable target to expose some iOS image pastes. */}
+                  {/* biome-ignore lint/a11y/useSemanticElements: an input or textarea cannot receive WebKit's pasted image markup */}
+                  <div
                     ref={clipboardPasteRef}
-                    value=""
+                    contentEditable={!busy}
+                    suppressContentEditableWarning
                     inputMode="none"
+                    role="textbox"
+                    tabIndex={0}
                     aria-label="Paste an image from the clipboard"
-                    className="absolute inset-0 z-10 size-full cursor-text resize-none bg-transparent text-transparent caret-transparent outline-none"
-                    onChange={() => {}}
+                    className="absolute inset-0 z-10 size-full cursor-text overflow-hidden bg-transparent text-transparent caret-transparent outline-none [&_img]:opacity-0"
+                    onInput={() => void acceptPastedMarkup()}
                   />
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 py-8 text-center">
                     <ClipboardPaste className="mb-4 size-7 text-amber-400" />

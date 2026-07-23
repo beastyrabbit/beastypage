@@ -58,6 +58,22 @@ export function imageFromPaste(data: ClipboardData, now = Date.now()) {
   return null;
 }
 
+export async function imageFromPastedMarkup(
+  container: ParentNode,
+  now = Date.now(),
+) {
+  const image = container.querySelector("img");
+  const source = image?.getAttribute("src")?.trim() ?? "";
+  if (!source.startsWith("blob:") && !source.startsWith("data:image/")) {
+    return null;
+  }
+
+  const response = await fetch(source);
+  if (!response.ok) return null;
+  const blob = await response.blob();
+  return clipboardImageFile(blob, blob.type || "image/png", now);
+}
+
 export async function readClipboardImage(
   reader: ClipboardReader,
   now = Date.now(),
