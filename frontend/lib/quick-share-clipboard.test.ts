@@ -3,7 +3,10 @@ import {
   clipboardImageFile,
   imageFromPaste,
   imageFromPastedMarkup,
+  imageUrlFromPaste,
+  imageUrlFromPastedMarkup,
   readClipboardImage,
+  readClipboardMedia,
 } from "./quick-share-clipboard";
 
 const NOW = Date.UTC(2026, 6, 23, 13, 15, 0);
@@ -79,6 +82,70 @@ describe("quick share clipboard images", () => {
 
     expect(result?.name).toBe("clipboard-2026-07-23T131500Z.png");
     expect(result?.type).toBe("image/png");
+  });
+
+  it("recovers an image URL from Safari clipboard formats", () => {
+    const values: Record<string, string> = {
+      "text/uri-list":
+        "# copied image\nhttps://dance-charts.b-cdn.net/images/Rick-Astley.jpg",
+      "text/html": '<img src="https://example.com/lower-priority-image.jpg">',
+      "text/plain": "https://example.com/lowest-priority-image.jpg",
+    };
+
+    expect(
+      imageUrlFromPaste({
+        files: [] as unknown as FileList,
+        items: [] as unknown as DataTransferItemList,
+        getData: (type) => values[type] ?? "",
+      }),
+    ).toBe("https://dance-charts.b-cdn.net/images/Rick-Astley.jpg");
+  });
+
+  it("recovers an HTTPS image source from pasted editable markup", () => {
+    const root = document.createElement("div");
+    root.innerHTML =
+      '<img src="https://dance-charts.b-cdn.net/images/Rick-Astley.jpg">';
+
+    expect(imageUrlFromPastedMarkup(root)).toBe(
+      "https://dance-charts.b-cdn.net/images/Rick-Astley.jpg",
+    );
+  });
+
+  it("reads an image URL from the async Clipboard API", async () => {
+    const result = await readClipboardMedia({
+      read: vi.fn(async () => [
+        {
+          types: ["text/html"],
+          getType: vi.fn(
+            async () =>
+              new Blob(
+                [
+                  '<img src="https://dance-charts.b-cdn.net/images/Rick-Astley.jpg">',
+                ],
+                { type: "text/html" },
+              ),
+          ),
+        },
+      ]),
+    });
+
+    expect(result).toEqual({
+      kind: "url",
+      url: "https://dance-charts.b-cdn.net/images/Rick-Astley.jpg",
+    });
+  });
+
+  it("rejects unsafe clipboard URL schemes", () => {
+    const root = document.createElement("div");
+    root.innerHTML = '<img src="javascript:alert(1)">';
+    expect(imageUrlFromPastedMarkup(root)).toBeNull();
+    expect(
+      imageUrlFromPaste({
+        files: [] as unknown as FileList,
+        items: [] as unknown as DataTransferItemList,
+        getData: () => "file:///private/var/mobile/image.jpg",
+      }),
+    ).toBeNull();
   });
 
   it("rejects empty and non-image clipboard content", async () => {

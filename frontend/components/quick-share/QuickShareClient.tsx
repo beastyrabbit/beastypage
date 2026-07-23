@@ -25,7 +25,9 @@ import { toast } from "sonner";
 import {
   imageFromPaste,
   imageFromPastedMarkup,
-  readClipboardImage,
+  imageUrlFromPaste,
+  imageUrlFromPastedMarkup,
+  readClipboardMedia,
 } from "@/lib/quick-share-clipboard";
 import { cn } from "@/lib/utils";
 
@@ -496,20 +498,43 @@ export function QuickShareClient() {
   const deviceFile = fileSource === "file" ? file : null;
   const pastedFile = fileSource === "clipboard" ? file : null;
 
-  const acceptPastedImage = useCallback(
-    (clipboardData: Pick<DataTransfer, "files" | "items">) => {
-      const pasted = imageFromPaste(clipboardData);
-      if (!pasted) return false;
-      selectFile(pasted, "clipboard");
-      return true;
+  const acceptClipboardUrl = useCallback(
+    (url: string) => {
+      selectFile(null, "clipboard");
+      setRemoteUrl(url);
+      setMode("url");
+      toast.success("Image link recovered from clipboard");
     },
     [selectFile],
+  );
+
+  const acceptPastedContent = useCallback(
+    (clipboardData: DataTransfer) => {
+      const pasted = imageFromPaste(clipboardData);
+      if (pasted) {
+        selectFile(pasted, "clipboard");
+        return true;
+      }
+      const url = imageUrlFromPaste(clipboardData);
+      if (url) {
+        acceptClipboardUrl(url);
+        return true;
+      }
+      return false;
+    },
+    [acceptClipboardUrl, selectFile],
   );
 
   const acceptPastedMarkup = useCallback(async () => {
     const target = clipboardPasteRef.current;
     if (!target) return;
     try {
+      const url = imageUrlFromPastedMarkup(target);
+      if (url) {
+        target.replaceChildren();
+        acceptClipboardUrl(url);
+        return;
+      }
       const pasted = await imageFromPastedMarkup(target);
       target.replaceChildren();
       if (pasted) {
@@ -527,13 +552,13 @@ export function QuickShareClient() {
         label: "Safari could not read the pasted image.",
       });
     }
-  }, [selectFile]);
+  }, [acceptClipboardUrl, selectFile]);
 
   useEffect(() => {
     if (mode !== "clipboard" || busy) return;
     const handlePaste = (event: ClipboardEvent) => {
       if (!event.clipboardData) return;
-      if (acceptPastedImage(event.clipboardData)) {
+      if (acceptPastedContent(event.clipboardData)) {
         event.preventDefault();
         return;
       }
@@ -556,7 +581,7 @@ export function QuickShareClient() {
     };
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
-  }, [acceptPastedImage, busy, mode]);
+  }, [acceptPastedContent, busy, mode]);
 
   async function pasteFromClipboard() {
     if (!navigator.clipboard?.read) {
@@ -569,8 +594,8 @@ export function QuickShareClient() {
       return;
     }
     try {
-      const pasted = await readClipboardImage(navigator.clipboard);
-      if (!pasted) {
+      const media = await readClipboardMedia(navigator.clipboard);
+      if (!media) {
         clipboardPasteRef.current?.focus();
         setWork({
           kind: "error",
@@ -579,7 +604,11 @@ export function QuickShareClient() {
         });
         return;
       }
-      selectFile(pasted, "clipboard");
+      if (media.kind === "url") {
+        acceptClipboardUrl(media.url);
+        return;
+      }
+      selectFile(media.file, "clipboard");
     } catch {
       clipboardPasteRef.current?.focus();
       setWork({

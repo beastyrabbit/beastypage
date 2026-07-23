@@ -1,4 +1,5 @@
-type ClipboardData = Pick<DataTransfer, "files" | "items">;
+type ClipboardData = Pick<DataTransfer, "files" | "items"> &
+  Partial<Pick<DataTransfer, "getData">>;
 
 type ClipboardReaderItem = {
   types: readonly string[];
@@ -8,6 +9,10 @@ type ClipboardReaderItem = {
 type ClipboardReader = {
   read(): Promise<ClipboardReaderItem[]>;
 };
+
+export type ClipboardMedia =
+  | { kind: "file"; file: File }
+  | { kind: "url"; url: string };
 
 function extensionForMime(mime: string) {
   const known: Record<string, string> = {
@@ -58,6 +63,66 @@ export function imageFromPaste(data: ClipboardData, now = Date.now()) {
   return null;
 }
 
+function httpUrl(value: string) {
+  const candidate = value.trim();
+  if (!candidate) return null;
+  try {
+    const url = new URL(
+      candidate.startsWith("//") ? `https:${candidate}` : candidate,
+    );
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function firstUriListUrl(value: string) {
+  for (const line of value.split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    const url = httpUrl(line);
+    if (url) return url;
+  }
+  return null;
+}
+
+function urlFromHtml(value: string) {
+  if (!value.trim()) return null;
+  const document = new DOMParser().parseFromString(value, "text/html");
+  const candidates = [
+    document.querySelector("img")?.getAttribute("src"),
+    document.querySelector("a")?.getAttribute("href"),
+  ];
+  for (const candidate of candidates) {
+    const url = httpUrl(candidate ?? "");
+    if (url) return url;
+  }
+  return null;
+}
+
+export function imageUrlFromPaste(data: ClipboardData) {
+  if (!data.getData) return null;
+  return (
+    firstUriListUrl(data.getData("text/uri-list")) ??
+    urlFromHtml(data.getData("text/html")) ??
+    httpUrl(data.getData("text/plain"))
+  );
+}
+
+export function imageUrlFromPastedMarkup(container: ParentNode) {
+  const candidates = [
+    container.querySelector("img")?.getAttribute("src"),
+    container.querySelector("a")?.getAttribute("href"),
+    container.textContent,
+  ];
+  for (const candidate of candidates) {
+    const url = httpUrl(candidate ?? "");
+    if (url) return url;
+  }
+  return null;
+}
+
 export async function imageFromPastedMarkup(
   container: ParentNode,
   now = Date.now(),
@@ -74,17 +139,40 @@ export async function imageFromPastedMarkup(
   return clipboardImageFile(blob, blob.type || "image/png", now);
 }
 
-export async function readClipboardImage(
+export async function readClipboardMedia(
   reader: ClipboardReader,
   now = Date.now(),
-) {
+): Promise<ClipboardMedia | null> {
   const items = await reader.read();
   for (const item of items) {
     const mime = item.types.find((type) => type.startsWith("image/"));
     if (!mime) continue;
     const blob = await item.getType(mime);
     const file = clipboardImageFile(blob, mime, now);
-    if (file) return file;
+    if (file) return { kind: "file", file };
+  }
+
+  const textTypes = ["text/uri-list", "text/html", "text/plain"] as const;
+  for (const type of textTypes) {
+    for (const item of items) {
+      if (!item.types.includes(type)) continue;
+      const value = await (await item.getType(type)).text();
+      const url =
+        type === "text/uri-list"
+          ? firstUriListUrl(value)
+          : type === "text/html"
+            ? urlFromHtml(value)
+            : httpUrl(value);
+      if (url) return { kind: "url", url };
+    }
   }
   return null;
+}
+
+export async function readClipboardImage(
+  reader: ClipboardReader,
+  now = Date.now(),
+) {
+  const media = await readClipboardMedia(reader, now);
+  return media?.kind === "file" ? media.file : null;
 }
