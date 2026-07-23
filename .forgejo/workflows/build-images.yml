@@ -20,6 +20,10 @@ on:
         description: 'Build image processing service image'
         type: boolean
         default: true
+      build_media:
+        description: 'Build Quick Share media service image'
+        type: boolean
+        default: true
       build_discord_bot:
         description: 'Build Discord bot image'
         type: boolean
@@ -52,6 +56,7 @@ jobs:
       convex: ${{ steps.filter.outputs.convex }}
       renderer: ${{ steps.filter.outputs.renderer }}
       image_processing: ${{ steps.filter.outputs.image_processing }}
+      media: ${{ steps.filter.outputs.media }}
       discord_bot: ${{ steps.filter.outputs.discord_bot }}
     steps:
       - uses: actions/checkout@v7
@@ -91,6 +96,7 @@ jobs:
           set_output convex '^frontend/convex/'
           set_output renderer '^backend/renderer_service/'
           set_output image_processing '^backend/image_processing_service/'
+          set_output media '^backend/media_service/'
           set_output discord_bot '^backend/discord-bot/'
 
   # Tags don't have path-filter outputs, so compute whether Convex changed
@@ -457,5 +463,51 @@ jobs:
         with:
           context: ./backend/discord-bot
           file: ./backend/discord-bot/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+  build-media:
+    needs: changes
+    if: |
+      always() &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       needs.changes.outputs.media == 'true' ||
+       github.event.inputs.build_media == 'true')
+    runs-on: personal
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Docker CLI
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates docker.io
+          docker --version
+
+      - uses: docker/setup-buildx-action@v4
+        with:
+          driver: remote
+          endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
+
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-media
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./backend/media_service
+          file: ./backend/media_service/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}

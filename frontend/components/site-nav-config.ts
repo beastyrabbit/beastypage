@@ -2,6 +2,7 @@ export type NavAccent =
   | "dash"
   | "projects"
   | "stream"
+  | "quick-share"
   | "collection"
   | "personal";
 
@@ -16,6 +17,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "dash", label: "Dash", href: "/dash", authRequired: true },
   { key: "projects", label: "Projects", href: "/projects" },
   { key: "stream", label: "Stream Tools", href: "/stream" },
+  { key: "quick-share", label: "Quick Share", href: "/quick-share" },
   { key: "collection", label: "Collection", href: "/collection" },
   { key: "personal", label: "Personal", href: "/" },
 ];

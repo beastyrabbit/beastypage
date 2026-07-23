@@ -15,3 +15,9 @@ pre-commit:
     tsc-discord-bot:
       glob: "backend/discord-bot/**/*.ts"
       run: cd backend/discord-bot && npx tsc --noEmit
+    tsc-media-service:
+      glob: "backend/media_service/**/*.ts"
+      run: cd backend/media_service && pnpm run typecheck
+    lint-media-service:
+      glob: "backend/media_service/**/*.{ts,json}"
+      run: cd backend/media_service && pnpm run lint

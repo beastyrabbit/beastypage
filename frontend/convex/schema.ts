@@ -470,4 +470,109 @@ export default defineSchema({
   })
     .index("byUserTool", ["userId", "toolKey"])
     .index("byUserVariant", ["userId", "toolKey", "variantId"]),
+
+  quick_share_uploads: defineTable({
+    slug: v.string(),
+    source: v.union(v.literal("file"), v.literal("url")),
+    originalName: v.string(),
+    declaredMime: v.optional(v.string()),
+    detectedMime: v.optional(v.string()),
+    originalSize: v.number(),
+    originalKey: v.string(),
+    multipartUploadId: v.optional(v.string()),
+    publicKey: v.optional(v.string()),
+    publicMime: v.optional(v.string()),
+    publicSize: v.optional(v.number()),
+    importReservedBytes: v.optional(v.number()),
+    state: v.union(
+      v.literal("uploading"),
+      v.literal("processing"),
+      v.literal("ready"),
+      v.literal("unsupported"),
+      v.literal("failed"),
+      v.literal("removed"),
+    ),
+    receiptHash: v.string(),
+    ownerTokenIdentifier: v.optional(v.string()),
+    rateIdentity: v.string(),
+    ipHash: v.string(),
+    rawIp: v.string(),
+    publicExpiresAt: v.number(),
+    retainedUntil: v.number(),
+    active: v.boolean(),
+    extendedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    failureCode: v.optional(v.string()),
+    failureMessage: v.optional(v.string()),
+    compatibilityWarning: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_receiptHash", ["receiptHash"])
+    .index("by_ownerTokenIdentifier_and_publicExpiresAt", [
+      "ownerTokenIdentifier",
+      "publicExpiresAt",
+    ])
+    .index("by_rateIdentity_and_active", ["rateIdentity", "active"])
+    .index("by_ipHash_and_active", ["ipHash", "active"])
+    .index("by_ipHash_and_createdAt", ["ipHash", "createdAt"])
+    .index("by_state_and_createdAt", ["state", "createdAt"])
+    .index("by_active_and_publicExpiresAt", ["active", "publicExpiresAt"])
+    .index("by_retainedUntil", ["retainedUntil"]),
+
+  quick_share_parts: defineTable({
+    uploadId: v.id("quick_share_uploads"),
+    partNumber: v.number(),
+    etag: v.string(),
+    size: v.number(),
+    createdAt: v.number(),
+  }).index("by_uploadId_and_partNumber", ["uploadId", "partNumber"]),
+
+  quick_share_jobs: defineTable({
+    uploadId: v.id("quick_share_uploads"),
+    kind: v.union(v.literal("process"), v.literal("delete")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("leased"),
+      v.literal("done"),
+    ),
+    attempts: v.number(),
+    leaseId: v.optional(v.string()),
+    leaseExpiresAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status_and_createdAt", ["status", "createdAt"])
+    .index("by_uploadId_and_kind", ["uploadId", "kind"]),
+
+  quick_share_usage: defineTable({
+    identity: v.string(),
+    kind: v.union(v.literal("hour"), v.literal("day")),
+    windowStart: v.number(),
+    starts: v.number(),
+    bytes: v.number(),
+    expiresAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_identity_and_kind_and_windowStart", [
+      "identity",
+      "kind",
+      "windowStart",
+    ])
+    .index("by_expiresAt", ["expiresAt"]),
+
+  quick_share_bans: defineTable({
+    ipHash: v.string(),
+    rawIp: v.optional(v.string()),
+    rawIpExpiresAt: v.optional(v.number()),
+    reason: v.optional(v.string()),
+    active: v.boolean(),
+    createdBy: v.string(),
+    createdAt: v.number(),
+    removedAt: v.optional(v.number()),
+  })
+    .index("by_ipHash_and_active", ["ipHash", "active"])
+    .index("by_active_and_createdAt", ["active", "createdAt"])
+    .index("by_active_and_rawIpExpiresAt", ["active", "rawIpExpiresAt"]),
 });

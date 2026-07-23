@@ -29,7 +29,7 @@ const remotePatterns = (() => {
 })();
 
 const allowedDevOrigins = (() => {
-  const values = new Set();
+  const values = new Set(["*.beastypage.localhost"]);
   const envList = process.env.NEXT_ALLOWED_DEV_ORIGINS;
   if (envList) {
     for (const entry of envList.split(",")) {

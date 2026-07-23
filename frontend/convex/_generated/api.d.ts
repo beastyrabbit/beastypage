@@ -19,6 +19,7 @@ import type * as crons from "../crons.js";
 import type * as dashSettings from "../dashSettings.js";
 import type * as discord from "../discord.js";
 import type * as discordUserConfig from "../discordUserConfig.js";
+import type * as http from "../http.js";
 import type * as imageService from "../imageService.js";
 import type * as importer from "../importer.js";
 import type * as init from "../init.js";
@@ -28,6 +29,9 @@ import type * as paletteGeneratorSettingsActions from "../paletteGeneratorSettin
 import type * as perfectCats from "../perfectCats.js";
 import type * as pixelatorSettings from "../pixelatorSettings.js";
 import type * as previews from "../previews.js";
+import type * as quickShare from "../quickShare.js";
+import type * as quickShareHttp from "../quickShareHttp.js";
+import type * as quickSharePolicy from "../quickSharePolicy.js";
 import type * as rarities from "../rarities.js";
 import type * as seasons from "../seasons.js";
 import type * as singleCatSettings from "../singleCatSettings.js";
@@ -58,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   dashSettings: typeof dashSettings;
   discord: typeof discord;
   discordUserConfig: typeof discordUserConfig;
+  http: typeof http;
   imageService: typeof imageService;
   importer: typeof importer;
   init: typeof init;
@@ -67,6 +72,9 @@ declare const fullApi: ApiFromModules<{
   perfectCats: typeof perfectCats;
   pixelatorSettings: typeof pixelatorSettings;
   previews: typeof previews;
+  quickShare: typeof quickShare;
+  quickShareHttp: typeof quickShareHttp;
+  quickSharePolicy: typeof quickSharePolicy;
   rarities: typeof rarities;
   seasons: typeof seasons;
   singleCatSettings: typeof singleCatSettings;

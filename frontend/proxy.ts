@@ -26,6 +26,14 @@ function normalizeRoute(route: string | undefined) {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (pathname === "/quick-share" || pathname.startsWith("/quick-share/")) {
+    const response = NextResponse.next();
+    response.headers.set(
+      "X-Robots-Tag",
+      "noindex, nofollow, noarchive, nosnippet, noimageindex",
+    );
+    return response;
+  }
   if (pathname !== "" && pathname !== "/") {
     return NextResponse.next();
   }
@@ -45,5 +53,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/"],
+  matcher: ["/", "/quick-share/:path*"],
 };

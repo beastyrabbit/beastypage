@@ -187,6 +187,11 @@
   box-shadow: 0 4px 20px -4px oklch(0.6 0.2 140 / 0.5);
 }
 
+.nav-pill[data-accent="quick-share"].nav-pill--active {
+  background: linear-gradient(135deg, oklch(0.62 0.14 55), oklch(0.48 0.12 35));
+  box-shadow: 0 4px 20px -4px oklch(0.55 0.13 45 / 0.45);
+}
+
 .nav-pill[data-accent="collection"].nav-pill--active {
   background: linear-gradient(
     135deg,
