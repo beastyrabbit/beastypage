@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1.25
 
+ARG PYTHON_VERSION=3.13
+
 # Stage 1: Build with uv
-FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
+FROM ghcr.io/astral-sh/uv:python${PYTHON_VERSION}-bookworm-slim AS builder
 WORKDIR /app
 
 # Copy dependency files
@@ -17,7 +19,7 @@ COPY renderer_service ./renderer_service
 COPY sprites ./sprites
 
 # Stage 2: Production image
-FROM python:3.14-slim-bookworm AS runner
+FROM python:${PYTHON_VERSION}-slim-bookworm AS runner
 WORKDIR /app
 
 # Install OS dependencies for pygame and pillow
@@ -50,6 +52,11 @@ USER appuser
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV CG3_SPRITE_ROOT=/app/sprites
+
+# Fail the image build if the copied virtual environment cannot run under the
+# production interpreter or the service cannot import its ASGI application.
+RUN uvicorn --version \
+    && python -c "from renderer_service.app.main import app"
 
 EXPOSE 8001
 
