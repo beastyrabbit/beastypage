@@ -33,8 +33,8 @@ importers:
         specifier: 4.3.3
         version: 4.3.3
       binpackingjs:
-        specifier: ^3.0.2
-        version: 3.0.2
+        specifier: ^4.0.0
+        version: 4.1.0
       canvas-confetti:
         specifier: ^1.9.4
         version: 1.9.4
@@ -2548,8 +2548,8 @@ packages:
   bidi-js@1.0.3:
     resolution: {integrity: sha512-RKshQI1R3YQ+n9YJz2QQ147P66ELpa1FQEg20Dk8oW9t2KgLbpDLLp9aGZ7y8WHSshDknG0bknqGw5/tyCs5tw==}
 
-  binpackingjs@3.0.2:
-    resolution: {integrity: sha512-Rq5CrfYr4K/MNdqlPZDJ7jpd+/Em7beypGOTSlHck8E2Bth0x+mxmFoSKFsasOjDmBOG/TMb4FI9gtsLjxqOIg==}
+  binpackingjs@4.1.0:
+    resolution: {integrity: sha512-3QLGsCLItj6kRG2UBU7YzLFcgT+6t/WK6zVx6LR09s69A6eYcANoMZBGaGOQqxWQtyC64GIYRgVfMO0X9tF2+w==}
 
   bmp-ts@1.0.9:
     resolution: {integrity: sha512-cTEHk2jLrPyi+12M3dhpEbnnPOsaZuq7C45ylbbQIiWgDFZq4UVYPEY5mlqjvsj/6gJv9qX5sa+ebDzLXT28Vw==}
@@ -7757,7 +7757,7 @@ snapshots:
     dependencies:
       require-from-string: 2.0.2
 
-  binpackingjs@3.0.2: {}
+  binpackingjs@4.1.0: {}
 
   bmp-ts@1.0.9: {}
 

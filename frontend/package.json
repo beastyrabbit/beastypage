@@ -26,7 +26,7 @@
     "@napi-rs/canvas": "^1.0.0",
     "@scalar/nextjs-api-reference": "^0.11.11",
     "@tailwindcss/postcss": "4.3.3",
-    "binpackingjs": "^3.0.2",
+    "binpackingjs": "^4.0.0",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
