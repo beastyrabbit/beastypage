@@ -64,6 +64,10 @@ uv run uvicorn renderer_service.app.main:app --reload --port 8001
 |----------|-------------|
 | `QUICK_SHARE_WORKER_URL` | Public base URL Convex uses to dispatch Quick Share jobs (for example, `https://beastyrabbit.com`) |
 
+Quick Share background processing is event driven. See the
+[Convex cost incident and production runbook](docs/quick-share-convex-cost-incident.md)
+for the architecture, cost model, rollout lessons, and verification procedure.
+
 ### Runtime
 
 | Variable | Description | Default |
