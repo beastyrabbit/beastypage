@@ -325,7 +325,7 @@ async function processOriginal(
 
 export class MediaWorker {
 	private running = false;
-	private timer: NodeJS.Timeout | undefined;
+	private accepting = true;
 	private readonly config: Config;
 	private readonly control: ConvexControlPlane;
 	private readonly store: ObjectStore;
@@ -336,24 +336,36 @@ export class MediaWorker {
 		this.store = store;
 	}
 
-	start() {
-		if (!this.config.workerEnabled) return;
-		void this.tick();
-		this.timer = setInterval(() => void this.tick(), 2_000);
-	}
-
 	stop() {
-		if (this.timer) clearInterval(this.timer);
+		this.accepting = false;
 	}
 
-	private async tick() {
-		if (this.running) return;
+	async dispatch(jobId: string) {
+		if (!this.config.workerEnabled || !this.accepting || this.running) {
+			return "busy" as const;
+		}
 		this.running = true;
 		const leaseId = crypto.randomUUID();
 		let job: ClaimedJob | null = null;
 		try {
-			job = await this.control.call<ClaimedJob | null>("claimJob", { leaseId });
-			if (!job) return;
+			job = await this.control.call<ClaimedJob | null>("claimJob", {
+				jobId,
+				leaseId,
+			});
+			if (!job) {
+				this.running = false;
+				return "not-claimable" as const;
+			}
+			void this.process(job, leaseId);
+			return "accepted" as const;
+		} catch (error) {
+			this.running = false;
+			throw error;
+		}
+	}
+
+	private async process(job: ClaimedJob, leaseId: string) {
+		try {
 			if (job.kind === "delete") {
 				await this.store.delete(job.upload.originalKey);
 				if (

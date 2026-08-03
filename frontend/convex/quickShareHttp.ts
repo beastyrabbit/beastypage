@@ -1,8 +1,58 @@
+import { v } from "convex/values";
 import { internal } from "./_generated/api.js";
 import type { Id } from "./_generated/dataModel.js";
-import { httpAction } from "./_generated/server.js";
+import { httpAction, internalAction } from "./_generated/server.js";
 
 type JsonObject = Record<string, unknown>;
+
+const RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 60_000, 5 * 60_000];
+
+function retryDelay(attempt: number) {
+  return RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+}
+
+export const dispatchJob = internalAction({
+  args: {
+    jobId: v.id("quick_share_jobs"),
+    attempt: v.number(),
+  },
+  handler: async (ctx, args): Promise<null> => {
+    const workerUrl = process.env.QUICK_SHARE_WORKER_URL;
+    const internalToken = process.env.QUICK_SHARE_INTERNAL_TOKEN;
+
+    try {
+      if (!workerUrl || !internalToken) {
+        throw new Error("Quick Share worker dispatch is not configured");
+      }
+      const url = new URL(
+        `/i/api/internal/jobs/${encodeURIComponent(args.jobId)}`,
+        workerUrl,
+      );
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "x-quick-share-internal-token": internalToken },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) {
+        throw new Error(`Quick Share worker returned ${response.status}`);
+      }
+    } catch (error) {
+      console.error(
+        `[quick-share] could not dispatch job ${args.jobId}`,
+        error instanceof Error ? error.message : error,
+      );
+      if (args.attempt < RETRY_DELAYS_MS.length) {
+        await ctx.scheduler.runAfter(
+          retryDelay(args.attempt),
+          internal.quickShare.retryDispatchJob,
+          { jobId: args.jobId, attempt: args.attempt + 1 },
+        );
+      }
+    }
+
+    return null;
+  },
+});
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -218,6 +268,7 @@ export const quickShareInternal = httpAction(async (ctx, request) => {
       }
       case "claimJob": {
         const result = await ctx.runMutation(internal.quickShare.claimJob, {
+          jobId: requiredString(body, "jobId") as Id<"quick_share_jobs">,
           leaseId: requiredString(body, "leaseId"),
           now,
         });

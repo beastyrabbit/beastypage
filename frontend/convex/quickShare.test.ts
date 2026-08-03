@@ -151,7 +151,14 @@ describe("Quick Share Convex policy", () => {
         .unique(),
     );
     expect(job).not.toBeNull();
+    const scheduled = await t.run(async (ctx) =>
+      ctx.db.system.query("_scheduled_functions").take(20),
+    );
+    expect(scheduled.some((row) => row.name.endsWith(":dispatchJob"))).toBe(
+      true,
+    );
     const claimed = await t.mutation(internal.quickShare.claimJob, {
+      jobId: job?._id as Id<"quick_share_jobs">,
       leaseId: "lease",
       now: 1_800_000_000_020,
     });
@@ -169,6 +176,44 @@ describe("Quick Share Convex policy", () => {
     expect(upload?.state).toBe("unsupported");
   });
 
+  it("requeues a job when its worker lease expires", async () => {
+    const t = convexTest(schema, modules);
+    const created = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Abcdefg1"),
+    );
+    await t.mutation(internal.quickShare.markComplete, {
+      uploadId: created.id,
+      receiptHash: "receipt-Abcdefg1",
+      now: Date.now() - 30 * 60 * 1000,
+    });
+    const job = await t.run(async (ctx) =>
+      ctx.db
+        .query("quick_share_jobs")
+        .withIndex("by_uploadId_and_kind", (q) =>
+          q.eq("uploadId", created.id).eq("kind", "process"),
+        )
+        .unique(),
+    );
+    await t.mutation(internal.quickShare.claimJob, {
+      jobId: job?._id as Id<"quick_share_jobs">,
+      leaseId: "expired-lease",
+      now: Date.now() - 30 * 60 * 1000,
+    });
+
+    await t.mutation(internal.quickShare.recoverJobLease, {
+      jobId: job?._id as Id<"quick_share_jobs">,
+      leaseId: "expired-lease",
+    });
+
+    const recovered = await t.run(async (ctx) =>
+      ctx.db.get(job?._id as Id<"quick_share_jobs">),
+    );
+    expect(recovered?.status).toBe("pending");
+    expect(recovered?.leaseId).toBeUndefined();
+    expect(recovered?.leaseExpiresAt).toBeUndefined();
+  });
+
   it("does not resurrect a share removed while processing", async () => {
     const t = convexTest(schema, modules);
     const created = await t.mutation(
@@ -180,7 +225,16 @@ describe("Quick Share Convex policy", () => {
       receiptHash: "receipt-Abcdefg1",
       now: 1_800_000_000_010,
     });
+    const job = await t.run(async (ctx) =>
+      ctx.db
+        .query("quick_share_jobs")
+        .withIndex("by_uploadId_and_kind", (q) =>
+          q.eq("uploadId", created.id).eq("kind", "process"),
+        )
+        .unique(),
+    );
     const claimed = await t.mutation(internal.quickShare.claimJob, {
+      jobId: job?._id as Id<"quick_share_jobs">,
       leaseId: "lease",
       now: 1_800_000_000_020,
     });

@@ -11,6 +11,7 @@ import { hmac, randomReceipt, randomSlug, safeEqual } from "./crypto.ts";
 import { downloadRemote } from "./importer.ts";
 import { clientIp, normalizeIp } from "./ip.ts";
 import { ObjectStore } from "./objectStore.ts";
+import { MediaWorker } from "./processor.ts";
 import type {
 	AdminUpload,
 	PolicyResponse,
@@ -131,9 +132,16 @@ function unavailable() {
 	});
 }
 
-export function createApp(config: Config, store = new ObjectStore(config)) {
+type WorkerDispatcher = Pick<MediaWorker, "dispatch" | "stop">;
+
+export function createApp(
+	config: Config,
+	store = new ObjectStore(config),
+	workerOverride?: WorkerDispatcher,
+) {
 	const app = new Hono();
 	const control = new ConvexControlPlane(config);
+	const worker = workerOverride ?? new MediaWorker(config, control, store);
 
 	app.use(
 		"*",
@@ -209,6 +217,20 @@ export function createApp(config: Config, store = new ObjectStore(config)) {
 	}
 
 	app.get("/health", (c) => c.json({ status: "ok", service: "quick-share" }));
+
+	app.post("/i/api/internal/jobs/:id", async (c) => {
+		const token = c.req.header("x-quick-share-internal-token");
+		if (!token || !safeEqual(token, config.internalToken)) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
+		const outcome = await worker.dispatch(c.req.param("id"));
+		if (outcome === "busy") {
+			c.header("Retry-After", "1");
+			return c.json({ error: "Worker is busy" }, 503);
+		}
+		if (outcome === "not-claimable") return c.body(null, 204);
+		return c.json({ accepted: true }, 202);
+	});
 
 	app.get("/i/api/policy", async (c) => {
 		const { bearer } = requestContext(c);
@@ -754,5 +776,5 @@ export function createApp(config: Config, store = new ObjectStore(config)) {
 		),
 	);
 
-	return { app, control, store };
+	return { app, control, store, worker };
 }

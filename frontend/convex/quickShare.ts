@@ -28,6 +28,29 @@ const uploadStateValidator = v.union(
 
 const tierValidator = v.union(v.literal("anonymous"), v.literal("signedIn"));
 
+const JOB_LEASE_MS = 25 * 60 * 1000;
+
+async function enqueueJob(
+  ctx: MutationCtx,
+  uploadId: Id<"quick_share_uploads">,
+  kind: "process" | "delete",
+  now: number,
+) {
+  const jobId = await ctx.db.insert("quick_share_jobs", {
+    uploadId,
+    kind,
+    status: "pending",
+    attempts: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await ctx.scheduler.runAfter(0, internal.quickShareHttp.dispatchJob, {
+    jobId,
+    attempt: 0,
+  });
+  return jobId;
+}
+
 function publicUpload(doc: Doc<"quick_share_uploads">) {
   return {
     id: doc._id,
@@ -320,14 +343,7 @@ export const markComplete = internalMutation({
       multipartUploadId: undefined,
       updatedAt: args.now,
     });
-    await ctx.db.insert("quick_share_jobs", {
-      uploadId: upload._id,
-      kind: "process",
-      status: "pending",
-      attempts: 0,
-      createdAt: args.now,
-      updatedAt: args.now,
-    });
+    await enqueueJob(ctx, upload._id, "process", args.now);
     const updated = await ctx.db.get("quick_share_uploads", upload._id);
     if (!updated) throw new Error("UPLOAD_NOT_AVAILABLE");
     return publicUpload(updated);
@@ -401,14 +417,7 @@ export const finishImport = internalMutation({
       completedAt: args.now,
       updatedAt: args.now,
     });
-    await ctx.db.insert("quick_share_jobs", {
-      uploadId: upload._id,
-      kind: "process",
-      status: "pending",
-      attempts: 0,
-      createdAt: args.now,
-      updatedAt: args.now,
-    });
+    await enqueueJob(ctx, upload._id, "process", args.now);
     const updated = await ctx.db.get("quick_share_uploads", upload._id);
     if (!updated) throw new Error("UPLOAD_NOT_AVAILABLE");
     return publicUpload(updated);
@@ -522,25 +531,21 @@ export const extendUpload = internalMutation({
 });
 
 export const claimJob = internalMutation({
-  args: { leaseId: v.string(), now: v.number() },
+  args: {
+    jobId: v.id("quick_share_jobs"),
+    leaseId: v.string(),
+    now: v.number(),
+  },
   handler: async (ctx, args) => {
-    let job: Doc<"quick_share_jobs"> | undefined = (
-      await ctx.db
-        .query("quick_share_jobs")
-        .withIndex("by_status_and_createdAt", (q) => q.eq("status", "pending"))
-        .take(1)
-    )[0];
-    if (!job) {
-      const leased = await ctx.db
-        .query("quick_share_jobs")
-        .withIndex("by_status_and_createdAt", (q) => q.eq("status", "leased"))
-        .take(25);
-      job = leased.find(
-        (candidate) => (candidate.leaseExpiresAt ?? 0) <= args.now,
-      );
+    const job = await ctx.db.get("quick_share_jobs", args.jobId);
+    if (
+      !job ||
+      job.status === "done" ||
+      (job.status === "leased" && (job.leaseExpiresAt ?? 0) > args.now)
+    ) {
+      return null;
     }
-    if (!job) return null;
-    const leaseExpiresAt = args.now + 25 * 60 * 1000;
+    const leaseExpiresAt = args.now + JOB_LEASE_MS;
     await ctx.db.patch(job._id, {
       status: "leased",
       leaseId: args.leaseId,
@@ -553,6 +558,11 @@ export const claimJob = internalMutation({
       await ctx.db.patch(job._id, { status: "done", updatedAt: args.now });
       return null;
     }
+    await ctx.scheduler.runAfter(
+      JOB_LEASE_MS,
+      internal.quickShare.recoverJobLease,
+      { jobId: job._id, leaseId: args.leaseId },
+    );
     return {
       jobId: job._id,
       kind: job.kind,
@@ -568,6 +578,55 @@ export const claimJob = internalMutation({
         retainedUntil: upload.retainedUntil,
       },
     };
+  },
+});
+
+export const retryDispatchJob = internalMutation({
+  args: {
+    jobId: v.id("quick_share_jobs"),
+    attempt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const job = await ctx.db.get("quick_share_jobs", args.jobId);
+    if (!job || job.status !== "pending") return null;
+    await ctx.scheduler.runAfter(0, internal.quickShareHttp.dispatchJob, {
+      jobId: job._id,
+      attempt: args.attempt,
+    });
+    return null;
+  },
+});
+
+export const recoverJobLease = internalMutation({
+  args: {
+    jobId: v.id("quick_share_jobs"),
+    leaseId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const job = await ctx.db.get("quick_share_jobs", args.jobId);
+    if (!job || job.status !== "leased" || job.leaseId !== args.leaseId) {
+      return null;
+    }
+    const now = Date.now();
+    if ((job.leaseExpiresAt ?? 0) > now) {
+      await ctx.scheduler.runAfter(
+        (job.leaseExpiresAt as number) - now,
+        internal.quickShare.recoverJobLease,
+        args,
+      );
+      return null;
+    }
+    await ctx.db.patch(job._id, {
+      status: "pending",
+      leaseId: undefined,
+      leaseExpiresAt: undefined,
+      updatedAt: now,
+    });
+    await ctx.scheduler.runAfter(0, internal.quickShareHttp.dispatchJob, {
+      jobId: job._id,
+      attempt: 0,
+    });
+    return null;
   },
 });
 
@@ -772,14 +831,7 @@ export const removeUpload = internalMutation({
       )
       .unique();
     if (!existing) {
-      await ctx.db.insert("quick_share_jobs", {
-        uploadId: upload._id,
-        kind: "delete",
-        status: "pending",
-        attempts: 0,
-        createdAt: args.now,
-        updatedAt: args.now,
-      });
+      await enqueueJob(ctx, upload._id, "delete", args.now);
     }
     return null;
   },
@@ -804,20 +856,48 @@ export const queueRetentionDeletes = internalMutation({
         )
         .unique();
       if (!existing) {
-        await ctx.db.insert("quick_share_jobs", {
-          uploadId: upload._id,
-          kind: "delete",
-          status: "pending",
-          attempts: 0,
-          createdAt: now,
-          updatedAt: now,
-        });
+        await enqueueJob(ctx, upload._id, "delete", now);
       }
     }
     if (!page.isDone) {
       await ctx.scheduler.runAfter(
         0,
         internal.quickShare.queueRetentionDeletes,
+        {
+          paginationOpts: {
+            numItems: 25,
+            cursor: page.continueCursor,
+          },
+        },
+      );
+    }
+    return {
+      isDone: page.isDone,
+      continueCursor: page.continueCursor,
+    };
+  },
+});
+
+export const redispatchPendingJobs = internalMutation({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ isDone: boolean; continueCursor: string }> => {
+    const page = await ctx.db
+      .query("quick_share_jobs")
+      .withIndex("by_status_and_createdAt", (q) => q.eq("status", "pending"))
+      .paginate(args.paginationOpts);
+    for (const job of page.page) {
+      await ctx.scheduler.runAfter(0, internal.quickShareHttp.dispatchJob, {
+        jobId: job._id,
+        attempt: 0,
+      });
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.quickShare.redispatchPendingJobs,
         {
           paginationOpts: {
             numItems: 25,
@@ -871,6 +951,9 @@ export const maintenance = internalMutation({
     }
 
     await ctx.scheduler.runAfter(0, internal.quickShare.queueRetentionDeletes, {
+      paginationOpts: { numItems: 25, cursor: null },
+    });
+    await ctx.scheduler.runAfter(0, internal.quickShare.redispatchPendingJobs, {
       paginationOpts: { numItems: 25, cursor: null },
     });
 

@@ -2,15 +2,11 @@ import { mkdir } from "node:fs/promises";
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
-import { MediaWorker } from "./processor.ts";
 
 const config = loadConfig();
 await mkdir(config.tempDir, { recursive: true, mode: 0o700 });
-const { app, control, store } = createApp(config);
+const { app, store, worker } = createApp(config);
 await store.ensureBucket();
-
-const worker = new MediaWorker(config, control, store);
-worker.start();
 
 const server = serve({
 	fetch: app.fetch,

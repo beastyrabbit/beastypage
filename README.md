@@ -58,6 +58,12 @@ uv run uvicorn renderer_service.app.main:app --reload --port 8001
 | `NEXT_PUBLIC_POSTHOG_KEY` | PostHog analytics key (optional) |
 | `NEXT_PUBLIC_POSTHOG_HOST` | PostHog host URL (optional) |
 
+### Convex deployment
+
+| Variable | Description |
+|----------|-------------|
+| `QUICK_SHARE_WORKER_URL` | Public base URL Convex uses to dispatch Quick Share jobs (for example, `https://beastyrabbit.com`) |
+
 ### Runtime
 
 | Variable | Description | Default |

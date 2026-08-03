@@ -141,6 +141,59 @@ describe("raw media delivery", () => {
 	});
 });
 
+describe("event-driven worker dispatch", () => {
+	it("rejects dispatch requests without the internal token", async () => {
+		const dispatch = vi.fn();
+		const worker = { dispatch, stop: vi.fn() };
+		const { app } = createApp(config, {} as ObjectStore, worker);
+		const response = await app.request(
+			"https://beastyrabbit.com/i/api/internal/jobs/job-id",
+			{ method: "POST" },
+		);
+
+		expect(response.status).toBe(401);
+		expect(dispatch).not.toHaveBeenCalled();
+	});
+
+	it("accepts a pushed job and passes its id to the worker", async () => {
+		const dispatch = vi.fn(async () => "accepted" as const);
+		const worker = { dispatch, stop: vi.fn() };
+		const { app } = createApp(config, {} as ObjectStore, worker);
+		const response = await app.request(
+			"https://beastyrabbit.com/i/api/internal/jobs/job-id",
+			{
+				method: "POST",
+				headers: {
+					"x-quick-share-internal-token": config.internalToken,
+				},
+			},
+		);
+
+		expect(response.status).toBe(202);
+		expect(dispatch).toHaveBeenCalledWith("job-id");
+	});
+
+	it("asks Convex to retry when this replica is busy", async () => {
+		const worker = {
+			dispatch: vi.fn(async () => "busy" as const),
+			stop: vi.fn(),
+		};
+		const { app } = createApp(config, {} as ObjectStore, worker);
+		const response = await app.request(
+			"https://beastyrabbit.com/i/api/internal/jobs/job-id",
+			{
+				method: "POST",
+				headers: {
+					"x-quick-share-internal-token": config.internalToken,
+				},
+			},
+		);
+
+		expect(response.status).toBe(503);
+		expect(response.headers.get("retry-after")).toBe("1");
+	});
+});
+
 describe("multipart upload limits", () => {
 	it("rejects a chunked oversized part before passing it to storage", async () => {
 		vi.stubGlobal(
