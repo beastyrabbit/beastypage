@@ -47,7 +47,7 @@ frontend/
 
 ```bash
 pnpm install             # Install dependencies
-pnpm run dev             # Start dev server (port via portless)
+pnpm run dev             # Start dev server at http://localhost:3000
 pnpm run build           # Production build
 pnpm run lint            # Lint check
 pnpm run typecheck       # TypeScript check
@@ -123,7 +123,7 @@ pnpm run test -- --watch # Watch mode
 
 ## Ports
 
-Ports are managed by portless — check dev server output or `/home/beasty/projects/.ports` for registered defaults.
+The frontend development server uses `http://localhost:3000`.
 
 ## Important Files
 

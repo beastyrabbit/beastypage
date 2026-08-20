@@ -13,7 +13,7 @@
       "name": "Run locally",
       "command": "pnpm dev",
       "icon": "play",
-      "previewUrl": "http://frontend.localhost:1355",
+      "previewUrl": "http://localhost:3000",
       "autoOpenPreview": true
     }
   ]

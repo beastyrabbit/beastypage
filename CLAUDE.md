@@ -89,7 +89,7 @@ await page.screenshot({ path: 'my-screenshot.png' });
 
 ## Ports
 
-Ports are managed by portless — check dev server output or `/home/beasty/projects/.ports` for registered defaults.
+The frontend uses `http://localhost:3000`; renderer and media services use ports `8001` and `8003`.
 
 ## Project Structure
 

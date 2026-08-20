@@ -3,17 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { getServerConvexUrl } from "@/lib/convexUrl";
 
-function normalizeRendererBase(url: string) {
-  const trimmed = url.replace(/\/$/, "");
-  if (/^http:\/\/[^/]+\.localhost:1355$/i.test(trimmed)) {
-    return trimmed.replace(/^http:/i, "https:");
-  }
-  return trimmed;
-}
-
-const RENDERER_BASE = normalizeRendererBase(
-  process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001",
-);
+const RENDERER_BASE = (process.env.RENDERER_INTERNAL_URL ?? "http://127.0.0.1:8001").replace(/\/$/, "");
 const PREVIEW_SIZE = 360;
 const RENDER_TIMEOUT_MS = 30_000;
 const PNG_DATA_URL_REGEX = /^data:image\/png;base64,([A-Za-z0-9+/=\s]+)$/;

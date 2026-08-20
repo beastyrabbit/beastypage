@@ -2,9 +2,8 @@
   "name": "frontend",
   "version": "1.6.2",
   "private": true,
-  "portless": "beastypage",
   "scripts": {
-    "dev": "portless run next dev",
+    "dev": "next dev --hostname 127.0.0.1 --port 3000",
     "test": "vitest",
     "prebuild": "sh scripts/write-version.sh && tsx scripts/generate-registry.ts",
     "build": "next build",

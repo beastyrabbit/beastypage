@@ -13,7 +13,7 @@ Frontend and renderer service for BeastyPage with Docker/Kubernetes deploy flow.
 - Roll out cross-service protocol and Convex function-signature changes in backward-compatible phases, and verify time-filtered production logs only after all legacy replicas are gone.
 
 ## Ports
-- Dev frontend: `http://frontend.localhost:1355` (portless, via `pnpm run dev` in `frontend/`)
+- Dev frontend: `http://localhost:3000` (via `pnpm run dev` in `frontend/`)
 - Renderer service: `8001`
 - Image processing: `8002`
 
