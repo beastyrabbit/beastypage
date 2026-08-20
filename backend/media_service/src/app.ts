@@ -23,6 +23,11 @@ const createSchema = z.object({
 	name: z.string().trim().min(1).max(255),
 	mime: z.string().trim().max(150).optional(),
 	size: z.number().int().positive(),
+	collectionSlug: z
+		.string()
+		.regex(/^[1-9A-HJ-NP-Za-km-z]{8}$/)
+		.optional(),
+	collectionReceipt: z.string().min(1).optional(),
 });
 
 const importSchema = z.object({
@@ -257,7 +262,7 @@ export function createApp(
 		const receiptHashValue = receiptHash(receiptToken, config.hmacKey);
 		const originalKey = `originals/${randomUUID()}`;
 		for (let attempt = 0; attempt < 5; attempt += 1) {
-			const slug = randomSlug();
+			const slug = input.collectionSlug ?? randomSlug();
 			const multipartUploadId = await store.createMultipart(originalKey);
 			try {
 				const created = await control.call<{
@@ -275,6 +280,14 @@ export function createApp(
 						originalSize: input.size,
 						originalKey,
 						multipartUploadId,
+						...(input.collectionReceipt
+							? {
+									collectionReceiptHash: receiptHash(
+										input.collectionReceipt,
+										config.hmacKey,
+									),
+								}
+							: {}),
 						receiptHash: receiptHashValue,
 						rateIdentity: `ip:${context.ipHash}`,
 						ipHash: context.ipHash,
@@ -768,13 +781,61 @@ export function createApp(
 		}
 	}
 
-	app.get("/i/:slug", (c) =>
-		servePublic(
+	async function publicCollection(slug: string) {
+		if (!/^[1-9A-HJ-NP-Za-km-z]{8}$/.test(slug)) return [];
+		let result: PublicUpload[] | PublicUpload;
+		try {
+			result = await control.call<PublicUpload[]>("publicCollection", { slug });
+		} catch (error) {
+			// Allows the media service to roll out before the new Convex operation.
+			if (statusCode(error) < 500) throw error;
+			result = await control.call<PublicUpload>("public", { slug });
+		}
+		return Array.isArray(result) ? result : [result];
+	}
+
+	app.get("/i/:slug/:item", async (c) => {
+		const items = await publicCollection(c.req.param("slug"));
+		const index = Number(c.req.param("item"));
+		if (!Number.isInteger(index) || index < 0 || index >= items.length)
+			return unavailable();
+		const item = items[index];
+		const object = await store.get(item.key, c.req.header("range"));
+		return new Response(object.body, {
+			status: object.contentRange ? 206 : 200,
+			headers: {
+				"content-type": item.mime,
+				"content-length": String(object.contentLength),
+				...(object.contentRange
+					? { "content-range": object.contentRange }
+					: {}),
+				"accept-ranges": "bytes",
+				"cache-control": "private, no-store",
+				"x-content-type-options": "nosniff",
+			},
+		});
+	});
+
+	app.get("/i/:slug", async (c) => {
+		const items = await publicCollection(c.req.param("slug"));
+		if (items.length > 1) {
+			const cards = items
+				.map((item, index) =>
+					item.mime.startsWith("video/")
+						? `<video controls playsinline preload="metadata" src="/i/${c.req.param("slug")}/${index}"></video>`
+						: `<img src="/i/${c.req.param("slug")}/${index}" alt="">`,
+				)
+				.join("");
+			return c.html(
+				`<!doctype html><html><head><meta name="robots" content="noindex"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shared media</title><style>body{margin:0;background:#111;color:#eee;font-family:system-ui;padding:24px}main{max-width:1100px;margin:auto;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))}img,video{display:block;width:100%;max-height:80vh;object-fit:contain;background:#000;border-radius:8px}</style></head><body><main>${cards}</main></body></html>`,
+			);
+		}
+		return servePublic(
 			c.req.param("slug"),
 			c.req.method === "HEAD" ? "HEAD" : "GET",
 			c.req.header("range"),
-		),
-	);
+		);
+	});
 
 	return { app, control, store, worker };
 }

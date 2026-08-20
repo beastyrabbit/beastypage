@@ -157,7 +157,7 @@ export function QuickShareClient() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const clipboardPasteRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"file" | "url" | "clipboard">("file");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [fileSource, setFileSource] = useState<"file" | "clipboard" | null>(
     null,
   );
@@ -169,10 +169,11 @@ export function QuickShareClient() {
   const [history, setHistory] = useState<ShareStatus[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [now, setNow] = useState(0);
+  const [currentItemCount, setCurrentItemCount] = useState(1);
 
   const selectFile = useCallback(
     (nextFile: File | null, source: "file" | "clipboard") => {
-      setFile(nextFile);
+      setFiles(nextFile ? [nextFile] : []);
       setFileSource(nextFile ? source : null);
       setActiveUpload(null);
       setCurrent(null);
@@ -370,52 +371,85 @@ export function QuickShareClient() {
     [apiFetch, waitForProcessing],
   );
 
-  async function startFileUpload(event: FormEvent, selectedFile: File | null) {
+  async function startFileUpload(event: FormEvent, selectedFiles: File[]) {
     event.preventDefault();
-    if (!selectedFile || !policy) return;
-    if (selectedFile.size > policy.maxBytes) {
+    if (selectedFiles.length === 0 || !policy) return;
+    const oversized = selectedFiles.find((item) => item.size > policy.maxBytes);
+    if (oversized) {
       setWork({
         kind: "error",
-        label: `This file is larger than the current ${formatBytes(
+        label: `${oversized.name} is larger than the current ${formatBytes(
           policy.maxBytes,
         )} limit.`,
       });
       return;
     }
     setCurrent(null);
+    setCurrentItemCount(selectedFiles.length);
     setWork({ kind: "preparing", label: "Starting your share…" });
     try {
-      const created = await apiFetch<{
-        uploadId: string;
-        slug: string;
-        receipt: string;
-        url: string;
-        publicExpiresAt: number;
-        chunkBytes: number;
-      }>("/i/api/uploads", {
-        method: "POST",
-        body: JSON.stringify({
+      let collection: { slug: string; receipt: string } | null = null;
+      let lastUpload: ActiveUpload | null = null;
+      for (
+        let fileIndex = 0;
+        fileIndex < selectedFiles.length;
+        fileIndex += 1
+      ) {
+        const selectedFile = selectedFiles[fileIndex];
+        setWork({
+          kind: "preparing",
+          label: `Preparing ${fileIndex + 1} of ${selectedFiles.length}: ${selectedFile.name}`,
+        });
+        const created = await apiFetch<{
+          uploadId: string;
+          slug: string;
+          receipt: string;
+          url: string;
+          publicExpiresAt: number;
+          chunkBytes: number;
+        }>("/i/api/uploads", {
+          method: "POST",
+          body: JSON.stringify({
+            name: selectedFile.name,
+            mime: selectedFile.type || undefined,
+            size: selectedFile.size,
+            ...(collection
+              ? {
+                  collectionSlug: collection.slug,
+                  collectionReceipt: collection.receipt,
+                }
+              : {}),
+          }),
+        });
+        const upload: ActiveUpload = {
+          ...created,
+          url: shareUrl(created.slug, created.url),
           name: selectedFile.name,
-          mime: selectedFile.type || undefined,
           size: selectedFile.size,
-        }),
-      });
-      const upload: ActiveUpload = {
-        ...created,
-        url: shareUrl(created.slug, created.url),
-        name: selectedFile.name,
-        size: selectedFile.size,
-        createdAt: Date.now(),
-      };
-      remember(upload);
-      await uploadParts(selectedFile, upload);
+          createdAt: Date.now(),
+        };
+        collection ??= { slug: upload.slug, receipt: upload.receipt };
+        lastUpload = upload;
+        remember(upload);
+        await uploadParts(selectedFile, upload);
+      }
+      if (lastUpload && selectedFiles.length > 1) {
+        setCurrent((value) =>
+          value ? { ...value, url: lastUpload.url } : value,
+        );
+        setWork({
+          kind: "done",
+          label: `${selectedFiles.length} media files share one link.`,
+        });
+      }
     } catch (error) {
       setWork({ kind: "error", label: errorMessage(error) });
     }
   }
 
   async function retryCurrent() {
-    if (!file || !activeUpload || file.size !== activeUpload.size) return;
+    const file = files.find((item) => item.size === activeUpload?.size);
+    if (!file || !activeUpload) return;
     setWork({ kind: "preparing", label: "Checking received parts…" });
     try {
       await uploadParts(file, activeUpload);
@@ -495,8 +529,8 @@ export function QuickShareClient() {
     work.kind === "preparing" ||
     work.kind === "uploading" ||
     work.kind === "processing";
-  const deviceFile = fileSource === "file" ? file : null;
-  const pastedFile = fileSource === "clipboard" ? file : null;
+  const deviceFiles = fileSource === "file" ? files : [];
+  const pastedFile = fileSource === "clipboard" ? (files[0] ?? null) : null;
 
   const acceptClipboardUrl = useCallback(
     (url: string) => {
@@ -690,16 +724,22 @@ export function QuickShareClient() {
           <div className="p-4 sm:p-6">
             {mode === "file" ? (
               <form
-                onSubmit={(event) => startFileUpload(event, deviceFile)}
+                onSubmit={(event) => startFileUpload(event, deviceFiles)}
                 className="space-y-5"
               >
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   accept="image/*,video/*,.heic,.heif,.avif,.tif,.tiff,.mkv,.avi"
                   className="sr-only"
                   onChange={(event) => {
-                    selectFile(event.target.files?.[0] ?? null, "file");
+                    const selected = Array.from(event.target.files ?? []);
+                    setFiles(selected);
+                    setFileSource(selected.length ? "file" : null);
+                    setActiveUpload(null);
+                    setCurrent(null);
+                    setWork({ kind: "idle" });
                   }}
                 />
                 <button
@@ -709,17 +749,19 @@ export function QuickShareClient() {
                 >
                   <FileUp className="mb-4 size-7 text-amber-400" />
                   <span className="font-medium">
-                    {deviceFile ? deviceFile.name : "Choose photo or video"}
+                    {deviceFiles.length > 0
+                      ? `${deviceFiles.length} media file${deviceFiles.length === 1 ? "" : "s"} selected`
+                      : "Choose photos or videos"}
                   </span>
                   <span className="mt-2 text-xs text-muted-foreground">
-                    {deviceFile
-                      ? `${formatBytes(deviceFile.size)} · tap to choose another`
+                    {deviceFiles.length > 0
+                      ? `${formatBytes(deviceFiles.reduce((sum, item) => sum + item.size, 0))} total · tap to change selection`
                       : "Camera, photo library, or files"}
                   </span>
                 </button>
                 <button
                   type="submit"
-                  disabled={!deviceFile || !policy || busy}
+                  disabled={deviceFiles.length === 0 || !policy || busy}
                   className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {busy ? (
@@ -766,7 +808,9 @@ export function QuickShareClient() {
               </form>
             ) : (
               <form
-                onSubmit={(event) => startFileUpload(event, pastedFile)}
+                onSubmit={(event) =>
+                  startFileUpload(event, pastedFile ? [pastedFile] : [])
+                }
                 className="space-y-5"
               >
                 <div className="relative min-h-44 overflow-hidden rounded-lg border border-dashed border-border transition focus-within:border-amber-500 focus-within:bg-amber-500/5 focus-within:ring-2 focus-within:ring-amber-500">
@@ -854,9 +898,9 @@ export function QuickShareClient() {
                   </div>
                 </div>
                 {work.kind === "error" &&
-                file &&
+                files.length === 1 &&
                 activeUpload &&
-                file.size === activeUpload.size ? (
+                files[0]?.size === activeUpload.size ? (
                   <button
                     type="button"
                     className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-300/30 px-3 py-2 text-xs font-semibold hover:bg-red-500/10"
@@ -871,7 +915,12 @@ export function QuickShareClient() {
 
             {current?.state === "ready" && current.publicExpiresAt > now ? (
               <div className="mt-5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
-                {current.publicMime?.startsWith("video/") ? (
+                {currentItemCount > 1 ? (
+                  <div className="mb-4 flex min-h-32 items-center justify-center rounded-md border border-border bg-background/60 px-6 text-center text-sm text-muted-foreground">
+                    {currentItemCount} photos and videos are collected on this
+                    link.
+                  </div>
+                ) : current.publicMime?.startsWith("video/") ? (
                   // biome-ignore lint/a11y/useMediaCaption: arbitrary user-supplied media has no caption track available
                   <video
                     src={current.url}

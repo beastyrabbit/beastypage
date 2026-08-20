@@ -157,6 +157,14 @@ export const quickShareInternal = httpAction(async (ctx, request) => {
             : requiredNumber(body, "importReservedBytes");
         const result = await ctx.runMutation(internal.quickShare.createUpload, {
           slug: requiredString(body, "slug"),
+          ...(optionalString(body, "collectionReceiptHash")
+            ? {
+                collectionReceiptHash: optionalString(
+                  body,
+                  "collectionReceiptHash",
+                ),
+              }
+            : {}),
           source: body.source === "url" ? ("url" as const) : ("file" as const),
           originalName: requiredString(body, "originalName"),
           ...(declaredMime ? { declaredMime } : {}),
@@ -245,6 +253,15 @@ export const quickShareInternal = httpAction(async (ctx, request) => {
           now,
         });
         return result ? json(result) : json({ error: "Not found" }, 404);
+      }
+      case "publicCollection": {
+        const result = await ctx.runQuery(
+          internal.quickShare.getPublicCollection,
+          { slug: requiredString(body, "slug"), now },
+        );
+        return result.length > 0
+          ? json(result)
+          : json({ error: "Not found" }, 404);
       }
       case "accountList": {
         if (!ownerTokenIdentifier) return json({ error: "Unauthorized" }, 401);
