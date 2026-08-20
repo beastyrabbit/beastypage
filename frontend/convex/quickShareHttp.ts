@@ -151,20 +151,17 @@ export const quickShareInternal = httpAction(async (ctx, request) => {
       case "create": {
         const declaredMime = optionalString(body, "declaredMime");
         const multipartUploadId = optionalString(body, "multipartUploadId");
+        const collectionReceiptHash = optionalString(
+          body,
+          "collectionReceiptHash",
+        );
         const importReservedBytes =
           body.importReservedBytes === undefined
             ? undefined
             : requiredNumber(body, "importReservedBytes");
         const result = await ctx.runMutation(internal.quickShare.createUpload, {
           slug: requiredString(body, "slug"),
-          ...(optionalString(body, "collectionReceiptHash")
-            ? {
-                collectionReceiptHash: optionalString(
-                  body,
-                  "collectionReceiptHash",
-                ),
-              }
-            : {}),
+          ...(collectionReceiptHash ? { collectionReceiptHash } : {}),
           source: body.source === "url" ? ("url" as const) : ("file" as const),
           originalName: requiredString(body, "originalName"),
           ...(declaredMime ? { declaredMime } : {}),
