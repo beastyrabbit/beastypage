@@ -1,0 +1,20 @@
+{
+  "$schema": "https://t3.codes/schema/t3.json",
+  "iconPath": "frontend/public/apple-touch-icon.png",
+  "defaultThreadEnvMode": "worktree",
+  "scripts": [
+    {
+      "name": "Initialize worktree",
+      "command": "./scripts/t3code-worktree-setup.sh",
+      "icon": "configure",
+      "runOnWorktreeCreate": true
+    },
+    {
+      "name": "Run locally",
+      "command": "pnpm dev",
+      "icon": "play",
+      "previewUrl": "http://frontend.localhost:1355",
+      "autoOpenPreview": true
+    }
+  ]
+}
