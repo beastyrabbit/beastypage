@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
 import spriteMapper from "@/lib/single-cat/spriteMapper";
+import {
+    applyCoatChoice,
+    getCoatChoiceValues,
+    getCoatPatternName,
+} from "@/lib/cat-v3/coatPatterns";
 import { DEFAULT_POSE_NAME, getUserSelectablePoseNames } from "@/lib/cat-v3/poseOptions";
 
 export function getDefaultStreamParams() {
@@ -37,6 +42,8 @@ export function getDefaultStreamParams() {
 export function formatDisplayName(value) {
     if (value === null || value === undefined) return '';
     if (typeof value === 'number') return `#${value}`;
+    const coatPatternName = getCoatPatternName(value);
+    if (coatPatternName) return coatPatternName;
     return value
         .toString()
         .replace(/_/g, ' ')
@@ -125,13 +132,13 @@ function buildColourOptions(state) {
 }
 
 function buildPatternOptions(state) {
-    const peltNames = spriteMapper.getPeltNames();
-    const curated = limitUnique(peltNames.filter(name => !/^Legacy/i.test(name)), 18);
-    return curated.map(pelt => ({
-        key: pelt,
-        label: formatDisplayName(pelt),
+    const coatChoices = getCoatChoiceValues(spriteMapper.getPeltNames());
+    const curated = limitUnique(coatChoices.filter(name => !/^Legacy/i.test(name)), Number.POSITIVE_INFINITY);
+    return curated.map(coatChoice => ({
+        key: coatChoice,
+        label: formatDisplayName(coatChoice),
         mutate: params => {
-            params.peltName = pelt;
+            applyCoatChoice(params, coatChoice);
         }
     }));
 }

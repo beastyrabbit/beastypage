@@ -4,7 +4,7 @@ A pixel cat gacha platform featuring generators, wheels, and collection tools bu
 
 ## Features
 
-- **Cat Generator** - Generate random pixel cats with customizable traits, accessories, and tortie coats
+- **Cat Generator** - Generate random pixel cats with customizable traits, accessories, tortie coats, and 20 derived coat patterns across gacha, builders, adoption, evolution, ancestry, streams, and Discord
 - **Gacha Wheel** - Weighted wheel spins with animated reveals
 - **Catdex** - Browse and search all generated cats in a Pokedex-style archive
 - **Adoption Generator** - Roll whole litters, trim each round, finish with your favorites
@@ -35,7 +35,7 @@ pnpm install
 pnpm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://frontend.localhost:1355](http://frontend.localhost:1355) in your browser.
 
 ### Renderer Service (Optional)
 
@@ -57,6 +57,7 @@ uv run uvicorn renderer_service.app.main:app --reload --port 8001
 | `NEXT_PUBLIC_CONVEX_URL` | Convex cloud URL |
 | `NEXT_PUBLIC_POSTHOG_KEY` | PostHog analytics key (optional) |
 | `NEXT_PUBLIC_POSTHOG_HOST` | PostHog host URL (optional) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser key |
 
 ### Convex deployment
 
@@ -84,19 +85,23 @@ beastypage/
 │   ├── app/                # Next.js app router pages
 │   └── Dockerfile          # Multi-stage build (pnpm → Node)
 ├── backend/
-│   ├── renderer_service/   # FastAPI cat renderer
-│   │   └── Dockerfile      # Python/uv build
-│   └── README.md
-├── lifegen-fullgen/        # LifeGen sprite generation library
-└── .github/workflows/      # CI/CD pipelines
+│   ├── discord-bot/        # Discord commands and cat generation
+│   ├── image_processing_service/
+│   ├── media_service/      # Quick Share media worker
+│   └── renderer_service/   # FastAPI cat renderer
+├── scripts/                 # Sprite import tooling
+└── .forgejo/workflows/     # Build and release pipelines
 ```
 
 ## Container Images
 
-Images are automatically built and pushed to GHCR on pushes to `main`:
+Forgejo Actions builds and pushes images to the Forgejo registry on `main` and version-tag pushes:
 
-- `ghcr.io/beastyrabbit/beastypage-frontend:latest`
-- `ghcr.io/beastyrabbit/beastypage-renderer:latest`
+- `git.heerlab.com/beasty/beastypage-frontend`
+- `git.heerlab.com/beasty/beastypage-renderer`
+- `git.heerlab.com/beasty/beastypage-image-processing`
+- `git.heerlab.com/beasty/beastypage-media`
+- `git.heerlab.com/beasty/beastypage-discord-bot`
 
 ### Running with Your Own Database
 
@@ -105,7 +110,7 @@ The frontend image uses a placeholder for the Convex URL at build time. Provide 
 ```bash
 docker run -p 3000:3000 \
   -e NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud \
-  ghcr.io/beastyrabbit/beastypage-frontend:latest
+  git.heerlab.com/beasty/beastypage-frontend:latest
 ```
 
 ### Kubernetes Deployment
@@ -120,7 +125,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/beastyrabbit/beastypage-frontend:latest
+          image: git.heerlab.com/beasty/beastypage-frontend:latest
           env:
             - name: NEXT_PUBLIC_CONVEX_URL
               valueFrom:

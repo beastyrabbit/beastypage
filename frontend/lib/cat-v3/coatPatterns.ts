@@ -122,3 +122,72 @@ export const COAT_PATTERNS = [
 ] as const;
 
 export type CoatPatternId = (typeof COAT_PATTERNS)[number]["id"];
+
+export interface CoatChoiceParams {
+  peltName?: string;
+  coatPattern?: string;
+}
+
+export interface ResolvedCoatChoice {
+  peltName: string;
+  coatPattern?: CoatPatternId;
+}
+
+const COAT_PATTERN_BY_ID = new Map<string, (typeof COAT_PATTERNS)[number]>(
+  COAT_PATTERNS.map((pattern) => [pattern.id, pattern] as const),
+);
+
+/** Values used by selectors and randomizers for the derived coat patterns. */
+export const COAT_PATTERN_IDS = COAT_PATTERNS.map((pattern) => pattern.id);
+
+export function isCoatPatternId(value: unknown): value is CoatPatternId {
+  return typeof value === "string" && COAT_PATTERN_BY_ID.has(value);
+}
+
+export function getCoatPatternName(value: unknown): string | undefined {
+  return isCoatPatternId(value)
+    ? COAT_PATTERN_BY_ID.get(value)?.name
+    : undefined;
+}
+
+/**
+ * Return every base pelt and derived coat pattern as one selector pool.
+ * Tortie and Calico are composed coats, so they are not valid base choices.
+ */
+export function getCoatChoiceValues(peltNames: readonly string[]): string[] {
+  const values = new Set(
+    peltNames.filter((pelt) => pelt !== "Tortie" && pelt !== "Calico"),
+  );
+  for (const pattern of COAT_PATTERNS) {
+    values.add(pattern.id);
+  }
+  return Array.from(values);
+}
+
+/** A derived pattern replaces the base pelt choice with a flat coat. */
+export function resolveCoatChoice(value: string): ResolvedCoatChoice {
+  if (isCoatPatternId(value)) {
+    return {
+      peltName: "SingleColour",
+      coatPattern: value,
+    };
+  }
+  return { peltName: value };
+}
+
+export function getCoatChoiceValue(params: CoatChoiceParams): string {
+  if (isCoatPatternId(params.coatPattern)) {
+    return params.coatPattern;
+  }
+  return params.peltName ?? "SingleColour";
+}
+
+export function applyCoatChoice(params: CoatChoiceParams, value: string): void {
+  const resolved = resolveCoatChoice(value);
+  params.peltName = resolved.peltName;
+  if (resolved.coatPattern) {
+    params.coatPattern = resolved.coatPattern;
+  } else {
+    delete params.coatPattern;
+  }
+}

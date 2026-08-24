@@ -31,17 +31,24 @@ backend/renderer_service/
 
 The backend renderer composes cats in this order:
 
-1. Base coat (pattern + tint + reverse)
-2. White patches
-3. Points overlays
-4. Vitiligo overlays
-5. Eyes / heterochromia overlays
-6. Shading (multiply) + lighting
-7. Dark Forest tint (multiply)
-8. Lineart (regular, dead, DF handled in `repository.lineart`)
-9. Skin tones
-10. Scars (additive and missing variants)
-11. Accessories (collars, plant/wild atlases)
+1. Base pelt and tortie layers
+2. Derived coat pattern, with tortie layers recomposed above it
+3. Tint
+4. White patches
+5. Points overlays
+6. Vitiligo overlays
+7. Eyes and heterochromia overlays
+8. Primary scars
+9. Shading (multiply)
+10. Lighting
+11. Dark Forest tint (multiply)
+12. Lineart (regular, dead, or Dark Forest)
+13. Skin tones
+14. Missing-part scars
+15. Accessories (collars, plant, and wild atlases)
+
+Horizontal reversal is applied after composition so every recorded stage and
+the final canvas stay aligned.
 
 Every stage records diagnostics and (optionally) returns intermediate canvases when `collectLayers=true`.
 

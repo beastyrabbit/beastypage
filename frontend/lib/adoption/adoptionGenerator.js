@@ -1,4 +1,10 @@
 import {
+  applyCoatChoice,
+  getCoatChoiceValue,
+  getCoatChoiceValues,
+  getCoatPatternName,
+} from "../cat-v3/coatPatterns";
+import {
   DEFAULT_POSE_NAME,
   formatPoseName,
   getUserSelectablePoseNames,
@@ -748,6 +754,7 @@ export class AdoptionGenerator {
       spriteNumber: 8,
       poseName: DEFAULT_POSE_NAME,
       peltName: "SingleColour",
+      coatPattern: undefined,
       colour: this.defaults.colour,
       tint: "none",
       skinColour: this.defaults.skinColour,
@@ -1065,6 +1072,9 @@ export class AdoptionGenerator {
   }
 
   getStageValue(plan, stage) {
+    if (stage.param === "peltName") {
+      return getCoatChoiceValue(plan.params);
+    }
     if (stage.param === "poseName") {
       return plan.params.poseName || DEFAULT_POSE_NAME;
     }
@@ -1099,6 +1109,9 @@ export class AdoptionGenerator {
     if (stage.param === "poseName") {
       return `${stage.label}: ${value ? formatPoseName(value) : "Unknown Pose"}`;
     }
+    if (stage.param === "peltName") {
+      return `${stage.label}: ${getCoatPatternName(value) ?? this.formatValue(value)}`;
+    }
     return `${stage.label}: ${this.formatValue(value)}`;
   }
 
@@ -1122,6 +1135,10 @@ export class AdoptionGenerator {
 
   applyStageValue(state, stage, value) {
     if (stage.type === "simple") {
+      if (stage.param === "peltName") {
+        applyCoatChoice(state, value);
+        return;
+      }
       if (stage.param === "whitePatches" && value === "none") {
         state.whitePatches = "none";
         return;
@@ -1211,6 +1228,7 @@ export class AdoptionGenerator {
       spriteNumber: state.spriteNumber,
       poseName: state.poseName || DEFAULT_POSE_NAME,
       peltName: state.peltName,
+      coatPattern: state.coatPattern,
       colour: state.colour,
       tint: state.tint,
       skinColour: state.skinColour,
@@ -1362,7 +1380,9 @@ export class AdoptionGenerator {
 
     return {
       colour: this.getColourOptions(),
-      peltName: peltNames.length > 0 ? peltNames : fallbackPelts,
+      peltName: getCoatChoiceValues(
+        peltNames.length > 0 ? peltNames : fallbackPelts,
+      ),
       eyeColour: spriteMapper.getEyeColours(),
       eyeColour2: [...spriteMapper.getEyeColours(), "none"],
       tint: ["none", ...spriteMapper.getTints()],
@@ -1657,7 +1677,12 @@ export class AdoptionGenerator {
         : this.formatValue(params.eyeColour);
 
     addRow("Colour", params.colour, { always: true });
-    addRow("Pelt", params.peltName, { always: true });
+    addRow(
+      "Pelt",
+      getCoatPatternName(params.coatPattern) ??
+        this.formatValue(params.peltName),
+      { formatted: true, always: true },
+    );
     addRow("Eyes", eyesDisplay, { formatted: true, always: true });
     if (params.eyeColour2 && params.eyeColour2 !== params.eyeColour) {
       addRow("Eye Colour 2", params.eyeColour2, { always: true });

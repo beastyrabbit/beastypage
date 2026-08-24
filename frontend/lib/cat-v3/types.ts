@@ -130,14 +130,19 @@ export interface BatchRenderResponse {
   sources?: BatchFrameSource[];
 }
 
+export type BatchVariantParams = Omit<Partial<CatParams>, "coatPattern"> & {
+  /** Explicit null clears a value inherited from the batch base params. */
+  coatPattern?: string | null;
+};
+
 export interface BatchVariantPayload {
   id: string;
   label?: string;
   group?: string;
   spriteNumber?: number;
   poseName?: string;
-  overrides?: Partial<CatParams>;
-  params?: Partial<CatParams>;
+  overrides?: BatchVariantParams;
+  params?: BatchVariantParams;
 }
 
 export interface BatchRenderOptions {

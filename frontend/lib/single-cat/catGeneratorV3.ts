@@ -15,6 +15,10 @@ import type {
   CatParams,
   CatRenderParams,
 } from '@/lib/cat-v3/types';
+import {
+  isCoatPatternId,
+  resolveCoatChoice,
+} from '@/lib/cat-v3/coatPatterns';
 
 type VariantInput = {
   id: string;
@@ -83,6 +87,14 @@ function coerceSpriteNumber(value: unknown, fallback = 0): number {
 
 function splitPayload(params: CatParams | Partial<CatParams>): CatRenderParams {
   const working = clonePlain(params as Record<string, unknown>);
+  const coatPattern = isCoatPatternId(working.coatPattern)
+    ? working.coatPattern
+    : isCoatPatternId(working.peltName)
+      ? working.peltName
+      : undefined;
+  if (coatPattern) {
+    Object.assign(working, resolveCoatChoice(coatPattern));
+  }
   const spriteNumber = coerceSpriteNumber(
     working.spriteNumber ?? working.sprite_number ?? working.sprite,
     0
@@ -105,6 +117,13 @@ function splitPayload(params: CatParams | Partial<CatParams>): CatRenderParams {
 
 function buildLegacyUrl(params: CatParams | null | undefined): string {
   if (!params) return '';
+  // The external legacy builder cannot represent renderer-derived coats.
+  if (
+    isCoatPatternId(params.coatPattern) ||
+    isCoatPatternId(params.peltName)
+  ) {
+    return '';
+  }
 
   const urlParams = new URLSearchParams();
   urlParams.set('version', 'v1');
@@ -196,13 +215,28 @@ export class CatGeneratorV3 {
     const payload = splitPayload(baseParams);
     const preparedVariants: BatchVariantPayload[] = variants.map((variant) => {
       const variantPayload = splitPayload(variant.params);
+      const variantParams: NonNullable<BatchVariantPayload['params']> = {
+        ...variantPayload.params,
+      };
+
+      // Batch variants are shallow-merged over the base render params. A
+      // normal pelt selection removes coatPattern from the cloned cat params,
+      // so send an explicit null to prevent the base derived coat leaking into
+      // that preview frame.
+      if (
+        payload.params.coatPattern &&
+        Object.prototype.hasOwnProperty.call(variant.params, 'peltName') &&
+        variantParams.coatPattern === undefined
+      ) {
+        variantParams.coatPattern = null;
+      }
       return {
         id: variant.id,
         label: variant.label,
         group: variant.group,
         spriteNumber: variantPayload.spriteNumber,
         poseName: variantPayload.poseName,
-        params: variantPayload.params,
+        params: variantParams,
       };
     });
 

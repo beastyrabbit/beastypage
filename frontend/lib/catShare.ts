@@ -1,3 +1,4 @@
+import { isCoatPatternId, resolveCoatChoice } from "@/lib/cat-v3/coatPatterns";
 import type { TortieLayer as SharedTortieLayer } from "@/lib/cat-v3/types";
 
 const SHARE_VERSION = 1;
@@ -30,6 +31,7 @@ const PARAM_KEYS = [
   "spriteNumber",
   "poseName",
   "peltName",
+  "coatPattern",
   "colour",
   "eyeColour",
   "eyeColour2",
@@ -194,6 +196,15 @@ function sanitizeParams(params: Record<string, unknown> = {}): SanitizedParams {
   }
   if (!clean.scar && Array.isArray(clean.scars) && clean.scars.length > 0) {
     clean.scar = clean.scars[0];
+  }
+
+  const coatPattern = isCoatPatternId(clean.coatPattern)
+    ? clean.coatPattern
+    : isCoatPatternId(clean.peltName)
+      ? clean.peltName
+      : undefined;
+  if (coatPattern) {
+    Object.assign(clean, resolveCoatChoice(coatPattern));
   }
 
   if (clean.isTortie) {

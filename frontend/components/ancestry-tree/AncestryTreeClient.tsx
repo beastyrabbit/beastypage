@@ -39,6 +39,7 @@ import {
   DEFAULT_TREE_CONFIG,
 } from "@/lib/ancestry-tree/types";
 import { useTreeWorker } from "@/lib/ancestry-tree/useTreeWorker";
+import { getCoatChoiceValues } from "@/lib/cat-v3/coatPatterns";
 import {
   ensureSpriteMapper,
   generateRandomParamsV3,
@@ -176,9 +177,7 @@ export function AncestryTreeClient({
       try {
         const mapper = await ensureSpriteMapper();
         mutationPoolRef.current = {
-          pelts: mapper
-            .getPeltNames()
-            .filter((p: string) => p !== "Tortie" && p !== "Calico"),
+          pelts: getCoatChoiceValues(mapper.getPeltNames()),
           colours: mapper.getColourOptions(),
           eyeColours: mapper.getEyeColours(),
           skinColours: mapper.getSkinColours(),

@@ -3,13 +3,14 @@ import re
 from pathlib import Path
 
 import numpy as np
-from renderer_service.models import LayerIdentifier
+from renderer_service.models import BatchVariant, LayerIdentifier
 from renderer_service.renderer.coat_patterns import (
     COAT_PATTERN_NAMES,
     apply_coat_pattern,
     normalize_coat_pattern_name,
     required_source_pelts,
 )
+from renderer_service.renderer.image_ops import apply_mask
 from renderer_service.renderer.pipeline import RenderPipeline
 from renderer_service.renderer.repository import SpriteRepository
 from renderer_service.renderer.sprite_mapper import SpriteMapper
@@ -21,6 +22,14 @@ FRONTEND_CATALOG = (
     / "lib"
     / "cat-v3"
     / "coatPatterns.ts"
+)
+DISCORD_CAT_COMMAND = (
+    Path(__file__).resolve().parents[3]
+    / "backend"
+    / "discord-bot"
+    / "src"
+    / "commands"
+    / "cat.ts"
 )
 PAGE_POSES = ("adult_short0", "adult_short1", "adult_short2")
 PAGE_COLOURS = ("GOLDEN", "GINGER", "LIGHTBROWN", "BROWN", "SILVER")
@@ -73,6 +82,15 @@ def test_frontend_catalog_matches_renderer_catalog():
         pattern_name: required_source_pelts(pattern_name)
         for pattern_name in COAT_PATTERN_NAMES
     }
+
+
+def test_discord_catalog_matches_renderer_catalog():
+    source = DISCORD_CAT_COMMAND.read_text()
+    discord_pattern_ids = tuple(
+        re.findall(r'\{\s*name: "[^"]+",\s*value: "([^"]+)"\s*\}', source)
+    )
+
+    assert discord_pattern_ids == COAT_PATTERN_NAMES
 
 
 def test_apply_coat_pattern_preserves_alpha():
@@ -173,6 +191,84 @@ def test_all_coat_patterns_render_distinct_cats():
     assert len(rendered_bytes) == len(COAT_PATTERN_NAMES)
 
 
+def test_coat_pattern_stays_beneath_tortie_layers():
+    pipeline = RenderPipeline(repository=SpriteRepository())
+    params = {
+        "poseName": "adult_short1",
+        "peltName": "SingleColour",
+        "colour": "GOLDEN",
+        "eyeColour": "PALEGREEN",
+        "skinColour": "DARKBROWN",
+        "isTortie": True,
+        "tortie": [
+            {"pattern": "Tabby", "colour": "BLACK", "mask": "ONE"},
+        ],
+    }
+    without_tortie = {**params, "isTortie": False, "tortie": []}
+
+    flat = np.asarray(pipeline.render(without_tortie).composed, dtype=np.uint8)
+    tortie = np.asarray(
+        pipeline.render(params, collect_layers=False).composed,
+        dtype=np.uint8,
+    )
+    patterned_tortie = np.asarray(
+        pipeline.render(
+            {**params, "coatPattern": "bengal-rosettes"},
+            collect_layers=False,
+        ).composed,
+        dtype=np.uint8,
+    )
+
+    tortie_layer = pipeline.renderer._build_pelt_layer("Tabby", "BLACK", params)
+    tortie_mask = pipeline.renderer._load_tortie_mask("ONE", params)
+    assert tortie_layer is not None
+    assert tortie_mask is not None
+    tortie_pixels = (
+        np.asarray(
+            apply_mask(tortie_layer, tortie_mask).getchannel("A"),
+            dtype=np.uint8,
+        )
+        > 0
+    )
+    base_pixels = (flat[..., 3] > 0) & ~tortie_pixels
+
+    assert np.any(tortie_pixels)
+    assert np.array_equal(patterned_tortie[tortie_pixels], tortie[tortie_pixels])
+    assert np.any(patterned_tortie[base_pixels, :3] != tortie[base_pixels, :3])
+
+
+def test_coat_pattern_supports_legacy_single_tortie_fields():
+    pipeline = RenderPipeline(repository=SpriteRepository())
+    shared = {
+        "poseName": "adult_short1",
+        "peltName": "SingleColour",
+        "coatPattern": "bengal-rosettes",
+        "colour": "GOLDEN",
+        "eyeColour": "PALEGREEN",
+        "skinColour": "DARKBROWN",
+        "isTortie": True,
+    }
+
+    layered = pipeline.render(
+        {
+            **shared,
+            "tortie": [
+                {"pattern": "Tabby", "colour": "BLACK", "mask": "ONE"},
+            ],
+        }
+    ).composed
+    legacy = pipeline.render(
+        {
+            **shared,
+            "tortiePattern": "Tabby",
+            "tortieColour": "BLACK",
+            "tortieMask": "ONE",
+        }
+    ).composed
+
+    assert legacy.tobytes() == layered.tobytes()
+
+
 def test_page_patterns_stay_visually_distinct_across_controls():
     pipeline = RenderPipeline(repository=SpriteRepository())
 
@@ -243,3 +339,124 @@ def test_unknown_coat_pattern_is_a_noop():
     assert required_source_pelts("not-a-pattern") == ()
     assert unknown.composed.tobytes() == base.tobytes()
     assert LayerIdentifier.coat_pattern not in [layer.id for layer in unknown.layers]
+
+
+def test_legacy_pelt_name_is_normalized_to_a_coat_pattern():
+    pipeline = RenderPipeline(repository=SpriteRepository())
+    params = {
+        "poseName": "adult_short1",
+        "peltName": "bengal-rosettes",
+        "colour": "GOLDEN",
+    }
+
+    legacy = pipeline.render(params, collect_layers=True)
+    canonical = pipeline.render(
+        {
+            **params,
+            "peltName": "SingleColour",
+            "coatPattern": "bengal-rosettes",
+        },
+        collect_layers=True,
+    )
+
+    assert legacy.composed.tobytes() == canonical.composed.tobytes()
+    assert LayerIdentifier.coat_pattern in [layer.id for layer in legacy.layers]
+
+
+def test_batch_variant_explicit_null_clears_base_coat_pattern():
+    pipeline = RenderPipeline(repository=SpriteRepository())
+    base_params = {
+        "poseName": "adult_short1",
+        "peltName": "SingleColour",
+        "coatPattern": "bengal-rosettes",
+        "colour": "GOLDEN",
+    }
+    variants = [
+        BatchVariant(
+            id="params-normal-pelt",
+            params={"peltName": "Tabby", "coatPattern": None},
+        ),
+        BatchVariant(
+            id="overrides-normal-pelt",
+            overrides={"peltName": "Tabby", "coatPattern": None},
+        ),
+    ]
+
+    batch = pipeline.render_batch(
+        base_params,
+        variants,
+        include_base=False,
+        include_sources=True,
+    )
+    expected = pipeline.render(
+        {**base_params, "peltName": "Tabby", "coatPattern": None},
+        collect_layers=False,
+    ).composed
+
+    assert [source[0] for source in batch.sources] == [
+        "params-normal-pelt",
+        "overrides-normal-pelt",
+    ]
+    assert all(source[1].tobytes() == expected.tobytes() for source in batch.sources)
+
+
+def test_batch_variant_normal_pelt_clears_inherited_coat_pattern():
+    pipeline = RenderPipeline(repository=SpriteRepository())
+    base_params = {
+        "poseName": "adult_short1",
+        "peltName": "SingleColour",
+        "coatPattern": "bengal-rosettes",
+        "colour": "GOLDEN",
+    }
+    variants = [
+        BatchVariant(id="params-normal-pelt", params={"peltName": "Tabby"}),
+        BatchVariant(id="overrides-normal-pelt", overrides={"peltName": "Tabby"}),
+    ]
+
+    batch = pipeline.render_batch(
+        base_params,
+        variants,
+        include_base=False,
+        include_sources=True,
+    )
+    expected = pipeline.render(
+        {**base_params, "peltName": "Tabby", "coatPattern": None},
+        collect_layers=False,
+    ).composed
+
+    assert [source[0] for source in batch.sources] == [
+        "params-normal-pelt",
+        "overrides-normal-pelt",
+    ]
+    assert all(source[1].tobytes() == expected.tobytes() for source in batch.sources)
+
+
+def test_batch_variant_normalizes_a_legacy_coat_pattern_override():
+    pipeline = RenderPipeline(repository=SpriteRepository())
+    base_params = {
+        "poseName": "adult_short1",
+        "peltName": "SingleColour",
+        "coatPattern": "bengal-rosettes",
+        "colour": "GOLDEN",
+    }
+    variants = [
+        BatchVariant(id="legacy-params", params={"peltName": "tiger-stripes"}),
+        BatchVariant(id="legacy-overrides", overrides={"peltName": "tiger-stripes"}),
+    ]
+
+    batch = pipeline.render_batch(
+        base_params,
+        variants,
+        include_base=False,
+        include_sources=True,
+    )
+    expected = pipeline.render(
+        {**base_params, "coatPattern": "tiger-stripes"},
+        collect_layers=False,
+    ).composed
+
+    assert [source[0] for source in batch.sources] == [
+        "legacy-params",
+        "legacy-overrides",
+    ]
+    assert all(source[1].tobytes() == expected.tobytes() for source in batch.sources)

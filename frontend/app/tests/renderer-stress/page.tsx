@@ -3,6 +3,10 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import { renderCatV3 } from "@/lib/cat-v3/api";
+import {
+  getCoatChoiceValues,
+  resolveCoatChoice,
+} from "@/lib/cat-v3/coatPatterns";
 import type { CatRenderParams } from "@/lib/cat-v3/types";
 
 type RunEntry = {
@@ -74,7 +78,7 @@ const EXPERIMENTAL_COLOURS = [
   "UMBRAL_VIOLET",
 ] as const;
 
-const PELTS = [
+const BASE_PELTS = [
   "SingleColour",
   "Tabby",
   "Marbled",
@@ -83,6 +87,7 @@ const PELTS = [
   "Ticked",
   "Speckled",
 ] as const;
+const COAT_CHOICES = getCoatChoiceValues(BASE_PELTS);
 
 const SPRITES = Array.from({ length: 21 }, (_, index) => index);
 
@@ -189,10 +194,11 @@ export default function RendererStressHarness() {
       const colour = useExperimental
         ? pick(EXPERIMENTAL_COLOURS)
         : pick(BASE_COLOURS);
+      const coat = resolveCoatChoice(pick(COAT_CHOICES));
       return {
         spriteNumber: pick(SPRITES),
         params: {
-          peltName: pick(PELTS),
+          ...coat,
           colour,
           isTortie: false,
           shading: Math.random() > 0.5,

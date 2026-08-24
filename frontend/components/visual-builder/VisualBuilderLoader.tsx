@@ -11,6 +11,7 @@ import {
 import { api } from "@/convex/_generated/api";
 
 import type { Id } from "@/convex/_generated/dataModel";
+import { isCoatPatternId } from "@/lib/cat-v3/coatPatterns";
 import type { PaletteMode } from "@/lib/palettes";
 
 type TortieLayer = {
@@ -126,6 +127,12 @@ function extractInitialPayload(
     peltName:
       coerceString(rawParams.peltName, DEFAULT_PARAMS.peltName) ??
       DEFAULT_PARAMS.peltName,
+    coatPattern: (() => {
+      const value = sanitizeOption(
+        rawParams.coatPattern ?? rawParams.coat_pattern,
+      );
+      return isCoatPatternId(value) ? value : undefined;
+    })(),
     colour:
       coerceColour(
         rawParams.colour ?? rawParams.color,

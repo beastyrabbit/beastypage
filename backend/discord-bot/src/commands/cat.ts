@@ -7,22 +7,44 @@ import { generateCat } from "../utils/api-client.js";
 import { buildCatEmbed } from "../utils/embed-builder.js";
 import { dataUrlToBase64 } from "../utils/data-url.js";
 
-const PELT_NAMES = [
-  "SingleColour",
-  "TwoColour",
-  "Tabby",
-  "Marbled",
-  "Rosette",
-  "Smoke",
-  "Ticked",
-  "Speckled",
-  "Bengal",
-  "Mackerel",
-  "Classic",
-  "Sokoke",
-  "Agouti",
-  "Singlestripe",
-  "Masked",
+const PELT_CHOICES = [
+  ...[
+    "SingleColour",
+    "TwoColour",
+    "Tabby",
+    "Marbled",
+    "Rosette",
+    "Smoke",
+    "Ticked",
+    "Speckled",
+    "Bengal",
+    "Mackerel",
+    "Classic",
+    "Sokoke",
+    "Agouti",
+    "Singlestripe",
+    "Masked",
+  ].map((value) => ({ name: value, value })),
+  { name: "Fine Bengal", value: "bengal-rosettes" },
+  { name: "Clouded rings", value: "clouded-leopard" },
+  { name: "Ocelot chains", value: "ocelot-chains" },
+  { name: "Serval spots", value: "serval-spots" },
+  { name: "Snow rosettes", value: "snow-leopard" },
+  { name: "Tiger bars", value: "tiger-stripes" },
+  { name: "King cheetah", value: "king-cheetah" },
+  { name: "Lynx fleck", value: "lynx-fleck" },
+  { name: "Marble lace", value: "marble-swirl" },
+  { name: "Brindle bars", value: "brindle" },
+  { name: "Jaguar mosaic", value: "jaguar-mosaic" },
+  { name: "Cheetah dots", value: "cheetah-dots" },
+  { name: "Fishing cat", value: "fishing-cat" },
+  { name: "Toyger braids", value: "toyger-braids" },
+  { name: "Sandcat bars", value: "sandcat-bars" },
+  { name: "Classic bullseye", value: "classic-bullseye" },
+  { name: "Ridgeback", value: "ridgeback" },
+  { name: "Masked mantle", value: "masked-mantle" },
+  { name: "Ghost stripes", value: "ghost-stripes" },
+  { name: "Split marble", value: "split-marble" },
 ];
 
 const COLOUR_NAMES = [
@@ -114,24 +136,26 @@ export async function handleCatAutocomplete(
     const focused = interaction.options.getFocused(true);
     const input = focused.value.toLowerCase();
 
-    let choices: string[];
+    let choices: { name: string; value: string }[];
     if (focused.name === "pelt") {
-      choices = PELT_NAMES;
+      choices = PELT_CHOICES;
     } else if (focused.name === "colour") {
-      choices = COLOUR_NAMES;
+      choices = COLOUR_NAMES.map((value) => ({ name: value, value }));
     } else if (focused.name === "eye_colour") {
-      choices = EYE_COLOURS;
+      choices = EYE_COLOURS.map((value) => ({ name: value, value }));
     } else {
       return;
     }
 
     const filtered = choices
-      .filter((c) => c.toLowerCase().includes(input))
+      .filter(
+        (choice) =>
+          choice.name.toLowerCase().includes(input) ||
+          choice.value.toLowerCase().includes(input),
+      )
       .slice(0, 25);
 
-    await interaction.respond(
-      filtered.map((c) => ({ name: c, value: c }))
-    );
+    await interaction.respond(filtered);
   } catch (error) {
     console.error("Autocomplete error:", error);
   }

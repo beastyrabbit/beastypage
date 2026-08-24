@@ -12,6 +12,7 @@
  * lib/adoption/adoptionGenerator.js (`buildStagePlan`).
  */
 
+import { applyCoatChoice, getCoatChoiceValue } from "@/lib/cat-v3/coatPatterns";
 import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
 
@@ -261,7 +262,10 @@ export function buildPartialBatchParams(
     return cat.catData.params;
   }
 
-  const simple: Record<string, unknown> = {
+  const simple: Record<string, unknown> & {
+    peltName: string;
+    coatPattern?: string;
+  } = {
     poseName: DEFAULT_POSE_NAME,
     peltName: "SingleColour",
     colour: "GINGER",
@@ -290,7 +294,23 @@ export function buildPartialBatchParams(
   ) {
     const stage = stages[index];
     if (stage.type === "simple") {
-      simple[stage.param] = finalParams[stage.param] ?? "none";
+      if (stage.param === "peltName") {
+        applyCoatChoice(
+          simple,
+          getCoatChoiceValue({
+            peltName:
+              typeof finalParams.peltName === "string"
+                ? finalParams.peltName
+                : undefined,
+            coatPattern:
+              typeof finalParams.coatPattern === "string"
+                ? finalParams.coatPattern
+                : undefined,
+          }),
+        );
+      } else {
+        simple[stage.param] = finalParams[stage.param] ?? "none";
+      }
     } else if (stage.type === "accessory") {
       accessorySlots[stage.slotIndex] =
         cat.catData.accessorySlots[stage.slotIndex] ?? "none";
@@ -328,6 +348,7 @@ export function buildPartialBatchParams(
     spriteNumber: 8,
     poseName: simple.poseName || DEFAULT_POSE_NAME,
     peltName: simple.peltName,
+    coatPattern: simple.coatPattern,
     colour: simple.colour,
     tint: simple.tint,
     skinColour: simple.skinColour,

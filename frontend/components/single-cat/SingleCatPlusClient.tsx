@@ -27,6 +27,12 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { track } from "@/lib/analytics";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import {
+  applyCoatChoice,
+  getCoatChoiceValue,
+  getCoatChoiceValues,
+  getCoatPatternName,
+} from "@/lib/cat-v3/coatPatterns";
+import {
   DEFAULT_POSE_NAME,
   formatPoseName,
   getAvailablePoseNames,
@@ -977,7 +983,7 @@ function getParameterRawValue(
     case "sprite":
       return params.poseName ?? params.spriteNumber;
     case "pelt":
-      return params.peltName;
+      return getCoatChoiceValue(params);
     case "colour":
       return params.colour;
     case "eyeColour":
@@ -1028,6 +1034,10 @@ function formatOptionDisplay(paramId: ParamId, raw: unknown): string {
     return raw ? "Yes" : "No";
   }
 
+  if (paramId === "pelt") {
+    return getCoatPatternName(raw) ?? formatValue(raw);
+  }
+
   if (raw === undefined || raw === null || raw === "") {
     return "None";
   }
@@ -1049,7 +1059,7 @@ function applyParamValue(
       params.colour = value as string;
       break;
     case "pelt":
-      params.peltName = value as string;
+      applyCoatChoice(params, value as string);
       break;
     case "eyeColour":
       params.eyeColour = value as string;
@@ -1145,7 +1155,10 @@ function getParameterValueForDisplay(
     case "colour":
       return formatValue(params.colour);
     case "pelt":
-      return formatValue(params.peltName);
+      return (
+        getCoatPatternName(getCoatChoiceValue(params)) ??
+        formatValue(params.peltName)
+      );
     case "eyeColour":
       return formatValue(params.eyeColour);
     case "eyeColour2":
@@ -1358,7 +1371,7 @@ async function buildParameterOptions(
 
   return {
     sprite: poseNames,
-    pelt: peltNames,
+    pelt: getCoatChoiceValues(peltNames),
     colour: colourList,
     tortie: [true, false],
     tortieMask: tortieMasks,

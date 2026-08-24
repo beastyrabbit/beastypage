@@ -1,3 +1,4 @@
+import { isCoatPatternId, resolveCoatChoice } from "@/lib/cat-v3/coatPatterns";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 
 export const EVOLUTION_SOURCE = "evolution-generator";
@@ -178,6 +179,7 @@ export type EvolutionBatchSettings = {
   starter: EvolutionStarterSource & {
     colour?: string;
     peltName?: string;
+    coatPattern?: string;
   };
   layerRanges: {
     torties: EvolutionRange;
@@ -657,6 +659,14 @@ export function normalizeEvolutionStarter(input: unknown): EvolutionCatData {
       ? (raw.params as Record<string, unknown>)
       : raw;
   const params = clone(paramsSource) as unknown as CatParams;
+  const coatPattern = isCoatPatternId(params.coatPattern)
+    ? params.coatPattern
+    : isCoatPatternId(params.peltName)
+      ? params.peltName
+      : undefined;
+  if (coatPattern) {
+    Object.assign(params, resolveCoatChoice(coatPattern));
+  }
   const accessories = normalizeStringSlots(
     raw.accessorySlots,
     params.accessories,
@@ -1380,6 +1390,7 @@ export function buildEvolutionBatchSettings(
       ...starterSource,
       colour: result.starter.catData.params.colour,
       peltName: result.starter.catData.params.peltName,
+      coatPattern: result.starter.catData.params.coatPattern,
     },
     layerRanges: {
       torties: result.controls.torties,

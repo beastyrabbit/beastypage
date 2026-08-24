@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import XIcon from "@/components/ui/x-icon";
 import type { AncestryTreeCat } from "@/lib/ancestry-tree/types";
 import { getCatPreviewUrl, MAX_SPRITE_POSE } from "@/lib/ancestry-tree/utils";
+import { getCoatPatternName, isCoatPatternId } from "@/lib/cat-v3/coatPatterns";
 import { cn } from "@/lib/utils";
 
 interface CatSidebarProps {
@@ -176,6 +177,7 @@ export function CatSidebar({
               allele2={cat.genetics.pelt.allele2}
               expressed={cat.genetics.pelt.expressed}
               getDominance={getPeltDominance}
+              formatValue={getPeltLabel}
             />
 
             {/* Colour */}
@@ -289,9 +291,13 @@ const DOMINANT_PELTS = new Set([
 const RECESSIVE_PELTS = new Set(["SingleColour", "Single", "Solid"]);
 
 function getPeltDominance(allele: string): "D" | "R" | null {
-  if (DOMINANT_PELTS.has(allele)) return "D";
+  if (DOMINANT_PELTS.has(allele) || isCoatPatternId(allele)) return "D";
   if (RECESSIVE_PELTS.has(allele)) return "R";
   return null;
+}
+
+function getPeltLabel(value: string): string {
+  return getCoatPatternName(value) ?? value;
 }
 
 // Component to display a genetic trait with both alleles
@@ -301,12 +307,14 @@ function GeneticTraitDisplay({
   allele2,
   expressed,
   getDominance,
+  formatValue = (value) => value,
 }: {
   label: string;
   allele1: string;
   allele2: string;
   expressed: string;
   getDominance?: (allele: string) => "D" | "R" | null;
+  formatValue?: (value: string) => string;
 }) {
   const isHeterozygous = allele1 !== allele2;
   const dom1 = getDominance?.(allele1);
@@ -316,7 +324,9 @@ function GeneticTraitDisplay({
     <div className="text-xs">
       <div className="flex items-center justify-between mb-1">
         <span className="text-muted-foreground">{label}</span>
-        <span className="text-emerald-400 font-medium">{expressed}</span>
+        <span className="text-emerald-400 font-medium">
+          {formatValue(expressed)}
+        </span>
       </div>
       {isHeterozygous && (
         <div className="flex gap-2 text-[10px] pl-2">
@@ -327,7 +337,7 @@ function GeneticTraitDisplay({
                 : "text-amber-400/60"
             }
           >
-            {allele1}
+            {formatValue(allele1)}
             {dom1 && (
               <span
                 className={
@@ -348,7 +358,7 @@ function GeneticTraitDisplay({
                 : "text-amber-400/60"
             }
           >
-            {allele2}
+            {formatValue(allele2)}
             {dom2 && (
               <span
                 className={

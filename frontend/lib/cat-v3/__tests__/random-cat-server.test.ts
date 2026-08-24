@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getColorNamesForPalette } from "@/lib/palettes";
+import { COAT_PATTERN_IDS } from "../coatPatterns";
 import { generateRandomParamsServer } from "../random-cat-server";
 
 const VALID_POSES = [
@@ -125,6 +126,25 @@ describe("generateRandomParamsServer", () => {
   it("applies pelt override", async () => {
     const params = await generateRandomParamsServer({ pelt: "Tabby" });
     expect(params.peltName).toBe("Tabby");
+  });
+
+  it("applies a derived coat-pattern override", async () => {
+    const params = await generateRandomParamsServer({
+      pelt: "bengal-rosettes",
+    });
+
+    expect(params.peltName).toBe("SingleColour");
+    expect(params.coatPattern).toBe("bengal-rosettes");
+  });
+
+  it("only generates registered derived coat patterns", async () => {
+    for (let i = 0; i < 50; i++) {
+      const params = await generateRandomParamsServer();
+      if (params.coatPattern) {
+        expect(COAT_PATTERN_IDS).toContain(params.coatPattern);
+        expect(params.peltName).toBe("SingleColour");
+      }
+    }
   });
 
   it("applies colour override", async () => {

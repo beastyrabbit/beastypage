@@ -11,6 +11,10 @@ import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import {
+  getCoatChoiceValue,
+  getCoatPatternName,
+} from "@/lib/cat-v3/coatPatterns";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { cn } from "@/lib/utils";
@@ -293,7 +297,12 @@ export function GuidedTimelineViewer({
             ? `Pose ${params.spriteNumber}`
             : "—",
       ],
-      ["Pattern", params.peltName ?? "—"],
+      [
+        "Pattern",
+        getCoatPatternName(getCoatChoiceValue(params)) ??
+          params.peltName ??
+          "—",
+      ],
       ["Base Colour", params.colour ?? "—"],
       ["Eye Colour", params.eyeColour ?? "—"],
       ["Eye Colour 2", params.eyeColour2 ?? "None"],
@@ -453,7 +462,7 @@ export function GuidedTimelineViewer({
                       {step.title ?? formatName(step.id)}
                     </div>
                     <p className="line-clamp-2 text-xs text-neutral-300/80">
-                      {step.summary ?? "—"}
+                      {getTimelineStepSummary(step)}
                     </p>
                   </div>
                 </button>
@@ -580,9 +589,9 @@ export function GuidedTimelineViewer({
             <h2 className="text-xl font-semibold text-white">
               Traits for this step
             </h2>
-            {activeStep?.summary && (
+            {activeStep && getTimelineStepSummary(activeStep) !== "—" && (
               <p className="mt-1 text-sm text-neutral-300">
-                {activeStep.summary}
+                {getTimelineStepSummary(activeStep)}
               </p>
             )}
           </header>
@@ -650,4 +659,12 @@ function formatName(value: unknown): string {
       .toLowerCase()
       .replace(/\b\w/g, (char) => char.toUpperCase()) || "None"
   );
+}
+
+function getTimelineStepSummary(step: TimelineStep): string {
+  if (step.id === "pattern") {
+    const patternName = getCoatPatternName(getCoatChoiceValue(step.params));
+    if (patternName) return patternName;
+  }
+  return step.summary ?? "—";
 }

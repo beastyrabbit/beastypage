@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { COAT_PATTERN_IDS } from "@/lib/cat-v3/coatPatterns";
 import { legacySpriteNumberForPoseName } from "@/lib/cat-v3/poseOptions";
 import {
   generateRandomParamsV3,
@@ -91,6 +92,21 @@ describe("random generator", () => {
     expect(params.colour).toEqual(expect.any(String));
     expect(params.eyeColour).toEqual(expect.any(String));
     expect(params.skinColour).toEqual(expect.any(String));
+    if (params.coatPattern) {
+      expect(COAT_PATTERN_IDS).toContain(params.coatPattern);
+      expect(params.peltName).toBe("SingleColour");
+    }
+  });
+
+  it("includes derived coat patterns in random generation", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.99);
+    try {
+      const params = await generateRandomParamsV3();
+      expect(params.peltName).toBe("SingleColour");
+      expect(params.coatPattern).toBe("split-marble");
+    } finally {
+      randomSpy.mockRestore();
+    }
   });
 
   it("keeps generated pose names and sprite numbers coherent", async () => {

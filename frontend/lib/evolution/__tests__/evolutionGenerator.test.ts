@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
   applyEvolutionStarterHairToPayload,
+  buildEvolutionBatchSettings,
   EVOLUTION_STARTER_HAIR_STYLES,
   type EvolutionAddition,
   type EvolutionPools,
@@ -16,7 +17,8 @@ import {
 
 const starterParams: CatParams = {
   spriteNumber: 7,
-  peltName: "Tabby",
+  peltName: "SingleColour",
+  coatPattern: "bengal-rosettes",
   colour: "GINGER",
   eyeColour: "GREEN",
   skinColour: "PINK",
@@ -132,6 +134,33 @@ describe("evolution generation", () => {
     expect(wrapped).toEqual(flat);
   });
 
+  it("upgrades legacy derived coats before generating descendants", () => {
+    const legacyStarter: CatParams = {
+      ...starterParams,
+      peltName: "bengal-rosettes",
+    };
+    delete legacyStarter.coatPattern;
+
+    const normalized = normalizeEvolutionStarter(legacyStarter);
+    const result = generateEvolutionBatch(
+      normalized,
+      {
+        branchCount: 1,
+        targetLevel: 1,
+        torties: { min: 0, max: 0 },
+        accessories: { min: 0, max: 0 },
+        scars: { min: 0, max: 0 },
+      },
+      pools,
+      { random: sequenceRandom([0.2, 0.4, 0.6]) },
+    );
+
+    for (const cat of result.cats) {
+      expect(cat.catData.params.peltName).toBe("SingleColour");
+      expect(cat.catData.params.coatPattern).toBe("bengal-rosettes");
+    }
+  });
+
   it("normalizes legacy flat tortie fields without tortie arrays", () => {
     const legacy: CatParams = { ...starterParams };
     delete legacy.tortie;
@@ -221,6 +250,7 @@ describe("evolution generation", () => {
     levels.forEach((cat, index) => {
       expect(cat.catData.params.spriteNumber).toBe(starterParams.spriteNumber);
       expect(cat.catData.params.peltName).toBe(starterParams.peltName);
+      expect(cat.catData.params.coatPattern).toBe(starterParams.coatPattern);
       expect(cat.catData.params.colour).toBe(starterParams.colour);
       expect(cat.catData.tortieSlots[0]).toEqual(starterParams.tortie?.[0]);
       expect(cat.catData.accessorySlots[0]).toBe("MAPLE LEAF");
@@ -229,6 +259,11 @@ describe("evolution generation", () => {
       expect(cat.catData.accessorySlots).toHaveLength(index + 2);
       expect(cat.catData.scarSlots).toHaveLength(index + 2);
     });
+
+    expect(
+      buildEvolutionBatchSettings(result, { type: "random" }, 123).starter
+        .coatPattern,
+    ).toBe(starterParams.coatPattern);
   });
 
   it("respects branch count and target level", () => {

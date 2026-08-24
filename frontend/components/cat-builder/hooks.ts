@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
-import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "./types";
+import { getCoatChoiceValues } from "@/lib/cat-v3/coatPatterns";
 import { getAvailablePoseNames } from "@/lib/cat-v3/poseOptions";
+import type { BuilderOptions, CatGeneratorApi, SpriteMapperApi } from "./types";
 
 export function useSpriteMapperOptions() {
   const [mapper, setMapper] = useState<SpriteMapperApi | null>(null);
@@ -29,9 +30,11 @@ export function useSpriteMapperOptions() {
         setMapper(spriteMapper);
 
         const poseNames = getAvailablePoseNames(spriteMapper);
+        const pelts = spriteMapper.getPeltNames();
         const builderOptions: BuilderOptions = {
           poseNames,
-          pelts: spriteMapper.getPeltNames(),
+          pelts,
+          coatChoices: getCoatChoiceValues(pelts),
           points: spriteMapper.getPoints(),
           vitiligo: spriteMapper.getVitiligo(),
           whitePatches: spriteMapper.getWhitePatches(),

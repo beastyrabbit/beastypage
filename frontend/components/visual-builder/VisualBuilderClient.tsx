@@ -37,6 +37,12 @@ import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
+import {
+  applyCoatChoice,
+  getCoatChoiceValue,
+  getCoatPatternName,
+  isCoatPatternId,
+} from "@/lib/cat-v3/coatPatterns";
 import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import { createCatShare } from "@/lib/catShare";
@@ -68,10 +74,10 @@ const MAX_TORTIE_LAYERS = 6;
 const DISPLAY_CANVAS_SIZE = 540;
 
 function getPoseCacheKey(params: Partial<CatParams>): string {
-  return (
+  const pose =
     params.poseName ??
-    `sprite-${params.spriteNumber ?? DEFAULT_PARAMS.spriteNumber}`
-  );
+    `sprite-${params.spriteNumber ?? DEFAULT_PARAMS.spriteNumber}`;
+  return `${pose}-${getCoatChoiceValue(params)}`;
 }
 
 type SectionId =
@@ -467,8 +473,18 @@ export function VisualBuilderClient({
         !prev.poseName ||
         normalizedOptions.poseNames.length === 0 ||
         normalizedOptions.poseNames.includes(prev.poseName);
+      const coatChoice = getCoatChoiceValue(prev);
+      const invalidCoatPattern =
+        prev.coatPattern !== undefined && !isCoatPatternId(prev.coatPattern);
 
-      if (!normalizedOptions.pelts.includes(prev.peltName)) needsUpdate = true;
+      if (
+        invalidCoatPattern ||
+        !normalizedOptions.coatChoices.includes(coatChoice) ||
+        isCoatPatternId(prev.peltName) ||
+        (isCoatPatternId(prev.coatPattern) && prev.peltName !== "SingleColour")
+      ) {
+        needsUpdate = true;
+      }
       if (!normalizedOptions.eyeColours.includes(prev.eyeColour))
         needsUpdate = true;
       if (!normalizedOptions.skinColours.includes(prev.skinColour))
@@ -478,8 +494,22 @@ export function VisualBuilderClient({
       if (!needsUpdate) return prev;
 
       const next = cloneParams(prev);
-      if (!normalizedOptions.pelts.includes(next.peltName)) {
-        next.peltName = normalizedOptions.pelts[0] ?? next.peltName;
+      if (
+        next.coatPattern !== undefined &&
+        !isCoatPatternId(next.coatPattern)
+      ) {
+        delete next.coatPattern;
+      }
+      const nextCoatChoice = getCoatChoiceValue(next);
+      if (normalizedOptions.coatChoices.includes(nextCoatChoice)) {
+        applyCoatChoice(next, nextCoatChoice);
+      } else {
+        applyCoatChoice(
+          next,
+          normalizedOptions.coatChoices[0] ??
+            normalizedOptions.pelts[0] ??
+            next.peltName,
+        );
       }
       if (!normalizedOptions.eyeColours.includes(next.eyeColour)) {
         next.eyeColour = normalizedOptions.eyeColours[0] ?? next.eyeColour;
@@ -841,29 +871,30 @@ export function VisualBuilderClient({
         </p>
       </header>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {(options?.pelts ?? []).map((pelt) => {
-          const previewKey = `pelt-${pelt}-${params.colour}-${getPoseCacheKey(params)}`;
-          const selected = params.peltName === pelt;
+        {(viewOptions?.coatChoices ?? []).map((choice) => {
+          const previewKey = `pelt-${choice}-${params.colour}-${getPoseCacheKey(params)}`;
+          const selected = getCoatChoiceValue(params) === choice;
+          const label = getCoatPatternName(choice) ?? formatName(choice);
           return (
             <button
-              key={pelt}
+              key={choice}
               type="button"
               className="text-left"
               onClick={() =>
                 updateParams(
                   (draft) => {
-                    draft.peltName = pelt;
+                    applyCoatChoice(draft, choice);
                   },
-                  { trait_type: "pelt", value: pelt },
+                  { trait_type: "pelt", value: choice },
                 )
               }
             >
               <VisualBuilderPreviewSprite
                 {...previewSpriteSharedProps}
                 cacheKey={previewKey}
-                label={formatName(pelt)}
+                label={label}
                 mutate={(draft) => {
-                  draft.peltName = pelt;
+                  applyCoatChoice(draft, choice);
                 }}
                 selected={selected}
               />
@@ -875,7 +906,7 @@ export function VisualBuilderClient({
                     : "text-neutral-300",
                 )}
               >
-                {formatName(pelt)}
+                {label}
               </p>
             </button>
           );
@@ -2200,6 +2231,7 @@ export function VisualBuilderClient({
   ]);
 
   const renderScarsSection = useCallback(() => scarsSection, [scarsSection]);
+  const poseCoatChoice = getCoatChoiceValue(params);
   const poseSection = useMemo(() => {
     const poseChoices =
       viewOptions?.poseNames && viewOptions.poseNames.length > 0
@@ -2245,7 +2277,7 @@ export function VisualBuilderClient({
               >
                 <VisualBuilderPreviewSprite
                   {...previewSpriteSharedProps}
-                  cacheKey={`pose-option-${poseName}`}
+                  cacheKey={`pose-option-${poseName}-${poseCoatChoice}`}
                   mutate={(draft) => {
                     draft.poseName = poseName;
                   }}
@@ -2262,6 +2294,7 @@ export function VisualBuilderClient({
     );
   }, [
     params.poseName,
+    poseCoatChoice,
     updateParams,
     viewOptions?.poseNames,
     previewSpriteSharedProps,

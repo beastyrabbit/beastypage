@@ -9,17 +9,18 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { getColorNamesForPalette, type PaletteId } from "@/lib/palettes";
-import config from "./random-config.json";
-import {
-  materializeStringSlots,
-  materializeTortieSlots,
-} from "./slotMaterializer";
+import { getCoatChoiceValues, resolveCoatChoice } from "./coatPatterns";
 import {
   isRandomSelectablePoseName,
   legacySpriteNumberForPoseName,
   poseNameForLegacySpriteNumber,
 } from "./poseOptions";
+import config from "./random-config.json";
 import { filterRandomAccessoryPool } from "./randomAccessories";
+import {
+  materializeStringSlots,
+  materializeTortieSlots,
+} from "./slotMaterializer";
 import type { CatParams, RandomGenerationOptions } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -607,6 +608,12 @@ export async function generateRandomParamsServer(
   const spriteNumber = legacySpriteNumberForPoseName(poseName) ?? 0;
 
   const pelts = data.peltNames.filter((p) => p !== "Tortie" && p !== "Calico");
+  const coatChoices = getCoatChoiceValues(pelts);
+  const coat = resolveCoatChoice(
+    overrides.pelt && coatChoices.includes(overrides.pelt)
+      ? overrides.pelt
+      : pickOne(coatChoices),
+  );
 
   const colourPools = buildColourPools(data.colours, overrides.palettes);
   const colourPool = flattenPools(colourPools);
@@ -626,10 +633,7 @@ export async function generateRandomParamsServer(
   const params: CatParams = {
     spriteNumber,
     poseName,
-    peltName:
-      overrides.pelt && pelts.includes(overrides.pelt)
-        ? overrides.pelt
-        : pickOne(pelts),
+    ...coat,
     colour:
       overrides.colour &&
       (data.colours.includes(overrides.colour) ||

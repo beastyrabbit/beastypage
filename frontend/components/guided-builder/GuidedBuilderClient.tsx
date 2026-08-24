@@ -31,6 +31,12 @@ import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
 import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
+import {
+  applyCoatChoice,
+  getCoatChoiceValue,
+  getCoatPatternName,
+  isCoatPatternId,
+} from "@/lib/cat-v3/coatPatterns";
 import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import type { PaletteMode } from "@/lib/palettes";
@@ -235,10 +241,10 @@ const DEFAULT_PARAMS: CatParams = {
 };
 
 function getPoseCacheKey(params: Partial<CatParams>): string {
-  return (
+  const pose =
     params.poseName ??
-    `sprite-${params.spriteNumber ?? DEFAULT_PARAMS.spriteNumber}`
-  );
+    `sprite-${params.spriteNumber ?? DEFAULT_PARAMS.spriteNumber}`;
+  return `${pose}-${getCoatChoiceValue(params)}`;
 }
 
 const PALETTE_CONTROLS: { id: PaletteMode; label: string }[] = [
@@ -428,8 +434,20 @@ export function GuidedBuilderClient() {
     if (!options) return;
     setParams((prev) => {
       const next = cloneParams(prev);
-      if (options.pelts.length > 0 && !options.pelts.includes(next.peltName)) {
-        next.peltName = options.pelts[0] ?? next.peltName;
+      if (
+        next.coatPattern !== undefined &&
+        !isCoatPatternId(next.coatPattern)
+      ) {
+        delete next.coatPattern;
+      }
+      const coatChoice = getCoatChoiceValue(next);
+      if (options.coatChoices.includes(coatChoice)) {
+        applyCoatChoice(next, coatChoice);
+      } else {
+        applyCoatChoice(
+          next,
+          options.coatChoices[0] ?? options.pelts[0] ?? next.peltName,
+        );
       }
       if (
         options.eyeColours.length > 0 &&
@@ -725,11 +743,13 @@ export function GuidedBuilderClient() {
             summary: formatName(colour),
           };
         }
-        case "pattern":
+        case "pattern": {
+          const coatChoice = getCoatChoiceValue(snapshot);
           return {
-            complete: Boolean(snapshot.peltName),
-            summary: formatName(snapshot.peltName),
+            complete: Boolean(coatChoice),
+            summary: getCoatPatternName(coatChoice) ?? formatName(coatChoice),
           };
+        }
         case "tortie":
           return {
             complete: true,
@@ -971,9 +991,9 @@ export function GuidedBuilderClient() {
   );
 
   const handleSelectPattern = useCallback(
-    (pelt: string) => {
+    (choice: string) => {
       updateParams((draft) => {
-        draft.peltName = pelt;
+        applyCoatChoice(draft, choice);
       }, "pattern");
     },
     [updateParams],
@@ -1252,30 +1272,31 @@ export function GuidedBuilderClient() {
 
   const renderPatternStep = () => (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-      {options?.pelts.map((pelt) => {
-        const previewKey = `pattern-${pelt}-${params.colour}-${getPoseCacheKey(params)}-${params.tint}-${params.whitePatches}`;
-        const label = formatName(pelt);
+      {options?.coatChoices.map((choice) => {
+        const previewKey = `pattern-${choice}-${params.colour}-${getPoseCacheKey(params)}-${params.tint}-${params.whitePatches}`;
+        const label = getCoatPatternName(choice) ?? formatName(choice);
+        const selected = getCoatChoiceValue(params) === choice;
         return (
           <button
-            key={pelt}
+            key={choice}
             type="button"
             aria-label={`Select pattern ${label}`}
             className={cn(
               "block aspect-square w-full max-w-[250px] rounded-2xl border bg-slate-900/60 p-0 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300",
-              params.peltName === pelt
+              selected
                 ? "border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.25)]"
                 : "border-slate-800 hover:border-amber-300/70",
             )}
-            onClick={() => handleSelectPattern(pelt)}
+            onClick={() => handleSelectPattern(choice)}
           >
             <GuidedPreviewSprite
               {...previewSpriteSharedProps}
               cacheKey={previewKey}
               mutate={(draft) => {
-                draft.peltName = pelt;
+                applyCoatChoice(draft, choice);
               }}
               label={label}
-              selected={params.peltName === pelt}
+              selected={selected}
             />
             <span className="sr-only">{label}</span>
           </button>

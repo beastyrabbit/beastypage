@@ -1,3 +1,4 @@
+import { applyCoatChoice } from "@/lib/cat-v3/coatPatterns";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
   createGeneticsFromParams,
@@ -534,18 +535,23 @@ export class AncestryTreeManager {
                 colours: this.mutationPool.colours,
                 tortieMasks: this.mutationPool.tortieMasks,
               };
+              const partnerParams = geneticsToParams(
+                child.genetics,
+                {},
+                tortiePool,
+              );
+              applyCoatChoice(
+                partnerParams,
+                this.mutationPool.pelts.length > 0
+                  ? pickOne(this.mutationPool.pelts)
+                  : "Tabby",
+              );
+              partnerParams.colour =
+                this.mutationPool.colours.length > 0
+                  ? pickOne(this.mutationPool.colours)
+                  : "BLACK";
               const partnerGenetics = createGeneticsFromParams(
-                {
-                  ...geneticsToParams(child.genetics, {}, tortiePool),
-                  peltName:
-                    this.mutationPool.pelts.length > 0
-                      ? pickOne(this.mutationPool.pelts)
-                      : "Tabby",
-                  colour:
-                    this.mutationPool.colours.length > 0
-                      ? pickOne(this.mutationPool.colours)
-                      : "BLACK",
-                },
+                partnerParams,
                 oppositeGender,
               );
 

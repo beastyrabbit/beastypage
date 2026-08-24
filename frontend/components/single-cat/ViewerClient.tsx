@@ -13,6 +13,7 @@ import PaintIcon from "@/components/ui/paint-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import { api } from "@/convex/_generated/api";
+import { getCoatPatternName } from "@/lib/cat-v3/coatPatterns";
 import {
   formatPoseName,
   getAvailablePoseNames,
@@ -533,7 +534,12 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     };
 
     push("Colour", params.colour);
-    push("Pelt", params.peltName);
+    push(
+      "Pelt",
+      getCoatPatternName(params.coatPattern) ??
+        getCoatPatternName(params.peltName) ??
+        params.peltName,
+    );
     push("Eyes", buildEyeLabel(params));
     push("Eye Colour 2", params.eyeColour2);
 

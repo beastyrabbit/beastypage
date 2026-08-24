@@ -93,6 +93,37 @@ describe("buildPartialBatchParams", () => {
     expect(params.shading).toBe(false); // not yet revealed
   });
 
+  it("reveals peltName and a derived coat pattern together", () => {
+    const base = makeCat();
+    const cat = {
+      ...base,
+      catData: {
+        ...base.catData,
+        params: {
+          ...base.catData.params,
+          peltName: "SingleColour",
+          coatPattern: "clouded-leopard",
+        },
+      },
+    };
+
+    const beforePelt = buildPartialBatchParams(
+      cat,
+      stages,
+      0,
+    ) as unknown as Record<string, unknown>;
+    const afterPelt = buildPartialBatchParams(
+      cat,
+      stages,
+      1,
+    ) as unknown as Record<string, unknown>;
+
+    expect(beforePelt.peltName).toBe("SingleColour");
+    expect(beforePelt.coatPattern).toBeUndefined();
+    expect(afterPelt.peltName).toBe("SingleColour");
+    expect(afterPelt.coatPattern).toBe("clouded-leopard");
+  });
+
   it("uses placeholders for unrevealed tortie sub-elements", () => {
     // Stage 4 = tortie-0-mask revealed only.
     const params = buildPartialBatchParams(cat, stages, 4, {

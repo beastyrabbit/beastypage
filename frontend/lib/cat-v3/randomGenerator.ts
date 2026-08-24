@@ -1,13 +1,14 @@
-import config from "./random-config.json";
-import {
-  materializeStringSlots,
-  materializeTortieSlots,
-} from "./slotMaterializer";
+import { getCoatChoiceValues, resolveCoatChoice } from "./coatPatterns";
 import {
   getRandomSelectablePoseNames,
   legacySpriteNumberForPoseName,
 } from "./poseOptions";
+import config from "./random-config.json";
 import { getRandomAccessoryPool } from "./randomAccessories";
+import {
+  materializeStringSlots,
+  materializeTortieSlots,
+} from "./slotMaterializer";
 import type {
   CatParams,
   RandomGenerationOptions,
@@ -304,6 +305,7 @@ export async function generateRandomParamsV3Detailed(
   const pelts = spriteMapper
     .getPeltNames()
     .filter((p: string) => p !== "Tortie" && p !== "Calico");
+  const coat = resolveCoatChoice(pickOne(getCoatChoiceValues(pelts)));
   const tints = spriteMapper.getTints();
   const eyeColours = spriteMapper.getEyeColours();
   const skinColours = spriteMapper.getSkinColours();
@@ -315,7 +317,7 @@ export async function generateRandomParamsV3Detailed(
   const params: CatParams = {
     spriteNumber,
     poseName,
-    peltName: pickOne(pelts),
+    ...coat,
     colour: pickColour(),
     tint: pickOne(tints),
     skinColour: pickOne(skinColours),

@@ -67,6 +67,7 @@ export interface CatGeneratorApi {
 export interface BuilderOptions {
   poseNames: string[];
   pelts: string[];
+  coatChoices: string[];
   points: string[];
   vitiligo: string[];
   whitePatches: string[];

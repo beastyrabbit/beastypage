@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-import time
-from dataclasses import dataclass
 import math
+import time
 from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List
 
 from PIL import Image
 
 from ..models import (
+    BatchVariant,
     LayerIdentifier,
     RenderMeta,
-    BatchVariant,
 )
+from .coat_patterns import normalize_coat_pattern_name
 from .repository import SpriteRepository
 from .sprite_mapper import SpriteMapper
 from .v3_renderer import CatRendererV3, StageInfo
@@ -25,14 +25,14 @@ class LayerResult:
     label: str
     image: Image.Image
     duration_ms: float
-    diagnostics: List[str]
+    diagnostics: list[str]
     blend_mode: str
 
 
 @dataclass
 class PipelineResult:
     composed: Image.Image
-    layers: List[LayerResult]
+    layers: list[LayerResult]
     meta: RenderMeta
 
 
@@ -53,8 +53,8 @@ class BatchFrameResult:
 @dataclass
 class BatchPipelineResult:
     sheet: Image.Image
-    frames: List[BatchFrameResult]
-    sources: List[tuple[str, Image.Image]]
+    frames: list[BatchFrameResult]
+    sources: list[tuple[str, Image.Image]]
     tile_size: int
 
 
@@ -73,7 +73,7 @@ class RenderPipeline:
     def render(self, params: dict, collect_layers: bool = False) -> PipelineResult:
         params = self._normalize_params(params)
 
-        layer_results: List[LayerResult] = []
+        layer_results: list[LayerResult] = []
         start_time = time.perf_counter()
 
         composed, stage_infos = self.renderer.render(params)
@@ -106,7 +106,7 @@ class RenderPipeline:
     def render_batch(
         self,
         base_params: dict,
-        variants: List[BatchVariant],
+        variants: list[BatchVariant],
         *,
         include_base: bool = True,
         tile_size: int | None = None,
@@ -117,7 +117,7 @@ class RenderPipeline:
     ) -> BatchPipelineResult:
         normalized_base = self._normalize_params(base_params)
 
-        render_specs: List[tuple[str, str | None, str | None, dict]] = []
+        render_specs: list[tuple[str, str | None, str | None, dict]] = []
 
         if include_base:
             render_specs.append(("base", None, None, normalized_base))
@@ -134,9 +134,9 @@ class RenderPipeline:
         if frame_mode == "layer" and layer_identifier is None:
             raise ValueError("layer_identifier is required when frame_mode='layer'")
 
-        images: List[Image.Image] = []
-        frame_infos: List[tuple[str, str | None, str | None]] = []
-        sources: List[tuple[str, Image.Image]] = []
+        images: list[Image.Image] = []
+        frame_infos: list[tuple[str, str | None, str | None]] = []
+        sources: list[tuple[str, Image.Image]] = []
 
         for frame_id, label, group, params in render_specs:
             composed, stages = self.renderer.render(params)
@@ -161,7 +161,7 @@ class RenderPipeline:
         sheet_height = row_count * sheet_tile
 
         sheet = Image.new("RGBA", (sheet_width, sheet_height), (0, 0, 0, 0))
-        frames: List[BatchFrameResult] = []
+        frames: list[BatchFrameResult] = []
 
         for index, (image, info) in enumerate(zip(images, frame_infos)):
             frame_id, label, group = info
@@ -198,6 +198,11 @@ class RenderPipeline:
     # ------------------------------------------------------------------
     def _normalize_params(self, params: dict) -> dict:
         normalized = deepcopy(params)
+        coat_pattern = normalize_coat_pattern_name(normalized.get("coatPattern"))
+        legacy_coat_pattern = normalize_coat_pattern_name(normalized.get("peltName"))
+        if coat_pattern or legacy_coat_pattern:
+            normalized["peltName"] = "SingleColour"
+            normalized["coatPattern"] = coat_pattern or legacy_coat_pattern
         pose_name = normalized.get("poseName") or normalized.get("pose_name")
         sprite_number = normalized.get(
             "spriteNumber", normalized.get("sprite_number", 0)
@@ -216,9 +221,32 @@ class RenderPipeline:
     def _prepare_variant_params(self, base_params: dict, variant: BatchVariant) -> dict:
         params = deepcopy(base_params)
         if variant.params:
-            params.update(deepcopy(variant.params))
+            variant_params = deepcopy(variant.params)
+            legacy_coat_pattern = normalize_coat_pattern_name(
+                variant_params.get("peltName")
+            )
+            if "peltName" in variant_params and "coatPattern" not in variant_params:
+                if legacy_coat_pattern:
+                    variant_params["peltName"] = "SingleColour"
+                    variant_params["coatPattern"] = legacy_coat_pattern
+                else:
+                    variant_params["coatPattern"] = None
+            params.update(variant_params)
         if variant.overrides:
-            params.update(deepcopy(variant.overrides))
+            variant_overrides = deepcopy(variant.overrides)
+            legacy_coat_pattern = normalize_coat_pattern_name(
+                variant_overrides.get("peltName")
+            )
+            if (
+                "peltName" in variant_overrides
+                and "coatPattern" not in variant_overrides
+            ):
+                if legacy_coat_pattern:
+                    variant_overrides["peltName"] = "SingleColour"
+                    variant_overrides["coatPattern"] = legacy_coat_pattern
+                else:
+                    variant_overrides["coatPattern"] = None
+            params.update(variant_overrides)
         if variant.pose_name is not None:
             params["poseName"] = variant.pose_name
         if variant.sprite_number is not None:
@@ -228,7 +256,7 @@ class RenderPipeline:
     # ------------------------------------------------------------------
     @staticmethod
     def _extract_layer_image(
-        stage_infos: List[StageInfo], target: LayerIdentifier
+        stage_infos: list[StageInfo], target: LayerIdentifier
     ) -> Image.Image | None:
         for info in stage_infos:
             if info.identifier == target and info.image is not None:
@@ -242,4 +270,4 @@ class RenderPipeline:
             return 1
         if requested and requested > 0:
             return min(requested, total_frames)
-        return min(total_frames, max(1, int(math.ceil(math.sqrt(total_frames)))))
+        return min(total_frames, max(1, math.ceil(math.sqrt(total_frames))))

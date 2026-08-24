@@ -2,31 +2,30 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from PIL import Image, ImageOps
 
-from .image_ops import (
-    add,
-    fill_with_colour,
-    multiply,
-    screen,
-    apply_mask,
-    apply_missing_scar,
-    tint_image,
-    sanitize_transparency,
-    alpha_over,
-)
-from .patterns import PatternDefinition, generate_pattern_tile
+from ..models import LayerIdentifier
 from .coat_patterns import (
     apply_coat_pattern,
     normalize_coat_pattern_name,
     required_source_pelts,
 )
+from .image_ops import (
+    add,
+    alpha_over,
+    apply_mask,
+    apply_missing_scar,
+    fill_with_colour,
+    multiply,
+    sanitize_transparency,
+    screen,
+    tint_image,
+)
+from .patterns import PatternDefinition, generate_pattern_tile
 from .repository import SpriteRepository
 from .sprite_mapper import SpriteMapper
-from ..models import LayerIdentifier
 
 logger = logging.getLogger("renderer.v3")
 
@@ -105,14 +104,14 @@ def _is_empty_value(value) -> bool:
 @dataclass
 class StageInfo:
     identifier: LayerIdentifier
-    diagnostics: List[str]
-    image: Optional[Image.Image]
+    diagnostics: list[str]
+    image: Image.Image | None
     blend_mode: str
 
 
-def _deduplicate(items: List[str]) -> List[str]:
+def _deduplicate(items: list[str]) -> list[str]:
     seen = set()
-    result: List[str] = []
+    result: list[str] = []
     for item in items:
         normalized = item.upper()
         if normalized in seen:
@@ -135,27 +134,27 @@ class CatRendererV3:
         return bool(value)
 
     @staticmethod
-    def _sprite_number(params: Dict) -> int:
+    def _sprite_number(params: dict) -> int:
         try:
             return int(params.get("spriteNumber", 0))
         except (TypeError, ValueError):
             return 0
 
     @staticmethod
-    def _pose_name(params: Dict) -> Optional[str]:
+    def _pose_name(params: dict) -> str | None:
         pose_name = params.get("poseName") or params.get("pose_name")
         if _is_empty_value(pose_name):
             return None
         return str(pose_name)
 
-    def _get_sprite(self, sprite_name: str, params: Dict) -> Image.Image:
+    def _get_sprite(self, sprite_name: str, params: dict) -> Image.Image:
         return self.repo.get_sprite(
             sprite_name,
             self._sprite_number(params),
             self._pose_name(params),
         )
 
-    def _get_missing_scar_mask(self, scar_name: str, params: Dict) -> Image.Image:
+    def _get_missing_scar_mask(self, scar_name: str, params: dict) -> Image.Image:
         return self.repo.get_missing_scar_mask(
             scar_name,
             self._sprite_number(params),
@@ -163,9 +162,9 @@ class CatRendererV3:
         )
 
     # ------------------------------------------------------------------
-    def render(self, params: Dict) -> tuple[Image.Image, List[StageInfo]]:
+    def render(self, params: dict) -> tuple[Image.Image, list[StageInfo]]:
         canvas = self.repo.blank_canvas()
-        stages: List[StageInfo] = []
+        stages: list[StageInfo] = []
         reverse = self._truthy(params.get("reverse"))
 
         stage_sequence = [
@@ -216,51 +215,56 @@ class CatRendererV3:
         return canvas, stages
 
     # ------------------------------------------------------------------
-    def _stage_base(self, params: Dict, canvas: Image.Image):
+    def _base_pelt_specs(self, params: dict) -> list[tuple[object, object, object]]:
         pelt_name = params.get("peltName")
         colour = params.get("colour") or "WHITE"
+        specs: list[tuple[object, object, object]] = [(pelt_name, colour, None)]
 
-        layers: List[Tuple[Image.Image, Optional[Image.Image]]] = []
-
-        def draw(pattern, colour, mask=None):
-            base = self._build_pelt_layer(pattern, colour, params)
-            if base is None:
-                return
-            mask_sprite = None
-            if mask:
-                mask_sprite = self._load_tortie_mask(mask, params)
-                if mask_sprite:
-                    base = apply_mask(base, mask_sprite)
-            layers.append((base, mask_sprite))
-
-        if params.get("isTortie"):
-            if isinstance(params.get("tortie"), list) and params["tortie"]:
-                draw(pelt_name, colour)
-                for layer in params["tortie"]:
-                    if not layer:
-                        continue
-                    draw(
-                        layer.get("pattern"),
-                        layer.get("colour") or "GINGER",
-                        layer.get("mask"),
-                    )
-            elif params.get("tortiePattern") and params.get("tortiePattern") != "none":
-                draw(pelt_name, colour)
-                draw(
+        if not params.get("isTortie"):
+            return specs
+        if isinstance(params.get("tortie"), list) and params["tortie"]:
+            specs.extend(
+                (
+                    layer.get("pattern"),
+                    layer.get("colour") or "GINGER",
+                    layer.get("mask"),
+                )
+                for layer in params["tortie"]
+                if layer
+            )
+        elif params.get("tortiePattern") and params.get("tortiePattern") != "none":
+            specs.append(
+                (
                     params.get("tortiePattern"),
                     params.get("tortieColour") or "GINGER",
                     params.get("tortieMask"),
                 )
-            else:
-                draw(pelt_name, colour)
-        else:
-            draw(pelt_name, colour)
+            )
+        return specs
+
+    def _build_pelt_layers(
+        self, params: dict, specs: list[tuple[object, object, object]]
+    ) -> list[Image.Image]:
+        layers: list[Image.Image] = []
+        for pattern, colour, mask in specs:
+            layer = self._build_pelt_layer(pattern, colour, params)
+            if layer is None:
+                continue
+            if mask:
+                mask_sprite = self._load_tortie_mask(mask, params)
+                if mask_sprite:
+                    layer = apply_mask(layer, mask_sprite)
+            layers.append(layer)
+        return layers
+
+    def _stage_base(self, params: dict, canvas: Image.Image):
+        layers = self._build_pelt_layers(params, self._base_pelt_specs(params))
 
         if not layers:
             return None, ["base:missing"], "alpha", LayerIdentifier.base
 
         overlay = self.repo.blank_canvas()
-        for layer, _mask in layers:
+        for layer in layers:
             overlay = alpha_over(overlay, layer)
         return overlay, ["base"] * len(layers), "alpha", LayerIdentifier.base
 
@@ -305,12 +309,27 @@ class CatRendererV3:
                 "replace",
                 LayerIdentifier.coat_pattern,
             )
-        overlay = apply_coat_pattern(
-            canvas,
+        base_layer = self._build_pelt_layer(
+            params.get("peltName"),
+            colour,
+            params,
+        )
+        if base_layer is None:
+            return None, [], "replace", LayerIdentifier.coat_pattern
+
+        patterned_base = apply_coat_pattern(
+            base_layer,
             pattern_name,
             flat_reference,
             source_pelts,
         )
+        tortie_layers = self._build_pelt_layers(
+            params,
+            self._base_pelt_specs(params)[1:],
+        )
+        overlay = patterned_base
+        for layer in tortie_layers:
+            overlay = alpha_over(overlay, layer)
         return (
             overlay,
             [f"coat-pattern:{pattern_name}"],
@@ -389,10 +408,9 @@ class CatRendererV3:
                 pattern_rgb = generate_pattern_tile(pat_def, w, h)
                 rgb = rgb * pattern_rgb
             except Exception:
-                logger.error(
+                logger.exception(
                     "Pattern generation failed, skipping multiply. pattern=%r",
                     definition.pattern,
-                    exc_info=True,
                 )
         elif definition.multiply:
             colour, blend_alpha = parse(definition.multiply)
@@ -412,7 +430,7 @@ class CatRendererV3:
         return Image.fromarray(arr, mode="RGBA")
 
     # ------------------------------------------------------------------
-    def _stage_tint(self, params: Dict, canvas: Image.Image):
+    def _stage_tint(self, params: dict, canvas: Image.Image):
         tint = self.mapper.get_tint_colour(params.get("tint"))
         dilute = self.mapper.get_dilute_tint_colour(params.get("tint"))
         overlays = []
@@ -446,7 +464,7 @@ class CatRendererV3:
                 result = alpha_over(result, overlay)
         return result, diagnostics, "replace", LayerIdentifier.tint
 
-    def _stage_white_patches(self, params: Dict, canvas: Image.Image):
+    def _stage_white_patches(self, params: dict, canvas: Image.Image):
         pattern = params.get("whitePatches")
         if _is_empty_value(pattern):
             return None, [], "alpha", LayerIdentifier.white_patches
@@ -459,7 +477,7 @@ class CatRendererV3:
             overlay = tint_image(overlay, [int(c) for c in tint[:3]], mode="multiply")
         return overlay, [f"white:{pattern}"], "alpha", LayerIdentifier.white_patches
 
-    def _stage_points(self, params: Dict, canvas: Image.Image):
+    def _stage_points(self, params: dict, canvas: Image.Image):
         pattern = params.get("points")
         if _is_empty_value(pattern):
             return None, [], "alpha", LayerIdentifier.points
@@ -469,7 +487,7 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_name, params)
         return overlay, [f"points:{pattern}"], "alpha", LayerIdentifier.points
 
-    def _stage_vitiligo(self, params: Dict, canvas: Image.Image):
+    def _stage_vitiligo(self, params: dict, canvas: Image.Image):
         pattern = params.get("vitiligo")
         if _is_empty_value(pattern):
             return None, [], "alpha", LayerIdentifier.vitiligo
@@ -479,7 +497,7 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_name, params)
         return overlay, [f"vitiligo:{pattern}"], "alpha", LayerIdentifier.vitiligo
 
-    def _stage_eyes(self, params: Dict, canvas: Image.Image):
+    def _stage_eyes(self, params: dict, canvas: Image.Image):
         primary = params.get("eyeColour") or params.get("eyeColor")
         secondary = params.get("eyeColour2") or params.get("eyeColor2")
 
@@ -508,7 +526,7 @@ class CatRendererV3:
 
         return overlay, diagnostics, "alpha", LayerIdentifier.eyes
 
-    def _stage_shading(self, params: Dict, canvas: Image.Image):
+    def _stage_shading(self, params: dict, canvas: Image.Image):
         if not self._truthy(params.get("shading")):
             return None, [], "alpha", LayerIdentifier.tint
         sprite_key = "shaders"
@@ -524,7 +542,7 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_key, params)
         return overlay, ["shading"], "multiply", LayerIdentifier.tint
 
-    def _stage_lighting(self, params: Dict, canvas: Image.Image):
+    def _stage_lighting(self, params: dict, canvas: Image.Image):
         lighting_param = params.get("lighting")
         if lighting_param is None or not self._truthy(lighting_param):
             return None, [], "alpha", LayerIdentifier.lighting
@@ -534,13 +552,13 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_key, params)
         return overlay, ["lighting"], "alpha", LayerIdentifier.lighting
 
-    def _stage_dark_forest(self, params: Dict, canvas: Image.Image):
+    def _stage_dark_forest(self, params: dict, canvas: Image.Image):
         if not (params.get("darkForest") or params.get("darkMode")):
             return None, [], "alpha", LayerIdentifier.tint
         overlay = fill_with_colour(canvas.size, (120, 30, 30, 200), canvas)
         return overlay, ["darkForest"], "multiply", LayerIdentifier.tint
 
-    def _stage_lineart(self, params: Dict, canvas: Image.Image):
+    def _stage_lineart(self, params: dict, canvas: Image.Image):
         if params.get("dead"):
             sprite_name = "lineartdead"
         elif params.get("darkForest") or params.get("darkMode"):
@@ -552,7 +570,7 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_name, params)
         return overlay, [sprite_name.lower()], "alpha", LayerIdentifier.lineart
 
-    def _stage_skin(self, params: Dict, canvas: Image.Image):
+    def _stage_skin(self, params: dict, canvas: Image.Image):
         skin = params.get("skinColour") or params.get("skinColor")
         if _is_empty_value(skin):
             return None, [], "alpha", LayerIdentifier.skin
@@ -562,8 +580,8 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_name, params)
         return overlay, [f"skin:{skin}"], "alpha", LayerIdentifier.skin
 
-    def _stage_scar_primary(self, params: Dict, canvas: Image.Image):
-        scars_raw: List[str] = []
+    def _stage_scar_primary(self, params: dict, canvas: Image.Image):
+        scars_raw: list[str] = []
         if isinstance(params.get("scars"), list):
             scars_raw.extend(str(s) for s in params["scars"] if not _is_empty_value(s))
         if isinstance(params.get("scarSlots"), list):
@@ -601,8 +619,8 @@ class CatRendererV3:
             return None, [], "alpha", LayerIdentifier.scars_primary
         return overlay, diagnostics, "alpha", LayerIdentifier.scars_primary
 
-    def _stage_scar_secondary(self, params: Dict, canvas: Image.Image):
-        scars_raw: List[str] = []
+    def _stage_scar_secondary(self, params: dict, canvas: Image.Image):
+        scars_raw: list[str] = []
         if isinstance(params.get("scars"), list):
             scars_raw.extend(str(s) for s in params["scars"] if not _is_empty_value(s))
         if isinstance(params.get("scarSlots"), list):
@@ -615,7 +633,7 @@ class CatRendererV3:
         if not scars:
             return None, [], "alpha", LayerIdentifier.scars_secondary
 
-        diagnostics: List[str] = []
+        diagnostics: list[str] = []
         current = canvas.copy()
 
         for scar in scars:
@@ -634,8 +652,8 @@ class CatRendererV3:
 
         return current, diagnostics, "replace", LayerIdentifier.scars_secondary
 
-    def _stage_accessories(self, params: Dict, canvas: Image.Image):
-        accessories_raw: List[str] = []
+    def _stage_accessories(self, params: dict, canvas: Image.Image):
+        accessories_raw: list[str] = []
         if isinstance(params.get("accessories"), list):
             accessories_raw.extend(
                 str(a) for a in params["accessories"] if not _is_empty_value(a)
@@ -657,7 +675,7 @@ class CatRendererV3:
             return None, [], "alpha", LayerIdentifier.accessories
         return overlay, diagnostics, "alpha", LayerIdentifier.accessories
 
-    def _resolve_accessory(self, name: str) -> Optional[str]:
+    def _resolve_accessory(self, name: str) -> str | None:
         sprite_name = self.mapper.accessory_sprite_name(name)
         if sprite_name and self.repo.has_sprite(sprite_name):
             return sprite_name

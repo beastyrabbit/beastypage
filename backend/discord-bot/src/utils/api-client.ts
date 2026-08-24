@@ -19,6 +19,7 @@ export interface CatResponse {
   params: {
     spriteNumber: number;
     peltName: string;
+    coatPattern?: string;
     colour: string;
     eyeColour: string;
     shading: boolean;
