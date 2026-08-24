@@ -591,9 +591,7 @@ export async function generateRandomParamsServer(
       ? data.renderablePoseNames
       : data.poseNames;
   const posePool = posePoolSource.filter((poseName) =>
-    isRandomSelectablePoseName(poseName, {
-      includeNewSprites: options.includeNewSprites === true,
-    }),
+    isRandomSelectablePoseName(poseName),
   );
   if (!posePool.length) throw new Error("Pose pool is empty");
 
@@ -604,7 +602,8 @@ export async function generateRandomParamsServer(
   const spritePoseName = poseNameForLegacySpriteNumber(overrides.sprite);
   const spritePoseNameOverride =
     spritePoseName && posePool.includes(spritePoseName) ? spritePoseName : null;
-  const poseName = poseNameOverride ?? spritePoseNameOverride ?? pickOne(posePool);
+  const poseName =
+    poseNameOverride ?? spritePoseNameOverride ?? pickOne(posePool);
   const spriteNumber = legacySpriteNumberForPoseName(poseName) ?? 0;
 
   const pelts = data.peltNames.filter((p) => p !== "Tortie" && p !== "Calico");
@@ -756,11 +755,7 @@ export async function generateRandomParamsServer(
   const accMin = overrides.accessoriesMin ?? 0;
   const accMax = overrides.accessoriesMax ?? 4;
   const accSlots = overrides.accessories ?? computeLayerCount(accMin, accMax);
-  const accessories = filterRandomAccessoryPool(
-    data.accessories,
-    data.extraAccessories,
-    options.includeNewSprites === true,
-  );
+  const accessories = filterRandomAccessoryPool(data.accessories);
   if (accSlots > 0 && accessories.length > 0) {
     const accConfig = RANDOM_CONFIG.counts.accessories;
     const uniqueAcc = accConfig.unique !== false;

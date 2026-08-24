@@ -1,11 +1,9 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from PIL import Image
-
-from renderer_service.renderer.sprite_mapper import SpriteMapper
 from renderer_service.renderer.repository import SpriteRepository
-
+from renderer_service.renderer.sprite_mapper import SpriteMapper
 
 DATA_DIR = Path("renderer_service/data")
 DICT_DIR = Path("sprites/dicts")
@@ -60,24 +58,63 @@ def test_palette_collars_and_legacy_aliases_resolve():
         assert repo.has_sprite(sprite_name, 8)
 
 
-def test_preserved_beasty_accessories_keep_legacy_pose_layout():
+def test_all_extra_accessories_render_every_new_pose():
+    mapper = SpriteMapper(DATA_DIR)
     repo = SpriteRepository()
 
-    legacy_key = "acc_craftedTOAST"
-    upstream_key = "acc_plantsWISTERIA"
+    missing = []
+    for name in mapper.pelt_info.get("extra_accessories", []):
+        sprite_name = mapper.accessory_sprite_name(name)
+        for pose_name in (
+            "adolescent_long0",
+            "adolescent_long1",
+            "adolescent_long2",
+        ):
+            if (
+                not sprite_name
+                or repo.get_sprite(sprite_name, 8, pose_name).getbbox() is None
+            ):
+                missing.append((name, sprite_name, pose_name))
 
-    assert repo.sprite_index[legacy_key]["poseLayout"] == "legacy"
-    assert "poseLayout" not in repo.sprite_index[upstream_key]
+    assert not missing, f"Extra accessories missing new poses: {missing[:10]}"
 
-    legacy_number = repo.get_sprite(legacy_key, 8)
-    legacy_named = repo.get_sprite(legacy_key, 8, "adult_short2")
-    missing_named = repo.get_sprite(legacy_key, 8, "adolescent_long0")
-    upstream_named = repo.get_sprite(upstream_key, 8, "adolescent_long0")
 
-    assert legacy_number.getbbox() is not None
-    assert legacy_number.tobytes() == legacy_named.tobytes()
-    assert missing_named.getbbox() is None
-    assert upstream_named.getbbox() is not None
+def test_renamed_and_adapted_lifegen_accessories_use_named_layout():
+    mapper = SpriteMapper(DATA_DIR)
+    repo = SpriteRepository()
+
+    holly = mapper.accessory_sprite_name("HOLLY2")
+    feathers = mapper.accessory_sprite_name("SPRINGFEATHERS")
+    jay = mapper.accessory_sprite_name("JAYFEATHER")
+
+    assert holly == "acc_lifegenHOLLY2"
+    assert feathers == "acc_lifegenSPRINGFEATHERS"
+    assert jay == "acc_lifegenJAYFEATHER"
+    assert repo.sprite_index[holly]["spritesheet"] == "acc_sophisticated"
+    assert repo.sprite_index[feathers]["spritesheet"] == "acc_misc2"
+    assert repo.sprite_index[jay]["spritesheet"] == "acc_lifegen_adapted"
+    assert all(
+        repo.sprite_index[key]["poseLayout"] == "named"
+        for key in (holly, feathers, jay)
+    )
+
+
+def test_wisteria_preserves_named_layout_through_future_imports():
+    mapper = SpriteMapper(DATA_DIR)
+    repo = SpriteRepository()
+
+    sprite_name = mapper.accessory_sprite_name("WISTERIA")
+
+    assert sprite_name == "acc_plantsWISTERIA"
+    assert repo.sprite_index[sprite_name]["poseLayout"] == "named"
+    assert all(
+        repo.get_sprite(sprite_name, 8, pose_name).getbbox() is not None
+        for pose_name in (
+            "adolescent_long0",
+            "adolescent_long1",
+            "adolescent_long2",
+        )
+    )
 
 
 def test_missing_scar_masks_use_imported_named_pose_sheet():

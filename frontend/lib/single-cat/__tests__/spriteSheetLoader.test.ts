@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 describe("SpriteSheetLoader pose offsets", () => {
-  it("has legacy offsets for every default random-selectable pose", () => {
+  it("keeps random-selectable named poses out of legacy sheets", () => {
     const loader = new SpriteSheetLoader();
     const expectedOffsets = new Map<string, { x: number; y: number }>([
       ["adolescent_short0", { x: 0, y: 1 }],
@@ -44,11 +44,15 @@ describe("SpriteSheetLoader pose offsets", () => {
 
     expect(selectablePoseNames).toContain("para_young0");
     expect(selectablePoseNames).toContain("sick_young0");
-    for (const poseName of selectablePoseNames) {
+    expect(selectablePoseNames).toContain("adolescent_long0");
+    for (const poseName of expectedOffsets.keys()) {
       expect(resolveLegacyPoseOffset(0, poseName)).toEqual(
         expectedOffsets.get(poseName),
       );
     }
+    expect(resolveLegacyPoseOffset(0, "adolescent_long0")).toBeNull();
+    expect(resolveLegacyPoseOffset(0, "adolescent_long1")).toBeNull();
+    expect(resolveLegacyPoseOffset(0, "adolescent_long2")).toBeNull();
   });
 
   it("uses legacy offsets only for preserved old-layout sheets", () => {

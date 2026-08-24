@@ -19,6 +19,11 @@ from .image_ops import (
     alpha_over,
 )
 from .patterns import PatternDefinition, generate_pattern_tile
+from .coat_patterns import (
+    apply_coat_pattern,
+    normalize_coat_pattern_name,
+    required_source_pelts,
+)
 from .repository import SpriteRepository
 from .sprite_mapper import SpriteMapper
 from ..models import LayerIdentifier
@@ -165,6 +170,7 @@ class CatRendererV3:
 
         stage_sequence = [
             self._stage_base,
+            self._stage_coat_pattern,
             self._stage_tint,
             self._stage_white_patches,
             self._stage_points,
@@ -257,6 +263,60 @@ class CatRendererV3:
         for layer, _mask in layers:
             overlay = alpha_over(overlay, layer)
         return overlay, ["base"] * len(layers), "alpha", LayerIdentifier.base
+
+    def _stage_coat_pattern(self, params: dict, canvas: Image.Image):
+        pattern_name = normalize_coat_pattern_name(params.get("coatPattern"))
+        if pattern_name is None or canvas.getbbox() is None:
+            return None, [], "replace", LayerIdentifier.coat_pattern
+
+        colour = params.get("colour") or "WHITE"
+        flat_reference = self._build_pelt_layer("SingleColour", colour, params)
+        if flat_reference is None:
+            logger.warning(
+                "Coat pattern %s is missing the SingleColour reference",
+                pattern_name,
+            )
+            return (
+                canvas.copy(),
+                [f"coat-pattern:{pattern_name}:missing:SingleColour"],
+                "replace",
+                LayerIdentifier.coat_pattern,
+            )
+
+        source_pelts = {}
+        required_pelts = required_source_pelts(pattern_name)
+        for pelt_name in required_pelts:
+            source = self._build_pelt_layer(pelt_name, colour, params)
+            if source is not None:
+                source_pelts[pelt_name] = source
+        missing_pelts = [
+            pelt_name for pelt_name in required_pelts if pelt_name not in source_pelts
+        ]
+        if missing_pelts:
+            missing_label = ",".join(missing_pelts)
+            logger.warning(
+                "Coat pattern %s is missing source pelts: %s",
+                pattern_name,
+                missing_label,
+            )
+            return (
+                canvas.copy(),
+                [f"coat-pattern:{pattern_name}:missing:{missing_label}"],
+                "replace",
+                LayerIdentifier.coat_pattern,
+            )
+        overlay = apply_coat_pattern(
+            canvas,
+            pattern_name,
+            flat_reference,
+            source_pelts,
+        )
+        return (
+            overlay,
+            [f"coat-pattern:{pattern_name}"],
+            "replace",
+            LayerIdentifier.coat_pattern,
+        )
 
     # ------------------------------------------------------------------
     def _build_pelt_layer(self, pattern, colour, params):

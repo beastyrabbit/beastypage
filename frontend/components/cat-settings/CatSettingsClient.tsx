@@ -304,19 +304,6 @@ export function CatSettingsClient({
         </select>
       </section>
 
-      {/* ─── New Sprites ─── */}
-      <section className="rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
-        <label className="flex cursor-pointer items-center gap-2.5">
-          <input
-            type="checkbox"
-            checked={includeNewSprites}
-            onChange={(e) => setIncludeNewSprites(e.target.checked)}
-            className="size-4 rounded border-border accent-primary"
-          />
-          <span className="text-sm text-foreground">Include new sprites</span>
-        </label>
-      </section>
-
       {/* ─── Colour Palettes ─── */}
       <section className="rounded-2xl border border-border/40 bg-card/60 p-5 backdrop-blur">
         <h2 className="mb-3 text-[10px] uppercase tracking-widest text-muted-foreground/70">

@@ -25,7 +25,10 @@ describe("pose options", () => {
       "adolescent_long0",
       "adult_short0",
     ]);
-    expect(getRandomSelectablePoseNames(mapper)).toEqual(["adult_short0"]);
+    expect(getRandomSelectablePoseNames(mapper)).toEqual([
+      "adolescent_long0",
+      "adult_short0",
+    ]);
     expect(
       getRandomSelectablePoseNames(mapper, { includeNewSprites: true }),
     ).toEqual(["adolescent_long0", "adult_short0"]);
@@ -37,7 +40,7 @@ describe("pose options", () => {
     ]);
   });
 
-  it("includes adolescent_long poses only when new sprites are enabled", () => {
+  it("always includes adolescent_long poses", () => {
     const mapper = {
       getRenderablePoseNames: () => [
         "newborn0",
@@ -48,7 +51,11 @@ describe("pose options", () => {
       ],
     };
 
-    expect(getRandomSelectablePoseNames(mapper)).toEqual(["adult_long0"]);
+    expect(getRandomSelectablePoseNames(mapper)).toEqual([
+      "adolescent_long0",
+      "adolescent_long2",
+      "adult_long0",
+    ]);
     expect(
       getRandomSelectablePoseNames(mapper, { includeNewSprites: true }),
     ).toEqual(["adolescent_long0", "adolescent_long2", "adult_long0"]);
@@ -84,7 +91,13 @@ describe("pose options", () => {
       expect(legacySpriteNumberForPoseName(poseName)).toBe(spriteNumber);
     }
 
-    for (const invalid of [999, -1, 7.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    for (const invalid of [
+      999,
+      -1,
+      7.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+    ]) {
       expect(poseNameForLegacySpriteNumber(invalid)).toBeNull();
     }
     expect(poseNameForLegacySpriteNumber("7")).toBeNull();

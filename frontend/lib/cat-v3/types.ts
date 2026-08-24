@@ -8,6 +8,7 @@ export interface CatParams {
   spriteNumber: number;
   poseName?: string;
   peltName: string;
+  coatPattern?: string;
   colour: string;
   isTortie: boolean;
   tortiePattern?: string;
@@ -38,12 +39,13 @@ export interface CatParams {
 
 export interface RandomGenerationOptions {
   /**
-   * @deprecated Legacy numeric-sprite flag retained for older callers. Pose
-   * filtering is now controlled by includeNewSprites.
+   * @deprecated Legacy numeric-sprite flag retained for older callers. All
+   * renderable poses are now available.
    */
   ignoreForbiddenSprites?: boolean;
   experimentalColourMode?: string | string[];
   includeBaseColours?: boolean;
+  /** @deprecated Retained for saved-setting compatibility and otherwise ignored. */
   includeNewSprites?: boolean;
   exactLayerCounts?: boolean;
   countsMode?:

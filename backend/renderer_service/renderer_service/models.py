@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class LayerIdentifier(str, Enum):
     base = "base"
+    coat_pattern = "coatPattern"
     tint = "tint"
     white_patches = "whitePatches"
     points = "points"

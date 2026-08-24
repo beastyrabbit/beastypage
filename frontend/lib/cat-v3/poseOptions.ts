@@ -3,11 +3,12 @@ export interface PoseNameMapper {
   getPoseNames?: () => string[];
 }
 
-export const DEFAULT_POSE_NAME = "adult_short2";
-
+/** @deprecated All renderable poses are now always available. */
 export interface RandomPoseOptions {
   includeNewSprites?: boolean;
 }
+
+export const DEFAULT_POSE_NAME = "adult_short2";
 
 const LEGACY_SPRITE_POSE_NAMES = [
   "kitten0",
@@ -53,15 +54,13 @@ function uniqueStringValues(values: unknown[]): string[] {
 
 export function isRandomSelectablePoseName(
   poseName: unknown,
-  options: RandomPoseOptions = {},
+  _options: RandomPoseOptions = {},
 ): poseName is string {
   return (
     typeof poseName === "string" &&
     poseName.length > 0 &&
     !poseName.startsWith("newborn") &&
-    !poseName.startsWith("kitten") &&
-    (options.includeNewSprites === true ||
-      !poseName.startsWith("adolescent_long"))
+    !poseName.startsWith("kitten")
   );
 }
 
@@ -75,13 +74,13 @@ export function getAvailablePoseNames(
 
 export function getRandomSelectablePoseNames(
   mapper: PoseNameMapper | null | undefined,
-  options: RandomPoseOptions = {},
+  _options: RandomPoseOptions = {},
 ): string[] {
   const renderable = mapper?.getRenderablePoseNames?.() ?? [];
   const source =
     renderable.length > 0 ? renderable : getAvailablePoseNames(mapper);
   return uniqueStringValues(
-    source.filter((poseName) => isRandomSelectablePoseName(poseName, options)),
+    source.filter((poseName) => isRandomSelectablePoseName(poseName)),
   );
 }
 
@@ -97,7 +96,9 @@ export function poseNameForLegacySpriteNumber(value: unknown): string | null {
   return LEGACY_SPRITE_POSE_NAMES[value] ?? null;
 }
 
-export function legacySpriteNumberForPoseName(poseName: unknown): number | null {
+export function legacySpriteNumberForPoseName(
+  poseName: unknown,
+): number | null {
   if (typeof poseName !== "string") {
     return null;
   }

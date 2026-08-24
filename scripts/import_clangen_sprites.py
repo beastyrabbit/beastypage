@@ -478,7 +478,7 @@ def build_sprite_index(
         if replacement != "__keep__":
             kept["spritesheet"] = replacement
         sheet = kept.get("spritesheet")
-        if sheet and sheet not in upstream_sheets:
+        if sheet and sheet not in upstream_sheets and "poseLayout" not in kept:
             kept["poseLayout"] = "legacy"
         index[key] = kept
 
@@ -567,6 +567,7 @@ def build_pelt_info(
         "tail_accessories": dedupe(tail_accessories),
         "collars": dedupe(collars),
         "collar_sprite_aliases": collar_aliases,
+        "accessory_sprite_aliases": old_pelt_info.get("accessory_sprite_aliases", {}),
         "extra_accessories": dedupe(old_pelt_info.get("extra_accessories", [])),
     }
     info["accessories"] = dedupe(

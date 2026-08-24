@@ -142,6 +142,14 @@ class SpriteMapper:
                 else {}
             ).items()
         }
+        self.accessory_sprite_aliases = {
+            str(key).upper(): str(value)
+            for key, value in (
+                self.pelt_info.get("accessory_sprite_aliases", {})
+                if self.pelt_info
+                else {}
+            ).items()
+        }
 
         sprite_keys = set(self.sprites_index.keys()) if self.sprites_index else set()
         self.accessory_sprite_names = sprite_keys
@@ -332,6 +340,10 @@ class SpriteMapper:
             return trimmed
         if upper in self.accessory_sprite_names:
             return upper
+
+        accessory_alias = self.accessory_sprite_aliases.get(upper)
+        if accessory_alias and accessory_alias in self.accessory_sprite_names:
+            return accessory_alias
 
         alias = self.collar_sprite_aliases.get(upper)
         if alias and alias in self.accessory_sprite_names:

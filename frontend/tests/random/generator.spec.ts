@@ -87,7 +87,6 @@ describe("random generator", () => {
     expect(params.spriteNumber).toEqual(expect.any(Number));
     expect(params.poseName).toEqual(expect.any(String));
     expect(params.poseName).not.toMatch(/^(newborn|kitten)/);
-    expect(params.poseName).not.toMatch(/^adolescent_long/);
     expect(params.peltName).toEqual(expect.any(String));
     expect(params.colour).toEqual(expect.any(String));
     expect(params.eyeColour).toEqual(expect.any(String));
@@ -98,17 +97,17 @@ describe("random generator", () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.15);
     try {
       const defaultResult = await generateRandomParamsV3Detailed();
-      expect(defaultResult.params.poseName).not.toMatch(/^adolescent_long/);
+      expect(defaultResult.params.poseName).toMatch(/^adolescent_long/);
       expect(defaultResult.params.spriteNumber).toBe(
         legacySpriteNumberForPoseName(defaultResult.params.poseName) ?? 0,
       );
 
-      const newSpriteResult = await generateRandomParamsV3Detailed({
-        includeNewSprites: true,
+      const retiredFlagResult = await generateRandomParamsV3Detailed({
+        includeNewSprites: false,
       });
-      expect(newSpriteResult.params.poseName).toMatch(/^adolescent_long/);
-      expect(newSpriteResult.params.spriteNumber).toBe(
-        legacySpriteNumberForPoseName(newSpriteResult.params.poseName) ?? 0,
+      expect(retiredFlagResult.params.poseName).toMatch(/^adolescent_long/);
+      expect(retiredFlagResult.params.spriteNumber).toBe(
+        legacySpriteNumberForPoseName(retiredFlagResult.params.poseName) ?? 0,
       );
     } finally {
       randomSpy.mockRestore();

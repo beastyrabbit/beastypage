@@ -25,10 +25,6 @@ const VALID_POSES = [
   "sick_young0",
 ];
 
-const DEFAULT_VALID_POSES = VALID_POSES.filter(
-  (poseName) => !poseName.startsWith("adolescent_long"),
-);
-
 const VALID_PELTS = [
   "SingleColour",
   "TwoColour",
@@ -86,23 +82,22 @@ describe("generateRandomParamsServer", () => {
   it("generates a selectable pose name from the valid pool", async () => {
     for (let i = 0; i < 10; i++) {
       const params = await generateRandomParamsServer();
-      expect(DEFAULT_VALID_POSES).toContain(params.poseName);
+      expect(VALID_POSES).toContain(params.poseName);
       expect(params.poseName).not.toMatch(/^(newborn|kitten)/);
-      expect(params.poseName).not.toMatch(/^adolescent_long/);
     }
   });
 
-  it("allows adolescent_long pose names only when new sprites are enabled", async () => {
+  it("allows adolescent_long pose names without a feature flag", async () => {
     const defaultParams = await generateRandomParamsServer({
       poseName: "adolescent_long2",
     });
-    expect(defaultParams.poseName).not.toBe("adolescent_long2");
+    expect(defaultParams.poseName).toBe("adolescent_long2");
 
-    const newSpriteParams = await generateRandomParamsServer(
+    const retiredFlagParams = await generateRandomParamsServer(
       { poseName: "adolescent_long2" },
-      { includeNewSprites: true },
+      { includeNewSprites: false },
     );
-    expect(newSpriteParams.poseName).toBe("adolescent_long2");
+    expect(retiredFlagParams.poseName).toBe("adolescent_long2");
   });
 
   it("does not pick Tortie or Calico as pelt name", async () => {
@@ -213,7 +208,7 @@ describe("generateRandomParamsServer", () => {
   it("ignores invalid sprite override", async () => {
     const params = await generateRandomParamsServer({ sprite: 999 });
     expect(params.spriteNumber).not.toBe(999);
-    expect(DEFAULT_VALID_POSES).toContain(params.poseName);
+    expect(VALID_POSES).toContain(params.poseName);
   });
 
   it("ignores invalid pelt override", async () => {

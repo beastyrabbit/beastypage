@@ -1,4 +1,1522 @@
 {
+  "acc_lifegenBROWN SNAIL": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenRED SNAIL": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWORM": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLUE SNAIL": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenZEBRA ISOPOD": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenDUCKY ISOPOD": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenDAIRY COW ISOPOD": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBEETLEJUICE ISOPOD": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 1050,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBEE": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 1200,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenRED LADYBUG": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 1350,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenORANGE LADYBUG": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 0,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenYELLOW LADYBUG": {
+    "spritesheet": "acc_aliveInsect",
+    "xOffset": 150,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLUNAR MOTH": {
+    "spritesheet": "acc_deadInsect",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenROSY MAPLE MOTH": {
+    "spritesheet": "acc_deadInsect",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMONARCH": {
+    "spritesheet": "acc_deadInsect",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenDAPPLED MONARCH": {
+    "spritesheet": "acc_deadInsect",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPOLYPHEMUS MOTH": {
+    "spritesheet": "acc_deadInsect",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMINT MOTH": {
+    "spritesheet": "acc_deadInsect",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenATLAS MOTH": {
+    "spritesheet": "acc_deadInsect",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCOMET MOTH": {
+    "spritesheet": "acc_deadInsect",
+    "xOffset": 1050,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPINKFLOWERCROWN": {
+    "spritesheet": "acc_flowercrowns",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenYELLOWFLOWERCROWN": {
+    "spritesheet": "acc_flowercrowns",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLUEFLOWERCROWN": {
+    "spritesheet": "acc_flowercrowns",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPURPLEFLOWERCROWN": {
+    "spritesheet": "acc_flowercrowns",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenDANDELIONCROWN": {
+    "spritesheet": "acc_flowercrowns",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPOPPYCROWN": {
+    "spritesheet": "acc_flowercrowns",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLILYPADHAT": {
+    "spritesheet": "acc_flowercrowns",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLACKBERRY": {
+    "spritesheet": "acc_fruit",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGOLDEN RASPBERRY": {
+    "spritesheet": "acc_fruit",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenYEW": {
+    "spritesheet": "acc_fruit",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenORANGE SLICE": {
+    "spritesheet": "acc_fruit",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSASKATOONS": {
+    "spritesheet": "acc_fruit",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenREDHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenNAVYHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenYELLOWHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTEALHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenORANGEHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGREENHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPINKHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMOSSHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 0,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenRAINBOWHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 150,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLACKHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 300,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBEEHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 450,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCREAMHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 600,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMAGENTAHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 750,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPEACHHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 900,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenVIOLETHARNESS": {
+    "spritesheet": "acc_harness",
+    "xOffset": 1050,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTIDE": {
+    "spritesheet": "acc_misc",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWOODDRAGON": {
+    "spritesheet": "acc_misc",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTOAST": {
+    "spritesheet": "acc_misc",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTOASTBERRY": {
+    "spritesheet": "acc_misc",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTOASTGRAPE": {
+    "spritesheet": "acc_misc",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTOASTNUTELLA": {
+    "spritesheet": "acc_misc",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTOASTPB": {
+    "spritesheet": "acc_misc",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWATTLE": {
+    "spritesheet": "acc_misc",
+    "xOffset": 1050,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCORKHAT": {
+    "spritesheet": "acc_misc",
+    "xOffset": 1200,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenZOOKEEPER": {
+    "spritesheet": "acc_misc",
+    "xOffset": 1350,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFAZBEAR": {
+    "spritesheet": "acc_misc",
+    "xOffset": 0,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWHITEBEAR": {
+    "spritesheet": "acc_misc",
+    "xOffset": 150,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPANDA": {
+    "spritesheet": "acc_misc",
+    "xOffset": 300,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBEAR": {
+    "spritesheet": "acc_misc",
+    "xOffset": 450,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBROWNBEAR": {
+    "spritesheet": "acc_misc",
+    "xOffset": 600,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenEGG": {
+    "spritesheet": "acc_misc",
+    "xOffset": 750,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPOPTABS": {
+    "spritesheet": "acc_misc",
+    "xOffset": 900,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBATHARNESS": {
+    "spritesheet": "acc_misc",
+    "xOffset": 1050,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenORANGEBUTTERFLY": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLUEBUTTERFLY": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBROWNPELT": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGRAYPELT": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBROWNMOSSPELT": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGRAYMOSSPELT": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFERN": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMOREFERN": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1050,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLEEDINGVINES": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1200,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLEEDINGHEART": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1350,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLILY": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1500,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCHERRYBLOSSOM": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 0,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTULIPPETALS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 150,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCLOVERFLOWER": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 300,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPANSIES": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 450,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBELLFLOWERS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 600,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSANVITALIAFLOWERS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 750,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenEGGSHELLS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 900,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLUEEGGSHELLS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1050,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenEASTEREGG": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1200,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFORSYTHIA": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1350,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMINTLEAF": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 0,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSTICKS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 150,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSPINGFEATHERS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 300,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSNAILSHELL": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 450,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMUD": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 600,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCHERRYPLUMLEAVES": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 750,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCATKIN": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 900,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenHONEYCOMB": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1050,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFLOWERCROWN": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1200,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLILIESOFTHEVALLEY": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1350,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSTRAWMANE": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 0,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMISTLETOE": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 150,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenREDPOINSETTIA": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 300,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWHITEPOINSETTIA": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 450,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCOTONEASTERWREATH": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 600,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenYEWS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 750,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCALLUNA": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 900,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTEETHCOLLAR": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1050,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenDRIEDORANGE": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1200,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenROESKULL": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1350,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWOODENOAKANTLERS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 0,
+    "yOffset": 1800,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWOODENBIRCHANTLERS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 150,
+    "yOffset": 1800,
+    "poseLayout": "named"
+  },
+  "acc_lifegenDOGWOOD": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 300,
+    "yOffset": 1800,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGRAYWOOL": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 450,
+    "yOffset": 1800,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLACKWOOL": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 600,
+    "yOffset": 1800,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCREAMWOOL": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 750,
+    "yOffset": 1800,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWHITEWOOL": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 900,
+    "yOffset": 1800,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFIRBRANCHES": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1050,
+    "yOffset": 1800,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCORALBELLS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1200,
+    "yOffset": 1800,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSLIVERDUSTPLANT": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 1350,
+    "yOffset": 1800,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSINGULARCLOVER": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSTICK": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPUMPKIN": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMOSS": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenIVY": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMOSS PELT": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenREEDS": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBAMBOO": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 1050,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSEAWEED": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 1200,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenDAISY CORSAGE": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 1350,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenDAISIES": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 0,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenDIANTHUS": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 150,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLEEDING HEARTS": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 300,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFRANGIPANI": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 450,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLUE GLORY": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 600,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCATNIP FLOWER": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 750,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLANKET FLOWER": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 900,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenALLIUM": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 1050,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLACELEAF": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 1200,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPURPLE GLORY": {
+    "spritesheet": "acc_plants2",
+    "xOffset": 1350,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGRAY SQUIRREL": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenRED SQUIRREL": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCRAB": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWHITE RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLACK RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBROWN RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenINDIAN GIANT SQUIRREL": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFAWN RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1050,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBROWN AND WHITE RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1200,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLACK AND WHITE RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1350,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWHITE AND FAWN RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 0,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLACK VITILIGO RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 150,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBROWN VITILIGO RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 300,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFAWN VITILIGO RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 450,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLACKBIRD": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 600,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenROBIN": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 750,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenJAY": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 900,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTHRUSH": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1050,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCARDINAL": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1200,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMAGPIE": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1350,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCUBAN TROGON": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 0,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTAN RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 150,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTAN AND WHITE RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 300,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenTAN VITILIGO RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 450,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenRAT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 600,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWHITE MOUSE": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 750,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLACK MOUSE": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 900,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGRAY MOUSE": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1050,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBROWN MOUSE": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1200,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGRAY RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1350,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGRAY AND WHITE RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 0,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGRAY VITILIGO RABBIT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 150,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenRAINBOWLORIKEET": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 300,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBILBY": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 450,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGRASS SNAKE": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 600,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLUE RACER": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 750,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWESTERN COACHWHIP": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 900,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenKINGSNAKE": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1050,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWINTERSTOAT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1200,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBROWNSTOAT": {
+    "spritesheet": "acc_smallanimals",
+    "xOffset": 1350,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMOONHAT": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFIDDLEHEADS": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLANTERNS": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenHEARTCHARMS": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCELESTIALCHIMES": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSTARCHIMES": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLUNARCHIMES": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSILVERLUNARCHIMES": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 1050,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSPRINGFLOWERCORSAGE": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 0,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenORCHID": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 150,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSPRINGFLOWERS": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 300,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenRADIO": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 450,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSWANFEATHER": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 600,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenDRACULAPARROTFEATHER": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 750,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenJAYFEATHER": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 1350,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenEAGLEFEATHER": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 0,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSTARFLOWERS": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 150,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenHEARTLEAVES": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 300,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenYELLOWWISTERIA": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 450,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenHOLLYLEAVES": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 600,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenHOLLYVINES": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 750,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLAVENDERHEADPIECE": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 900,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLAVENDERTAILWRAP": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 1050,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLAVENDERANKLET": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 1200,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWILLOWBARK BAG": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 0,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCLAY DAISY POT": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 150,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCLAY AMANITA POT": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 300,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCLAY BROWNCAP POT": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 450,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBIRD SKULL": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 600,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLEAF BOW": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 750,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLILYPAD": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLARGE DEATHBERRY": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSMALL DEATHBERRY": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenACORN": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPINECONE": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenVINE": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCHERRY": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLEEDING HEART BRANCH": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 1050,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSHELL PACK": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 1200,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenWHEAT": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 0,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLACK WHEAT": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 150,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGOLD FERNS": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 300,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMUD PAWS": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 450,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenASHY PAWS": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 600,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBERRIES": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 750,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFLOWER MOSS": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 900,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMUSHROOMS": {
+    "spritesheet": "acc_wilds2",
+    "xOffset": 1050,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPURPLERAINCOAT": {
+    "spritesheet": "acc_raincoats",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLUERAINCOAT": {
+    "spritesheet": "acc_raincoats",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenGREENRAINCOAT": {
+    "spritesheet": "acc_raincoats",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenPINKRAINCOAT": {
+    "spritesheet": "acc_raincoats",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenREDRAINCOAT": {
+    "spritesheet": "acc_raincoats",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLIMERAINCOAT": {
+    "spritesheet": "acc_raincoats",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenORANGERAINCOAT": {
+    "spritesheet": "acc_raincoats",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenYELLOWRAINCOAT": {
+    "spritesheet": "acc_raincoats",
+    "xOffset": 0,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_plantsWISTERIA": {
+    "spritesheet": "acc_plants",
+    "xOffset": 0,
+    "yOffset": 1350,
+    "poseLayout": "named"
+  },
+  "acc_lifegenHOLLY2": {
+    "spritesheet": "acc_sophisticated",
+    "xOffset": 600,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSPRINGFEATHERS": {
+    "spritesheet": "acc_misc2",
+    "xOffset": 300,
+    "yOffset": 900,
+    "poseLayout": "named"
+  },
+  "acc_lifegenACORN2": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenBLEEDING HEARTS2": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCHERRY2": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCLOVER2": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 450,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenCLOVERS": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 600,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenFERNS": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 750,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenHESPERIS": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 900,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLADYBUG": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 1050,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLARGE COMET": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 1200,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLARGE LUNA": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 1350,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_lifegenLILYPADCROWN": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 0,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMARIGOLD": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 150,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenMOSS2": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 300,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenRASPBERRY2": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 450,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenREDCROWN": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 600,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSMALL COMET": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 750,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenSMALL LUNA": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 900,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenYELLOW PRIMROSE": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 1050,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
+  "acc_lifegenYELLOWCROWN": {
+    "spritesheet": "acc_lifegen_adapted",
+    "xOffset": 1200,
+    "yOffset": 450,
+    "poseLayout": "named"
+  },
   "lineart": {
     "spritesheet": "lineart",
     "xOffset": 0,
@@ -3323,11 +4841,6 @@
     "spritesheet": "acc_plants",
     "xOffset": 1500,
     "yOffset": 900
-  },
-  "acc_plantsWISTERIA": {
-    "spritesheet": "acc_plants",
-    "xOffset": 0,
-    "yOffset": 1350
   },
   "acc_herbsWISTERIA": {
     "spritesheet": "acc_plants",

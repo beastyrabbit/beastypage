@@ -24,6 +24,33 @@ export default function TestsLanding() {
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <div className="glass-card relative flex h-full flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
           <div
+            className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-orange-400/15 via-transparent to-amber-500/15"
+            aria-hidden
+          />
+          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground/60">
+            <span className="font-semibold text-foreground">
+              Coat Pattern Atlas
+            </span>
+            <span className="rounded-full bg-orange-500/15 px-3 py-1 text-[11px] font-semibold text-orange-300">
+              Patterns
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Inspect twenty new pose-aware coat markings at the cat renderer's
+            native 50 × 50 resolution.
+          </p>
+          <div className="mt-auto flex gap-2 text-xs">
+            <Link
+              href="/tests/cat-coat-patterns"
+              className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 font-semibold text-foreground transition hover:bg-foreground hover:text-background"
+            >
+              Open atlas
+            </Link>
+          </div>
+        </div>
+
+        <div className="glass-card relative flex h-full flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+          <div
             className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-amber-400/15 via-transparent to-rose-500/15"
             aria-hidden
           />
@@ -52,27 +79,27 @@ export default function TestsLanding() {
 
         <div className="glass-card relative flex h-full flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
           <div
-            className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-primary/10 via-transparent to-rose-400/10"
+            className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-lime-400/10 via-transparent to-amber-400/10"
             aria-hidden
           />
           <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground/60">
             <span className="font-semibold text-foreground">
-              Snapshot Runner
+              LifeGen Accessory Check
             </span>
-            <span className="rounded-full bg-primary/15 px-3 py-1 text-[11px] font-semibold text-primary">
-              Sample
+            <span className="rounded-full bg-lime-500/15 px-3 py-1 text-[11px] font-semibold text-lime-300">
+              Sprites
             </span>
           </div>
           <p className="text-sm text-muted-foreground">
-            Use this slot to wire up a quick renderer check, API call, or QA
-            checklist. Duplicate the card to add more experiments.
+            Compare all 22 adapted or renamed accessories and ten current
+            LifeGen examples across the three new ClanGen poses.
           </p>
           <div className="mt-auto flex gap-2 text-xs">
             <Link
-              href="/projects/gacha"
+              href="/tests/lifegen-accessories"
               className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 font-semibold text-foreground transition hover:bg-foreground hover:text-background"
             >
-              Back to Gacha
+              Open matrix
             </Link>
           </div>
         </div>
@@ -104,7 +131,6 @@ export default function TestsLanding() {
             </Link>
           </div>
         </div>
-
       </section>
     </main>
   );

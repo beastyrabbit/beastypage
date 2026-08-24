@@ -5,24 +5,15 @@ export interface RandomAccessoryMapper {
 
 export function filterRandomAccessoryPool(
   accessories: readonly string[],
-  extraAccessories: readonly string[] = [],
-  includeNewSprites = false,
+  _extraAccessories: readonly string[] = [],
+  _includeNewSprites = false,
 ): string[] {
-  if (!includeNewSprites) {
-    return [...accessories];
-  }
-
-  const legacyAccessories = new Set(extraAccessories);
-  return accessories.filter((accessory) => !legacyAccessories.has(accessory));
+  return Array.from(new Set(accessories));
 }
 
 export function getRandomAccessoryPool(
   mapper: RandomAccessoryMapper,
-  includeNewSprites = false,
+  _includeNewSprites = false,
 ): string[] {
-  return filterRandomAccessoryPool(
-    mapper.getAccessories?.() ?? [],
-    mapper.getExtraAccessories?.() ?? [],
-    includeNewSprites,
-  );
+  return filterRandomAccessoryPool(mapper.getAccessories?.() ?? []);
 }

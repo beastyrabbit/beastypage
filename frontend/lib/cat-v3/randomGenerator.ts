@@ -282,9 +282,7 @@ export async function generateRandomParamsV3Detailed(
 ): Promise<RandomGenerationResult> {
   const spriteMapper = await ensureSpriteMapper();
 
-  const posePool = getRandomSelectablePoseNames(spriteMapper, {
-    includeNewSprites: options.includeNewSprites === true,
-  });
+  const posePool = getRandomSelectablePoseNames(spriteMapper);
   if (!posePool.length) {
     throw new Error("Pose pool is empty; check poseData.json");
   }
@@ -309,10 +307,7 @@ export async function generateRandomParamsV3Detailed(
   const tints = spriteMapper.getTints();
   const eyeColours = spriteMapper.getEyeColours();
   const skinColours = spriteMapper.getSkinColours();
-  const accessories = getRandomAccessoryPool(
-    spriteMapper,
-    options.includeNewSprites === true,
-  );
+  const accessories = getRandomAccessoryPool(spriteMapper);
   const scars = spriteMapper.getScars();
   const points = spriteMapper.getPoints();
   const vitiligo = spriteMapper.getVitiligo();

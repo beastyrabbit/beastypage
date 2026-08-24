@@ -1,0 +1,122 @@
+{
+  "source": {
+    "project": "LifeGen",
+    "release": "v0.7.7.5",
+    "releaseApi": "https://clangen.io/api/v1/Update/Channels/lifegen-stable/Releases",
+    "downloadPage": "https://mods.clangen.io/LifeGen/download",
+    "retrieved": "2026-08-24",
+    "artifact": {
+      "platform": "linux2.35",
+      "url": "https://clangen.io/api/v1/Update/Channels/lifegen-stable/Releases/v0.7.7.5/Artifacts/linux2.35",
+      "filename": "Lifegen_Linux64_glibc2.35+.tar.xz",
+      "sha256": "15a8a5469ffed45eaa86b2ff9ceb64c3ba19d2b151c853e27bc107ff442cefdc",
+      "spritesPath": "Lifegen/_internal/sprites"
+    }
+  },
+  "license": {
+    "name": "CC BY-NC 4.0",
+    "url": "https://creativecommons.org/licenses/by-nc/4.0/",
+    "attribution": "LifeGen, a ClanGen mod",
+    "projectRecord": "README.md#credits"
+  },
+  "assets": [
+    {
+      "path": "acc_aliveInsect.png",
+      "sha256": "6996e8e26f4e1904f6cb42be87a9974e1322dbc0054633abdaeee48eb1288909"
+    },
+    {
+      "path": "acc_deadInsect.png",
+      "sha256": "8be5f62b4523abf0c11fe7895f6336ae58d913b574419fb5b25dc973ef291d7a"
+    },
+    {
+      "path": "acc_flowercrowns.png",
+      "sha256": "dc61c21755e9368b48687d0c1ce74e0227f390fbfc2c1884872a87c5760806ba"
+    },
+    {
+      "path": "acc_fruit.png",
+      "sha256": "4d6967c714a3148b15c99e61765acdaa3ef8255069aec9d95e592377a1a78385"
+    },
+    {
+      "path": "acc_harness.png",
+      "sha256": "d0173cb6823f8bed61b54cd0e8a2d53c1784dae73c0a3d239f26cc8219edc2ae"
+    },
+    {
+      "path": "acc_misc.png",
+      "sha256": "9703508f729f597019c5cdaca9b8c659f8c8289b92574cf8d9ffbd636e3f39f2"
+    },
+    {
+      "path": "acc_misc2.png",
+      "sha256": "8b21eadb6bd9461d0e9aa35166d46f2f961a0830192347ccb1876bac6a38257f"
+    },
+    {
+      "path": "acc_plants2.png",
+      "sha256": "3dd64a04ac70e9be42a50df4003ec4a235e0cbe542d3b7e4b17608d9a258ada6"
+    },
+    {
+      "path": "acc_raincoats.png",
+      "sha256": "22dd977616970f960595c7b4381bd5755b25ee16e7fecd7819afd890f403296b"
+    },
+    {
+      "path": "acc_smallanimals.png",
+      "sha256": "0c11e9effd2df548faebb7e62add6f05f326778678a3bcc9742e265108613058"
+    },
+    {
+      "path": "acc_sophisticated.png",
+      "sha256": "ca193d2d03596477f0d84d218bc7ed59a077204e2214a0cf824120dbe1ab1440"
+    },
+    {
+      "path": "acc_wilds2.png",
+      "sha256": "5f143fb013e4cad315e36845160f59f2878bb096bb1d9364a0c29a4d496fdeb5"
+    },
+    {
+      "path": "dicts/alive_insect_data.json",
+      "sha256": "64be997b408deb0fc8ec4c6ff54789eaaed9188fa081d87de730f2e5024049e0"
+    },
+    {
+      "path": "dicts/dead_insect_data.json",
+      "sha256": "ad68ae282041999a644ce1a777e92f53bb185adbc5fd6987444e24e4ee93eb96"
+    },
+    {
+      "path": "dicts/flowercrowns_data.json",
+      "sha256": "f1ff456335fbc7b91a0596dd70d74a0e5f1a1773b18825997d0a792c9cdacae6"
+    },
+    {
+      "path": "dicts/fruit_data.json",
+      "sha256": "f09768ccff05abaa54fd15e0f351b9fe47b40ada5dd59c381539ce87b591c4e7"
+    },
+    {
+      "path": "dicts/harness_data.json",
+      "sha256": "2962da6a181f18104adeb73853bf07eb1eb0836859932a7f828096a2ec188b9e"
+    },
+    {
+      "path": "dicts/misc2_accs_data.json",
+      "sha256": "969ffe4f6531c04d31e15bd907c282da77e9747ec06244280047e61e5ea8c7c8"
+    },
+    {
+      "path": "dicts/misc_accs_data.json",
+      "sha256": "c0c20ae57329135cb834d19c2feec5fe678f3c66781dacad56500725a310a922"
+    },
+    {
+      "path": "dicts/plant2_sprite_data.json",
+      "sha256": "5c45fbfd24a7a68ac3dfd3da975d6a20b98c20f624a6719889faf254fb149f6a"
+    },
+    {
+      "path": "dicts/smallanimals_data.json",
+      "sha256": "6cc413b9b567ddfd62c113d001c85f27b35c8a8dc95a1a42f630cec0f43b8b7e"
+    },
+    {
+      "path": "dicts/sophisticated_data.json",
+      "sha256": "f4058e9f92c8cbf07b86a273f977215bdc3f81067abb31765d8c99197b49a24e"
+    },
+    {
+      "path": "dicts/wild2_sprite_data.json",
+      "sha256": "bc4451a96e2fb6b8a7d412446cdd365af9cd53dbe8ae3975a9c0dffba0422acb"
+    }
+  ],
+  "generated": [
+    {
+      "path": "acc_lifegen_adapted.png",
+      "description": "Existing BeastyPage pixels translated to the three adolescent_long poses using placement offsets from the verified LifeGen source assets."
+    }
+  ]
+}
