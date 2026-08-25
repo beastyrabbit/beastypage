@@ -24,6 +24,33 @@ export default function TestsLanding() {
       <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <div className="glass-card relative flex h-full flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
           <div
+            className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-cyan-400/15 via-transparent to-fuchsia-500/10"
+            aria-hidden
+          />
+          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground/60">
+            <span className="font-semibold text-foreground">
+              Custom Accessory Fit Check
+            </span>
+            <span className="rounded-full bg-cyan-500/15 px-3 py-1 text-[11px] font-semibold text-cyan-300">
+              Sprites
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Inspect three original pixel accessories on all 26 named cat poses
+            at the renderer&apos;s native 50 × 50 resolution.
+          </p>
+          <div className="mt-auto flex gap-2 text-xs">
+            <Link
+              href="/tests/custom-accessories"
+              className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-2 font-semibold text-foreground transition hover:bg-foreground hover:text-background"
+            >
+              Open fit check
+            </Link>
+          </div>
+        </div>
+
+        <div className="glass-card relative flex h-full flex-col gap-4 rounded-3xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+          <div
             className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-orange-400/15 via-transparent to-amber-500/15"
             aria-hidden
           />

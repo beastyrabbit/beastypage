@@ -454,7 +454,13 @@ def write_accessory_aliases(
         pelt_info["extra_accessories"] = list(
             OrderedDict.fromkeys([*current_extras, *upstream_extras])
         )
-        aliases: OrderedDict[str, str] = OrderedDict()
+        aliases: OrderedDict[str, str] = OrderedDict(
+            (str(name).upper(), str(sprite_name))
+            for name, sprite_name in pelt_info.get(
+                "accessory_sprite_aliases", {}
+            ).items()
+            if str(sprite_name).startswith("acc_beastypage")
+        )
         for name in pelt_info.get("extra_accessories", []):
             if (
                 name in groups

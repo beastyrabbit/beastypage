@@ -1,4 +1,22 @@
 {
+  "acc_beastypageCOMPUTER MOUSE": {
+    "spritesheet": "acc_beastypage_custom",
+    "xOffset": 0,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_beastypageGAME CONTROLLER": {
+    "spritesheet": "acc_beastypage_custom",
+    "xOffset": 150,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
+  "acc_beastypageSCREWDRIVER": {
+    "spritesheet": "acc_beastypage_custom",
+    "xOffset": 300,
+    "yOffset": 0,
+    "poseLayout": "named"
+  },
   "acc_lifegenBROWN SNAIL": {
     "spritesheet": "acc_aliveInsect",
     "xOffset": 0,

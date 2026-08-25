@@ -1261,7 +1261,10 @@
     "SPINGFEATHERS",
     "MOONHAT",
     "HOLLYLEAVES",
-    "BLEEDING HEART BRANCH"
+    "BLEEDING HEART BRANCH",
+    "COMPUTER MOUSE",
+    "GAME CONTROLLER",
+    "SCREWDRIVER"
   ],
   "accessories": [
     "MAPLE LEAF",
@@ -1732,7 +1735,10 @@
     "SPINGFEATHERS",
     "MOONHAT",
     "HOLLYLEAVES",
-    "BLEEDING HEART BRANCH"
+    "BLEEDING HEART BRANCH",
+    "COMPUTER MOUSE",
+    "GAME CONTROLLER",
+    "SCREWDRIVER"
   ],
   "accessory_sprite_aliases": {
     "ACORN": "acc_lifegenACORN",
@@ -1986,6 +1992,9 @@
     "SPINGFEATHERS": "acc_lifegenSPINGFEATHERS",
     "MOONHAT": "acc_lifegenMOONHAT",
     "HOLLYLEAVES": "acc_lifegenHOLLYLEAVES",
-    "BLEEDING HEART BRANCH": "acc_lifegenBLEEDING HEART BRANCH"
+    "BLEEDING HEART BRANCH": "acc_lifegenBLEEDING HEART BRANCH",
+    "COMPUTER MOUSE": "acc_beastypageCOMPUTER MOUSE",
+    "GAME CONTROLLER": "acc_beastypageGAME CONTROLLER",
+    "SCREWDRIVER": "acc_beastypageSCREWDRIVER"
   }
 }

@@ -1,5 +1,7 @@
+import hashlib
 import json
 from pathlib import Path
+from statistics import median
 
 from PIL import Image
 from renderer_service.renderer.repository import SpriteRepository
@@ -7,6 +9,14 @@ from renderer_service.renderer.sprite_mapper import SpriteMapper
 
 DATA_DIR = Path("renderer_service/data")
 DICT_DIR = Path("sprites/dicts")
+ROOT_DIR = Path(__file__).parents[3]
+
+CUSTOM_ACCESSORIES = (
+    "COMPUTER MOUSE",
+    "GAME CONTROLLER",
+    "SCREWDRIVER",
+)
+RETIRED_CUSTOM_ACCESSORIES = ("HEADPHONES", "HANDBAG")
 
 
 def _load_json(path: Path) -> dict:
@@ -77,6 +87,80 @@ def test_all_extra_accessories_render_every_new_pose():
                 missing.append((name, sprite_name, pose_name))
 
     assert not missing, f"Extra accessories missing new poses: {missing[:10]}"
+
+
+def test_custom_accessories_render_every_named_pose():
+    mapper = SpriteMapper(DATA_DIR)
+    repo = SpriteRepository()
+    pose_data = _load_json(DATA_DIR / "poseData.json")
+
+    missing = []
+    for name in CUSTOM_ACCESSORIES:
+        sprite_name = mapper.accessory_sprite_name(name)
+        assert sprite_name == f"acc_beastypage{name}"
+        assert repo.sprite_index[sprite_name]["poseLayout"] == "named"
+        for pose_name in pose_data["poses"]:
+            sprite = repo.get_sprite(sprite_name, None, pose_name)
+            if sprite.getbbox() is None:
+                missing.append((name, pose_name))
+            assert sprite.size == (50, 50)
+
+    assert not missing, f"Custom accessories missing named poses: {missing}"
+
+
+def test_custom_accessory_art_is_unique_and_not_age_scaled():
+    mapper = SpriteMapper(DATA_DIR)
+    repo = SpriteRepository()
+    poses = _load_json(DATA_DIR / "poseData.json")["poses"]
+    age_groups = {
+        "newborn": poses[0:3],
+        "kitten": poses[3:6],
+        "adolescent": poses[6:12],
+        "adult": poses[12:18],
+    }
+
+    def pixel_count(sprite: Image.Image) -> int:
+        alpha_histogram = sprite.getchannel("A").histogram()
+        return sum(alpha_histogram[1:])
+
+    counts_by_accessory = {}
+    for name in CUSTOM_ACCESSORIES:
+        sprite_name = mapper.accessory_sprite_name(name)
+        sprites = {
+            pose_name: repo.get_sprite(sprite_name, None, pose_name)
+            for pose_name in poses
+        }
+        assert len({sprite.tobytes() for sprite in sprites.values()}) == len(poses)
+        counts_by_accessory[name] = {
+            age: [pixel_count(sprites[pose_name]) for pose_name in pose_names]
+            for age, pose_names in age_groups.items()
+        }
+
+    for counts in counts_by_accessory.values():
+        # Different viewing angles change the projected footprint, but a
+        # newborn gets the same physical object instead of a miniature copy.
+        assert median(counts["newborn"]) >= median(counts["adult"]) * 0.7
+
+
+def test_rejected_custom_accessories_are_fully_removed():
+    mapper = SpriteMapper(DATA_DIR)
+    repo = SpriteRepository()
+
+    for name in RETIRED_CUSTOM_ACCESSORIES:
+        assert name not in mapper.accessories
+        assert name not in mapper.pelt_info.get("extra_accessories", [])
+        assert mapper.accessory_sprite_name(name) is None
+        assert f"acc_beastypage{name}" not in repo.sprite_index
+
+
+def test_custom_accessory_sheet_is_synchronized():
+    paths = (
+        ROOT_DIR / "frontend/public/sprites/acc_beastypage_custom.png",
+        ROOT_DIR / "backend/renderer_service/sprites/acc_beastypage_custom.png",
+    )
+    hashes = [hashlib.sha256(path.read_bytes()).hexdigest() for path in paths]
+
+    assert hashes[0] == hashes[1]
 
 
 def test_renamed_and_adapted_lifegen_accessories_use_named_layout():
@@ -199,7 +283,7 @@ def test_generated_metadata_covers_upstream_sprite_dicts():
         "Masked": "masked",
     }
     colours = list(_flatten_sprite_list(pelt_data["sprite_list"]))
-    for _sheet, pelt_names in pelt_data["spritesheet"].items():
+    for pelt_names in pelt_data["spritesheet"].values():
         for pelt_name in pelt_names:
             prefix = pelt_prefix[pelt_name]
             for colour in colours:
