@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
 from pathlib import Path
@@ -374,7 +373,7 @@ def test_pipeline_rejects_runtime_palette_drift(tmp_path):
 
 def test_pipeline_rejects_missing_canonical_sprite(tmp_path):
     sprite_root = tmp_path / "sprites"
-    shutil.copytree(settings.sprite_root, sprite_root, copy_function=os.link)
+    shutil.copytree(settings.sprite_root, sprite_root, copy_function=shutil.copy2)
     next(sprite_root.rglob("*.png")).unlink()
     repository = SpriteRepository(sprite_root=sprite_root)
 
