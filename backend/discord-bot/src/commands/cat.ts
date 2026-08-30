@@ -4,94 +4,14 @@ import {
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { generateCat } from "../utils/api-client.js";
+import {
+  getLegacyCatOptionChoices,
+  getTraitChoices,
+  getTraitValueChoices,
+  type LegacyCatOption,
+} from "../utils/cat-catalog.js";
 import { buildCatEmbed } from "../utils/embed-builder.js";
 import { dataUrlToBase64 } from "../utils/data-url.js";
-
-const PELT_CHOICES = [
-  ...[
-    "SingleColour",
-    "TwoColour",
-    "Tabby",
-    "Marbled",
-    "Rosette",
-    "Smoke",
-    "Ticked",
-    "Speckled",
-    "Bengal",
-    "Mackerel",
-    "Classic",
-    "Sokoke",
-    "Agouti",
-    "Singlestripe",
-    "Masked",
-  ].map((value) => ({ name: value, value })),
-  { name: "Fine Bengal", value: "bengal-rosettes" },
-  { name: "Clouded rings", value: "clouded-leopard" },
-  { name: "Ocelot chains", value: "ocelot-chains" },
-  { name: "Serval spots", value: "serval-spots" },
-  { name: "Snow rosettes", value: "snow-leopard" },
-  { name: "Tiger bars", value: "tiger-stripes" },
-  { name: "King cheetah", value: "king-cheetah" },
-  { name: "Lynx fleck", value: "lynx-fleck" },
-  { name: "Marble lace", value: "marble-swirl" },
-  { name: "Brindle bars", value: "brindle" },
-  { name: "Jaguar mosaic", value: "jaguar-mosaic" },
-  { name: "Cheetah dots", value: "cheetah-dots" },
-  { name: "Fishing cat", value: "fishing-cat" },
-  { name: "Toyger braids", value: "toyger-braids" },
-  { name: "Sandcat bars", value: "sandcat-bars" },
-  { name: "Classic bullseye", value: "classic-bullseye" },
-  { name: "Ridgeback", value: "ridgeback" },
-  { name: "Masked mantle", value: "masked-mantle" },
-  { name: "Ghost stripes", value: "ghost-stripes" },
-  { name: "Split marble", value: "split-marble" },
-];
-
-const COLOUR_NAMES = [
-  "WHITE",
-  "PALEGREY",
-  "SILVER",
-  "GREY",
-  "DARKGREY",
-  "GHOST",
-  "BLACK",
-  "CREAM",
-  "PALEGINGER",
-  "GOLDEN",
-  "GINGER",
-  "DARKGINGER",
-  "SIENNA",
-  "LIGHTBROWN",
-  "LILAC",
-  "BROWN",
-  "GOLDEN-BROWN",
-  "DARKBROWN",
-  "CHOCOLATE",
-];
-
-const EYE_COLOURS = [
-  "YELLOW",
-  "AMBER",
-  "HAZEL",
-  "PALEGREEN",
-  "GREEN",
-  "BLUE",
-  "DARKBLUE",
-  "GREY",
-  "CYAN",
-  "EMERALD",
-  "HEATHERBLUE",
-  "SUNLITICE",
-  "COPPER",
-  "SAGE",
-  "COBALT",
-  "PALEBLUE",
-  "PALEYELLOW",
-  "GOLD",
-  "GREENYELLOW",
-  "BRONZE",
-  "SILVER",
-];
 
 export async function handleCatCommand(
   interaction: ChatInputCommandInteraction
@@ -99,12 +19,23 @@ export async function handleCatCommand(
   await interaction.deferReply();
 
   try {
+    const trait = interaction.options.getString("trait") ?? undefined;
+    const value = interaction.options.getString("value") ?? undefined;
+    if ((trait && value === undefined) || (!trait && value !== undefined)) {
+      await interaction.editReply({
+        content: "Use `trait` and `value` together for a registry override.",
+      });
+      return;
+    }
+
     const options = {
       sprite: interaction.options.getInteger("sprite") ?? undefined,
       pelt: interaction.options.getString("pelt") ?? undefined,
       colour: interaction.options.getString("colour") ?? undefined,
       shading: interaction.options.getBoolean("shading") ?? undefined,
       eye_colour: interaction.options.getString("eye_colour") ?? undefined,
+      trait,
+      value,
       discord_user_id: interaction.user.id,
       discord_username: interaction.user.displayName,
     };
@@ -136,26 +67,27 @@ export async function handleCatAutocomplete(
     const focused = interaction.options.getFocused(true);
     const input = focused.value.toLowerCase();
 
-    let choices: { name: string; value: string }[];
-    if (focused.name === "pelt") {
-      choices = PELT_CHOICES;
-    } else if (focused.name === "colour") {
-      choices = COLOUR_NAMES.map((value) => ({ name: value, value }));
-    } else if (focused.name === "eye_colour") {
-      choices = EYE_COLOURS.map((value) => ({ name: value, value }));
-    } else {
+    if (focused.name === "trait") {
+      await interaction.respond(
+        getTraitChoices(input, { overrideableOnly: true }),
+      );
       return;
     }
 
-    const filtered = choices
-      .filter(
-        (choice) =>
-          choice.name.toLowerCase().includes(input) ||
-          choice.value.toLowerCase().includes(input),
-      )
-      .slice(0, 25);
+    if (focused.name === "value") {
+      const traitId = interaction.options.getString("trait") ?? "";
+      await interaction.respond(getTraitValueChoices(traitId, input));
+      return;
+    }
 
-    await interaction.respond(filtered);
+    if (["pelt", "colour", "eye_colour"].includes(focused.name)) {
+      await interaction.respond(
+        getLegacyCatOptionChoices(focused.name as LegacyCatOption, input),
+      );
+      return;
+    }
+
+    await interaction.respond([]);
   } catch (error) {
     console.error("Autocomplete error:", error);
   }

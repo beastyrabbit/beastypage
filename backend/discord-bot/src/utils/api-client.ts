@@ -2,12 +2,14 @@ import { config } from "../config.js";
 
 const TIMEOUT_MS = 30_000;
 
-interface CatOptions {
+export interface CatOptions {
   sprite?: number;
   pelt?: string;
   colour?: string;
   shading?: boolean;
   eye_colour?: string;
+  trait?: string;
+  value?: string;
   discord_user_id?: string;
   discord_username?: string;
 }

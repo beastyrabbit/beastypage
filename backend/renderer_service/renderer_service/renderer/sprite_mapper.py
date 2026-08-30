@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
 
 from .repository import SpriteRepository
 
@@ -18,15 +18,15 @@ class MissingAccessorySprite(RuntimeError):
 @dataclass
 class ExperimentalColourDefinition:
     base_colour: str
-    multiply: Optional[List[float]] = None
-    screen: Optional[List[float]] = None
-    overlay: Optional[List[float]] = None
-    pattern: Optional[dict] = None
+    multiply: list[float] | None = None
+    screen: list[float] | None = None
+    overlay: list[float] | None = None
+    pattern: dict | None = None
 
 
-def _dedupe(seq: Iterable[str]) -> List[str]:
+def _dedupe(seq: Iterable[str]) -> list[str]:
     seen: set[str] = set()
-    result: List[str] = []
+    result: list[str] = []
     for item in seq:
         if not item:
             continue
@@ -48,24 +48,30 @@ def _is_empty_value(value: str | None) -> bool:
 class SpriteMapper:
     """Maps public cat-generation parameters to renderer atlas sprite keys."""
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(self, data_dir: Path, palette_dir: Path | None = None) -> None:
         self.data_dir = data_dir
-        self.sprites_index: Dict[str, dict] | None = None
-        self.pelt_info: Dict[str, list] | None = None
-        self.tints: Dict[str, list[int]] = {}
-        self.white_patch_tints: Dict[str, list[int]] = {}
-        self.experimental_defs: Dict[str, ExperimentalColourDefinition] = {}
-        self.experimental_categories: Dict[str, List[str]] = {}
+        packaged_palette_dir = Path(__file__).resolve().parents[1] / "data" / "palettes"
+        self.palette_dir = palette_dir or (
+            data_dir / "palettes"
+            if (data_dir / "palettes").exists()
+            else packaged_palette_dir
+        )
+        self.sprites_index: dict[str, dict] | None = None
+        self.pelt_info: dict[str, list] | None = None
+        self.tints: dict[str, list[int]] = {}
+        self.white_patch_tints: dict[str, list[int]] = {}
+        self.experimental_defs: dict[str, ExperimentalColourDefinition] = {}
+        self.experimental_categories: dict[str, list[str]] = {}
 
-        self.pelt_names: List[str] = []
-        self.colours: List[str] = []
-        self.eye_colours: List[str] = []
-        self.skin_colours: List[str] = []
-        self.accessories: List[str] = []
-        self.scars: List[str] = []
-        self.white_patches: List[str] = []
-        self.points: List[str] = []
-        self.vitiligo: List[str] = []
+        self.pelt_names: list[str] = []
+        self.colours: list[str] = []
+        self.eye_colours: list[str] = []
+        self.skin_colours: list[str] = []
+        self.accessories: list[str] = []
+        self.scars: list[str] = []
+        self.white_patches: list[str] = []
+        self.points: list[str] = []
+        self.vitiligo: list[str] = []
 
         self._load()
 
@@ -158,7 +164,7 @@ class SpriteMapper:
             for name in sprite_keys
             if name.startswith("collars")
         }
-        self.accessory_lookup: Dict[str, str] = {}
+        self.accessory_lookup: dict[str, str] = {}
 
         self.accessories = self._collect_accessories()
         if not self.accessories:
@@ -183,12 +189,12 @@ class SpriteMapper:
         self._validate_accessory_sprites()
 
     # ------------------------------------------------------------------
-    def _load_experimental_defs(self) -> Dict[str, ExperimentalColourDefinition]:
+    def _load_experimental_defs(self) -> dict[str, ExperimentalColourDefinition]:
         """Load experimental color palettes from JSON files in data/palettes/"""
-        palettes_dir = self.data_dir / "palettes"
-        result: Dict[str, ExperimentalColourDefinition] = {}
+        palettes_dir = self.palette_dir
+        result: dict[str, ExperimentalColourDefinition] = {}
         self.experimental_categories = {}
-        self._palette_metadata: List[dict] = []
+        self._palette_metadata: list[dict] = []
 
         if not palettes_dir.exists():
             return result
@@ -212,7 +218,7 @@ class SpriteMapper:
                 )
 
                 # Build category list and color definitions
-                category_colors: List[str] = []
+                category_colors: list[str] = []
                 for color_name, color_def in colors.items():
                     upper_name = color_name.upper()
                     category_colors.append(upper_name)
@@ -227,8 +233,8 @@ class SpriteMapper:
                 self.experimental_categories[palette_id] = category_colors
 
             except (
+                OSError,
                 json.JSONDecodeError,
-                IOError,
                 KeyError,
                 TypeError,
                 ValueError,
@@ -237,14 +243,14 @@ class SpriteMapper:
 
         return result
 
-    def get_palette_metadata(self) -> List[dict]:
+    def get_palette_metadata(self) -> list[dict]:
         """Return palette metadata for API endpoint"""
         return getattr(self, "_palette_metadata", [])
 
     # ------------------------------------------------------------------
     def build_sprite_name(
         self, sprite_type: str, name: str | None, colour: str | None
-    ) -> Optional[str]:
+    ) -> str | None:
         colour = colour or "WHITE"
         if sprite_type == "pelt":
             if not name:
@@ -297,26 +303,26 @@ class SpriteMapper:
     # ------------------------------------------------------------------
     def get_experimental_definition(
         self, colour: str | None
-    ) -> Optional[ExperimentalColourDefinition]:
+    ) -> ExperimentalColourDefinition | None:
         if _is_empty_value(colour):
             return None
         return self.experimental_defs.get(colour.upper())
 
-    def get_tint_colour(self, tint: str | None) -> Optional[List[int]]:
+    def get_tint_colour(self, tint: str | None) -> list[int] | None:
         if _is_empty_value(tint):
             return None
         key = tint.lower()
         value = self.tints.get(key)
         return list(value) if value else None
 
-    def get_dilute_tint_colour(self, tint: str | None) -> Optional[List[int]]:
+    def get_dilute_tint_colour(self, tint: str | None) -> list[int] | None:
         if _is_empty_value(tint):
             return None
         key = tint.lower()
         value = self.dilute_tints.get(key)
         return list(value) if value else None
 
-    def get_white_patch_tint(self, tint: str | None) -> Optional[List[int]]:
+    def get_white_patch_tint(self, tint: str | None) -> list[int] | None:
         if _is_empty_value(tint):
             return None
         key = tint.lower()
@@ -325,11 +331,11 @@ class SpriteMapper:
 
     # ------------------------------------------------------------------
     @property
-    def sprite_index(self) -> Dict[str, dict]:  # type: ignore[return-value]
+    def sprite_index(self) -> dict[str, dict]:  # type: ignore[return-value]
         return self.sprites_index or {}
 
     # ------------------------------------------------------------------
-    def accessory_sprite_name(self, raw: str) -> Optional[str]:
+    def accessory_sprite_name(self, raw: str) -> str | None:
         if not raw:
             return None
 
@@ -424,8 +430,8 @@ class SpriteMapper:
 
         return None
 
-    def _collect_accessories(self) -> List[str]:
-        combined: List[str] = []
+    def _collect_accessories(self) -> list[str]:
+        combined: list[str] = []
         for key in (
             "accessories",
             "plant_accessories",
@@ -441,8 +447,8 @@ class SpriteMapper:
         return _dedupe(combined)
 
     # ------------------------------------------------------------------
-    def _collect_list(self, label: str, keys: Iterable[str]) -> List[str]:
-        combined: List[str] = []
+    def _collect_list(self, label: str, keys: Iterable[str]) -> list[str]:
+        combined: list[str] = []
         for key in keys:
             values = self.pelt_info.get(key, []) if self.pelt_info else []
             if isinstance(values, list):
@@ -450,9 +456,9 @@ class SpriteMapper:
         return _dedupe(combined)
 
     # ------------------------------------------------------------------
-    def _gather_white_patches(self) -> List[str]:
-        derived: List[str] = []
-        for key in self.sprites_index.keys():
+    def _gather_white_patches(self) -> list[str]:
+        derived: list[str] = []
+        for key in self.sprites_index:
             if key.startswith("white") and key not in {"whitepatches"}:
                 suffix = key[5:]
                 if suffix:
@@ -464,8 +470,8 @@ class SpriteMapper:
 
     # ------------------------------------------------------------------
     def _build_accessory_lookup(self) -> None:
-        lookup: Dict[str, str] = {}
-        for key in self.sprites_index.keys():
+        lookup: dict[str, str] = {}
+        for key in self.sprites_index:
             if not key.startswith("acc_"):
                 continue
             idx = 4
@@ -482,7 +488,7 @@ class SpriteMapper:
     # ------------------------------------------------------------------
     def _validate_accessory_sprites(self) -> None:
         repository = SpriteRepository()
-        missing: List[tuple[str, str | None]] = []
+        missing: list[tuple[str, str | None]] = []
         for name in self.accessories:
             sprite_key = self.accessory_sprite_name(name)
             if not sprite_key or not repository.has_sprite(sprite_key, 8):

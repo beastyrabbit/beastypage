@@ -1074,6 +1074,7 @@ const CHIP_KIND_STYLE: Record<EvolutionAddition["kind"], string> = {
   scar: "border-red-300/40 bg-red-500/15 text-red-100",
   coat: "border-amber-300/40 bg-amber-500/15 text-amber-100",
   replacement: "border-violet-300/40 bg-violet-500/15 text-violet-100",
+  trait: "border-emerald-300/40 bg-emerald-500/15 text-emerald-100",
 };
 
 function RevealScene({

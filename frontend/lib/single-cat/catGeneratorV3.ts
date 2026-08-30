@@ -19,6 +19,11 @@ import {
   isCoatPatternId,
   resolveCoatChoice,
 } from '@/lib/cat-v3/coatPatterns';
+import {
+  createDualCatPayload,
+  legacyParamsToCatDocument,
+  readCatDocument,
+} from '@/lib/cat-system/document';
 
 type VariantInput = {
   id: string;
@@ -85,7 +90,10 @@ function coerceSpriteNumber(value: unknown, fallback = 0): number {
   return fallback;
 }
 
-function splitPayload(params: CatParams | Partial<CatParams>): CatRenderParams {
+function splitPayload(
+  params: CatParams | Partial<CatParams>,
+  includeDocument = true,
+): CatRenderParams {
   const working = clonePlain(params as Record<string, unknown>);
   const coatPattern = isCoatPatternId(working.coatPattern)
     ? working.coatPattern
@@ -108,11 +116,31 @@ function splitPayload(params: CatParams | Partial<CatParams>): CatRenderParams {
   delete working.sprite;
   // The render envelope carries poseName; nested params should not duplicate it.
   delete working.poseName;
-  return {
+  const payload: CatRenderParams = {
     spriteNumber,
     poseName,
     params: working as Omit<CatParams, 'spriteNumber' | 'poseName'>,
   };
+  if (includeDocument) {
+    const document =
+      working.traits && typeof working.traits === 'object'
+        ? readCatDocument({
+            schemaVersion: working.schemaVersion,
+            traits: working.traits,
+            unknownTraits: working.unknownTraits,
+          })
+        : legacyParamsToCatDocument({
+            ...working,
+            poseName,
+            spriteNumber,
+          });
+    const dual = createDualCatPayload(document);
+    payload.document = dual.document;
+    payload.params = dual.params as CatRenderParams['params'];
+    payload.poseName = dual.poseName;
+    payload.spriteNumber = dual.spriteNumber;
+  }
+  return payload;
 }
 
 function buildLegacyUrl(params: CatParams | null | undefined): string {
@@ -214,7 +242,7 @@ export class CatGeneratorV3 {
   ): Promise<BatchRenderResponse> {
     const payload = splitPayload(baseParams);
     const preparedVariants: BatchVariantPayload[] = variants.map((variant) => {
-      const variantPayload = splitPayload(variant.params);
+      const variantPayload = splitPayload(variant.params, false);
       const variantParams: NonNullable<BatchVariantPayload['params']> = {
         ...variantPayload.params,
       };

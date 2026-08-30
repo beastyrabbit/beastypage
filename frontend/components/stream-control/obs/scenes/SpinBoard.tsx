@@ -12,6 +12,7 @@ import {
 import { QrBadge } from "../QrBadge";
 import {
   DISPLAY_SIZE,
+  LAYER_GROUPS,
   LAYER_PARAM_IDS,
   type LayerGroup,
   type LayerRowState,
@@ -288,21 +289,17 @@ export function SpinBoard({
         }}
       >
         <div className="flex h-full">
-          {[
-            { group: "torties" as const, label: "Tortie Layers", width: "50%" },
-            {
-              group: "accessories" as const,
-              label: "Accessories",
-              width: "25%",
-            },
-            { group: "scars" as const, label: "Scars", width: "25%" },
-          ].map(({ group, label, width }) => {
+          {LAYER_GROUPS.map((definition) => {
+            const group = definition.layerKey;
+            const label = definition.groupLabel;
             const rows = layerRows[group];
+            const flexWeight =
+              definition.compoundMode === "tortieParts" ? 2 : 1;
             return (
               <div
                 key={group}
                 className="flex flex-col overflow-hidden px-5"
-                style={{ width, flexShrink: 0 }}
+                style={{ flex: `${flexWeight} 1 0`, minWidth: 0 }}
               >
                 <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400">
                   {label}

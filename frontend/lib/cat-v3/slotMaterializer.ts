@@ -1,3 +1,7 @@
+import {
+  mathRandomSource,
+  type RandomFloatSource,
+} from "@/lib/cat-system/gacha/strategies";
 import type { TortieLayer } from "./types";
 
 export interface MaterializedSlotsResult<TValue, TSlot = TValue | null> {
@@ -6,6 +10,7 @@ export interface MaterializedSlotsResult<TValue, TSlot = TValue | null> {
 }
 
 interface BaseSlotOptions<TChoice, TValue, TSlot> {
+  random?: RandomFloatSource;
   slotCount: number;
   availableChoices: readonly TChoice[];
   unique?: boolean;
@@ -19,6 +24,7 @@ interface BaseSlotOptions<TChoice, TValue, TSlot> {
 }
 
 interface TortieSlotOptions {
+  random?: RandomFloatSource;
   slotCount: number;
   masks: readonly string[];
   pelts: readonly string[];
@@ -28,27 +34,32 @@ interface TortieSlotOptions {
   shouldFillSlot(slotIndex: number, selectedCount: number): boolean;
 }
 
-function drawUnique<T>(available: T[]): T | null {
+function drawUnique<T>(available: T[], random: RandomFloatSource): T | null {
   if (!available.length) return null;
-  const index = Math.floor(Math.random() * available.length);
+  const index = Math.floor(random.nextFloat() * available.length);
   const [item] = available.splice(index, 1);
   return item ?? null;
 }
 
-function pickOne<T>(items: readonly T[]): T {
+function pickOne<T>(items: readonly T[], random: RandomFloatSource): T {
   if (!items.length) {
     throw new Error("Attempted to pick from an empty list");
   }
-  const index = Math.floor(Math.random() * items.length);
+  const index = Math.floor(random.nextFloat() * items.length);
   return items[index];
 }
 
-function drawChoice<T>(available: T[], unique: boolean): T | null {
+function drawChoice<T>(
+  available: T[],
+  unique: boolean,
+  random: RandomFloatSource,
+): T | null {
   if (!available.length) return null;
-  return unique ? drawUnique(available) : pickOne(available);
+  return unique ? drawUnique(available, random) : pickOne(available, random);
 }
 
 export function materializeStringSlots<TChoice, TValue = TChoice>({
+  random = mathRandomSource,
   slotCount,
   availableChoices,
   unique = true,
@@ -81,7 +92,7 @@ export function materializeStringSlots<TChoice, TValue = TChoice>({
       slotSelections.push(placeholder);
       continue;
     }
-    const choice = drawChoice(available, unique);
+    const choice = drawChoice(available, unique, random);
     if (!choice) break;
     const value = mapChoice(choice);
     selectedValues.push(value);
@@ -95,6 +106,7 @@ export function materializeStringSlots<TChoice, TValue = TChoice>({
 }
 
 export function materializeTortieSlots({
+  random = mathRandomSource,
   slotCount,
   masks,
   pelts,
@@ -120,12 +132,12 @@ export function materializeTortieSlots({
       continue;
     }
 
-    const mask = drawChoice(availableMasks, uniqueMasks);
+    const mask = drawChoice(availableMasks, uniqueMasks, random);
     if (!mask) break;
 
     const layer: TortieLayer = {
       mask,
-      pattern: pickOne(pelts),
+      pattern: pickOne(pelts, random),
       colour: pickColour(),
     };
     selectedValues.push(layer);

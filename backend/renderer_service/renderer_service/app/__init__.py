@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, Optional, TypeVar
+from typing import Any, Literal, TypeVar
 
 import anyio
 from fastapi import FastAPI, HTTPException, status
@@ -12,13 +14,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ..config import settings
 from ..models import (
-    RenderRequest,
-    RenderResponse,
     BatchRenderRequest,
     BatchRenderResponse,
-    SpritesheetFrame,
     FrameSource,
-    LayerIdentifier,
+    RenderRequest,
+    RenderResponse,
+    SpritesheetFrame,
 )
 from ..renderer import RenderPipeline
 
@@ -125,10 +126,7 @@ class RendererSupervisor:
         self.total_enqueued += 1
         self.max_observed_queue = max(self.max_observed_queue, self.queue.qsize())
 
-        try:
-            return await future
-        except asyncio.CancelledError:
-            raise
+        return await future
 
     async def _worker(self) -> None:
         while True:
@@ -186,7 +184,10 @@ def create_app() -> FastAPI:
             {"name": "diagnostics", "description": "Health and operational metrics"},
         ],
     )
-    pipeline = RenderPipeline(canvas_size=settings.default_canvas_size)
+    pipeline = RenderPipeline(
+        canvas_size=settings.default_canvas_size,
+        expected_catalog_hash=os.getenv("CAT_SYSTEM_CATALOG_HASH", "unknown"),
+    )
     supervisor = RendererSupervisor(
         pipeline,
         max_queue_size=settings.max_queue_size
@@ -221,7 +222,14 @@ def create_app() -> FastAPI:
     def health() -> dict[str, Any]:
         metrics = supervisor.metrics()
         status_label = "degraded" if metrics["circuit_open"] else "ok"
-        return {"status": status_label, "metrics": metrics}
+        return {
+            "status": status_label,
+            "metrics": metrics,
+            "schemaVersion": pipeline.executor.metadata.schema_version,
+            "renderPlanVersion": pipeline.executor.metadata.format_version,
+            "catalogHash": pipeline.executor.metadata.catalog_hash,
+            "manifestHash": pipeline.executor.metadata.manifest_hash,
+        }
 
     @app.post(
         "/render",
@@ -279,17 +287,21 @@ def create_app() -> FastAPI:
 
 def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderResponse:
     payload = request.payload
-    params = {**payload.params}
-    if payload.poseName is not None:
-        params["poseName"] = payload.poseName
-    if payload.spriteNumber is not None:
-        params.setdefault("spriteNumber", payload.spriteNumber)
+    if payload.document is not None:
+        render_source = payload.document
+    else:
+        params = {**payload.params}
+        if payload.poseName is not None:
+            params["poseName"] = payload.poseName
+        if payload.spriteNumber is not None:
+            params.setdefault("spriteNumber", payload.spriteNumber)
+        render_source = params
     collect_layers = request.options.collect_layers if request.options else False
     include_layer_images = (
         request.options.include_layer_images if request.options else False
     )
 
-    result = pipeline.render(params, collect_layers=collect_layers)
+    result = pipeline.render(render_source, collect_layers=collect_layers)
     image_bytes = _image_to_data_url(result.composed)
     return RenderResponse(
         image=image_bytes,
@@ -297,6 +309,7 @@ def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderRe
         layers=[
             {
                 "id": layer.id,
+                "operationId": layer.operation_id,
                 "label": layer.label,
                 "duration_ms": layer.duration_ms,
                 "diagnostics": layer.diagnostics,
@@ -315,17 +328,27 @@ def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderRe
 def _render_batch(
     pipeline: RenderPipeline, request: BatchRenderRequest
 ) -> BatchRenderResponse:
-    base_params = {**request.payload.params}
-    if request.payload.poseName is not None:
-        base_params["poseName"] = request.payload.poseName
-    if request.payload.spriteNumber is not None:
-        base_params.setdefault("spriteNumber", request.payload.spriteNumber)
+    if request.payload.document is not None:
+        document = pipeline.adapter.normalize_document(request.payload.document)
+        base_params = {
+            **document.traits,
+            **pipeline.adapter.to_renderer_params(
+                document,
+                pipeline.repository.sprite_number_for_pose,
+            ),
+        }
+    else:
+        base_params = {**request.payload.params}
+        if request.payload.poseName is not None:
+            base_params["poseName"] = request.payload.poseName
+        if request.payload.spriteNumber is not None:
+            base_params.setdefault("spriteNumber", request.payload.spriteNumber)
 
     options = request.options
     frame_mode = options.frame_mode if options else "composed"
-    layer_identifier: Optional[LayerIdentifier] = None
+    layer_identifier: str | None = None
     if options and options.layer_id is not None:
-        layer_identifier = _coerce_layer_identifier(options.layer_id)
+        layer_identifier = _coerce_layer_identifier(pipeline, options.layer_id)
 
     batch_result = pipeline.render_batch(
         base_params,
@@ -367,6 +390,9 @@ def _render_batch(
         width=batch_result.sheet.width,
         height=batch_result.sheet.height,
         tileSize=batch_result.tile_size,
+        catalogHash=pipeline.executor.metadata.catalog_hash,
+        manifestHash=pipeline.executor.metadata.manifest_hash,
+        renderPlanVersion=pipeline.executor.metadata.format_version,
         frames=frames,
         sources=sources,
     )
@@ -382,10 +408,8 @@ def _image_to_data_url(image) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def _coerce_layer_identifier(layer: LayerIdentifier | str) -> LayerIdentifier:
-    if isinstance(layer, LayerIdentifier):
-        return layer
-    try:
-        return LayerIdentifier(layer)
-    except ValueError as exc:
-        raise ValueError(f"Unknown layer identifier '{layer}'") from exc
+def _coerce_layer_identifier(pipeline: RenderPipeline, layer: str) -> str:
+    layer_ids = {operation.layer_id for operation in pipeline.executor.operations}
+    if layer not in layer_ids:
+        raise ValueError(f"Unknown layer identifier '{layer}'")
+    return layer

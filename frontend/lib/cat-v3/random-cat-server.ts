@@ -1,550 +1,27 @@
-/**
- * Server-side random cat parameter generation.
- *
- * Mirrors the browser-based `generateRandomParamsV3()` but loads sprite data
- * from disk instead of fetching over HTTP, making it suitable for Next.js API
- * routes and other Node.js contexts.
- */
-
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import {
+  getCatalogElements,
+  getPublicCatTrait,
+} from "@/lib/cat-system/catalog";
+import { catDocumentToLegacyParams } from "@/lib/cat-system/document";
+import {
+  createGachaCatalogs,
+  type GachaSeed,
+  type GachaSlotOverrides,
+  type GachaSlotRanges,
+  rollCatFromRegistry,
+} from "@/lib/cat-system/gacha";
+import type { CatTraitId } from "@/lib/cat-system/registry";
+import type { CatDocument } from "@/lib/cat-system/runtime";
+import { getCatTraitDefinition } from "@/lib/cat-system/runtime";
 import { getColorNamesForPalette, type PaletteId } from "@/lib/palettes";
-import { getCoatChoiceValues, resolveCoatChoice } from "./coatPatterns";
-import {
-  isRandomSelectablePoseName,
-  legacySpriteNumberForPoseName,
-  poseNameForLegacySpriteNumber,
-} from "./poseOptions";
-import config from "./random-config.json";
-import { filterRandomAccessoryPool } from "./randomAccessories";
-import {
-  materializeStringSlots,
-  materializeTortieSlots,
-} from "./slotMaterializer";
-import type { CatParams, RandomGenerationOptions } from "./types";
+import peltInfo from "@/public/sprite-data/peltInfo.json";
+import { poseNameForLegacySpriteNumber } from "./poseOptions";
+import type { RandomGenerationOptions } from "./randomGenerator";
+import type { CatParams, SlotSelections } from "./types";
 
-// ---------------------------------------------------------------------------
-// Config types (same as randomGenerator.ts)
-// ---------------------------------------------------------------------------
-
-type CountCategory = "tortie" | "accessories" | "scars";
-type CountStrategy = "weighted" | "uniform";
-
-interface CountConfig {
-  weights?: Record<string, number>;
-  min?: number;
-  max?: number;
-  unique?: boolean;
-}
-
-interface GenerationConfig {
-  version: number;
-  probabilities: Record<string, number>;
-  counts: Record<CountCategory, CountConfig> & Record<string, CountConfig>;
-  defaultSlots?: Record<string, number>;
-  whitePatches: {
-    tintMode?: string;
-    allowNoneTint?: boolean;
-  };
-}
-
-const RANDOM_CONFIG = config as GenerationConfig;
-
-// ---------------------------------------------------------------------------
-// Sprite data cache
-// ---------------------------------------------------------------------------
-
-interface SpriteData {
-  readonly peltNames: readonly string[];
-  readonly colours: readonly string[];
-  readonly eyeColours: readonly string[];
-  readonly skinColours: readonly string[];
-  readonly accessories: readonly string[];
-  readonly extraAccessories: readonly string[];
-  readonly scars: readonly string[];
-  readonly tortieMasks: readonly string[];
-  readonly whitePatches: readonly string[];
-  readonly points: readonly string[];
-  readonly vitiligo: readonly string[];
-  readonly tints: readonly string[];
-  readonly whiteTints: readonly string[];
-  readonly poseNames: readonly string[];
-  readonly renderablePoseNames: readonly string[];
-}
-
-let cachedData: SpriteData | null = null;
-let loadPromise: Promise<SpriteData> | null = null;
-
-function resolvePublicPath(relativePath: string): string {
-  // In both dev and standalone Docker builds, public/ is at ${cwd}/public.
-  // Standalone: Dockerfile copies public/ to /app/public, WORKDIR is /app.
-  // Dev: cwd is the frontend/ directory which contains public/.
-  const root =
-    process.env.NEXT_PUBLIC_DIR ?? path.join(process.cwd(), "public");
-  return path.join(root, relativePath);
-}
-
-async function loadSpriteData(): Promise<SpriteData> {
-  if (cachedData) return cachedData;
-  if (loadPromise) return loadPromise;
-
-  loadPromise = (async () => {
-    try {
-      const [indexRaw, peltRaw, poseRaw] = await Promise.all([
-        readFile(resolvePublicPath("sprite-data/spritesIndex.json"), "utf-8"),
-        readFile(resolvePublicPath("sprite-data/peltInfo.json"), "utf-8"),
-        readFile(resolvePublicPath("sprite-data/poseData.json"), "utf-8"),
-      ]);
-
-      const spritesIndex = JSON.parse(indexRaw) as Record<string, unknown>;
-      const peltInfo = JSON.parse(peltRaw) as Record<string, string[]>;
-      const poseData = JSON.parse(poseRaw) as Record<string, unknown>;
-
-      const data = extractLists(spritesIndex, peltInfo, poseData);
-      cachedData = data;
-      return data;
-    } catch (error) {
-      loadPromise = null; // Allow retry on next call
-      throw error;
-    }
-  })();
-
-  return loadPromise;
-}
-
-// ---------------------------------------------------------------------------
-// List extraction (mirrors spriteMapper.js extractNamesFromIndex/PeltInfo)
-// ---------------------------------------------------------------------------
-
-function extractLists(
-  spritesIndex: Record<string, unknown>,
-  peltInfo: Record<string, string[]>,
-  poseData: Record<string, unknown>,
-): SpriteData {
-  // --- Pelt names ---
-  const patterns = [
-    "single",
-    "tabby",
-    "marbled",
-    "rosette",
-    "smoke",
-    "ticked",
-    "speckled",
-    "bengal",
-    "mackerel",
-    "classic",
-    "sokoke",
-    "agouti",
-    "singlestripe",
-    "masked",
-  ];
-  const patternMap: Record<string, string> = {
-    single: "SingleColour",
-    tabby: "Tabby",
-    marbled: "Marbled",
-    rosette: "Rosette",
-    smoke: "Smoke",
-    ticked: "Ticked",
-    speckled: "Speckled",
-    bengal: "Bengal",
-    mackerel: "Mackerel",
-    classic: "Classic",
-    sokoke: "Sokoke",
-    agouti: "Agouti",
-    singlestripe: "Singlestripe",
-    masked: "Masked",
-  };
-
-  const peltPatterns = new Set<string>();
-  for (const key of Object.keys(spritesIndex)) {
-    for (const p of patterns) {
-      if (key.startsWith(p)) peltPatterns.add(p);
-    }
-  }
-  const peltNames = Array.from(peltPatterns)
-    .map((p) => patternMap[p])
-    .filter(Boolean) as string[];
-  if (peltNames.includes("SingleColour") && !peltNames.includes("TwoColour")) {
-    const idx = peltNames.indexOf("SingleColour");
-    peltNames.splice(idx + 1, 0, "TwoColour");
-  }
-
-  // --- Colours ---
-  const colours = [
-    "WHITE",
-    "PALEGREY",
-    "SILVER",
-    "GREY",
-    "DARKGREY",
-    "GHOST",
-    "BLACK",
-    "CREAM",
-    "PALEGINGER",
-    "GOLDEN",
-    "GINGER",
-    "DARKGINGER",
-    "SIENNA",
-    "LIGHTBROWN",
-    "LILAC",
-    "BROWN",
-    "GOLDEN-BROWN",
-    "DARKBROWN",
-    "CHOCOLATE",
-  ];
-
-  // --- Eye colours ---
-  const eyeColours =
-    Array.isArray(peltInfo.eyes) && peltInfo.eyes.length > 0
-      ? peltInfo.eyes
-      : [
-          "YELLOW",
-          "AMBER",
-          "HAZEL",
-          "PALEGREEN",
-          "GREEN",
-          "BLUE",
-          "DARKBLUE",
-          "GREY",
-          "CYAN",
-          "EMERALD",
-          "HEATHERBLUE",
-          "SUNLITICE",
-          "COPPER",
-          "SAGE",
-          "COBALT",
-          "PALEBLUE",
-          "PALEYELLOW",
-          "GOLD",
-          "GREENYELLOW",
-          "BRONZE",
-          "SILVER",
-        ];
-
-  // --- Skin colours ---
-  const skinColors = new Set<string>();
-  for (const key of Object.keys(spritesIndex)) {
-    if (key.startsWith("skin") && key !== "skin" && key !== "skinparalyzed") {
-      const color = key.replace("skin", "");
-      if (color) skinColors.add(color);
-    }
-  }
-  const skinColours =
-    skinColors.size > 0
-      ? Array.from(skinColors)
-      : [
-          "BLACK",
-          "PINK",
-          "DARKBROWN",
-          "BROWN",
-          "LIGHTBROWN",
-          "DARK",
-          "DARKGREY",
-          "GREY",
-          "DARKSALMON",
-          "SALMON",
-          "PEACH",
-          "DARKMARBLED",
-          "MARBLED",
-          "LIGHTMARBLED",
-          "DARKBLUE",
-          "BLUE",
-          "LIGHTBLUE",
-          "RED",
-        ];
-
-  // --- Tortie masks ---
-  const tortieMaskSet = new Set<string>();
-  for (const key of Object.keys(spritesIndex)) {
-    if (key.startsWith("tortiemask") && key !== "tortiepatchesmasks") {
-      const mask = key.replace("tortiemask", "");
-      if (mask) tortieMaskSet.add(mask);
-    }
-  }
-  const tortieMasks =
-    tortieMaskSet.size > 0
-      ? Array.from(tortieMaskSet)
-      : [
-          "ONE",
-          "TWO",
-          "THREE",
-          "FOUR",
-          "REDTAIL",
-          "DELILAH",
-          "MINIMALONE",
-          "MINIMALTWO",
-          "MINIMALTHREE",
-          "MINIMALFOUR",
-          "HALF",
-          "OREO",
-          "SWOOP",
-          "MOTTLED",
-          "SIDEMASK",
-          "EYEDOT",
-          "BANDANA",
-          "PACMAN",
-          "STREAMSTRIKE",
-          "ORIOLE",
-          "CHIMERA",
-          "DAUB",
-          "EMBER",
-          "BLANKET",
-          "ROBIN",
-          "BRINDLE",
-          "PAIGE",
-          "ROSETAIL",
-          "SAFI",
-          "SMUDGED",
-          "DAPPLENIGHT",
-          "STREAK",
-          "MASK",
-          "CHEST",
-          "ARMTAIL",
-          "SMOKE",
-          "GRUMPYFACE",
-          "BRIE",
-          "BELOVED",
-          "BODY",
-          "SHILOH",
-          "FRECKLED",
-          "HEARTBEAT",
-        ];
-
-  // --- Points & vitiligo ---
-  const points =
-    Array.isArray(peltInfo.point_markings) && peltInfo.point_markings.length > 0
-      ? peltInfo.point_markings
-      : ["COLOURPOINT", "RAGDOLL", "SEPIAPOINT", "MINKPOINT", "SEALPOINT"];
-  const vitiligo =
-    Array.isArray(peltInfo.vitiligo) && peltInfo.vitiligo.length > 0
-      ? peltInfo.vitiligo
-      : [
-          "VITILIGO",
-          "VITILIGOTWO",
-          "MOON",
-          "PHANTOM",
-          "KARPATI",
-          "POWDER",
-          "BLEACHED",
-          "SMOKEY",
-        ];
-
-  // --- White patches ---
-  const whitePatchSet = new Set<string>();
-  for (const key of Object.keys(spritesIndex)) {
-    if (key.startsWith("white") && key !== "whitepatches") {
-      const patch = key.substring(5);
-      if (patch) whitePatchSet.add(patch);
-    }
-  }
-  const pointsSet = new Set(points);
-  const vitiligoSet = new Set(vitiligo);
-  const whitePatches = Array.from(whitePatchSet).filter(
-    (p) => !pointsSet.has(p) && !vitiligoSet.has(p),
-  );
-
-  // --- Accessories ---
-  const accessories: string[] = [];
-  if (peltInfo.plant_accessories)
-    accessories.push(...peltInfo.plant_accessories);
-  if (peltInfo.wild_accessories) accessories.push(...peltInfo.wild_accessories);
-  if (peltInfo.collars) accessories.push(...peltInfo.collars);
-  const extraAccessories = Array.isArray(peltInfo.extra_accessories)
-    ? [...peltInfo.extra_accessories]
-    : [];
-  if (peltInfo.extra_accessories)
-    accessories.push(...peltInfo.extra_accessories);
-
-  // --- Scars ---
-  const scars: string[] = [];
-  if (peltInfo.scars1) scars.push(...peltInfo.scars1);
-  if (peltInfo.scars2) scars.push(...peltInfo.scars2);
-  if (peltInfo.scars3) scars.push(...peltInfo.scars3);
-
-  // --- Tints ---
-  const tints = [
-    "none",
-    "pink",
-    "gray",
-    "red",
-    "black",
-    "orange",
-    "yellow",
-    "purple",
-    "blue",
-    "dilute",
-    "warmdilute",
-    "cooldilute",
-  ];
-  const whiteTints = ["none", "darkcream", "cream", "offwhite", "gray", "pink"];
-
-  const poseNames = Array.isArray(poseData.poses)
-    ? poseData.poses.map(String)
-    : [];
-  const renderablePoseNames = Array.isArray(poseData.renderablePoseNames)
-    ? poseData.renderablePoseNames.map(String)
-    : poseNames.filter(
-        (poseName) =>
-          !poseName.startsWith("para_") && !poseName.startsWith("sick_"),
-      );
-  return {
-    peltNames,
-    colours,
-    eyeColours,
-    skinColours,
-    accessories,
-    extraAccessories,
-    scars,
-    tortieMasks,
-    whitePatches,
-    points,
-    vitiligo,
-    tints,
-    whiteTints,
-    poseNames,
-    renderablePoseNames,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Pure random helpers (same as randomGenerator.ts)
-// ---------------------------------------------------------------------------
-
-function roll(probability: number | undefined): boolean {
-  if (!probability || probability <= 0) return false;
-  if (probability >= 1) return true;
-  return Math.random() < probability;
-}
-
-function pickOne<T>(items: readonly T[]): T {
-  if (!items.length) throw new Error("Attempted to pick from an empty list");
-  return items[Math.floor(Math.random() * items.length)];
-}
-
-function weightedPick(
-  values: Record<string, number>,
-  fallback: () => number,
-): number {
-  const entries = Object.entries(values ?? {})
-    .map(([key, weight]) => ({ value: Number(key), weight: Number(weight) }))
-    .filter(
-      (e) =>
-        Number.isFinite(e.value) && Number.isFinite(e.weight) && e.weight > 0,
-    );
-  if (!entries.length) return fallback();
-  const total = entries.reduce((s, e) => s + e.weight, 0);
-  const target = Math.random() * total;
-  let running = 0;
-  for (const entry of entries) {
-    running += entry.weight;
-    if (target <= running) return entry.value;
-  }
-  return entries[entries.length - 1].value;
-}
-
-function buildColourPools(
-  baseColours: readonly string[],
-  paletteIds?: readonly string[],
-): string[][] {
-  const palettePools: string[][] = [];
-  const seen = new Set<string>();
-
-  for (const paletteId of paletteIds ?? []) {
-    const normalized = String(paletteId).trim().toLowerCase();
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-
-    const colours = getColorNamesForPalette(normalized as PaletteId);
-    if (colours.length > 0) {
-      palettePools.push(colours);
-    }
-  }
-
-  if (palettePools.length > 0) {
-    return palettePools;
-  }
-
-  return baseColours.length > 0 ? [Array.from(baseColours)] : [];
-}
-
-function flattenPools(pools: readonly string[][]): string[] {
-  const combined = new Set<string>();
-  for (const pool of pools) {
-    for (const colour of pool) {
-      combined.add(colour);
-    }
-  }
-  return Array.from(combined);
-}
-
-function pickColourFromPools(pools: readonly string[][]): string {
-  const availablePools = pools.filter((pool) => pool.length > 0);
-  if (!availablePools.length) {
-    throw new Error("Attempted to pick from an empty colour pool");
-  }
-  return pickOne(pickOne([...availablePools]));
-}
-
-function resolveCountsMode(
-  category: CountCategory,
-  override?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>,
-): CountStrategy {
-  if (!override) return "weighted";
-  if (typeof override === "string") return override;
-  return override[category] ?? "weighted";
-}
-
-function hasOverride(
-  category: CountCategory,
-  override?: CountStrategy | Partial<Record<CountCategory, CountStrategy>>,
-): boolean {
-  if (!override) return false;
-  if (typeof override === "string") return true;
-  return override[category] !== undefined;
-}
-
-function resolveCount(
-  _category: CountCategory,
-  mode: CountStrategy,
-  cfg: CountConfig,
-): number {
-  const min = cfg.min ?? 0;
-  const max = cfg.max ?? min;
-  const clamp = (v: number) => Math.min(Math.max(v, min), max);
-  if (min >= max) return min;
-  if (mode === "uniform") {
-    const range = [];
-    for (let i = min; i <= max; i++) range.push(i);
-    return pickOne(range);
-  }
-  return clamp(
-    weightedPick(cfg.weights ?? {}, () => {
-      const range = [];
-      for (let i = min; i <= max; i++) range.push(i);
-      return pickOne(range);
-    }),
-  );
-}
-
-function _determineSlotCount(
-  category: CountCategory,
-  cfg: CountConfig,
-  defaults: Record<string, number> | undefined,
-  options: RandomGenerationOptions,
-): number {
-  const slotOverride = options.slotOverrides?.[category];
-  if (slotOverride !== undefined) {
-    return Math.max(0, Math.trunc(slotOverride));
-  }
-  if (hasOverride(category, options.countsMode)) {
-    const mode = resolveCountsMode(category, options.countsMode);
-    return Math.max(0, Math.trunc(resolveCount(category, mode, cfg)));
-  }
-  return Math.max(0, Math.trunc(defaults?.[category] ?? 1));
-}
-
-// ---------------------------------------------------------------------------
-// Discord-specific overrides
-// ---------------------------------------------------------------------------
+const WHITE_TINTS = ["darkcream", "cream", "offwhite", "gray", "pink"] as const;
+const DISCORD_OVERRIDE_VALUE_MAX_LENGTH = 100;
+const TORTIE_LAYER_KEYS = ["mask", "pattern", "colour"] as const;
 
 export interface DiscordCatOverrides {
   sprite?: number;
@@ -553,258 +30,254 @@ export interface DiscordCatOverrides {
   colour?: string;
   eyeColour?: string;
   shading?: boolean;
-  accessories?: number; // pin slot count 0-4
-  scars?: number; // pin slot count 0-3
-  torties?: number; // pin layer count 0-4; 0 = force no tortie
-  // Ranges (from user config)
+  accessories?: number;
+  scars?: number;
+  torties?: number;
   accessoriesMin?: number;
   accessoriesMax?: number;
   scarsMin?: number;
   scarsMax?: number;
   tortiesMin?: number;
   tortiesMax?: number;
-  // Booleans
   darkForest?: boolean;
   starclan?: boolean;
-  // Palettes
   palettes?: string[];
+  traitOverrides?: Readonly<Record<string, unknown>>;
 }
 
-// ---------------------------------------------------------------------------
-// Main generation function
-// ---------------------------------------------------------------------------
+export interface DiscordTraitOverride {
+  traitId: CatTraitId;
+  value: unknown;
+}
 
-// Random integer in [min, max] — mirrors computeLayerCount from single-cat-plus
-function computeLayerCount(min: number, max: number): number {
-  if (min >= max) return min;
-  return min + Math.floor(Math.random() * (max - min + 1));
+function parseDiscordObjectListOverride(
+  definition: NonNullable<ReturnType<typeof getCatTraitDefinition>>,
+  rawValue: string,
+): unknown[] | null {
+  if (definition.gacha.strategy !== "tortieList") return null;
+
+  let item: unknown;
+  try {
+    item = JSON.parse(rawValue);
+  } catch {
+    return null;
+  }
+  if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+
+  const record = item as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  if (
+    keys.length !== TORTIE_LAYER_KEYS.length ||
+    !TORTIE_LAYER_KEYS.every((key) => keys.includes(key))
+  ) {
+    return null;
+  }
+
+  const catalogByProperty = {
+    mask: definition.gacha.maskCatalog,
+    pattern: definition.gacha.peltCatalog,
+    colour: definition.gacha.colourCatalog,
+  } as const;
+  for (const key of TORTIE_LAYER_KEYS) {
+    const value = record[key];
+    if (
+      typeof value !== "string" ||
+      !getCatalogElements(catalogByProperty[key]).some(
+        (entry) => entry.id === value,
+      )
+    ) {
+      return null;
+    }
+  }
+
+  const parsed = definition.value.schema.safeParse([record]);
+  return parsed.success && Array.isArray(parsed.data) ? parsed.data : null;
+}
+
+/** Parses the generic Discord trait/value pair against the compiled registry. */
+export function parseDiscordTraitOverride(
+  rawTraitId: string,
+  rawValue: string,
+): DiscordTraitOverride | null {
+  if (rawValue.length > DISCORD_OVERRIDE_VALUE_MAX_LENGTH) return null;
+  const definition = getCatTraitDefinition(rawTraitId);
+  if (!definition) return null;
+
+  let value: unknown;
+  switch (definition.value.kind) {
+    case "string":
+      value = rawValue;
+      break;
+    case "boolean": {
+      const normalized = rawValue.trim().toLowerCase();
+      if (normalized !== "true" && normalized !== "false") return null;
+      value = normalized === "true";
+      break;
+    }
+    case "integer": {
+      const parsed = Number(rawValue);
+      if (!Number.isInteger(parsed)) return null;
+      value = parsed;
+      break;
+    }
+    case "stringList":
+      value = [rawValue];
+      break;
+    case "objectList":
+      value = parseDiscordObjectListOverride(definition, rawValue);
+      if (value === null) return null;
+      break;
+  }
+
+  const publicTrait = getPublicCatTrait(definition.id);
+  const catalogId = publicTrait?.gacha?.catalog ?? publicTrait?.value.catalog;
+  if (
+    catalogId &&
+    !getCatalogElements(catalogId).some((entry) => entry.id === rawValue)
+  ) {
+    return null;
+  }
+  const parsed = definition.value.schema.safeParse(value);
+  if (!parsed.success) return null;
+  return {
+    traitId: definition.id as CatTraitId,
+    value: parsed.data,
+  };
+}
+
+export interface SeededServerRandomResult {
+  params: CatParams;
+  document: CatDocument;
+  slotSelections: SlotSelections;
+  seed: GachaSeed;
+  rngVersion: "xoshiro128**-v1";
+}
+
+function colourPools(overrides: DiscordCatOverrides): string[][] {
+  const pools = Array.from(
+    new Set(
+      (overrides.palettes ?? [])
+        .map((palette) => palette.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+    (palette) => getColorNamesForPalette(palette as PaletteId),
+  ).filter((pool) => pool.length > 0);
+  return pools.length > 0 ? pools : [peltInfo.colors];
+}
+
+function bundledCatalogs(overrides: DiscordCatOverrides) {
+  return createGachaCatalogs({
+    colours: colourPools(overrides),
+    whitePatchColours: WHITE_TINTS,
+    tortieWhitePatchColours: WHITE_TINTS,
+    // Discord palettes historically affected coats, never white-patch tints.
+    paletteColours: [],
+  });
+}
+
+function fixedTraits(
+  overrides: DiscordCatOverrides,
+): Partial<Record<CatTraitId, unknown>> {
+  const result: Partial<Record<CatTraitId, unknown>> = {};
+  const poseName =
+    overrides.poseName ?? poseNameForLegacySpriteNumber(overrides.sprite);
+  if (poseName) result.pose = poseName;
+  if (overrides.pelt) result.pelt = overrides.pelt;
+  if (overrides.colour) result.colour = overrides.colour;
+  if (overrides.eyeColour) result.eyeColour = overrides.eyeColour;
+  if (overrides.shading !== undefined) result.shading = overrides.shading;
+  if (overrides.darkForest !== undefined) {
+    result.darkForest = overrides.darkForest;
+  }
+  if (overrides.starclan !== undefined) result.dead = overrides.starclan;
+  for (const [rawTraitId, value] of Object.entries(
+    overrides.traitOverrides ?? {},
+  )) {
+    const definition = getCatTraitDefinition(rawTraitId);
+    if (definition?.value.schema.safeParse(value).success) {
+      result[definition.id as CatTraitId] = value;
+    }
+  }
+  return result;
+}
+
+function slotOverrides(
+  overrides: DiscordCatOverrides,
+  options: RandomGenerationOptions,
+): GachaSlotOverrides | undefined {
+  const result: GachaSlotOverrides = { ...(options.slotOverrides ?? {}) };
+  if (overrides.accessories !== undefined) {
+    result.accessories = overrides.accessories;
+  }
+  if (overrides.scars !== undefined) result.scars = overrides.scars;
+  if (overrides.torties !== undefined) result.tortie = overrides.torties;
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+function slotRanges(overrides: DiscordCatOverrides): GachaSlotRanges {
+  return {
+    accessories: {
+      min: overrides.accessoriesMin ?? 0,
+      max: overrides.accessoriesMax ?? 4,
+    },
+    scars: {
+      min: overrides.scarsMin ?? 0,
+      max: overrides.scarsMax ?? 4,
+    },
+    tortie: {
+      min: overrides.tortiesMin ?? 0,
+      max: overrides.tortiesMax ?? 4,
+    },
+  };
+}
+
+function dualParams(document: CatDocument): CatParams {
+  const legacy = catDocumentToLegacyParams(document);
+  for (const key of ["accessories", "scars", "tortie"] as const) {
+    if (Array.isArray(legacy[key]) && legacy[key].length === 0) {
+      delete legacy[key];
+    }
+  }
+  for (const key of ["lighting", "dead"] as const) {
+    if (legacy[key] === false) delete legacy[key];
+  }
+  return {
+    ...legacy,
+    spriteNumber:
+      typeof legacy.spriteNumber === "number" ? legacy.spriteNumber : 0,
+    schemaVersion: document.schemaVersion,
+    traits: document.traits,
+    unknownTraits: document.unknownTraits,
+  } as unknown as CatParams;
+}
+
+export async function generateRandomParamsServerDetailed(
+  overrides: DiscordCatOverrides = {},
+  options: RandomGenerationOptions = {},
+): Promise<SeededServerRandomResult> {
+  const result = rollCatFromRegistry(bundledCatalogs(overrides), {
+    seed: options.seed,
+    exactLayerCounts: options.exactLayerCounts,
+    countsMode: options.countsMode,
+    slotOverrides: slotOverrides(overrides, options),
+    slotRanges: slotRanges(overrides),
+    fixedTraits: fixedTraits(overrides),
+    traitProbabilities:
+      overrides.darkForest === undefined ? { darkForest: 0.1 } : undefined,
+  });
+
+  return {
+    params: dualParams(result.document),
+    document: result.document,
+    slotSelections: result.slotSelections as unknown as SlotSelections,
+    seed: result.seed,
+    rngVersion: result.rngVersion,
+  };
 }
 
 export async function generateRandomParamsServer(
   overrides: DiscordCatOverrides = {},
   options: RandomGenerationOptions = {},
 ): Promise<CatParams> {
-  const data = await loadSpriteData();
-  const exactLayerCounts = options.exactLayerCounts === true;
-
-  const posePoolSource =
-    data.renderablePoseNames.length > 0
-      ? data.renderablePoseNames
-      : data.poseNames;
-  const posePool = posePoolSource.filter((poseName) =>
-    isRandomSelectablePoseName(poseName),
-  );
-  if (!posePool.length) throw new Error("Pose pool is empty");
-
-  const poseNameOverride =
-    overrides.poseName && posePool.includes(overrides.poseName)
-      ? overrides.poseName
-      : null;
-  const spritePoseName = poseNameForLegacySpriteNumber(overrides.sprite);
-  const spritePoseNameOverride =
-    spritePoseName && posePool.includes(spritePoseName) ? spritePoseName : null;
-  const poseName =
-    poseNameOverride ?? spritePoseNameOverride ?? pickOne(posePool);
-  const spriteNumber = legacySpriteNumberForPoseName(poseName) ?? 0;
-
-  const pelts = data.peltNames.filter((p) => p !== "Tortie" && p !== "Calico");
-  const coatChoices = getCoatChoiceValues(pelts);
-  const coat = resolveCoatChoice(
-    overrides.pelt && coatChoices.includes(overrides.pelt)
-      ? overrides.pelt
-      : pickOne(coatChoices),
-  );
-
-  const colourPools = buildColourPools(data.colours, overrides.palettes);
-  const colourPool = flattenPools(colourPools);
-  if (!colourPool.length) {
-    throw new Error("Colour pool is empty");
-  }
-  const pickColour = () => pickColourFromPools(colourPools);
-
-  // Afterlife: respect overrides, otherwise 10% chance
-  const isDarkForest =
-    overrides.darkForest === true
-      ? true
-      : overrides.darkForest === false
-        ? false
-        : Math.random() < 0.1;
-
-  const params: CatParams = {
-    spriteNumber,
-    poseName,
-    ...coat,
-    colour:
-      overrides.colour &&
-      (data.colours.includes(overrides.colour) ||
-        colourPool.includes(overrides.colour))
-        ? overrides.colour
-        : pickColour(),
-    tint: pickOne(data.tints),
-    skinColour: pickOne(data.skinColours),
-    eyeColour:
-      overrides.eyeColour && data.eyeColours.includes(overrides.eyeColour)
-        ? overrides.eyeColour
-        : pickOne(data.eyeColours),
-    shading: overrides.shading ?? roll(RANDOM_CONFIG.probabilities.shading),
-    reverse: roll(RANDOM_CONFIG.probabilities.reverse),
-    isTortie: false,
-    darkForest: isDarkForest,
-    darkMode: isDarkForest,
-    dead:
-      overrides.starclan === true
-        ? true
-        : overrides.starclan === false
-          ? false
-          : undefined,
-  };
-
-  // Heterochromia
-  if (roll(RANDOM_CONFIG.probabilities.heterochromia)) {
-    const pool = ["", ...data.eyeColours];
-    const selected = pickOne(pool);
-    if (selected) params.eyeColour2 = selected;
-  }
-
-  // Tortie — per-invocation override > user config range > random chance
-  const tortieMin = overrides.tortiesMin ?? 0;
-  const tortieMax = overrides.tortiesMax ?? 4;
-  const tortieCount = overrides.torties;
-  if (tortieCount === 0) {
-    params.isTortie = false;
-  } else if (tortieCount !== undefined) {
-    params.isTortie = true;
-  } else {
-    params.isTortie = roll(RANDOM_CONFIG.probabilities.isTortie);
-  }
-
-  if (params.isTortie) {
-    const slotCount = tortieCount ?? computeLayerCount(tortieMin, tortieMax);
-    const tortieConfig = RANDOM_CONFIG.counts.tortie;
-    const masks = data.tortieMasks;
-    const uniqueMasks = tortieConfig.unique !== false;
-    const layerProb =
-      RANDOM_CONFIG.probabilities.tortieLayer ??
-      RANDOM_CONFIG.probabilities.isTortie ??
-      0.5;
-    const tortieResult = materializeTortieSlots({
-      slotCount,
-      masks,
-      pelts,
-      pickColour,
-      uniqueMasks,
-      exactCount: exactLayerCounts,
-      shouldFillSlot: (slotIndex) => slotIndex === 0 || roll(layerProb),
-    });
-
-    if (tortieResult.selectedValues.length > 0) {
-      params.tortie = tortieResult.selectedValues;
-      params.tortieMask = tortieResult.selectedValues[0].mask;
-      params.tortieColour = tortieResult.selectedValues[0].colour;
-      params.tortiePattern = tortieResult.selectedValues[0].pattern;
-    } else if (exactLayerCounts || slotCount === 0) {
-      params.isTortie = false;
-    } else {
-      const fallback = materializeTortieSlots({
-        slotCount: 1,
-        masks,
-        pelts,
-        pickColour,
-        uniqueMasks,
-        exactCount: true,
-        shouldFillSlot: () => true,
-      });
-      if (fallback.selectedValues.length > 0) {
-        params.tortie = fallback.selectedValues;
-        params.tortieMask = fallback.selectedValues[0].mask;
-        params.tortieColour = fallback.selectedValues[0].colour;
-        params.tortiePattern = fallback.selectedValues[0].pattern;
-      } else {
-        params.isTortie = false;
-      }
-    }
-  }
-
-  // White patches
-  if (roll(RANDOM_CONFIG.probabilities.whitePatchGroup)) {
-    if (
-      roll(RANDOM_CONFIG.probabilities.whitePatch) &&
-      data.whitePatches.length > 0
-    ) {
-      params.whitePatches = pickOne(data.whitePatches);
-    }
-
-    const allowNone = RANDOM_CONFIG.whitePatches.allowNoneTint !== false;
-    const filteredTints = allowNone
-      ? data.whiteTints
-      : data.whiteTints.filter((t) => t !== "none");
-    if (filteredTints.length > 0) {
-      const candidate = pickOne(filteredTints);
-      if (candidate && candidate !== "none")
-        params.whitePatchesTint = candidate;
-    }
-
-    if (roll(RANDOM_CONFIG.probabilities.points) && data.points.length > 0) {
-      params.points = pickOne(data.points);
-    }
-    if (
-      roll(RANDOM_CONFIG.probabilities.vitiligo) &&
-      data.vitiligo.length > 0
-    ) {
-      params.vitiligo = pickOne(data.vitiligo);
-    }
-  }
-
-  // Accessories — per-invocation override > user config range > random
-  const accMin = overrides.accessoriesMin ?? 0;
-  const accMax = overrides.accessoriesMax ?? 4;
-  const accSlots = overrides.accessories ?? computeLayerCount(accMin, accMax);
-  const accessories = filterRandomAccessoryPool(data.accessories);
-  if (accSlots > 0 && accessories.length > 0) {
-    const accConfig = RANDOM_CONFIG.counts.accessories;
-    const uniqueAcc = accConfig.unique !== false;
-    const accProb =
-      RANDOM_CONFIG.probabilities.accessorySlot ??
-      RANDOM_CONFIG.probabilities.accessory ??
-      0.5;
-    const accResult = materializeStringSlots({
-      slotCount: accSlots,
-      availableChoices: accessories,
-      unique: uniqueAcc,
-      exactCount: exactLayerCounts,
-      placeholder: "none",
-      shouldFillSlot: () => roll(accProb),
-    });
-    if (accResult.selectedValues.length > 0) {
-      params.accessories = accResult.selectedValues;
-      params.accessory = accResult.selectedValues[0];
-    }
-  }
-
-  // Scars — per-invocation override > user config range > random
-  const scarMin = overrides.scarsMin ?? 0;
-  const scarMax = overrides.scarsMax ?? 4;
-  const scarSlots = overrides.scars ?? computeLayerCount(scarMin, scarMax);
-  if (scarSlots > 0 && data.scars.length > 0) {
-    const scarsConfig = RANDOM_CONFIG.counts.scars;
-    const uniqueScars = scarsConfig.unique !== false;
-    const scarProb =
-      RANDOM_CONFIG.probabilities.scarSlot ??
-      RANDOM_CONFIG.probabilities.scar ??
-      0.5;
-    const scarResult = materializeStringSlots({
-      slotCount: scarSlots,
-      availableChoices: data.scars,
-      unique: uniqueScars,
-      exactCount: exactLayerCounts,
-      placeholder: "none",
-      shouldFillSlot: () => roll(scarProb),
-    });
-    if (scarResult.selectedValues.length > 0) {
-      params.scars = scarResult.selectedValues;
-      params.scar = scarResult.selectedValues[0];
-    }
-  }
-
-  return params;
+  return (await generateRandomParamsServerDetailed(overrides, options)).params;
 }

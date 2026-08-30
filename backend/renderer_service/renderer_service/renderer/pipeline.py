@@ -10,18 +10,29 @@ from PIL import Image
 
 from ..models import (
     BatchVariant,
-    LayerIdentifier,
     RenderMeta,
 )
 from .coat_patterns import normalize_coat_pattern_name
+from .contracts import CatDocument, RenderPlan
+from .executor import (
+    DEFAULT_MANIFEST_PATH,
+    DEFAULT_PLAN_PATH,
+    InvalidRenderPlan,
+    RenderExecutor,
+    load_render_plan,
+)
+from .integrity import DEFAULT_INTEGRITY_PATH, verify_bundle_integrity
+from .legacy_adapter import LegacyCatAdapter
 from .repository import SpriteRepository
 from .sprite_mapper import SpriteMapper
+from .strategies import STRATEGY_REGISTRY
 from .v3_renderer import CatRendererV3, StageInfo
 
 
 @dataclass
 class LayerResult:
-    id: LayerIdentifier
+    id: str
+    operation_id: str | None
     label: str
     image: Image.Image
     duration_ms: float
@@ -62,21 +73,98 @@ class RenderPipeline:
     """Wrapper around the CatRendererV3 that prepares API responses."""
 
     def __init__(
-        self, canvas_size: int = 50, repository: SpriteRepository | None = None
+        self,
+        canvas_size: int = 50,
+        repository: SpriteRepository | None = None,
+        *,
+        plan: RenderPlan | None = None,
+        plan_path: Path | None = None,
+        manifest_path: Path | None = None,
+        integrity_path: Path = DEFAULT_INTEGRITY_PATH,
+        adapter: LegacyCatAdapter | None = None,
+        verify_manifest_file: bool = True,
+        verify_static_assets: bool = True,
+        verify_bundle: bool = True,
+        expected_catalog_hash: str | None = None,
     ) -> None:
         self.canvas_size = canvas_size
         self.repository = repository or SpriteRepository(tile_size=canvas_size)
-        data_dir = Path(__file__).resolve().parents[1] / "data"
-        self.mapper = SpriteMapper(data_dir)
+        generated_dir = integrity_path.parent
+        resolved_plan_path = plan_path or generated_dir / DEFAULT_PLAN_PATH.name
+        resolved_manifest_path = (
+            manifest_path or generated_dir / DEFAULT_MANIFEST_PATH.name
+        )
+        if verify_bundle:
+            if plan is not None or adapter is not None:
+                raise InvalidRenderPlan(
+                    "Custom plans or adapters require verify_bundle=False because "
+                    "they are not part of the generated integrity manifest"
+                )
+            expected_plan_path = generated_dir / DEFAULT_PLAN_PATH.name
+            expected_manifest_path = generated_dir / DEFAULT_MANIFEST_PATH.name
+            if (
+                resolved_plan_path.resolve() != expected_plan_path.resolve()
+                or resolved_manifest_path.resolve() != expected_manifest_path.resolve()
+            ):
+                raise InvalidRenderPlan(
+                    "Verified render plan and strategy manifest must be siblings of "
+                    "bundle-integrity.json"
+                )
+            verify_bundle_integrity(
+                integrity_path=integrity_path,
+                sprite_root=self.repository.sprite_root,
+                data_root=self.repository.data_root,
+                expected_catalog_hash=expected_catalog_hash,
+            )
+        self.mapper = SpriteMapper(self.repository.data_root)
         self.renderer = CatRendererV3(self.repository, self.mapper)
+        self.adapter = adapter or LegacyCatAdapter.from_path(
+            generated_dir / "compatibility.json",
+            generated_dir / "cat-document.schema.json",
+        )
+        resolved_plan = plan or load_render_plan(resolved_plan_path)
+        contract_versions = {
+            "render plan": resolved_plan.schema_version,
+            "compatibility": self.adapter.manifest.schema_version,
+        }
+        if self.adapter.document_schema is not None:
+            contract_versions["document schema"] = (
+                self.adapter.document_schema.schema_version
+            )
+        if len(set(contract_versions.values())) != 1:
+            raise InvalidRenderPlan(
+                "Render plan, compatibility and document schemaVersion must match: "
+                f"{contract_versions}"
+            )
+        self.executor = RenderExecutor(
+            self.renderer,
+            resolved_plan,
+            STRATEGY_REGISTRY,
+            manifest_path=resolved_manifest_path,
+            verify_manifest_file=verify_manifest_file,
+            verify_static_assets=verify_static_assets,
+            expected_catalog_hash=expected_catalog_hash,
+        )
 
-    def render(self, params: dict, collect_layers: bool = False) -> PipelineResult:
+    def render(
+        self,
+        source: dict | CatDocument,
+        collect_layers: bool = False,
+    ) -> PipelineResult:
+        document = self._coerce_document(source)
+        params = self.adapter.to_renderer_params(
+            document,
+            self.repository.sprite_number_for_pose,
+        )
+        # Canonical trait IDs remain available to generic strategy handlers while
+        # legacy aliases keep the existing pixel implementations byte-compatible.
+        params = {**document.traits, **params}
         params = self._normalize_params(params)
 
         layer_results: list[LayerResult] = []
         start_time = time.perf_counter()
 
-        composed, stage_infos = self.renderer.render(params)
+        composed, stage_infos = self.executor.execute(document, params)
 
         if collect_layers:
             for info in stage_infos:
@@ -85,9 +173,10 @@ class RenderPipeline:
                 layer_results.append(
                     LayerResult(
                         id=info.identifier,
-                        label=info.identifier.value,
+                        operation_id=info.operation_id,
+                        label=info.identifier,
                         image=info.image.copy(),
-                        duration_ms=0.0,
+                        duration_ms=info.duration_ms,
                         diagnostics=info.diagnostics,
                         blend_mode=info.blend_mode,
                     )
@@ -98,6 +187,9 @@ class RenderPipeline:
             finished_at=time.perf_counter(),
             duration_ms=(time.perf_counter() - start_time) * 1000,
             memory_pressure=False,
+            catalog_hash=self.executor.metadata.catalog_hash,
+            manifest_hash=self.executor.metadata.manifest_hash,
+            render_plan_version=self.executor.metadata.format_version,
         )
 
         return PipelineResult(composed=composed, layers=layer_results, meta=meta)
@@ -113,7 +205,7 @@ class RenderPipeline:
         columns: int | None = None,
         include_sources: bool = False,
         frame_mode: str = "composed",
-        layer_identifier: LayerIdentifier | None = None,
+        layer_identifier: str | None = None,
     ) -> BatchPipelineResult:
         normalized_base = self._normalize_params(base_params)
 
@@ -139,7 +231,14 @@ class RenderPipeline:
         sources: list[tuple[str, Image.Image]] = []
 
         for frame_id, label, group, params in render_specs:
-            composed, stages = self.renderer.render(params)
+            document = self._coerce_document(params)
+            render_params = self.adapter.to_renderer_params(
+                document,
+                self.repository.sprite_number_for_pose,
+            )
+            render_params = {**document.traits, **render_params}
+            render_params = self._normalize_params(render_params)
+            composed, stages = self.executor.execute(document, render_params)
             if frame_mode == "layer" and layer_identifier is not None:
                 overlay = self._extract_layer_image(stages, layer_identifier)
                 if overlay is not None:
@@ -218,6 +317,15 @@ class RenderPipeline:
         return normalized
 
     # ------------------------------------------------------------------
+    def _coerce_document(self, source: dict | CatDocument) -> CatDocument:
+        if isinstance(source, CatDocument):
+            return self.adapter.normalize_document(source)
+        return self.adapter.from_legacy_params(
+            deepcopy(source),
+            self.repository.pose_name_for_sprite_number,
+        )
+
+    # ------------------------------------------------------------------
     def _prepare_variant_params(self, base_params: dict, variant: BatchVariant) -> dict:
         params = deepcopy(base_params)
         if variant.params:
@@ -256,7 +364,7 @@ class RenderPipeline:
     # ------------------------------------------------------------------
     @staticmethod
     def _extract_layer_image(
-        stage_infos: list[StageInfo], target: LayerIdentifier
+        stage_infos: list[StageInfo], target: str
     ) -> Image.Image | None:
         for info in stage_infos:
             if info.identifier == target and info.image is not None:

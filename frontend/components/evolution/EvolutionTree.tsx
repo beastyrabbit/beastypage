@@ -265,6 +265,7 @@ const CHIP_KIND_STYLE: Record<EvolutionAddition["kind"], string> = {
   scar: "border-red-300/30 bg-red-500/10 text-red-200",
   coat: "border-amber-300/30 bg-amber-500/10 text-amber-200",
   replacement: "border-violet-300/30 bg-violet-500/10 text-violet-200",
+  trait: "border-emerald-300/30 bg-emerald-500/10 text-emerald-200",
 };
 
 const MAX_VISIBLE_CHIPS = 3;

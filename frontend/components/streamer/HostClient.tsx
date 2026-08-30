@@ -23,6 +23,7 @@ import UsersIcon from "@/components/ui/users-icon";
 import { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
 import { track } from "@/lib/analytics";
+import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { buildStreamerSharePayload } from "@/lib/streamer/share";
 import type { StreamerParams, StreamStep } from "@/lib/streamer/steps";
 import {
@@ -944,7 +945,7 @@ export function HostClient() {
         finalHistoryRef.current = historyCopy;
         const payload = buildStreamerSharePayload(paramsCopy, historyCopy);
         const record = await createMapperRecord({
-          catData: payload,
+          catData: catDataToLegacyPersistence(payload),
           catName: name || undefined,
           creatorName: creator || undefined,
         });

@@ -1,0 +1,327 @@
+{
+  "formatVersion": 1,
+  "strategies": [
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "EmptyConfig",
+        "type": "object"
+      },
+      "key": "basePelt",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "blend": {
+            "default": "alpha",
+            "enum": [
+              "alpha",
+              "multiply",
+              "screen",
+              "add",
+              "replace"
+            ],
+            "title": "Blend",
+            "type": "string"
+          },
+          "diagnostic": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Diagnostic",
+            "type": "string"
+          },
+          "spriteKeys": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Spritekeys",
+            "type": "array"
+          },
+          "valueTrait": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Valuetrait",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valueTrait",
+          "spriteKeys",
+          "diagnostic"
+        ],
+        "title": "BooleanSpriteLayerConfig",
+        "type": "object"
+      },
+      "key": "booleanSpriteLayer",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "availablePoses": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Availableposes",
+            "type": "object"
+          },
+          "blend": {
+            "default": "alpha",
+            "enum": [
+              "alpha",
+              "multiply",
+              "screen",
+              "add",
+              "replace"
+            ],
+            "title": "Blend",
+            "type": "string"
+          },
+          "catalog": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Catalog",
+            "type": "string"
+          },
+          "resolver": {
+            "enum": [
+              "accessory",
+              "direct",
+              "mapping"
+            ],
+            "title": "Resolver",
+            "type": "string"
+          },
+          "sprites": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Sprites",
+            "type": "object"
+          },
+          "valueTrait": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Valuetrait",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valueTrait",
+          "catalog",
+          "resolver"
+        ],
+        "title": "CatalogSpriteListConfig",
+        "type": "object"
+      },
+      "key": "catalogSpriteList",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "EmptyConfig",
+        "type": "object"
+      },
+      "key": "coatPattern",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "EmptyConfig",
+        "type": "object"
+      },
+      "key": "eyes",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "affectsPreviousLayers": {
+            "default": true,
+            "title": "Affectspreviouslayers",
+            "type": "boolean"
+          },
+          "valueTrait": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Valuetrait",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valueTrait"
+        ],
+        "title": "GlobalMirrorConfig",
+        "type": "object"
+      },
+      "key": "globalMirror",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "EmptyConfig",
+        "type": "object"
+      },
+      "key": "lineart",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "EmptyConfig",
+        "type": "object"
+      },
+      "key": "scarPrimary",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "EmptyConfig",
+        "type": "object"
+      },
+      "key": "scarSecondary",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "colour": {
+            "items": {
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Colour",
+            "type": "array"
+          },
+          "diagnostic": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Diagnostic",
+            "type": "string"
+          },
+          "valueTrait": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Valuetrait",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valueTrait",
+          "colour",
+          "diagnostic"
+        ],
+        "title": "SolidMultiplyConfig",
+        "type": "object"
+      },
+      "key": "solidMultiply",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "diagnosticPrefix": {
+            "default": "sprite",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Diagnosticprefix",
+            "type": "string"
+          },
+          "spriteByValue": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Spritebyvalue",
+            "type": "object"
+          },
+          "spriteFamily": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Spritefamily",
+            "type": "string"
+          },
+          "tintResolver": {
+            "anyOf": [
+              {
+                "const": "whitePatch",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tintresolver"
+          },
+          "tintTrait": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tinttrait"
+          },
+          "valueTrait": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:-]+$",
+            "title": "Valuetrait",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valueTrait",
+          "spriteFamily"
+        ],
+        "title": "SpriteLayerConfig",
+        "type": "object"
+      },
+      "key": "spriteLayer",
+      "version": 1
+    },
+    {
+      "configSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "EmptyConfig",
+        "type": "object"
+      },
+      "key": "tintMultiply",
+      "version": 1
+    }
+  ]
+}

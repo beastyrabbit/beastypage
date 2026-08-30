@@ -1,3 +1,12 @@
+import {
+  catDocumentToLegacyParams,
+  legacyParamsToCatDocument,
+  parseCatDocumentStrict,
+  readCatDocument,
+  setCatTrait,
+} from "@/lib/cat-system/document";
+import { catSystem } from "@/lib/cat-system/registry";
+import { inheritCatDocument } from "@/lib/cat-system/runtime";
 import { applyCoatChoice } from "@/lib/cat-v3/coatPatterns";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
@@ -5,6 +14,11 @@ import {
   geneticsToParams,
   inheritGenetics,
 } from "./genetics";
+import {
+  applyGeneticsTraitOverrides,
+  selectAncestryTraitMutations,
+  type TraitMutationPools,
+} from "./inheritance";
 import { generateWarriorName, pickOne } from "./nameGenerator";
 import type {
   AncestryTree,
@@ -33,6 +47,51 @@ function generateSlug(): string {
   return `tree-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function paramsFromDocument(
+  document: ReturnType<typeof readCatDocument>,
+): CatParams {
+  return {
+    ...catDocumentToLegacyParams(document),
+    schemaVersion: document.schemaVersion,
+    traits: document.traits,
+    unknownTraits: document.unknownTraits,
+  } as unknown as CatParams;
+}
+
+function ensureCanonicalParams(params: CatParams): CatParams {
+  return paramsFromDocument(readCatDocument(params));
+}
+
+function inheritCanonicalParams(
+  mother: CatParams,
+  father: CatParams,
+  generated: CatParams,
+  mutationPool: MutationPool,
+): CatParams {
+  const generatedDocument = legacyParamsToCatDocument(generated);
+  const inheritedDocument = inheritCatDocument(
+    readCatDocument(mother),
+    readCatDocument(father),
+    {
+      generated: generatedDocument.traits,
+      mutations: selectAncestryTraitMutations(
+        catSystem,
+        generatedDocument.traits,
+        mutationPool.traits,
+      ),
+    },
+  );
+  return paramsFromDocument(
+    parseCatDocumentStrict({
+      ...inheritedDocument,
+      traits: applyGeneticsTraitOverrides(
+        inheritedDocument.traits,
+        generatedDocument.traits,
+      ),
+    }),
+  );
+}
+
 export interface MutationPool {
   pelts: string[];
   colours: string[];
@@ -43,6 +102,7 @@ export interface MutationPool {
   accessories: string[];
   scars: string[];
   tortieMasks: string[];
+  traits: TraitMutationPools;
 }
 
 type RelationshipType = "sibling" | "cousin" | "unrelated" | "unknown";
@@ -143,6 +203,7 @@ export class AncestryTreeManager {
       accessories: [],
       scars: [],
       tortieMasks: [],
+      traits: {},
     };
   }
 
@@ -170,7 +231,7 @@ export class AncestryTreeManager {
     params: CatParams,
     options: OffspringOptions,
   ): CatParams {
-    const result = { ...params };
+    let result = ensureCanonicalParams(params);
 
     // Apply accessory chance (only if maxAccessories > 0)
     if (
@@ -181,8 +242,9 @@ export class AncestryTreeManager {
       const count = Math.floor(Math.random() * options.maxAccessories) + 1;
       const accessories = this.pickAccessories(count);
       if (accessories.length > 0) {
-        result.accessories = accessories;
-        result.accessory = accessories[0] ?? undefined;
+        result = paramsFromDocument(
+          setCatTrait(readCatDocument(result), "accessories", accessories),
+        );
       }
     }
 
@@ -195,8 +257,9 @@ export class AncestryTreeManager {
       const count = Math.floor(Math.random() * options.maxScars) + 1;
       const scars = this.pickScars(count);
       if (scars.length > 0) {
-        result.scars = scars;
-        result.scar = scars[0] ?? undefined;
+        result = paramsFromDocument(
+          setCatTrait(readCatDocument(result), "scars", scars),
+        );
       }
     }
 
@@ -256,7 +319,7 @@ export class AncestryTreeManager {
       name,
       gender,
       lifeStage,
-      params,
+      params: ensureCanonicalParams(params),
       motherId,
       fatherId,
       partnerIds: [],
@@ -365,6 +428,13 @@ export class AncestryTreeManager {
           colours: this.mutationPool.colours,
           tortieMasks: this.mutationPool.tortieMasks,
         },
+      );
+
+      childParams = inheritCanonicalParams(
+        mother.params,
+        father.params,
+        childParams,
+        this.mutationPool,
       );
 
       // Apply offspring options (accessories/scars)
@@ -845,7 +915,7 @@ export class AncestryTreeManager {
       );
 
       // Update params based on new genetics
-      child.params = geneticsToParams(
+      const regeneratedParams = geneticsToParams(
         child.genetics,
         {
           spriteNumber: child.params.spriteNumber,
@@ -857,6 +927,12 @@ export class AncestryTreeManager {
           colours: this.mutationPool.colours,
           tortieMasks: this.mutationPool.tortieMasks,
         },
+      );
+      child.params = inheritCanonicalParams(
+        mother.params,
+        father.params,
+        regeneratedParams,
+        this.mutationPool,
       );
 
       // Add child to new partner's children list
@@ -903,6 +979,7 @@ export class AncestryTreeManager {
 
       return {
         ...cat,
+        params: ensureCanonicalParams(cat.params),
         partnerIds,
       };
     });

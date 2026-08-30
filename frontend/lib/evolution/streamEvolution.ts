@@ -6,6 +6,7 @@
  * re-render locally.
  */
 
+import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { estimateCeremonySecondsFromCounts } from "./ceremonyEstimate";
 import type {
   EvolutionAddition,
@@ -46,7 +47,9 @@ export function toEvolutionStreamCats(
     branchLabel: cat.branchLabel,
     archetype: cat.archetype,
     additions: cat.additions,
-    catData: cat.catData,
+    catData: catDataToLegacyPersistence(
+      cat.catData as unknown as Record<string, unknown>,
+    ) as unknown as EvolutionCatData,
   }));
 }
 

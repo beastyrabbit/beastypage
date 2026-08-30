@@ -13,12 +13,17 @@ import PaintIcon from "@/components/ui/paint-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import { api } from "@/convex/_generated/api";
-import { getCoatPatternName } from "@/lib/cat-v3/coatPatterns";
+import {
+  type CanonicalCatViewPayload,
+  catViewPayloadToShareSeed,
+  getCatViewDisplayRows,
+  normalizeCatViewPayload,
+  setCanonicalViewTrait,
+} from "@/lib/cat-consumers/viewPayload";
 import {
   formatPoseName,
   getAvailablePoseNames,
 } from "@/lib/cat-v3/poseOptions";
-import type { TortieLayer } from "@/lib/cat-v3/types";
 import { createCatShare, decodeCatShare, encodeCatShare } from "@/lib/catShare";
 import { cn } from "@/lib/utils";
 
@@ -26,18 +31,6 @@ type ViewerClientProps = {
   slug?: string | null;
   encoded?: string | null;
 };
-
-interface CatSharePayload {
-  params: Record<string, unknown>;
-  accessorySlots?: string[];
-  scarSlots?: string[];
-  tortieSlots?: (TortieLayer | null)[];
-  counts?: {
-    accessories?: number;
-    scars?: number;
-    tortie?: number;
-  };
-}
 
 interface ProfilePreviews {
   tiny?: { url: string | null; name?: string | null } | null;
@@ -55,7 +48,7 @@ interface MapperRecord {
   id: string;
   shareToken?: string | null;
   slug?: string | null;
-  cat_data?: CatSharePayload | null;
+  cat_data?: unknown;
   catName?: string | null;
   creatorName?: string | null;
   created?: number;
@@ -70,43 +63,6 @@ interface SpriteVariantPreview {
   dataUrl: string;
 }
 
-interface TraitRow {
-  label: string;
-  value: string;
-  type?: "darkForest";
-}
-
-/**
- * Normalize catData that may be in flat format (pre-v4.2.3 Discord cats)
- * or the standard CatSharePayload format.
- * Flat format: { spriteNumber, peltName, colour, ... } at the top level.
- * Wrapped format: { params: {...}, accessorySlots: [...], ... }.
- */
-function normalizeCatPayload(data: Record<string, unknown>): CatSharePayload {
-  if (data.params && typeof data.params === "object") {
-    return data as unknown as CatSharePayload;
-  }
-  // Flat format — wrap it
-  const accessories = Array.isArray(data.accessories)
-    ? (data.accessories as string[])
-    : [];
-  const scars = Array.isArray(data.scars) ? (data.scars as string[]) : [];
-  const tortie = Array.isArray(data.tortie)
-    ? (data.tortie as (TortieLayer | null)[])
-    : [];
-  return {
-    params: data,
-    accessorySlots: accessories,
-    scarSlots: scars,
-    tortieSlots: tortie,
-    counts: {
-      accessories: accessories.length,
-      scars: scars.length,
-      tortie: tortie.length,
-    },
-  };
-}
-
 const DISPLAY_CANVAS_SIZE = 900;
 const PREVIEW_CANVAS_SIZE = 360;
 
@@ -117,7 +73,7 @@ type BuilderMeta = {
 };
 
 function buildVisualBuilderUrl(
-  payload: CatSharePayload | null,
+  payload: CanonicalCatViewPayload | null,
   meta?: BuilderMeta,
 ): string | null {
   if (meta?.slug) {
@@ -125,7 +81,7 @@ function buildVisualBuilderUrl(
   }
   if (!payload?.params) return null;
   try {
-    const encoded = encodeCatShare(payload);
+    const encoded = encodeCatShare(catViewPayloadToShareSeed(payload));
     const params = new URLSearchParams({ cat: encoded });
     if (meta?.catName) {
       params.set("name", meta.catName);
@@ -159,7 +115,9 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     cachedPreviewUrl ??
     (mapperRecord?.id ? `/api/preview/${mapperRecord.id}` : null);
 
-  const [catPayload, setCatPayload] = useState<CatSharePayload | null>(null);
+  const [catPayload, setCatPayload] = useState<CanonicalCatViewPayload | null>(
+    null,
+  );
   const [meta, setMeta] = useState<{
     shareToken?: string | null;
     slug?: string | null;
@@ -244,11 +202,14 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       return;
     }
     if (mapperRecord.cat_data) {
-      setCatPayload(
-        normalizeCatPayload(
-          mapperRecord.cat_data as unknown as Record<string, unknown>,
-        ),
-      );
+      try {
+        setCatPayload(normalizeCatViewPayload(mapperRecord.cat_data));
+      } catch (payloadError) {
+        console.error("Failed to normalize saved cat", payloadError);
+        setError("The saved cat payload is invalid or corrupted.");
+        setLoadingMessage(null);
+        return;
+      }
       setMeta({
         shareToken:
           mapperRecord.shareToken ?? mapperRecord.slug ?? mapperRecord.id,
@@ -269,10 +230,10 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       try {
         const decoded = await decodeCatShare(encoded);
         if (cancelled) return;
-        if (!decoded?.params) {
+        if (!decoded?.document) {
           throw new Error("Invalid payload");
         }
-        setCatPayload(decoded as CatSharePayload);
+        setCatPayload(normalizeCatViewPayload(decoded));
         setMeta(null);
         setLoadingMessage(null);
       } catch (err) {
@@ -305,7 +266,9 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     }
     if (catPayload) {
       try {
-        const encodedPayload = encodeCatShare(catPayload);
+        const encodedPayload = encodeCatShare(
+          catViewPayloadToShareSeed(catPayload),
+        );
         setShareUrl(
           origin
             ? `${origin}/view?cat=${encodedPayload}`
@@ -337,11 +300,11 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       const generator = generatorRef.current;
       if (!generator) return;
       try {
-        const params =
+        const renderPayload =
           !showDarkForestTint && catPayload.params.darkForest
-            ? { ...catPayload.params, darkForest: false, darkMode: false }
-            : catPayload.params;
-        const result = await generator.generateCat(params);
+            ? setCanonicalViewTrait(catPayload, "darkForest", false)
+            : catPayload;
+        const result = await generator.generateCat(renderPayload.params);
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(
@@ -397,19 +360,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     }
 
     let cancelled = false;
-    const counts = catPayload.counts ?? {
-      accessories: catPayload.accessorySlots?.length ?? 0,
-      scars: catPayload.scarSlots?.length ?? 0,
-      tortie: catPayload.tortieSlots?.length ?? 0,
-    };
-
-    const shareSeed = {
-      params: catPayload.params,
-      accessorySlots: catPayload.accessorySlots ?? [],
-      scarSlots: catPayload.scarSlots ?? [],
-      tortieSlots: catPayload.tortieSlots ?? [],
-      counts,
-    } as const;
+    const shareSeed = catViewPayloadToShareSeed(catPayload);
 
     (async () => {
       const shareRecord = await createCatShare(shareSeed);
@@ -475,12 +426,14 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
               async (poseChoice): Promise<SpriteVariantPreview | null> => {
                 if (cancelled) return null;
                 try {
-                  const params = {
-                    ...catPayload.params,
-                    spriteNumber: poseChoice.spriteNumber,
-                    poseName: poseChoice.poseName,
-                  };
-                  const result = await generator.generateCat(params);
+                  const variantPayload = setCanonicalViewTrait(
+                    catPayload,
+                    "pose",
+                    poseChoice.poseName,
+                  );
+                  const result = await generator.generateCat(
+                    variantPayload.params,
+                  );
                   const previewCanvas = document.createElement("canvas");
                   previewCanvas.width = PREVIEW_CANVAS_SIZE;
                   previewCanvas.height = PREVIEW_CANVAS_SIZE;
@@ -524,66 +477,9 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   }, [rendererReady, catPayload]);
 
   const traitRows = useMemo(() => {
-    if (!catPayload?.params) return [] as TraitRow[];
-    const params = catPayload.params;
-    const rows: TraitRow[] = [];
-    const push = (label: string, value: unknown) => {
-      const formatted = formatValue(value);
-      if (!formatted || formatted === "None") return;
-      rows.push({ label, value: formatted });
-    };
-
-    push("Colour", params.colour);
-    push(
-      "Pelt",
-      getCoatPatternName(params.coatPattern) ??
-        getCoatPatternName(params.peltName) ??
-        params.peltName,
-    );
-    push("Eyes", buildEyeLabel(params));
-    push("Eye Colour 2", params.eyeColour2);
-
-    const accessories = (catPayload.accessorySlots ?? []).filter(
-      (item) => item && item !== "none",
-    );
-    accessories.forEach((item, index) => {
-      push(`Accessory ${index + 1}`, item);
-    });
-
-    const scars = (catPayload.scarSlots ?? []).filter(
-      (item) => item && item !== "none",
-    );
-    scars.forEach((item, index) => {
-      push(`Scar ${index + 1}`, item);
-    });
-
-    const torties = (catPayload.tortieSlots ?? []).filter(
-      (slot): slot is TortieLayer => !!slot,
-    );
-    torties.forEach((slot, index) => {
-      push(`Tortie ${index + 1}`, formatTortieLayer(slot));
-    });
-
-    push("Tint", params.tint);
-    push("Skin", params.skinColour);
-    push("White Patches", params.whitePatches);
-    push("Points", params.points);
-    push("Vitiligo", params.vitiligo);
-
-    if (params.darkForest) {
-      rows.push({
-        label: "Dark Forest",
-        value: showDarkForestTint ? "Enabled" : "Disabled",
-        type: "darkForest",
-      });
-    }
-
-    if (params.dead) {
-      rows.push({ label: "StarClan", value: "Yes" });
-    }
-
-    return rows;
-  }, [catPayload, showDarkForestTint]);
+    if (!catPayload) return [];
+    return getCatViewDisplayRows(catPayload);
+  }, [catPayload]);
 
   const spriteVariantsSubtitle = spriteVariantsLoading
     ? "Rendering preview sprites…"
@@ -861,10 +757,10 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                 >
                   {traitsOpen &&
                     traitRows.map((row) => {
-                      if (row.type === "darkForest") {
+                      if (row.traitId === "darkForest") {
                         return (
                           <div
-                            key={row.label}
+                            key={row.key}
                             className="flex flex-col gap-1 rounded-xl border border-border/30 bg-background/60 px-3 py-2"
                           >
                             <dt className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
@@ -901,7 +797,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
 
                       return (
                         <div
-                          key={row.label}
+                          key={row.key}
                           className="flex flex-col gap-1 rounded-xl border border-border/30 bg-background/60 px-3 py-2"
                         >
                           <dt className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
@@ -1037,33 +933,4 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
       </div>
     </div>
   );
-}
-
-function formatValue(value: unknown): string {
-  if (
-    value === undefined ||
-    value === null ||
-    value === "" ||
-    value === "none"
-  ) {
-    return "None";
-  }
-  if (typeof value === "boolean") {
-    return value ? "Yes" : "No";
-  }
-  return String(value);
-}
-
-function formatTortieLayer(slot: TortieLayer | null | undefined): string {
-  if (!slot) return "None";
-  return [slot.mask, slot.pattern, slot.colour]
-    .map((part) => formatValue(part))
-    .join(" • ");
-}
-
-function buildEyeLabel(params: Record<string, unknown>) {
-  const primary = formatValue(params.eyeColour);
-  const secondary = formatValue(params.eyeColour2 ?? "None");
-  if (secondary === "None" || secondary === primary) return primary;
-  return `${primary} / ${secondary}`;
 }

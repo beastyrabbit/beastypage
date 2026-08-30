@@ -16,6 +16,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { toId } from "@/convex/utils";
 import { track } from "@/lib/analytics";
+import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import type { PaletteId } from "@/lib/palettes";
 
 interface LegacyBatchCat {
@@ -179,7 +180,9 @@ export function AdoptionGeneratorClient() {
                 if (!shareToken || !profileIdStr) {
                   try {
                     const mapperResult = await createMapper({
-                      catData: cat.catData,
+                      catData: catDataToLegacyPersistence(
+                        cat.catData as Record<string, unknown>,
+                      ),
                       catName: cat.catName ?? undefined,
                       creatorName: cat.creatorName ?? undefined,
                     });
@@ -203,7 +206,9 @@ export function AdoptionGeneratorClient() {
 
                 return {
                   label,
-                  catData: cat.catData,
+                  catData: catDataToLegacyPersistence(
+                    cat.catData as Record<string, unknown>,
+                  ),
                   profileId: profileIdStr
                     ? toId("cat_profile", profileIdStr)
                     : undefined,

@@ -1,0 +1,722 @@
+{
+  "baseDocument": {
+    "schemaVersion": 1,
+    "traits": {
+      "__probe_a81f": [],
+      "accessories": [],
+      "colour": "WHITE",
+      "darkForest": false,
+      "dead": false,
+      "eyeColour": "BLUE",
+      "eyeColour2": "AURORA",
+      "lighting": false,
+      "pelt": "SingleColour",
+      "pose": "adult_short1",
+      "reverse": false,
+      "scars": [],
+      "shading": false,
+      "skinColour": "PINK",
+      "tint": "pink",
+      "tortie": [],
+      "vitiligo": "PHANTOM",
+      "whitePatches": "HALFWHITE",
+      "whitePatchesTint": "pink"
+    }
+  },
+  "compatibility": {
+    "aliases": {
+      "accessory": "accessories",
+      "darkMode": "darkForest",
+      "scar": "scars",
+      "sprite": "pose"
+    },
+    "formatVersion": 1,
+    "schemaVersion": 1,
+    "tombstones": {},
+    "traits": [
+      {
+        "default": "adult_short0",
+        "id": "pose",
+        "legacy": {
+          "key": "poseName",
+          "spriteKey": "spriteNumber",
+          "strategy": "pose"
+        },
+        "required": true,
+        "valueKind": "string"
+      },
+      {
+        "default": "SingleColour",
+        "id": "pelt",
+        "legacy": {
+          "key": "peltName",
+          "strategy": "direct"
+        },
+        "required": true,
+        "valueKind": "string"
+      },
+      {
+        "id": "coatPattern",
+        "legacy": {
+          "key": "coatPattern",
+          "strategy": "direct"
+        },
+        "required": false,
+        "valueKind": "string"
+      },
+      {
+        "default": "WHITE",
+        "id": "colour",
+        "legacy": {
+          "key": "colour",
+          "strategy": "direct"
+        },
+        "required": true,
+        "valueKind": "string"
+      },
+      {
+        "default": [],
+        "id": "tortie",
+        "legacy": {
+          "strategy": "tortie"
+        },
+        "required": false,
+        "valueKind": "objectList"
+      },
+      {
+        "default": "none",
+        "id": "tint",
+        "legacy": {
+          "key": "tint",
+          "strategy": "direct"
+        },
+        "required": false,
+        "valueKind": "string"
+      },
+      {
+        "id": "whitePatches",
+        "legacy": {
+          "key": "whitePatches",
+          "strategy": "direct"
+        },
+        "required": false,
+        "valueKind": "string"
+      },
+      {
+        "id": "points",
+        "legacy": {
+          "key": "points",
+          "strategy": "direct"
+        },
+        "required": false,
+        "valueKind": "string"
+      },
+      {
+        "id": "whitePatchesTint",
+        "legacy": {
+          "key": "whitePatchesTint",
+          "strategy": "direct"
+        },
+        "required": false,
+        "valueKind": "string"
+      },
+      {
+        "id": "vitiligo",
+        "legacy": {
+          "key": "vitiligo",
+          "strategy": "direct"
+        },
+        "required": false,
+        "valueKind": "string"
+      },
+      {
+        "default": "BLUE",
+        "id": "eyeColour",
+        "legacy": {
+          "key": "eyeColour",
+          "strategy": "direct"
+        },
+        "required": true,
+        "valueKind": "string"
+      },
+      {
+        "id": "eyeColour2",
+        "legacy": {
+          "key": "eyeColour2",
+          "strategy": "direct"
+        },
+        "required": false,
+        "valueKind": "string"
+      },
+      {
+        "default": [],
+        "id": "scars",
+        "legacy": {
+          "key": "scars",
+          "singleKey": "scar",
+          "strategy": "list"
+        },
+        "required": false,
+        "valueKind": "stringList"
+      },
+      {
+        "default": false,
+        "id": "shading",
+        "legacy": {
+          "key": "shading",
+          "strategy": "direct"
+        },
+        "required": true,
+        "valueKind": "boolean"
+      },
+      {
+        "default": false,
+        "id": "lighting",
+        "legacy": {
+          "key": "lighting",
+          "strategy": "direct"
+        },
+        "required": false,
+        "valueKind": "boolean"
+      },
+      {
+        "default": false,
+        "id": "darkForest",
+        "legacy": {
+          "aliases": [
+            "darkMode"
+          ],
+          "key": "darkForest",
+          "strategy": "booleanAlias"
+        },
+        "required": false,
+        "valueKind": "boolean"
+      },
+      {
+        "default": false,
+        "id": "dead",
+        "legacy": {
+          "key": "dead",
+          "strategy": "direct"
+        },
+        "required": false,
+        "valueKind": "boolean"
+      },
+      {
+        "default": "PINK",
+        "id": "skinColour",
+        "legacy": {
+          "key": "skinColour",
+          "strategy": "direct"
+        },
+        "required": true,
+        "valueKind": "string"
+      },
+      {
+        "default": [],
+        "id": "accessories",
+        "legacy": {
+          "key": "accessories",
+          "singleKey": "accessory",
+          "strategy": "list"
+        },
+        "required": false,
+        "valueKind": "stringList"
+      },
+      {
+        "default": false,
+        "id": "reverse",
+        "legacy": {
+          "key": "reverse",
+          "strategy": "direct"
+        },
+        "required": true,
+        "valueKind": "boolean"
+      },
+      {
+        "default": [],
+        "id": "__probe_a81f",
+        "legacy": {
+          "key": "__probe_a81f",
+          "strategy": "list"
+        },
+        "required": false,
+        "valueKind": "stringList"
+      }
+    ]
+  },
+  "formatVersion": 1,
+  "gacha": {
+    "document": {
+      "schemaVersion": 1,
+      "traits": {
+        "__probe_a81f": [
+          "wisteria-ear",
+          "toast-ear"
+        ],
+        "accessories": [],
+        "colour": "WHITE",
+        "darkForest": false,
+        "dead": false,
+        "eyeColour": "BLUE",
+        "eyeColour2": "AURORA",
+        "lighting": false,
+        "pelt": "SingleColour",
+        "pose": "adult_short1",
+        "reverse": false,
+        "scars": [],
+        "shading": false,
+        "skinColour": "PINK",
+        "tint": "pink",
+        "tortie": [],
+        "vitiligo": "PHANTOM",
+        "whitePatches": "HALFWHITE",
+        "whitePatchesTint": "pink"
+      }
+    },
+    "rngVersion": "xoshiro128**-v1",
+    "seed": "cat-system-ear-accessory-v1-1",
+    "slotSelections": {
+      "__probe_a81f": [
+        "wisteria-ear",
+        "toast-ear"
+      ]
+    }
+  },
+  "generatedBy": "frontend/scripts/generate-cat-system-probe.ts",
+  "probeDefinition": {
+    "capabilities": {
+      "display": true,
+      "edit": "list",
+      "evolution": "accumulate",
+      "inherit": "mutate",
+      "reveal": {
+        "defaultSteps": 4,
+        "strategy": "slots",
+        "timingKey": "__probe_a81f"
+      },
+      "settings": false
+    },
+    "gacha": {
+      "availableForPose": true,
+      "catalog": "__probe_a81f",
+      "count": {
+        "max": 2,
+        "min": 0,
+        "strategy": "uniformCount"
+      },
+      "dependsOn": [
+        "pose"
+      ],
+      "fillProbability": 1,
+      "strategy": "slotList",
+      "unique": true
+    },
+    "id": "__probe_a81f",
+    "label": "Probe ear accessories",
+    "legacy": {
+      "key": "__probe_a81f",
+      "strategy": "list"
+    },
+    "order": 195,
+    "render": [
+      {
+        "after": [
+          "accessories"
+        ],
+        "config": {
+          "catalog": "__probe_a81f",
+          "resolver": "mapping",
+          "valueTrait": "__probe_a81f"
+        },
+        "kind": "operation",
+        "layerId": "__probe_a81f",
+        "operationId": "__probe_a81f",
+        "reads": [
+          "__probe_a81f"
+        ],
+        "strategy": "catalogSpriteList",
+        "version": 1
+      }
+    ],
+    "renderOperations": [
+      "__probe_a81f"
+    ],
+    "value": {
+      "catalog": "__probe_a81f",
+      "default": [],
+      "kind": "stringList",
+      "maxItems": 2,
+      "required": false,
+      "unique": true
+    }
+  },
+  "probeId": "__probe_a81f",
+  "renderDocument": {
+    "schemaVersion": 1,
+    "traits": {
+      "__probe_a81f": [
+        "wisteria-ear"
+      ],
+      "accessories": [],
+      "colour": "WHITE",
+      "darkForest": false,
+      "dead": false,
+      "eyeColour": "BLUE",
+      "eyeColour2": "AURORA",
+      "lighting": false,
+      "pelt": "SingleColour",
+      "pose": "adult_short1",
+      "reverse": false,
+      "scars": [],
+      "shading": false,
+      "skinColour": "PINK",
+      "tint": "pink",
+      "tortie": [],
+      "vitiligo": "PHANTOM",
+      "whitePatches": "HALFWHITE",
+      "whitePatchesTint": "pink"
+    }
+  },
+  "renderPlan": {
+    "catalogHash": "7eded7800df6d48f6511ef544d70a7f6a971fa9ebd495a77d51e07540c9a3d6c",
+    "catalogs": {
+      "__probe_a81f": [
+        {
+          "id": "wisteria-ear",
+          "label": "Wisteria ear",
+          "poses": [
+            "adult_short1"
+          ],
+          "spriteKey": "acc_plantsWISTERIA",
+          "weight": 2
+        },
+        {
+          "deprecated": false,
+          "id": "toast-ear",
+          "label": "Toast ear",
+          "poses": [
+            "adult_short1"
+          ],
+          "spriteKey": "acc_lifegenTOAST"
+        }
+      ]
+    },
+    "formatVersion": 1,
+    "manifestHash": "744603ad8be96fd45c47a983484e7efc5b40f1be9f012adea860a758097d425b",
+    "operations": [
+      {
+        "config": {},
+        "dependsOn": [],
+        "id": "base",
+        "layerId": "base",
+        "order": 0,
+        "reads": [
+          "pelt",
+          "colour",
+          "tortie"
+        ],
+        "strategy": "basePelt",
+        "strategyVersion": 1
+      },
+      {
+        "config": {},
+        "dependsOn": [
+          "base"
+        ],
+        "id": "coatPattern",
+        "layerId": "coatPattern",
+        "order": 1,
+        "reads": [
+          "coatPattern",
+          "pelt",
+          "colour",
+          "tortie"
+        ],
+        "strategy": "coatPattern",
+        "strategyVersion": 1
+      },
+      {
+        "config": {},
+        "dependsOn": [
+          "coatPattern"
+        ],
+        "id": "tint",
+        "layerId": "tint",
+        "order": 2,
+        "reads": [
+          "tint"
+        ],
+        "strategy": "tintMultiply",
+        "strategyVersion": 1
+      },
+      {
+        "config": {
+          "diagnosticPrefix": "white",
+          "spriteFamily": "white",
+          "tintResolver": "whitePatch",
+          "tintTrait": "whitePatchesTint",
+          "valueTrait": "whitePatches"
+        },
+        "dependsOn": [
+          "tint"
+        ],
+        "id": "whitePatches",
+        "layerId": "whitePatches",
+        "order": 3,
+        "reads": [
+          "whitePatches",
+          "whitePatchesTint"
+        ],
+        "strategy": "spriteLayer",
+        "strategyVersion": 1
+      },
+      {
+        "config": {
+          "diagnosticPrefix": "points",
+          "spriteFamily": "white",
+          "valueTrait": "points"
+        },
+        "dependsOn": [
+          "whitePatches"
+        ],
+        "id": "points",
+        "layerId": "points",
+        "order": 4,
+        "reads": [
+          "points"
+        ],
+        "strategy": "spriteLayer",
+        "strategyVersion": 1
+      },
+      {
+        "config": {
+          "diagnosticPrefix": "vitiligo",
+          "spriteFamily": "white",
+          "valueTrait": "vitiligo"
+        },
+        "dependsOn": [
+          "points"
+        ],
+        "id": "vitiligo",
+        "layerId": "vitiligo",
+        "order": 5,
+        "reads": [
+          "vitiligo"
+        ],
+        "strategy": "spriteLayer",
+        "strategyVersion": 1
+      },
+      {
+        "config": {},
+        "dependsOn": [
+          "vitiligo"
+        ],
+        "id": "eyes",
+        "layerId": "eyes",
+        "order": 6,
+        "reads": [
+          "eyeColour",
+          "eyeColour2"
+        ],
+        "strategy": "eyes",
+        "strategyVersion": 1
+      },
+      {
+        "config": {},
+        "dependsOn": [
+          "eyes"
+        ],
+        "id": "scarsPrimary",
+        "layerId": "scarsPrimary",
+        "order": 7,
+        "reads": [
+          "scars"
+        ],
+        "strategy": "scarPrimary",
+        "strategyVersion": 1
+      },
+      {
+        "config": {
+          "blend": "multiply",
+          "diagnostic": "shading",
+          "spriteKeys": [
+            "shaders"
+          ],
+          "valueTrait": "shading"
+        },
+        "dependsOn": [
+          "scarsPrimary"
+        ],
+        "id": "shading",
+        "layerId": "tint",
+        "order": 8,
+        "reads": [
+          "shading"
+        ],
+        "strategy": "booleanSpriteLayer",
+        "strategyVersion": 1
+      },
+      {
+        "config": {
+          "blend": "alpha",
+          "diagnostic": "lighting",
+          "spriteKeys": [
+            "lighting"
+          ],
+          "valueTrait": "lighting"
+        },
+        "dependsOn": [
+          "shading"
+        ],
+        "id": "lighting",
+        "layerId": "lighting",
+        "order": 9,
+        "reads": [
+          "lighting"
+        ],
+        "strategy": "booleanSpriteLayer",
+        "strategyVersion": 1
+      },
+      {
+        "config": {
+          "colour": [
+            120,
+            30,
+            30,
+            200
+          ],
+          "diagnostic": "darkForest",
+          "valueTrait": "darkForest"
+        },
+        "dependsOn": [
+          "lighting"
+        ],
+        "id": "darkForest",
+        "layerId": "tint",
+        "order": 10,
+        "reads": [
+          "darkForest"
+        ],
+        "strategy": "solidMultiply",
+        "strategyVersion": 1
+      },
+      {
+        "config": {},
+        "dependsOn": [
+          "darkForest"
+        ],
+        "id": "lineart",
+        "layerId": "lineart",
+        "order": 11,
+        "reads": [
+          "dead",
+          "darkForest"
+        ],
+        "strategy": "lineart",
+        "strategyVersion": 1
+      },
+      {
+        "config": {
+          "diagnosticPrefix": "skin",
+          "spriteFamily": "skin",
+          "valueTrait": "skinColour"
+        },
+        "dependsOn": [
+          "lineart"
+        ],
+        "id": "skin",
+        "layerId": "skin",
+        "order": 12,
+        "reads": [
+          "skinColour"
+        ],
+        "strategy": "spriteLayer",
+        "strategyVersion": 1
+      },
+      {
+        "config": {},
+        "dependsOn": [
+          "skin"
+        ],
+        "id": "scarsSecondary",
+        "layerId": "scarsSecondary",
+        "order": 13,
+        "reads": [
+          "scars"
+        ],
+        "strategy": "scarSecondary",
+        "strategyVersion": 1
+      },
+      {
+        "config": {
+          "catalog": "accessories",
+          "resolver": "accessory",
+          "valueTrait": "accessories"
+        },
+        "dependsOn": [
+          "scarsSecondary"
+        ],
+        "id": "accessories",
+        "layerId": "accessories",
+        "order": 14,
+        "reads": [
+          "accessories"
+        ],
+        "strategy": "catalogSpriteList",
+        "strategyVersion": 1
+      },
+      {
+        "config": {
+          "catalog": "__probe_a81f",
+          "resolver": "mapping",
+          "valueTrait": "__probe_a81f"
+        },
+        "dependsOn": [
+          "accessories"
+        ],
+        "id": "__probe_a81f",
+        "layerId": "__probe_a81f",
+        "order": 15,
+        "reads": [
+          "__probe_a81f"
+        ],
+        "strategy": "catalogSpriteList",
+        "strategyVersion": 1
+      },
+      {
+        "config": {
+          "affectsPreviousLayers": true,
+          "valueTrait": "reverse"
+        },
+        "dependsOn": [
+          "base",
+          "coatPattern",
+          "tint",
+          "whitePatches",
+          "points",
+          "vitiligo",
+          "eyes",
+          "scarsPrimary",
+          "scarsSecondary",
+          "shading",
+          "lighting",
+          "darkForest",
+          "lineart",
+          "skin",
+          "accessories",
+          "__probe_a81f"
+        ],
+        "id": "reverse",
+        "layerId": "transform",
+        "order": 16,
+        "reads": [
+          "reverse"
+        ],
+        "strategy": "globalMirror",
+        "strategyVersion": 1
+      }
+    ],
+    "schemaVersion": 1
+  }
+}

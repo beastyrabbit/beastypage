@@ -2,13 +2,16 @@
   "name": "beastypage",
   "private": true,
   "scripts": {
-    "predev": "pnpm env:check",
-    "dev": "concurrently -n frontend,convex,renderer,media,bot,palettes -c blue,magenta,green,red,yellow,cyan \"pnpm dev:frontend\" \"pnpm dev:convex\" \"pnpm dev:renderer\" \"pnpm dev:media\" \"pnpm dev:bot\" \"pnpm dev:palettes\"",
+    "cat-system:generate": "pnpm --dir frontend run cat-system:generate",
+    "cat-system:check": "pnpm --dir frontend run cat-system:check",
+    "cat-system:build": "pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run && sh frontend/scripts/write-version.sh && pnpm --dir frontend exec tsc --noEmit && NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_placeholder_CLERK_KEY pnpm --dir frontend run build && npm --prefix backend/discord-bot test && cd backend/renderer_service && uv run python -m renderer_service.render_contract --check && uv run --extra dev pytest -q",
+    "predev": "pnpm cat-system:check && pnpm env:check",
+    "dev": "node scripts/dev.mjs",
     "dev:all": "pnpm dev",
     "dev:frontend": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/frontend -- pnpm --dir frontend run dev",
     "dev:convex": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/frontend -- pnpm --dir frontend exec convex dev",
-    "dev:renderer": "cd backend/renderer_service && portless renderer.beastypage --app-port 8001 sh -c '.venv/bin/python -m uvicorn renderer_service.app.main:app --reload --host $HOST --port $PORT'",
-    "dev:media": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/media -- portless media.beastypage --app-port 8003 pnpm --dir backend/media_service run dev",
+    "dev:renderer": "cd backend/renderer_service && PORTLESS_PORT=1355 PORTLESS_HTTPS=0 portless renderer.beastypage --app-port 8001 sh -c '.venv/bin/python -m uvicorn renderer_service.app.main:app --reload --reload-include \"*.json\" --host $HOST --port $PORT'",
+    "dev:media": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/media -- env PORTLESS_PORT=1355 PORTLESS_HTTPS=0 portless media.beastypage --app-port 8003 pnpm --dir backend/media_service run dev",
     "dev:bot": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/discord-bot -- pnpm --dir backend/discord-bot exec tsx src/index.ts",
     "dev:palettes": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/frontend -- pnpm --dir frontend exec tsx scripts/watch-renderer-palettes.ts",
     "env:check": "pnpm env:check:frontend && pnpm env:check:media && pnpm env:check:bot",
@@ -20,6 +23,7 @@
     "sharp": "^0.35.0"
   },
   "devDependencies": {
-    "concurrently": "^10.0.0"
+    "concurrently": "^10.0.0",
+    "portless": "^0.15.6"
   }
 }

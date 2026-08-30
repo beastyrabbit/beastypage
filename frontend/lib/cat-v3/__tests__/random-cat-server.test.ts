@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { getColorNamesForPalette } from "@/lib/palettes";
 import { COAT_PATTERN_IDS } from "../coatPatterns";
-import { generateRandomParamsServer } from "../random-cat-server";
+import {
+  generateRandomParamsServer,
+  parseDiscordTraitOverride,
+} from "../random-cat-server";
 
 const VALID_POSES = [
   "adolescent_short0",
@@ -152,9 +155,116 @@ describe("generateRandomParamsServer", () => {
     expect(params.colour).toBe("GINGER");
   });
 
+  it("keeps a canonical colour override when a runtime palette narrows rolls", async () => {
+    const results = await Promise.all(
+      Array.from({ length: 16 }, (_, seed) =>
+        generateRandomParamsServer(
+          { colour: "GINGER", palettes: ["chevron-patterns"] },
+          { seed },
+        ),
+      ),
+    );
+
+    expect(results.every((params) => params.colour === "GINGER")).toBe(true);
+  });
+
   it("applies shading override", async () => {
     const params = await generateRandomParamsServer({ shading: true });
     expect(params.shading).toBe(true);
+  });
+
+  it("parses registry-backed Discord overrides without a trait switch", () => {
+    const tortieLayer = {
+      mask: "ONE",
+      pattern: "SingleColour",
+      colour: "WHITE",
+    };
+    expect(parseDiscordTraitOverride("accessory", "MAPLE LEAF")).toEqual({
+      traitId: "accessories",
+      value: ["MAPLE LEAF"],
+    });
+    expect(parseDiscordTraitOverride("reverse", "true")).toEqual({
+      traitId: "reverse",
+      value: true,
+    });
+    expect(
+      parseDiscordTraitOverride("accessories", "NOT-A-CATALOG-VALUE"),
+    ).toBeNull();
+    expect(parseDiscordTraitOverride("tortie", "ONE")).toBeNull();
+    expect(
+      parseDiscordTraitOverride("tortie", JSON.stringify(tortieLayer)),
+    ).toEqual({
+      traitId: "tortie",
+      value: [tortieLayer],
+    });
+  });
+
+  it("rejects malformed or non-canonical compound Discord overrides", () => {
+    expect(parseDiscordTraitOverride("tortie", "not-json")).toBeNull();
+    expect(
+      parseDiscordTraitOverride(
+        "tortie",
+        JSON.stringify([
+          { mask: "ONE", pattern: "SingleColour", colour: "WHITE" },
+        ]),
+      ),
+    ).toBeNull();
+    expect(
+      parseDiscordTraitOverride(
+        "tortie",
+        JSON.stringify({
+          mask: "NOT-A-MASK",
+          pattern: "SingleColour",
+          colour: "WHITE",
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      parseDiscordTraitOverride(
+        "tortie",
+        JSON.stringify({
+          mask: "ONE",
+          pattern: "SingleColour",
+          colour: "WHITE",
+          extra: "not-part-of-the-contract",
+        }),
+      ),
+    ).toBeNull();
+    expect(parseDiscordTraitOverride("tortie", "x".repeat(101))).toBeNull();
+  });
+
+  it("carries generic registry overrides into the canonical document", async () => {
+    const params = await generateRandomParamsServer({
+      traitOverrides: {
+        accessories: ["MAPLE LEAF"],
+        reverse: true,
+      },
+    });
+
+    expect(params.traits?.accessories).toEqual(["MAPLE LEAF"]);
+    expect(params.traits?.reverse).toBe(true);
+    expect(params.accessories).toEqual(["MAPLE LEAF"]);
+    expect(params.reverse).toBe(true);
+  });
+
+  it("carries a parsed compound override into the canonical document", async () => {
+    const layer = {
+      mask: "ONE",
+      pattern: "SingleColour",
+      colour: "WHITE",
+    };
+    const override = parseDiscordTraitOverride("tortie", JSON.stringify(layer));
+    expect(override).not.toBeNull();
+
+    const params = await generateRandomParamsServer({
+      traitOverrides: override
+        ? { [override.traitId]: override.value }
+        : undefined,
+    });
+
+    expect(params.traits?.tortie).toEqual([layer]);
+    expect(params.tortie).toEqual([layer]);
+    expect(params.isTortie).toBe(true);
   });
 
   it("applies torties override > 0 forces tortie", async () => {

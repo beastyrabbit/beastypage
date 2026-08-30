@@ -1,4 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { catDataToLegacyPersistence } from "@/lib/cat-system/document";
+import {
+  EAR_ACCESSORY_PROBE_ID,
+  EAR_ACCESSORY_PROBE_PRIMARY_VALUE,
+  EAR_ACCESSORY_PROBE_SECONDARY_VALUE,
+  earAccessoryProbeSystem,
+} from "@/lib/cat-system/testing/earAccessoryProbe";
+import probeArtifact from "@/lib/cat-system/testing/fixtures/cat-system-ear-accessory-probe.generated.json";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
   type BatchStreamCat,
@@ -6,6 +14,7 @@ import {
   buildBatchStagePlan,
   buildPartialBatchParams,
   parseBatchStreamCommand,
+  trimBatchPoolToStageCount,
 } from "../streamBatch";
 
 const CONFIG = { accessoryCount: 2, scarCount: 2, tortieCount: 2 };
@@ -44,6 +53,31 @@ function makeCat(): BatchStreamCat {
   };
 }
 
+function makeProbeCat(
+  values = [
+    EAR_ACCESSORY_PROBE_PRIMARY_VALUE,
+    EAR_ACCESSORY_PROBE_SECONDARY_VALUE,
+  ],
+): BatchStreamCat {
+  const cat = makeCat();
+  return {
+    ...cat,
+    catData: {
+      ...cat.catData,
+      params: {
+        ...cat.catData.params,
+        poseName: "adult_short1",
+        schemaVersion: earAccessoryProbeSystem.schemaVersion,
+        traits: {
+          ...probeArtifact.renderDocument.traits,
+          pelt: "Tabby",
+          [EAR_ACCESSORY_PROBE_ID]: values,
+        },
+      },
+    },
+  };
+}
+
 describe("buildBatchStagePlan", () => {
   it("matches the website's stage order and count", () => {
     const stages = buildBatchStagePlan(CONFIG);
@@ -59,6 +93,78 @@ describe("buildBatchStagePlan", () => {
     expect(
       batchStartCount({ accessoryCount: 0, scarCount: 0, tortieCount: 0 }, 10),
     ).toBe(23);
+  });
+
+  it("derives added slot stages and the exact pool size from canonical traits", () => {
+    const oneSlotCat = makeProbeCat([EAR_ACCESSORY_PROBE_PRIMARY_VALUE]);
+    const stages = buildBatchStagePlan(
+      CONFIG,
+      [oneSlotCat],
+      earAccessoryProbeSystem,
+    );
+
+    expect(
+      stages.filter(
+        (stage) =>
+          stage.type === "registry" && stage.traitId === EAR_ACCESSORY_PROBE_ID,
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        id: `${EAR_ACCESSORY_PROBE_ID}-0`,
+        strategy: "slots",
+        slotIndex: 0,
+      }),
+    ]);
+    expect(
+      batchStartCount(CONFIG, 10, [oneSlotCat], earAccessoryProbeSystem),
+    ).toBe(34);
+    expect(
+      batchStartCount(CONFIG, 10, undefined, earAccessoryProbeSystem),
+    ).toBe(35);
+
+    const upperBoundPool = Array.from({ length: 35 }, () => oneSlotCat);
+    expect(
+      trimBatchPoolToStageCount(
+        CONFIG,
+        10,
+        upperBoundPool,
+        earAccessoryProbeSystem,
+      ),
+    ).toHaveLength(34);
+  });
+
+  it("reconstructs added stages after persistence strips canonical traits", () => {
+    const canonicalCat = makeProbeCat();
+    const persistedCat: BatchStreamCat = {
+      ...canonicalCat,
+      catData: catDataToLegacyPersistence(
+        canonicalCat.catData as unknown as Readonly<Record<string, unknown>>,
+      ) as unknown as BatchStreamCat["catData"],
+    };
+    const persistedParams = persistedCat.catData.params as unknown as Record<
+      string,
+      unknown
+    >;
+
+    expect(persistedParams.traits).toBeUndefined();
+    expect(persistedParams[EAR_ACCESSORY_PROBE_ID]).toEqual([
+      EAR_ACCESSORY_PROBE_PRIMARY_VALUE,
+      EAR_ACCESSORY_PROBE_SECONDARY_VALUE,
+    ]);
+
+    const addedStages = buildBatchStagePlan(
+      CONFIG,
+      [persistedCat],
+      earAccessoryProbeSystem,
+    ).filter(
+      (stage) =>
+        stage.type === "registry" && stage.traitId === EAR_ACCESSORY_PROBE_ID,
+    );
+
+    expect(addedStages).toHaveLength(2);
+    expect(
+      batchStartCount(CONFIG, 10, [persistedCat], earAccessoryProbeSystem),
+    ).toBe(35);
   });
 });
 
@@ -164,6 +270,55 @@ describe("buildPartialBatchParams", () => {
     ) as unknown as Record<string, unknown>;
     expect(params.accessories).toEqual(["BROWNBEAR"]);
     expect(params.scars).toEqual([]);
+  });
+
+  it("keeps an added trait hidden in canonical traits until its registry stages", () => {
+    const probeCat = makeProbeCat();
+    const probeStages = buildBatchStagePlan(
+      CONFIG,
+      [probeCat],
+      earAccessoryProbeSystem,
+    );
+    const firstProbeIndex = probeStages.findIndex(
+      (stage) =>
+        stage.type === "registry" && stage.traitId === EAR_ACCESSORY_PROBE_ID,
+    );
+
+    const before = buildPartialBatchParams(
+      probeCat,
+      probeStages,
+      firstProbeIndex - 1,
+      undefined,
+      earAccessoryProbeSystem,
+    ) as unknown as Record<string, unknown>;
+    const afterFirst = buildPartialBatchParams(
+      probeCat,
+      probeStages,
+      firstProbeIndex,
+      undefined,
+      earAccessoryProbeSystem,
+    ) as unknown as Record<string, unknown>;
+    const afterSecond = buildPartialBatchParams(
+      probeCat,
+      probeStages,
+      firstProbeIndex + 1,
+      undefined,
+      earAccessoryProbeSystem,
+    ) as unknown as Record<string, unknown>;
+
+    expect((before.traits as Record<string, unknown>).pelt).toBe("Tabby");
+    expect(
+      (before.traits as Record<string, unknown>)[EAR_ACCESSORY_PROBE_ID],
+    ).toEqual([]);
+    expect(
+      (afterFirst.traits as Record<string, unknown>)[EAR_ACCESSORY_PROBE_ID],
+    ).toEqual([EAR_ACCESSORY_PROBE_PRIMARY_VALUE]);
+    expect(
+      (afterSecond.traits as Record<string, unknown>)[EAR_ACCESSORY_PROBE_ID],
+    ).toEqual([
+      EAR_ACCESSORY_PROBE_PRIMARY_VALUE,
+      EAR_ACCESSORY_PROBE_SECONDARY_VALUE,
+    ]);
   });
 });
 

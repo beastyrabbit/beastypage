@@ -1,0 +1,212 @@
+{
+  "aliases": {
+    "accessory": "accessories",
+    "darkMode": "darkForest",
+    "scar": "scars",
+    "sprite": "pose"
+  },
+  "formatVersion": 1,
+  "schemaVersion": 1,
+  "tombstones": {},
+  "traits": [
+    {
+      "default": "adult_short0",
+      "id": "pose",
+      "legacy": {
+        "key": "poseName",
+        "spriteKey": "spriteNumber",
+        "strategy": "pose"
+      },
+      "required": true,
+      "valueKind": "string"
+    },
+    {
+      "default": "SingleColour",
+      "id": "pelt",
+      "legacy": {
+        "key": "peltName",
+        "strategy": "direct"
+      },
+      "required": true,
+      "valueKind": "string"
+    },
+    {
+      "id": "coatPattern",
+      "legacy": {
+        "key": "coatPattern",
+        "strategy": "direct"
+      },
+      "required": false,
+      "valueKind": "string"
+    },
+    {
+      "default": "WHITE",
+      "id": "colour",
+      "legacy": {
+        "key": "colour",
+        "strategy": "direct"
+      },
+      "required": true,
+      "valueKind": "string"
+    },
+    {
+      "default": [],
+      "id": "tortie",
+      "legacy": {
+        "strategy": "tortie"
+      },
+      "required": false,
+      "valueKind": "objectList"
+    },
+    {
+      "default": "none",
+      "id": "tint",
+      "legacy": {
+        "key": "tint",
+        "strategy": "direct"
+      },
+      "required": false,
+      "valueKind": "string"
+    },
+    {
+      "id": "whitePatches",
+      "legacy": {
+        "key": "whitePatches",
+        "strategy": "direct"
+      },
+      "required": false,
+      "valueKind": "string"
+    },
+    {
+      "id": "points",
+      "legacy": {
+        "key": "points",
+        "strategy": "direct"
+      },
+      "required": false,
+      "valueKind": "string"
+    },
+    {
+      "id": "whitePatchesTint",
+      "legacy": {
+        "key": "whitePatchesTint",
+        "strategy": "direct"
+      },
+      "required": false,
+      "valueKind": "string"
+    },
+    {
+      "id": "vitiligo",
+      "legacy": {
+        "key": "vitiligo",
+        "strategy": "direct"
+      },
+      "required": false,
+      "valueKind": "string"
+    },
+    {
+      "default": "BLUE",
+      "id": "eyeColour",
+      "legacy": {
+        "key": "eyeColour",
+        "strategy": "direct"
+      },
+      "required": true,
+      "valueKind": "string"
+    },
+    {
+      "id": "eyeColour2",
+      "legacy": {
+        "key": "eyeColour2",
+        "strategy": "direct"
+      },
+      "required": false,
+      "valueKind": "string"
+    },
+    {
+      "default": [],
+      "id": "scars",
+      "legacy": {
+        "key": "scars",
+        "singleKey": "scar",
+        "strategy": "list"
+      },
+      "required": false,
+      "valueKind": "stringList"
+    },
+    {
+      "default": false,
+      "id": "shading",
+      "legacy": {
+        "key": "shading",
+        "strategy": "direct"
+      },
+      "required": true,
+      "valueKind": "boolean"
+    },
+    {
+      "default": false,
+      "id": "lighting",
+      "legacy": {
+        "key": "lighting",
+        "strategy": "direct"
+      },
+      "required": false,
+      "valueKind": "boolean"
+    },
+    {
+      "default": false,
+      "id": "darkForest",
+      "legacy": {
+        "aliases": [
+          "darkMode"
+        ],
+        "key": "darkForest",
+        "strategy": "booleanAlias"
+      },
+      "required": false,
+      "valueKind": "boolean"
+    },
+    {
+      "default": false,
+      "id": "dead",
+      "legacy": {
+        "key": "dead",
+        "strategy": "direct"
+      },
+      "required": false,
+      "valueKind": "boolean"
+    },
+    {
+      "default": "PINK",
+      "id": "skinColour",
+      "legacy": {
+        "key": "skinColour",
+        "strategy": "direct"
+      },
+      "required": true,
+      "valueKind": "string"
+    },
+    {
+      "default": [],
+      "id": "accessories",
+      "legacy": {
+        "key": "accessories",
+        "singleKey": "accessory",
+        "strategy": "list"
+      },
+      "required": false,
+      "valueKind": "stringList"
+    },
+    {
+      "default": false,
+      "id": "reverse",
+      "legacy": {
+        "key": "reverse",
+        "strategy": "direct"
+      },
+      "required": true,
+      "valueKind": "boolean"
+    }
+  ]
+}

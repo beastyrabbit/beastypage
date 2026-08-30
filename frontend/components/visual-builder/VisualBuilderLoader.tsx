@@ -11,6 +11,10 @@ import {
 import { api } from "@/convex/_generated/api";
 
 import type { Id } from "@/convex/_generated/dataModel";
+import {
+  hydrateBuilderParams,
+  synchronizeBuilderParams,
+} from "@/lib/cat-builder/genericTraitEditor";
 import { isCoatPatternId } from "@/lib/cat-v3/coatPatterns";
 import type { PaletteMode } from "@/lib/palettes";
 
@@ -113,12 +117,16 @@ function extractInitialPayload(
 ): VisualBuilderInitialPayload {
   const catData = toRecord(record.cat_data);
   const rawParamsSource =
-    catData.params ?? catData.finalParams ?? record.cat_data;
+    catData.document ??
+    catData.params ??
+    catData.finalParams ??
+    record.cat_data;
   const rawParams = toRecord(rawParamsSource);
   const shareSlug = coerceString(catData.shareSlug);
 
-  const params = {
+  let params = {
     ...DEFAULT_PARAMS,
+    ...rawParams,
     spriteNumber: coerceNumber(
       rawParams.spriteNumber ?? rawParams.sprite ?? rawParams.sprite_number,
       DEFAULT_PARAMS.spriteNumber,
@@ -167,16 +175,26 @@ function extractInitialPayload(
       coerceString(rawParams.tint, DEFAULT_PARAMS.tint) ?? DEFAULT_PARAMS.tint,
     shading: coerceBoolean(rawParams.shading, DEFAULT_PARAMS.shading),
     reverse: coerceBoolean(rawParams.reverse, DEFAULT_PARAMS.reverse),
-  } satisfies typeof DEFAULT_PARAMS;
+  } as VisualBuilderInitialPayload["params"];
+
+  params = hydrateBuilderParams(params);
 
   const accessories = toStringArray(
-    catData.accessorySlots ?? rawParams.accessories ?? rawParams.accessory,
+    catData.accessorySlots ??
+      rawParams.accessories ??
+      rawParams.accessory ??
+      params.accessories ??
+      params.accessory,
   );
   const scars = toStringArray(
-    catData.scarSlots ?? rawParams.scars ?? rawParams.scar,
+    catData.scarSlots ??
+      rawParams.scars ??
+      rawParams.scar ??
+      params.scars ??
+      params.scar,
   );
   const tortieLayers = normalizeTortieLayers(
-    catData.tortieSlots ?? rawParams.tortie,
+    catData.tortieSlots ?? rawParams.tortie ?? params.tortie,
   );
 
   params.accessories = accessories;
@@ -200,6 +218,7 @@ function extractInitialPayload(
   if (!params.tint) {
     params.tint = "none";
   }
+  params = synchronizeBuilderParams(params);
 
   const palette = coerceString(catData.basePalette)?.toLowerCase();
   const tortiePalette = coerceString(catData.tortiePalette)?.toLowerCase();

@@ -6,6 +6,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import LockIcon from "@/components/ui/lock-icon";
 import RightChevron from "@/components/ui/right-chevron";
+import {
+  catViewPayloadToShareSeed,
+  normalizeCatViewPayload,
+} from "@/lib/cat-consumers/viewPayload";
 import { encodeCatShare } from "@/lib/catShare";
 
 type TreePreviewCat = {
@@ -32,22 +36,17 @@ type HistoryAncestryTreeCardProps = {
   onPreview: (title: string, url: string) => void;
 };
 
-function getPreviewUrlFromParams(params: Record<string, unknown>): string {
-  const tortieSlots = params?.tortie as
-    | Array<Record<string, unknown> | null>
-    | undefined;
-  const encoded = encodeCatShare({
-    params,
-    accessorySlots: (params?.accessories as string[]) ?? [],
-    scarSlots: (params?.scars as string[]) ?? [],
-    tortieSlots: tortieSlots ?? [],
-    counts: {
-      accessories: (params?.accessories as string[])?.length ?? 0,
-      scars: (params?.scars as string[])?.length ?? 0,
-      tortie: tortieSlots?.length ?? 0,
-    },
-  });
-  return `/api/preview/_?cat=${encodeURIComponent(encoded)}`;
+function getPreviewUrlFromParams(
+  params: Record<string, unknown>,
+): string | null {
+  try {
+    const canonical = normalizeCatViewPayload(params);
+    const encoded = encodeCatShare(catViewPayloadToShareSeed(canonical));
+    return `/api/preview/_?cat=${encodeURIComponent(encoded)}`;
+  } catch (error) {
+    console.warn("Failed to normalize ancestry preview cat", error);
+    return null;
+  }
 }
 
 export function HistoryAncestryTreeCard({

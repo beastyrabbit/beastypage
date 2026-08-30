@@ -1,93 +1,64 @@
-import { isCoatPatternId, resolveCoatChoice } from "@/lib/cat-v3/coatPatterns";
+import {
+  type CatDocument,
+  catDocumentToLegacyParams,
+  parseCatDocumentStrict,
+  readCatDocument,
+} from "@/lib/cat-system";
+import type { JsonValue } from "@/lib/cat-system/definition";
+import { getSlotTraits, isJsonValue } from "@/lib/cat-system/runtime";
 import type { TortieLayer as SharedTortieLayer } from "@/lib/cat-v3/types";
 
-const SHARE_VERSION = 1;
+// Keep the wire version readable by v7.3.1 during rolling deploys and
+// rollbacks. New readers use the embedded document; old readers ignore it and
+// consume the legacy projection.
+const SHARE_VERSION = 1 as const;
+const CANONICAL_ONLY_SHARE_VERSION = 2;
 
-function toBase64(str: string): string {
-  if (typeof btoa === "function") {
-    return btoa(str);
-  }
+function toBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
   const nodeBuffer = (globalThis as unknown as { Buffer?: typeof Buffer })
     .Buffer;
-  if (nodeBuffer) {
-    return nodeBuffer.from(str, "utf-8").toString("base64");
+  if (nodeBuffer) return nodeBuffer.from(bytes).toString("base64");
+  if (typeof btoa === "function") {
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
   }
   throw new Error("Base64 encoding not supported in this environment");
 }
 
-function fromBase64(str: string): string {
-  if (typeof atob === "function") {
-    return atob(str);
-  }
+function fromBase64(value: string): string {
   const nodeBuffer = (globalThis as unknown as { Buffer?: typeof Buffer })
     .Buffer;
-  if (nodeBuffer) {
-    return nodeBuffer.from(str, "base64").toString("utf-8");
+  if (nodeBuffer) return nodeBuffer.from(value, "base64").toString("utf8");
+  if (typeof atob === "function") {
+    const binary = atob(value);
+    const bytes = Uint8Array.from(binary, (character) =>
+      character.charCodeAt(0),
+    );
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   }
   throw new Error("Base64 decoding not supported in this environment");
 }
 
-const PARAM_KEYS = [
-  "spriteNumber",
-  "poseName",
-  "peltName",
-  "coatPattern",
-  "colour",
-  "eyeColour",
-  "eyeColour2",
-  "tint",
-  "skinColour",
-  "whitePatches",
-  "points",
-  "whitePatchesTint",
-  "vitiligo",
-  "accessories",
-  "accessory",
-  "scars",
-  "scar",
-  "tortie",
-  "isTortie",
-  "tortieMask",
-  "tortiePattern",
-  "tortieColour",
-  "shading",
-  "reverse",
-  "darkForest",
-  "darkMode",
-  "dead",
-] as const;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
-type ParamKey = (typeof PARAM_KEYS)[number];
-
-const BOOLEAN_KEYS: Set<ParamKey> = new Set([
-  "isTortie",
-  "shading",
-  "reverse",
-  "darkForest",
-  "darkMode",
-  "dead",
-]);
-const NUMBER_KEYS: Set<ParamKey> = new Set(["spriteNumber"]);
+function cloneJson<T>(value: T): T {
+  if (typeof structuredClone === "function") return structuredClone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 
 function cleanString(value: unknown): string | undefined {
   if (value === undefined || value === null) return undefined;
-  const str = String(value).trim();
-  return str === "" ? undefined : str;
+  const stringValue = String(value).trim();
+  return stringValue === "" ? undefined : stringValue;
 }
 
 function sanitizeStringArray(values: unknown, fallbackLength = 0): string[] {
-  const result: string[] = [];
-  if (!Array.isArray(values)) {
-    if (fallbackLength > 0) {
-      return new Array(fallbackLength).fill("none");
-    }
-    return result;
-  }
-  for (const entry of values) {
-    const cleaned = cleanString(entry) || "none";
-    result.push(cleaned);
-  }
-  return result;
+  if (!Array.isArray(values)) return new Array(fallbackLength).fill("none");
+  return values.map((entry) => cleanString(entry) || "none");
 }
 
 export type TortieLayer = {
@@ -100,154 +71,118 @@ function sanitizeTortieArray(
   values: unknown,
   fallbackLength = 0,
 ): (TortieLayer | null)[] {
-  if (!Array.isArray(values)) {
-    return new Array(fallbackLength).fill(null);
-  }
-  const result: (TortieLayer | null)[] = [];
-  for (const value of values) {
-    if (!value || typeof value !== "object") {
-      result.push(null);
-      continue;
-    }
-    const record = value as Record<string, unknown>;
-    const cleaned: TortieLayer = {
-      mask: cleanString(record.mask) || "ONE",
-      pattern: cleanString(record.pattern) || "SingleColour",
-      colour: cleanString(record.colour) || "GINGER",
+  if (!Array.isArray(values)) return new Array(fallbackLength).fill(null);
+  return values.map((value) => {
+    if (!isRecord(value)) return null;
+    return {
+      mask: cleanString(value.mask) || "ONE",
+      pattern: cleanString(value.pattern) || "SingleColour",
+      colour: cleanString(value.colour) || "GINGER",
     };
-    if (!cleaned.mask && !cleaned.pattern && !cleaned.colour) {
-      result.push(null);
-    } else {
-      result.push(cleaned);
-    }
-  }
-  return result;
+  });
 }
 
-export type CatShareCounts = {
+export type CatShareCounts = Record<string, number> & {
   accessories: number;
   scars: number;
   tortie: number;
 };
 
+export type CatShareSlots = Record<string, JsonValue[]>;
 type SanitizedParams = Record<string, unknown>;
 
-function sanitizeCounts(counts?: Partial<CatShareCounts>): CatShareCounts {
+function normalizeCount(value: unknown): number {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue)
+    ? Math.max(0, Math.trunc(numberValue))
+    : 0;
+}
+
+function normalizeCounts(
+  input: unknown,
+  slots: Readonly<CatShareSlots> = {},
+): CatShareCounts {
+  const source = isRecord(input) ? input : {};
+  const result: Record<string, number> = {};
+  for (const [traitId, value] of Object.entries(source)) {
+    result[traitId] = normalizeCount(value);
+  }
+  for (const [traitId, values] of Object.entries(slots)) {
+    result[traitId] = values.length;
+  }
   return {
-    accessories: Number.isFinite(counts?.accessories)
-      ? Math.max(0, Math.trunc(counts?.accessories ?? 0))
-      : 0,
-    scars: Number.isFinite(counts?.scars)
-      ? Math.max(0, Math.trunc(counts?.scars ?? 0))
-      : 0,
-    tortie: Number.isFinite(counts?.tortie)
-      ? Math.max(0, Math.trunc(counts?.tortie ?? 0))
-      : 0,
+    ...result,
+    accessories: result.accessories ?? 0,
+    scars: result.scars ?? 0,
+    tortie: result.tortie ?? 0,
   };
 }
 
-function sanitizeParams(params: Record<string, unknown> = {}): SanitizedParams {
-  const clean: SanitizedParams = {};
-  for (const key of PARAM_KEYS) {
-    if (!(key in params)) continue;
-    const value = params[key];
-    if (BOOLEAN_KEYS.has(key)) {
-      clean[key] = Boolean(value);
-      continue;
-    }
-    if (NUMBER_KEYS.has(key)) {
-      const num = Number(value);
-      if (Number.isFinite(num)) {
-        clean[key] = num;
-      }
-      continue;
-    }
-    if (key === "accessories" || key === "scars") {
-      const arr = sanitizeStringArray(value);
-      if (arr.length) {
-        clean[key] = arr.filter((entry) => entry !== "none");
-      }
-      continue;
-    }
-    if (key === "tortie") {
-      const arr = sanitizeTortieArray(value);
-      if (arr.some((entry) => entry)) {
-        clean[key] = arr.filter((entry): entry is TortieLayer => !!entry);
-      }
-      continue;
-    }
-    if (key === "accessory" || key === "scar") {
-      const str = cleanString(value);
-      if (str) clean[key] = str;
-      continue;
-    }
-    const strValue = cleanString(value);
-    if (strValue !== undefined) {
-      clean[key] = strValue;
-    }
+function normalizeSlots(input: unknown): CatShareSlots {
+  if (!isRecord(input)) return {};
+  const slots: CatShareSlots = {};
+  for (const [traitId, value] of Object.entries(input)) {
+    if (!Array.isArray(value)) continue;
+    const entries = value.filter(isJsonValue).map(cloneJson);
+    slots[traitId] = entries;
   }
-
-  if (
-    !clean.accessory &&
-    Array.isArray(clean.accessories) &&
-    clean.accessories.length > 0
-  ) {
-    clean.accessory = clean.accessories[0];
-  }
-  if (!clean.scar && Array.isArray(clean.scars) && clean.scars.length > 0) {
-    clean.scar = clean.scars[0];
-  }
-
-  const coatPattern = isCoatPatternId(clean.coatPattern)
-    ? clean.coatPattern
-    : isCoatPatternId(clean.peltName)
-      ? clean.peltName
-      : undefined;
-  if (coatPattern) {
-    Object.assign(clean, resolveCoatChoice(coatPattern));
-  }
-
-  if (clean.isTortie) {
-    if (
-      !clean.tortieMask &&
-      Array.isArray(clean.tortie) &&
-      clean.tortie.length > 0
-    ) {
-      const primary = clean.tortie[0] as TortieLayer | undefined;
-      clean.tortieMask = primary?.mask || undefined;
-      clean.tortiePattern = primary?.pattern || undefined;
-      clean.tortieColour = primary?.colour || undefined;
-    }
-  } else {
-    delete clean.tortieMask;
-    delete clean.tortiePattern;
-    delete clean.tortieColour;
-  }
-
-  return clean;
+  return slots;
 }
 
-export type CatShareStoredPayload = {
-  v: number;
-  params: SanitizedParams;
-  slots: {
-    accessories: string[];
-    scars: string[];
-    tortie: (TortieLayer | null)[];
-  };
-  counts: CatShareCounts;
-};
+function buildSlots(data: EncodePayload, document: CatDocument): CatShareSlots {
+  const slots = normalizeSlots(data.traitSlots);
+  if (data.accessorySlots) {
+    slots.accessories = sanitizeStringArray(data.accessorySlots);
+  }
+  if (data.scarSlots) slots.scars = sanitizeStringArray(data.scarSlots);
+  if (data.tortieSlots) {
+    slots.tortie = sanitizeTortieArray(data.tortieSlots) as JsonValue[];
+  }
 
-export type CatSharePayload = {
+  const traits = document.traits as Record<string, unknown>;
+  for (const trait of getSlotTraits()) {
+    if (slots[trait.id]) continue;
+    const value = traits[trait.id];
+    if (Array.isArray(value)) {
+      slots[trait.id] = value.filter(isJsonValue).map(cloneJson);
+    }
+  }
+
+  const requestedCounts = normalizeCounts(data.counts);
+  for (const [traitId, count] of Object.entries(requestedCounts)) {
+    if (count <= 0 || slots[traitId]?.length) continue;
+    slots[traitId] = new Array(count).fill(
+      traitId === "tortie" ? null : "none",
+    );
+  }
+  return slots;
+}
+
+export interface CatShareStoredPayloadV1 {
+  v: typeof SHARE_VERSION;
+  document: CatDocument;
   params: SanitizedParams;
+  slots: CatShareSlots;
+  counts: Record<string, number>;
+}
+
+export type CatShareStoredPayload = CatShareStoredPayloadV1;
+
+export interface CatSharePayload {
+  document: CatDocument;
+  params: SanitizedParams;
+  traitSlots: CatShareSlots;
+  traitCounts: Record<string, number>;
   accessorySlots: string[];
   scarSlots: string[];
   tortieSlots: (TortieLayer | null)[];
   counts: CatShareCounts;
-};
+}
 
-type EncodePayload = {
-  params: Record<string, unknown>;
+export type EncodePayload = {
+  document?: CatDocument | unknown;
+  params?: Record<string, unknown>;
+  traitSlots?: Readonly<Record<string, readonly JsonValue[]>>;
   accessorySlots?: (string | null)[];
   scarSlots?: (string | null)[];
   tortieSlots?: (
@@ -256,30 +191,39 @@ type EncodePayload = {
     | Record<string, unknown>
     | null
   )[];
-  counts?: Partial<CatShareCounts>;
+  counts?: Partial<Record<string, number>>;
 };
 
 export function prepareCatShare(data: EncodePayload): CatShareStoredPayload {
-  if (!data?.params) {
-    throw new Error("encodeCatShare: params are required");
+  if (!data || (!data.document && !data.params)) {
+    throw new Error("encodeCatShare: document or params are required");
   }
-
-  const counts = sanitizeCounts(data.counts);
-  const slots = {
-    accessories: sanitizeStringArray(data.accessorySlots, counts.accessories),
-    scars: sanitizeStringArray(data.scarSlots, counts.scars),
-    tortie: sanitizeTortieArray(data.tortieSlots, counts.tortie),
-  };
-
+  let document = parseCatDocumentStrict(
+    readCatDocument(data.document ?? data.params),
+  );
+  // Named poses no longer always have a legacy numeric index. Keep an incoming
+  // index as rollback metadata so old viewers receive exactly what was shared.
+  const legacySpriteNumber = data.params?.spriteNumber;
+  if (
+    typeof legacySpriteNumber === "number" &&
+    Number.isFinite(legacySpriteNumber)
+  ) {
+    document = parseCatDocumentStrict({
+      ...document,
+      unknownTraits: {
+        ...(document.unknownTraits ?? {}),
+        spriteNumber: legacySpriteNumber,
+      },
+    });
+  }
+  const slots = buildSlots(data, document);
+  const counts = normalizeCounts(data.counts, slots);
   return {
     v: SHARE_VERSION,
-    params: sanitizeParams(data.params),
+    document,
+    params: catDocumentToLegacyParams(document),
     slots,
-    counts: {
-      accessories: slots.accessories.length,
-      scars: slots.scars.length,
-      tortie: slots.tortie.length,
-    },
+    counts,
   };
 }
 
@@ -289,9 +233,7 @@ export type CreateCatShareResult = {
   payload: CatShareStoredPayload;
 };
 
-type CreateCatShareOptions = {
-  slug?: string;
-};
+type CreateCatShareOptions = { slug?: string };
 
 export async function createCatShare(
   data: EncodePayload,
@@ -301,71 +243,78 @@ export async function createCatShare(
     console.warn("createCatShare: fetch is unavailable in this environment");
     return null;
   }
-
   try {
     const payload = prepareCatShare(data);
     const response = await fetch("/api/cat-share", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       cache: "no-store",
-      body: JSON.stringify({
-        slug: options?.slug,
-        data: payload,
-      }),
+      body: JSON.stringify({ slug: options?.slug, data: payload }),
     });
-
     if (!response.ok) {
       throw new Error(`createCatShare: unexpected status ${response.status}`);
     }
-
     const json = (await response.json()) as {
       slug?: string;
       id?: string | null;
     };
-    const slug = json?.slug;
-    if (!slug) {
-      throw new Error("createCatShare: response missing slug");
-    }
-
-    return {
-      slug,
-      id: json?.id ?? null,
-      payload,
-    };
+    if (!json.slug) throw new Error("createCatShare: response missing slug");
+    return { slug: json.slug, id: json.id ?? null, payload };
   } catch (error) {
     console.error("Failed to create cat share", error);
     return null;
   }
 }
 
+function projectPayload(
+  documentInput: unknown,
+  slotsInput: unknown,
+  countsInput: unknown,
+): CatSharePayload | null {
+  try {
+    const document = readCatDocument(documentInput);
+    const slots = normalizeSlots(slotsInput);
+    const counts = normalizeCounts(countsInput, slots);
+    return {
+      document,
+      params: catDocumentToLegacyParams(document),
+      traitSlots: slots,
+      traitCounts: { ...counts },
+      accessorySlots: sanitizeStringArray(
+        slots.accessories,
+        counts.accessories,
+      ),
+      scarSlots: sanitizeStringArray(slots.scars, counts.scars),
+      tortieSlots: sanitizeTortieArray(slots.tortie, counts.tortie),
+      counts,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function normalizeStoredPayload(payload: unknown): CatSharePayload | null {
-  if (!payload || typeof payload !== "object") return null;
-  const p = payload as Record<string, unknown>;
-  if (p.v !== SHARE_VERSION) return null;
-  const slots = (p.slots ?? {}) as Record<string, unknown>;
-  const counts = sanitizeCounts(
-    p.counts as Partial<CatShareCounts> | undefined,
-  );
-  return {
-    params: sanitizeParams((p.params as Record<string, unknown>) || {}),
-    accessorySlots: sanitizeStringArray(slots.accessories, counts.accessories),
-    scarSlots: sanitizeStringArray(slots.scars, counts.scars),
-    tortieSlots: sanitizeTortieArray(slots.tortie, counts.tortie),
-    counts,
-  };
+  if (!isRecord(payload)) return null;
+  if (payload.v === SHARE_VERSION) {
+    return projectPayload(
+      payload.document ?? payload.params,
+      payload.slots,
+      payload.counts,
+    );
+  }
+  if (payload.v === CANONICAL_ONLY_SHARE_VERSION) {
+    return projectPayload(payload.document, payload.slots, payload.counts);
+  }
+  return null;
 }
 
 export function encodeCatShare(data: EncodePayload): string {
-  const payload = prepareCatShare(data);
-  return toBase64(JSON.stringify(payload));
+  return toBase64(JSON.stringify(prepareCatShare(data)));
 }
 
-function decodeLegacyCatShare(encoded: string): CatSharePayload | null {
+function decodeInlineCatShare(encoded: string): CatSharePayload | null {
   try {
-    const payload = JSON.parse(fromBase64(encoded));
-    return normalizeStoredPayload(payload);
+    return normalizeStoredPayload(JSON.parse(fromBase64(encoded)));
   } catch (error) {
     console.error("decodeCatShare: failed to parse payload", error);
     return null;
@@ -373,17 +322,16 @@ function decodeLegacyCatShare(encoded: string): CatSharePayload | null {
 }
 
 function isLikelySlug(value: string): boolean {
-  if (!value) return false;
-  if (value.length < 4 || value.length > 16) return false;
-  if (/[^0-9A-Za-z]/.test(value)) return false;
-  return !value.includes("=");
+  return (
+    value.length >= 4 &&
+    value.length <= 16 &&
+    !/[^0-9A-Za-z]/.test(value) &&
+    !value.includes("=")
+  );
 }
 
 function resolveApiBase(): string {
-  if (typeof window !== "undefined") {
-    return "";
-  }
-
+  if (typeof window !== "undefined") return "";
   const candidates = [
     process.env.NEXT_PUBLIC_SITE_URL,
     process.env.NEXT_PUBLIC_APP_URL,
@@ -395,26 +343,24 @@ function resolveApiBase(): string {
       : undefined,
     "http://localhost:3000",
   ];
-
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    if (candidate.startsWith("http://") || candidate.startsWith("https://")) {
-      return candidate.replace(/\/$/, "");
-    }
-  }
-  return "";
+  return (
+    candidates
+      .find(
+        (candidate) =>
+          candidate?.startsWith("http://") || candidate?.startsWith("https://"),
+      )
+      ?.replace(/\/$/, "") ?? ""
+  );
 }
 
 async function fetchShareBySlug(slug: string): Promise<CatSharePayload | null> {
   try {
     const base = resolveApiBase();
-    const url = base
-      ? `${base}/api/cat-share?slug=${encodeURIComponent(slug)}`
-      : `/api/cat-share?slug=${encodeURIComponent(slug)}`;
-    const response = await fetch(url, { cache: "no-store" });
-    if (!response.ok) {
-      return null;
-    }
+    const response = await fetch(
+      `${base}/api/cat-share?slug=${encodeURIComponent(slug)}`,
+      { cache: "no-store" },
+    );
+    if (!response.ok) return null;
     const json = await response.json();
     return normalizeStoredPayload(json?.data ?? json);
   } catch (error) {
@@ -427,16 +373,10 @@ export async function decodeCatShare(
   value: string | null | undefined,
 ): Promise<CatSharePayload | null> {
   if (!value) return null;
-  if (isLikelySlug(value)) {
-    return fetchShareBySlug(value);
-  }
-  return decodeLegacyCatShare(value);
+  return isLikelySlug(value)
+    ? fetchShareBySlug(value)
+    : decodeInlineCatShare(value);
 }
 
-export async function resolveCatShareValue(
-  value: string | null | undefined,
-): Promise<CatSharePayload | null> {
-  return decodeCatShare(value);
-}
-
-export { sanitizeCounts }; // exported for tests if needed
+export const resolveCatShareValue = decodeCatShare;
+export const sanitizeCounts = normalizeCounts;

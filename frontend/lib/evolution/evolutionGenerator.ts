@@ -1,5 +1,31 @@
+import type {
+  AnyCatTraitDefinition,
+  CatSystemDefinition,
+  JsonValue,
+} from "@/lib/cat-system/definition";
+import {
+  catDocumentToLegacyParams,
+  legacyParamsToCatDocument,
+  readCatDocument,
+} from "@/lib/cat-system/document";
+import { createGachaCatalogs } from "@/lib/cat-system/gacha/catalogs";
+import {
+  materializeSlots,
+  resolveCount,
+  roll,
+} from "@/lib/cat-system/gacha/strategies";
+import type { GachaCatalog, GachaCatalogs } from "@/lib/cat-system/gacha/types";
+import { catSystem } from "@/lib/cat-system/registry";
+import {
+  type CatDocument,
+  createSystemCatDocumentSchema,
+} from "@/lib/cat-system/runtime";
 import { isCoatPatternId, resolveCoatChoice } from "@/lib/cat-v3/coatPatterns";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
+import {
+  applyEvolutionTraitChanges,
+  type EvolutionTraitChange,
+} from "./traitEvolution";
 
 export const EVOLUTION_SOURCE = "evolution-generator";
 export const EVOLUTION_POLICY = "type-archetype-v1";
@@ -58,6 +84,9 @@ export type EvolutionTortiePart = {
 };
 
 export type EvolutionCatData = {
+  /** Canonical state used by evolution and the renderer. */
+  document: CatDocument;
+  /** Legacy projection retained for existing pages and saved payloads. */
   params: CatParams;
   accessorySlots: string[];
   scarSlots: string[];
@@ -75,26 +104,44 @@ export type EvolutionReplacementSlot = "tortie" | "accessory" | "scar";
 export type EvolutionAddition =
   | {
       kind: "tortie";
+      traitId: "tortie";
       label: string;
       value: TortieLayer;
+      traitValue: TortieLayer;
       parts: EvolutionTortiePart[];
     }
   | {
       kind: "accessory" | "scar";
+      traitId: "accessories" | "scars";
       label: string;
       value: string;
+      traitValue: string;
     }
   | {
       kind: "coat";
+      traitId: "pose";
       label: string;
       value: string;
+      traitValue: string;
     }
   | {
       kind: "replacement";
+      traitId: "tortie" | "accessories" | "scars";
       slot: EvolutionReplacementSlot;
       label: string;
       previous: string;
       value: string;
+      previousValue: unknown;
+      traitValue: unknown;
+    }
+  | {
+      kind: "trait";
+      traitId: string;
+      label: string;
+      value: JsonValue;
+      traitValue: JsonValue;
+      previous?: JsonValue;
+      previousValue?: JsonValue;
     };
 
 export type EvolutionRoll =
@@ -126,6 +173,12 @@ export type EvolutionRoll =
       label: "Replacement";
       slot: EvolutionReplacementSlot;
       value: string;
+    }
+  | {
+      kind: "trait";
+      traitId: string;
+      label: string;
+      value: JsonValue;
     };
 
 export type EvolutionCatMeta = {
@@ -191,6 +244,15 @@ export type EvolutionBatchSettings = {
 };
 
 type RandomFn = () => number;
+
+export type EvolutionBatchOptions = {
+  random?: RandomFn;
+  archetypes?: EvolutionArchetype[];
+  /** Test seam and future registry extension point. */
+  system?: CatSystemDefinition;
+  /** Runtime catalogs compiled from the same registry/public catalog. */
+  catalogs?: GachaCatalogs;
+};
 
 const DEFAULT_CONTROLS: EvolutionControls = {
   branchCount: 6,
@@ -503,6 +565,9 @@ export function applyEvolutionStarterHairToParams(
     ...params,
     spriteNumber: hair.spriteNumber,
     poseName: hair.poseName,
+    ...(params.traits
+      ? { traits: { ...params.traits, pose: hair.poseName } }
+      : {}),
   };
 }
 
@@ -512,6 +577,27 @@ export function applyEvolutionStarterHairToPayload(
 ): unknown {
   if (!input || typeof input !== "object" || Array.isArray(input)) return input;
   const raw = clone(input as Record<string, unknown>);
+  if (hasCanonicalTraits(raw.document)) {
+    const document = readCatDocument(raw.document);
+    const updated = readCatDocument({
+      ...document,
+      traits: { ...document.traits, pose: hair.poseName },
+    });
+    raw.document = updated;
+    if (raw.params && typeof raw.params === "object") {
+      raw.params = documentToEvolutionParams(updated);
+    }
+    return raw;
+  }
+  if (hasCanonicalTraits(raw)) {
+    const document = readCatDocument(raw);
+    return documentToEvolutionParams(
+      readCatDocument({
+        ...document,
+        traits: { ...document.traits, pose: hair.poseName },
+      }),
+    );
+  }
   if (
     raw.params &&
     typeof raw.params === "object" &&
@@ -648,41 +734,125 @@ function applySlotsToParams(
   return next;
 }
 
-export function normalizeEvolutionStarter(input: unknown): EvolutionCatData {
-  if (!input || typeof input !== "object") {
-    throw new Error("Evolution starter payload is missing");
+function hasCanonicalTraits(value: unknown): value is {
+  schemaVersion?: unknown;
+  traits: Record<string, unknown>;
+  unknownTraits?: unknown;
+} {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const traits = (value as Record<string, unknown>).traits;
+  return (
+    Boolean(traits) && typeof traits === "object" && !Array.isArray(traits)
+  );
+}
+
+function parseEvolutionDocumentForSystem(
+  input: unknown,
+  system: CatSystemDefinition,
+): CatDocument {
+  if (system === catSystem) return readCatDocument(input);
+  return createSystemCatDocumentSchema(system).parse(input) as CatDocument;
+}
+
+function readEvolutionDocument(
+  raw: Record<string, unknown>,
+  system: CatSystemDefinition,
+): CatDocument {
+  if (hasCanonicalTraits(raw.document)) {
+    return parseEvolutionDocumentForSystem(raw.document, system);
+  }
+  if (hasCanonicalTraits(raw))
+    return parseEvolutionDocumentForSystem(raw, system);
+  if (hasCanonicalTraits(raw.params)) {
+    return parseEvolutionDocumentForSystem(raw.params, system);
   }
 
-  const raw = input as Record<string, unknown>;
-  const paramsSource =
-    raw.params && typeof raw.params === "object"
+  const legacySource =
+    raw.params && typeof raw.params === "object" && !Array.isArray(raw.params)
       ? (raw.params as Record<string, unknown>)
       : raw;
-  const params = clone(paramsSource) as unknown as CatParams;
-  const coatPattern = isCoatPatternId(params.coatPattern)
-    ? params.coatPattern
-    : isCoatPatternId(params.peltName)
-      ? params.peltName
-      : undefined;
-  if (coatPattern) {
-    Object.assign(params, resolveCoatChoice(coatPattern));
+  return legacyParamsToCatDocument(legacySource);
+}
+
+function normalizeDocumentForEvolutionSystem(
+  document: CatDocument,
+  normalizedParams: CatParams,
+  system: CatSystemDefinition,
+): CatDocument {
+  const productDocument = legacyParamsToCatDocument(normalizedParams);
+  if (system === catSystem) return productDocument;
+
+  const traits: Record<string, unknown> = {
+    ...(document.traits as Record<string, unknown>),
+    ...(productDocument.traits as Record<string, unknown>),
+  };
+  const unknownTraits = {
+    ...(document.unknownTraits ?? {}),
+    ...(productDocument.unknownTraits ?? {}),
+  };
+
+  for (const trait of system.traits) {
+    if (traits[trait.id] === undefined) {
+      const candidate = unknownTraits[trait.id];
+      const parsed = trait.value.schema.safeParse(candidate);
+      if (parsed.success) traits[trait.id] = parsed.data;
+      else if (trait.value.default !== undefined) {
+        traits[trait.id] = clone(trait.value.default);
+      }
+    }
+    delete unknownTraits[trait.id];
   }
-  const accessories = normalizeStringSlots(
-    raw.accessorySlots,
-    params.accessories,
-    params.accessory,
+
+  return createSystemCatDocumentSchema(system).parse({
+    schemaVersion: system.schemaVersion,
+    traits,
+    unknownTraits:
+      Object.keys(unknownTraits).length > 0 ? unknownTraits : undefined,
+  }) as CatDocument;
+}
+
+function documentToEvolutionParams(document: CatDocument): CatParams {
+  const legacy = catDocumentToLegacyParams(document);
+  return {
+    ...legacy,
+    schemaVersion: document.schemaVersion,
+    traits: clone(document.traits),
+    ...(document.unknownTraits
+      ? { unknownTraits: clone(document.unknownTraits) }
+      : {}),
+  } as unknown as CatParams;
+}
+
+function getDocumentTraitList<T>(
+  document: CatDocument,
+  traitId: string,
+  normalize: (value: unknown) => T | null,
+): T[] {
+  const value = (document.traits as Record<string, unknown>)[traitId];
+  if (!Array.isArray(value)) return [];
+  return value.map(normalize).filter((entry): entry is T => entry !== null);
+}
+
+function projectEvolutionCatData(
+  document: CatDocument,
+  meta: EvolutionCatMeta,
+): EvolutionCatData {
+  const params = documentToEvolutionParams(document);
+  const accessories = getDocumentTraitList(document, "accessories", (value) =>
+    cleanString(value),
   );
-  const scars = normalizeStringSlots(raw.scarSlots, params.scars, params.scar);
-  const torties = normalizeTortieSlots({
-    ...params,
-    tortieSlots: raw.tortieSlots,
-  });
-  const normalizedParams = applyCanonicalStarterHair(
-    applySlotsToParams(params, accessories, scars, torties),
+  const scars = getDocumentTraitList(document, "scars", (value) =>
+    cleanString(value),
+  );
+  const torties = getDocumentTraitList(
+    document,
+    "tortie",
+    normalizeTortieLayer,
   );
 
   return {
-    params: normalizedParams,
+    document: clone(document),
+    params,
     accessorySlots: accessories,
     scarSlots: scars,
     tortieSlots: torties.map((layer) => ({ ...layer })),
@@ -691,18 +861,77 @@ export function normalizeEvolutionStarter(input: unknown): EvolutionCatData {
       scars: scars.length,
       tortie: torties.length,
     },
-    evolution: {
-      source: EVOLUTION_SOURCE,
-      policy: EVOLUTION_POLICY,
-      role: "starter",
-      branchIndex: null,
-      branchLabel: null,
-      level: 0,
-      archetype: null,
-      additions: [],
-      rolls: [],
-    },
+    evolution: clone(meta),
   };
+}
+
+export function normalizeEvolutionStarter(
+  input: unknown,
+  options: { system?: CatSystemDefinition } = {},
+): EvolutionCatData {
+  if (!input || typeof input !== "object") {
+    throw new Error("Evolution starter payload is missing");
+  }
+
+  const system = options.system ?? catSystem;
+  const raw = input as Record<string, unknown>;
+  const hasCanonicalDocument =
+    hasCanonicalTraits(raw.document) ||
+    hasCanonicalTraits(raw) ||
+    hasCanonicalTraits(raw.params);
+  const document = readEvolutionDocument(raw, system);
+  const legacyParamsSource =
+    raw.params && typeof raw.params === "object" && !Array.isArray(raw.params)
+      ? (raw.params as Record<string, unknown>)
+      : raw;
+  const params = hasCanonicalDocument
+    ? documentToEvolutionParams(document)
+    : (clone(legacyParamsSource) as unknown as CatParams);
+  const coatPattern = isCoatPatternId(params.coatPattern)
+    ? params.coatPattern
+    : isCoatPatternId(params.peltName)
+      ? params.peltName
+      : undefined;
+  if (coatPattern) {
+    Object.assign(params, resolveCoatChoice(coatPattern));
+  }
+  const accessories = hasCanonicalDocument
+    ? getDocumentTraitList(document, "accessories", (value) =>
+        cleanString(value),
+      )
+    : normalizeStringSlots(
+        raw.accessorySlots,
+        params.accessories,
+        params.accessory,
+      );
+  const scars = hasCanonicalDocument
+    ? getDocumentTraitList(document, "scars", (value) => cleanString(value))
+    : normalizeStringSlots(raw.scarSlots, params.scars, params.scar);
+  const torties = hasCanonicalDocument
+    ? getDocumentTraitList(document, "tortie", normalizeTortieLayer)
+    : normalizeTortieSlots({
+        ...params,
+        tortieSlots: raw.tortieSlots,
+      });
+  const normalizedParams = applyCanonicalStarterHair(
+    applySlotsToParams(params, accessories, scars, torties),
+  );
+  const normalizedDocument = normalizeDocumentForEvolutionSystem(
+    document,
+    normalizedParams,
+    system,
+  );
+  return projectEvolutionCatData(normalizedDocument, {
+    source: EVOLUTION_SOURCE,
+    policy: EVOLUTION_POLICY,
+    role: "starter",
+    branchIndex: null,
+    branchLabel: null,
+    level: 0,
+    archetype: null,
+    additions: [],
+    rolls: [],
+  });
 }
 
 function weightedPick<T extends string | number>(
@@ -999,30 +1228,29 @@ export function getTortieLayerParts(
 }
 
 function createCatData(
-  params: CatParams,
-  accessories: string[],
-  scars: string[],
-  torties: TortieLayer[],
+  parent: EvolutionCatData,
+  changes: readonly EvolutionTraitChange[],
   meta: EvolutionCatMeta,
+  system: CatSystemDefinition = catSystem,
 ): EvolutionCatData {
-  const normalizedParams = applySlotsToParams(
-    params,
-    accessories,
-    scars,
-    torties,
-  );
-  return {
-    params: normalizedParams,
-    accessorySlots: [...accessories],
-    scarSlots: [...scars],
-    tortieSlots: torties.map((layer) => ({ ...layer })),
-    counts: {
-      accessories: accessories.length,
-      scars: scars.length,
-      tortie: torties.length,
-    },
-    evolution: clone(meta),
-  };
+  const document = applyEvolutionTraitChanges({
+    parent: parent.document,
+    changes,
+    system,
+  });
+  return projectEvolutionCatData(document, meta);
+}
+
+function additionsToTraitChanges(
+  additions: readonly EvolutionAddition[],
+): EvolutionTraitChange[] {
+  return additions.map((addition) => ({
+    traitId: addition.traitId,
+    value: addition.traitValue,
+    ...("previousValue" in addition && addition.previousValue !== undefined
+      ? { previous: addition.previousValue }
+      : {}),
+  }));
 }
 
 function splitSlots(catData: EvolutionCatData) {
@@ -1074,15 +1302,172 @@ function pickAccessory(
   return pickUniqueString(pools.accessories, used, random);
 }
 
+function genericEvolutionSlotTraits(
+  system: CatSystemDefinition,
+  controls: EvolutionControls,
+): AnyCatTraitDefinition[] {
+  return [...system.traits]
+    .filter(
+      (trait) =>
+        // Named range controls are the existing themed product plugins. A new
+        // registry trait has no such control and therefore enters this pool.
+        !isEvolutionRange(
+          (controls as unknown as Record<string, unknown>)[trait.id],
+        ) &&
+        trait.value.kind === "stringList" &&
+        trait.capabilities.evolution === "accumulate" &&
+        trait.gacha.strategy === "slotList",
+    )
+    .sort(
+      (left, right) =>
+        left.order - right.order || left.id.localeCompare(right.id),
+    );
+}
+
+function isEvolutionRange(value: unknown): value is EvolutionRange {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof (value as Record<string, unknown>).min === "number" &&
+    typeof (value as Record<string, unknown>).max === "number"
+  );
+}
+
+function evolutionCatalogFor(
+  catalogs: GachaCatalogs,
+  catalogId: string,
+  pose: unknown,
+): GachaCatalog | undefined {
+  const catalog = catalogs[catalogId];
+  if (
+    catalog?.byPose &&
+    typeof pose === "string" &&
+    catalog.byPose[pose] !== undefined
+  ) {
+    return { pools: [catalog.byPose[pose]], weights: catalog.weights };
+  }
+  return catalog;
+}
+
+function evolutionCatalogValues(catalog: GachaCatalog | undefined): string[] {
+  if (!catalog) return [];
+  return Array.from(
+    new Set(
+      catalog.pools
+        .flatMap((pool) => [...pool])
+        .filter((value) => typeof value === "string" && value.length > 0),
+    ),
+  );
+}
+
+function appendGenericEvolutionTraits({
+  parent,
+  traits,
+  catalogs,
+  random,
+  additions,
+  rolls,
+}: {
+  parent: EvolutionCatData;
+  traits: readonly AnyCatTraitDefinition[];
+  catalogs: GachaCatalogs;
+  random: RandomFn;
+  additions: EvolutionAddition[];
+  rolls: EvolutionRoll[];
+}): void {
+  const randomSource = { nextFloat: random };
+  const parentTraits = parent.document.traits as Record<string, unknown>;
+  const pose = parentTraits.pose;
+  const gateResults = new Map<string, boolean>();
+
+  for (const trait of traits) {
+    const binding = trait.gacha;
+    if (
+      binding.strategy !== "slotList" ||
+      trait.value.kind !== "stringList" ||
+      trait.capabilities.evolution !== "accumulate"
+    ) {
+      continue;
+    }
+
+    if (binding.gate) {
+      let active = gateResults.get(binding.gate.group);
+      if (active === undefined) {
+        active = roll(randomSource, binding.gate.probability);
+        gateResults.set(binding.gate.group, active);
+      }
+      if (!active) continue;
+    }
+
+    const catalog = evolutionCatalogFor(catalogs, binding.catalog, pose);
+    const current = Array.isArray(parentTraits[trait.id])
+      ? (parentTraits[trait.id] as unknown[]).filter(
+          (value): value is string => typeof value === "string",
+        )
+      : [];
+    const enforceUnique = binding.unique || trait.value.unique === true;
+    const owned = new Set(current);
+    const available = evolutionCatalogValues(catalog).filter(
+      (value) => !enforceUnique || !owned.has(value),
+    );
+    if (available.length === 0) continue;
+
+    const remaining =
+      trait.value.maxItems === undefined
+        ? Number.POSITIVE_INFINITY
+        : Math.max(0, trait.value.maxItems - current.length);
+    const slotCount = Math.min(
+      remaining,
+      Math.max(0, resolveCount(randomSource, binding.count)),
+    );
+    if (slotCount <= 0) continue;
+
+    const selected = materializeSlots({
+      random: randomSource,
+      slotCount,
+      availableChoices: available,
+      unique: enforceUnique,
+      exactCount: false,
+      placeholder: null,
+      shouldFillSlot: () => roll(randomSource, binding.fillProbability ?? 1),
+      choiceWeight: (choice) => catalog?.weights?.[choice] ?? 1,
+      mapChoice: (choice) => choice,
+      mapValueToSlot: (choice) => choice,
+    }).selectedValues;
+
+    for (const value of selected) {
+      additions.push({
+        kind: "trait",
+        traitId: trait.id,
+        label: `${trait.label} ${value}`,
+        value,
+        traitValue: value,
+      });
+      rolls.push({
+        kind: "trait",
+        traitId: trait.id,
+        label: trait.label,
+        value,
+      });
+    }
+  }
+}
+
 export function generateEvolutionBatch(
   starterInput: unknown,
   controlsInput: Partial<EvolutionControls>,
   pools: EvolutionPools,
-  options: { random?: RandomFn; archetypes?: EvolutionArchetype[] } = {},
+  options: EvolutionBatchOptions = {},
 ): EvolutionBatchResult {
   const random = options.random ?? Math.random;
+  const system = options.system ?? catSystem;
   const controls = normalizeEvolutionControls(controlsInput);
-  const starterData = normalizeEvolutionStarter(starterInput);
+  const genericTraits = genericEvolutionSlotTraits(system, controls);
+  const catalogs =
+    options.catalogs ??
+    (genericTraits.length > 0 ? createGachaCatalogs() : ({} as GachaCatalogs));
+  const starterData = normalizeEvolutionStarter(starterInput, { system });
   const requestedArchetypes = (options.archetypes ?? [])
     .filter((archetype) => ARCHETYPE_RING.includes(archetype))
     .slice(0, 12);
@@ -1151,8 +1536,10 @@ export function generateEvolutionBatch(
         rolls.push({ kind: "coat", label: "Coat", value: "Long hair" });
         additions.push({
           kind: "coat",
+          traitId: "pose",
           label: "Coat grew long",
           value: "Long hair",
+          traitValue: LONG_HAIR_POSE,
         });
       }
 
@@ -1191,7 +1578,8 @@ export function generateEvolutionBatch(
               usedColours,
             );
             usedColours.add(colour.toUpperCase());
-            const previous = formatTortieLayer(nextTorties[target.index]);
+            const previousLayer = { ...nextTorties[target.index] };
+            const previous = formatTortieLayer(previousLayer);
             const layer: TortieLayer = { mask, pattern, colour };
             nextTorties[target.index] = layer;
             const value = formatTortieLayer(layer);
@@ -1203,10 +1591,13 @@ export function generateEvolutionBatch(
             });
             additions.push({
               kind: "replacement",
+              traitId: "tortie",
               slot: "tortie",
               label: `Replaced tortie ${previous}`,
               previous,
               value,
+              previousValue: previousLayer,
+              traitValue: layer,
             });
           }
         } else if (target.slot === "accessory") {
@@ -1227,10 +1618,13 @@ export function generateEvolutionBatch(
             });
             additions.push({
               kind: "replacement",
+              traitId: "accessories",
               slot: "accessory",
               label: `Replaced accessory ${previous}`,
               previous,
               value: accessory,
+              previousValue: previous,
+              traitValue: accessory,
             });
           }
         } else {
@@ -1246,10 +1640,13 @@ export function generateEvolutionBatch(
             });
             additions.push({
               kind: "replacement",
+              traitId: "scars",
               slot: "scar",
               label: `Replaced scar ${previous}`,
               previous,
               value: scar,
+              previousValue: previous,
+              traitValue: scar,
             });
           }
         }
@@ -1293,8 +1690,10 @@ export function generateEvolutionBatch(
         nextTorties.push(layer);
         additions.push({
           kind: "tortie",
+          traitId: "tortie",
           label: `Tortie ${formatTortieLayer(layer)}`,
           value: layer,
+          traitValue: layer,
           parts,
         });
       }
@@ -1307,7 +1706,13 @@ export function generateEvolutionBatch(
         if (!scar) continue;
         nextScars.push(scar);
         rolls.push({ kind: "scar", label: "Scar", value: scar });
-        additions.push({ kind: "scar", label: `Scar ${scar}`, value: scar });
+        additions.push({
+          kind: "scar",
+          traitId: "scars",
+          label: `Scar ${scar}`,
+          value: scar,
+          traitValue: scar,
+        });
       }
 
       const accessoryCount = pickCount(
@@ -1327,10 +1732,21 @@ export function generateEvolutionBatch(
         rolls.push({ kind: "accessory", label: "Accessory", value: accessory });
         additions.push({
           kind: "accessory",
+          traitId: "accessories",
           label: `Accessory ${accessory}`,
           value: accessory,
+          traitValue: accessory,
         });
       }
+
+      appendGenericEvolutionTraits({
+        parent,
+        traits: genericTraits,
+        catalogs,
+        random,
+        additions,
+        rolls,
+      });
 
       const meta: EvolutionCatMeta = {
         source: EVOLUTION_SOURCE,
@@ -1349,12 +1765,27 @@ export function generateEvolutionBatch(
             EVOLUTION_STARTER_HAIR_STYLES.long,
           )
         : parent.params;
+      const evolutionParent = coatGrew
+        ? {
+            ...parent,
+            document: parseEvolutionDocumentForSystem(
+              {
+                ...parent.document,
+                traits: {
+                  ...parent.document.traits,
+                  pose: LONG_HAIR_POSE,
+                },
+              },
+              system,
+            ),
+            params: nextParams,
+          }
+        : parent;
       const catData = createCatData(
-        nextParams,
-        nextAccessories,
-        nextScars,
-        nextTorties,
+        evolutionParent,
+        additionsToTraitChanges(additions),
         meta,
+        system,
       );
       cats.push({
         key: `branch-${branchIndex}-level-${level}`,
@@ -1419,6 +1850,7 @@ export function generateTeaserVariant(
 ): CatParams {
   const random = options.random ?? Math.random;
   const parent = normalizeEvolutionStarter(parentInput);
+  const traitChanges: EvolutionTraitChange[] = [];
   const accessories = [...parent.accessorySlots];
   const scars = [...parent.scarSlots];
   const torties = parent.tortieSlots
@@ -1463,40 +1895,90 @@ export function generateTeaserVariant(
     if (addition.kind !== "replacement" || random() < 0.5) continue;
     if (addition.slot === "tortie" && torties.length > 0) {
       const layer = randomLayer();
-      if (layer) torties[randomIndex(torties.length)] = layer;
+      if (layer) {
+        const index = randomIndex(torties.length);
+        const previous = torties[index];
+        torties[index] = layer;
+        traitChanges.push({
+          traitId: addition.traitId,
+          previous,
+          value: layer,
+        });
+      }
     } else if (addition.slot === "accessory" && accessories.length > 0) {
       const accessory = pickOne(pools.accessories, random);
-      if (accessory) accessories[randomIndex(accessories.length)] = accessory;
+      if (accessory) {
+        const index = randomIndex(accessories.length);
+        const previous = accessories[index];
+        accessories[index] = accessory;
+        traitChanges.push({
+          traitId: addition.traitId,
+          previous,
+          value: accessory,
+        });
+      }
     } else if (addition.slot === "scar" && scars.length > 0) {
       const scar = pickOne(pools.scars, random);
-      if (scar) scars[randomIndex(scars.length)] = scar;
+      if (scar) {
+        const index = randomIndex(scars.length);
+        const previous = scars[index];
+        scars[index] = scar;
+        traitChanges.push({
+          traitId: addition.traitId,
+          previous,
+          value: scar,
+        });
+      }
     }
   }
 
   const tortieAdds = rollCount(countOf("tortie"));
   for (let i = 0; i < tortieAdds; i += 1) {
     const layer = randomLayer();
-    if (layer) torties.push(layer);
+    if (layer) {
+      torties.push(layer);
+      traitChanges.push({ traitId: "tortie", value: layer });
+    }
   }
   const accessoryAdds = rollCount(countOf("accessory"));
   for (let i = 0; i < accessoryAdds; i += 1) {
     const accessory = pickOne(pools.accessories, random);
-    if (accessory) accessories.push(accessory);
+    if (accessory) {
+      accessories.push(accessory);
+      traitChanges.push({ traitId: "accessories", value: accessory });
+    }
   }
   const scarAdds = rollCount(countOf("scar"));
   for (let i = 0; i < scarAdds; i += 1) {
     const scar = pickOne(pools.scars, random);
-    if (scar) scars.push(scar);
+    if (scar) {
+      scars.push(scar);
+      traitChanges.push({ traitId: "scars", value: scar });
+    }
   }
 
-  const params = applySlotsToParams(parent.params, accessories, scars, torties);
-  if (countOf("coat") > 0 && random() < 0.5) {
-    return applyEvolutionStarterHairToParams(
-      params,
-      EVOLUTION_STARTER_HAIR_STYLES.long,
-    );
+  for (const addition of additions) {
+    if (addition.kind !== "trait" || random() >= 0.5) continue;
+    traitChanges.push({
+      traitId: addition.traitId,
+      value: addition.traitValue,
+      ...(addition.previousValue !== undefined
+        ? { previous: addition.previousValue }
+        : {}),
+    });
   }
-  return params;
+
+  let document = applyEvolutionTraitChanges({
+    parent: parent.document,
+    changes: traitChanges,
+  });
+  if (countOf("coat") > 0 && random() < 0.5) {
+    document = readCatDocument({
+      ...document,
+      traits: { ...document.traits, pose: LONG_HAIR_POSE },
+    });
+  }
+  return documentToEvolutionParams(document);
 }
 
 export function isEvolutionBatchSettings(settings: unknown): boolean {

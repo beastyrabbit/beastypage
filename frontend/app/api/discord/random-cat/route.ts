@@ -3,9 +3,12 @@ import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
 import { RENDERER_BASE } from "@/app/api/renderer/_lib/proxy";
 import { api } from "@/convex/_generated/api";
+import { catDataToLegacyPersistence } from "@/lib/cat-system";
+import { CAT_CATALOG_HASH } from "@/lib/cat-system/generated/cat-schema.generated";
 import {
   type DiscordCatOverrides,
-  generateRandomParamsServer,
+  generateRandomParamsServerDetailed,
+  parseDiscordTraitOverride,
 } from "@/lib/cat-v3/random-cat-server";
 import { getServerConvexUrl } from "@/lib/convexUrl";
 
@@ -34,6 +37,27 @@ export async function POST(request: NextRequest) {
   if (typeof body.eye_colour === "string")
     overrides.eyeColour = body.eye_colour;
   if (typeof body.shading === "boolean") overrides.shading = body.shading;
+  const rawTrait = typeof body.trait === "string" ? body.trait : undefined;
+  const rawValue = typeof body.value === "string" ? body.value : undefined;
+  if (
+    (rawTrait && rawValue === undefined) ||
+    (!rawTrait && rawValue !== undefined)
+  ) {
+    return NextResponse.json(
+      { error: "Use trait and value together" },
+      { status: 400 },
+    );
+  }
+  if (rawTrait && rawValue !== undefined) {
+    const parsed = parseDiscordTraitOverride(rawTrait, rawValue);
+    if (!parsed) {
+      return NextResponse.json(
+        { error: "Invalid registry trait override" },
+        { status: 400 },
+      );
+    }
+    overrides.traitOverrides = { [parsed.traitId]: parsed.value };
+  }
 
   // Fetch user config from Convex if discord_user_id is provided
   const discordUserId =
@@ -64,9 +88,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Generate random params
-  let params: Awaited<ReturnType<typeof generateRandomParamsServer>>;
+  let generated: Awaited<ReturnType<typeof generateRandomParamsServerDetailed>>;
   try {
-    params = await generateRandomParamsServer(overrides);
+    generated = await generateRandomParamsServerDetailed(overrides);
   } catch (error) {
     console.error("[discord/random-cat] Failed to generate params", error);
     return NextResponse.json(
@@ -74,11 +98,13 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+  const { document, params } = generated;
 
   // Render via the renderer service
   const renderPayload = {
     payload: {
       spriteNumber: params.spriteNumber,
+      document,
       params: { ...params, source: "discordkitten" },
     },
   };
@@ -105,10 +131,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const renderResult = (await rendererRes.json()) as { image?: string };
+    const renderResult = (await rendererRes.json()) as {
+      image?: string;
+      meta?: { catalogHash?: string; catalog_hash?: string };
+    };
     if (!renderResult.image) {
       return NextResponse.json(
         { error: "Renderer returned no image" },
+        { status: 502 },
+      );
+    }
+    const rendererCatalogHash =
+      renderResult.meta?.catalogHash ?? renderResult.meta?.catalog_hash;
+    if (
+      rendererCatalogHash !== undefined &&
+      rendererCatalogHash !== CAT_CATALOG_HASH
+    ) {
+      console.error(
+        "[discord/random-cat] Renderer catalog mismatch",
+        CAT_CATALOG_HASH,
+        rendererCatalogHash,
+      );
+      return NextResponse.json(
+        { error: "Renderer catalog mismatch" },
         { status: 502 },
       );
     }
@@ -156,7 +201,7 @@ export async function POST(request: NextRequest) {
           ? body.discord_username
           : undefined;
       const result = await convex.mutation(api.mapper.create, {
-        catData,
+        catData: catDataToLegacyPersistence(catData),
         creatorName: discordUsername || "Discord",
       });
       slug = result.slug;

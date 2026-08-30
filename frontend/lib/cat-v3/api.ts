@@ -1,5 +1,7 @@
 type RequestPriority = "high" | "low" | "auto";
 
+import { catDocumentToLegacyParams } from "@/lib/cat-system/document";
+import { CAT_CATALOG_HASH } from "@/lib/cat-system/generated/cat-schema.generated";
 import type {
   BatchRenderRequest,
   BatchRenderResponse,
@@ -50,9 +52,15 @@ interface RawLayerDiagnostic {
   image?: string | null;
 }
 
+type RawRenderMeta = RendererResponse["meta"] & {
+  catalogHash?: string;
+  manifestHash?: string;
+  renderPlanVersion?: number;
+};
+
 interface RawRenderResponse {
   image: string;
-  meta: RendererResponse["meta"];
+  meta: RawRenderMeta;
   layers?: RawLayerDiagnostic[];
 }
 
@@ -63,6 +71,14 @@ export async function renderCatV3(
   const baseUrl = resolveRendererBase(options.baseUrl);
   const collectLayers = Boolean(payload.collectLayers);
   const includeLayerImages = Boolean(payload.includeLayerImages);
+  const documentFallback = payload.document
+    ? catDocumentToLegacyParams(payload.document)
+    : {};
+  const {
+    spriteNumber: documentSpriteNumber,
+    poseName: documentPoseName,
+    ...documentParams
+  } = documentFallback;
   const requestInit: RequestInit & { priority?: RequestPriority } = {
     method: "POST",
     headers: {
@@ -70,9 +86,10 @@ export async function renderCatV3(
     },
     body: JSON.stringify({
       payload: {
-        spriteNumber: payload.spriteNumber,
-        poseName: payload.poseName,
-        params: payload.params,
+        spriteNumber: payload.spriteNumber ?? documentSpriteNumber,
+        poseName: payload.poseName ?? documentPoseName,
+        document: payload.document,
+        params: { ...documentParams, ...payload.params },
       },
       options: {
         collectLayers,
@@ -101,9 +118,32 @@ export async function renderCatV3(
   }
 
   const data: RawRenderResponse = await response.json();
+  const rendererCatalogHash = data.meta?.catalogHash ?? data.meta?.catalog_hash;
+  const rendererManifestHash =
+    data.meta?.manifestHash ?? data.meta?.manifest_hash;
+  const rendererPlanVersion =
+    data.meta?.renderPlanVersion ?? data.meta?.plan_version;
+  // Legacy renderer replicas do not report a catalog hash. Accept an absent
+  // hash during rolling deployment, but fail closed as soon as a replica
+  // advertises a different generated contract.
+  if (
+    rendererCatalogHash !== undefined &&
+    rendererCatalogHash !== CAT_CATALOG_HASH
+  ) {
+    throw new Error(
+      `Renderer catalog mismatch: frontend=${CAT_CATALOG_HASH} renderer=${rendererCatalogHash}`,
+    );
+  }
   return {
     imageDataUrl: data.image,
-    meta: data.meta,
+    meta: {
+      ...data.meta,
+      catalog_hash: rendererCatalogHash,
+      manifest_hash: rendererManifestHash,
+      plan_version: rendererPlanVersion,
+    },
+    catalogHash: rendererCatalogHash,
+    planVersion: rendererPlanVersion,
     layers: data.layers?.map((layer) => ({
       id: layer.id,
       label: layer.label,
@@ -183,6 +223,16 @@ export async function renderCatBatchV3(
   }
 
   const data = await response.json();
+  const rendererCatalogHash =
+    typeof data.catalogHash === "string" ? data.catalogHash : undefined;
+  if (
+    rendererCatalogHash !== undefined &&
+    rendererCatalogHash !== CAT_CATALOG_HASH
+  ) {
+    throw new Error(
+      `Renderer catalog mismatch: frontend=${CAT_CATALOG_HASH} renderer=${rendererCatalogHash}`,
+    );
+  }
   type RawFrame = {
     id: string;
     label?: string | null;
@@ -211,6 +261,13 @@ export async function renderCatBatchV3(
     width: data.width,
     height: data.height,
     tileSize: data.tileSize,
+    catalogHash: rendererCatalogHash,
+    manifestHash:
+      typeof data.manifestHash === "string" ? data.manifestHash : undefined,
+    renderPlanVersion:
+      typeof data.renderPlanVersion === "number"
+        ? data.renderPlanVersion
+        : undefined,
     frames: framesData.map((frame) => ({
       id: frame.id,
       label: frame.label ?? null,

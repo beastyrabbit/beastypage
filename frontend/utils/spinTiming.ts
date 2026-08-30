@@ -1,31 +1,21 @@
-type ParamId =
-  | "colour"
-  | "pelt"
-  | "eyeColour"
-  | "eyeColour2"
-  | "tortie"
-  | "tortieMask"
-  | "tortiePattern"
-  | "tortieColour"
-  | "tint"
-  | "skinColour"
-  | "whitePatches"
-  | "points"
-  | "whitePatchesTint"
-  | "vitiligo"
-  | "shading"
-  | "reverse"
-  | "accessory"
-  | "scar"
-  | "sprite";
+import {
+  getSelectableCatalogElementsFromCatalog,
+  publicCatCatalog,
+} from "@/lib/cat-system/catalog";
+import type {
+  CatSystemDefinition,
+  TraitValueKind,
+} from "@/lib/cat-system/definition";
+import {
+  catDocumentToLegacyParams,
+  legacyParamsToCatDocument,
+} from "@/lib/cat-system/document";
+import { catSystem } from "@/lib/cat-system/registry";
+import { getSystemRevealTraits } from "@/lib/cat-system/runtime";
+import type { CatParams } from "@/lib/cat-v3/types";
 
-export type ParamTimingKey =
-  | ParamId
-  | "accessory"
-  | "scar"
-  | "tortieMask"
-  | "tortiePattern"
-  | "tortieColour";
+/** Registry timing IDs plus legacy compound-animation substeps. */
+export type ParamTimingKey = string;
 
 export interface SpinTimingConfig {
   allowFastFlips: boolean;
@@ -53,6 +43,35 @@ export interface TimingTotals {
 export const ABSOLUTE_MIN_STEP_MS = 45;
 export const MIN_SAFE_STEP_MS = 120;
 
+function spinRevealTraits(system: CatSystemDefinition) {
+  return getSystemRevealTraits(system)
+    .filter((trait) => {
+      const reveal = trait.capabilities.reveal;
+      return reveal !== false && reveal?.spin !== false;
+    })
+    .sort((left, right) => {
+      const leftReveal = left.capabilities.reveal;
+      const rightReveal = right.capabilities.reveal;
+      const leftOrder =
+        leftReveal && leftReveal.spin !== false
+          ? (leftReveal.spin?.order ?? left.order)
+          : left.order;
+      const rightOrder =
+        rightReveal && rightReveal.spin !== false
+          ? (rightReveal.spin?.order ?? right.order)
+          : right.order;
+      return leftOrder - rightOrder || left.id.localeCompare(right.id);
+    });
+}
+
+const revealTraits = spinRevealTraits(catSystem);
+const legacyCompoundTimingKeys = [
+  "tortieMask",
+  "tortiePattern",
+  "tortieColour",
+] as const;
+
+/** Fixed product setting: registry additions do not grow the timing UI. */
 export const PARAM_TIMING_ORDER: ParamTimingKey[] = [
   "colour",
   "pelt",
@@ -66,13 +85,180 @@ export const PARAM_TIMING_ORDER: ParamTimingKey[] = [
   "vitiligo",
   "accessory",
   "scar",
-  "tortieMask",
-  "tortiePattern",
-  "tortieColour",
+  ...legacyCompoundTimingKeys,
   "sprite",
 ];
 
-export const PARAM_TIMING_LABELS: Record<ParamTimingKey, string> = {
+export interface RegistryRevealDefinition {
+  /** Animation/timing ID. Existing aliases such as `sprite` remain stable. */
+  id: string;
+  traitId: string;
+  /** Product label used for a multi-row layer group's heading. */
+  groupLabel: string;
+  label: string;
+  optional: boolean;
+  strategy: "single" | "slots" | "compoundSlots";
+  timingKey: string;
+  valueKind: TraitValueKind;
+  catalogId?: string;
+  layerKey: string;
+  compoundMode?: "tortieParts" | "wholeValue";
+}
+
+/**
+ * The one reveal-sequence builder shared by Single Cat Plus and OBS. It has no
+ * trait-ID list: adding a reveal capability to the registry adds a definition.
+ */
+export function buildRegistryRevealSequence(
+  system: CatSystemDefinition = catSystem,
+): RegistryRevealDefinition[] {
+  return spinRevealTraits(system).flatMap((trait) => {
+    const reveal = trait.capabilities.reveal;
+    if (!reveal) return [];
+    const timingKey = reveal.timingKey ?? trait.id;
+    const gachaCatalog =
+      trait.gacha?.strategy === "catalogChoice" ||
+      trait.gacha?.strategy === "slotList"
+        ? trait.gacha.catalog
+        : undefined;
+    return [
+      {
+        id: timingKey,
+        traitId: trait.id,
+        groupLabel: trait.label,
+        label:
+          reveal.spin !== false
+            ? (reveal.spin?.label ?? trait.label)
+            : trait.label,
+        optional: !trait.value.required,
+        strategy: reveal.strategy,
+        timingKey,
+        valueKind: trait.value.kind,
+        catalogId: trait.value.catalog ?? gachaCatalog,
+        layerKey: trait.id,
+        ...(reveal.strategy === "compoundSlots"
+          ? {
+              compoundMode:
+                trait.legacy.strategy === "tortie" &&
+                trait.gacha.strategy === "tortieList"
+                  ? ("tortieParts" as const)
+                  : ("wholeValue" as const),
+            }
+          : {}),
+      },
+    ];
+  });
+}
+
+export const REGISTRY_REVEAL_SEQUENCE = buildRegistryRevealSequence();
+
+export function getRegistryRevealOptions(
+  definition: RegistryRevealDefinition,
+  pose?: string,
+  catalogs: Readonly<
+    Record<
+      string,
+      readonly {
+        id: string;
+        poses?: readonly string[];
+        deprecated?: boolean;
+      }[]
+    >
+  > = publicCatCatalog.catalogs,
+): unknown[] {
+  if (definition.valueKind === "boolean") return [true, false];
+  if (!definition.catalogId) return [];
+  const values = getSelectableCatalogElementsFromCatalog(
+    { catalogs },
+    definition.catalogId,
+    pose,
+  ).map((element) => element.id);
+  return Array.from(
+    new Set(definition.optional ? ["none", ...values] : values),
+  );
+}
+
+export function getRegistryRevealDefinition(
+  id: string,
+): RegistryRevealDefinition | undefined {
+  return REGISTRY_REVEAL_SEQUENCE.find(
+    (definition) => definition.id === id || definition.traitId === id,
+  );
+}
+
+function withoutCanonicalEnvelope(
+  params: Partial<CatParams>,
+): Record<string, unknown> {
+  const legacy = { ...(params as Record<string, unknown>) };
+  delete legacy.schemaVersion;
+  delete legacy.traits;
+  delete legacy.unknownTraits;
+  return legacy;
+}
+
+function partialParamsToCatDocument(params: Partial<CatParams>) {
+  const legacy = withoutCanonicalEnvelope(params);
+  const poseTrait = catSystem.traits.find(
+    (trait) => trait.legacy.strategy === "pose",
+  );
+  if (
+    poseTrait?.legacy.strategy === "pose" &&
+    legacy[poseTrait.legacy.key] === undefined &&
+    legacy[poseTrait.legacy.spriteKey] === undefined &&
+    poseTrait.value.default !== undefined
+  ) {
+    legacy[poseTrait.legacy.key] = poseTrait.value.default;
+  }
+  return legacyParamsToCatDocument(legacy);
+}
+
+/** Keeps canonical traits authoritative while maintaining legacy projections. */
+export function setRegistryRevealValue(
+  params: Partial<CatParams>,
+  definition: RegistryRevealDefinition,
+  rawValue: unknown,
+): void {
+  const legacyDocument = partialParamsToCatDocument(params);
+  const traits: Record<string, unknown> = {
+    ...legacyDocument.traits,
+    ...(params.traits ?? {}),
+  };
+  const absent =
+    rawValue === undefined ||
+    rawValue === null ||
+    (definition.optional &&
+      typeof rawValue === "string" &&
+      rawValue.toLowerCase() === "none");
+  if (absent) delete traits[definition.traitId];
+  else traits[definition.traitId] = rawValue;
+
+  const document = {
+    ...legacyDocument,
+    traits,
+    unknownTraits: params.unknownTraits,
+  };
+  Object.assign(params, catDocumentToLegacyParams(document), {
+    schemaVersion: document.schemaVersion,
+    traits: document.traits,
+    unknownTraits: document.unknownTraits,
+  });
+}
+
+export function getRegistryRevealValue(
+  params: Partial<CatParams>,
+  definition: RegistryRevealDefinition,
+): unknown {
+  if (params.traits && definition.traitId in params.traits) {
+    return (params.traits as Record<string, unknown>)[definition.traitId];
+  }
+  return partialParamsToCatDocument(params).traits[
+    definition.traitId as keyof ReturnType<
+      typeof legacyParamsToCatDocument
+    >["traits"]
+  ];
+}
+
+const legacyTimingLabels: Record<string, string> = {
   colour: "Base Colour",
   pelt: "Pelt",
   eyeColour: "Eyes",
@@ -92,27 +278,30 @@ export const PARAM_TIMING_LABELS: Record<ParamTimingKey, string> = {
   tortie: "Tortie Toggle",
   shading: "Shading",
   reverse: "Reverse",
-} as const;
+};
+
+export const PARAM_TIMING_LABELS: Record<ParamTimingKey, string> = {
+  ...Object.fromEntries(
+    revealTraits.map((trait) => [
+      (trait.capabilities.reveal || undefined)?.timingKey ?? trait.id,
+      trait.label,
+    ]),
+  ),
+  ...legacyTimingLabels,
+};
 
 export const PARAM_DEFAULT_STEP_COUNTS: Partial<
   Record<ParamTimingKey, number>
 > = {
-  colour: 19,
-  pelt: 10,
-  eyeColour: 8,
-  eyeColour2: 6,
-  tint: 8,
-  skinColour: 5,
-  whitePatches: 10,
-  points: 6,
-  whitePatchesTint: 6,
-  vitiligo: 6,
-  accessory: 12,
-  scar: 10,
+  ...Object.fromEntries(
+    revealTraits.map((trait) => [
+      (trait.capabilities.reveal || undefined)?.timingKey ?? trait.id,
+      (trait.capabilities.reveal || undefined)?.defaultSteps ?? 1,
+    ]),
+  ),
   tortieMask: 8,
   tortiePattern: 8,
   tortieColour: 8,
-  sprite: 10,
 };
 
 export interface TimingPresetSet {
@@ -121,7 +310,7 @@ export interface TimingPresetSet {
   fast: number;
 }
 
-export const PARAM_TIMING_PRESETS: Record<ParamTimingKey, TimingPresetSet> = {
+const legacyTimingPresets: Record<string, TimingPresetSet> = {
   colour: { slow: 360, normal: 180, fast: 150 },
   pelt: { slow: 360, normal: 180, fast: 150 },
   eyeColour: { slow: 320, normal: 160, fast: 130 },
@@ -141,6 +330,16 @@ export const PARAM_TIMING_PRESETS: Record<ParamTimingKey, TimingPresetSet> = {
   reverse: { slow: 300, normal: 150, fast: 120 },
   tortie: { slow: 400, normal: 200, fast: 160 },
   shading: { slow: 300, normal: 150, fast: 120 },
+};
+
+export const PARAM_TIMING_PRESETS: Record<ParamTimingKey, TimingPresetSet> = {
+  ...Object.fromEntries(
+    revealTraits.map((trait) => [
+      (trait.capabilities.reveal || undefined)?.timingKey ?? trait.id,
+      { slow: 360, normal: 180, fast: 150 },
+    ]),
+  ),
+  ...legacyTimingPresets,
 };
 
 const STORAGE_KEY = "singleCatPlus.paramTiming";

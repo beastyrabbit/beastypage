@@ -80,8 +80,8 @@ export function BatchScene({ command, liveState, apiKey }: BatchSceneProps) {
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stages = useMemo(
-    () => buildBatchStagePlan(command.config),
-    [command.config],
+    () => buildBatchStagePlan(command.config, command.cats),
+    [command.config, command.cats],
   );
   const maxEliminations = Math.max(0, command.cats.length - command.finalCount);
 

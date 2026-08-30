@@ -1,4 +1,11 @@
 import {
+  catDocumentToLegacyParams,
+  legacyParamsToCatDocument,
+  readCatDocument,
+  setCatTrait,
+  syncChangedRegistryTraitsFromLegacy,
+} from "../cat-system/document";
+import {
   applyCoatChoice,
   getCoatChoiceValue,
   getCoatChoiceValues,
@@ -12,6 +19,10 @@ import {
 import { createCatShare, encodeCatShare } from "../catShare";
 import catGenerator from "../single-cat/catGeneratorV3";
 import spriteMapper from "../single-cat/spriteMapper.js";
+import {
+  buildAdoptionInitialTraits,
+  buildAdoptionRevealPlan,
+} from "./revealPlan";
 
 const CONFIG = {
   CANVAS: {
@@ -314,9 +325,14 @@ export class AdoptionGenerator {
     const layerConfig = this.getLayerConfig();
     this.currentLayerConfig = layerConfig;
     this.lastSettingsSnapshot = this.buildSettingsSnapshot(layerConfig);
-    this.stagePlan = this.buildStagePlan(layerConfig);
+    const firstParams = await this.generateRandomParams(layerConfig);
+    this.stagePlan = this.buildStagePlan(firstParams, layerConfig);
     const startCount = 10 + this.stagePlan.length;
-    this.catPlans = await this.generateCatPlans(startCount, layerConfig);
+    this.catPlans = await this.generateCatPlans(
+      startCount,
+      layerConfig,
+      firstParams,
+    );
 
     await this.renderCatCards();
     this.updateCatCount();
@@ -365,6 +381,10 @@ export class AdoptionGenerator {
     }
     if (stage.type === "scar") {
       await this.animateScarSlot(plan, stage);
+      return;
+    }
+    if (stage.type === "slot") {
+      await this.animateTraitSlot(plan, stage);
       return;
     }
     await this.animateSimpleParameter(plan, stage);
@@ -521,132 +541,25 @@ export class AdoptionGenerator {
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
-  buildStagePlan({ accessoryCount, scarCount, tortieCount }) {
-    const stages = [];
-    stages.push({
-      id: "colour",
-      label: "Colour",
-      type: "simple",
-      param: "colour",
+  buildStagePlan(params, { accessoryCount, scarCount, tortieCount }) {
+    const document = this.readAdoptionDocument(params);
+    return buildAdoptionRevealPlan({
+      traits: document.traits,
+      slotCounts: {
+        accessories: accessoryCount,
+        scars: scarCount,
+        tortie: tortieCount,
+      },
     });
-    stages.push({
-      id: "peltName",
-      label: "Pelt",
-      type: "simple",
-      param: "peltName",
-    });
-    stages.push({
-      id: "eyeColour",
-      label: "Eyes",
-      type: "simple",
-      param: "eyeColour",
-    });
-    stages.push({
-      id: "eyeColour2",
-      label: "Eye Colour 2",
-      type: "simple",
-      param: "eyeColour2",
-    });
-
-    for (let i = 0; i < tortieCount; i++) {
-      stages.push({
-        id: `tortie-${i}-mask`,
-        label: `Tortie ${i + 1} Mask`,
-        type: "tortie-sub",
-        layerIndex: i,
-        subElement: "mask",
-      });
-      stages.push({
-        id: `tortie-${i}-pattern`,
-        label: `Tortie ${i + 1} Pelt`,
-        type: "tortie-sub",
-        layerIndex: i,
-        subElement: "pattern",
-      });
-      stages.push({
-        id: `tortie-${i}-colour`,
-        label: `Tortie ${i + 1} Colour`,
-        type: "tortie-sub",
-        layerIndex: i,
-        subElement: "colour",
-      });
-    }
-
-    stages.push({ id: "tint", label: "Tint", type: "simple", param: "tint" });
-    stages.push({
-      id: "skinColour",
-      label: "Skin",
-      type: "simple",
-      param: "skinColour",
-    });
-    stages.push({
-      id: "whitePatches",
-      label: "White Patches",
-      type: "simple",
-      param: "whitePatches",
-    });
-    stages.push({
-      id: "points",
-      label: "Points",
-      type: "simple",
-      param: "points",
-    });
-    stages.push({
-      id: "whitePatchesTint",
-      label: "Patches Tint",
-      type: "simple",
-      param: "whitePatchesTint",
-    });
-    stages.push({
-      id: "vitiligo",
-      label: "Vitiligo",
-      type: "simple",
-      param: "vitiligo",
-    });
-
-    for (let i = 0; i < accessoryCount; i++) {
-      stages.push({
-        id: `accessory-${i}`,
-        label: `Accessory ${i + 1}`,
-        type: "accessory",
-        slotIndex: i,
-      });
-    }
-
-    for (let i = 0; i < scarCount; i++) {
-      stages.push({
-        id: `scar-${i}`,
-        label: `Scar ${i + 1}`,
-        type: "scar",
-        slotIndex: i,
-      });
-    }
-
-    stages.push({
-      id: "shading",
-      label: "Shading",
-      type: "simple",
-      param: "shading",
-    });
-    stages.push({
-      id: "reverse",
-      label: "Reverse",
-      type: "simple",
-      param: "reverse",
-    });
-    stages.push({
-      id: "poseName",
-      label: "Pose",
-      type: "simple",
-      param: "poseName",
-    });
-    return stages;
   }
 
-  async generateCatPlans(count, layerConfig) {
+  async generateCatPlans(count, layerConfig, firstParams = null) {
     const plans = [];
     for (let i = 0; i < count; i++) {
-      const params = await this.generateRandomParams(layerConfig);
+      const params =
+        i === 0 && firstParams
+          ? firstParams
+          : await this.generateRandomParams(layerConfig);
       plans.push(this.buildCatPlan(i, params, layerConfig));
     }
     return plans;
@@ -670,7 +583,34 @@ export class AdoptionGenerator {
     randomResult.dead = enableDead;
 
     this.ensureLayerDepth(randomResult, layerConfig);
-    return randomResult;
+    return this.toCanonicalParams(randomResult);
+  }
+
+  toCanonicalParams(params) {
+    const document = legacyParamsToCatDocument(params);
+    return {
+      ...catDocumentToLegacyParams(document),
+      schemaVersion: document.schemaVersion,
+      traits: document.traits,
+      ...(document.unknownTraits
+        ? { unknownTraits: document.unknownTraits }
+        : {}),
+    };
+  }
+
+  readAdoptionDocument(params) {
+    if (
+      params?.traits &&
+      typeof params.traits === "object" &&
+      !Array.isArray(params.traits)
+    ) {
+      return readCatDocument(params);
+    }
+    return legacyParamsToCatDocument({
+      ...params,
+      spriteNumber: params?.spriteNumber ?? 8,
+      poseName: params?.poseName ?? DEFAULT_POSE_NAME,
+    });
   }
 
   resolveAfterlifeFlags() {
@@ -699,14 +639,18 @@ export class AdoptionGenerator {
   }
 
   buildCatPlan(index, params, layerConfig) {
+    const document = this.readAdoptionDocument(params);
     const accessorySlots = this.fillSlots(
       layerConfig.accessoryCount,
-      params.accessories,
+      document.traits.accessories,
     );
-    const scarSlots = this.fillSlots(layerConfig.scarCount, params.scars);
+    const scarSlots = this.fillSlots(
+      layerConfig.scarCount,
+      document.traits.scars,
+    );
     const tortieSlots = this.fillTortieSlots(
       layerConfig.tortieCount,
-      params.tortie,
+      document.traits.tortie,
     );
 
     const state = this.buildInitialState(
@@ -720,6 +664,7 @@ export class AdoptionGenerator {
       id: `cat-${Date.now()}-${index}`,
       index: index + 1,
       params,
+      document,
       accessorySlots,
       scarSlots,
       tortieSlots,
@@ -767,7 +712,7 @@ export class AdoptionGenerator {
       shading: false,
       reverse: false,
       dead: params.dead,
-      darkForest: params.darkForest,
+      darkForest: false,
       isTortie: false,
       accessorySlots: Array(accessoryCount).fill("none"),
       scarSlots: Array(scarCount).fill("none"),
@@ -776,6 +721,24 @@ export class AdoptionGenerator {
         .fill(null)
         .map(() => ({ mask: false, pattern: false, colour: false })),
     };
+    const finalDocument = this.readAdoptionDocument(params);
+    state.document = readCatDocument({
+      ...finalDocument,
+      traits: buildAdoptionInitialTraits({
+        finalTraits: finalDocument.traits,
+        overrides: {
+          pose: DEFAULT_POSE_NAME,
+          pelt: "SingleColour",
+          colour: this.defaults.colour,
+          tint: "none",
+          eyeColour: this.defaults.eyeColour,
+          shading: false,
+          darkForest: false,
+          skinColour: this.defaults.skinColour,
+          reverse: false,
+        },
+      }),
+    });
     return state;
   }
 
@@ -928,6 +891,27 @@ export class AdoptionGenerator {
     plan.valueEl.textContent = this.describeStageValue(stage, finalValue);
   }
 
+  async animateTraitSlot(plan, stage) {
+    const values = plan.document?.traits?.[stage.traitId];
+    const finalValue = Array.isArray(values)
+      ? values[stage.slotIndex]
+      : undefined;
+    const resolvedFinal = finalValue ?? "none";
+    const options = this.sampleVariations(stage.timingKey, resolvedFinal);
+    const baseState = this.cloneState(plan.state);
+
+    for (const value of options) {
+      const tempState = this.cloneState(baseState);
+      this.applyStageValue(tempState, stage, value);
+      await this.drawCat(tempState, plan.canvas);
+      await this.wait(this.speedDurations[this.currentSpeed]);
+    }
+
+    this.applyStageValue(plan.state, stage, resolvedFinal);
+    await this.drawCat(plan.state, plan.canvas);
+    plan.valueEl.textContent = this.describeStageValue(stage, resolvedFinal);
+  }
+
   async animateTortieLayer(plan, stage) {
     const layer = plan.tortieSlots[stage.layerIndex];
     if (!layer) {
@@ -1075,25 +1059,15 @@ export class AdoptionGenerator {
     if (stage.param === "peltName") {
       return getCoatChoiceValue(plan.params);
     }
-    if (stage.param === "poseName") {
-      return plan.params.poseName || DEFAULT_POSE_NAME;
+    if (stage.traitId && plan.document?.traits) {
+      const value = plan.document.traits[stage.traitId];
+      if (stage.type === "slot" && Array.isArray(value)) {
+        return value[stage.slotIndex] ?? "none";
+      }
+      if (value !== undefined && value !== null) return value;
     }
-    if (stage.param === "whitePatches") {
-      return plan.params.whitePatches || "none";
-    }
-    if (stage.param === "points") {
-      return plan.params.points || "none";
-    }
-    if (stage.param === "whitePatchesTint") {
-      return plan.params.whitePatchesTint || "none";
-    }
-    if (stage.param === "vitiligo") {
-      return plan.params.vitiligo || "none";
-    }
-    if (stage.param === "eyeColour2") {
-      return plan.params.eyeColour2 || "none";
-    }
-    return plan.params[stage.param];
+    if (stage.param === "poseName") return DEFAULT_POSE_NAME;
+    return plan.params[stage.param] ?? "none";
   }
 
   describeStageValue(stage, value) {
@@ -1161,9 +1135,23 @@ export class AdoptionGenerator {
       }
       if (stage.param === "poseName") {
         state.poseName = value;
-        return;
+      } else {
+        state[stage.param] = value;
       }
-      state[stage.param] = value;
+      if (stage.traitId && state.document) {
+        state.document = setCatTrait(state.document, stage.traitId, value);
+      }
+      return;
+    }
+    if (stage.type === "slot") {
+      const current = state.document?.traits?.[stage.traitId];
+      const values = Array.isArray(current) ? [...current] : [];
+      if (value === undefined || value === null || value === "none") {
+        values.splice(stage.slotIndex, 1);
+      } else {
+        values[stage.slotIndex] = value;
+      }
+      state.document = setCatTrait(state.document, stage.traitId, values);
       return;
     }
     if (stage.type === "accessory") {
@@ -1217,7 +1205,7 @@ export class AdoptionGenerator {
     ctx.drawImage(result.canvas, 0, 0, CONFIG.CANVAS.SIZE, CONFIG.CANVAS.SIZE);
   }
 
-  buildRenderParams(state) {
+  buildLegacyRenderParams(state) {
     const accessories = state.accessorySlots.filter((v) => v && v !== "none");
     const scars = state.scarSlots.filter((v) => v && v !== "none");
     const tortieLayers = state.tortieLayers
@@ -1254,6 +1242,25 @@ export class AdoptionGenerator {
     };
   }
 
+  buildRenderParams(state) {
+    const current = state.document
+      ? catDocumentToLegacyParams(state.document)
+      : {};
+    const document = legacyParamsToCatDocument({
+      ...current,
+      ...this.buildLegacyRenderParams(state),
+    });
+    state.document = document;
+    return {
+      ...catDocumentToLegacyParams(document),
+      schemaVersion: document.schemaVersion,
+      traits: document.traits,
+      ...(document.unknownTraits
+        ? { unknownTraits: document.unknownTraits }
+        : {}),
+    };
+  }
+
   buildSharePayload(plan, preparedParams = null) {
     const params = preparedParams
       ? { ...preparedParams }
@@ -1284,6 +1291,7 @@ export class AdoptionGenerator {
     };
 
     return {
+      document: readCatDocument(params),
       params,
       accessorySlots,
       scarSlots,
@@ -1315,6 +1323,7 @@ export class AdoptionGenerator {
   cloneState(state) {
     return {
       ...state,
+      document: state.document ? readCatDocument(state.document) : undefined,
       accessorySlots: [...state.accessorySlots],
       scarSlots: [...state.scarSlots],
       tortieLayers: state.tortieLayers.map((layer) =>
@@ -1764,6 +1773,7 @@ export class AdoptionGenerator {
               spriteNumber: params.spriteNumber ?? 8,
               poseName,
             };
+            syncChangedRegistryTraitsFromLegacy(spriteParams, ["pose"]);
             const result = await catGenerator.generateCat(spriteParams);
             if (!force && this.detailRenderToken !== token) return null;
             if (!result?.canvas) return null;
@@ -1873,6 +1883,7 @@ export class AdoptionGenerator {
     if (!this.currentDetailParams) return;
     try {
       const params = { ...this.currentDetailParams, poseName };
+      syncChangedRegistryTraitsFromLegacy(params, ["pose"]);
       const result = await catGenerator.generateCat(params);
       if (!result?.canvas) throw new Error("Sprite canvas unavailable");
       await this.copyCanvasToClipboard(result.canvas, size);

@@ -1,3 +1,4 @@
+import { getCatTraitDefinition } from "@/lib/cat-system/runtime";
 import type {
   EvolutionAddition,
   EvolutionRoll,
@@ -52,7 +53,11 @@ export function formatAddition(addition: EvolutionAddition) {
   if (addition.kind === "replacement") {
     return `${formatValue(addition.previous)} ➜ ${formatValue(addition.value)}`;
   }
-  return formatValue(addition.value);
+  if (typeof addition.value === "string") return formatValue(addition.value);
+  if (Array.isArray(addition.value)) {
+    return addition.value.map((value) => formatValue(String(value))).join(", ");
+  }
+  return JSON.stringify(addition.value);
 }
 
 function getTortieParts(
@@ -68,6 +73,14 @@ const SIMPLE_ADDITION_LABEL: Record<string, string> = {
   scar: "Scar",
   coat: "Coat",
 };
+
+function traitLabel(addition: EvolutionAddition): string {
+  return (
+    getCatTraitDefinition(addition.traitId)?.label ??
+    SIMPLE_ADDITION_LABEL[addition.kind] ??
+    addition.label
+  );
+}
 
 export function buildAdditionDisplayRows(
   additions: EvolutionAddition[],
@@ -96,7 +109,7 @@ export function buildAdditionDisplayRows(
     return [
       {
         id: `${idPrefix}-${additionIndex}-${addition.kind}`,
-        label: SIMPLE_ADDITION_LABEL[addition.kind] ?? addition.kind,
+        label: traitLabel(addition),
         value: formatAddition(addition),
       },
     ];
@@ -134,6 +147,7 @@ const ADDITION_KIND_LABEL: Record<EvolutionAddition["kind"], string> = {
   scar: "Scar",
   coat: "Coat",
   replacement: "Reroll",
+  trait: "Trait",
 };
 
 export function buildAdditionChips(
@@ -144,7 +158,9 @@ export function buildAdditionChips(
     const label =
       addition.kind === "replacement"
         ? `${ADDITION_KIND_LABEL.replacement} ${formatValue(addition.slot)}`
-        : ADDITION_KIND_LABEL[addition.kind];
+        : addition.kind === "trait"
+          ? traitLabel(addition)
+          : ADDITION_KIND_LABEL[addition.kind];
     return {
       id: `${idPrefix}-chip-${index}`,
       kind: addition.kind,

@@ -5,6 +5,10 @@
  */
 
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
+import {
+  type CatTraitId,
+  syncChangedRegistryTraitsFromLegacy,
+} from "@/lib/cat-system";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import {
   applyCoatChoice,
@@ -29,14 +33,20 @@ import type {
 } from "@/utils/singleCatVariants";
 import {
   ABSOLUTE_MIN_STEP_MS,
+  buildRegistryRevealSequence,
   clampDelay,
   getDelayForKey,
+  getRegistryRevealDefinition,
+  getRegistryRevealOptions,
+  getRegistryRevealValue,
   MIN_SAFE_STEP_MS,
   PARAM_DEFAULT_STEP_COUNTS,
   PARAM_TIMING_LABELS,
   PARAM_TIMING_ORDER,
   type ParamTimingKey,
+  type RegistryRevealDefinition,
   type SpinTimingConfig,
+  setRegistryRevealValue,
   type TimingPresetSet,
 } from "@/utils/spinTiming";
 
@@ -72,14 +82,15 @@ export interface ParamRow {
 }
 
 /** Param IDs that map to layer-panel rows rather than the main param board. */
-export const LAYER_PARAM_IDS = new Set([
-  "accessory",
-  "scar",
-  "tortie",
-  "tortieMask",
-  "tortiePattern",
-  "tortieColour",
-]);
+export const PARAM_SEQUENCE = buildRegistryRevealSequence();
+export const LAYER_PARAM_IDS = new Set(
+  PARAM_SEQUENCE.filter((definition) => definition.strategy !== "single").map(
+    (definition) => definition.id,
+  ),
+);
+export const LAYER_GROUPS = PARAM_SEQUENCE.filter(
+  (definition) => definition.strategy !== "single",
+);
 
 export interface VariationOption {
   raw: unknown;
@@ -125,7 +136,7 @@ export const GLOBAL_PRESETS: Array<keyof TimingPresetSet> = [
 ];
 export const SUBSET_LIMIT = 20;
 
-export type LayerGroup = "accessories" | "scars" | "torties";
+export type LayerGroup = string;
 
 export interface LayerRowState {
   label: string;
@@ -156,6 +167,7 @@ export interface WheelRewardState {
 }
 
 export interface ParameterOptions {
+  [paramId: string]: unknown[];
   sprite: (number | string)[];
   pelt: string[];
   colour: string[];
@@ -307,33 +319,8 @@ export interface SpriteMapperApi {
   getRenderablePoseNames?: () => string[];
 }
 
-export type ParamId =
-  | "colour"
-  | "pelt"
-  | "eyeColour"
-  | "eyeColour2"
-  | "tortie"
-  | "tortieMask"
-  | "tortiePattern"
-  | "tortieColour"
-  | "tint"
-  | "skinColour"
-  | "whitePatches"
-  | "points"
-  | "whitePatchesTint"
-  | "vitiligo"
-  | "shading"
-  | "reverse"
-  | "accessory"
-  | "scar"
-  | "sprite";
-
-export interface ParamDefinition {
-  id: ParamId;
-  label: string;
-  optional?: boolean;
-  requiresTortie?: boolean;
-}
+export type ParamId = string;
+export type ParamDefinition = RegistryRevealDefinition;
 
 export const DISPLAY_SIZE = 720;
 export const FULL_EXPORT_SIZE = 700;
@@ -491,31 +478,10 @@ export function getSpeedSettings(durationMs: number) {
   return scaleProfile(SPEED_PRESETS.slow, ratio, duration);
 }
 
-export const _layerGroupLabels: Record<LayerGroup, string> = {
-  accessories: "Accessories",
-  scars: "Scars",
-  torties: "Tortie Layers",
-};
-
-export const PARAM_SEQUENCE: ParamDefinition[] = [
-  { id: "colour", label: "Colour" },
-  { id: "pelt", label: "Pelt" },
-  { id: "eyeColour", label: "Eyes" },
-  { id: "eyeColour2", label: "Eye Colour 2", optional: true },
-  { id: "tortie", label: "Tortie", optional: true },
-  { id: "tortieMask", label: "Tortie Mask", requiresTortie: true },
-  { id: "tortiePattern", label: "Tortie Pelt", requiresTortie: true },
-  { id: "tortieColour", label: "Tortie Colour", requiresTortie: true },
-  { id: "tint", label: "Tint", optional: true },
-  { id: "skinColour", label: "Skin" },
-  { id: "whitePatches", label: "White Patches", optional: true },
-  { id: "points", label: "Points", optional: true },
-  { id: "whitePatchesTint", label: "White Patch Tint", optional: true },
-  { id: "vitiligo", label: "Vitiligo", optional: true },
-  { id: "accessory", label: "Accessory", optional: true },
-  { id: "scar", label: "Scar", optional: true },
-  { id: "sprite", label: "Sprite" },
-];
+export const LAYER_GROUP_LABELS: Record<LayerGroup, string> =
+  Object.fromEntries(
+    LAYER_GROUPS.map((definition) => [definition.layerKey, definition.label]),
+  );
 
 // AFTERLIFE_OPTIONS imported from @/utils/catSettingsHelpers
 
@@ -935,8 +901,12 @@ export function getParameterRawValue(
       return params.shading ?? false;
     case "reverse":
       return params.reverse ?? false;
-    default:
-      return undefined;
+    default: {
+      const definition = getRegistryRevealDefinition(paramId);
+      return definition
+        ? getRegistryRevealValue(params, definition)
+        : undefined;
+    }
   }
 }
 
@@ -975,6 +945,9 @@ export function applyParamValue(
   paramId: ParamId,
   value: unknown,
 ) {
+  const definition = getRegistryRevealDefinition(paramId);
+  const isNoneValue =
+    typeof value === "string" && value.toLowerCase() === "none";
   switch (paramId) {
     case "colour":
       params.colour = value as string;
@@ -986,7 +959,7 @@ export function applyParamValue(
       params.eyeColour = value as string;
       break;
     case "eyeColour2":
-      params.eyeColour2 = value === "None" ? undefined : (value as string);
+      params.eyeColour2 = isNoneValue ? undefined : (value as string);
       break;
     case "tortie":
       params.isTortie = Boolean(value);
@@ -1013,21 +986,20 @@ export function applyParamValue(
       params.skinColour = value as string;
       break;
     case "whitePatches":
-      params.whitePatches = value === "None" ? undefined : (value as string);
+      params.whitePatches = isNoneValue ? undefined : (value as string);
       break;
     case "points":
-      params.points = value === "None" ? undefined : (value as string);
+      params.points = isNoneValue ? undefined : (value as string);
       break;
     case "whitePatchesTint":
-      params.whitePatchesTint =
-        value === "None" ? undefined : (value as string);
+      params.whitePatchesTint = isNoneValue ? undefined : (value as string);
       break;
     case "vitiligo":
-      params.vitiligo = value === "None" ? undefined : (value as string);
+      params.vitiligo = isNoneValue ? undefined : (value as string);
       break;
     case "accessory": {
       const accessoryValue =
-        typeof value === "string" && value !== "none" ? value : undefined;
+        typeof value === "string" && !isNoneValue ? value : undefined;
       params.accessory = accessoryValue;
       if (accessoryValue) {
         params.accessories = [accessoryValue];
@@ -1038,7 +1010,7 @@ export function applyParamValue(
     }
     case "scar": {
       const scarValue =
-        typeof value === "string" && value !== "none" ? value : undefined;
+        typeof value === "string" && !isNoneValue ? value : undefined;
       params.scar = scarValue;
       if (scarValue) {
         params.scars = [scarValue];
@@ -1065,6 +1037,21 @@ export function applyParamValue(
       }
       break;
     }
+    default: {
+      if (definition) setRegistryRevealValue(params, definition, value);
+      return;
+    }
+  }
+  if (paramId === "pelt" && !params.coatPattern && params.traits) {
+    delete params.traits.coatPattern;
+  }
+  if (definition) {
+    const changedTraitIds = (
+      paramId === "pelt"
+        ? [definition.traitId, "coatPattern"]
+        : [definition.traitId]
+    ) as CatTraitId[];
+    syncChangedRegistryTraitsFromLegacy(params, changedTraitIds);
   }
 }
 
@@ -1115,8 +1102,14 @@ export function getParameterValueForDisplay(
       return params.poseName
         ? formatPoseName(params.poseName)
         : `Sprite ${params.spriteNumber}`;
-    default:
-      return "";
+    default: {
+      const definition = getRegistryRevealDefinition(paramId);
+      const value = definition
+        ? getRegistryRevealValue(params, definition)
+        : undefined;
+      if (Array.isArray(value)) return value.map(formatValue).join(", ");
+      return formatOptionDisplay(paramId, value);
+    }
   }
 }
 
@@ -1353,7 +1346,7 @@ export async function buildParameterOptions(
     includeNewSprites,
   });
 
-  return {
+  const options: ParameterOptions = {
     sprite: poseNames,
     pelt: getCoatChoiceValues(peltNames),
     colour: colourList,
@@ -1374,6 +1367,11 @@ export async function buildParameterOptions(
     shading: [true, false],
     reverse: [true, false],
   };
+  for (const definition of PARAM_SEQUENCE) {
+    if (options[definition.id] !== undefined) continue;
+    options[definition.id] = getRegistryRevealOptions(definition);
+  }
+  return options;
 }
 
 export function sampleValues(

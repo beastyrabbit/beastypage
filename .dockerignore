@@ -1,0 +1,11 @@
+.git
+**/.DS_Store
+**/.next
+**/.turbo
+**/.venv
+**/__pycache__
+**/node_modules
+**/.pytest_cache
+**/dist
+backend/renderer_service/sprites
+.playwright-mcp

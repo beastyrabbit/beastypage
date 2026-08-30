@@ -7,6 +7,7 @@
 
 import type { Id } from "@/convex/_generated/dataModel";
 import { toId } from "@/convex/utils";
+import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { encodeCatShare } from "@/lib/catShare";
 import {
   buildEvolutionBatchSettings,
@@ -70,7 +71,9 @@ export async function persistEvolutionBatch(options: {
         cat.catData as unknown as Parameters<typeof encodeCatShare>[0],
       );
       const mapperResult = await createMapper({
-        catData: cat.catData,
+        catData: catDataToLegacyPersistence(
+          cat.catData as unknown as Record<string, unknown>,
+        ) as unknown as EvolutionCatData,
       });
       const profileId = mapperResult.id;
       const shareToken =
@@ -83,7 +86,9 @@ export async function persistEvolutionBatch(options: {
       });
       return {
         label: cat.label || `Evolution ${index + 1}`,
-        catData: cat.catData,
+        catData: catDataToLegacyPersistence(
+          cat.catData as unknown as Record<string, unknown>,
+        ) as unknown as EvolutionCatData,
         profileId: toId("cat_profile", profileId),
         encoded,
         shareToken,

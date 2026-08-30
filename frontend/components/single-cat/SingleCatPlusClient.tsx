@@ -25,6 +25,11 @@ import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { track } from "@/lib/analytics";
+import {
+  type CatTraitId,
+  catDataToLegacyPersistence,
+  syncChangedRegistryTraitsFromLegacy,
+} from "@/lib/cat-system";
 import { decodeImageFromDataUrl } from "@/lib/cat-v3/api";
 import {
   applyCoatChoice,
@@ -73,14 +78,20 @@ import {
   DEFAULT_TIMING_CONFIG,
   getDelayForKey,
   getPresetValues,
+  getRegistryRevealDefinition,
+  getRegistryRevealOptions,
+  getRegistryRevealValue,
   isParamTimingKey,
   MIN_SAFE_STEP_MS,
   PARAM_DEFAULT_STEP_COUNTS,
+  REGISTRY_REVEAL_SEQUENCE as PARAM_SEQUENCE,
   PARAM_TIMING_LABELS,
   PARAM_TIMING_ORDER,
   PARAM_TIMING_PRESETS,
   type ParamTimingKey,
+  type RegistryRevealDefinition,
   type SpinTimingConfig,
+  setRegistryRevealValue,
   stepCountsToMetrics,
   type TimingPresetSet,
 } from "../../utils/spinTiming";
@@ -156,8 +167,7 @@ const DEFAULT_SPRITE_NUMBER = 8;
 const PLACEHOLDER_COLOUR = "GINGER";
 const GLOBAL_PRESETS: Array<keyof TimingPresetSet> = ["slow", "normal", "fast"];
 const SUBSET_LIMIT = 20;
-
-type LayerGroup = "accessories" | "scars" | "torties";
+type LayerGroup = string;
 
 interface LayerRowState {
   label: string;
@@ -183,6 +193,7 @@ interface CatState {
 }
 
 interface ParameterOptions {
+  [paramId: string]: unknown[];
   sprite: (number | string)[];
   pelt: string[];
   colour: string[];
@@ -335,33 +346,8 @@ interface SpriteMapperApi {
   getRenderablePoseNames?: () => string[];
 }
 
-type ParamId =
-  | "colour"
-  | "pelt"
-  | "eyeColour"
-  | "eyeColour2"
-  | "tortie"
-  | "tortieMask"
-  | "tortiePattern"
-  | "tortieColour"
-  | "tint"
-  | "skinColour"
-  | "whitePatches"
-  | "points"
-  | "whitePatchesTint"
-  | "vitiligo"
-  | "shading"
-  | "reverse"
-  | "accessory"
-  | "scar"
-  | "sprite";
-
-interface ParamDefinition {
-  id: ParamId;
-  label: string;
-  optional?: boolean;
-  requiresTortie?: boolean;
-}
+type ParamId = string;
+type ParamDefinition = RegistryRevealDefinition;
 
 const DISPLAY_SIZE = 720;
 const FULL_EXPORT_SIZE = 700;
@@ -517,31 +503,11 @@ function getSpeedSettings(durationMs: number) {
   return scaleProfile(SPEED_PRESETS.slow, ratio, duration);
 }
 
-const layerGroupLabels: Record<LayerGroup, string> = {
-  accessories: "Accessories",
-  scars: "Scars",
-  torties: "Tortie Layers",
-};
-
-const PARAM_SEQUENCE: ParamDefinition[] = [
-  { id: "colour", label: "Colour" },
-  { id: "pelt", label: "Pelt" },
-  { id: "eyeColour", label: "Eyes" },
-  { id: "eyeColour2", label: "Eye Colour 2", optional: true },
-  { id: "tortie", label: "Tortie", optional: true },
-  { id: "tortieMask", label: "Tortie Mask", requiresTortie: true },
-  { id: "tortiePattern", label: "Tortie Pelt", requiresTortie: true },
-  { id: "tortieColour", label: "Tortie Colour", requiresTortie: true },
-  { id: "tint", label: "Tint", optional: true },
-  { id: "skinColour", label: "Skin" },
-  { id: "whitePatches", label: "White Patches", optional: true },
-  { id: "points", label: "Points", optional: true },
-  { id: "whitePatchesTint", label: "White Patch Tint", optional: true },
-  { id: "vitiligo", label: "Vitiligo", optional: true },
-  { id: "accessory", label: "Accessory", optional: true },
-  { id: "scar", label: "Scar", optional: true },
-  { id: "sprite", label: "Sprite" },
-];
+const layerGroupLabels: Record<LayerGroup, string> = Object.fromEntries(
+  PARAM_SEQUENCE.filter((definition) => definition.strategy !== "single").map(
+    (definition) => [definition.layerKey, definition.groupLabel],
+  ),
+);
 
 // AFTERLIFE_OPTIONS imported from @/utils/catSettingsHelpers
 
@@ -1014,8 +980,12 @@ function getParameterRawValue(
       return params.shading ?? false;
     case "reverse":
       return params.reverse ?? false;
-    default:
-      return undefined;
+    default: {
+      const definition = getRegistryRevealDefinition(paramId);
+      return definition
+        ? getRegistryRevealValue(params, definition)
+        : undefined;
+    }
   }
 }
 
@@ -1054,6 +1024,9 @@ function applyParamValue(
   paramId: ParamId,
   value: unknown,
 ) {
+  const definition = getRegistryRevealDefinition(paramId);
+  const isNoneValue =
+    typeof value === "string" && value.toLowerCase() === "none";
   switch (paramId) {
     case "colour":
       params.colour = value as string;
@@ -1065,7 +1038,7 @@ function applyParamValue(
       params.eyeColour = value as string;
       break;
     case "eyeColour2":
-      params.eyeColour2 = value === "None" ? undefined : (value as string);
+      params.eyeColour2 = isNoneValue ? undefined : (value as string);
       break;
     case "tortie":
       params.isTortie = Boolean(value);
@@ -1092,21 +1065,20 @@ function applyParamValue(
       params.skinColour = value as string;
       break;
     case "whitePatches":
-      params.whitePatches = value === "None" ? undefined : (value as string);
+      params.whitePatches = isNoneValue ? undefined : (value as string);
       break;
     case "points":
-      params.points = value === "None" ? undefined : (value as string);
+      params.points = isNoneValue ? undefined : (value as string);
       break;
     case "whitePatchesTint":
-      params.whitePatchesTint =
-        value === "None" ? undefined : (value as string);
+      params.whitePatchesTint = isNoneValue ? undefined : (value as string);
       break;
     case "vitiligo":
-      params.vitiligo = value === "None" ? undefined : (value as string);
+      params.vitiligo = isNoneValue ? undefined : (value as string);
       break;
     case "accessory": {
       const accessoryValue =
-        typeof value === "string" && value !== "none" ? value : undefined;
+        typeof value === "string" && !isNoneValue ? value : undefined;
       params.accessory = accessoryValue;
       if (accessoryValue) {
         params.accessories = [accessoryValue];
@@ -1117,7 +1089,7 @@ function applyParamValue(
     }
     case "scar": {
       const scarValue =
-        typeof value === "string" && value !== "none" ? value : undefined;
+        typeof value === "string" && !isNoneValue ? value : undefined;
       params.scar = scarValue;
       if (scarValue) {
         params.scars = [scarValue];
@@ -1144,6 +1116,21 @@ function applyParamValue(
       }
       break;
     }
+    default: {
+      if (definition) setRegistryRevealValue(params, definition, value);
+      return;
+    }
+  }
+  if (paramId === "pelt" && !params.coatPattern && params.traits) {
+    delete params.traits.coatPattern;
+  }
+  if (definition) {
+    const changedTraitIds = (
+      paramId === "pelt"
+        ? [definition.traitId, "coatPattern"]
+        : [definition.traitId]
+    ) as CatTraitId[];
+    syncChangedRegistryTraitsFromLegacy(params, changedTraitIds);
   }
 }
 
@@ -1192,8 +1179,14 @@ function getParameterValueForDisplay(
       return params.reverse ? "Yes" : "No";
     case "sprite":
       return getPoseDisplayName(params);
-    default:
-      return "";
+    default: {
+      const definition = getRegistryRevealDefinition(paramId);
+      const value = definition
+        ? getRegistryRevealValue(params, definition)
+        : undefined;
+      if (Array.isArray(value)) return value.map(formatValue).join(", ");
+      return formatOptionDisplay(paramId, value);
+    }
   }
 }
 
@@ -1369,7 +1362,7 @@ async function buildParameterOptions(
     includeNewSprites,
   });
 
-  return {
+  const options: ParameterOptions = {
     sprite: poseNames,
     pelt: getCoatChoiceValues(peltNames),
     colour: colourList,
@@ -1390,6 +1383,11 @@ async function buildParameterOptions(
     shading: [true, false],
     reverse: [true, false],
   };
+  for (const definition of PARAM_SEQUENCE) {
+    if (options[definition.id] !== undefined) continue;
+    options[definition.id] = getRegistryRevealOptions(definition);
+  }
+  return options;
 }
 
 function sampleValues(
@@ -1836,11 +1834,11 @@ export function SingleCatPlusClient({
   const [activeParamId, setActiveParamId] = useState<ParamId | null>(null);
   const [layerRows, setLayerRows] = useState<
     Record<LayerGroup, LayerRowState[]>
-  >({
-    accessories: [],
-    scars: [],
-    torties: [],
-  });
+  >(() =>
+    Object.fromEntries(
+      Object.keys(layerGroupLabels).map((group) => [group, []]),
+    ),
+  );
   const [rollSummary, setRollSummary] = useState<string | null>(null);
   const [spriteVariations, setSpriteVariations] = useState<SpriteVariation[]>(
     [],
@@ -2265,6 +2263,7 @@ export function SingleCatPlusClient({
       accessoriesInput: string[] | null | undefined,
       scarsInput: string[] | null | undefined,
       tortiesInput: (TortieSlot | null)[] | null | undefined,
+      traitsInput?: Readonly<Record<string, unknown>>,
     ) => {
       const accessories = Array.isArray(accessoriesInput)
         ? accessoriesInput
@@ -2272,7 +2271,28 @@ export function SingleCatPlusClient({
       const scars = Array.isArray(scarsInput) ? scarsInput : [];
       const torties = Array.isArray(tortiesInput) ? tortiesInput : [];
 
+      const genericRows = Object.fromEntries(
+        PARAM_SEQUENCE.filter(
+          (definition) =>
+            definition.strategy === "slots" &&
+            definition.traitId !== "accessories" &&
+            definition.traitId !== "scars",
+        ).map((definition) => {
+          const values = Array.isArray(traitsInput?.[definition.traitId])
+            ? (traitsInput?.[definition.traitId] as unknown[])
+            : [];
+          return [
+            definition.layerKey,
+            values.map((_, index) => ({
+              label: `${definition.label} ${index + 1}`,
+              value: "—",
+              status: "idle" as const,
+            })),
+          ];
+        }),
+      );
       setLayerRows({
+        ...genericRows,
         accessories: accessories.map((_, idx) => ({
           label: `Accessory ${idx + 1}`,
           value: "—",
@@ -2283,7 +2303,7 @@ export function SingleCatPlusClient({
           value: "—",
           status: "idle",
         })),
-        torties: torties.map((_, idx) => ({
+        tortie: torties.map((_, idx) => ({
           label: `Tortie ${idx + 1}`,
           value: "—",
           status: "idle",
@@ -2385,6 +2405,123 @@ export function SingleCatPlusClient({
     [drawCanvas],
   );
 
+  const spinRegistryStringSlots = useCallback(
+    async (
+      definition: ParamDefinition,
+      rowIndex: number,
+      targetSlotsInput: unknown,
+      progressiveParams: Partial<CatParams>,
+      pauseDuration: number,
+      currentToken: number,
+    ) => {
+      const generator = generatorRef.current;
+      if (!generator) return;
+      const targetSlots = Array.isArray(targetSlotsInput)
+        ? targetSlotsInput.filter(
+            (value): value is string => typeof value === "string",
+          )
+        : [];
+      const choices = getRegistryRevealOptions(definition).filter(
+        (value): value is string =>
+          typeof value === "string" && value.toLowerCase() !== "none",
+      );
+      const committed: string[] = [];
+      const summary: string[] = [];
+
+      clearMirror();
+      setRollerLabel(definition.label);
+      if (targetSlots.length === 0) {
+        setRegistryRevealValue(progressiveParams, definition, []);
+        updateParamRow(rowIndex, { value: "None", status: "revealed" });
+        await renderCat(progressiveParams);
+        await wait(pauseDuration);
+        setRollerLabel(null);
+        setRollerActiveValue(null);
+        return;
+      }
+      for (let index = 0; index < targetSlots.length; index += 1) {
+        if (generationIdRef.current !== currentToken) return;
+        const target = targetSlots[index];
+        const spinState = readSpinState();
+        const variations = buildLayerOptionStrings(choices, target, true, {
+          spinny: spinState.spinny,
+          limit: subsetLimits[definition.timingKey] ? SUBSET_LIMIT : undefined,
+        });
+
+        if (spinState.spinny) {
+          const descriptors: VariantDescriptor[] = variations.map(
+            (option, variantIndex) => {
+              const preview = cloneParams(progressiveParams);
+              const nextValues = [...committed];
+              if (typeof option.raw === "string" && option.raw !== "none") {
+                nextValues.push(option.raw);
+              }
+              setRegistryRevealValue(preview, definition, nextValues);
+              return {
+                id: `${definition.traitId}-${index}-${variantIndex}`,
+                option,
+                params: preview,
+                label: option.display,
+                group: `${definition.traitId}-${index + 1}`,
+              };
+            },
+          );
+          const frames = await renderVariantFrames(
+            generator,
+            progressiveParams,
+            descriptors,
+            { priority: "high" },
+          );
+          const sequence = buildFlipSequence(frames);
+          for (const step of sequence) {
+            if (generationIdRef.current !== currentToken) return;
+            const display = step.frame.option.display;
+            updateLayerRow(definition.layerKey, index, {
+              value: display,
+              status: step.isFinal ? "revealed" : "active",
+            });
+            setRollerActiveValue(display);
+            await playFlip(
+              () => drawCanvas(step.frame.canvas),
+              getDelayWithMultiplier(definition.timingKey),
+            );
+          }
+        }
+
+        if (target.toLowerCase() !== "none") committed.push(target);
+        summary.push(
+          target.toLowerCase() === "none" ? "None" : formatValue(target),
+        );
+        setRegistryRevealValue(progressiveParams, definition, committed);
+        updateLayerRow(definition.layerKey, index, {
+          value: target.toLowerCase() === "none" ? "None" : formatValue(target),
+          status: "revealed",
+        });
+        await renderCat(progressiveParams);
+        await wait(pauseDuration);
+      }
+
+      updateParamRow(rowIndex, {
+        value: summary.length > 0 ? summary.join(", ") : "None",
+        status: "revealed",
+      });
+      setRollerLabel(null);
+      setRollerActiveValue(null);
+      clearMirror();
+    },
+    [
+      clearMirror,
+      drawCanvas,
+      getDelayWithMultiplier,
+      playFlip,
+      readSpinState,
+      renderCat,
+      subsetLimits,
+      updateLayerRow,
+      updateParamRow,
+    ],
+  );
+
   const spinAccessorySlots = useCallback(
     async (
       rowIndex: number,
@@ -2466,6 +2603,7 @@ export function SingleCatPlusClient({
             const basePreview = cloneParams(progressiveParams);
             basePreview.accessories = [];
             basePreview.accessory = undefined;
+            syncChangedRegistryTraitsFromLegacy(basePreview, ["accessories"]);
             const baseResult = await generator.generateCat(basePreview);
             baseCanvas = cloneSourceCanvas(
               baseResult.canvas as HTMLCanvasElement | OffscreenCanvas,
@@ -2481,6 +2619,7 @@ export function SingleCatPlusClient({
               }
               preview.accessories = accessoriesList;
               preview.accessory = accessoriesList[0];
+              syncChangedRegistryTraitsFromLegacy(preview, ["accessories"]);
               return {
                 id: `accessory-${i}-${variantIndex}`,
                 option,
@@ -2551,6 +2690,9 @@ export function SingleCatPlusClient({
 
           progressiveParams.accessories = committed.slice();
           progressiveParams.accessory = committed[0];
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, [
+            "accessories",
+          ]);
           await renderCat(progressiveParams);
           await wait(pauseDuration);
         } else {
@@ -2571,6 +2713,9 @@ export function SingleCatPlusClient({
           }
           progressiveParams.accessories = committed.slice();
           progressiveParams.accessory = committed[0];
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, [
+            "accessories",
+          ]);
           setRollerActiveValue(formatted);
           await renderCat(progressiveParams);
           await wait(pauseDuration);
@@ -2683,6 +2828,7 @@ export function SingleCatPlusClient({
             const basePreview = cloneParams(progressiveParams);
             basePreview.scars = [];
             basePreview.scar = undefined;
+            syncChangedRegistryTraitsFromLegacy(basePreview, ["scars"]);
             const baseResult = await generator.generateCat(basePreview);
             baseCanvas = cloneSourceCanvas(
               baseResult.canvas as HTMLCanvasElement | OffscreenCanvas,
@@ -2698,6 +2844,7 @@ export function SingleCatPlusClient({
               }
               preview.scars = scarsList;
               preview.scar = scarsList[0];
+              syncChangedRegistryTraitsFromLegacy(preview, ["scars"]);
               return {
                 id: `scar-${i}-${variantIndex}`,
                 option,
@@ -2768,6 +2915,7 @@ export function SingleCatPlusClient({
 
           progressiveParams.scars = committed.slice();
           progressiveParams.scar = committed[0];
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, ["scars"]);
           await renderCat(progressiveParams);
           await wait(pauseDuration);
         } else {
@@ -2785,6 +2933,7 @@ export function SingleCatPlusClient({
           }
           progressiveParams.scars = committed.slice();
           progressiveParams.scar = committed[0];
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, ["scars"]);
           setRollerActiveValue(formatted);
           await renderCat(progressiveParams);
           await wait(pauseDuration);
@@ -2885,7 +3034,7 @@ export function SingleCatPlusClient({
         const spinState = readSpinState();
 
         if (!target) {
-          updateLayerRow("torties", i, { value: "None", status: "revealed" });
+          updateLayerRow("tortie", i, { value: "None", status: "revealed" });
           context.torties[i] = null;
           summary.push("None");
           if (!spinState.spinny) {
@@ -2914,7 +3063,7 @@ export function SingleCatPlusClient({
               : target.colour;
 
           let working: TortieSlot = { ...target, colour: startColour };
-          updateLayerRow("torties", i, { value: "—", status: "active" });
+          updateLayerRow("tortie", i, { value: "—", status: "active" });
 
           const stageConfigs: Array<{
             kind: "mask" | "pattern" | "colour";
@@ -2984,6 +3133,7 @@ export function SingleCatPlusClient({
                 preview.tortieMask = candidateLayer.mask;
                 preview.tortiePattern = candidateLayer.pattern;
                 preview.tortieColour = candidateLayer.colour;
+                syncChangedRegistryTraitsFromLegacy(preview, ["tortie"]);
                 return {
                   id: `tortie-${i}-${stage.kind}-${variantIndex}`,
                   option,
@@ -3039,7 +3189,7 @@ export function SingleCatPlusClient({
               const drawStep = () => drawCanvas(step.frame.canvas);
               await playFlip(drawStep, stepDuration);
               setRollerActiveValue(formatTortieLayer(candidateLayer));
-              updateLayerRow("torties", i, {
+              updateLayerRow("tortie", i, {
                 value: formatTortieLayer(candidateLayer),
                 status: step.isFinal ? "revealed" : "active",
               });
@@ -3071,6 +3221,7 @@ export function SingleCatPlusClient({
           progressiveParams.tortiePattern = committed[0]?.pattern;
           progressiveParams.tortieColour = committed[0]?.colour;
           progressiveParams.isTortie = committed.length > 0;
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, ["tortie"]);
 
           setRollerLabel(`Tortie Layer ${i + 1}`);
           setRollerActiveValue(formatTortieLayer(working));
@@ -3078,7 +3229,7 @@ export function SingleCatPlusClient({
           await wait(pauseDuration);
         } else {
           const display = formatTortieLayer(target);
-          updateLayerRow("torties", i, { value: display, status: "revealed" });
+          updateLayerRow("tortie", i, { value: display, status: "revealed" });
           summary.push(display);
           committed.push({ ...target });
           context.torties[i] = { ...target };
@@ -3087,6 +3238,7 @@ export function SingleCatPlusClient({
           progressiveParams.tortiePattern = committed[0]?.pattern;
           progressiveParams.tortieColour = committed[0]?.colour;
           progressiveParams.isTortie = committed.length > 0;
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, ["tortie"]);
           setRollerActiveValue(display);
           await renderCat(progressiveParams);
           await wait(pauseDuration);
@@ -3166,7 +3318,12 @@ export function SingleCatPlusClient({
     return () => {
       cancelled = true;
     };
-  }, [drawPlaceholder, includeBaseColours, extendedModesArray, includeNewSprites]);
+  }, [
+    drawPlaceholder,
+    includeBaseColours,
+    extendedModesArray,
+    includeNewSprites,
+  ]);
 
   useEffect(() => {
     const mapper = mapperRef.current;
@@ -3338,6 +3495,14 @@ export function SingleCatPlusClient({
           }
 
           try {
+            syncChangedRegistryTraitsFromLegacy(previewParams, [
+              "pose",
+              group.key === "accessory"
+                ? "accessories"
+                : group.key === "scar"
+                  ? "scars"
+                  : "tortie",
+            ]);
             const result = await generator.generateCat(previewParams);
             const catCanvas = cloneSourceCanvas(
               result.canvas as HTMLCanvasElement | OffscreenCanvas,
@@ -3505,13 +3670,17 @@ export function SingleCatPlusClient({
         );
       const tortieLayers = tortieSlots.filter(Boolean) as TortieSlot[];
 
-      resetLayerRows(accessorySlots, scarSlots, tortieSlots);
+      resetLayerRows(accessorySlots, scarSlots, tortieSlots, {
+        ...(params.traits ?? {}),
+        ...(randomResult.slotSelections ?? {}),
+      });
 
       const { darkForest: enableDarkForest, dead: enableDead } =
         resolveAfterlife(afterlifeMode);
       params.darkForest = enableDarkForest;
       params.darkMode = enableDarkForest;
       params.dead = enableDead;
+      syncChangedRegistryTraitsFromLegacy(params, ["darkForest", "dead"]);
 
       const countsResult: GenerationCounts = {
         accessories: accessorySlots.length,
@@ -3545,8 +3714,8 @@ export function SingleCatPlusClient({
 
       const progressiveParams: Partial<CatParams> = {
         spriteNumber: DEFAULT_SPRITE_NUMBER,
-        shading: false,
-        reverse: false,
+        shading: params.shading ?? false,
+        reverse: params.reverse ?? false,
         isTortie: false,
         peltName: "SingleColour",
         accessories: [],
@@ -3558,9 +3727,14 @@ export function SingleCatPlusClient({
       progressiveParams.darkForest = params.darkForest ?? false;
       progressiveParams.darkMode = params.darkMode ?? false;
       progressiveParams.dead = params.dead ?? false;
-      progressiveParams.shading = params.shading ?? false;
-      progressiveParams.reverse = params.reverse ?? false;
-
+      syncChangedRegistryTraitsFromLegacy(progressiveParams, [
+        "accessories",
+        "scars",
+        "tortie",
+        "colour",
+        "darkForest",
+        "dead",
+      ]);
       const contextForApply = {
         accessories: accessorySlots.map(() => "none" as string),
         scars: scarSlots.map(() => "none" as string),
@@ -3598,8 +3772,6 @@ export function SingleCatPlusClient({
           continue;
         }
         if (generationIdRef.current !== token) return;
-        if (definition.requiresTortie && !params.isTortie) continue;
-
         const paramKeyCandidate = definition.id;
         const paramKey = isParamTimingKey(paramKeyCandidate)
           ? paramKeyCandidate
@@ -3636,7 +3808,7 @@ export function SingleCatPlusClient({
           basePause / speedMultiplierRef.current,
         );
         const isInstantParam = INSTANT_PARAMS.includes(definition.id);
-        const isTortieToggle = definition.id === "tortie";
+        const isTortieToggle = definition.compoundMode === "tortieParts";
         const shouldAnimate =
           spinState.spinny &&
           !!rollerOptions &&
@@ -3684,6 +3856,22 @@ export function SingleCatPlusClient({
             setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
           }
           clearMirror();
+          continue;
+        }
+
+        if (definition.strategy === "slots") {
+          await spinRegistryStringSlots(
+            definition,
+            rowIndex,
+            randomResult.slotSelections?.[definition.traitId] ??
+              getRegistryRevealValue(params, definition),
+            progressiveParams,
+            pauseDuration,
+            token,
+          );
+          if (rowIndex >= 0) {
+            setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+          }
           continue;
         }
 
@@ -3797,7 +3985,7 @@ export function SingleCatPlusClient({
           await settleRoller(token, { keepLabel: false, skipHighlight: true });
         }
 
-        if (definition.id === "tortie") {
+        if (definition.compoundMode === "tortieParts") {
           await spinTortieSlots(
             rowIndex,
             tortieSlots,
@@ -3936,7 +4124,7 @@ export function SingleCatPlusClient({
 
         try {
           const result = await createMapper({
-            catData: mapperPayload,
+            catData: catDataToLegacyPersistence(mapperPayload),
             catName: state.catName ?? undefined,
             creatorName: state.creatorName ?? undefined,
           });
@@ -4016,6 +4204,7 @@ export function SingleCatPlusClient({
     tortieRange,
     resetLayerRows,
     spinAccessorySlots,
+    spinRegistryStringSlots,
     spinScarSlots,
     spinTortieSlots,
     revealLayerCounts,
@@ -4065,6 +4254,7 @@ export function SingleCatPlusClient({
         params.darkForest = false;
         params.darkMode = false;
         params.dead = false;
+        syncChangedRegistryTraitsFromLegacy(params, ["darkForest", "dead"]);
       }
       const result = await generator.generateCat(params);
       const exportCanvas = document.createElement("canvas");
@@ -4112,10 +4302,12 @@ export function SingleCatPlusClient({
               spriteNumber,
               poseName: state.params.poseName,
             }));
-      const params = { ...state.params, spriteNumber };
-      if (poseName) {
-        params.poseName = poseName;
-      }
+      const params = {
+        ...state.params,
+        spriteNumber,
+        poseName: poseName ?? undefined,
+      };
+      syncChangedRegistryTraitsFromLegacy(params, ["pose"]);
       const result = await generator.generateCat(params);
       const exportCanvas = document.createElement("canvas");
       exportCanvas.width = size;
@@ -4175,6 +4367,7 @@ export function SingleCatPlusClient({
           spriteNumber: poseChoice.spriteNumber,
           poseName: poseChoice.poseName,
         };
+        syncChangedRegistryTraitsFromLegacy(spriteParams, ["pose"]);
         const result = await generator.generateCat(spriteParams);
         if (spritePreviewTokenRef.current !== previewToken) return;
         const previewCanvas = document.createElement("canvas");
@@ -4252,7 +4445,9 @@ export function SingleCatPlusClient({
 
     try {
       const result = await createMapper({
-        catData: shareSlug ? { ...payload, shareSlug } : payload,
+        catData: catDataToLegacyPersistence(
+          shareSlug ? { ...payload, shareSlug } : payload,
+        ),
         catName: state.catName ?? undefined,
         creatorName: state.creatorName ?? undefined,
       });
@@ -4983,114 +5178,114 @@ export function SingleCatPlusClient({
       {spriteGalleryOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
-              onClick={(event) => {
-                if (event.target === event.currentTarget) {
-                  closeSpriteGallery();
-                }
-              }}
-              onKeyDown={(event) =>
-                handleManagedDialogKeyDown(event, closeSpriteGallery)
-              }
-              role="dialog"
-              aria-modal="true"
-              tabIndex={-1}
-              aria-labelledby="sprite-gallery-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeSpriteGallery();
+            }
+          }}
+          onKeyDown={(event) =>
+            handleManagedDialogKeyDown(event, closeSpriteGallery)
+          }
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          aria-labelledby="sprite-gallery-title"
+        >
+          <div className="relative flex max-h-[85vh] w-full max-w-5xl flex-col rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
+            <button
+              ref={spriteGalleryCloseRef}
+              type="button"
+              onClick={closeSpriteGallery}
+              aria-label="Close sprite gallery"
+              className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
             >
-              <div className="relative flex max-h-[85vh] w-full max-w-5xl flex-col rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
-                <button
-                  ref={spriteGalleryCloseRef}
-                  type="button"
-                  onClick={closeSpriteGallery}
-                  aria-label="Close sprite gallery"
-                  className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
+              <XIcon size={16} />
+            </button>
+            <div className="flex min-h-0 flex-col gap-6">
+              <div>
+                <h2
+                  id="sprite-gallery-title"
+                  className="text-xl font-semibold text-foreground"
                 >
-                  <XIcon size={16} />
-                </button>
-                <div className="flex min-h-0 flex-col gap-6">
-                  <div>
-                    <h2
-                      id="sprite-gallery-title"
-                      className="text-xl font-semibold text-foreground"
-                    >
-                      Sprite Gallery
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Browse every sprite rendered for this cat and copy quick
-                      exports.
-                    </p>
-                  </div>
-                  {spritePreviewLoading ? (
-                    <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
-                      Generating sprite previews...
-                    </div>
-                  ) : spriteVariations.length === 0 ? (
-                    <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
-                      No sprite previews available.
-                    </div>
-                  ) : (
-                    <div className="min-h-0 overflow-y-auto pr-1">
-                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        {spriteVariations.map((variation) => (
-                          <div
-                            key={variation.id}
-                            className="rounded-2xl border border-border/40 bg-background/70 p-4"
-                          >
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-semibold text-foreground">
-                                {variation.name}
-                              </p>
-                              <span className="text-xs text-muted-foreground">
-                                Named pose
-                              </span>
-                            </div>
-                            <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
-                              <Image
-                                src={variation.dataUrl}
-                                alt={variation.name}
-                                width={120}
-                                height={120}
-                                unoptimized
-                                className="mx-auto block h-28 w-28 image-render-pixel"
-                              />
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                aria-label={`Copy ${variation.name} at 120 by 120 pixels`}
-                                className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                                onClick={() =>
-                                  handleCopySprite(
-                                    variation.spriteNumber,
-                                    120,
-                                    variation.poseName ?? null,
-                                    variation.name,
-                                  )
-                                }
-                              >
-                                Copy 120×120
-                              </button>
-                              <button
-                                type="button"
-                                aria-label={`Copy ${variation.name} at ${FULL_EXPORT_SIZE} by ${FULL_EXPORT_SIZE} pixels`}
-                                className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
-                                onClick={() =>
-                                  handleCopySprite(
-                                    variation.spriteNumber,
-                                    FULL_EXPORT_SIZE,
-                                    variation.poseName ?? null,
-                                    variation.name,
-                                  )
-                                }
-                              >
-                                Copy 700×700
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  Sprite Gallery
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Browse every sprite rendered for this cat and copy quick
+                  exports.
+                </p>
+              </div>
+              {spritePreviewLoading ? (
+                <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+                  Generating sprite previews...
                 </div>
+              ) : spriteVariations.length === 0 ? (
+                <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
+                  No sprite previews available.
+                </div>
+              ) : (
+                <div className="min-h-0 overflow-y-auto pr-1">
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {spriteVariations.map((variation) => (
+                      <div
+                        key={variation.id}
+                        className="rounded-2xl border border-border/40 bg-background/70 p-4"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-foreground">
+                            {variation.name}
+                          </p>
+                          <span className="text-xs text-muted-foreground">
+                            Named pose
+                          </span>
+                        </div>
+                        <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
+                          <Image
+                            src={variation.dataUrl}
+                            alt={variation.name}
+                            width={120}
+                            height={120}
+                            unoptimized
+                            className="mx-auto block h-28 w-28 image-render-pixel"
+                          />
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            aria-label={`Copy ${variation.name} at 120 by 120 pixels`}
+                            className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
+                            onClick={() =>
+                              handleCopySprite(
+                                variation.spriteNumber,
+                                120,
+                                variation.poseName ?? null,
+                                variation.name,
+                              )
+                            }
+                          >
+                            Copy 120×120
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Copy ${variation.name} at ${FULL_EXPORT_SIZE} by ${FULL_EXPORT_SIZE} pixels`}
+                            className="flex-1 rounded-lg border border-border/50 px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-foreground hover:text-background"
+                            onClick={() =>
+                              handleCopySprite(
+                                variation.spriteNumber,
+                                FULL_EXPORT_SIZE,
+                                variation.poseName ?? null,
+                                variation.name,
+                              )
+                            }
+                          >
+                            Copy 700×700
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -5098,25 +5293,25 @@ export function SingleCatPlusClient({
       {timingModalOpen && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 py-10"
-              onClick={(event) => {
-                if (event.target === event.currentTarget) {
-                  setTimingModalOpen(false);
-                }
-              }}
-              onKeyDown={(event) =>
-                handleManagedDialogKeyDown(event, () => setTimingModalOpen(false))
-              }
-              role="dialog"
-              aria-modal="true"
-              tabIndex={-1}
-              aria-labelledby="spin-timing-title"
-            >
-              <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
-                <button
-                  ref={timingCloseRef}
-                  type="button"
-                  onClick={() => setTimingModalOpen(false)}
-                  className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setTimingModalOpen(false);
+            }
+          }}
+          onKeyDown={(event) =>
+            handleManagedDialogKeyDown(event, () => setTimingModalOpen(false))
+          }
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
+          aria-labelledby="spin-timing-title"
+        >
+          <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
+            <button
+              ref={timingCloseRef}
+              type="button"
+              onClick={() => setTimingModalOpen(false)}
+              className="absolute right-4 top-4 rounded-full border border-border/50 bg-background/80 p-1.5 text-muted-foreground transition hover:bg-foreground hover:text-background"
               aria-label="Close timing settings"
             >
               <XIcon size={16} />

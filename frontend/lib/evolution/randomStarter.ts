@@ -4,6 +4,11 @@
  * the evolution generator page and the stream control panel.
  */
 
+import {
+  catDocumentToLegacyParams,
+  readCatDocument,
+} from "@/lib/cat-system/document";
+import { getEvolutionTraits } from "@/lib/cat-system/runtime";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
   applyEvolutionStarterHairToParams,
@@ -12,17 +17,23 @@ import {
 } from "./evolutionGenerator";
 
 export function cleanRandomStarterLayers(params: CatParams): CatParams {
-  const next = { ...params };
-  next.accessories = [];
-  next.scars = [];
-  next.tortie = [];
-  next.isTortie = false;
-  delete next.accessory;
-  delete next.scar;
-  delete next.tortieMask;
-  delete next.tortiePattern;
-  delete next.tortieColour;
-  return next;
+  const document = readCatDocument(params);
+  const traits = { ...document.traits } as Record<string, unknown>;
+  for (const trait of getEvolutionTraits()) {
+    if (
+      trait.capabilities.evolution === "accumulate" &&
+      (trait.value.kind === "stringList" || trait.value.kind === "objectList")
+    ) {
+      traits[trait.id] = [];
+    }
+  }
+  const cleaned = readCatDocument({ ...document, traits });
+  return {
+    ...catDocumentToLegacyParams(cleaned),
+    schemaVersion: cleaned.schemaVersion,
+    traits: cleaned.traits,
+    ...(cleaned.unknownTraits ? { unknownTraits: cleaned.unknownTraits } : {}),
+  } as unknown as CatParams;
 }
 
 export async function buildRandomEvolutionStarter(
@@ -40,11 +51,13 @@ export async function buildRandomEvolutionStarter(
     },
   });
   const starterHair = resolveEvolutionStarterHair(hairSprite);
+  const params = applyEvolutionStarterHairToParams(
+    cleanRandomStarterLayers(randomStarter.params),
+    starterHair,
+  );
   return {
-    params: applyEvolutionStarterHairToParams(
-      cleanRandomStarterLayers(randomStarter.params),
-      starterHair,
-    ),
+    document: readCatDocument(params),
+    params,
     accessorySlots: [],
     scarSlots: [],
     tortieSlots: [],

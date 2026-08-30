@@ -15,6 +15,10 @@ import {
   type BatchStreamCat,
   batchStartCount,
 } from "@/lib/adoption/streamBatch";
+import {
+  catDataToLegacyPersistence,
+  syncChangedRegistryTraitsFromLegacy,
+} from "@/lib/cat-system";
 import { encodeCatShare } from "@/lib/catShare";
 import type { PaletteId } from "@/lib/palettes";
 import { cn } from "@/lib/utils";
@@ -168,7 +172,9 @@ export function BatchPanel() {
     setStarting(true);
     try {
       const cats: BatchStreamCat[] = [];
-      for (let index = 0; index < startCount; index++) {
+      let requiredCount = BATCH_FINAL_COUNT;
+      while (cats.length < requiredCount) {
+        const index = cats.length;
         const result = await generator.generateRandomCat({
           experimentalColourMode:
             extendedModes.length > 0
@@ -185,6 +191,10 @@ export function BatchPanel() {
           result.params as unknown as Record<string, unknown>,
           settings.afterlifeMode,
         );
+        syncChangedRegistryTraitsFromLegacy(resolvedParams, [
+          "darkForest",
+          "dead",
+        ]);
         const accessorySlots = padSlots(
           result.slotSelections?.accessories,
           accessoryCount,
@@ -211,6 +221,7 @@ export function BatchPanel() {
             },
           },
         });
+        requiredCount = batchStartCount(config, BATCH_FINAL_COUNT, cats);
       }
       if (startTokenRef.current !== token) return;
 
@@ -219,7 +230,12 @@ export function BatchPanel() {
           title: title.trim() || "Stream Litter",
           finalCount: BATCH_FINAL_COUNT,
           config,
-          cats,
+          cats: cats.map((cat) => ({
+            ...cat,
+            catData: catDataToLegacyPersistence(
+              cat.catData,
+            ) as unknown as BatchStreamCat["catData"],
+          })),
         },
       });
       setLastSlug(null);
@@ -243,7 +259,6 @@ export function BatchPanel() {
     includeBaseColours,
     scarCount,
     settings,
-    startCount,
     starting,
     title,
     tortieCount,
@@ -276,14 +291,14 @@ export function BatchPanel() {
         const catsPayload = await Promise.all(
           finalists.map(async (cat, index) => {
             const mapperResult = await createMapper({
-              catData: cat.catData,
+              catData: catDataToLegacyPersistence(cat.catData),
               creatorName: creatorNameDraft.trim() || undefined,
             });
             const shareToken =
               mapperResult.shareToken ?? mapperResult.slug ?? mapperResult.id;
             return {
               label: `Cat ${index + 1}`,
-              catData: cat.catData,
+              catData: catDataToLegacyPersistence(cat.catData),
               profileId: toId("cat_profile", mapperResult.id),
               encoded: encodeCatShare(
                 cat.catData as unknown as Parameters<typeof encodeCatShare>[0],

@@ -7,6 +7,7 @@ import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import DownChevron from "@/components/ui/down-chevron";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import {
   DEFAULT_POSE_NAME,
   formatPoseName,
@@ -74,17 +75,19 @@ export function ColorPaletteContent({
   const catParams = useMemo(() => {
     if (!mapperRecord?.cat_data) return null;
     const data = mapperRecord.cat_data as Record<string, unknown>;
-    let params: Record<string, unknown>;
+    let sourceParams: Record<string, unknown>;
     if (data.params && typeof data.params === "object") {
-      params = data.params as Record<string, unknown>;
+      sourceParams = data.params as Record<string, unknown>;
     } else if (data.spriteNumber !== undefined) {
       // Flat format — the entire catData IS the params
-      params = data;
+      sourceParams = data;
     } else {
       return null;
     }
-    if (darkForestParam === "false" && params.darkForest) {
+    let params = { ...sourceParams };
+    if (darkForestParam === "false") {
       params = { ...params, darkForest: false, darkMode: false };
+      syncChangedRegistryTraitsFromLegacy(params, ["darkForest"]);
     }
     return params;
   }, [mapperRecord, darkForestParam]);
@@ -136,7 +139,9 @@ export function ColorPaletteContent({
       poseName: string,
       size: number,
     ): Promise<HTMLCanvasElement> => {
-      const result = await generator.generateCat({ ...params, poseName });
+      const renderParams = { ...params, poseName };
+      syncChangedRegistryTraitsFromLegacy(renderParams, ["pose"]);
+      const result = await generator.generateCat(renderParams);
       const canvas = document.createElement("canvas");
       canvas.width = size;
       canvas.height = size;
