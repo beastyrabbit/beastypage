@@ -6,6 +6,7 @@ import {
   getArchetypeTheme,
   withAlpha,
 } from "@/components/evolution/archetypes";
+import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import {
   estimateCeremonySeconds,
   formatDuration,
@@ -251,6 +252,10 @@ export function OBSLobby({
               spriteNumber: fixedSprite,
               reverse: false,
             };
+            syncChangedRegistryTraitsFromLegacy(overrideParams, [
+              "pose",
+              "reverse",
+            ]);
             const rendered = await generator.generateCat(overrideParams);
             if (rendered.canvas instanceof HTMLCanvasElement) {
               frames.push(rendered.canvas.toDataURL("image/png"));

@@ -1,0 +1,942 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BeastyPage Katzenmerkmal-System: implementierter Iststand</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #25211b;
+        --muted: #696156;
+        --paper: #f3efe6;
+        --card: #fffdf8;
+        --line: #d6cebf;
+        --accent: #8a4823;
+        --accent-soft: #f3e1d3;
+        --green: #285f47;
+        --green-soft: #e1eee6;
+        --yellow: #795914;
+        --yellow-soft: #f4e9ca;
+        --red: #843b34;
+        --red-soft: #f3dedb;
+        --code: #282720;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 16px;
+        line-height: 1.55;
+      }
+
+      main {
+        width: min(1100px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 60px;
+      }
+
+      h1, h2, h3 {
+        color: #29231c;
+        line-height: 1.2;
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 900px;
+        margin: 0 0 10px;
+        font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+        font-size: clamp(2rem, 5vw, 3.25rem);
+        letter-spacing: -0.03em;
+      }
+
+      h2 {
+        margin: 42px 0 14px;
+        padding-top: 9px;
+        border-top: 2px solid var(--ink);
+        font-size: clamp(1.4rem, 3vw, 1.9rem);
+      }
+
+      h3 {
+        margin: 21px 0 8px;
+        font-size: 1.08rem;
+      }
+
+      p { margin: 8px 0 14px; }
+      ul, ol { padding-left: 1.3rem; }
+      li { margin: 6px 0; }
+      code, pre { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
+      code { font-size: 0.92em; }
+
+      pre {
+        margin: 14px 0;
+        padding: 16px;
+        overflow-x: auto;
+        border-radius: 10px;
+        background: var(--code);
+        color: #f7f1e3;
+        font-size: 0.82rem;
+        line-height: 1.48;
+      }
+
+      .eyebrow {
+        margin: 0 0 5px;
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .subhead {
+        max-width: 880px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 1.04rem;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px 18px;
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 0.84rem;
+      }
+
+      .decision {
+        margin-top: 27px;
+        padding: 20px 22px;
+        border: 1px solid #c7a387;
+        border-left: 6px solid var(--accent);
+        border-radius: 10px;
+        background: #fff9f2;
+      }
+
+      .decision strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 1.16rem;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 9px;
+        margin: 19px 0;
+      }
+
+      .metric {
+        min-height: 104px;
+        padding: 13px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--card);
+      }
+
+      .metric b {
+        display: block;
+        color: var(--accent);
+        font-family: ui-serif, Georgia, serif;
+        font-size: 1.85rem;
+        line-height: 1;
+      }
+
+      .metric span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 0.79rem;
+        line-height: 1.32;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin: 14px 0 22px;
+      }
+
+      .card {
+        padding: 17px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--card);
+      }
+
+      .card h3 { margin-top: 0; }
+      .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+
+      .table-wrap {
+        overflow-x: auto;
+        margin: 14px 0 22px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--card);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.89rem;
+      }
+
+      th, td {
+        padding: 11px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #ece5d9;
+        color: #40382f;
+        font-size: 0.76rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td { border-bottom: 0; }
+
+      .tag {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: 999px;
+        font-size: 0.71rem;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+
+      .tag.good { background: var(--green-soft); color: var(--green); }
+      .tag.warn { background: var(--yellow-soft); color: var(--yellow); }
+      .tag.neutral { background: #e9e4da; color: #4d473e; }
+
+      .note, .warning, .acceptance {
+        margin: 18px 0;
+        padding: 15px 17px;
+        border-radius: 8px;
+      }
+
+      .note {
+        border-left: 4px solid var(--yellow);
+        background: var(--yellow-soft);
+      }
+
+      .warning {
+        border-left: 4px solid var(--red);
+        background: var(--red-soft);
+        color: #67312c;
+      }
+
+      .acceptance {
+        background: var(--green-soft);
+        color: #244d39;
+      }
+
+      .acceptance h3 { margin-top: 0; color: #244d39; }
+
+      .architecture {
+        margin: 18px 0 24px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--card);
+      }
+
+      .architecture svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .hash {
+        display: block;
+        padding: 10px 12px;
+        overflow-wrap: anywhere;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: #eee8dd;
+        font-size: 0.8rem;
+      }
+
+      .small { color: var(--muted); font-size: 0.84rem; }
+
+      footer {
+        margin-top: 44px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      @media (max-width: 960px) {
+        .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      }
+
+      @media (max-width: 700px) {
+        main { width: min(100% - 22px, 1100px); padding-top: 22px; }
+        .cards { grid-template-columns: 1fr; }
+        th, td { padding: 9px; }
+      }
+
+      @media (max-width: 460px) {
+        .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Technischer Iststandsbericht</p>
+        <h1>Das Katzenmerkmal-System ist als geschlossener Vertrag implementiert</h1>
+        <p class="subhead">
+          Eine TypeScript-Registry beschreibt Trait-Werte, Kataloge, Renderoperationen, Gacha und Consumer-Fähigkeiten.
+          Generatoren verteilen daraus sprachneutrale Verträge an Frontend, Python-Renderer und Discord. Der gemeinsame
+          Build lehnt veraltete Artefakte, unbekannte Strategien und ungültige Abhängigkeiten ab. Die drei Docker-Gates
+          lehnen Images ab, deren erwarteter Hash nicht zum eingebetteten Vertrag passt.
+        </p>
+        <div class="meta">
+          <span>Stand: 25. August 2026</span>
+          <span>Projektversion: v7.3.1</span>
+          <span>Status: lokal implementiert und gegen Produktion geprüft</span>
+          <span>Nicht deployed oder released</span>
+        </div>
+      </header>
+
+      <section class="decision" aria-label="Ergebnis der Architekturentscheidung">
+        <strong>Der Big Bang ist im Arbeitsstand umgesetzt. Python bleibt, Convex bleibt draußen.</strong>
+        Ein neuer Trait mit vorhandenen Strategien wird einmal in der Registry beschrieben. Derselbe Eintrag speist Schema,
+        Renderer, Gacha, Builder, Stream-Abläufe, Evolution, Vererbung, Share-Formate und Discord. Die vorhandenen
+        Gacha-Einstellungen bleiben davon getrennt. Neue technische Semantik braucht weiterhin genau eine zentrale Strategie.
+        Sie braucht keine Kopie pro Seite.
+      </section>
+
+      <div class="metrics" aria-label="Kennzahlen des implementierten Vertrags">
+        <div class="metric"><b>20</b><span>Produkt-Traits in der Registry</span></div>
+        <div class="metric"><b>18</b><span>generierte Kataloge</span></div>
+        <div class="metric"><b>16</b><span>geordnete Renderoperationen</span></div>
+        <div class="metric"><b>12</b><span>versionierte Python-Strategien</span></div>
+        <div class="metric"><b>463</b><span>Tests im letzten vollständigen lokalen Gate-Lauf</span></div>
+        <div class="metric"><b>3/3</b><span>Images im lokalen Laufbericht geprüft</span></div>
+      </div>
+
+      <h2>Was sich grundlegend geändert hat</h2>
+
+      <p>
+        Vor dem Umbau konnte ein neues Element an einer Stelle sichtbar sein und in einem anderen Tool fehlen. Mehrere
+        Listen, Parameterformen und Renderpfade mussten von Hand übereinstimmen. Der neue Kern ersetzt diese stillen
+        Vereinbarungen durch eine geschlossene Definition. <code>defineCatTrait</code> verlangt für jeden Trait Wertetyp,
+        Legacy-Abbildung, Renderbindung, Gacha-Verhalten und Consumer-Fähigkeiten. <code>defineCatSystem</code> prüft die
+        Beziehungen zwischen diesen Angaben.
+      </p>
+
+      <pre><code>CatTraitDefinition
+  id + label + order
+  value schema + catalog + cardinality
+  legacy mapping
+  render binding or operation
+  gacha strategy + dependencies
+  display/edit/reveal/evolution/inherit/settings</code></pre>
+
+      <div class="cards">
+        <article class="card">
+          <h3>Eine fachliche Quelle</h3>
+          <p>
+            TypeScript und Zod sind die bearbeitbare Quelle. Katalogdaten stammen weiterhin aus den kanonischen Sprite- und
+            Fellmetadaten. Die Registry erklärt, wie diese Daten im System verwendet werden.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Ein portables Dokument</h3>
+          <p>
+            <code>CatDocument</code> speichert <code>schemaVersion</code>, eine typisierte Trait-Map und optional
+            <code>unknownTraits</code>. Legacy-Parameter werden an den Rändern übersetzt. Unbekannte Werte überleben einen
+            älteren Leser, statt beim Weiterreichen verloren zu gehen.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Generierte Verträge</h3>
+          <p>
+            Der Compiler schreibt JSON Schema, öffentlichen Katalog, Renderplan, Kompatibilitätsdaten, Strategiemanifest und
+            Hashdateien. Ein Bundle-Manifest bindet diese Verträge und die Assets an denselben Katalog-Hash. Frontend,
+            Renderer und Discord bekommen denselben Stand.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Generische Consumer</h3>
+          <p>
+            Consumer fragen Fähigkeiten ab, etwa <code>edit</code>, <code>reveal</code> oder <code>evolution</code>. Neue Traits
+            erscheinen über diese Abfragen. Die Settings-Seite ist bewusst keine generische Trait-Oberfläche. Dort bleiben
+            nur die drei vorhandenen Count-Bereiche.
+          </p>
+        </article>
+      </div>
+
+      <h2>Technologieentscheidung</h2>
+
+      <p>
+        Die bearbeitbare Quelle bleibt eine TypeScript-DSL mit Zod-Schemas. Das ist hier mehr als eine Typwahl. Derselbe
+        Compiler kann den Wertetyp eines Traits mit Legacy-Abbildung, Renderstrategie, Gacha-Katalog und
+        Consumer-Fähigkeiten vergleichen. Ungültige Kombinationen scheitern bereits in <code>defineCatTrait</code>,
+        <code>defineCatSystem</code> oder bei der Artefaktgenerierung.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Technik</th><th>Rolle im System</th><th>Entscheidung</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>TypeScript und Zod</td>
+              <td>Fachliche Definition, statische Typen, Laufzeitprüfung und projektspezifische Konsistenzregeln</td>
+              <td><span class="tag good">Quelle</span></td>
+            </tr>
+            <tr>
+              <td>JSON Schema</td>
+              <td>Sprachneutraler Vertrag für <code>CatDocument</code> und den Python-Validator</td>
+              <td><span class="tag good">generiert</span></td>
+            </tr>
+            <tr>
+              <td>Microsoft TypeSpec</td>
+              <td>Kann API- und Datenformen beschreiben, ersetzt aber nicht die Regeln für Gacha, Render-DAG und Consumer-Fähigkeiten</td>
+              <td><span class="tag neutral">bewusst nicht die Quelle</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        TypeSpec wäre eine zusätzliche Definitions- und Generatorschicht. Es würde für dieses System keinen Vertrag
+        schließen, den die TypeScript-DSL nicht bereits näher am laufenden Code prüft. Sollte später ein öffentliches API
+        mit mehreren unabhängigen Clients entstehen, kann TypeSpec dafür separat sinnvoll werden. Der Katzenvertrag bleibt
+        trotzdem bei TypeScript und Zod.
+      </p>
+
+      <h2>So verteilt sich eine Definition</h2>
+
+      <div class="architecture" role="img" aria-label="Die TypeScript-Registry erzeugt Verträge für alle Consumer, ohne Convex-Laufzeit">
+        <svg viewBox="0 0 1040 430" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="#8a4823"></path>
+            </marker>
+          </defs>
+          <rect x="25" y="137" width="250" height="148" rx="12" fill="#f3e1d3" stroke="#8a4823" stroke-width="2"></rect>
+          <text x="48" y="172" font-size="18" font-weight="700" fill="#5f321c">TypeScript-Registry</text>
+          <text x="48" y="201" font-size="13" fill="#644a3b">Traits, Zod-Werte, Katalogquellen</text>
+          <text x="48" y="224" font-size="13" fill="#644a3b">Render- und Gacha-Strategien</text>
+          <text x="48" y="247" font-size="13" fill="#644a3b">Consumer-Fähigkeiten</text>
+
+          <line x1="275" y1="211" x2="355" y2="211" stroke="#8a4823" stroke-width="3" marker-end="url(#arrow)"></line>
+
+          <rect x="370" y="137" width="265" height="148" rx="12" fill="#eee8dd" stroke="#6a6257" stroke-width="2"></rect>
+          <text x="394" y="172" font-size="18" font-weight="700" fill="#40382f">Compiler und Gate</text>
+          <text x="394" y="201" font-size="13" fill="#51493f">Typen, Graphen und Kataloge prüfen</text>
+          <text x="394" y="224" font-size="13" fill="#51493f">Artefakte deterministisch erzeugen</text>
+          <text x="394" y="247" font-size="13" fill="#51493f">Hash und Probe vergleichen</text>
+
+          <line x1="635" y1="211" x2="710" y2="82" stroke="#8a4823" stroke-width="2" marker-end="url(#arrow)"></line>
+          <line x1="635" y1="211" x2="710" y2="168" stroke="#8a4823" stroke-width="2" marker-end="url(#arrow)"></line>
+          <line x1="635" y1="211" x2="710" y2="254" stroke="#8a4823" stroke-width="2" marker-end="url(#arrow)"></line>
+          <line x1="635" y1="211" x2="710" y2="340" stroke="#8a4823" stroke-width="2" marker-end="url(#arrow)"></line>
+
+          <rect x="725" y="40" width="285" height="72" rx="10" fill="#e1eee6" stroke="#285f47"></rect>
+          <text x="748" y="70" font-size="16" font-weight="700" fill="#244d39">Python-Renderer</text>
+          <text x="748" y="93" font-size="13" fill="#365c49">Pydantic, Manifest und Render-DAG</text>
+
+          <rect x="725" y="126" width="285" height="72" rx="10" fill="#e1eee6" stroke="#285f47"></rect>
+          <text x="748" y="156" font-size="16" font-weight="700" fill="#244d39">Gacha und Settings</text>
+          <text x="748" y="179" font-size="13" fill="#365c49">seedbarer Kern und feste Registry-Regeln</text>
+
+          <rect x="725" y="212" width="285" height="72" rx="10" fill="#e1eee6" stroke="#285f47"></rect>
+          <text x="748" y="242" font-size="16" font-weight="700" fill="#244d39">Seiten und Abläufe</text>
+          <text x="748" y="265" font-size="13" fill="#365c49">Builder, Stream, Share, Evolution</text>
+
+          <rect x="725" y="298" width="285" height="72" rx="10" fill="#e1eee6" stroke="#285f47"></rect>
+          <text x="748" y="328" font-size="16" font-weight="700" fill="#244d39">Discord und Images</text>
+          <text x="748" y="351" font-size="13" fill="#365c49">öffentlicher Katalog und gleicher Hash</text>
+
+          <rect x="25" y="345" width="610" height="55" rx="10" fill="#f4e9ca" stroke="#795914"></rect>
+          <text x="47" y="368" font-size="15" font-weight="700" fill="#59420f">Convex ist nicht Teil dieser Kette</text>
+          <text x="47" y="389" font-size="12" fill="#6b5525">Keine Registry, Generierung, Gacha-, Render- oder Verteilungsarbeit in der Datenbank</text>
+        </svg>
+      </div>
+
+      <h2>Was ein erfolgreicher System-Build jetzt beweist</h2>
+
+      <p>
+        Der Befehl <code>pnpm cat-system:build</code> ist das Big-Bang-Gate. Er läuft ohne echte Convex- oder Clerk-Zugänge.
+        Der Befehl setzt dafür lokal gültige Platzhalter und benötigt weder einen Convex-Deploy-Key noch eine
+        Datenbankänderung. Er prüft den Source- und Laufzeitvertrag. Die Docker-Builds sind eigene, nachgelagerte Gates.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Prüfung</th><th>Was bei einem Fehler passiert</th><th>Aktueller Beleg</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Registry und Generatoren</td>
+              <td>Unvollständige Traits, ungültige Kataloge, veraltete Artefakte, Trait- oder Renderzyklen stoppen den Build.</td>
+              <td><span class="tag good">grün</span> 20 Traits, 18 Kataloge</td>
+            </tr>
+            <tr>
+              <td>TypeScript und Frontend</td>
+              <td>Typfehler, Consumer-Regressionen und ein nicht prerenderbares Next-Frontend stoppen den Build.</td>
+              <td><span class="tag good">grün</span> 48 Testdateien, 396 Tests, Next-Seitengenerierung 61/61</td>
+            </tr>
+            <tr>
+              <td>Discord</td>
+              <td>Der Bot muss kompilieren und den generierten öffentlichen Katalog lesen können.</td>
+              <td><span class="tag good">grün</span> TypeScript und 3 Adaptertests</td>
+            </tr>
+            <tr>
+              <td>Python-Vertrag</td>
+              <td>Unbekannte Strategien, falsche Parameter, fehlende Assets, Schemaabweichungen und Hash-Konflikte stoppen den Start oder Test.</td>
+              <td><span class="tag good">grün</span> 64 Tests, davon 24 Vertragsfälle</td>
+            </tr>
+            <tr>
+              <td>Geteilte Vertragsprobe</td>
+              <td>Ein synthetischer neuer Slot-Trait muss durch TypeScript und den echten Python-Executor laufen.</td>
+              <td><span class="tag good">grün</span> <code>__probe_a81f</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="small">
+        Die Zahlen 396 und 61/61 stammen aus dem vollständigen lokalen Gate-Lauf vom 25. August 2026. 61/61 ist der
+        Fortschrittszähler der Next-Seitengenerierung, nicht die Anzahl statischer Routen. Die anschließende Routenliste
+        enthält statische und dynamische Routen.
+      </p>
+
+      <p>Der geprüfte Produkt-Hash lautet:</p>
+      <code class="hash">644c07d1533117cd7c4b7c2774f0d6ba574de7b7509de418010d42ef8ce44ef8</code>
+
+      <h2>Renderer-Entscheidung</h2>
+
+      <section class="decision" aria-label="Entscheidung zum Python-Renderer">
+        <strong>Den Python-Renderer zu entfernen hätte das Verteilungsproblem nicht behoben.</strong>
+        Das Verteilungsproblem entstand durch mehrere unabhängige Trait-Listen. Python war nicht die Ursache. Der Service
+        bleibt deshalb auf Python, Pillow und Pydantic, arbeitet jetzt aber als geprüfter Executor eines generierten Plans.
+      </section>
+
+      <div class="cards">
+        <article class="card">
+          <h3>Render-DAG statt versteckter Reihenfolge</h3>
+          <p>
+            Der generierte Plan enthält 16 Operationen mit Abhängigkeiten. Der Executor sortiert sie topologisch und lehnt
+            fehlende Operationen, doppelte IDs, Selbstbezüge und Zyklen ab.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Versionierte Strategie-Registry</h3>
+          <p>
+            Zwölf Python-Handler sind mit Key, Version und Pydantic-Konfiguration registriert. Das generierte Manifest muss
+            bytegenau zur laufenden Registry passen. Eine neue Bildoperation wird einmal als neue Strategie ergänzt.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Gleiche Assets wie im Frontend</h3>
+          <p>
+            Der Renderer baut aus der kanonischen Spritequelle des Frontends. Die lokale Image-Prüfung verglich alle 195
+            Dateien des Sprite-Baums bytegenau. Das sind 166 PNG-Dateien und 29 zugehörige JSON-Dateien. Hinzu kommen sieben
+            Root-Metadatendateien aus <code>sprite-data</code>.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Vertrag in Health und Antworten</h3>
+          <p>
+            Der Health-Endpunkt meldet Schema-Version, Renderplan-Version, Katalog-Hash und Manifest-Hash. Ein Image mit
+            falschem erwarteten Hash startet nicht.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Bundle-Integrität vor dem ersten Rendern</h3>
+          <p>
+            <code>bundle-integrity.json</code> bindet Schema, Kompatibilität, Public Catalog, Renderplan,
+            Strategiemanifest, sieben Root-Metadaten und den 195 Dateien umfassenden Sprite-Baum an den Katalog-Hash. Der
+            Renderer prüft Bytes, vollständige Inventare und Schema-Versionen beim Start.
+          </p>
+        </article>
+      </div>
+
+      <p>
+        Der Umbau schließt die belegte Vertragslücke zwischen Trait-Definition, Assets und Renderer. Ein Sprachwechsel war
+        dafür nicht nötig. TypeScript oder Rust hätten dieselbe Registry-, Plan- und Versionsfrage erneut lösen müssen.
+      </p>
+
+      <h2>Gacha und das Weighted-Slot-Layout</h2>
+
+      <p>
+        Weighted Slots sind keine eigene große Trait-Struktur und auch kein frei formbares JSON. Sie sind eine feste,
+        typisierte Gacha-Strategie. Die Registry liefert Katalog, Minima, Maxima, Gewichte, Eindeutigkeit,
+        Pose-Verfügbarkeit und Abhängigkeiten. Der gemeinsame TypeScript-Kern interpretiert diese Daten in Browser und Node.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Teil</th><th>Feste Semantik</th><th>Dynamische Daten</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Slot-Anzahl</td>
+              <td><code>uniformCount</code> oder <code>weightedDiscrete</code></td>
+              <td>Bereich und Gewicht je erreichbarer Anzahl, einschließlich null</td>
+            </tr>
+            <tr>
+              <td>Elementauswahl</td>
+              <td>Katalogwahl mit oder ohne Wiederholung</td>
+              <td>Elementgewicht, Pose-Filter und <code>deprecated</code></td>
+            </tr>
+            <tr>
+              <td>Aktivierung</td>
+              <td>Boolean, optionale Wahrscheinlichkeit oder gemeinsames Gate</td>
+              <td>Feste Wahrscheinlichkeit aus dem Registry-Vertrag</td>
+            </tr>
+            <tr>
+              <td>Abgeleitete Werte</td>
+              <td>Benannter Resolver</td>
+              <td><code>sourceTrait</code> und <code>dependsOn</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        Der Umbau schließt mehrere Details, die bei einem generischen System leicht falsch werden. Ein Bereich
+        <code>0..N</code> erreicht auch mit exakter Anzahl wirklich null. Ein fest gesetzter Farbwert gewinnt gegen eine
+        eingeschränkte Laufzeitpalette. Elementgewichte beeinflussen die Ziehung. Veraltete Elemente werden nicht neu
+        gezogen, bleiben für Bestandskatzen und feste Werte aber gültig. Gacha-Abhängigkeiten werden topologisch sortiert,
+        Zyklen scheitern beim Kompilieren. Produktseiten können diese Wahrscheinlichkeiten nicht überschreiben. Damit bleibt
+        dieselbe Gacha-Verteilung in Single Cat Plus, Stream und Discord erhalten.
+      </p>
+
+      <p>
+        Das sichtbare Settings-Layout bleibt unverändert. Es enthält die Bereiche Accessories, Scars und Tortie Layers sowie
+        den vorhandenen Schalter für exakte Anzahlen. Die Registry erzeugt keine Probability-Regler und ergänzt für neue Traits
+        auch keine Settings. Ein neuer Trait übernimmt sein festes Gacha-Verhalten direkt aus der Registry.
+      </p>
+
+      <p>
+        Evolution ist davon getrennt. <code>replace</code>, <code>accumulate</code> und <code>preserve</code> beschreiben, wie
+        ein vorhandener Evolutionswert auf ein Dokument angewendet wird. Sie versprechen keinen Gacha-Producer.
+        <code>accumulate</code> darf deshalb Listen aus einem Evolutionsablauf ergänzen, auch wenn der Trait selbst nicht vom
+        Gacha erzeugt wird.
+      </p>
+
+      <h2>Abdeckung der Consumer</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Consumer</th><th>Generischer Mechanismus</th><th>Stand</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Renderer und Render-API</td>
+              <td>CatDocument, generierter Plan, Pydantic-Verträge, Strategie-Registry und Legacy-Adapter</td>
+              <td><span class="tag good">integriert</span></td>
+            </tr>
+            <tr>
+              <td>Gacha, Server und Browser</td>
+              <td>Seedbarer Registry-Kern, feste Werte, feste Wahrscheinlichkeiten, Kataloggewichte und Abhängigkeitsgraph</td>
+              <td><span class="tag good">integriert</span></td>
+            </tr>
+            <tr>
+              <td>Visual und Guided Builder</td>
+              <td>Editor-Definitionen aus Public Catalog, generischer Fallback für Select, Toggle, Listen und Compound-Listen</td>
+              <td><span class="tag good">integriert</span></td>
+            </tr>
+            <tr>
+              <td>Cat Settings und portable Codes</td>
+              <td>Unveränderte V3-Codes für Accessories, Scars, Tortie Layers, Afterlife und Farbpaletten</td>
+              <td><span class="tag good">integriert</span></td>
+            </tr>
+            <tr>
+              <td>Single Cat Plus und Stream Control</td>
+              <td>Spin, Batch, Lobby, BRB, Control und OBS reichen dieselben CatDocuments und Count-Werte weiter</td>
+              <td><span class="tag good">integriert</span></td>
+            </tr>
+            <tr>
+              <td>Adoption und Reveal</td>
+              <td>Reveal-Plan aus der Trait-Fähigkeit, dynamische Stages und verborgenes Canonical Document bis zur Stage</td>
+              <td><span class="tag good">integriert</span></td>
+            </tr>
+            <tr>
+              <td>Evolution und Ahnenbaum</td>
+              <td><code>replace</code>, <code>accumulate</code>, <code>preserve</code>, <code>copy</code> und <code>mutate</code> aus Fähigkeiten</td>
+              <td><span class="tag good">integriert</span></td>
+            </tr>
+            <tr>
+              <td>Share, History und Viewer</td>
+              <td>CatDocument als kanonischer Payload, Legacy-Projektion und Erhalt unbekannter Traits</td>
+              <td><span class="tag good">integriert</span></td>
+            </tr>
+            <tr>
+              <td>Streamer Voting</td>
+              <td>Bestehende Spezialschritte plus generische Schritte für neue anzeigbare und revealbare Traits</td>
+              <td><span class="tag good">integriert</span></td>
+            </tr>
+            <tr>
+              <td>Discord</td>
+              <td>Generierter öffentlicher Katalog und generische, validierte Overrides pro <code>/gen-discord-kitten</code>-Aufruf</td>
+              <td><span class="tag good">integriert</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <strong>Discord-Persistenz bleibt spezialisiert.</strong> Die alte Optionsmaske von <code>/config set</code> schreibt
+        weiterhin ihre vorhandenen Felder. Neue Traits erscheinen automatisch in den Overrides eines einzelnen
+        <code>/gen-discord-kitten</code>-Aufrufs, aber nicht automatisch als dauerhaft gespeicherte Discord-Einstellung. Eine
+        generische persistente Maske hätte neue Datenbankfelder oder einen neuen Convex-Speichervertrag verlangt. Genau das
+        sollte dieser Umbau nicht einführen.
+      </div>
+
+      <div class="note">
+        <strong>Wichtige Grenze.</strong> Der Compiler kann nur Consumer schließen, die an die generische API angeschlossen
+        sind. Eine später neu gebaute Seite, die wieder eigene Trait-Listen erfindet, umgeht das System. Die Projektregel
+        lautet deshalb: Neue Katzen-Consumer lesen Registry, Public Catalog oder CatDocument. Sie erhalten keine zweite
+        manuelle Liste.
+      </div>
+
+      <h2>Der Ear-Accessory-Beweis</h2>
+
+      <p>
+        <code>earAccessory</code> wurde bewusst nicht als Produkttrait erfunden. Stattdessen erzeugt der Build einen
+        synthetischen Trait mit der ID <code>__probe_a81f</code>. Er hat zwei poseabhängige Werte, einen gewichteten Eintrag,
+        maximal zwei eindeutige Slots, Reveal-Stages, Evolution, Vererbung und eine
+        <code>catalogSpriteList</code>-Renderoperation. Die Probe verwendet nur bereits vorhandene Strategien.
+      </p>
+
+      <p>
+        TypeScript rollt daraus ein CatDocument und die generischen Consumer entdecken den Trait. Der Compiler erzeugt den
+        Rendervertrag. Python lädt denselben Vertrag, validiert das Dokument und rendert mit dem echten Executor einen
+        anderen Pixeloutput als ohne den Trait. Anschließend prüft der Generator, dass der Probe-Trait nicht in die 20
+        Produkt-Traits geraten ist.
+      </p>
+
+      <p>
+        Der Discord-Test verwendet separat einen synthetischen Public Catalog mit derselben Probe-ID. Er beweist, dass der
+        generische Adapter einen neuen Trait als Auswahl und validierten Override anbietet. Er behauptet nicht, dass das
+        temporäre Renderer-Probe-Artefakt im Produktkatalog ausgeliefert wird.
+      </p>
+
+      <div class="acceptance">
+        <h3>Was dieser Test aussagt</h3>
+        <p>
+          Ein neuer Trait mit vorhandenen Wert-, Gacha-, Consumer- und Renderstrategien läuft durch den implementierten
+          Verteilungspfad. Fehlt ein Artefakt oder passt eine Strategie nicht, wird der Build rot. Das ist die gewünschte
+          Convex-TypeScript-Idee als Repository-Vertrag und ohne Datenbankarbeit.
+        </p>
+      </div>
+
+      <h2>Convex bleibt unverändert</h2>
+
+      <p>
+        Keine Datei im Convex-Verzeichnis wurde für diesen Umbau geändert. Die Registry, Kataloggenerierung, Gacha-Logik,
+        Renderpläne, Assetprüfung, Probe und Image-Hashes laufen im Build oder im jeweiligen Prozess. Es gibt keine neue
+        Convex-Funktion, keinen Index, Cronjob, Poller, zusätzlichen Read oder Trait-spezifische Spalte.
+      </p>
+
+      <div class="cards">
+        <article class="card">
+          <h3>Was vorhanden ist</h3>
+          <p>
+            Eine kleine <code>CatStore</code>-Schnittstelle beschreibt <code>save</code>, <code>load</code>, paginiertes
+            <code>listPage</code> und <code>delete</code>. Cat-System-Code muss dadurch keine Datenbankfelder kennen.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Was bewusst nicht gemacht wurde</h3>
+          <p>
+            Der Umbau migriert keine Convex-Tabellen und baut keinen neuen Convex-Adapter. Bestehende Persistenz bleibt, wo
+            sie ist. Ein späterer Datenbankwechsel kann hinter der Schnittstelle stattfinden und ändert den Trait-Vertrag
+            nicht.
+          </p>
+        </article>
+      </div>
+
+      <h2>Lokale Verifikation</h2>
+
+      <p>
+        Die folgende Tabelle ist der Laufbericht vom 25. August 2026. Testquellen und Hashmechanik liegen im Repository. Die
+        konkreten Exit-Codes, Container-IDs, Health-Antworten und Lint-Zahlen stammen aus den lokalen Befehlen dieses Laufs.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Nachweis</th><th>Ergebnis am 25. August 2026</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>pnpm cat-system:build</code></td>
+              <td>Exit 0 ohne echte Convex- oder Clerk-Zugänge</td>
+            </tr>
+            <tr>
+              <td>Frontend</td>
+              <td>48 Testdateien und 396 Tests grün; TypeScript grün; Next-Produktionsbuild grün; Seitengenerierung 61/61</td>
+            </tr>
+            <tr>
+              <td>Discord</td>
+              <td>TypeScript grün; 3 Public-Catalog-Adaptertests grün</td>
+            </tr>
+            <tr>
+              <td>Python</td>
+              <td>Strategiemanifest, Bundle und Renderplan geprüft; 64 Tests grün, davon 24 Vertragsfälle</td>
+            </tr>
+            <tr>
+              <td>Container</td>
+              <td>Frontend, Renderer und Discord lokal mit identischem OCI-Label und Image-ENV gebaut</td>
+            </tr>
+            <tr>
+              <td>Falscher Hash</td>
+              <td>Alle drei Negativbuilds mit einem abweichenden 64-stelligen Hash scheiterten; kein falsches Image entstand</td>
+            </tr>
+            <tr>
+              <td>Renderer Health</td>
+              <td><code>status=ok</code>, Schema 1, Renderplan 1, korrekter Katalog- und Manifest-Hash</td>
+            </tr>
+            <tr>
+              <td>Asset-Identität</td>
+              <td>195 von 195 Dateien im Sprite-Baum bytegleich, davon 166 PNG und 29 JSON; zusätzlich sieben von sieben Root-Metadaten</td>
+            </tr>
+            <tr>
+              <td>Repository-Hygiene</td>
+              <td><code>git diff --check</code> grün; keine Convex-Datei im Diff</td>
+            </tr>
+            <tr>
+              <td>Zusätzlicher Lint-Lauf</td>
+              <td>Biome-Lint mit Exit 0; 44 Warnungen und 2 Hinweise bleiben als getrennte Bestandsarbeit sichtbar</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="small">
+        Die Python-Suite meldet Deprecation-Warnungen aus Pillow, FastAPI und AnyIO. Sie ändern das Prüfergebnis nicht,
+        sollten aber vor den jeweils angekündigten Entfernungsterminen separat bereinigt werden.
+      </p>
+
+      <h2>Pixelvergleich mit beastyrabbit.com</h2>
+
+      <p>
+        Am 26. August 2026 wurde der lokale Produktionsbuild lesend gegen
+        <code>https://beastyrabbit.com</code> geprüft. Verglichen wurden die decodierten RGBA-Pixel mit Schwellwert null.
+        Ein Vergleich der PNG-Dateibytes wäre irreführend, weil lokale und produktive Antworten dieselben Pixel mit
+        unterschiedlichen PNG-Kompressionen speichern können.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Vergleich</th><th>Ergebnis am 26. August 2026</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Feste Renderer-Fälle</td>
+              <td>45 Payloads, je zweimal lokal und produktiv; beide Renderer deterministisch; 44/45 direkt pixelgleich</td>
+            </tr>
+            <tr>
+              <td>100 feste Gacha-Seeds</td>
+              <td>Nach Entfernung des redundanten alten <code>accessory</code>-Alias 100/100 RGBA-pixelgleich</td>
+            </tr>
+            <tr>
+              <td>Coat-Pattern-Matrix</td>
+              <td>20/20 Frames für GOLDEN/Sit, GINGER/Walk und SILVER/Turn pixelgleich und deterministisch</td>
+            </tr>
+            <tr>
+              <td>Accessory-Matrix</td>
+              <td>96/96 LifeGen-Accessory-Frames auf Sand und Black pixelgleich und deterministisch</td>
+            </tr>
+            <tr>
+              <td>Single- und Batch-API</td>
+              <td>Vollständige aktuelle Payloads im Composed- und Layer-Modus RGBA-pixelgleich</td>
+            </tr>
+            <tr>
+              <td>Seitenprüfung</td>
+              <td>Guided Builder und Settings auf 1280 × 800 sowie 390 × 844 geprüft; kein horizontaler Overflow</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="warning">
+        <strong>Erklärte Legacy-Abweichung.</strong> Der alte Produktionsrenderer zeichnet die erste Accessory zweimal,
+        wenn ein Request gleichzeitig <code>accessories: ["X"]</code> und <code>accessory: "X"</code> enthält. Der neue
+        Adapter führt beide alten Schreibweisen zu einem eindeutigen kanonischen Wert zusammen. In 100 Seeds betraf das
+        27 Payloads. Ohne den redundanten Alias waren alle 100 Ergebnisse pixelgleich. Das ist eine Korrektur des alten
+        Doppelzeichnens, keine zufällige Renderer- oder Asset-Abweichung.
+      </div>
+
+      <p class="small">
+        Ein weiterer absichtlich unvollständiger Legacy-Test ließ Augen- und Hautfarbe ganz aus. Produktion ließ beide
+        Layer weg, während das neue CatDocument die deklarierten Pflichtdefaults BLUE und PINK einsetzte. Vollständige
+        aktuelle Payloads waren auch in diesem Fall pixelgleich.
+      </p>
+
+      <h2>Arbeitsablauf für den nächsten Trait</h2>
+
+      <ol>
+        <li>Trait, Katalogquelle und Assets in der zentralen Registry beziehungsweise der kanonischen Spritequelle ergänzen.</li>
+        <li>Vorhandene Strategien für Wert, Rendern, Gacha, Reveal, Evolution, Vererbung und Editor wählen.</li>
+        <li>Generator ausführen und <code>pnpm cat-system:build</code> starten.</li>
+        <li>Wenn der Build grün ist, sind die angeschlossenen Consumer und ihre generierten Vertragskopien auf demselben Stand.</li>
+        <li>Die drei Docker-Images mit dem erzeugten Hash bauen. Jeder Docker-Build prüft den Hash noch einmal.</li>
+        <li>Wenn echte neue Semantik nötig ist, einmal die passende zentrale Strategie samt Vertragstest ergänzen. Danach gilt wieder derselbe Ablauf.</li>
+      </ol>
+
+      <p>
+        Es gibt kein Phasensystem und keinen parallelen halbfertigen Produktmodus. Legacy-Adapter bleiben nur an den
+        Systemgrenzen, damit vorhandene Katzen und Links lesbar bleiben. Neue Implementierungen schreiben CatDocument.
+      </p>
+
+      <h2>Was der Compiler nicht versprechen kann</h2>
+
+      <div class="warning">
+        <strong>Systemvertrag und Bildqualität sind zwei verschiedene Prüfungen.</strong> Die Probe beweist, dass ein Layer
+        geladen, geordnet und sichtbar gerendert wird. Sie kann nicht beurteilen, ob ein Ear Accessory künstlerisch korrekt
+        sitzt, in jeder Pose schön aussieht oder mit jedem anderen Sprite sinnvoll überlappt. Dafür bleibt eine visuelle
+        Pixelprüfung nötig.
+      </div>
+
+      <ul>
+        <li>Neue Semantik erfordert eine neue zentrale Strategie. Der Compiler kann unbekanntes Verhalten nicht erraten.</li>
+        <li>Eine neue externe Integration muss einmal an Public Catalog und CatDocument angeschlossen werden. Danach entdeckt sie neue Traits automatisch.</li>
+        <li>Bekannte Spezial-UX bleibt teilweise umfangreicher als der generische Fallback. Die bestehende Count-Voranimation im Stream ist so ein Fall.</li>
+        <li>Unbekannte Traits werden verlustfrei weitergereicht, aber von einem älteren Renderer nicht sichtbar gerendert.</li>
+        <li>Der Stand ist lokal und über lesende Render- und Seitenaufrufe gegen Produktion geprüft. Es gab keinen Release, kein Deployment und keine Prüfung von Produktionslogs.</li>
+      </ul>
+
+      <h2>Abschlussbewertung</h2>
+
+      <p>
+        Die gewünschte Regel ist als prüfbarer Repository-Vertrag umgesetzt. Der System-Build ist das Ergebnis, nicht der
+        Renderer allein. Python führt einen generierten Vertrag aus. Gacha interpretiert feste, typisierte Strategien mit
+        variablen Katalogdaten. Builder und Reveal-Abläufe erhalten generische Fallbacks. Die Settings-Seite bleibt beim alten
+        Vertrag. Discord und Images tragen denselben Hash. Convex trägt keine zusätzliche Last.
+      </p>
+
+      <p>
+        Das ist die richtige Grenze für Automatisierung. Ein neues Ear Accessory mit vorhandener Semantik ist eine Definition
+        plus Assets. Eine neue Art von Verhalten ist eine zentrale Strategie. Beides ist prüfbar, ohne wieder zehn Stellen
+        von Hand synchron zu halten.
+      </p>
+
+      <footer>
+        Dieser Bericht beschreibt den implementierten Arbeitsstand sowie die lokale und lesende produktive Verifikation.
+        Er dokumentiert keine Freigabe für Deployment, Release oder Produktionsänderungen.
+      </footer>
+    </main>
+  </body>
+</html>

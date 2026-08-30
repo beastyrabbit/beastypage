@@ -37,6 +37,15 @@ import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
+import { GenericTraitEditors } from "@/lib/cat-builder/GenericTraitEditors";
+import {
+  getUnhandledTraitEditorDefinitions,
+  hydrateBuilderParams,
+  mutateBuilderParams,
+  synchronizeBuilderParams,
+  VISUAL_BUILDER_SPECIALIZED_TRAITS,
+} from "@/lib/cat-builder/genericTraitEditor";
+import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import {
   applyCoatChoice,
   getCoatChoiceValue,
@@ -89,7 +98,8 @@ type SectionId =
   | "markings"
   | "skin"
   | "accessories"
-  | "scars";
+  | "scars"
+  | `trait-${string}`;
 
 interface SectionDefinition {
   id: SectionId;
@@ -244,7 +254,9 @@ function VisualBuilderPreviewSprite({
 export function VisualBuilderClient({
   initialCat,
 }: VisualBuilderClientProps = {}) {
-  const [params, setParams] = useState<CatParams>(DEFAULT_PARAMS);
+  const [params, setParams] = useState<CatParams>(() =>
+    synchronizeBuilderParams(DEFAULT_PARAMS),
+  );
   const [tortieLayers, setTortieLayers] = useState<TortieLayer[]>([]);
   const [experimentalColourMode, setExperimentalColourMode] =
     useState<PaletteMode>("off");
@@ -344,6 +356,14 @@ export function VisualBuilderClient({
   const deferredOptions = useDeferredValue(normalizedOptions);
   const viewParams = deferredParams ?? params;
   const viewOptions = deferredOptions ?? normalizedOptions;
+  const genericTraitEditors = useMemo(
+    () =>
+      getUnhandledTraitEditorDefinitions(
+        VISUAL_BUILDER_SPECIALIZED_TRAITS,
+        params.poseName,
+      ),
+    [params.poseName],
+  );
 
   const spriteMapperRef = useRef<SpriteMapperApi | null>(null);
   const ensureTortieSync = useCallback(
@@ -404,14 +424,14 @@ export function VisualBuilderClient({
     if (initialCat.params.poseName === undefined) {
       delete initialParams.poseName;
     }
-    const mergedParams = cloneParams(initialParams);
+    const mergedParams = hydrateBuilderParams(cloneParams(initialParams));
     const incomingTortie = (
       initialCat.tortie ??
       mergedParams.tortie ??
       []
     ).filter(Boolean) as TortieLayer[];
     const synced = ensureTortieSync(incomingTortie, mergedParams);
-    setParams(synced);
+    setParams(synchronizeBuilderParams(synced));
     setTortieLayers(
       (synced.tortie ?? []).filter(
         (layer): layer is TortieLayer => layer !== null,
@@ -524,7 +544,7 @@ export function VisualBuilderClient({
       ) {
         next.poseName = normalizedOptions.poseNames[0];
       }
-      return next;
+      return synchronizeBuilderParams(next);
     });
 
     if (shareInfo) {
@@ -539,7 +559,7 @@ export function VisualBuilderClient({
     setPreviewLoading(true);
     (async () => {
       try {
-        const payload = cloneParams(params);
+        const payload = synchronizeBuilderParams(cloneParams(params));
         const result = await generatorInstance.generateCat({
           ...payload,
           spriteNumber: payload.spriteNumber,
@@ -572,13 +592,23 @@ export function VisualBuilderClient({
     ) => {
       markShareDirty();
       setParams((prev) => {
-        const draft = cloneParams(prev);
-        mutator(draft);
-        return draft;
+        return mutateBuilderParams(prev, mutator);
       });
       if (traitInfo) {
         track("visual_builder_trait_selected", traitInfo);
       }
+    },
+    [markShareDirty],
+  );
+
+  const updateGenericTraitParams = useCallback(
+    (nextParams: CatParams, definition: { traitId: string }) => {
+      markShareDirty();
+      setParams(synchronizeBuilderParams(nextParams));
+      track("visual_builder_trait_selected", {
+        trait_type: definition.traitId,
+        value: "custom",
+      });
     },
     [markShareDirty],
   );
@@ -666,7 +696,7 @@ export function VisualBuilderClient({
       setParams((prevParams) => {
         const draft = cloneParams(prevParams);
         draft.isTortie = enabled && layers.length > 0;
-        return ensureTortieSync(layers, draft);
+        return synchronizeBuilderParams(ensureTortieSync(layers, draft));
       });
     },
     [ensureTortieSync, markShareDirty],
@@ -685,8 +715,7 @@ export function VisualBuilderClient({
       if (pending) return pending;
       const promise = (async () => {
         try {
-          const draft = cloneParams(params);
-          mutator(draft);
+          const draft = mutateBuilderParams(params, mutator);
           const result = await generatorInstance.generateCat(
             draft as unknown as Record<string, unknown>,
           );
@@ -2302,6 +2331,28 @@ export function VisualBuilderClient({
 
   const renderPoseSection = useCallback(() => poseSection, [poseSection]);
 
+  const renderGenericTraitsSection = useCallback(
+    () => (
+      <section
+        id="trait-system"
+        className="scroll-mt-40 space-y-5 rounded-3xl border border-slate-800 bg-slate-950/60 p-6"
+      >
+        <header className="space-y-1">
+          <h2 className="text-xl font-semibold text-white">More traits</h2>
+          <p className="text-sm text-neutral-300">
+            Additional options supported by the current cat system.
+          </p>
+        </header>
+        <GenericTraitEditors
+          definitions={genericTraitEditors}
+          params={params}
+          onParamsChange={updateGenericTraitParams}
+        />
+      </section>
+    ),
+    [genericTraitEditors, params, updateGenericTraitParams],
+  );
+
   const sections: SectionDefinition[] = [
     {
       id: "pose",
@@ -2352,6 +2403,16 @@ export function VisualBuilderClient({
       description: "",
       render: renderScarsSection,
     },
+    ...(genericTraitEditors.length > 0
+      ? [
+          {
+            id: "trait-system" as const,
+            title: "More traits",
+            description: "",
+            render: renderGenericTraitsSection,
+          },
+        ]
+      : []),
   ];
 
   const buildSharePayload = useCallback(() => {
@@ -2373,20 +2434,21 @@ export function VisualBuilderClient({
       packaged.tortieColour = primary?.colour;
       packaged.tortieMask = primary?.mask;
     }
+    const canonical = synchronizeBuilderParams(packaged);
     return {
       mode: "visual-builder",
       version: 1,
-      spriteNumber: packaged.spriteNumber,
-      params: packaged,
+      spriteNumber: canonical.spriteNumber,
+      params: canonical,
       basePalette: experimentalColourMode,
       tortiePalette: tortiePaletteMode,
-      accessorySlots: packaged.accessories ?? [],
-      scarSlots: packaged.scars ?? [],
-      tortieSlots: (packaged.tortie ?? []).map((layer) => ({ ...layer })),
+      accessorySlots: canonical.accessories ?? [],
+      scarSlots: canonical.scars ?? [],
+      tortieSlots: (canonical.tortie ?? []).map((layer) => ({ ...layer })),
       counts: {
-        accessories: packaged.accessories?.length ?? 0,
-        scars: packaged.scars?.length ?? 0,
-        tortie: packaged.tortie?.length ?? 0,
+        accessories: canonical.accessories?.length ?? 0,
+        scars: canonical.scars?.length ?? 0,
+        tortie: canonical.tortie?.length ?? 0,
       },
       metaLocked: false,
     };
@@ -2431,7 +2493,7 @@ export function VisualBuilderClient({
       const mapperPayload = shareSlug ? { ...payload, shareSlug } : payload;
 
       const record = await createMapperRecord({
-        catData: mapperPayload,
+        catData: catDataToLegacyPersistence(mapperPayload),
         catName: catName.trim() || undefined,
         creatorName: creatorName.trim() || undefined,
       });
@@ -2491,7 +2553,7 @@ export function VisualBuilderClient({
     unlockShare();
     setShareInfo(null);
     setStatusMessage(null);
-    setParams(DEFAULT_PARAMS);
+    setParams(synchronizeBuilderParams(DEFAULT_PARAMS));
     setTortieLayers([]);
     setExperimentalColourMode("off");
     setTortiePaletteMode("off");
@@ -2569,7 +2631,7 @@ export function VisualBuilderClient({
       );
       setExperimentalColourMode(nextPaletteMode);
       setTortiePaletteMode(nextTortiePaletteMode);
-      setParams(combined);
+      setParams(synchronizeBuilderParams(combined));
       setTortieLayers(tortie);
       setExpandedLayer(null);
       setExpandedTortieSub({});

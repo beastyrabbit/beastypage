@@ -15,6 +15,10 @@ import RightChevron from "@/components/ui/right-chevron";
 import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
+import {
+  catViewPayloadToShareSeed,
+  normalizeCatViewPayload,
+} from "@/lib/cat-consumers/viewPayload";
 import { encodeCatShare } from "@/lib/catShare";
 import { isEvolutionBatchSettings } from "@/lib/evolution/evolutionGenerator";
 import { HistoryAncestryTreeCard } from "./HistoryAncestryTreeCard";
@@ -204,10 +208,14 @@ export function HistoryClient() {
     .map((profile) => {
       const catData = profile.cat_data as Record<string, unknown> | null;
       const mode = (catData as { mode?: string } | null)?.mode ?? null;
-      // Detect discordkitten source in both wrapped ({ params: { source } }) and flat ({ source }) formats
-      const source =
-        (catData?.params as Record<string, unknown> | undefined)?.source ??
-        catData?.source;
+      let source: unknown = catData?.source;
+      if (catData) {
+        try {
+          source = normalizeCatViewPayload(catData).params.source ?? source;
+        } catch (error) {
+          console.warn("Failed to normalize history cat metadata", error);
+        }
+      }
       const variant: "single" | "guided" | "discordkitten" =
         source === "discordkitten"
           ? "discordkitten"
@@ -247,7 +255,8 @@ export function HistoryClient() {
       let encoded = cat.encoded ?? null;
       if ((!encoded || encoded.length === 0) && cat.catData) {
         try {
-          encoded = encodeCatShare(cat.catData);
+          const canonical = normalizeCatViewPayload(cat.catData);
+          encoded = encodeCatShare(catViewPayloadToShareSeed(canonical));
         } catch (error) {
           console.warn("Failed to encode adoption cat payload", error);
           encoded = null;

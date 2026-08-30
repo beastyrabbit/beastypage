@@ -54,6 +54,20 @@ const genDiscordKittenCommand = new SlashCommandBuilder()
       .setDescription("Eye colour")
       .setAutocomplete(true)
       .setRequired(false)
+  )
+  .addStringOption((option) =>
+    option
+      .setName("trait")
+      .setDescription("Registry trait to override")
+      .setAutocomplete(true)
+      .setRequired(false)
+  )
+  .addStringOption((option) =>
+    option
+      .setName("value")
+      .setDescription("Value for the selected registry trait")
+      .setAutocomplete(true)
+      .setRequired(false)
   );
 
 const catCommand = new SlashCommandBuilder()

@@ -16,12 +16,14 @@ import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { BatchStreamCommand } from "@/lib/adoption/streamBatch";
+import {
+  catDataToLegacyPersistence,
+  catParamsToLegacyPersistence,
+} from "@/lib/cat-system";
+import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import { normalizePortableSettingsCode } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
-import {
-  computeLayerCount,
-  withResolvedAfterlifeParams,
-} from "@/utils/catSettingsHelpers";
+import { withResolvedAfterlifeParams } from "@/utils/catSettingsHelpers";
 import {
   DEFAULT_SINGLE_CAT_SETTINGS,
   parseSingleCatPayload,
@@ -34,6 +36,7 @@ import { BatchPanel } from "./BatchPanel";
 import { type StreamControlApi, StreamControlContext } from "./context";
 import { EvolutionPanel } from "./EvolutionPanel";
 import {
+  buildStreamGeneratorOptions,
   type CanvasExportSource,
   canvasToPngBlob,
   FULL_EXPORT_SIZE,
@@ -417,23 +420,18 @@ export function ControlShell() {
       if (!generator.generateRandomCat) {
         throw new Error("Generator does not support random cat generation");
       }
-      const result = await generator.generateRandomCat({
-        experimentalColourMode:
-          settings.extendedModes.length > 0
-            ? settings.extendedModes.filter((m) => m !== "base")
-            : undefined,
-        includeBaseColours: settings.includeBaseColours,
-        includeNewSprites: settings.includeNewSprites,
-        exactLayerCounts: settings.exactLayerCounts,
-        accessoryCount: computeLayerCount(settings.accessoryRange),
-        scarCount: computeLayerCount(settings.scarRange),
-        tortieCount: computeLayerCount(settings.tortieRange),
-      });
+      const result = await generator.generateRandomCat(
+        buildStreamGeneratorOptions(settings),
+      );
 
       const resolvedParams = withResolvedAfterlifeParams(
         result.params as unknown as Record<string, unknown>,
         settings.afterlifeMode,
       );
+      syncChangedRegistryTraitsFromLegacy(resolvedParams, [
+        "darkForest",
+        "dead",
+      ]);
       const generatedHasTint = Boolean(
         resolvedParams.darkForest || resolvedParams.dead,
       );
@@ -453,7 +451,7 @@ export function ControlShell() {
       await saveSessionSettings(settingsWithCreator);
 
       const spinSeq = await triggerSpinMut({
-        params: resolvedParams,
+        params: catParamsToLegacyPersistence(resolvedParams),
         slots: result.slotSelections,
         countdownSeconds,
       });
@@ -488,7 +486,7 @@ export function ControlShell() {
           },
         };
         const profile = await createMapper({
-          catData,
+          catData: catDataToLegacyPersistence(catData),
           creatorName: creatorNameDraft.trim() || undefined,
         });
         if (!profile) {
@@ -699,6 +697,7 @@ export function ControlShell() {
           darkMode: false,
           dead: false,
         };
+        syncChangedRegistryTraitsFromLegacy(params, ["darkForest", "dead"]);
         const rendered = await generator.generateCat(params);
         sourceCanvas = rendered.canvas;
       }

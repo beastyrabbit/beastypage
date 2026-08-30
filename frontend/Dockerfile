@@ -23,13 +23,21 @@ ARG NEXT_PUBLIC_POSTHOG_KEY=phc_PLACEHOLDER_KEY
 ARG NEXT_PUBLIC_POSTHOG_HOST=https://placeholder.posthog.com
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_placeholder_CLERK_KEY
 ARG APP_VERSION=dev
+ARG CAT_SYSTEM_CATALOG_HASH=unknown
 
 ENV CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
 ENV APP_VERSION=${APP_VERSION}
+ENV CAT_SYSTEM_CATALOG_HASH=${CAT_SYSTEM_CATALOG_HASH}
 ENV NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}
 ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
 ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+
+# A CI image may only advertise the contract embedded in this source tree.
+# `unknown` remains available for local ad-hoc builds that do not stamp OCI
+# metadata; every Forgejo build passes the concrete generated hash.
+RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
+    || test "$(cat public/cat-system/catalog-hash.txt)" = "$CAT_SYSTEM_CATALOG_HASH"
 
 # Build Next.js with standalone output
 # Note: convex codegen runs via the "prepare" script during pnpm install;
@@ -40,9 +48,13 @@ RUN pnpm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+ARG CAT_SYSTEM_CATALOG_HASH=unknown
+LABEL dev.beastypage.cat-system.catalog-hash=${CAT_SYSTEM_CATALOG_HASH}
+
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+ENV CAT_SYSTEM_CATALOG_HASH=${CAT_SYSTEM_CATALOG_HASH}
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \

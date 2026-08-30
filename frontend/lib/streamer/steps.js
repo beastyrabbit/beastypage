@@ -7,6 +7,40 @@ import {
     getCoatPatternName,
 } from "@/lib/cat-v3/coatPatterns";
 import { DEFAULT_POSE_NAME, getUserSelectablePoseNames } from "@/lib/cat-v3/poseOptions";
+import {
+    getTraitEditorDefinitionsFromCatalog,
+    publicCatCatalog,
+} from "@/lib/cat-system/catalog";
+import {
+    legacyParamsToCatDocument,
+    projectCanonicalRegistryTraitsToLegacy,
+    syncChangedRegistryTraitsFromLegacy,
+} from "@/lib/cat-system/document";
+
+// These traits predate the registry fallback. Keeping them here preserves the
+// current voting flow while every newly compiled trait gets a generic step.
+const STREAMER_BASELINE_TRAIT_IDS = new Set([
+    'pose',
+    'pelt',
+    'coatPattern',
+    'colour',
+    'tortie',
+    'tint',
+    'whitePatches',
+    'points',
+    'whitePatchesTint',
+    'vitiligo',
+    'eyeColour',
+    'eyeColour2',
+    'scars',
+    'shading',
+    'lighting',
+    'darkForest',
+    'dead',
+    'skinColour',
+    'accessories',
+    'reverse',
+]);
 
 export function getDefaultStreamParams() {
     return {
@@ -59,6 +93,249 @@ export async function ensureSpriteDataLoaded() {
 
 export function cloneParams(params) {
     return JSON.parse(JSON.stringify(params));
+}
+
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function registryOptionKey(traitId, value) {
+    const suffix = value === undefined ? 'none' : String(value);
+    return `registry_${traitId}_${encodeURIComponent(suffix)}`;
+}
+
+function setRegistryTraitValue(
+    params,
+    source,
+    traitId,
+    value
+) {
+    const existingTraits = isRecord(params.traits) ? params.traits : {};
+    const projected = legacyParamsToCatDocument(params);
+    const traits = {
+        ...cloneParams(projected.traits),
+        ...cloneParams(existingTraits),
+    };
+    if (value === undefined) {
+        delete traits[traitId];
+    } else {
+        traits[traitId] = cloneParams(value);
+    }
+    params.schemaVersion = source.schemaVersion ?? projected.schemaVersion;
+    params.traits = traits;
+}
+
+function getRegistryVotingDefinitions(source, poseName, handledTraitIds) {
+    const handled = new Set(handledTraitIds);
+    const traits = new Map(source.traits.map(trait => [trait.id, trait]));
+    return getTraitEditorDefinitionsFromCatalog(source, poseName).filter(definition => {
+        const trait = traits.get(definition.traitId);
+        return Boolean(
+            trait &&
+            !handled.has(definition.traitId) &&
+            trait.capabilities.display &&
+            trait.capabilities.reveal !== false
+        );
+    });
+}
+
+function activeCatalogOptions(source, catalogId, poseName) {
+    return (source.catalogs[catalogId] || []).filter(element =>
+        !element.deprecated &&
+        element.id.toLowerCase() !== 'none' &&
+        (!element.poses || !poseName || element.poses.includes(poseName))
+    );
+}
+
+function addCompoundPreset(options, seen, keyValue, label, value) {
+    if (!Array.isArray(value)) return;
+    const serialized = JSON.stringify(value);
+    if (seen.has(serialized)) return;
+    seen.add(serialized);
+    options.push({
+        value: cloneParams(value),
+        keyValue,
+        label,
+    });
+}
+
+function buildCompoundListVotingOptions(
+    source,
+    trait,
+    definition,
+    poseName,
+    currentValue
+) {
+    const binding = trait.gacha;
+    const options = [];
+    const seen = new Set();
+    if (binding?.strategy === 'tortieList' && definition.maxItems !== 0) {
+        const masks = activeCatalogOptions(source, binding.maskCatalog, poseName);
+        const patterns = activeCatalogOptions(source, binding.peltCatalog, poseName);
+        const colours = activeCatalogOptions(source, binding.colourCatalog, poseName);
+        if (masks.length > 0 && patterns.length > 0 && colours.length > 0) {
+            // tortieList defines the compound value contract. Use masks as the
+            // bounded candidate set and rotate through the other two catalogs.
+            for (const [index, mask] of masks.entries()) {
+                const pattern = patterns[index % patterns.length];
+                const colour = colours[index % colours.length];
+                addCompoundPreset(
+                    options,
+                    seen,
+                    mask.id,
+                    [mask, pattern, colour]
+                        .map(element => element.label || formatDisplayName(element.id))
+                        .join(' / '),
+                    [{
+                        mask: mask.id,
+                        pattern: pattern.id,
+                        colour: colour.id,
+                    }]
+                );
+            }
+        }
+    }
+
+    // A compile-valid compoundList may deliberately opt out of gacha. Its
+    // schema is not part of the public catalog, so only known-valid presets can
+    // be offered without guessing at object fields.
+    if (definition.required || (Array.isArray(currentValue) && currentValue.length > 0)) {
+        addCompoundPreset(options, seen, 'current', 'Keep current value', currentValue);
+    }
+    if (
+        definition.required ||
+        (Array.isArray(trait.value.default) && trait.value.default.length > 0)
+    ) {
+        addCompoundPreset(
+            options,
+            seen,
+            'default',
+            'Use default value',
+            trait.value.default
+        );
+    }
+    return options;
+}
+
+function buildRegistryVotingOptions(
+    source,
+    trait,
+    definition,
+    poseName,
+    currentValue
+) {
+    let options;
+    if (definition.kind === 'toggle' && definition.valueKind === 'boolean') {
+        options = [
+            {
+                value: false,
+                keyValue: 'false',
+                label: `No ${definition.label.toLowerCase()}`,
+            },
+            {
+                value: true,
+                keyValue: 'true',
+                label: definition.label,
+            },
+        ];
+    } else if (
+        definition.kind === 'compoundList' &&
+        definition.valueKind === 'objectList'
+    ) {
+        options = buildCompoundListVotingOptions(
+            source,
+            trait,
+            definition,
+            poseName,
+            currentValue
+        );
+        if (!definition.required) {
+            options.unshift({
+                value: [],
+                keyValue: 'none',
+                label: 'None',
+            });
+        }
+    } else {
+        const isSingleChoice =
+            definition.kind === 'select' && definition.valueKind === 'string';
+        const isListChoice =
+            definition.kind === 'list' && definition.valueKind === 'stringList';
+        if (!isSingleChoice && !isListChoice) {
+            throw new Error(
+                `Streamer voting has no generic editor for ${definition.traitId} (${definition.kind}/${definition.valueKind})`
+            );
+        }
+        const catalogOptions = definition.options.filter(
+            element => !element.deprecated && element.id.toLowerCase() !== 'none'
+        );
+        if (catalogOptions.length === 0) {
+            throw new Error(
+                `Streamer voting trait ${definition.traitId} has no catalog options`
+            );
+        }
+
+        options = catalogOptions.map(element => ({
+            value: isListChoice ? [element.id] : element.id,
+            keyValue: element.id,
+            label: element.label || formatDisplayName(element.id),
+        }));
+        if (!definition.required) {
+            options.unshift({
+                value: isListChoice ? [] : undefined,
+                keyValue: 'none',
+                label: 'None',
+            });
+        }
+    }
+    return options.map(option => ({
+        key: registryOptionKey(definition.traitId, option.keyValue),
+        label: option.label,
+        mutate: params => {
+            setRegistryTraitValue(
+                params,
+                source,
+                definition.traitId,
+                option.value
+            );
+        },
+    }));
+}
+
+/**
+ * Generic voting adapter used for traits added after the original voting UI.
+ * The generated catalog supplies the editor shape and pose-filtered options.
+ */
+export function createRegistryTraitVotingSteps(
+    source,
+    state = { params: getDefaultStreamParams() },
+    handledTraitIds = STREAMER_BASELINE_TRAIT_IDS
+) {
+    const params = state?.params || getDefaultStreamParams();
+    const definitions = getRegistryVotingDefinitions(
+        source,
+        params.poseName,
+        handledTraitIds
+    );
+    return definitions.map(definition => {
+        const trait = source.traits.find(candidate => candidate.id === definition.traitId);
+        if (!trait) {
+            throw new Error(`Streamer voting trait ${definition.traitId} is missing`);
+        }
+        const options = buildRegistryVotingOptions(
+            source,
+            trait,
+            definition,
+            params.poseName,
+            isRecord(params.traits) ? params.traits[definition.traitId] : undefined
+        );
+        return createStep(
+            `registry_trait_${definition.traitId}`,
+            definition.label,
+            definition.description || `Choose ${definition.label.toLowerCase()}.`,
+            () => options
+        );
+    });
 }
 
 function limitUnique(list, limit) {
@@ -348,8 +625,12 @@ function syncTortieState(params) {
 }
 
 function syncAccessoryState(params) {
-    const slots = clampNumber(params._accessorySlots ?? 0, 0, MAX_ACCESSORY_SLOTS);
     const existing = Array.isArray(params.accessories) ? params.accessories : [];
+    const slots = clampNumber(
+        params._accessorySlots ?? existing.length,
+        0,
+        MAX_ACCESSORY_SLOTS
+    );
     params._accessorySlots = slots;
     params.accessories = existing.slice(0, slots).map(item => (item === 'none' ? null : item));
     while (params.accessories.length < slots) {
@@ -359,8 +640,12 @@ function syncAccessoryState(params) {
 }
 
 function syncScarState(params) {
-    const slots = clampNumber(params._scarSlots ?? 0, 0, MAX_SCAR_SLOTS);
     const existing = Array.isArray(params.scars) ? params.scars : [];
+    const slots = clampNumber(
+        params._scarSlots ?? existing.length,
+        0,
+        MAX_SCAR_SLOTS
+    );
     params.scars = existing
         .slice(0, slots)
         .map(item => (typeof item === 'string' && item !== 'none' ? item : null));
@@ -628,7 +913,13 @@ function buildPoseOptions(state) {
     }));
 }
 
-function createStep(id, title, description, optionsBuilder) {
+function createStep(
+    id,
+    title,
+    description,
+    optionsBuilder,
+    changedTraitIds = []
+) {
     return {
         id,
         title,
@@ -636,26 +927,39 @@ function createStep(id, title, description, optionsBuilder) {
         getOptions: currentState => optionsBuilder(currentState),
         summarize: option => option?.label || '',
         apply: (option, currentState) => {
+            if (changedTraitIds.length > 0) {
+                projectCanonicalRegistryTraitsToLegacy(currentState.params);
+            }
             option?.mutate?.(currentState.params, currentState);
             syncDerivedState(currentState.params);
+            if (changedTraitIds.length > 0) {
+                syncChangedRegistryTraitsFromLegacy(
+                    currentState.params,
+                    changedTraitIds
+                );
+            }
         }
     };
 }
 
-export function createStreamSteps(state = { params: getDefaultStreamParams() }) {
+export function createStreamSteps(
+    state = { params: getDefaultStreamParams() },
+    catalogSource = publicCatCatalog
+) {
     const workingState = state || { params: getDefaultStreamParams() };
     if (!workingState.params) {
         workingState.params = getDefaultStreamParams();
     }
 
+    projectCanonicalRegistryTraitsToLegacy(workingState.params);
     syncDerivedState(workingState.params);
 
     const steps = [];
 
-    steps.push(createStep('colour', 'Base Colour', 'Choose the base coat colour that defines the cat.', buildColourOptions));
-    steps.push(createStep('pattern', 'Pattern', 'Select the main fur pattern.', buildPatternOptions));
+    steps.push(createStep('colour', 'Base Colour', 'Choose the base coat colour that defines the cat.', buildColourOptions, ['colour']));
+    steps.push(createStep('pattern', 'Pattern', 'Select the main fur pattern.', buildPatternOptions, ['pelt', 'coatPattern']));
 
-    steps.push(createStep('tortie_toggle', 'Tortie Layers', 'Decide whether to layer tortie patterns.', () => buildTortieToggleOptions()));
+    steps.push(createStep('tortie_toggle', 'Tortie Layers', 'Decide whether to layer tortie patterns.', () => buildTortieToggleOptions(), ['tortie']));
 
     const tortieLayers = workingState.params._tortieLayers ?? 0;
     if (tortieLayers > 0) {
@@ -665,19 +969,22 @@ export function createStreamSteps(state = { params: getDefaultStreamParams() }) 
                 `tortie_layer_${layerIndex}_mask`,
                 `Tortie Layer ${layerIndex}: Mask`,
                 'Choose the mask that controls where this layer appears.',
-                stepState => buildTortieMaskOptions(stepState, i)
+                stepState => buildTortieMaskOptions(stepState, i),
+                ['tortie']
             ));
             steps.push(createStep(
                 `tortie_layer_${layerIndex}_pattern`,
                 `Tortie Layer ${layerIndex}: Pattern`,
                 'Select the pattern that shapes this tortie overlay.',
-                stepState => buildTortiePatternOptions(stepState, i)
+                stepState => buildTortiePatternOptions(stepState, i),
+                ['tortie']
             ));
             steps.push(createStep(
                 `tortie_layer_${layerIndex}_colour`,
                 `Tortie Layer ${layerIndex}: Colour`,
                 'Pick the colour for this tortie overlay.',
-                stepState => buildTortieColourOptions(stepState, i)
+                stepState => buildTortieColourOptions(stepState, i),
+                ['tortie']
             ));
         }
 
@@ -687,42 +994,50 @@ export function createStreamSteps(state = { params: getDefaultStreamParams() }) 
                 `tortie_add_layer_${nextLayer}`,
                 `Add tortie layer ${nextLayer}?`,
                 'Viewers can add up to four tortie overlays.',
-                state => buildTortieMoreOptions(state, tortieLayers)
+                state => buildTortieMoreOptions(state, tortieLayers),
+                ['tortie']
             ));
         }
     }
 
-    steps.push(createStep('eye_primary', 'Primary Eye Colour', 'Pick the main eye colour.', buildEyePrimaryOptions));
-    steps.push(createStep('eye_secondary', 'Secondary Eye Colour', 'Choose a secondary eye colour or keep them matching.', buildEyeSecondaryOptions));
-    steps.push(createStep('white_patches', 'White Patches', 'Choose a white patch overlay.', buildWhitePatchOptions));
-    steps.push(createStep('points_pattern', 'Points Pattern', 'Select a points (siamese-style) highlight.', buildPointsOptions));
-    steps.push(createStep('vitiligo_pattern', 'Vitiligo', 'Add vitiligo overlays if desired.', buildVitiligoOptions));
-    steps.push(createStep('skin', 'Skin Tone', 'Select nose and ear skin colour.', buildSkinOptions));
-    steps.push(createStep('tint', 'Overall Tint', 'Choose an optional tint overlay.', buildTintOptions));
+    steps.push(createStep('eye_primary', 'Primary Eye Colour', 'Pick the main eye colour.', buildEyePrimaryOptions, ['eyeColour', 'eyeColour2']));
+    steps.push(createStep('eye_secondary', 'Secondary Eye Colour', 'Choose a secondary eye colour or keep them matching.', buildEyeSecondaryOptions, ['eyeColour2']));
+    steps.push(createStep('white_patches', 'White Patches', 'Choose a white patch overlay.', buildWhitePatchOptions, ['whitePatches']));
+    steps.push(createStep('points_pattern', 'Points Pattern', 'Select a points (siamese-style) highlight.', buildPointsOptions, ['points']));
+    steps.push(createStep('vitiligo_pattern', 'Vitiligo', 'Add vitiligo overlays if desired.', buildVitiligoOptions, ['vitiligo']));
+    steps.push(createStep('skin', 'Skin Tone', 'Select nose and ear skin colour.', buildSkinOptions, ['skinColour']));
+    steps.push(createStep('tint', 'Overall Tint', 'Choose an optional tint overlay.', buildTintOptions, ['tint']));
 
-    steps.push(createStep('accessories_toggle', 'Accessories', 'Decide whether to add accessories.', () => buildAccessoryToggleOptions()));
+    steps.push(createStep('accessories_toggle', 'Accessories', 'Decide whether to add accessories.', () => buildAccessoryToggleOptions(), ['accessories']));
     const accessorySlots = workingState.params._accessorySlots ?? 0;
     if (accessorySlots > 0) {
         for (let i = 0; i < accessorySlots; i += 1) {
-            steps.push(createStep(`accessory_slot_${i + 1}`, `Accessory Slot ${i + 1}`, 'Select an accessory for this slot.', state => buildAccessorySelectionOptions(state, i)));
+            steps.push(createStep(`accessory_slot_${i + 1}`, `Accessory Slot ${i + 1}`, 'Select an accessory for this slot.', state => buildAccessorySelectionOptions(state, i), ['accessories']));
         }
         if (accessorySlots < MAX_ACCESSORY_SLOTS) {
-            steps.push(createStep(`accessory_more_${accessorySlots + 1}`, 'Add another accessory?', 'Viewers can queue up to ten accessories.', () => buildAccessoryMoreOptions(accessorySlots)));
+            steps.push(createStep(`accessory_more_${accessorySlots + 1}`, 'Add another accessory?', 'Viewers can queue up to ten accessories.', () => buildAccessoryMoreOptions(accessorySlots), ['accessories']));
         }
     }
 
-    steps.push(createStep('scars_toggle', 'Scars', 'Choose whether to add scars.', () => buildScarToggleOptions()));
+    steps.push(createStep('scars_toggle', 'Scars', 'Choose whether to add scars.', () => buildScarToggleOptions(), ['scars']));
     const scarSlots = workingState.params._scarSlots ?? 0;
     if (scarSlots > 0) {
         for (let i = 0; i < scarSlots; i += 1) {
-            steps.push(createStep(`scar_slot_${i + 1}`, `Scar Slot ${i + 1}`, 'Pick a scar for this slot.', state => buildScarSelectionOptions(state, i)));
+            steps.push(createStep(`scar_slot_${i + 1}`, `Scar Slot ${i + 1}`, 'Pick a scar for this slot.', state => buildScarSelectionOptions(state, i), ['scars']));
         }
         if (scarSlots < MAX_SCAR_SLOTS) {
-            steps.push(createStep(`scar_more_${scarSlots + 1}`, 'Add another scar?', 'Viewers can queue several scars, up to six slots.', () => buildScarMoreOptions(scarSlots)));
+            steps.push(createStep(`scar_more_${scarSlots + 1}`, 'Add another scar?', 'Viewers can queue several scars, up to six slots.', () => buildScarMoreOptions(scarSlots), ['scars']));
         }
     }
 
-    steps.push(createStep('pose', 'Pose', 'Choose the final sprite pose to present the cat.', buildPoseOptions));
+    steps.push(createStep('pose', 'Pose', 'Choose the final sprite pose to present the cat.', buildPoseOptions, ['pose']));
+    steps.push(
+        ...createRegistryTraitVotingSteps(
+            catalogSource,
+            workingState,
+            STREAMER_BASELINE_TRAIT_IDS
+        )
+    );
 
     return steps;
 }

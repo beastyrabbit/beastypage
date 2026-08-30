@@ -37,7 +37,7 @@ const starterParams: CatParams = {
 };
 
 const pools: EvolutionPools = {
-  tortieMasks: ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN"],
+  tortieMasks: ["ONE", "TWO", "THREE", "FOUR", "REDTAIL", "DELILAH", "HALF"],
   tortiePatterns: ["SingleColour", "Tabby", "Marbled"],
   baseColours: [
     "WHITE",
@@ -608,14 +608,22 @@ describe("evolution generation", () => {
   it("bounds teaser variants by the real evolution's trait shape", () => {
     const tortieAddition: EvolutionAddition = {
       kind: "tortie",
+      traitId: "tortie",
       label: "Tortie ONE / Tabby / AQUA",
       value: { mask: "ONE", pattern: "Tabby", colour: "AQUA" },
+      traitValue: { mask: "ONE", pattern: "Tabby", colour: "AQUA" },
       parts: [],
     };
     const additions: EvolutionAddition[] = [
       tortieAddition,
       tortieAddition,
-      { kind: "accessory", label: "Accessory HOLLY", value: "HOLLY" },
+      {
+        kind: "accessory",
+        traitId: "accessories",
+        label: "Accessory HOLLY",
+        value: "HOLLY",
+        traitValue: "HOLLY",
+      },
     ];
 
     for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -644,8 +652,10 @@ describe("evolution generation", () => {
     };
     const tortieAddition: EvolutionAddition = {
       kind: "tortie",
+      traitId: "tortie",
       label: "Tortie ONE / Tabby / AQUA",
       value: { mask: "ONE", pattern: "Tabby", colour: "AQUA" },
+      traitValue: { mask: "ONE", pattern: "Tabby", colour: "AQUA" },
       parts: [],
     };
     const allowed = new Set(
@@ -690,7 +700,15 @@ describe("evolution generation", () => {
           poseName: "adult_short2",
         },
       },
-      [{ kind: "coat", label: "Coat grew long", value: "Long hair" }],
+      [
+        {
+          kind: "coat",
+          traitId: "pose",
+          label: "Coat grew long",
+          value: "Long hair",
+          traitValue: "adult_long0",
+        },
+      ],
       pools,
       { random: sequenceRandom([0.1]) },
     );

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { CAT_CATALOG_HASH } from "@/lib/cat-system/generated/cat-schema.generated";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { CatGeneratorV3 } from "../catGeneratorV3";
 
@@ -48,6 +49,7 @@ describe("CatGeneratorV3 batch coat variants", () => {
           width: 0,
           height: 0,
           tileSize: 50,
+          catalogHash: CAT_CATALOG_HASH,
           frames: [],
         }),
         { status: 200, headers: { "content-type": "application/json" } },
@@ -84,6 +86,7 @@ describe("CatGeneratorV3 batch coat variants", () => {
           width: 0,
           height: 0,
           tileSize: 50,
+          catalogHash: CAT_CATALOG_HASH,
           frames: [],
         }),
         { status: 200, headers: { "content-type": "application/json" } },

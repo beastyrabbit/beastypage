@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image
 
 from ..models import LayerIdentifier
 from .coat_patterns import (
@@ -19,7 +19,6 @@ from .image_ops import (
     apply_missing_scar,
     fill_with_colour,
     multiply,
-    sanitize_transparency,
     screen,
     tint_image,
 )
@@ -103,10 +102,12 @@ def _is_empty_value(value) -> bool:
 
 @dataclass
 class StageInfo:
-    identifier: LayerIdentifier
+    identifier: str
     diagnostics: list[str]
     image: Image.Image | None
     blend_mode: str
+    operation_id: str | None = None
+    duration_ms: float = 0.0
 
 
 def _deduplicate(items: list[str]) -> list[str]:
@@ -160,59 +161,6 @@ class CatRendererV3:
             self._sprite_number(params),
             self._pose_name(params),
         )
-
-    # ------------------------------------------------------------------
-    def render(self, params: dict) -> tuple[Image.Image, list[StageInfo]]:
-        canvas = self.repo.blank_canvas()
-        stages: list[StageInfo] = []
-        reverse = self._truthy(params.get("reverse"))
-
-        stage_sequence = [
-            self._stage_base,
-            self._stage_coat_pattern,
-            self._stage_tint,
-            self._stage_white_patches,
-            self._stage_points,
-            self._stage_vitiligo,
-            self._stage_eyes,
-            self._stage_scar_primary,
-            self._stage_shading,
-            self._stage_lighting,
-            self._stage_dark_forest,
-            self._stage_lineart,
-            self._stage_skin,
-            self._stage_scar_secondary,
-            self._stage_accessories,
-        ]
-
-        for stage_fn in stage_sequence:
-            overlay, diagnostics, blend, identifier = stage_fn(params, canvas)
-            if overlay is None:
-                continue
-
-            if blend == "alpha":
-                canvas = alpha_over(canvas, overlay)
-            elif blend == "multiply":
-                canvas = multiply(canvas, overlay)
-            elif blend == "screen":
-                canvas = screen(canvas, overlay)
-            elif blend == "add":
-                canvas = add(canvas, overlay)
-            elif blend == "replace":
-                canvas = overlay
-            else:
-                canvas = alpha_over(canvas, overlay)
-
-            stages.append(StageInfo(identifier, diagnostics, overlay, blend))
-
-        if reverse:
-            canvas = ImageOps.mirror(canvas)
-            for info in stages:
-                if info.image is not None:
-                    info.image = ImageOps.mirror(info.image)
-
-        canvas = sanitize_transparency(canvas)
-        return canvas, stages
 
     # ------------------------------------------------------------------
     def _base_pelt_specs(self, params: dict) -> list[tuple[object, object, object]]:

@@ -1,4 +1,9 @@
 import type { CatParams } from "@/lib/cat-v3/types";
+import type { TraitEditorCatalogSource } from "@/lib/cat-system/catalog";
+
+export type StreamCatalogSource = TraitEditorCatalogSource & {
+  schemaVersion?: number;
+};
 
 export type StreamerParams = CatParams & {
   _tortieLayers?: number;
@@ -50,7 +55,15 @@ export function getDefaultStreamParams(): StreamerParams;
 export function formatDisplayName(value: unknown): string;
 export function ensureSpriteDataLoaded(): Promise<void>;
 export function cloneParams<T>(params: T): T;
-export function createStreamSteps(state?: {
-  params: StreamerParams;
-}): StreamStep[];
+export function createRegistryTraitVotingSteps(
+  source: StreamCatalogSource,
+  state?: { params: StreamerParams },
+  handledTraitIds?: Iterable<string>,
+): StreamStep[];
+export function createStreamSteps(
+  state?: {
+    params: StreamerParams;
+  },
+  catalogSource?: StreamCatalogSource,
+): StreamStep[];
 export function getStepById(steps: StreamStep[], id: string): StreamStep | null;

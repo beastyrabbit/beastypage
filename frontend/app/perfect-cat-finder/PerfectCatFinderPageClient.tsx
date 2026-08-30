@@ -10,6 +10,13 @@ import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { track } from "@/lib/analytics";
+import {
+  catViewPayloadToShareSeed,
+  getCatViewDisplayRows,
+  normalizeCatViewPayload,
+  toCanonicalRenderPayload,
+} from "@/lib/cat-consumers/viewPayload";
+import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { renderCatV3 } from "@/lib/cat-v3/api";
 import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { createCatShare, encodeCatShare } from "@/lib/catShare";
@@ -101,7 +108,7 @@ function usePreviewCache() {
       };
     });
     try {
-      const result = await renderCatV3(cat.params);
+      const result = await renderCatV3(toCanonicalRenderPayload(cat.params));
       setPreviews((prev) => ({
         ...prev,
         [key]: { url: result.imageDataUrl, loading: false },
@@ -151,15 +158,7 @@ async function buildRandomCat(
     },
   });
 
-  const spriteNumber = Number.isFinite(randomParams.spriteNumber)
-    ? randomParams.spriteNumber
-    : 0;
-  const { spriteNumber: _ignored, ...rest } = randomParams;
-
-  return {
-    spriteNumber,
-    params: rest,
-  };
+  return toCanonicalRenderPayload(randomParams);
 }
 
 function formatRating(value: number): string {
@@ -269,7 +268,11 @@ export default function PerfectCatFinderPage() {
       for (let i = 0; i < count; i += 1) {
         try {
           const catParams = await buildRandomCat(generator);
-          payload.push({ params: catParams });
+          payload.push({
+            params: catDataToLegacyPersistence(
+              catParams as unknown as Record<string, unknown>,
+            ) as unknown as CatRenderParams,
+          });
         } catch (err) {
           failed += 1;
           console.error("Failed to generate random cat", err);
@@ -335,7 +338,7 @@ export default function PerfectCatFinderPage() {
       if (response.cats.length >= 2) {
         const normalized = response.cats.slice(0, 2).map((cat) => ({
           ...cat,
-          params: cat.params as CatRenderParams,
+          params: toCanonicalRenderPayload(cat.params),
         }));
         setMatchup(normalized);
         setPoolSize(response.totalCats);
@@ -426,32 +429,8 @@ export default function PerfectCatFinderPage() {
 
   const handleOpenInBuilder = useCallback(async (cat: MatchupCat) => {
     try {
-      const coreParams = {
-        ...(cat.params.params as Record<string, unknown>),
-        spriteNumber: cat.params.spriteNumber,
-      } as Record<string, unknown>;
-
-      const accessories = Array.isArray(coreParams.accessories)
-        ? (coreParams.accessories as string[])
-        : [];
-      const scars = Array.isArray(coreParams.scars)
-        ? (coreParams.scars as string[])
-        : [];
-      const tortie = Array.isArray(coreParams.tortie)
-        ? (coreParams.tortie as Record<string, unknown>[])
-        : [];
-
-      const shareSeed = {
-        params: coreParams,
-        accessorySlots: accessories,
-        scarSlots: scars,
-        tortieSlots: tortie,
-        counts: {
-          accessories: accessories.length,
-          scars: scars.length,
-          tortie: tortie.length,
-        },
-      } as const;
+      const canonical = normalizeCatViewPayload(cat.params);
+      const shareSeed = catViewPayloadToShareSeed(canonical);
 
       const shareRecord = await createCatShare(shareSeed);
       let url: string | null = null;
@@ -479,8 +458,31 @@ export default function PerfectCatFinderPage() {
   }, []);
 
   const leaderboardEntries: LeaderboardEntry[] = useMemo(
-    () => (leaderboard as LeaderboardEntry[] | undefined) ?? [],
+    () =>
+      ((leaderboard as LeaderboardEntry[] | undefined) ?? []).flatMap(
+        (entry) => {
+          try {
+            return [
+              {
+                ...entry,
+                params: toCanonicalRenderPayload(entry.params),
+              },
+            ];
+          } catch (error) {
+            console.warn(
+              "Skipping invalid perfect-cat leaderboard entry",
+              error,
+            );
+            return [];
+          }
+        },
+      ),
     [leaderboard],
+  );
+
+  const selectedTraitRows = useMemo(
+    () => (selectedCat ? getCatViewDisplayRows(selectedCat.params) : []),
+    [selectedCat],
   );
 
   useEffect(() => {
@@ -690,6 +692,20 @@ export default function PerfectCatFinderPage() {
                 </span>
                 <span>{selectedCat.appearances} votes</span>
               </div>
+              {selectedTraitRows.length > 0 && (
+                <dl className="grid max-h-48 gap-2 overflow-y-auto rounded-2xl border border-border/40 bg-background/70 p-3 sm:grid-cols-2">
+                  {selectedTraitRows.map((row) => (
+                    <div key={row.key} className="min-w-0">
+                      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
+                        {row.label}
+                      </dt>
+                      <dd className="truncate text-xs text-foreground">
+                        {row.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"

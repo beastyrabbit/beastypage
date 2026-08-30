@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import type { SingleCatPortableSettings } from "@/lib/portable-settings";
 import {
   computeLayerCount,
@@ -111,7 +112,9 @@ export function WizardExampleCats({
 
         if (afterlife.darkForest || afterlife.dead) {
           params.darkForest = afterlife.darkForest;
+          params.darkMode = afterlife.darkForest;
           params.dead = afterlife.dead;
+          syncChangedRegistryTraitsFromLegacy(params, ["darkForest", "dead"]);
           const rerendered = await catGenerator.generateCat(params);
           imageDataUrl = rerendered.imageDataUrl;
         } else {

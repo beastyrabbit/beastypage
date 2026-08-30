@@ -3,7 +3,11 @@
  * extracted verbatim from StreamControlClient.tsx.
  */
 
-import { encodePortableSettings } from "@/lib/portable-settings";
+import {
+  encodePortableSettings,
+  extractPortableSettings,
+} from "@/lib/portable-settings";
+import { computeLayerCount } from "@/utils/catSettingsHelpers";
 import type { SingleCatSettings } from "@/utils/singleCatVariants";
 
 export const LOBBY_MODE_DEFAULTS = {
@@ -55,14 +59,23 @@ export function formatMultiplier(v: number): string {
 export function encodePortableCodeFromSettings(
   settings: SingleCatSettings,
 ): string {
-  return encodePortableSettings({
-    accessoryRange: settings.accessoryRange,
-    scarRange: settings.scarRange,
-    tortieRange: settings.tortieRange,
-    exactLayerCounts: settings.exactLayerCounts,
-    afterlifeMode: settings.afterlifeMode,
+  return encodePortableSettings(extractPortableSettings(settings));
+}
+
+/** Shared boundary so every Stream Control spin forwards registry rules. */
+export function buildStreamGeneratorOptions(
+  settings: SingleCatSettings,
+): Record<string, unknown> {
+  return {
+    experimentalColourMode:
+      settings.extendedModes.length > 0
+        ? settings.extendedModes.filter((mode) => mode !== "base")
+        : undefined,
     includeBaseColours: settings.includeBaseColours,
     includeNewSprites: settings.includeNewSprites,
-    extendedModes: settings.extendedModes,
-  });
+    exactLayerCounts: settings.exactLayerCounts,
+    accessoryCount: computeLayerCount(settings.accessoryRange),
+    scarCount: computeLayerCount(settings.scarRange),
+    tortieCount: computeLayerCount(settings.tortieRange),
+  };
 }

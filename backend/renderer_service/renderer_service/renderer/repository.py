@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 from PIL import Image
@@ -14,42 +14,49 @@ from .colors import resolve_colour
 class SpriteRepository:
     """Thin loader around the Lifegen sprite atlases (minimal subset for V3 bootstrap)."""
 
-    def __init__(self, sprite_root: Path | None = None, tile_size: int = 50) -> None:
+    def __init__(
+        self,
+        sprite_root: Path | None = None,
+        tile_size: int = 50,
+        data_root: Path | None = None,
+    ) -> None:
         self.sprite_root = sprite_root or settings.sprite_root
+        self.data_root = data_root or settings.data_root
         self.tile_size = tile_size
-        data_root = Path(__file__).resolve().parents[1] / "data"
-        with open(data_root / "spritesIndex.json", "r", encoding="utf-8") as fh:
-            self.sprite_index: Dict[str, dict] = json.load(fh)
-        with open(data_root / "spritesOffsetMap.json", "r", encoding="utf-8") as fh:
+        with open(self.data_root / "spritesIndex.json", "r", encoding="utf-8") as fh:
+            self.sprite_index: dict[str, dict] = json.load(fh)
+        with open(
+            self.data_root / "spritesOffsetMap.json", "r", encoding="utf-8"
+        ) as fh:
             self.sprite_offsets = json.load(fh)
-        with open(data_root / "poseData.json", "r", encoding="utf-8") as fh:
-            self.pose_data: Dict[str, Any] = json.load(fh)
+        with open(self.data_root / "poseData.json", "r", encoding="utf-8") as fh:
+            self.pose_data: dict[str, Any] = json.load(fh)
 
         self.pose_names: list[str] = list(self.pose_data.get("poses", []))
-        self.pose_name_to_offset: Dict[str, dict] = dict(
+        self.pose_name_to_offset: dict[str, dict] = dict(
             self.pose_data.get("poseNameToOffset", {})
         )
-        self.legacy_sprite_to_pose: Dict[str, str] = {
+        self.legacy_sprite_to_pose: dict[str, str] = {
             str(key): str(value)
             for key, value in self.pose_data.get(
                 "legacySpriteNumberToPoseName", {}
             ).items()
         }
-        self.legacy_pose_to_sprite: Dict[str, int] = {
+        self.legacy_pose_to_sprite: dict[str, int] = {
             str(key): int(value)
             for key, value in self.pose_data.get(
                 "legacyPoseNameToSpriteNumber", {}
             ).items()
         }
-        self.legacy_pose_to_offset: Dict[str, dict] = dict(
+        self.legacy_pose_to_offset: dict[str, dict] = dict(
             self.pose_data.get("legacyPoseNameToOffset", {})
         )
 
-        self._sheet_cache: Dict[str, Image.Image] = {}
-        self._sprite_cache: Dict[
+        self._sheet_cache: dict[str, Image.Image] = {}
+        self._sprite_cache: dict[
             tuple[str, int, str | None, str | None], Image.Image
         ] = {}
-        self._missing_mask_cache: Dict[tuple[str, int, str | None], Image.Image] = {}
+        self._missing_mask_cache: dict[tuple[str, int, str | None], Image.Image] = {}
 
     # ------------------------------------------------------------------
     # Sprite sheet helpers
@@ -357,3 +364,17 @@ class SpriteRepository:
             return sheet_path.exists()
         sheet_path = self.sprite_root / f"{sprite_name}.png"
         return sheet_path.exists()
+
+    def missing_indexed_assets(self) -> list[str]:
+        """Return atlas files referenced by canonical metadata but absent on disk."""
+        required: set[str] = set()
+        for info in self.sprite_index.values():
+            for key in ("spritesheet", "paletteSheet"):
+                sheet_name = info.get(key)
+                if isinstance(sheet_name, str) and sheet_name:
+                    required.add(f"{sheet_name}.png")
+        return sorted(
+            relative_path
+            for relative_path in required
+            if not (self.sprite_root / relative_path).is_file()
+        )

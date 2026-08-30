@@ -22,20 +22,37 @@ A pixel cat gacha platform featuring generators, wheels, and collection tools bu
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v22+)
+- [Node.js](https://nodejs.org/) (v24+; required by Portless)
 - [pnpm](https://pnpm.io/) (v10+)
 - [Convex](https://convex.dev) account (for database)
 - Python 3.11+ with [uv](https://github.com/astral-sh/uv) (for renderer service)
+- [Infisical CLI](https://infisical.com/docs/cli/overview) with access to the development project
 
-### Frontend
+### Full development environment
 
 ```bash
-cd frontend
-pnpm install
-pnpm run dev
+pnpm install --frozen-lockfile
+pnpm --dir frontend install --frozen-lockfile
+pnpm --dir backend/media_service install --frozen-lockfile
+npm --prefix backend/discord-bot ci
+(cd backend/renderer_service && uv sync --frozen --extra dev)
+pnpm dev
 ```
 
-Open [http://frontend.localhost:1355](http://frontend.localhost:1355) in your browser.
+`pnpm dev` checks the generated cat-system contract and required secrets, starts
+the frontend, renderer, media service, Discord bot, and palette watcher, then
+opens the worktree-specific Portless URL after every service is ready. The exact
+URL is printed in the terminal; it is intentionally not hard-coded.
+
+The frontend uses the Convex development deployment configured through
+Infisical. Run `pnpm dev:convex` separately only when you intend to sync Convex
+functions and already have an interactive Convex CLI login.
+
+### Frontend only
+
+```bash
+pnpm --dir frontend dev
+```
 
 ### Renderer Service (Optional)
 
@@ -102,6 +119,22 @@ Forgejo Actions builds and pushes images to the Forgejo registry on `main` and v
 - `git.heerlab.com/beasty/beastypage-image-processing`
 - `git.heerlab.com/beasty/beastypage-media`
 - `git.heerlab.com/beasty/beastypage-discord-bot`
+
+### Cat-system release cutover
+
+Frontend, renderer, and Discord images from one release carry the same generated
+cat-catalog hash. Their image builds fail when the supplied hash does not match
+the bundled contract, and runtime consumers fail closed when a renderer reports
+a different hash.
+
+A release that changes this hash must therefore use a coordinated big-bang
+cutover, not an ordinary mixed-version rolling deployment: build every consumer
+from one tag, verify the new frontend and renderer stacks report the same hash,
+then switch traffic to both together. Keep the previous stack available for
+rollback until external smoke tests pass. Never suppress a catalog mismatch to
+make a rollout green; that can return a valid response containing the wrong
+pixels. The one-time `v7.3.1` to `v7.4.0` transition is compatible because the
+legacy renderer does not advertise a catalog hash.
 
 ### Running with Your Own Database
 

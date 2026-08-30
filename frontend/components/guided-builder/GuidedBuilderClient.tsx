@@ -31,6 +31,18 @@ import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
 import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
+import { GenericTraitEditors } from "@/lib/cat-builder/GenericTraitEditors";
+import {
+  GUIDED_BUILDER_SPECIALIZED_TRAITS,
+  getBuilderTraitValue,
+  getUnhandledTraitEditorDefinitions,
+  mutateBuilderParams,
+  synchronizeBuilderParams,
+} from "@/lib/cat-builder/genericTraitEditor";
+import {
+  catDataToLegacyPersistence,
+  catParamsToLegacyPersistence,
+} from "@/lib/cat-system";
 import {
   applyCoatChoice,
   getCoatChoiceValue,
@@ -58,7 +70,8 @@ type StepId =
   | "skin-tint"
   | "accessories"
   | "scars"
-  | "pose";
+  | "pose"
+  | "additional-traits";
 
 interface StepDefinition {
   id: StepId;
@@ -75,7 +88,8 @@ interface StepDefinition {
     | "skin-tint"
     | "accessories"
     | "scars"
-    | "pose";
+    | "pose"
+    | "generic";
   parent?: StepId;
   layerIndex?: number;
 }
@@ -209,6 +223,13 @@ const STEP_DEFINITIONS: StepDefinition[] = [
     navLabel: "Age & Pose",
     description: "Pick the sprite pose to showcase your cat.",
     type: "pose",
+  },
+  {
+    id: "additional-traits",
+    title: "More Traits",
+    navLabel: "More Traits",
+    description: "Review the additional options supported by this cat system.",
+    type: "generic",
   },
 ];
 
@@ -385,7 +406,9 @@ function GuidedPreviewSprite({
 
 export function GuidedBuilderClient() {
   const router = useRouter();
-  const [params, setParams] = useState<CatParams>(DEFAULT_PARAMS);
+  const [params, setParams] = useState<CatParams>(() =>
+    synchronizeBuilderParams(DEFAULT_PARAMS),
+  );
   const [tortieLayers, setTortieLayers] = useState<TortieLayer[]>([]);
   const [desiredTortieLayers, setDesiredTortieLayers] = useState(0);
   const [experimentalColourMode, setExperimentalColourMode] =
@@ -411,6 +434,21 @@ export function GuidedBuilderClient() {
     slug: string;
     url: string;
   } | null>(null);
+  const genericTraitEditors = useMemo(
+    () =>
+      getUnhandledTraitEditorDefinitions(
+        GUIDED_BUILDER_SPECIALIZED_TRAITS,
+        params.poseName,
+      ),
+    [params.poseName],
+  );
+  const guidedSteps = useMemo(
+    () =>
+      genericTraitEditors.length > 0
+        ? STEP_DEFINITIONS
+        : STEP_DEFINITIONS.filter((step) => step.type !== "generic"),
+    [genericTraitEditors.length],
+  );
 
   const spriteMapperRef = useRef<SpriteMapperApi | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
@@ -468,7 +506,7 @@ export function GuidedBuilderClient() {
       ) {
         next.poseName = options.poseNames[0];
       }
-      return next;
+      return synchronizeBuilderParams(next);
     });
   }, [options]);
 
@@ -484,7 +522,7 @@ export function GuidedBuilderClient() {
     setPreviewLoading(true);
     (async () => {
       try {
-        const payload = cloneParams(params);
+        const payload = synchronizeBuilderParams(cloneParams(params));
         const result = await generator.generateCat({
           ...payload,
           spriteNumber: payload.spriteNumber,
@@ -509,10 +547,8 @@ export function GuidedBuilderClient() {
   }, [params]);
 
   const activeStepDefinition = useMemo(
-    () =>
-      STEP_DEFINITIONS.find((step) => step.id === activeStep) ??
-      STEP_DEFINITIONS[0],
-    [activeStep],
+    () => guidedSteps.find((step) => step.id === activeStep) ?? guidedSteps[0],
+    [activeStep, guidedSteps],
   );
 
   const getPaletteForMode = useCallback(
@@ -612,8 +648,7 @@ export function GuidedBuilderClient() {
 
       const promise = (async () => {
         try {
-          const draft = cloneParams(params);
-          mutator(draft);
+          const draft = mutateBuilderParams(params, mutator);
           const result = await generator.generateCat(
             draft as unknown as Record<string, unknown>,
           );
@@ -820,6 +855,25 @@ export function GuidedBuilderClient() {
               ? formatName(snapshot.poseName)
               : `Pose ${snapshot.spriteNumber}`,
           };
+        case "additional-traits": {
+          const summary = genericTraitEditors
+            .map((definition) => {
+              const value = getBuilderTraitValue(snapshot, definition.traitId);
+              if (Array.isArray(value)) {
+                return `${definition.label}: ${value.length}`;
+              }
+              if (typeof value === "boolean") {
+                return `${definition.label}: ${value ? "on" : "off"}`;
+              }
+              if (typeof value === "string" && value) {
+                return `${definition.label}: ${formatName(value)}`;
+              }
+              return null;
+            })
+            .filter((entry): entry is string => entry !== null)
+            .join(" · ");
+          return { complete: true, summary: summary || "Defaults unchanged" };
+        }
         default: {
           const layerMatch = /^tortie-layer-(\d+)$/.exec(stepId);
           if (layerMatch) {
@@ -837,7 +891,7 @@ export function GuidedBuilderClient() {
         }
       }
     },
-    [tortieLayers],
+    [genericTraitEditors, tortieLayers],
   );
 
   const markStepState = useCallback(
@@ -857,7 +911,7 @@ export function GuidedBuilderClient() {
       setTimeline((prev) => {
         const filtered = prev.filter((entry) => entry.id !== stepId);
         if (complete && summary) {
-          const stepMeta = STEP_DEFINITIONS.find((step) => step.id === stepId);
+          const stepMeta = guidedSteps.find((step) => step.id === stepId);
           return [
             ...filtered,
             {
@@ -872,16 +926,14 @@ export function GuidedBuilderClient() {
       });
       return complete;
     },
-    [evaluateStep],
+    [evaluateStep, guidedSteps],
   );
 
   const findNextStepId = useCallback(
     (afterStepId: StepId, snapshot: CatParams): StepId | null => {
-      const index = STEP_DEFINITIONS.findIndex(
-        (step) => step.id === afterStepId,
-      );
-      for (let i = index + 1; i < STEP_DEFINITIONS.length; i += 1) {
-        const candidate = STEP_DEFINITIONS[i];
+      const index = guidedSteps.findIndex((step) => step.id === afterStepId);
+      for (let i = index + 1; i < guidedSteps.length; i += 1) {
+        const candidate = guidedSteps[i];
         if (candidate.type === "tortie-layer") {
           const layerIndex = candidate.layerIndex ?? 0;
           if (!snapshot.isTortie) continue;
@@ -891,7 +943,7 @@ export function GuidedBuilderClient() {
       }
       return null;
     },
-    [desiredTortieLayers],
+    [desiredTortieLayers, guidedSteps],
   );
 
   const unlockNextRelevantStep = useCallback(
@@ -913,8 +965,9 @@ export function GuidedBuilderClient() {
         const draft = cloneParams(prevParams);
         draft.isTortie = enabled;
         const synced = ensureTortieSync(nextLayers, draft);
-        markStepState("tortie", synced, nextLayers);
-        return synced;
+        const canonical = synchronizeBuilderParams(synced);
+        markStepState("tortie", canonical, nextLayers);
+        return canonical;
       });
     },
     [ensureTortieSync, markStepState],
@@ -967,8 +1020,7 @@ export function GuidedBuilderClient() {
     (mutator: (draft: CatParams) => void, stepId?: StepId) => {
       setShareInfo(null);
       setParams((prev) => {
-        const draft = cloneParams(prev);
-        mutator(draft);
+        const draft = mutateBuilderParams(prev, mutator);
         if (stepId) {
           const complete = markStepState(stepId, draft);
           if (complete) {
@@ -980,6 +1032,11 @@ export function GuidedBuilderClient() {
     },
     [markStepState, unlockNextRelevantStep],
   );
+
+  const updateGenericTraitParams = useCallback((nextParams: CatParams) => {
+    setShareInfo(null);
+    setParams(synchronizeBuilderParams(nextParams));
+  }, []);
 
   const handleSelectColour = useCallback(
     (colour: string) => {
@@ -1060,9 +1117,8 @@ export function GuidedBuilderClient() {
       applyTortieLayers(nextLayers, true);
       const stepId = TORTIE_LAYER_STEPS[layerIndex];
       if (stepId) {
-        const updatedSnapshot = ensureTortieSync(
-          nextLayers,
-          cloneParams(params),
+        const updatedSnapshot = synchronizeBuilderParams(
+          ensureTortieSync(nextLayers, cloneParams(params)),
         );
         markStepState(stepId, updatedSnapshot, nextLayers);
         const { complete } = evaluateStep(stepId, updatedSnapshot, nextLayers);
@@ -1148,6 +1204,7 @@ export function GuidedBuilderClient() {
       }
 
       try {
+        const finalParams = synchronizeBuilderParams(cloneParams(params));
         const payload = {
           mode: "wizard-timeline",
           version: 1,
@@ -1159,12 +1216,22 @@ export function GuidedBuilderClient() {
             summary: step.summary,
             params: step.params,
           })),
-          finalParams: cloneParams(params),
-          params: cloneParams(params),
-          spriteNumber: params.spriteNumber,
+          finalParams,
+          params: finalParams,
+          spriteNumber: finalParams.spriteNumber,
           metaLocked: false,
         };
-        const record = await createMapperRecord({ catData: payload });
+        const record = await createMapperRecord({
+          catData: {
+            ...catDataToLegacyPersistence(payload),
+            steps: payload.steps.map((step) => ({
+              ...step,
+              params: catParamsToLegacyPersistence(
+                step.params as unknown as Record<string, unknown>,
+              ),
+            })),
+          },
+        });
         if (!record?.slug && !record?.id) {
           throw new Error("Share API did not return a slug.");
         }
@@ -1203,7 +1270,7 @@ export function GuidedBuilderClient() {
     track("guided_builder_reset", {
       at_step: currentStepIndex >= 0 ? currentStepIndex + 1 : 0,
     });
-    setParams(DEFAULT_PARAMS);
+    setParams(synchronizeBuilderParams(DEFAULT_PARAMS));
     setTortieLayers([]);
     setDesiredTortieLayers(0);
     setExperimentalColourMode("off");
@@ -1238,8 +1305,9 @@ export function GuidedBuilderClient() {
               const fallback = palette[0] ?? prev.colour;
               const next = cloneParams(prev);
               next.colour = fallback;
-              markStepState("colour", next);
-              return next;
+              const canonical = synchronizeBuilderParams(next);
+              markStepState("colour", canonical);
+              return canonical;
             }
             return prev;
           });
@@ -1488,7 +1556,9 @@ export function GuidedBuilderClient() {
                       return entry;
                     });
                     setParams((prevParams) =>
-                      ensureTortieSync(updated, prevParams),
+                      synchronizeBuilderParams(
+                        ensureTortieSync(updated, prevParams),
+                      ),
                     );
                     return updated;
                   });
@@ -2167,6 +2237,15 @@ export function GuidedBuilderClient() {
     case "pose":
       stepContent = renderPoseStep();
       break;
+    case "generic":
+      stepContent = (
+        <GenericTraitEditors
+          definitions={genericTraitEditors}
+          params={params}
+          onParamsChange={updateGenericTraitParams}
+        />
+      );
+      break;
     default:
       stepContent = (
         <div className="text-sm text-neutral-300/80">
@@ -2188,7 +2267,7 @@ export function GuidedBuilderClient() {
           </p>
         </header>
         <nav className="flex-1 space-y-1">
-          {STEP_DEFINITIONS.map((step) => {
+          {guidedSteps.map((step) => {
             const unlocked = unlockedSteps.includes(step.id);
             const state = stepStates[step.id];
             return (

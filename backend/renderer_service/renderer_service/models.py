@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Literal
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
+
+from .renderer.contracts import CatDocument
 
 
 class LayerIdentifier(str, Enum):
@@ -52,9 +54,10 @@ class RenderOptions(BaseModel):
 
 
 class RenderParams(BaseModel):
-    spriteNumber: Optional[int] = None
-    poseName: Optional[str] = None
-    params: Dict[str, Any] = Field(default_factory=dict)
+    spriteNumber: int | None = None
+    poseName: str | None = None
+    document: CatDocument | None = None
+    params: dict[str, JsonValue] = Field(default_factory=dict)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -65,12 +68,13 @@ class RenderRequest(BaseModel):
 
 
 class LayerDiagnostic(BaseModel):
-    id: LayerIdentifier
+    id: str
+    operation_id: str | None = Field(default=None, alias="operationId")
     label: str
     duration_ms: float
-    diagnostics: List[str] = Field(default_factory=list)
-    blend_mode: Optional[str] = None
-    image: Optional[str] = None
+    diagnostics: list[str] = Field(default_factory=list)
+    blend_mode: str | None = None
+    image: str | None = None
 
 
 class RenderMeta(BaseModel):
@@ -78,39 +82,44 @@ class RenderMeta(BaseModel):
     finished_at: float
     duration_ms: float
     memory_pressure: bool
+    catalog_hash: str | None = Field(default=None, alias="catalogHash")
+    manifest_hash: str | None = Field(default=None, alias="manifestHash")
+    render_plan_version: int | None = Field(default=None, alias="renderPlanVersion")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class RenderResponse(BaseModel):
     image: str
     meta: RenderMeta
-    layers: Optional[List[LayerDiagnostic]] = None
+    layers: list[LayerDiagnostic] | None = None
 
 
 class BatchVariant(BaseModel):
     id: str = Field(..., description="Unique identifier for the variant frame")
-    label: Optional[str] = Field(
+    label: str | None = Field(
         default=None,
         description="Human-readable label for UI display",
     )
-    group: Optional[str] = Field(
+    group: str | None = Field(
         default=None,
         description="Logical group identifier (e.g. accessories round)",
     )
-    sprite_number: Optional[int] = Field(
+    sprite_number: int | None = Field(
         default=None,
         alias="spriteNumber",
         description="Override sprite number for this variant",
     )
-    pose_name: Optional[str] = Field(
+    pose_name: str | None = Field(
         default=None,
         alias="poseName",
         description="Override named pose for this variant",
     )
-    overrides: Optional[Dict[str, Any]] = Field(
+    overrides: dict[str, JsonValue] | None = Field(
         default=None,
         description="Shallow overrides applied to the base payload params",
     )
-    params: Optional[Dict[str, Any]] = Field(
+    params: dict[str, JsonValue] | None = Field(
         default=None,
         description="Full parameter object for this variant; takes precedence over overrides",
     )
@@ -119,13 +128,13 @@ class BatchVariant(BaseModel):
 
 
 class BatchRenderOptions(BaseModel):
-    tile_size: Optional[int] = Field(
+    tile_size: int | None = Field(
         default=None,
         alias="tileSize",
         description="Output tile size in pixels. Defaults to renderer tile size (50).",
         ge=1,
     )
-    columns: Optional[int] = Field(
+    columns: int | None = Field(
         default=None,
         description="Desired column count when packing frames into the sheet.",
         ge=1,
@@ -145,7 +154,7 @@ class BatchRenderOptions(BaseModel):
         alias="frameMode",
         description="Choose whether frames capture full composites or a single layer overlay.",
     )
-    layer_id: Optional[LayerIdentifier | str] = Field(
+    layer_id: str | None = Field(
         default=None,
         alias="layerId",
         description="When frameMode is 'layer', specify which layer identifier to extract.",
@@ -161,14 +170,14 @@ class BatchRenderOptions(BaseModel):
 
 class BatchRenderRequest(BaseModel):
     payload: RenderParams
-    variants: List[BatchVariant] = Field(default_factory=list)
-    options: Optional[BatchRenderOptions] = None
+    variants: list[BatchVariant] = Field(default_factory=list)
+    options: BatchRenderOptions | None = None
 
 
 class SpritesheetFrame(BaseModel):
     id: str
-    label: Optional[str] = None
-    group: Optional[str] = None
+    label: str | None = None
+    group: str | None = None
     index: int
     column: int
     row: int
@@ -188,5 +197,10 @@ class BatchRenderResponse(BaseModel):
     width: int
     height: int
     tileSize: int
-    frames: List[SpritesheetFrame]
-    sources: Optional[List[FrameSource]] = None
+    catalog_hash: str = Field(alias="catalogHash")
+    manifest_hash: str = Field(alias="manifestHash")
+    render_plan_version: int = Field(alias="renderPlanVersion")
+    frames: list[SpritesheetFrame]
+    sources: list[FrameSource] | None = None
+
+    model_config = ConfigDict(populate_by_name=True)

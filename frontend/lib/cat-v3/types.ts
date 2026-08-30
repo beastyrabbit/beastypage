@@ -1,3 +1,11 @@
+import type { JsonValue } from "@/lib/cat-system/definition";
+import type {
+  GachaCountsMode,
+  GachaSeed,
+  GachaSlotOverrides,
+} from "@/lib/cat-system/gacha/types";
+import type { CatDocument, CatTraits } from "@/lib/cat-system/runtime";
+
 export interface TortieLayer {
   pattern?: string;
   colour?: string;
@@ -5,6 +13,10 @@ export interface TortieLayer {
 }
 
 export interface CatParams {
+  /** Canonical system envelope. Legacy flat fields remain during rollback-safe rollout. */
+  schemaVersion?: number;
+  traits?: Partial<CatTraits> & Record<string, unknown>;
+  unknownTraits?: Record<string, JsonValue>;
   spriteNumber: number;
   poseName?: string;
   peltName: string;
@@ -38,6 +50,7 @@ export interface CatParams {
 }
 
 export interface RandomGenerationOptions {
+  seed?: GachaSeed;
   /**
    * @deprecated Legacy numeric-sprite flag retained for older callers. All
    * renderable poses are now available.
@@ -48,13 +61,8 @@ export interface RandomGenerationOptions {
   /** @deprecated Retained for saved-setting compatibility and otherwise ignored. */
   includeNewSprites?: boolean;
   exactLayerCounts?: boolean;
-  countsMode?:
-    | "weighted"
-    | "uniform"
-    | Partial<
-        Record<"tortie" | "accessories" | "scars", "weighted" | "uniform">
-      >;
-  slotOverrides?: Partial<Record<"tortie" | "accessories" | "scars", number>>;
+  countsMode?: GachaCountsMode;
+  slotOverrides?: GachaSlotOverrides;
   whitePatchColourMode?: string;
   // Legacy count options (mapped to slotOverrides internally)
   accessoryCount?: number;
@@ -66,16 +74,21 @@ export interface SlotSelections {
   accessories: string[];
   scars: string[];
   tortie: (TortieLayer | null)[];
+  [traitId: string]: unknown;
 }
 
 export interface RandomGenerationResult {
   params: CatParams;
+  document?: CatDocument;
   slotSelections: SlotSelections;
+  seed?: GachaSeed;
+  rngVersion?: "xoshiro128**-v1";
 }
 
 export interface CatRenderParams {
   spriteNumber?: number;
   poseName?: string;
+  document?: CatDocument;
   params: Partial<Omit<CatParams, "spriteNumber" | "poseName">>;
   collectLayers?: boolean;
   includeLayerImages?: boolean;
@@ -95,11 +108,16 @@ export interface RenderMeta {
   finished_at: number;
   duration_ms: number;
   memory_pressure: boolean;
+  catalog_hash?: string;
+  plan_version?: number;
+  manifest_hash?: string;
 }
 
 export interface RendererResponse {
   imageDataUrl: string;
   meta: RenderMeta;
+  catalogHash?: string;
+  planVersion?: number;
   layers?: RenderLayerDiagnostic[];
 }
 
@@ -126,6 +144,9 @@ export interface BatchRenderResponse {
   width: number;
   height: number;
   tileSize: number;
+  catalogHash?: string;
+  manifestHash?: string;
+  renderPlanVersion?: number;
   frames: SpritesheetFrameMeta[];
   sources?: BatchFrameSource[];
 }

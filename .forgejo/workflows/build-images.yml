@@ -58,6 +58,7 @@ jobs:
       image_processing: ${{ steps.filter.outputs.image_processing }}
       media: ${{ steps.filter.outputs.media }}
       discord_bot: ${{ steps.filter.outputs.discord_bot }}
+      cat_system: ${{ steps.filter.outputs.cat_system }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -94,10 +95,45 @@ jobs:
 
           set_output frontend '^frontend/'
           set_output convex '^frontend/convex/'
-          set_output renderer '^backend/renderer_service/'
+          set_output renderer '^(backend/renderer_service/|frontend/lib/cat-system/|frontend/lib/cat-v3/(coatPatterns|poseOptions)\.ts|frontend/scripts/generate-cat-system\.ts|frontend/public/(cat-system|sprite-data|sprites)/|\.dockerignore$)'
           set_output image_processing '^backend/image_processing_service/'
           set_output media '^backend/media_service/'
-          set_output discord_bot '^backend/discord-bot/'
+          set_output discord_bot '^(backend/discord-bot/|frontend/lib/cat-system/|frontend/lib/cat-v3/(coatPatterns|poseOptions)\.ts|frontend/scripts/generate-cat-system\.ts|frontend/public/(cat-system|sprite-data|sprites)/)'
+          # This is intentionally broad. A consumer cannot opt out of the
+          # closed-system gate merely because it lives in a new directory.
+          set_output cat_system '^(frontend/|backend/renderer_service/|backend/discord-bot/|package\.json$|pnpm-lock\.yaml$|\.dockerignore$|\.forgejo/workflows/build-images\.yml$)'
+
+  cat-system-contract:
+    needs: changes
+    if: |
+      always() &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.cat_system == 'true')
+    runs-on: personal
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install contract build dependencies
+        run: |
+          pnpm --dir frontend install --frozen-lockfile --ignore-scripts
+          npm --prefix backend/discord-bot ci
+          uv sync --project backend/renderer_service --extra dev --frozen
+
+      - name: Verify the closed cat-system contract
+        run: pnpm cat-system:build
 
   # Tags don't have path-filter outputs, so compute whether Convex changed
   # since the previous release tag before deciding to deploy.
@@ -221,10 +257,11 @@ jobs:
           CONVEX_DEPLOY_KEY: ${{ steps.ci-secrets.outputs.CONVEX_DEPLOY_KEY }}
 
   build-frontend:
-    needs: changes
+    needs: [changes, cat-system-contract]
     # Build if: tag push, frontend files changed on main, or manual trigger
     if: |
       always() &&
+      (needs.cat-system-contract.result == 'success' || needs.cat-system-contract.result == 'skipped') &&
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.frontend == 'true' ||
        github.event.inputs.build_frontend == 'true')
@@ -234,6 +271,10 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v7
+
+      - name: Read cat-system catalog hash
+        id: cat-system
+        run: echo "hash=$(cat frontend/public/cat-system/catalog-hash.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Install Docker CLI
         run: |
@@ -320,18 +361,23 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            dev.beastypage.cat-system.catalog-hash=${{ steps.cat-system.outputs.hash }}
           build-args: |
             CONVEX_DEPLOYMENT=${{ steps.ci-secrets.outputs.CONVEX_DEPLOYMENT }}
             NEXT_PUBLIC_POSTHOG_KEY=${{ steps.ci-secrets.outputs.NEXT_PUBLIC_POSTHOG_KEY }}
             NEXT_PUBLIC_POSTHOG_HOST=${{ steps.ci-secrets.outputs.NEXT_PUBLIC_POSTHOG_HOST }}
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ steps.ci-secrets.outputs.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
             APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
+            CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
 
   build-renderer:
-    needs: changes
+    needs: [changes, cat-system-contract]
     # Build if: tag push, renderer files changed on main, or manual trigger
     if: |
       always() &&
+      (needs.cat-system-contract.result == 'success' || needs.cat-system-contract.result == 'skipped') &&
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.renderer == 'true' ||
        github.event.inputs.build_renderer == 'true')
@@ -341,6 +387,10 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v7
+
+      - name: Read cat-system catalog hash
+        id: cat-system
+        run: echo "hash=$(cat frontend/public/cat-system/catalog-hash.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Install Docker CLI
         run: |
@@ -369,10 +419,15 @@ jobs:
 
       - uses: docker/build-push-action@v7
         with:
-          context: ./backend/renderer_service
+          context: .
           file: ./backend/renderer_service/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            dev.beastypage.cat-system.catalog-hash=${{ steps.cat-system.outputs.hash }}
+          build-args: |
+            CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
 
   build-image-processing:
     needs: changes
@@ -421,9 +476,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
 
   build-discord-bot:
-    needs: changes
+    needs: [changes, cat-system-contract]
     if: |
       always() &&
+      (needs.cat-system-contract.result == 'success' || needs.cat-system-contract.result == 'skipped') &&
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.discord_bot == 'true' ||
        github.event.inputs.build_discord_bot == 'true')
@@ -433,6 +489,10 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v7
+
+      - name: Read cat-system catalog hash
+        id: cat-system
+        run: echo "hash=$(cat frontend/public/cat-system/catalog-hash.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Install Docker CLI
         run: |
@@ -465,6 +525,11 @@ jobs:
           file: ./backend/discord-bot/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            dev.beastypage.cat-system.catalog-hash=${{ steps.cat-system.outputs.hash }}
+          build-args: |
+            CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
 
   build-media:
     needs: changes

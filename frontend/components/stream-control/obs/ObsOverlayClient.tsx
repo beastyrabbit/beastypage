@@ -17,6 +17,10 @@ import {
   type BatchStreamCommand,
   parseBatchStreamCommand,
 } from "@/lib/adoption/streamBatch";
+import {
+  catDataToLegacyPersistence,
+  syncChangedRegistryTraitsFromLegacy,
+} from "@/lib/cat-system";
 import { DEFAULT_POSE_NAME, formatPoseName } from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
@@ -48,13 +52,17 @@ import {
   DEFAULT_TIMING_CONFIG,
   getDelayForKey,
   getPresetValues,
+  getRegistryRevealOptions,
+  getRegistryRevealValue,
   isParamTimingKey,
   MIN_SAFE_STEP_MS,
   PARAM_DEFAULT_STEP_COUNTS,
   PARAM_TIMING_ORDER,
   PARAM_TIMING_PRESETS,
   type ParamTimingKey,
+  type RegistryRevealDefinition,
   type SpinTimingConfig,
+  setRegistryRevealValue,
   stepCountsToMetrics,
   type TimingPresetSet,
 } from "@/utils/spinTiming";
@@ -96,6 +104,7 @@ import {
   type Id,
   INSTANT_PARAMS,
   invokeMapperArray,
+  LAYER_GROUPS,
   LAYER_PARAM_IDS,
   type LayerGroup,
   type LayerRowState,
@@ -354,11 +363,11 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
   const [wheelBannerVisible, setWheelBannerVisible] = useState(false);
   const [layerRows, setLayerRows] = useState<
     Record<LayerGroup, LayerRowState[]>
-  >({
-    accessories: [],
-    scars: [],
-    torties: [],
-  });
+  >(() =>
+    Object.fromEntries(
+      LAYER_GROUPS.map((definition) => [definition.layerKey, []]),
+    ),
+  );
   const [_rollSummary, setRollSummary] = useState<string | null>(null);
   const [_shareLink, setShareLink] = useState<string | null>(null);
   const [_hasTint, setHasTint] = useState(false);
@@ -764,6 +773,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
       accessoriesInput: string[] | null | undefined,
       scarsInput: string[] | null | undefined,
       tortiesInput: (TortieSlot | null)[] | null | undefined,
+      traitsInput?: Readonly<Record<string, unknown>>,
     ) => {
       const accessories = Array.isArray(accessoriesInput)
         ? accessoriesInput
@@ -771,23 +781,28 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
       const scars = Array.isArray(scarsInput) ? scarsInput : [];
       const torties = Array.isArray(tortiesInput) ? tortiesInput : [];
 
-      setLayerRows({
-        accessories: accessories.map((_, idx) => ({
-          label: `Accessory ${idx + 1}`,
-          value: "—",
-          status: "idle",
-        })),
-        scars: scars.map((_, idx) => ({
-          label: `Scar ${idx + 1}`,
-          value: "—",
-          status: "idle",
-        })),
-        torties: torties.map((_, idx) => ({
-          label: `Tortie ${idx + 1}`,
-          value: "—",
-          status: "idle",
-        })),
-      });
+      const valuesByTrait: Readonly<Record<string, unknown>> = {
+        ...(traitsInput ?? {}),
+        accessories,
+        scars,
+        tortie: torties,
+      };
+      setLayerRows(
+        Object.fromEntries(
+          LAYER_GROUPS.map((definition) => {
+            const values = valuesByTrait[definition.traitId];
+            const slots = Array.isArray(values) ? values : [];
+            return [
+              definition.layerKey,
+              slots.map((_, index) => ({
+                label: `${definition.label} ${index + 1}`,
+                value: "—",
+                status: "idle" as const,
+              })),
+            ];
+          }),
+        ),
+      );
     },
     [],
   );
@@ -842,11 +857,27 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
         status: "idle" as const,
       }));
     }
-    setLayerRows({
-      accessories: placeholderRows("Accessory", accessoryRange.max),
-      scars: placeholderRows("Scar", scarRange.max),
-      torties: placeholderRows("Tortie", tortieRange.max),
-    });
+    setLayerRows(
+      Object.fromEntries(
+        LAYER_GROUPS.map((definition) => {
+          const configuredMax =
+            definition.traitId === "accessories"
+              ? accessoryRange.max
+              : definition.traitId === "scars"
+                ? scarRange.max
+                : definition.traitId === "tortie"
+                  ? tortieRange.max
+                  : 0;
+          return [
+            definition.layerKey,
+            placeholderRows(
+              definition.label,
+              Math.max(0, Math.trunc(configuredMax)),
+            ),
+          ];
+        }),
+      ),
+    );
   }, [accessoryRange.max, scarRange.max, tortieRange.max]);
 
   // Brief highlight on a layer row before its spin begins
@@ -1006,23 +1037,33 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
         ),
       );
 
-      setLayerRows({
-        accessories: accessorySlots.map((slot, idx) => ({
-          label: `Accessory ${idx + 1}`,
-          value: slot === "none" ? "None" : formatValue(slot),
-          status: "revealed" as const,
-        })),
-        scars: scarSlots.map((slot, idx) => ({
-          label: `Scar ${idx + 1}`,
-          value: slot === "none" ? "None" : formatValue(slot),
-          status: "revealed" as const,
-        })),
-        torties: tortieSlots.map((slot, idx) => ({
-          label: `Tortie ${idx + 1}`,
-          value: formatTortieLayer(slot),
-          status: "revealed" as const,
-        })),
-      });
+      const valuesByTrait: Readonly<Record<string, unknown>> = {
+        ...(params.traits ?? {}),
+        accessories: accessorySlots,
+        scars: scarSlots,
+        tortie: tortieSlots,
+      };
+      setLayerRows(
+        Object.fromEntries(
+          LAYER_GROUPS.map((definition) => {
+            const value = valuesByTrait[definition.traitId];
+            const slots = Array.isArray(value) ? value : [];
+            return [
+              definition.layerKey,
+              slots.map((slot, index) => ({
+                label: `${definition.label} ${index + 1}`,
+                value:
+                  definition.compoundMode === "tortieParts"
+                    ? formatTortieLayer((slot as TortieSlot | null) ?? null)
+                    : typeof slot === "string" && slot.toLowerCase() !== "none"
+                      ? formatValue(slot)
+                      : "None",
+                status: "revealed" as const,
+              })),
+            ];
+          }),
+        ),
+      );
 
       setRollerLabel(null);
       setRollerActiveValue(null);
@@ -1154,6 +1195,129 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
     [],
   );
 
+  const spinRegistryStringSlots = useCallback(
+    async (
+      definition: RegistryRevealDefinition,
+      rowIndex: number,
+      targetSlotsInput: unknown,
+      progressiveParams: Partial<CatParams>,
+      pauseDuration: number,
+      currentToken: number,
+    ) => {
+      const generator = generatorRef.current;
+      if (!generator) return;
+      const targetSlots = Array.isArray(targetSlotsInput)
+        ? targetSlotsInput.filter(
+            (value): value is string => typeof value === "string",
+          )
+        : [];
+      const choices = getRegistryRevealOptions(definition).filter(
+        (value): value is string =>
+          typeof value === "string" && value.toLowerCase() !== "none",
+      );
+      const committed: string[] = [];
+      const summary: string[] = [];
+
+      clearMirror();
+      setRollerLabel(definition.label);
+      if (targetSlots.length === 0) {
+        setRegistryRevealValue(progressiveParams, definition, []);
+        updateParamRow(rowIndex, { value: "None", status: "revealed" });
+        await renderCat(progressiveParams);
+        await wait(pauseDuration);
+        setRollerLabel(null);
+        setRollerActiveValue(null);
+        return;
+      }
+
+      for (let index = 0; index < targetSlots.length; index += 1) {
+        if (generationIdRef.current !== currentToken) return;
+        const target = targetSlots[index];
+        const spinState = readSpinState();
+        await flashLayer(`${definition.layerKey}-${index}`);
+        const variations = buildLayerOptionStrings(choices, target, true, {
+          spinny: spinState.spinny,
+          limit: subsetLimits[definition.timingKey] ? SUBSET_LIMIT : undefined,
+        });
+
+        if (spinState.spinny) {
+          const descriptors: VariantDescriptor[] = variations.map(
+            (option, variantIndex) => {
+              const preview = cloneParams(progressiveParams);
+              const nextValues = [...committed];
+              if (
+                typeof option.raw === "string" &&
+                option.raw.toLowerCase() !== "none"
+              ) {
+                nextValues.push(option.raw);
+              }
+              setRegistryRevealValue(preview, definition, nextValues);
+              return {
+                id: `${definition.traitId}-${index}-${variantIndex}`,
+                option,
+                params: preview,
+                label: option.display,
+                group: `${definition.traitId}-${index + 1}`,
+              };
+            },
+          );
+          const frames = await renderVariantFrames(
+            generator,
+            progressiveParams,
+            descriptors,
+            { priority: "high" },
+          );
+          const sequence = buildFlipSequence(frames);
+          for (const step of sequence) {
+            if (generationIdRef.current !== currentToken) return;
+            const display = step.frame.option.display;
+            updateLayerRow(definition.layerKey, index, {
+              value: display,
+              status: step.isFinal ? "revealed" : "active",
+            });
+            setRollerActiveValue(display);
+            await playFlip(
+              () => drawCanvas(step.frame.canvas),
+              getDelayWithMultiplier(definition.timingKey),
+            );
+          }
+        }
+
+        if (target.toLowerCase() !== "none") committed.push(target);
+        const display =
+          target.toLowerCase() === "none" ? "None" : formatValue(target);
+        summary.push(display);
+        setRegistryRevealValue(progressiveParams, definition, committed);
+        updateLayerRow(definition.layerKey, index, {
+          value: display,
+          status: "revealed",
+        });
+        await renderCat(progressiveParams);
+        await wait(pauseDuration);
+      }
+
+      updateParamRow(rowIndex, {
+        value: summary.length > 0 ? summary.join(", ") : "None",
+        status: "revealed",
+      });
+      setRollerLabel(null);
+      setRollerActiveValue(null);
+      clearMirror();
+    },
+    [
+      clearMirror,
+      drawCanvas,
+      flashLayer,
+      getDelayWithMultiplier,
+      playFlip,
+      readSpinState,
+      renderCat,
+      subsetLimits,
+      updateLayerRow,
+      updateParamRow,
+    ],
+  );
+
   const spinAccessorySlots = useCallback(
     async (
       rowIndex: number,
@@ -1237,6 +1401,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
             const basePreview = cloneParams(progressiveParams);
             basePreview.accessories = [];
             basePreview.accessory = undefined;
+            syncChangedRegistryTraitsFromLegacy(basePreview, ["accessories"]);
             const baseResult = await generator.generateCat(basePreview);
             baseCanvas = cloneSourceCanvas(
               baseResult.canvas as HTMLCanvasElement | OffscreenCanvas,
@@ -1252,6 +1417,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
               }
               preview.accessories = accessoriesList;
               preview.accessory = accessoriesList[0];
+              syncChangedRegistryTraitsFromLegacy(preview, ["accessories"]);
               return {
                 id: `accessory-${i}-${variantIndex}`,
                 option,
@@ -1322,6 +1488,9 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
 
           progressiveParams.accessories = committed.slice();
           progressiveParams.accessory = committed[0];
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, [
+            "accessories",
+          ]);
           await renderCat(progressiveParams);
           await wait(pauseDuration);
         } else {
@@ -1342,6 +1511,9 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           }
           progressiveParams.accessories = committed.slice();
           progressiveParams.accessory = committed[0];
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, [
+            "accessories",
+          ]);
           setRollerActiveValue(formatted);
           await renderCat(progressiveParams);
           await wait(pauseDuration);
@@ -1457,6 +1629,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
             const basePreview = cloneParams(progressiveParams);
             basePreview.scars = [];
             basePreview.scar = undefined;
+            syncChangedRegistryTraitsFromLegacy(basePreview, ["scars"]);
             const baseResult = await generator.generateCat(basePreview);
             baseCanvas = cloneSourceCanvas(
               baseResult.canvas as HTMLCanvasElement | OffscreenCanvas,
@@ -1472,6 +1645,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
               }
               preview.scars = scarsList;
               preview.scar = scarsList[0];
+              syncChangedRegistryTraitsFromLegacy(preview, ["scars"]);
               return {
                 id: `scar-${i}-${variantIndex}`,
                 option,
@@ -1542,6 +1716,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
 
           progressiveParams.scars = committed.slice();
           progressiveParams.scar = committed[0];
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, ["scars"]);
           await renderCat(progressiveParams);
           await wait(pauseDuration);
         } else {
@@ -1559,6 +1734,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           }
           progressiveParams.scars = committed.slice();
           progressiveParams.scar = committed[0];
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, ["scars"]);
           setRollerActiveValue(formatted);
           await renderCat(progressiveParams);
           await wait(pauseDuration);
@@ -1593,6 +1769,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
 
   const spinTortieSlots = useCallback(
     async (
+      definition: RegistryRevealDefinition,
       rowIndex: number,
       targetSlotsInput: (TortieSlot | null)[] | null | undefined,
       context: {
@@ -1659,10 +1836,10 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
         const target = targetSlots[i];
         const spinState = readSpinState();
 
-        await flashLayer(`torties-${i}`);
+        await flashLayer(`${definition.layerKey}-${i}`);
 
         if (!target) {
-          updateLayerRow("torties", i, { value: "None", status: "revealed" });
+          updateLayerRow("tortie", i, { value: "None", status: "revealed" });
           context.torties[i] = null;
           summary.push("None");
           if (!spinState.spinny) {
@@ -1691,7 +1868,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
               : target.colour;
 
           let working: TortieSlot = { ...target, colour: startColour };
-          updateLayerRow("torties", i, { value: "—", status: "active" });
+          updateLayerRow("tortie", i, { value: "—", status: "active" });
 
           const stageConfigs: Array<{
             kind: "mask" | "pattern" | "colour";
@@ -1761,6 +1938,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
                 preview.tortieMask = candidateLayer.mask;
                 preview.tortiePattern = candidateLayer.pattern;
                 preview.tortieColour = candidateLayer.colour;
+                syncChangedRegistryTraitsFromLegacy(preview, ["tortie"]);
                 return {
                   id: `tortie-${i}-${stage.kind}-${variantIndex}`,
                   option,
@@ -1816,7 +1994,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
               const drawStep = () => drawCanvas(step.frame.canvas);
               await playFlip(drawStep, stepDuration);
               setRollerActiveValue(formatTortieLayer(candidateLayer));
-              updateLayerRow("torties", i, {
+              updateLayerRow("tortie", i, {
                 value: formatTortieLayer(candidateLayer),
                 status: step.isFinal ? "revealed" : "active",
               });
@@ -1848,6 +2026,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           progressiveParams.tortiePattern = committed[0]?.pattern;
           progressiveParams.tortieColour = committed[0]?.colour;
           progressiveParams.isTortie = committed.length > 0;
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, ["tortie"]);
 
           setRollerLabel(`Tortie Layer ${i + 1}`);
           setRollerActiveValue(formatTortieLayer(working));
@@ -1855,7 +2034,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           await wait(pauseDuration);
         } else {
           const display = formatTortieLayer(target);
-          updateLayerRow("torties", i, { value: display, status: "revealed" });
+          updateLayerRow("tortie", i, { value: display, status: "revealed" });
           summary.push(display);
           committed.push({ ...target });
           context.torties[i] = { ...target };
@@ -1864,6 +2043,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           progressiveParams.tortiePattern = committed[0]?.pattern;
           progressiveParams.tortieColour = committed[0]?.colour;
           progressiveParams.isTortie = committed.length > 0;
+          syncChangedRegistryTraitsFromLegacy(progressiveParams, ["tortie"]);
           setRollerActiveValue(display);
           await renderCat(progressiveParams);
           await wait(pauseDuration);
@@ -2137,6 +2317,14 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           }
 
           try {
+            syncChangedRegistryTraitsFromLegacy(previewParams, [
+              "pose",
+              group.key === "accessory"
+                ? "accessories"
+                : group.key === "scar"
+                  ? "scars"
+                  : "tortie",
+            ]);
             const result = await generator.generateCat(previewParams);
             const catCanvas = cloneSourceCanvas(
               result.canvas as HTMLCanvasElement | OffscreenCanvas,
@@ -2337,6 +2525,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
         params.darkMode = enableDarkForest;
         params.dead = enableDead;
       }
+      syncChangedRegistryTraitsFromLegacy(params, ["darkForest", "dead"]);
 
       const countsResult: GenerationCounts = {
         accessories: accessorySlots.length,
@@ -2369,8 +2558,8 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
 
       const progressiveParams: Partial<CatParams> = {
         spriteNumber: DEFAULT_SPRITE_NUMBER,
-        shading: false,
-        reverse: false,
+        shading: params.shading ?? false,
+        reverse: params.reverse ?? false,
         isTortie: false,
         peltName: "SingleColour",
         accessories: [],
@@ -2382,9 +2571,14 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
       progressiveParams.darkForest = params.darkForest ?? false;
       progressiveParams.darkMode = params.darkMode ?? false;
       progressiveParams.dead = params.dead ?? false;
-      progressiveParams.shading = params.shading ?? false;
-      progressiveParams.reverse = params.reverse ?? false;
-
+      syncChangedRegistryTraitsFromLegacy(progressiveParams, [
+        "accessories",
+        "scars",
+        "tortie",
+        "colour",
+        "darkForest",
+        "dead",
+      ]);
       const contextForApply = {
         accessories: accessorySlots.map(() => "none" as string),
         scars: scarSlots.map(() => "none" as string),
@@ -2399,12 +2593,9 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
         await revealLayerCounts(
           generator,
           {
-            accessories: {
-              range: accessoryRange,
-              count: accessorySlots.length,
-            },
-            scars: { range: scarRange, count: scarSlots.length },
-            torties: { range: tortieRange, count: tortieLayers.length },
+            accessories: { range: accessoryRange, count: accessoryCount },
+            scars: { range: scarRange, count: scarCount },
+            torties: { range: tortieRange, count: tortieCount },
           },
           {
             experimentalColourMode: experimentalMode,
@@ -2417,7 +2608,10 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
       }
 
       // Count reveal done — resize layer rows from max-prefill to actual slot counts
-      resetLayerRows(accessorySlots, scarSlots, tortieSlots);
+      resetLayerRows(accessorySlots, scarSlots, tortieSlots, {
+        ...(params.traits ?? {}),
+        ...(randomResult.slotSelections ?? {}),
+      });
 
       for (const definition of PARAM_SEQUENCE) {
         if (
@@ -2428,8 +2622,6 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           continue;
         }
         if (generationIdRef.current !== token) return;
-        if (definition.requiresTortie && !params.isTortie) continue;
-
         const paramKeyCandidate = definition.id;
         const paramKey = isParamTimingKey(paramKeyCandidate)
           ? paramKeyCandidate
@@ -2485,7 +2677,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           basePause / speedMultiplierRef.current,
         );
         const isInstantParam = INSTANT_PARAMS.includes(definition.id);
-        const isTortieToggle = definition.id === "tortie";
+        const isTortieToggle = definition.compoundMode === "tortieParts";
         const shouldAnimate =
           spinState.spinny &&
           !!rollerOptions &&
@@ -2533,6 +2725,22 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
             setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
           }
           clearMirror();
+          continue;
+        }
+
+        if (definition.strategy === "slots") {
+          await spinRegistryStringSlots(
+            definition,
+            rowIndex,
+            randomResult.slotSelections?.[definition.traitId] ??
+              getRegistryRevealValue(params, definition),
+            progressiveParams,
+            pauseDuration,
+            token,
+          );
+          if (rowIndex >= 0) {
+            setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
+          }
           continue;
         }
 
@@ -2646,8 +2854,9 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           await settleRoller(token, { keepLabel: false, skipHighlight: true });
         }
 
-        if (definition.id === "tortie") {
+        if (definition.compoundMode === "tortieParts") {
           await spinTortieSlots(
+            definition,
             rowIndex,
             tortieSlots,
             contextForApply,
@@ -2839,7 +3048,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
 
         try {
           const result = await createMapper({
-            catData: mapperPayload,
+            catData: catDataToLegacyPersistence(mapperPayload),
             catName: state.catName ?? undefined,
             creatorName: state.creatorName ?? undefined,
           });
@@ -2922,6 +3131,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
     resetLayerRows,
     spinAccessorySlots,
     spinScarSlots,
+    spinRegistryStringSlots,
     spinTortieSlots,
     revealLayerCounts,
     initBoardRows,
@@ -2974,6 +3184,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
         params.darkForest = false;
         params.darkMode = false;
         params.dead = false;
+        syncChangedRegistryTraitsFromLegacy(params, ["darkForest", "dead"]);
       }
       const result = await generator.generateCat(params);
       const exportCanvas = document.createElement("canvas");
@@ -2999,47 +3210,6 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
         showToast,
         (message) => setError(message),
       );
-    },
-    [showToast],
-  );
-
-  const _handleCopySprite = useCallback(
-    async (
-      spriteNumber: number,
-      size: 120 | typeof FULL_EXPORT_SIZE,
-      poseName?: string,
-    ) => {
-      const state = catStateRef.current;
-      const generator = generatorRef.current;
-      if (!state || !generator) return;
-      const spriteName = poseName
-        ? formatPoseName(poseName)
-        : `Sprite ${spriteNumber}`;
-      const params = { ...state.params, spriteNumber };
-      if (poseName) {
-        params.poseName = poseName;
-      }
-      const result = await generator.generateCat(params);
-      const exportCanvas = document.createElement("canvas");
-      exportCanvas.width = size;
-      exportCanvas.height = size;
-      const ctx = exportCanvas.getContext("2d");
-      if (ctx) {
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(result.canvas as HTMLCanvasElement, 0, 0, size, size);
-      }
-      await copyCanvasToClipboard(
-        exportCanvas,
-        size === 120
-          ? `Copied ${spriteName} (120×120)!`
-          : `Copied ${spriteName} (${FULL_EXPORT_SIZE}×${FULL_EXPORT_SIZE})!`,
-        size === 120
-          ? `${spriteName.toLowerCase()}-120`
-          : `${spriteName.toLowerCase()}-700`,
-        showToast,
-        (message) => setError(message),
-      );
-      track("single_cat_exported", { format: `copy-${size}px` });
     },
     [showToast],
   );
@@ -3074,7 +3244,9 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
 
     try {
       const result = await createMapper({
-        catData: shareSlug ? { ...payload, shareSlug } : payload,
+        catData: catDataToLegacyPersistence(
+          shareSlug ? { ...payload, shareSlug } : payload,
+        ),
         catName: state.catName ?? undefined,
         creatorName: state.creatorName ?? undefined,
       });
@@ -3800,13 +3972,13 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
     drawPlaceholder,
     resetCommandState,
     exactLayerCounts,
-    tortieRange,
     obsPhase,
     extendedModesArray,
-    scarRange,
     includeBaseColours,
     includeNewSprites,
     accessoryRange,
+    scarRange,
+    tortieRange,
   ]);
 
   // Memoize lobby settings so OBSLobby doesn't restart animations on every render

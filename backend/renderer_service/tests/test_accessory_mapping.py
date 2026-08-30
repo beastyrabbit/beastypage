@@ -2,11 +2,12 @@ import json
 from pathlib import Path
 
 from PIL import Image
+from renderer_service.config import settings
 from renderer_service.renderer.repository import SpriteRepository
 from renderer_service.renderer.sprite_mapper import SpriteMapper
 
-DATA_DIR = Path("renderer_service/data")
-DICT_DIR = Path("sprites/dicts")
+DATA_DIR = settings.data_root
+DICT_DIR = DATA_DIR / "dicts"
 
 
 def _load_json(path: Path) -> dict:
@@ -199,7 +200,7 @@ def test_generated_metadata_covers_upstream_sprite_dicts():
         "Masked": "masked",
     }
     colours = list(_flatten_sprite_list(pelt_data["sprite_list"]))
-    for _sheet, pelt_names in pelt_data["spritesheet"].items():
+    for pelt_names in pelt_data["spritesheet"].values():
         for pelt_name in pelt_names:
             prefix = pelt_prefix[pelt_name]
             for colour in colours:

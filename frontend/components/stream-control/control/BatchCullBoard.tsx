@@ -43,7 +43,7 @@ export function BatchCullBoard() {
 
   const active = Boolean(command && liveState && liveState.seq === command.seq);
   const stages = useMemo(
-    () => (command ? buildBatchStagePlan(command.config) : []),
+    () => (command ? buildBatchStagePlan(command.config, command.cats) : []),
     [command],
   );
   const eliminated = useMemo(

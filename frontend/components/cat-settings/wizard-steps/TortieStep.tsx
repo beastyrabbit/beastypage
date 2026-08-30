@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { LayerRangeSelector } from "@/components/common/LayerRangeSelector";
+import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import type { ExtendedMode } from "@/utils/singleCatVariants";
 import { WizardExampleCats } from "../WizardExampleCats";
 import { ForceInitialRollInfo } from "./ForceInitialRollInfo";
@@ -65,6 +66,7 @@ function TortieComparison({
           ...params,
           tortie: fullLayers.slice(0, count),
         };
+        syncChangedRegistryTraitsFromLegacy(slicedParams, ["tortie"]);
         const result = await generator.generateCat(slicedParams);
         const imageDataUrl =
           result.imageDataUrl ??

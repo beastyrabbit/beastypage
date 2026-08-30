@@ -39,6 +39,10 @@ import {
   DEFAULT_TREE_CONFIG,
 } from "@/lib/ancestry-tree/types";
 import { useTreeWorker } from "@/lib/ancestry-tree/useTreeWorker";
+import { catParamsToLegacyPersistence } from "@/lib/cat-system";
+import { getSelectableTraitCatalogElements } from "@/lib/cat-system/catalog";
+import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
+import { getInheritanceTraits } from "@/lib/cat-system/runtime";
 import { getCoatChoiceValues } from "@/lib/cat-v3/coatPatterns";
 import {
   ensureSpriteMapper,
@@ -70,6 +74,22 @@ type ViewMode = "config" | "tree";
 interface ParentPreview {
   params: CatParams;
   name: CatName;
+}
+
+function createTraitMutationPools(): MutationPool["traits"] {
+  return Object.fromEntries(
+    getInheritanceTraits()
+      .map(
+        (trait) =>
+          [
+            trait.id,
+            getSelectableTraitCatalogElements(trait.id).map(
+              (element) => element.id,
+            ),
+          ] as const,
+      )
+      .filter(([, values]) => values.length > 0),
+  );
 }
 
 /**
@@ -167,6 +187,7 @@ export function AncestryTreeClient({
     accessories: [],
     scars: [],
     tortieMasks: [],
+    traits: createTraitMutationPools(),
   });
 
   const saveTreeMutation = useMutation(api.ancestryTree.save);
@@ -186,6 +207,7 @@ export function AncestryTreeClient({
           accessories: mapper.getAccessories(),
           scars: mapper.getScars(),
           tortieMasks: mapper.getTortieMasks(),
+          traits: createTraitMutationPools(),
         };
         setIsSpriteMapperReady(true);
         setSpriteMapperError(null);
@@ -731,31 +753,22 @@ export function AncestryTreeClient({
       if (!tree) return;
 
       // Update the cat's sprite number in the tree
-      const updatedCats = tree.cats.map((c) =>
-        c.id === cat.id
-          ? {
-              ...c,
-              params: {
-                ...c.params,
-                spriteNumber: newSpriteNumber,
-                poseName: undefined,
-              },
-            }
-          : c,
-      );
+      const updatedCats = tree.cats.map((c) => {
+        if (c.id !== cat.id) return c;
+        const params = {
+          ...c.params,
+          spriteNumber: newSpriteNumber,
+          poseName: undefined,
+        };
+        syncChangedRegistryTraitsFromLegacy(params, ["pose"]);
+        return { ...c, params };
+      });
 
       setTree({ ...tree, cats: updatedCats });
 
       // Update selectedCat if it's the same cat
       if (selectedCat?.id === cat.id) {
-        setSelectedCat({
-          ...cat,
-          params: {
-            ...cat.params,
-            spriteNumber: newSpriteNumber,
-            poseName: undefined,
-          },
-        });
+        setSelectedCat(updatedCats.find((c) => c.id === cat.id) ?? selectedCat);
       }
 
       track("ancestry_cat_edited", { edit_type: "pose_change" });
@@ -783,7 +796,12 @@ export function AncestryTreeClient({
           name: updatedTree.name,
           foundingMotherId: updatedTree.foundingMotherId,
           foundingFatherId: updatedTree.foundingFatherId,
-          cats: updatedTree.cats,
+          cats: updatedTree.cats.map((cat) => ({
+            ...cat,
+            params: catParamsToLegacyPersistence(
+              cat.params as unknown as Record<string, unknown>,
+            ) as unknown as typeof cat.params,
+          })),
           config: updatedTree.config,
           creatorName: updatedTree.creatorName,
           password,

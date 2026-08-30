@@ -1,0 +1,25 @@
+{
+  "formatVersion": 1,
+  "traitIds": [
+    "accessories",
+    "coatPattern",
+    "colour",
+    "darkForest",
+    "dead",
+    "eyeColour",
+    "eyeColour2",
+    "lighting",
+    "pelt",
+    "points",
+    "pose",
+    "reverse",
+    "scars",
+    "shading",
+    "skinColour",
+    "tint",
+    "tortie",
+    "vitiligo",
+    "whitePatches",
+    "whitePatchesTint"
+  ]
+}

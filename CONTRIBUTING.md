@@ -6,7 +6,7 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v22 or higher
+- [Node.js](https://nodejs.org/) v24 or higher (required by Portless)
 - [pnpm](https://pnpm.io/) v10 or higher
 - [Git](https://git-scm.com/)
 - A [Convex](https://convex.dev) account (for database features)

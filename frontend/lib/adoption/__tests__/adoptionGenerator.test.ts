@@ -1,4 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import {
+  catDocumentToLegacyParams,
+  decodeCatDocumentLegacy,
+} from "@/lib/cat-system";
+import catGenerator from "@/lib/single-cat/catGeneratorV3";
 import { AdoptionGenerator } from "../adoptionGenerator.js";
 
 function makeGenerator(): AdoptionGenerator {
@@ -18,10 +23,43 @@ function makeGenerator(): AdoptionGenerator {
 describe("AdoptionGenerator coat reveal", () => {
   const peltStage = {
     id: "peltName",
+    traitId: "pelt",
     label: "Pelt",
     type: "simple",
+    strategy: "single",
     param: "peltName",
+    timingKey: "pelt",
+    defaultSteps: 10,
   };
+
+  it("builds every reveal stage from registry trait metadata", () => {
+    const generator = makeGenerator();
+    const stages = generator.buildStagePlan(
+      {
+        spriteNumber: 8,
+        poseName: "adult_short2",
+        peltName: "SingleColour",
+        colour: "GINGER",
+        eyeColour: "BLUE",
+        skinColour: "PINK",
+        shading: false,
+        reverse: false,
+        isTortie: false,
+      },
+      { accessoryCount: 2, scarCount: 1, tortieCount: 1 },
+    );
+
+    expect(stages.every((stage) => typeof stage.traitId === "string")).toBe(
+      true,
+    );
+    expect(stages.filter((stage) => stage.traitId === "tortie")).toHaveLength(
+      3,
+    );
+    expect(
+      stages.filter((stage) => stage.traitId === "accessories"),
+    ).toHaveLength(2);
+    expect(stages.filter((stage) => stage.traitId === "scars")).toHaveLength(1);
+  });
 
   it("reveals a derived coat pattern atomically at the pelt stage", () => {
     const generator = makeGenerator();
@@ -42,6 +80,10 @@ describe("AdoptionGenerator coat reveal", () => {
     expect(generator.buildRenderParams(state)).toMatchObject({
       peltName: "SingleColour",
       coatPattern: "tiger-stripes",
+      traits: {
+        pelt: "SingleColour",
+        coatPattern: "tiger-stripes",
+      },
     });
     expect(generator.describeStageValue(peltStage, target)).toBe(
       "Pelt: Tiger bars",
@@ -95,5 +137,48 @@ describe("AdoptionGenerator coat reveal", () => {
     expect(peltRow?.querySelector(".param-value")?.textContent).toBe(
       "Fine Bengal",
     );
+  });
+
+  it("copies the selected pose when canonical params carry an older pose", async () => {
+    const generator = makeGenerator();
+    const catDocument = decodeCatDocumentLegacy({
+      spriteNumber: 8,
+      poseName: "adult_short2",
+      peltName: "SingleColour",
+      colour: "WHITE",
+      eyeColour: "BLUE",
+      skinColour: "PINK",
+      shading: false,
+      reverse: false,
+    });
+    Object.assign(generator, {
+      currentDetailParams: {
+        ...catDocumentToLegacyParams(catDocument),
+        schemaVersion: catDocument.schemaVersion,
+        traits: catDocument.traits,
+        unknownTraits: catDocument.unknownTraits,
+      },
+      copyCanvasToClipboard: vi.fn().mockResolvedValue(undefined),
+      flashButton: vi.fn(),
+    });
+    const canvas = document.createElement("canvas");
+    const generateSpy = vi
+      .spyOn(catGenerator, "generateCat")
+      .mockResolvedValue({ canvas } as never);
+
+    await generator.copySpriteVariation(
+      "senior0",
+      120,
+      document.createElement("button"),
+    );
+
+    expect(generateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        poseName: "senior0",
+        spriteNumber: 12,
+        traits: expect.objectContaining({ pose: "senior0" }),
+      }),
+    );
+    generateSpy.mockRestore();
   });
 });

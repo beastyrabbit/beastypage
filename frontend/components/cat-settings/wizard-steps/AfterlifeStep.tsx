@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
+import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import { cn } from "@/lib/utils";
 import type { AfterlifeOption, ExtendedMode } from "@/utils/singleCatVariants";
 import { WizardExampleCats } from "../WizardExampleCats";
@@ -106,8 +107,13 @@ function AfterlifeComparison({
         const variantParams = {
           ...params,
           darkForest: variant.darkForest,
+          darkMode: variant.darkForest,
           dead: variant.dead,
         };
+        syncChangedRegistryTraitsFromLegacy(variantParams, [
+          "darkForest",
+          "dead",
+        ]);
         const result = await generator.generateCat(variantParams);
         const canvas = result.canvas;
         const imageDataUrl =

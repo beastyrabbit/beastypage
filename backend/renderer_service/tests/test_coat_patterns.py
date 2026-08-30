@@ -1,8 +1,11 @@
 import itertools
+import json
 import re
 from pathlib import Path
 
 import numpy as np
+import pytest
+from renderer_service.config import settings
 from renderer_service.models import BatchVariant, LayerIdentifier
 from renderer_service.renderer.coat_patterns import (
     COAT_PATTERN_NAMES,
@@ -10,12 +13,13 @@ from renderer_service.renderer.coat_patterns import (
     normalize_coat_pattern_name,
     required_source_pelts,
 )
+from renderer_service.renderer.document_schema import InvalidCatDocument
 from renderer_service.renderer.image_ops import apply_mask
 from renderer_service.renderer.pipeline import RenderPipeline
 from renderer_service.renderer.repository import SpriteRepository
 from renderer_service.renderer.sprite_mapper import SpriteMapper
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "renderer_service" / "data"
+DATA_DIR = settings.data_root
 FRONTEND_CATALOG = (
     Path(__file__).resolve().parents[3]
     / "frontend"
@@ -23,13 +27,13 @@ FRONTEND_CATALOG = (
     / "cat-v3"
     / "coatPatterns.ts"
 )
-DISCORD_CAT_COMMAND = (
+DISCORD_PUBLIC_CATALOG = (
     Path(__file__).resolve().parents[3]
     / "backend"
     / "discord-bot"
     / "src"
-    / "commands"
-    / "cat.ts"
+    / "generated"
+    / "public-cat-catalog.json"
 )
 PAGE_POSES = ("adult_short0", "adult_short1", "adult_short2")
 PAGE_COLOURS = ("GOLDEN", "GINGER", "LIGHTBROWN", "BROWN", "SILVER")
@@ -85,9 +89,9 @@ def test_frontend_catalog_matches_renderer_catalog():
 
 
 def test_discord_catalog_matches_renderer_catalog():
-    source = DISCORD_CAT_COMMAND.read_text()
+    catalog = json.loads(DISCORD_PUBLIC_CATALOG.read_text())
     discord_pattern_ids = tuple(
-        re.findall(r'\{\s*name: "[^"]+",\s*value: "([^"]+)"\s*\}', source)
+        entry["id"] for entry in catalog["catalogs"]["coatPatterns"]
     )
 
     assert discord_pattern_ids == COAT_PATTERN_NAMES
@@ -322,7 +326,7 @@ def test_page_patterns_stay_visually_distinct_across_controls():
             )
 
 
-def test_unknown_coat_pattern_is_a_noop():
+def test_unknown_coat_pattern_is_rejected_by_the_generated_contract():
     pipeline = RenderPipeline(repository=SpriteRepository())
     params = {
         "poseName": "adult_short1",
@@ -330,15 +334,10 @@ def test_unknown_coat_pattern_is_a_noop():
         "colour": "GOLDEN",
     }
 
-    base = pipeline.render(params, collect_layers=False).composed
-    unknown = pipeline.render(
-        {**params, "coatPattern": "not-a-pattern"}, collect_layers=True
-    )
-
     assert normalize_coat_pattern_name("not-a-pattern") is None
     assert required_source_pelts("not-a-pattern") == ()
-    assert unknown.composed.tobytes() == base.tobytes()
-    assert LayerIdentifier.coat_pattern not in [layer.id for layer in unknown.layers]
+    with pytest.raises(InvalidCatDocument, match="coatPattern"):
+        pipeline.render({**params, "coatPattern": "not-a-pattern"}, collect_layers=True)
 
 
 def test_legacy_pelt_name_is_normalized_to_a_coat_pattern():

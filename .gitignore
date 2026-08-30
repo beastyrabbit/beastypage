@@ -38,6 +38,7 @@ backend/renderer_service/.pytest_cache/
 backend/renderer_service/renderer_service.egg-info/
 backend/renderer_service/tests/__pycache__/
 backend/renderer_service/*.png
+backend/discord-bot/dist/
 # Lockfiles (uv.lock, pnpm-lock.yaml) are intentionally committed for reproducible builds
 
 # Data exports / runtime assets

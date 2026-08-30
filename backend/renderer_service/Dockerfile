@@ -1,26 +1,37 @@
 # syntax=docker/dockerfile:1.25
 
 ARG PYTHON_VERSION=3.13
+ARG CAT_SYSTEM_CATALOG_HASH=unknown
 
 # Stage 1: Build with uv
 FROM ghcr.io/astral-sh/uv:python${PYTHON_VERSION}-bookworm-slim AS builder
+ARG CAT_SYSTEM_CATALOG_HASH
 WORKDIR /app
 
 # Copy dependency files
-COPY pyproject.toml uv.lock ./
+COPY backend/renderer_service/pyproject.toml backend/renderer_service/uv.lock ./
 
 # Install dependencies (create virtual environment)
 RUN uv sync --frozen --no-dev
 
 # Copy application code
-COPY renderer_service ./renderer_service
+COPY backend/renderer_service/renderer_service ./renderer_service
 
-# Copy sprites (required for rendering)
-COPY sprites ./sprites
+# The browser and renderer ship the same canonical sprite assets. Keeping the
+# Docker build on frontend/public prevents a stale backend copy from passing
+# local tests but failing after deployment.
+COPY frontend/public/sprites ./sprites
+COPY frontend/public/sprite-data/*.json ./renderer_service/data/
+
+RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
+    || test "$(cat renderer_service/generated/catalog-hash.txt)" = "$CAT_SYSTEM_CATALOG_HASH"
 
 # Stage 2: Production image
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runner
 WORKDIR /app
+
+ARG CAT_SYSTEM_CATALOG_HASH
+LABEL dev.beastypage.cat-system.catalog-hash=${CAT_SYSTEM_CATALOG_HASH}
 
 # Install OS dependencies for pygame and pillow
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -52,6 +63,7 @@ USER appuser
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV CG3_SPRITE_ROOT=/app/sprites
+ENV CAT_SYSTEM_CATALOG_HASH=${CAT_SYSTEM_CATALOG_HASH}
 
 # Fail the image build if the copied virtual environment cannot run under the
 # production interpreter or the service cannot import its ASGI application.

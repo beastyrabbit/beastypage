@@ -1,5 +1,9 @@
 import { EmbedBuilder } from "discord.js";
-import type { CatResponse, PaletteColor, UserConfig } from "./api-client.js";
+import type {
+  CatResponse,
+  PaletteColor,
+  UserConfig,
+} from "./api-client.js";
 
 export function buildCatEmbed(
   _params: CatResponse["params"],

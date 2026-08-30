@@ -1,13 +1,14 @@
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import ImageChops, ImageOps
-
 from renderer_service.app import create_app
+from renderer_service.models import LayerIdentifier
+from renderer_service.renderer.document_schema import InvalidCatDocument
 from renderer_service.renderer.pipeline import RenderPipeline
 from renderer_service.renderer.repository import SpriteRepository
-from renderer_service.models import LayerIdentifier
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 CLAN_PALETTE_DIR = Path(__file__).parents[1] / "renderer_service" / "data" / "palettes"
@@ -80,7 +81,7 @@ def test_pipeline_smoke():
         **base_params,
         "skinColour": "PINK",
         "scars": ["ONE"],
-        "accessories": ["collarsBLUE"],
+        "accessories": ["BLUE"],
     }
     ids, _ = render_layer_ids(pipeline, extras_params)
     assert LayerIdentifier.skin in ids
@@ -151,7 +152,7 @@ def test_heterochromia_uses_masked_eye_sheet():
     assert "eye2:BLUE" in eyes_layer.diagnostics
 
 
-def test_null_and_none_tints_are_noops():
+def test_none_tints_are_noops_and_null_tints_are_rejected():
     repo = SpriteRepository()
     pipeline = RenderPipeline(repository=repo)
 
@@ -166,12 +167,14 @@ def test_null_and_none_tints_are_noops():
         {**base_params, "tint": "none", "whitePatchesTint": "none"},
         collect_layers=False,
     ).composed
-    null_render = pipeline.render(
-        {**base_params, "tint": "null", "whitePatchesTint": "null"},
-        collect_layers=False,
-    ).composed
+    default_render = pipeline.render(base_params, collect_layers=False).composed
 
-    assert none_render.tobytes() == null_render.tobytes()
+    assert none_render.tobytes() == default_render.tobytes()
+    with pytest.raises(InvalidCatDocument, match="tint"):
+        pipeline.render(
+            {**base_params, "tint": "null", "whitePatchesTint": "null"},
+            collect_layers=False,
+        )
 
 
 def test_reference_cat_complex_layers():
@@ -392,11 +395,15 @@ def test_render_batch_endpoint():
 
     with TestClient(app) as client:
         response = client.post("/render/batch", json=payload)
+        health = client.get("/health").json()
     assert response.status_code == 200
 
     data = response.json()
     assert data["tileSize"] == 50
     assert data["width"] == 100
+    assert data["catalogHash"] == health["catalogHash"]
+    assert data["manifestHash"] == health["manifestHash"]
+    assert data["renderPlanVersion"] == 1
     assert data["frames"][0]["id"] == "base"
     assert len(data["frames"]) == 3  # base + 2 variants
     assert data.get("sources") is not None
