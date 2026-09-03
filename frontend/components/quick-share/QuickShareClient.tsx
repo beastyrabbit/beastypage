@@ -29,6 +29,7 @@ import {
   imageUrlFromPastedMarkup,
   readClipboardMedia,
 } from "@/lib/quick-share-clipboard";
+import { uploadBlobWithProgress } from "@/lib/quick-share-upload";
 import { cn } from "@/lib/utils";
 
 type Policy = {
@@ -215,6 +216,24 @@ export function QuickShareClient() {
     [getToken, isSignedIn],
   );
 
+  const uploadPart = useCallback(
+    async (
+      path: string,
+      body: Blob,
+      uploadReceipt: string,
+      onProgress: (loaded: number) => void,
+    ) => {
+      const token = isSignedIn ? await getToken({ template: "convex" }) : null;
+      const headers = new Headers({ "x-upload-receipt": uploadReceipt });
+      if (token) headers.set("authorization", `Bearer ${token}`);
+      await uploadBlobWithProgress(path, body, {
+        headers,
+        onProgress: ({ loaded }) => onProgress(loaded),
+      });
+    },
+    [getToken, isSignedIn],
+  );
+
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
@@ -323,6 +342,24 @@ export function QuickShareClient() {
       let completedBytes =
         status.parts?.reduce((sum, part) => sum + part.size, 0) ?? 0;
 
+      const reportProgress = (inFlightBytes: number) => {
+        const sentBytes = Math.min(
+          selectedFile.size,
+          completedBytes + inFlightBytes,
+        );
+        setWork({
+          kind: "uploading",
+          progress:
+            selectedFile.size === 0
+              ? 0
+              : Math.round((sentBytes / selectedFile.size) * 100),
+          label: `Uploading ${selectedFile.name} · ${formatBytes(
+            sentBytes,
+          )} of ${formatBytes(selectedFile.size)}`,
+        });
+      };
+      reportProgress(0);
+
       for (let index = 0; index < count; index += 1) {
         const partNumber = index + 1;
         if (completeParts.has(partNumber)) continue;
@@ -334,15 +371,17 @@ export function QuickShareClient() {
         let lastError: unknown;
         for (let retry = 0; retry < 3; retry += 1) {
           try {
-            await apiFetch(
+            await uploadPart(
               `/i/api/uploads/${upload.uploadId}/parts/${partNumber}`,
-              { method: "PUT", body: chunk },
+              chunk,
               upload.receipt,
+              reportProgress,
             );
             lastError = null;
             break;
           } catch (error) {
             lastError = error;
+            reportProgress(0);
             if (retry < 2) {
               await new Promise((resolve) =>
                 window.setTimeout(resolve, 750 * (retry + 1)),
@@ -352,13 +391,7 @@ export function QuickShareClient() {
         }
         if (lastError) throw lastError;
         completedBytes += chunk.size;
-        setWork({
-          kind: "uploading",
-          progress: Math.round((completedBytes / selectedFile.size) * 100),
-          label: `Sending ${formatBytes(completedBytes)} of ${formatBytes(
-            selectedFile.size,
-          )}`,
-        });
+        reportProgress(0);
       }
 
       await apiFetch<ShareStatus>(
@@ -368,7 +401,7 @@ export function QuickShareClient() {
       );
       await waitForProcessing(upload);
     },
-    [apiFetch, waitForProcessing],
+    [apiFetch, uploadPart, waitForProcessing],
   );
 
   async function startFileUpload(event: FormEvent, selectedFiles: File[]) {
@@ -875,7 +908,7 @@ export function QuickShareClient() {
                       ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
                       : "border-border bg-muted/40 text-foreground",
                 )}
-                aria-live="polite"
+                aria-live={work.kind === "uploading" ? "off" : "polite"}
               >
                 <div className="flex items-start gap-3">
                   {work.kind === "error" ? (
@@ -886,15 +919,32 @@ export function QuickShareClient() {
                     <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <p>{work.label}</p>
                     {work.kind === "uploading" ? (
-                      <div className="mt-3 h-1.5 overflow-hidden rounded-sm bg-background">
+                      <>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p>{work.label}</p>
+                          <span className="shrink-0 font-mono text-xs font-semibold text-amber-300 tabular-nums">
+                            {work.progress}%
+                          </span>
+                        </div>
                         <div
-                          className="h-full bg-amber-500 transition-[width]"
-                          style={{ width: `${work.progress}%` }}
-                        />
-                      </div>
-                    ) : null}
+                          className="mt-3 h-2 overflow-hidden rounded-full bg-background"
+                          role="progressbar"
+                          aria-label="Upload progress"
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={work.progress}
+                          aria-valuetext={work.label}
+                        >
+                          <div
+                            className="h-full rounded-full bg-amber-500 transition-[width] duration-150 ease-out motion-reduce:transition-none"
+                            style={{ width: `${work.progress}%` }}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <p>{work.label}</p>
+                    )}
                   </div>
                 </div>
                 {work.kind === "error" &&
