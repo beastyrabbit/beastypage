@@ -1,0 +1,503 @@
+name: Build and Push Container Images
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+    # The migration commit must not publish or deploy merely because this
+    # workflow was added. Mixed commits still run and are filtered below.
+    paths-ignore:
+      - ".github/workflows/build-images.yml"
+      - ".forgejo/workflows/build-images.yml"
+  workflow_dispatch:
+    inputs:
+      build_frontend:
+        description: "Build frontend image"
+        type: boolean
+        default: true
+      build_renderer:
+        description: "Build renderer service image"
+        type: boolean
+        default: true
+      build_image_processing:
+        description: "Build image processing service image"
+        type: boolean
+        default: true
+      build_media:
+        description: "Build Quick Share media service image"
+        type: boolean
+        default: true
+      build_discord_bot:
+        description: "Build Discord bot image"
+        type: boolean
+        default: true
+      publish_images:
+        description: "Publish selected images to GHCR"
+        type: boolean
+        default: false
+      deploy_convex:
+        description: "Deploy Convex backend (main branch only)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+
+concurrency:
+  group: beastypage-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: arc-beastypage
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      convex: ${{ steps.filter.outputs.convex }}
+      renderer: ${{ steps.filter.outputs.renderer }}
+      image_processing: ${{ steps.filter.outputs.image_processing }}
+      media: ${{ steps.filter.outputs.media }}
+      discord_bot: ${{ steps.filter.outputs.discord_bot }}
+      cat_system: ${{ steps.filter.outputs.cat_system }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: filter
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          base="$BEFORE_SHA"
+          head="$HEAD_SHA"
+          if [ -z "$base" ] || [ "$base" = "null" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-list --max-parents=0 "$head")"
+          fi
+
+          changed="$(git diff --name-only "$base" "$head" || git diff --name-only HEAD~1 HEAD || true)"
+
+          has_changed() {
+            printf '%s\n' "$changed" | grep -Eq "$1"
+          }
+
+          set_output() {
+            name="$1"
+            pattern="$2"
+            if has_changed "$pattern"; then
+              echo "$name=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$name=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          set_output frontend '^frontend/'
+          set_output convex '^frontend/convex/'
+          set_output renderer '^(backend/renderer_service/|frontend/lib/cat-system/|frontend/lib/cat-v3/(coatPatterns|poseOptions)\.ts|frontend/scripts/generate-cat-system\.ts|frontend/public/(cat-system|sprite-data|sprites)/|\.dockerignore$)'
+          set_output image_processing '^backend/image_processing_service/'
+          set_output media '^backend/media_service/'
+          set_output discord_bot '^(backend/discord-bot/|frontend/lib/cat-system/|frontend/lib/cat-v3/(coatPatterns|poseOptions)\.ts|frontend/scripts/generate-cat-system\.ts|frontend/public/(cat-system|sprite-data|sprites)/)'
+          set_output cat_system '^(frontend/|backend/renderer_service/|backend/discord-bot/|package\.json$|pnpm-lock\.yaml$|\.dockerignore$|\.(github|forgejo)/workflows/build-images\.yml$)'
+
+  cat-system-contract:
+    needs: changes
+    if: |
+      always() &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+       github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.cat_system == 'true')
+    runs-on: arc-beastypage
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+
+      - name: Install contract build dependencies
+        run: |
+          pnpm --dir frontend install --frozen-lockfile --ignore-scripts
+          npm --prefix backend/discord-bot ci
+          uv sync --project backend/renderer_service --extra dev --frozen
+
+      - name: Verify the closed cat-system contract
+        run: pnpm cat-system:build
+
+  tag-convex-changes:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: arc-beastypage
+    outputs:
+      convex: ${{ steps.diff.outputs.convex }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - id: diff
+        env:
+          CURRENT_TAG: ${{ github.ref_name }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          previous_tag=$(
+            git tag --sort=-version:refname \
+              | grep -Fxv "$CURRENT_TAG" \
+              | sed -n '1p'
+          )
+
+          if [ -z "$previous_tag" ]; then
+            echo "No previous release tag found; deploying Convex by default."
+            echo "convex=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Comparing frontend/convex changes from $previous_tag to $CURRENT_SHA"
+
+          if git diff --quiet "$previous_tag..$CURRENT_SHA" -- frontend/convex; then
+            echo "convex=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "convex=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy-convex:
+    needs: [changes, tag-convex-changes]
+    if: |
+      always() &&
+      ((github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        needs.changes.outputs.convex == 'true') ||
+       (github.event_name == 'push' &&
+        startsWith(github.ref, 'refs/tags/v') &&
+        needs.tag-convex-changes.outputs.convex == 'true') ||
+       (github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/main' &&
+        inputs.deploy_convex))
+    runs-on: arc-beastypage
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 11
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Fetch Convex deploy secret from Infisical
+        uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_GITHUB_ACTIONS_IDENTITY_ID }}
+          domain: "http://192.168.60.11:8080"
+          project-slug: beastypage
+          env-slug: prod
+          secret-path: /ci
+
+      - name: Deploy Convex backend
+        run: |
+          : "${CONVEX_DEPLOY_KEY:?Missing CONVEX_DEPLOY_KEY from Infisical prod /ci}"
+          pnpm exec convex deploy
+
+  build-frontend:
+    needs: [changes, cat-system-contract]
+    if: |
+      always() &&
+      (needs.cat-system-contract.result == 'success' || needs.cat-system-contract.result == 'skipped') &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+       (github.event_name == 'push' && needs.changes.outputs.frontend == 'true') ||
+       (github.event_name == 'workflow_dispatch' && inputs.build_frontend))
+    runs-on: arc-beastypage
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Read cat-system catalog hash
+        id: cat-system
+        run: echo "hash=$(cat frontend/public/cat-system/catalog-hash.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch frontend build settings from Infisical
+        uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_GITHUB_ACTIONS_IDENTITY_ID }}
+          domain: "http://192.168.60.11:8080"
+          project-slug: beastypage
+          env-slug: prod
+          secret-path: /ci
+
+      - name: Verify frontend build settings
+        run: |
+          : "${CONVEX_DEPLOYMENT:?Missing CONVEX_DEPLOYMENT from Infisical prod /ci}"
+          : "${NEXT_PUBLIC_POSTHOG_KEY:?Missing NEXT_PUBLIC_POSTHOG_KEY from Infisical prod /ci}"
+          : "${NEXT_PUBLIC_POSTHOG_HOST:?Missing NEXT_PUBLIC_POSTHOG_HOST from Infisical prod /ci}"
+          : "${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY from Infisical prod /ci}"
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Log in to GHCR
+        if: github.event_name != 'workflow_dispatch' || inputs.publish_images
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-frontend
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=,enable=${{ github.event_name == 'push' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=raw,value=smoke-${{ github.run_id }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build frontend image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            dev.beastypage.cat-system.catalog-hash=${{ steps.cat-system.outputs.hash }}
+          build-args: |
+            CONVEX_DEPLOYMENT=${{ env.CONVEX_DEPLOYMENT }}
+            NEXT_PUBLIC_POSTHOG_KEY=${{ env.NEXT_PUBLIC_POSTHOG_KEY }}
+            NEXT_PUBLIC_POSTHOG_HOST=${{ env.NEXT_PUBLIC_POSTHOG_HOST }}
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+            APP_VERSION=${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'dev' }}
+            CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
+
+  build-renderer:
+    needs: [changes, cat-system-contract]
+    if: |
+      always() &&
+      (needs.cat-system-contract.result == 'success' || needs.cat-system-contract.result == 'skipped') &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+       (github.event_name == 'push' && needs.changes.outputs.renderer == 'true') ||
+       (github.event_name == 'workflow_dispatch' && inputs.build_renderer))
+    runs-on: arc-beastypage
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Read cat-system catalog hash
+        id: cat-system
+        run: echo "hash=$(cat frontend/public/cat-system/catalog-hash.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Log in to GHCR
+        if: github.event_name != 'workflow_dispatch' || inputs.publish_images
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-renderer
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=,enable=${{ github.event_name == 'push' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=raw,value=smoke-${{ github.run_id }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build renderer image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: ./backend/renderer_service/Dockerfile
+          push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            dev.beastypage.cat-system.catalog-hash=${{ steps.cat-system.outputs.hash }}
+          build-args: |
+            CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
+
+  build-image-processing:
+    needs: changes
+    if: |
+      always() &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+       (github.event_name == 'push' && needs.changes.outputs.image_processing == 'true') ||
+       (github.event_name == 'workflow_dispatch' && inputs.build_image_processing))
+    runs-on: arc-beastypage
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Log in to GHCR
+        if: github.event_name != 'workflow_dispatch' || inputs.publish_images
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-image-processing
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=,enable=${{ github.event_name == 'push' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=raw,value=smoke-${{ github.run_id }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build image-processing image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./backend/image_processing_service
+          file: ./backend/image_processing_service/Dockerfile
+          push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
+          tags: ${{ steps.meta.outputs.tags }}
+
+  build-discord-bot:
+    needs: [changes, cat-system-contract]
+    if: |
+      always() &&
+      (needs.cat-system-contract.result == 'success' || needs.cat-system-contract.result == 'skipped') &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+       (github.event_name == 'push' && needs.changes.outputs.discord_bot == 'true') ||
+       (github.event_name == 'workflow_dispatch' && inputs.build_discord_bot))
+    runs-on: arc-beastypage
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Read cat-system catalog hash
+        id: cat-system
+        run: echo "hash=$(cat frontend/public/cat-system/catalog-hash.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Log in to GHCR
+        if: github.event_name != 'workflow_dispatch' || inputs.publish_images
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-discord-bot
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=,enable=${{ github.event_name == 'push' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=raw,value=smoke-${{ github.run_id }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build Discord bot image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./backend/discord-bot
+          file: ./backend/discord-bot/Dockerfile
+          push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            dev.beastypage.cat-system.catalog-hash=${{ steps.cat-system.outputs.hash }}
+          build-args: |
+            CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
+
+  build-media:
+    needs: changes
+    if: |
+      always() &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+       (github.event_name == 'push' && needs.changes.outputs.media == 'true') ||
+       (github.event_name == 'workflow_dispatch' && inputs.build_media))
+    runs-on: arc-beastypage
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Log in to GHCR
+        if: github.event_name != 'workflow_dispatch' || inputs.publish_images
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-media
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=,enable=${{ github.event_name == 'push' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=raw,value=smoke-${{ github.run_id }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Build media image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./backend/media_service
+          file: ./backend/media_service/Dockerfile
+          push: ${{ github.event_name != 'workflow_dispatch' || inputs.publish_images }}
+          tags: ${{ steps.meta.outputs.tags }}
