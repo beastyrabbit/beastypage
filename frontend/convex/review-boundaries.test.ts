@@ -52,6 +52,89 @@ describe("adoption authority", () => {
 });
 
 describe("legacy voting transactions", () => {
+  it("preserves the deciding vote when coin-flip cleanup closes a tie-break", async () => {
+    const t = convexTest(schema, modules);
+    const host = t.withIdentity({
+      subject: "host",
+      issuer: "https://identity.example",
+    });
+    const created = await host.mutation(api.streamSessions.create, {
+      viewerKey: "fixture",
+      status: "live",
+      currentStep: "colour",
+    });
+    const id = created!.id as Id<"stream_sessions">;
+    await host.mutation(api.streamSessions.update, {
+      id,
+      allowedOptions: ["WHITE", "BLACK"],
+      params: {
+        _votesOpen: true,
+        _tieFilter: ["WHITE", "BLACK"],
+        _tieIteration: 1,
+      },
+    });
+    for (const optionKey of ["WHITE", "BLACK"]) {
+      const viewerSession = crypto.randomUUID();
+      const participant = await t.mutation(api.streamParticipants.create, {
+        sessionId: id,
+        viewerSession,
+        displayName: optionKey,
+        status: "active",
+      });
+      await t.mutation(api.streamVotes.create, {
+        sessionId: id,
+        stepId: "colour",
+        voteRound: 1,
+        optionKey,
+        viewerSession,
+        votedBy: participant!.id as Id<"stream_participants">,
+      });
+    }
+    await host.mutation(api.streamVotes.create, {
+      sessionId: id,
+      stepId: "colour",
+      voteRound: 1,
+      optionKey: "BLACK",
+    });
+    await host.mutation(api.streamSessions.update, {
+      id,
+      params: { _votesOpen: false },
+      allowedOptions: ["WHITE", "BLACK"],
+    });
+    expect((await t.query(api.streamSessions.get, { id }))?.vote_round).toBe(1);
+    const votes = await t.query(api.streamVotes.list, {
+      session: id,
+      stepId: "colour",
+      limit: 500,
+    });
+    expect(votes).toHaveLength(3);
+    expect(votes.filter((vote) => vote.option_key === "BLACK")).toHaveLength(2);
+  });
+
+  it("finds active owned sessions beyond newer completed sessions", async () => {
+    const t = convexTest(schema, modules);
+    const host = t.withIdentity({
+      subject: "host",
+      issuer: "https://identity.example",
+    });
+    const active = await host.mutation(api.streamSessions.create, {
+      viewerKey: "active",
+      status: "live",
+    });
+    for (let i = 0; i < 5; i++)
+      await host.mutation(api.streamSessions.create, {
+        viewerKey: `completed-${i}`,
+        status: "completed",
+      });
+    for (const filter of [{ status: "live" }, { exclude: "completed" }]) {
+      expect(
+        (
+          await host.query(api.streamSessions.list, { ...filter, limit: 2 })
+        ).map((session) => session.id),
+      ).toEqual([active!.id]);
+    }
+  });
+
   it("enforces host, membership, choice, round, and one participant vote", async () => {
     const t = convexTest(schema, modules);
     const host = t.withIdentity({

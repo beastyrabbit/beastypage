@@ -183,7 +183,7 @@ function AuthenticatedHostClient() {
   const session = useQuery(api.streamSessions.get, sessionArgs);
 
   const sessionList = useQuery(api.streamSessions.list, {
-    exclude: "completed",
+    status: "live",
     limit: 20,
   });
   const sessionListResolved = sessionList ?? [];

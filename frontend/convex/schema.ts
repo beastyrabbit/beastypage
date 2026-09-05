@@ -255,6 +255,11 @@ export default defineSchema({
     .index("by_ownerTokenIdentifier_and_updatedAt", [
       "ownerTokenIdentifier",
       "updatedAt",
+    ])
+    .index("by_ownerTokenIdentifier_and_status_and_updatedAt", [
+      "ownerTokenIdentifier",
+      "status",
+      "updatedAt",
     ]),
 
   stream_participants: defineTable({

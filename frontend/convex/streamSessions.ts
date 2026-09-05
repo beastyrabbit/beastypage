@@ -15,15 +15,29 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
+    // Older host clients request exclude=completed. Owned sessions have two
+    // supported states, so use the same indexed live query for that request.
+    const status =
+      args.status ?? (args.exclude === "completed" ? "live" : undefined);
     const source = args.viewerKey
       ? ctx.db
           .query("stream_sessions")
           .withIndex("byViewerKey", (q) => q.eq("viewerKey", args.viewerKey!))
-      : ctx.db
-          .query("stream_sessions")
-          .withIndex("by_ownerTokenIdentifier_and_updatedAt", (q) =>
-            q.eq("ownerTokenIdentifier", identity?.tokenIdentifier),
-          );
+      : status
+        ? ctx.db
+            .query("stream_sessions")
+            .withIndex(
+              "by_ownerTokenIdentifier_and_status_and_updatedAt",
+              (q) =>
+                q
+                  .eq("ownerTokenIdentifier", identity?.tokenIdentifier)
+                  .eq("status", status),
+            )
+        : ctx.db
+            .query("stream_sessions")
+            .withIndex("by_ownerTokenIdentifier_and_updatedAt", (q) =>
+              q.eq("ownerTokenIdentifier", identity?.tokenIdentifier),
+            );
     if (!args.viewerKey && !identity) return [];
     let sessions = await source.order("desc").take(listLimit(args.limit));
     if (args.status) {
@@ -64,7 +78,7 @@ export const get = query({
 export const create = mutation({
   args: {
     viewerKey: v.string(),
-    status: v.string(),
+    status: v.union(v.literal("live"), v.literal("completed")),
     currentStep: v.optional(v.string()),
     stepIndex: v.optional(v.number()),
     stepHistory: v.optional(v.any()),
@@ -102,7 +116,7 @@ export const update = mutation({
     allowedOptions: v.optional(v.array(v.string())),
     id: v.id("stream_sessions"),
     viewerKey: v.optional(v.string()),
-    status: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("live"), v.literal("completed"))),
     currentStep: v.optional(v.string()),
     stepIndex: v.optional(v.number()),
     stepHistory: v.optional(v.any()),
@@ -120,7 +134,7 @@ export const update = mutation({
         args.currentStep !== doc.currentStep) ||
       (args.stepIndex !== undefined && args.stepIndex !== doc.stepIndex) ||
       (args.params !== undefined &&
-        (args.params?._tieIteration ?? 0) !== (doc.params?._tieIteration ?? 0));
+        (args.params?._tieIteration ?? 0) > (doc.params?._tieIteration ?? 0));
     const updated = {
       ...doc,
       voteRound: (doc.voteRound ?? 0) + (roundChanged ? 1 : 0),
