@@ -52,6 +52,52 @@ describe("adoption authority", () => {
 });
 
 describe("legacy voting transactions", () => {
+  it("admits host choices before opening viewer voting on creation and advancement", async () => {
+    const t = convexTest(schema, modules);
+    const host = t.withIdentity({
+      subject: "host",
+      issuer: "https://identity.example",
+    });
+    const created = await host.mutation(api.streamSessions.create, {
+      viewerKey: "fixture",
+      status: "live",
+      currentStep: "colour",
+      allowedOptions: ["WHITE"],
+      params: { _votesOpen: false },
+    });
+    const sessionId = created!.id as Id<"stream_sessions">;
+    await expect(
+      host.mutation(api.streamVotes.create, {
+        sessionId,
+        stepId: "colour",
+        voteRound: 0,
+        optionKey: "BLACK",
+      }),
+    ).rejects.toThrow("Choice");
+    await host.mutation(api.streamVotes.create, {
+      sessionId,
+      stepId: "colour",
+      voteRound: 0,
+      optionKey: "WHITE",
+    });
+    await host.mutation(api.streamSessions.update, {
+      id: sessionId,
+      currentStep: "pelt",
+      stepIndex: 1,
+      allowedOptions: ["SingleColour"],
+      params: { _votesOpen: false },
+    });
+    await host.mutation(api.streamVotes.create, {
+      sessionId,
+      stepId: "pelt",
+      voteRound: 1,
+      optionKey: "SingleColour",
+    });
+    expect(
+      await t.query(api.streamVotes.list, { session: sessionId, limit: 500 }),
+    ).toMatchObject([{ option_key: "SingleColour" }]);
+  });
+
   it("preserves the deciding vote when coin-flip cleanup closes a tie-break", async () => {
     const t = convexTest(schema, modules);
     const host = t.withIdentity({

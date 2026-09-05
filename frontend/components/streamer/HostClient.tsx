@@ -495,6 +495,10 @@ function AuthenticatedHostClient() {
         viewerKey,
         status: "live",
         currentStep: firstStepId,
+        allowedOptions:
+          initialSteps[0]
+            ?.getOptions({ params: initialParams, history: [] })
+            .map((option) => option.key) ?? [],
         stepIndex: 0,
         stepHistory: [],
         params: initialParams,
@@ -719,6 +723,11 @@ function AuthenticatedHostClient() {
           stepHistory: updatedHistory,
           stepIndex: nextStepIndex >= 0 ? nextStepIndex : 0,
           currentStep: nextStepId,
+          allowedOptions:
+            updatedSteps
+              .find((step) => step.id === nextStepId)
+              ?.getOptions({ params: draftParams, history: updatedHistory })
+              .map((option) => option.key) ?? [],
         });
         if (shouldFinalize && session?.status !== "completed") {
           setFinalShareInfo(null);

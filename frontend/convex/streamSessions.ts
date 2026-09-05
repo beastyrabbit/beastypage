@@ -77,6 +77,7 @@ export const get = query({
 
 export const create = mutation({
   args: {
+    allowedOptions: v.optional(v.array(v.string())),
     viewerKey: v.string(),
     status: v.union(v.literal("live"), v.literal("completed")),
     currentStep: v.optional(v.string()),
@@ -89,10 +90,12 @@ export const create = mutation({
     const nowTs = Date.now();
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Sign in to host a session");
+    if (args.allowedOptions && args.allowedOptions.length > 2000)
+      throw new Error("Too many choices");
     const insertDoc = {
       ownerTokenIdentifier: identity.tokenIdentifier,
       voteRound: 0,
-      allowedOptions: [],
+      allowedOptions: args.allowedOptions ?? [],
       viewerKey: args.viewerKey,
       status: args.status,
       stepIndex: args.stepIndex ?? 0,
