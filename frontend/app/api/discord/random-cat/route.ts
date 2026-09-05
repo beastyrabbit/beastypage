@@ -68,22 +68,19 @@ export async function POST(request: NextRequest) {
     if (!isDiscordServiceRequest(request))
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     try {
-      const convexUrl = getServerConvexUrl();
-      if (convexUrl) {
-        const cfg = await discordConfig("get", {
-          discordUserId,
-        });
-        // User config provides defaults; per-invocation overrides take priority
-        overrides.accessoriesMin = cfg.accessoriesMin;
-        overrides.accessoriesMax = cfg.accessoriesMax;
-        overrides.scarsMin = cfg.scarsMin;
-        overrides.scarsMax = cfg.scarsMax;
-        overrides.tortiesMin = cfg.tortiesMin;
-        overrides.tortiesMax = cfg.tortiesMax;
-        overrides.darkForest = cfg.darkForest;
-        overrides.starclan = cfg.starclan;
-        if (cfg.palettes.length > 0) overrides.palettes = cfg.palettes;
-      }
+      const cfg = await discordConfig("get", {
+        discordUserId,
+      });
+      // User config provides defaults; per-invocation overrides take priority
+      overrides.accessoriesMin = cfg.accessoriesMin;
+      overrides.accessoriesMax = cfg.accessoriesMax;
+      overrides.scarsMin = cfg.scarsMin;
+      overrides.scarsMax = cfg.scarsMax;
+      overrides.tortiesMin = cfg.tortiesMin;
+      overrides.tortiesMax = cfg.tortiesMax;
+      overrides.darkForest = cfg.darkForest;
+      overrides.starclan = cfg.starclan;
+      if (cfg.palettes.length > 0) overrides.palettes = cfg.palettes;
     } catch (error) {
       // Non-fatal — proceed with defaults if config fetch fails
       console.error("[discord/random-cat] Failed to fetch user config", error);

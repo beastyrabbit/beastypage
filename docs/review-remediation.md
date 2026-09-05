@@ -20,7 +20,7 @@ This change addresses the [project review](https://schaffa.dev/p/m8tcd0usfcrqvul
 | F12 | A collection response serves its selected surviving upload directly. A local service test covers an unavailable first upload and a ready later upload. |
 | F13 | The profile now offers “Reset saved variants” and explicitly says the account, profile, shared content, and sessions remain. Reset deletes the authenticated user's variants in retryable batches of 100. It does not claim to delete a Clerk account. |
 | F14 | Pixelator repairs input and blend references after disabling, removing, reordering, or restoring steps. Only earlier enabled steps are selectable. Unit tests cover both reference kinds. |
-| F15 | Pixelator aborts superseded fetches and clears stale results when the image, pipeline, or output mode changes. Browser tests hold responses pending and verify cancellation, clearing, and image reset. |
+| F15 | Pixelator aborts superseded fetches. Setting edits retain a marked previous result and disable export until the new result arrives. Image replacement or disabling every step clears the result. Browser tests hold responses pending and verify these transitions. |
 | F16 | Media and image-processing publication requires successful service checks in both workflows. PR validation runs their type/tests and media lint. |
 | F17 | Unit tests no longer start a renderer. The renderer integration project starts and verifies its own ephemeral listener, then stops only that process. |
 | F18 | Catdex loads approval-indexed pages of 48, enriches only each page, and shares season/rarity reads within that page. A bounded pending-existence query replaces the count subscription. Pagination tests cover uniqueness and approval filtering. Search, filters, and sorting apply to loaded cards, with explicit UI copy and a load-more control. |
@@ -32,7 +32,7 @@ This change addresses the [project review](https://schaffa.dev/p/m8tcd0usfcrqvul
 - Encoded image intermediates are released after their final input/blend consumer. A branching pipeline test protects shared consumers. No raw-buffer rewrite or render-result cache was added without profiling evidence.
 - Media shutdown rejects new jobs and drains current work for up to ten seconds. An unfinished lease remains recoverable after the deadline.
 - Pixelator proxy deadlines and browser cancellation remain active through response-body consumption.
-- Renderer runtime dependencies no longer include pytest. The bot image prunes development dependencies after compilation. Image sizes were not measured because no container was built or published.
+- Renderer runtime dependencies no longer include pytest. The bot image prunes development dependencies after compilation. No image-size reduction is claimed.
 - Removed inert renderer cache settings. Existing sprite caching remains. Component READMEs now describe the actual services, Portless entry point, sprite source, and shared-versus-local Convex behavior.
 - Direct frontend typecheck generates ignored version metadata first. Convex TypeScript uses the current package's generated-config template.
 - Frontend Biome configuration matches the installed version. Changed first-party TypeScript files were formatted; legacy asset JSON and adapted-code exclusions were retained. Newly reported optional-chain diagnostics in two unchanged files remain scoped warnings. Python pins Ruff and a scoped first-party rule set. Pillow/AnyIO/FastAPI deprecated call sites were updated. One upstream Starlette test-client warning remains.
@@ -65,4 +65,14 @@ Recheck registry advisories before release. Native libraries, operating-system i
 
 ## Verification scope
 
-Run the root `cat-system:build`, `media:check`, and `image-processing:check` commands, the scoped Ruff checks, and `pnpm --dir frontend exec playwright test`. Browser fixtures use actual Collection, Profile, and Pixelator components with local assets and fake auth/database hooks. They block nonlocal requests. They verify UI state and keyboard behavior, not live Clerk/Convex/Discord/S3 integration. Screenshot evidence is kept outside tracked source and published through Schaffa in the PR.
+Run the root `cat-system:build`, `media:check`, and `image-processing:check` commands, the scoped Ruff checks, and `pnpm --dir frontend exec playwright test`. Browser fixtures use actual Collection, Profile, Pixelator, Host, and Catdex components with local assets and fake auth/database hooks. They block nonlocal requests. They verify UI state and keyboard behavior, not live Clerk/Convex/Discord/S3 integration. Screenshot evidence is kept outside tracked source and published through Schaffa in the PR.
+
+## PR feedback
+
+- Pixelator preserves images up to 4,000 pixels on the longest side and four million pixels in total. A 4,000 × 800 image remains full size. Worker validation errors keep their safe hints; unexpected decoder errors remain masked.
+- Clearing tie-break choices retains the current round and its deciding votes. Earlier rounds are not restored. The host UI states this explicitly. Host votes retain only bounded label/step strings and recognized coin-flip provenance after authorization; participant metadata comes from the server.
+- The legacy `catdex.list` endpoint remains capped at 48 for compatibility. Clients needing every card must use `catdex.page` until pagination completes.
+- Configure the bot's `FRONTEND_API_URL` with the canonical HTTPS origin. Redirects are rejected so a bearer credential is never forwarded to a different endpoint. Set the same `DISCORD_API_TOKEN` through the approved secret mechanism in the bot, frontend, and Convex. Local frontend/bot environment checks require it. Frontend config reads use `CONVEX_SITE_URL` or `NEXT_PUBLIC_CONVEX_SITE_URL`; they do not depend on the separate Convex query URL.
+- Image download sources must return an `image/*` Content-Type. Missing headers are rejected intentionally. Temporary DNS abort listeners are removed as soon as resolution settles.
+- Frontend, bot, and image-processing Docker stages and contract CI use Node 24. Renderer test dependencies explicitly include PyYAML. `httpx2` remains because the installed Starlette test client imports it and deprecates its `httpx` fallback.
+- Convex declarations were regenerated locally with the installed CLI, including the new Discord and stream modules. No deployment was needed.

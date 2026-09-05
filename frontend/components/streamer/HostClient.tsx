@@ -131,11 +131,23 @@ export function HostClient() {
   if (isLoading) return <p>Loading host account…</p>;
   if (!isAuthenticated)
     return (
-      <div className="p-8">
-        <p>Sign in to host a voting session.</p>
-        <SignInButton>
-          <button type="button">Sign in</button>
-        </SignInButton>
+      <div className="mx-auto max-w-xl px-4 py-16">
+        <div className="glass-card space-y-6 p-8 text-center">
+          <h1 className="text-2xl font-bold text-foreground">
+            Host a voting session
+          </h1>
+          <p className="text-muted-foreground">
+            Sign in to create a session and manage viewer votes.
+          </p>
+          <SignInButton>
+            <button
+              type="button"
+              className="rounded-full border border-primary/50 bg-primary/15 px-6 py-2.5 font-semibold text-primary transition hover:bg-primary/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              Sign in
+            </button>
+          </SignInButton>
+        </div>
       </div>
     );
   return <AuthenticatedHostClient />;
@@ -866,6 +878,7 @@ function AuthenticatedHostClient() {
     }
   }, [
     coinWinner,
+    session?.vote_round,
     voteSent,
     currentStep,
     activeSessionId,
@@ -901,7 +914,9 @@ function AuthenticatedHostClient() {
         }
       }
     });
-    setStatusMessage("Tie-break filter cleared.");
+    setStatusMessage(
+      "Tie-break choices cleared. The current round's votes remain; earlier rounds are not restored.",
+    );
   }, [updateSessionParams]);
 
   const handleToggleOptionDisabled = useCallback(

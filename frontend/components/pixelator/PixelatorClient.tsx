@@ -51,6 +51,7 @@ import { PreviewCanvas } from "./PreviewCanvas";
 interface PixelatorState {
   imageDataUrl: string | null;
   resultDataUrl: string | null;
+  resultStale: boolean;
   steps: PipelineStep[];
   processing: boolean;
   error: string | null;
@@ -63,6 +64,7 @@ interface PixelatorState {
 const INITIAL_STATE: PixelatorState = {
   imageDataUrl: null,
   resultDataUrl: null,
+  resultStale: false,
   steps: [],
   processing: false,
   error: null,
@@ -98,16 +100,34 @@ export function PixelatorClient() {
   const abortRef = useRef<AbortController | null>(null);
 
   const imageLoadRef = useRef(0);
+  const resultImageRef = useRef<string | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: These values identify the result to invalidate, even though the cleanup only reads refs.
   useLayoutEffect(() => {
     abortRef.current?.abort();
-    setState((prev) => ({
-      ...prev,
-      processing: false,
-      resultDataUrl: null,
-      lastDuration: null,
-      error: null,
-    }));
+    const imageChanged = resultImageRef.current !== state.imageDataUrl;
+    resultImageRef.current = state.imageDataUrl;
+    const clearResult =
+      imageChanged || !state.steps.some((step) => step.enabled);
+    setState((prev) => {
+      const result = clearResult ? null : prev.resultDataUrl;
+      const stale = Boolean(result);
+      if (
+        !prev.processing &&
+        prev.resultDataUrl === result &&
+        prev.resultStale === stale &&
+        prev.lastDuration === null &&
+        prev.error === null
+      )
+        return prev;
+      return {
+        ...prev,
+        processing: false,
+        resultDataUrl: result,
+        resultStale: stale,
+        lastDuration: null,
+        error: null,
+      };
+    });
     return () => {
       abortRef.current?.abort();
     };
@@ -164,7 +184,7 @@ export function PixelatorClient() {
           : await loadImageFromUrl(source);
 
       if (generation !== imageLoadRef.current) return;
-      const dataUrl = imageToDataUrl(img, 2000);
+      const dataUrl = imageToDataUrl(img, 4000, 4_000_000);
 
       setState((prev) => ({
         ...prev,
@@ -268,6 +288,7 @@ export function PixelatorClient() {
         setState((prev) => ({
           ...prev,
           resultDataUrl: res.image,
+          resultStale: false,
           processing: false,
           lastDuration: res.meta.duration_ms,
         }));
@@ -319,6 +340,7 @@ export function PixelatorClient() {
 
   // ---- Export ----
   const handleExport = useCallback(() => {
+    if (state.resultStale) return;
     const dataUrl = state.resultDataUrl ?? state.imageDataUrl;
     if (!dataUrl) return;
 
@@ -326,7 +348,7 @@ export function PixelatorClient() {
     link.download = "pixelator-result.png";
     link.href = dataUrl;
     link.click();
-  }, [state.resultDataUrl, state.imageDataUrl]);
+  }, [state.resultDataUrl, state.imageDataUrl, state.resultStale]);
 
   // ---- DnD handlers ----
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -396,6 +418,7 @@ export function PixelatorClient() {
             <PreviewCanvas
               originalUrl={state.imageDataUrl}
               resultUrl={state.resultDataUrl}
+              stale={state.resultStale}
               processing={state.processing}
               lastDuration={state.lastDuration}
               onChangeImage={() => {
@@ -432,7 +455,8 @@ export function PixelatorClient() {
                 <button
                   type="button"
                   onClick={handleExport}
-                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground transition-all hover:-translate-y-0.5 hover:border-primary/30"
+                  disabled={state.resultStale}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-bold text-foreground transition-all enabled:hover:-translate-y-0.5 enabled:hover:border-primary/30 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Export PNG
                 </button>

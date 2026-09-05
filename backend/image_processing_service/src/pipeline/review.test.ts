@@ -12,6 +12,12 @@ const step = (id: string, inputSource = "original"): PipelineStep => ({ id, inpu
 const image = () => sharp({ create: { width: 8, height: 8, channels: 4, background: { r: 128, g: 128, b: 128, alpha: 1 } } }).png().toBuffer();
 
 describe("image processing review regressions", () => {
+  it("preserves safe validation hints across the worker boundary and masks decoder internals", async () => {
+    const input = await image();
+    const request = { image: `data:image/png;base64,${input.toString("base64")}`, mode: "full" as const, pipeline: { steps: [step("invalid", "missing")] }, outputFormat: "png" as const, outputQuality: 90 };
+    await expect(runJob("process", request, new AbortController().signal)).rejects.toThrow("earlier enabled step");
+    await expect(runJob("process", { ...request, image: `data:image/png;base64,${Buffer.from("not an image").toString("base64")}` }, new AbortController().signal)).rejects.toThrow("Image or pipeline could not be processed within the service limits");
+  });
   it("has all 64 Bayer thresholds and preserves the ordered 4x4 pattern", async () => {
     const matrix = generateBayer8();
     expect(matrix.flat().sort((a, b) => a - b)).toEqual(Array.from({ length: 64 }, (_, i) => i));

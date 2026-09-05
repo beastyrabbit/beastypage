@@ -123,7 +123,7 @@ export default function CollectionPage() {
             return (
               <article
                 key={entry.id}
-                className="glass-card group flex cursor-pointer flex-col overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:border-sky-500/30 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
+                className="glass-card group flex flex-col overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:border-sky-500/30 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <button

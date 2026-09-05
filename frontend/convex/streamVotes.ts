@@ -93,6 +93,12 @@ export const create = mutation({
     } else {
       await requireHost(ctx, session);
       optionMeta = { streamer: true };
+      // Preserve presentation/provenance only after verifying host authority.
+      for (const key of ["label", "step"] as const) {
+        if (typeof args.optionMeta?.[key] === "string")
+          optionMeta[key] = args.optionMeta[key].slice(0, 160);
+      }
+      if (args.optionMeta?.via === "coinFlip") optionMeta.via = "coinFlip";
     }
     const nowTs = Date.now();
     const insertDoc = {

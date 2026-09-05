@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { processImage } from "@/lib/pixelator/api";
 import { repairPipeline } from "@/lib/pixelator/pipeline";
 import type { PipelineStep } from "@/lib/pixelator/types";
+import { imageToDataUrl } from "@/lib/color-extraction/image-processing";
 
 const step = (id: string, inputSource = "original"): PipelineStep => ({
   id,
@@ -12,6 +13,30 @@ const step = (id: string, inputSource = "original"): PipelineStep => ({
   label: id,
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it("preserves wide images within four megapixels and scales larger images by area", () => {
+  const drawImage = vi.fn();
+  const canvas = {
+    width: 0,
+    height: 0,
+    getContext: () => ({ drawImage }),
+    toDataURL: () => "fixture",
+  };
+  vi.stubGlobal("document", { createElement: () => canvas });
+  imageToDataUrl(
+    { width: 4000, height: 800 } as HTMLImageElement,
+    4000,
+    4_000_000,
+  );
+  expect([canvas.width, canvas.height]).toEqual([4000, 800]);
+  imageToDataUrl(
+    { width: 4000, height: 2000 } as HTMLImageElement,
+    4000,
+    4_000_000,
+  );
+  expect(canvas.width * canvas.height).toBeLessThanOrEqual(4_000_000);
+  expect(canvas.width).toBeGreaterThan(2000);
+});
 
 it("repairs both reference kinds after disable, delete, and reorder", () => {
   const first = step("first");

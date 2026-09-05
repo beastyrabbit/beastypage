@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { EventEmitter } from "node:events";
+import { EventEmitter, getEventListeners } from "node:events";
 import { Readable } from "node:stream";
 import { afterEach, expect, it, vi } from "vitest";
 import { downloadPublicImage } from "@/lib/public-image-download";
@@ -9,6 +9,18 @@ vi.mock("node:dns/promises", () => ({ lookup: mocks.lookup }));
 vi.mock("node:https", () => ({ request: mocks.request }));
 vi.mock("node:http", () => ({ request: mocks.request }));
 afterEach(() => vi.resetAllMocks());
+
+it("rejects responses without an image Content-Type", async () => {
+  mocks.lookup.mockResolvedValue([{ address: "8.8.8.8", family: 4 }]);
+  mocks.request.mockImplementation((_url, _options, callback) =>
+    Object.assign(new EventEmitter(), {
+      end: () => callback(response(200, {}, [Buffer.from("fixture")])),
+    }),
+  );
+  await expect(
+    downloadPublicImage("https://images.example/image.png"),
+  ).rejects.toThrow("image");
+});
 
 function response(
   statusCode: number,
@@ -23,6 +35,7 @@ it("pins the validated address and validates a redirect before connecting again"
     .mockResolvedValueOnce([{ address: "8.8.8.8", family: 4 }])
     .mockResolvedValueOnce([{ address: "127.0.0.1", family: 4 }]);
   mocks.request.mockImplementation((_url, options, callback) => {
+    expect(getEventListeners(options.signal, "abort")).toHaveLength(0);
     const pinned = vi.fn();
     options.lookup("images.example", { all: true }, pinned);
     expect(pinned).toHaveBeenCalledWith(null, [

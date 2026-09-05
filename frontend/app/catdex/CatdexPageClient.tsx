@@ -471,6 +471,7 @@ export default function CatdexPage() {
                 type="button"
                 disabled={pageStatus !== "CanLoadMore"}
                 onClick={() => loadMore(48)}
+                className="rounded-full border border-primary/50 bg-primary/15 px-4 py-2 font-semibold text-primary transition hover:bg-primary/25 disabled:cursor-wait disabled:opacity-50"
               >
                 {pageStatus === "LoadingMore" ? "Loading…" : "Load more cards"}
               </button>

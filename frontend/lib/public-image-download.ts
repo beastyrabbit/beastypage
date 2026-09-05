@@ -34,19 +34,18 @@ export async function downloadPublicImage(input: string): Promise<Buffer> {
   const signal = AbortSignal.timeout(15_000);
   let url = validateImageUrl(input);
   for (let redirects = 0; redirects <= 5; redirects++) {
+    signal.throwIfAborted();
+    let onAbort = () => {};
     const addresses = await Promise.race([
       lookup(url.hostname.replace(/^\[|\]$/g, ""), {
         all: true,
         verbatim: true,
       }),
-      new Promise<never>((_, reject) =>
-        signal.addEventListener(
-          "abort",
-          () => reject(new Error("Image download timed out")),
-          { once: true },
-        ),
-      ),
-    ]);
+      new Promise<never>((_, reject) => {
+        onAbort = () => reject(new Error("Image download timed out"));
+        signal.addEventListener("abort", onAbort, { once: true });
+      }),
+    ]).finally(() => signal.removeEventListener("abort", onAbort));
     assertPublicAddresses(addresses);
     signal.throwIfAborted();
     const selected = addresses[0]!;

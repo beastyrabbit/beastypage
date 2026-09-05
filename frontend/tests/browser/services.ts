@@ -1,5 +1,9 @@
 import { getFunctionName } from "convex/server";
+import type { ReactNode } from "react";
 export const CONVEX_HTTP_URL = location.origin;
+export const SignInButton = ({ children }: { children: ReactNode }) => children;
+export const usePathname = () => "/streamer/host";
+export const useRouter = () => ({ replace: () => {}, push: () => {} });
 
 const artwork = {
   id: "fixture-art",
@@ -38,6 +42,8 @@ export function useQuery(reference: Parameters<typeof getFunctionName>[0]) {
       return [artwork];
     case "users:viewer":
       return viewer;
+    case "catdex:hasPending":
+      return false;
     default:
       return [];
   }
@@ -45,7 +51,7 @@ export function useQuery(reference: Parameters<typeof getFunctionName>[0]) {
 export const useMutation = () => async () => ({ remaining: false });
 export const usePaginatedQuery = () => ({
   results: [],
-  status: "Exhausted",
+  status: "CanLoadMore",
   loadMore: () => {},
 });
 export class ConvexReactClient {}

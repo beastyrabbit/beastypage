@@ -8,6 +8,11 @@
  * @module
  */
 
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
 import type * as adoption from "../adoption.js";
 import type * as ancestryTree from "../ancestryTree.js";
 import type * as catShares from "../catShares.js";
@@ -18,6 +23,8 @@ import type * as collection from "../collection.js";
 import type * as crons from "../crons.js";
 import type * as dashSettings from "../dashSettings.js";
 import type * as discord from "../discord.js";
+import type * as discordAuth from "../discordAuth.js";
+import type * as discordHttp from "../discordHttp.js";
 import type * as discordUserConfig from "../discordUserConfig.js";
 import type * as http from "../http.js";
 import type * as imageService from "../imageService.js";
@@ -35,6 +42,7 @@ import type * as quickSharePolicy from "../quickSharePolicy.js";
 import type * as rarities from "../rarities.js";
 import type * as seasons from "../seasons.js";
 import type * as singleCatSettings from "../singleCatSettings.js";
+import type * as streamAccess from "../streamAccess.js";
 import type * as streamParticipants from "../streamParticipants.js";
 import type * as streamSessions from "../streamSessions.js";
 import type * as streamVotes from "../streamVotes.js";
@@ -44,12 +52,14 @@ import type * as users from "../users.js";
 import type * as utils from "../utils.js";
 import type * as wheel from "../wheel.js";
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
-
+/**
+ * A utility for referencing Convex functions in your app's API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 declare const fullApi: ApiFromModules<{
   adoption: typeof adoption;
   ancestryTree: typeof ancestryTree;
@@ -61,6 +71,8 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dashSettings: typeof dashSettings;
   discord: typeof discord;
+  discordAuth: typeof discordAuth;
+  discordHttp: typeof discordHttp;
   discordUserConfig: typeof discordUserConfig;
   http: typeof http;
   imageService: typeof imageService;
@@ -78,6 +90,7 @@ declare const fullApi: ApiFromModules<{
   rarities: typeof rarities;
   seasons: typeof seasons;
   singleCatSettings: typeof singleCatSettings;
+  streamAccess: typeof streamAccess;
   streamParticipants: typeof streamParticipants;
   streamSessions: typeof streamSessions;
   streamVotes: typeof streamVotes;
@@ -87,31 +100,11 @@ declare const fullApi: ApiFromModules<{
   utils: typeof utils;
   wheel: typeof wheel;
 }>;
-
-/**
- * A utility for referencing Convex functions in your app's public API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
-
-/**
- * A utility for referencing Convex functions in your app's internal API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = internal.myModule.myFunction;
- * ```
- */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
-
-export declare const components: {};

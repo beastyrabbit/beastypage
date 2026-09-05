@@ -905,6 +905,7 @@ dev = [
     { name = "httpx" },
     { name = "httpx2" },
     { name = "pytest" },
+    { name = "pyyaml" },
     { name = "ruff" },
 ]
 
@@ -920,6 +921,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.6.0" },
     { name = "pygame", specifier = ">=2.5.2" },
     { name = "pytest", marker = "extra == 'dev'" },
+    { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.3" },
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.16.4" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.6" },
 ]

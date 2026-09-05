@@ -9,6 +9,25 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
+test("host sign-in gate has a visible sign-in control", async ({ page }) => {
+  await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=host`);
+  await expect(
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Sign in to create a session and manage viewer votes."),
+  ).toBeVisible();
+  await page.screenshot({ path: "../.playwright-mcp/host-sign-in.png" });
+});
+
+test("Catdex shows the styled load-more control", async ({ page }) => {
+  await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=catdex`);
+  await expect(
+    page.getByRole("button", { name: "Load more cards", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({ path: "../.playwright-mcp/catdex-load-more.png" });
+});
+
 test("collection supports keyboard opening, focus containment, Escape, and restoration", async ({
   page,
 }) => {
@@ -137,6 +156,38 @@ test("Pixelator cancels obsolete processing and clears results when steps are di
   await expect(
     page.getByRole("button", { name: "Show Original", exact: true }),
   ).toBeVisible();
+  await page.screenshot({
+    path: "../.playwright-mcp/pixelator-current.png",
+    fullPage: true,
+  });
+  await page.getByRole("slider").first().fill("20");
+  await expect(
+    page.getByText(
+      "Previous result. Current settings have not been rendered yet.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Processed result" }),
+  ).toHaveAttribute("src", original!);
+  await expect(page.getByRole("button", { name: "Export PNG" })).toBeDisabled();
+  await expect.poll(() => requests.length).toBe(3);
+  await page.screenshot({
+    path: "../.playwright-mcp/pixelator-stale.png",
+    fullPage: true,
+  });
+  await requests[2]!.fulfill({
+    json: { image: original, meta: { duration_ms: 3 } },
+  });
+  await expect(page.getByRole("button", { name: "Export PNG" })).toBeEnabled();
+  await expect(
+    page.getByText(
+      "Previous result. Current settings have not been rendered yet.",
+    ),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: "../.playwright-mcp/pixelator-refreshed.png",
+    fullPage: true,
+  });
   await page.getByRole("checkbox").first().uncheck();
   await expect(
     page.getByRole("button", { name: "Show Original", exact: true }),

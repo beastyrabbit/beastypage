@@ -135,7 +135,7 @@ Ports are managed by portless — check dev server output or `/home/beasty/proje
 ## Server-Side Patterns
 
 - **Server-side canvas**: Use `@napi-rs/canvas` (already a dependency) for image generation in API routes
-- **SSRF protection**: Any API route that fetches user-provided URLs must validate against private IPs — see `app/api/discord/palette/route.ts` for the blocklist pattern (IPv4 + IPv6 with bracket stripping)
+- **SSRF protection**: For user-provided image URLs, use `downloadPublicImage` in `lib/public-image-download.ts`. It validates all resolved addresses with `assertPublicAddresses`, pins the connection, and revalidates redirects.
 - **Convex HTTP client in API routes**: Use `ConvexHttpClient` with `getServerConvexUrl()` — see `app/api/discord/random-cat/route.ts` or `app/api/cat-share/route.ts`
 - **Standalone Docker path resolution**: `process.cwd()` may not point to the Next.js dir in standalone builds — use `NEXT_PUBLIC_DIR` env var as fallback
 

@@ -7,6 +7,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: "next/navigation",
+        replacement: resolve(import.meta.dirname, "services.ts"),
+      },
+      {
         find: "@/lib/convexClient",
         replacement: resolve(import.meta.dirname, "services.ts"),
       },

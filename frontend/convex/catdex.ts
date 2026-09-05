@@ -47,6 +47,7 @@ export const hasPending = query({
     ),
 });
 
+/** Legacy compatibility query: returns at most 48 cards. Use page for the full archive. */
 export const list = query({
   args: {
     approved: v.optional(v.boolean()),

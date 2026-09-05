@@ -52,6 +52,65 @@ describe("adoption authority", () => {
 });
 
 describe("legacy voting transactions", () => {
+  it("preserves only verified host presentation metadata and ignores participant spoofing", async () => {
+    const t = convexTest(schema, modules);
+    const host = t.withIdentity({
+      subject: "host",
+      issuer: "https://identity.example",
+    });
+    const session = await host.mutation(api.streamSessions.create, {
+      viewerKey: "fixture",
+      status: "live",
+      currentStep: "colour",
+      allowedOptions: ["WHITE"],
+      params: { _votesOpen: true },
+    });
+    const sessionId = session!.id as Id<"stream_sessions">;
+    const vote = {
+      sessionId,
+      stepId: "colour",
+      voteRound: 0,
+      optionKey: "WHITE",
+      optionMeta: {
+        streamer: false,
+        via: "coinFlip",
+        label: "White",
+        step: "Colour",
+        arbitrary: "discard",
+      },
+    };
+    await expect(t.mutation(api.streamVotes.create, vote)).rejects.toThrow(
+      "host",
+    );
+    await host.mutation(api.streamVotes.create, vote);
+    const viewerSession = crypto.randomUUID();
+    const participant = await t.mutation(api.streamParticipants.create, {
+      sessionId,
+      viewerSession,
+      displayName: "Viewer",
+      status: "active",
+    });
+    await t.mutation(api.streamVotes.create, {
+      ...vote,
+      viewerSession,
+      votedBy: participant!.id as Id<"stream_participants">,
+    });
+    const votes = await t.query(api.streamVotes.list, {
+      session: sessionId,
+      limit: 20,
+    });
+    expect(votes.find((v) => !v.votedby)?.option_meta).toEqual({
+      streamer: true,
+      via: "coinFlip",
+      label: "White",
+      step: "Colour",
+    });
+    expect(votes.find((v) => v.votedby)?.option_meta).toEqual({
+      participantId: participant!.id,
+      participantName: "Viewer",
+    });
+  });
+
   it("admits host choices before opening viewer voting on creation and advancement", async () => {
     const t = convexTest(schema, modules);
     const host = t.withIdentity({
