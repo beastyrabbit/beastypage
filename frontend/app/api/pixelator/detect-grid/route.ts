@@ -30,12 +30,12 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: { "content-type": "application/json" },
       body,
-      signal: controller.signal,
+      signal: AbortSignal.any([controller.signal, request.signal]),
+      redirect: "error",
     });
 
-    clearTimeout(timeout);
-
     const data = await upstream.text();
+    clearTimeout(timeout);
 
     if (!upstream.ok) {
       console.error(

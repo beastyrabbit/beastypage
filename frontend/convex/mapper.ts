@@ -51,7 +51,7 @@ async function getAuthenticatedUser(ctx: MutationCtx) {
   return identity;
 }
 
-async function requireProfileEditor(
+export async function requireProfileEditor(
   ctx: MutationCtx,
   doc: ProfileDoc,
   editToken: string | undefined,

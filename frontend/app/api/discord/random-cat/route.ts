@@ -3,6 +3,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
 import { RENDERER_BASE } from "@/app/api/renderer/_lib/proxy";
 import { api } from "@/convex/_generated/api";
+import { isDiscordServiceRequest } from "@/convex/discordAuth";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { CAT_CATALOG_HASH } from "@/lib/cat-system/generated/cat-schema.generated";
 import {
@@ -11,6 +12,7 @@ import {
   parseDiscordTraitOverride,
 } from "@/lib/cat-v3/random-cat-server";
 import { getServerConvexUrl } from "@/lib/convexUrl";
+import { discordConfig } from "@/lib/discord-service";
 
 const DISCORD_IMAGE_SIZE = 500;
 
@@ -63,11 +65,12 @@ export async function POST(request: NextRequest) {
   const discordUserId =
     typeof body.discord_user_id === "string" ? body.discord_user_id : undefined;
   if (discordUserId) {
+    if (!isDiscordServiceRequest(request))
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     try {
       const convexUrl = getServerConvexUrl();
       if (convexUrl) {
-        const convex = new ConvexHttpClient(convexUrl);
-        const cfg = await convex.query(api.discordUserConfig.get, {
+        const cfg = await discordConfig("get", {
           discordUserId,
         });
         // User config provides defaults; per-invocation overrides take priority

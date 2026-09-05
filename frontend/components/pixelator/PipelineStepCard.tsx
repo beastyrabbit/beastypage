@@ -43,7 +43,7 @@ export function PipelineStepCard({
   };
 
   const def = OPERATIONS.find((o) => o.type === step.algorithm);
-  const previousSteps = allSteps.slice(0, index);
+  const previousSteps = allSteps.slice(0, index).filter((step) => step.enabled);
   const idPrefix = `pipeline-step-${step.id}`;
 
   // Input source options

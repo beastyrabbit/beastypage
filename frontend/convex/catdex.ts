@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api.js";
 import type { Doc } from "./_generated/dataModel.js";
@@ -11,12 +12,53 @@ type RarityDoc = Doc<"rarity">;
 
 export type CatdexPayload = Awaited<ReturnType<typeof catdexRecordToClient>>;
 
+export const page = query({
+  args: { paginationOpts: paginationOptsValidator, approved: v.boolean() },
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("catdex")
+      .withIndex("byApproval", (q) => q.eq("approved", args.approved))
+      .order("desc")
+      .paginate({
+        ...args.paginationOpts,
+        numItems: Math.min(48, Math.max(1, args.paginationOpts.numItems)),
+      });
+    const seasons = new Map<string, Promise<SeasonDoc | null>>();
+    const rarities = new Map<string, Promise<RarityDoc | null>>();
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map((doc) =>
+          catdexRecordToClient(ctx, doc, { seasons, rarities }),
+        ),
+      ),
+    };
+  },
+});
+
+export const hasPending = query({
+  args: {},
+  handler: async (ctx) =>
+    Boolean(
+      await ctx.db
+        .query("catdex")
+        .withIndex("byApproval", (q) => q.eq("approved", false))
+        .first(),
+    ),
+});
+
 export const list = query({
   args: {
     approved: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    let cats = await ctx.db.query("catdex").collect();
+    const source =
+      typeof args.approved === "boolean"
+        ? ctx.db
+            .query("catdex")
+            .withIndex("byApproval", (q) => q.eq("approved", args.approved!))
+        : ctx.db.query("catdex");
+    let cats = await source.order("desc").take(48);
     if (typeof args.approved === "boolean") {
       cats = cats.filter((c) => Boolean(c.approved) === args.approved);
     }
@@ -30,19 +72,12 @@ export const list = query({
 export const pendingCount = query({
   args: {},
   handler: async (ctx) => {
-    const cats = await ctx.db.query("catdex").collect();
-    return cats.filter((c) => !c.approved).length;
-  },
-});
-
-export const totalCount = query({
-  args: {},
-  handler: async (ctx) => {
-    let count = 0;
-    for await (const _ of ctx.db.query("catdex")) {
-      count += 1;
-    }
-    return count;
+    // Compatibility endpoint for older clients. New clients use hasPending.
+    const cats = await ctx.db
+      .query("catdex")
+      .withIndex("byApproval", (q) => q.eq("approved", false))
+      .take(500);
+    return cats.length;
   },
 });
 
@@ -117,10 +152,21 @@ export const create = mutation({
   },
 });
 
-async function catdexRecordToClient(ctx: QueryCtx, doc: CatdexDoc) {
+async function catdexRecordToClient(
+  ctx: QueryCtx,
+  doc: CatdexDoc,
+  cache = {
+    seasons: new Map<string, Promise<SeasonDoc | null>>(),
+    rarities: new Map<string, Promise<RarityDoc | null>>(),
+  },
+) {
   const id = docIdToString(doc._id);
-  const seasonDoc = doc.seasonId ? await ctx.db.get(doc.seasonId) : null;
-  const rarityDoc = doc.rarityId ? await ctx.db.get(doc.rarityId) : null;
+  if (!cache.seasons.has(doc.seasonId))
+    cache.seasons.set(doc.seasonId, ctx.db.get(doc.seasonId));
+  if (!cache.rarities.has(doc.rarityId))
+    cache.rarities.set(doc.rarityId, ctx.db.get(doc.rarityId));
+  const seasonDoc = await cache.seasons.get(doc.seasonId);
+  const rarityDoc = await cache.rarities.get(doc.rarityId);
   const seasonInfo = seasonDoc ? seasonRecordToClient(seasonDoc) : null;
   const rarityInfo = rarityDoc ? rarityRecordToClient(rarityDoc) : null;
 

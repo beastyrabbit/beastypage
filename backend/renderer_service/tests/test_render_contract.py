@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+
 from renderer_service.app import create_app
 from renderer_service.config import settings
 from renderer_service.render_contract import check_manifest

@@ -12,6 +12,7 @@ export async function processImage(
   mode: ProcessMode,
   outputFormat: "png" | "jpeg" | "webp" = "png",
   outputQuality = 90,
+  signal?: AbortSignal,
 ): Promise<ProcessResponse> {
   const body: ProcessRequest = {
     image,
@@ -25,6 +26,7 @@ export async function processImage(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok) {

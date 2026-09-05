@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
@@ -68,10 +68,18 @@ type MassUploadModalProps = {
 };
 
 export default function CatdexPage() {
-  const cats = useQuery(api.catdex.list, {});
+  const {
+    results: cats,
+    status: pageStatus,
+    loadMore,
+  } = usePaginatedQuery(
+    api.catdex.page,
+    { approved: true },
+    { initialNumItems: 48 },
+  );
   const seasons = useQuery(api.seasons.list, {});
   const rarities = useQuery(api.rarities.list, {});
-  const pendingCount = useQuery(api.catdex.pendingCount, {});
+  const hasPending = useQuery(api.catdex.hasPending, {});
   const createCatMutation = useMutation(api.catdex.create);
 
   const [search, setSearch] = useState("");
@@ -247,7 +255,10 @@ export default function CatdexPage() {
   }, [activeCat]);
 
   const isLoading =
-    !cats || !seasons || !rarities || typeof pendingCount === "undefined";
+    pageStatus === "LoadingFirstPage" ||
+    !seasons ||
+    !rarities ||
+    typeof hasPending === "undefined";
 
   const { filteredCats, stats } = useMemo(() => {
     if (!cats) {
@@ -335,10 +346,12 @@ export default function CatdexPage() {
           <span
             className={cn(
               "rounded-full border border-amber-400/30 bg-slate-950/60 px-3 py-1",
-              (pendingCount ?? 0) > 0 ? "text-amber-200" : "text-neutral-300",
+              hasPending ? "text-amber-200" : "text-neutral-300",
             )}
           >
-            {(pendingCount ?? 0).toLocaleString()} pending approvals
+            {hasPending
+              ? "Submissions awaiting approval"
+              : "No pending approvals"}
           </span>
         </div>
       </section>
@@ -449,6 +462,19 @@ export default function CatdexPage() {
             </div>
           )}
           <div className="ml-auto flex items-center gap-2 text-xs">
+            <span>
+              {cats.length} cards loaded. Filters and sorting apply to loaded
+              cards.
+            </span>
+            {pageStatus !== "Exhausted" && (
+              <button
+                type="button"
+                disabled={pageStatus !== "CanLoadMore"}
+                onClick={() => loadMore(48)}
+              >
+                {pageStatus === "LoadingMore" ? "Loading…" : "Load more cards"}
+              </button>
+            )}
             <button
               type="button"
               onClick={handleSubmitButtonClick}

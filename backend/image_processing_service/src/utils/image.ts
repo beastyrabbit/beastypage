@@ -33,9 +33,10 @@ export function bufferToDataUrl(buffer: Buffer, format: string): string {
 export async function validateDimensions(
   buffer: Buffer,
 ): Promise<{ width: number; height: number }> {
-  const metadata = await sharp(buffer).metadata();
+  const metadata = await sharp(buffer, { limitInputPixels: config.maxPixels }).metadata();
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
+  if (width * height * (metadata.pages ?? 1) > config.maxPixels) throw new ProcessingError(`Image exceeds ${config.maxPixels} decoded pixels`);
 
   if (width === 0 || height === 0) {
     throw new ProcessingError("Unable to read image dimensions");

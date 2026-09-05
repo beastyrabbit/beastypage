@@ -1,5 +1,10 @@
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.hoisted(() => {
+  process.env.RENDERER_INTERNAL_URL = "http://127.0.0.1:8001";
+});
+
 import { proxyRendererJson } from "@/app/api/renderer/_lib/proxy";
 
 describe("renderer proxy", () => {

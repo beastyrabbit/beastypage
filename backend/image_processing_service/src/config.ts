@@ -15,7 +15,10 @@ export const config = {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),
-  maxImageSize: envInt("MAX_IMAGE_SIZE", 52_428_800),
+  maxImageSize: Math.min(10_485_760, Math.max(1, envInt("MAX_IMAGE_SIZE", 10_485_760))),
+  maxPixels: Math.min(4_000_000, Math.max(1, envInt("MAX_PIXELS", 4_000_000))),
+  maxPixelWork: 32_000_000,
+  workers: Math.min(2, Math.max(1, envInt("WORKERS", 2))),
   maxDimension: envInt("MAX_DIMENSION", 8000),
   previewMaxDimension: envInt("PREVIEW_MAX_DIMENSION", 1200),
   requestTimeout: envInt("REQUEST_TIMEOUT", 30_000),

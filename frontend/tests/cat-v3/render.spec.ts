@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, inject, it } from "vitest";
 
 import { renderCatV3 } from "@/lib/cat-v3/api";
 
-const baseUrl = process.env.RENDERER_BASE_URL;
+const baseUrl = inject("rendererBaseUrl");
 
 // Skip tests if RENDERER_BASE_URL is not set
-describe.skipIf(!baseUrl)("renderer-service", () => {
+describe("renderer-service", () => {
   it("returns a PNG data URL for a simple cat", async () => {
     const result = await renderCatV3(
       {

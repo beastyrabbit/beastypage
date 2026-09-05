@@ -257,9 +257,9 @@ export const resolveUsernames = query({
 });
 
 /**
- * Delete the authenticated user's account.
+ * Remove one bounded batch of the authenticated user's saved variants.
  */
-export const deleteAccount = mutation({
+export const resetSavedVariants = mutation({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -276,11 +276,11 @@ export const deleteAccount = mutation({
     const variants = await ctx.db
       .query("user_variants")
       .withIndex("byUserTool", (q) => q.eq("userId", user._id))
-      .collect();
+      .take(100);
     for (const variant of variants) {
       await ctx.db.delete(variant._id);
     }
 
-    await ctx.db.delete(user._id);
+    return { remaining: variants.length === 100 };
   },
 });

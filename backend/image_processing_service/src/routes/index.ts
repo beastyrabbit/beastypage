@@ -6,14 +6,8 @@ import {
   DetectGridRequest,
   HealthResponse,
 } from "../models.ts";
-import { executePipeline } from "../pipeline/executor.ts";
-import { detectGrid } from "../detection/grid-detector.ts";
-import {
-  parseDataUrl,
-  bufferToDataUrl,
-  validateDimensions,
-  downscaleForPreview,
-} from "../utils/image.ts";
+import { runJob } from "../workers.ts";
+import { bodyLimit } from "hono/body-limit";
 import { config } from "../config.ts";
 import { generateOpenAPISpec } from "../openapi.ts";
 
@@ -21,6 +15,7 @@ const startTime = Date.now();
 const openApiSpec = generateOpenAPISpec();
 
 export const routes = new Hono();
+routes.use("*", bodyLimit({ maxSize: Math.ceil(config.maxImageSize * 4 / 3) + 65_536 }));
 
 // ---------------------------------------------------------------------------
 // GET /openapi.json
@@ -49,38 +44,7 @@ routes.post(
   "/process",
   zValidator("json", ProcessRequest),
   async (c) => {
-    const start = performance.now();
-    const req = c.req.valid("json");
-
-    const { buffer: rawBuffer } = parseDataUrl(req.image);
-    await validateDimensions(rawBuffer);
-
-    // Preview mode: downscale before processing
-    let imageBuffer = rawBuffer;
-    if (req.mode === "preview") {
-      const result = await downscaleForPreview(rawBuffer, config.previewMaxDimension);
-      imageBuffer = result.buffer;
-    }
-
-    const { result, stepsProcessed, width, height } = await executePipeline(
-      imageBuffer,
-      req.pipeline.steps,
-      req.outputFormat,
-      req.outputQuality,
-    );
-
-    const dataUrl = bufferToDataUrl(result, req.outputFormat);
-    const duration = Math.round(performance.now() - start);
-
-    return c.json({
-      image: dataUrl,
-      meta: {
-        duration_ms: duration,
-        width,
-        height,
-        steps_processed: stepsProcessed,
-      },
-    });
+    return c.json(await runJob("process", c.req.valid("json"), c.req.raw.signal));
   },
 );
 
@@ -91,11 +55,6 @@ routes.post(
   "/detect-grid",
   zValidator("json", DetectGridRequest),
   async (c) => {
-    const req = c.req.valid("json");
-    const { buffer } = parseDataUrl(req.image);
-    await validateDimensions(buffer);
-
-    const result = await detectGrid(buffer);
-    return c.json(result);
+    return c.json(await runJob("detect", c.req.valid("json"), c.req.raw.signal));
   },
 );

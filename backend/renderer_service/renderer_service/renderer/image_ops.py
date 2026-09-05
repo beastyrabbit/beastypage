@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import numpy as np
-from typing import Sequence
+from collections.abc import Sequence
 
+import numpy as np
 from PIL import Image, ImageChops
 
 
@@ -45,7 +45,13 @@ def screen(base: Image.Image, overlay: Image.Image) -> Image.Image:
     base_arr = np.asarray(base, dtype=np.float32) / 255.0
     overlay_arr = np.asarray(overlay, dtype=np.float32) / 255.0
     rgb = 1.0 - (1.0 - base_arr[..., :3]) * (1.0 - overlay_arr[..., :3])
-    alpha = np.clip(base_arr[..., 3:] + overlay_arr[..., 3:] - base_arr[..., 3:] * overlay_arr[..., 3:], 0.0, 1.0)
+    alpha = np.clip(
+        base_arr[..., 3:]
+        + overlay_arr[..., 3:]
+        - base_arr[..., 3:] * overlay_arr[..., 3:],
+        0.0,
+        1.0,
+    )
     result = np.concatenate([rgb, alpha], axis=-1)
     result = np.clip(np.rint(result * 255.0), 0, 255).astype(np.uint8)
     return Image.fromarray(result, mode="RGBA")
@@ -60,7 +66,10 @@ def alpha_over(base: Image.Image, overlay: Image.Image) -> Image.Image:
     inverse_overlay = 1.0 - alpha_overlay
     alpha_out = alpha_overlay + alpha_base * inverse_overlay
 
-    numerator = overlay_arr[..., :3] * alpha_overlay + base_arr[..., :3] * alpha_base * inverse_overlay
+    numerator = (
+        overlay_arr[..., :3] * alpha_overlay
+        + base_arr[..., :3] * alpha_base * inverse_overlay
+    )
     safe_alpha = np.where(alpha_out > 0, alpha_out, 1.0)
     rgb_out = numerator / safe_alpha
     rgb_out = np.where(alpha_out > 0, rgb_out, 0.0)
@@ -74,7 +83,6 @@ def apply_mask(image: Image.Image, mask: Image.Image) -> Image.Image:
     base = np.asarray(ensure_rgba(image), dtype=np.uint16)
     mask_alpha = np.asarray(ensure_rgba(mask).split()[3], dtype=np.uint16)
     # scale RGB by mask alpha to avoid residual colour
-    mask_factor = mask_alpha.astype(np.float32) / 255.0
     image_alpha = base[..., 3].astype(np.uint16)
     new_alpha = (image_alpha * mask_alpha) // 255
     base[..., 3] = new_alpha
@@ -98,11 +106,17 @@ def erase_with_mask(image: Image.Image, mask: Image.Image) -> Image.Image:
     return Image.fromarray(base, mode="RGBA")
 
 
-def fill_with_colour(size: tuple[int, int], colour: tuple[int, int, int, int], alpha_source: Image.Image | None = None) -> Image.Image:
+def fill_with_colour(
+    size: tuple[int, int],
+    colour: tuple[int, int, int, int],
+    alpha_source: Image.Image | None = None,
+) -> Image.Image:
     r, g, b, a = colour
     overlay = Image.new("RGBA", size, (r, g, b, 255))
     if alpha_source is not None:
-        alpha_arr = np.asarray(ensure_rgba(alpha_source).split()[3], dtype=np.float32) / 255.0
+        alpha_arr = (
+            np.asarray(ensure_rgba(alpha_source).split()[3], dtype=np.float32) / 255.0
+        )
         if a < 255:
             alpha_arr = alpha_arr * (a / 255.0)
         overlay_alpha = np.clip(np.rint(alpha_arr * 255.0), 0, 255).astype(np.uint8)
@@ -156,7 +170,9 @@ def apply_missing_scar(canvas: Image.Image, mask: Image.Image) -> Image.Image:
     return Image.fromarray(result, mode="RGBA")
 
 
-def tint_image(image: Image.Image, colour: Sequence[int], mode: str = "multiply") -> Image.Image:
+def tint_image(
+    image: Image.Image, colour: Sequence[int], mode: str = "multiply"
+) -> Image.Image:
     arr = np.asarray(ensure_rgba(image), dtype=np.float32) / 255.0
     rgb = arr[..., :3]
     alpha = arr[..., 3:]

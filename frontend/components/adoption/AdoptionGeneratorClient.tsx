@@ -39,6 +39,7 @@ interface LegacyBatchPayload {
 }
 
 type AdoptionCatPayload = {
+  editToken?: string;
   label: string;
   catData: unknown;
   profileId?: Id<"cat_profile">;
@@ -83,6 +84,7 @@ export function AdoptionGeneratorClient() {
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [generationComplete, setGenerationComplete] = useState(false);
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
+  const [batchEditToken, setBatchEditToken] = useState<string>();
   const [savedMetadata, setSavedMetadata] = useState<AdoptionMetadata>({
     title: "",
     creator: "",
@@ -170,39 +172,19 @@ export function AdoptionGeneratorClient() {
                   : `Cat ${index + 1}`;
                 const encoded =
                   typeof cat.encoded === "string" ? cat.encoded : undefined;
-                let shareToken =
-                  typeof cat.shareToken === "string"
-                    ? cat.shareToken
-                    : undefined;
-                let profileIdStr =
-                  typeof cat.profileId === "string" ? cat.profileId : undefined;
-
-                if (!shareToken || !profileIdStr) {
-                  try {
-                    const mapperResult = await createMapper({
-                      catData: catDataToLegacyPersistence(
-                        cat.catData as Record<string, unknown>,
-                      ),
-                      catName: cat.catName ?? undefined,
-                      creatorName: cat.creatorName ?? undefined,
-                    });
-                    if (mapperResult && typeof mapperResult === "object") {
-                      const mapperPayload = mapperResult as {
-                        id: string;
-                        shareToken?: string | null;
-                        slug?: string | null;
-                      };
-                      shareToken =
-                        shareToken ??
-                        mapperPayload.shareToken ??
-                        mapperPayload.slug ??
-                        mapperPayload.id;
-                      profileIdStr = profileIdStr ?? mapperPayload.id;
-                    }
-                  } catch (error) {
-                    console.warn("Failed to persist adoption cat", error);
-                  }
-                }
+                // The generator payload carries viewing links, not editing authority.
+                // Create a profile whose capability belongs to this save operation.
+                const profile = await createMapper({
+                  catData: catDataToLegacyPersistence(
+                    cat.catData as Record<string, unknown>,
+                  ),
+                  catName: cat.catName ?? undefined,
+                  creatorName: cat.creatorName ?? undefined,
+                });
+                const profileIdStr = profile.id;
+                const shareToken =
+                  profile.shareToken ?? profile.slug ?? profile.id;
+                const editToken = profile.editToken ?? undefined;
 
                 return {
                   label,
@@ -214,6 +196,7 @@ export function AdoptionGeneratorClient() {
                     : undefined,
                   encoded,
                   shareToken,
+                  editToken,
                   catName: cat.catName ?? undefined,
                   creatorName: cat.creatorName ?? undefined,
                 } satisfies AdoptionCatPayload;
@@ -245,6 +228,7 @@ export function AdoptionGeneratorClient() {
               setLastSavedToken(token);
               setLastSavedAt(Date.now());
               setLastSavedId(result.id ?? null);
+              setBatchEditToken(result.editToken);
             }
             setMetadataError(null);
             setMetadataMessage(null);
@@ -319,6 +303,7 @@ export function AdoptionGeneratorClient() {
         setMetadataError(null);
         await updateBatchMeta({
           id: lastSavedId as Id<"adoption_batch">,
+          editToken: batchEditToken,
           title: nextMetadata.title,
           creatorName: nextMetadata.creator,
         });
@@ -332,7 +317,7 @@ export function AdoptionGeneratorClient() {
         setMetadataSaving(false);
       }
     },
-    [lastSavedId, savedMetadata, updateBatchMeta],
+    [lastSavedId, batchEditToken, savedMetadata, updateBatchMeta],
   );
 
   const statusNode = (() => {

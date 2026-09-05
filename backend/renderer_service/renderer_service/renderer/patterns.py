@@ -10,7 +10,7 @@ import logging
 import math
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Literal, Optional, Tuple
+from typing import Literal
 
 import numpy as np
 
@@ -90,7 +90,7 @@ SPRITE_SIZE = 50
 
 @dataclass(frozen=True)
 class PatternStripe:
-    color: Tuple[int, int, int]
+    color: tuple[int, int, int]
     width: int
     offset: int
 
@@ -99,9 +99,9 @@ class PatternStripe:
 class PatternDefinition:
     type: PatternType
     tile_size: int
-    background: Tuple[int, int, int]
-    foreground: Optional[Tuple[int, int, int]] = None
-    stripes: Tuple[PatternStripe, ...] = field(default_factory=tuple)
+    background: tuple[int, int, int]
+    foreground: tuple[int, int, int] | None = None
+    stripes: tuple[PatternStripe, ...] = field(default_factory=tuple)
     spacing: int = 6
 
     @staticmethod
@@ -155,7 +155,7 @@ class PatternDefinition:
 # ---------------------------------------------------------------------------
 
 
-def _c(rgb: Tuple[int, int, int]) -> np.ndarray:
+def _c(rgb: tuple[int, int, int]) -> np.ndarray:
     """Convert 0-255 int tuple to 0-1 float32 array."""
     return np.array(rgb, dtype=np.float32) / 255.0
 
@@ -164,7 +164,7 @@ def _fg(defn: PatternDefinition) -> np.ndarray:
     return _c(defn.foreground or (255, 255, 255))
 
 
-def _svg_rgb(rgb: Tuple[int, int, int]) -> str:
+def _svg_rgb(rgb: tuple[int, int, int]) -> str:
     """Format an RGB tuple as an SVG color string."""
     return f"rgb({rgb[0]},{rgb[1]},{rgb[2]})"
 

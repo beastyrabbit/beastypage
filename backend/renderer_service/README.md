@@ -1,7 +1,6 @@
 # Renderer Service (CatGenerator V3 backend)
 
-FastAPI service that reproduces the Lifegen sprite renderer for CatGenerator V3. It loads atlases copied from the
-upstream game (`backend/renderer_service/sprites`) and exposes an API for rendering and inspecting layer diagnostics.
+FastAPI service that reproduces the Lifegen sprite renderer for CatGenerator V3. It loads the canonical atlases from `frontend/public/sprites` in a checkout and exposes an API for rendering and inspecting layer diagnostics.
 
 ## Project layout
 
@@ -60,7 +59,7 @@ uv sync                                   # install dependencies once
 uv run uvicorn renderer_service.app.main:app --reload --host 127.0.0.1 --port 8001
 ```
 
-* The service defaults to the bundled `sprites/` directory. Override with `CG3_SPRITE_ROOT=/path/to/sprites`.
+* Sprite discovery prefers `frontend/public/sprites`, then the bundled `sprites/` directory. Override with `CG3_SPRITE_ROOT`. Sprite and atlas caches are in memory. There is no render-result or disk cache.
 * `/health` returns a liveness probe plus queue metrics (`queue_size`, `circuit_open`, etc.). `/render` accepts Cat Generator V3 JSON payloads.
 
 ### Runtime observability
@@ -84,27 +83,23 @@ When the queue approaches capacity or the circuit opens, FastAPI logs (`renderer
 
 ### During frontend development
 
-The Next.js app proxies to the renderer:
-
-```sh
-cd frontend
-pnpm run backend:test-server   # starts uvicorn on the configured port (8001 by default)
-pnpm run dev                   # launches Next.js + renderer concurrently
-```
-
-Vitest spins the renderer automatically when `pnpm run test` is executed (set `CG3_SKIP_RENDERER_BOOT=1` to reuse an
-already running instance).
+Use `pnpm dev` from the repository root for the configured full stack, or run the renderer separately with `pnpm dev:renderer`.
+`pnpm --dir frontend dev` starts only Next.js. See the [root setup guide](../../README.md).
 
 ## Testing
 
 ```sh
-# Backend unit tests
-uv run --directory backend/renderer_service pytest
-
-# Frontend renderer smoke test
-cd frontend
-pnpm run test
+uv run --project backend/renderer_service --frozen --extra dev pytest backend/renderer_service/tests
+pnpm --dir frontend exec vitest run --project renderer
 ```
+
+The frontend integration project owns an ephemeral-port renderer and verifies its catalog and manifest hashes. Unit tests do not start Python. No shared listener or lock file is reused.
+
+## Request limits and options
+
+Batches accept at most 256 total frames, tiles up to 1024 pixels, and a 16 million pixel working budget including sheet padding, source copies, and layer extraction. Validation runs before queue admission.
+Only PNG HTTP output is supported. `collectLayers` returns layers, `includeLayerImages` embeds their PNGs, and `diagnostics=false` suppresses per-layer notes and timing. Batch `params` merge over the base, then `overrides` win. Omitted values retain the base; empty lists and false explicitly clear traits.
+`expandVariants=true` is rejected. Callers must send explicit variants.
 
 ## Deployment
 

@@ -2,7 +2,7 @@
 
 import { useQuery } from "convex/react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
@@ -17,18 +17,19 @@ export default function CollectionPage() {
   const [search, setSearch] = useState("");
   const [activeEntry, setActiveEntry] = useState<CollectionEntry | null>(null);
 
+  const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    if (!activeEntry) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setActiveEntry(null);
-      }
+    if (!activeEntry || !dialogRef.current) return;
+    const dialog = dialogRef.current;
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    dialog.showModal();
+    return () => {
+      dialog.close();
+      opener?.focus();
     };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeEntry]);
 
   const isLoading = !entries;
@@ -124,16 +125,13 @@ export default function CollectionPage() {
                 key={entry.id}
                 className="glass-card group flex cursor-pointer flex-col overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:border-sky-500/30 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
                 style={{ animationDelay: `${index * 50}ms` }}
-                onClick={() => setActiveEntry(entry)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return;
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    setActiveEntry(entry);
-                  }
-                }}
               >
-                <div className="relative aspect-video overflow-hidden bg-muted">
+                <button
+                  type="button"
+                  aria-label={`Open ${entry.animal ?? "artwork"} by ${entry.artist_name}`}
+                  onClick={() => setActiveEntry(entry)}
+                  className="relative aspect-video overflow-hidden bg-muted focus-visible:outline-2 focus-visible:outline-sky-400"
+                >
                   <ProgressiveImage
                     lowSrc={blur}
                     highSrc={preview}
@@ -147,7 +145,7 @@ export default function CollectionPage() {
                   <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur-md border border-white/10">
                     {entry.animal ?? "Unknown"}
                   </span>
-                </div>
+                </button>
                 <div className="flex flex-1 flex-col gap-2 p-5">
                   <h3 className="text-lg font-bold capitalize text-foreground group-hover:text-sky-400 transition-colors">
                     {entry.artist_name}
@@ -179,30 +177,35 @@ export default function CollectionPage() {
       </footer>
 
       {activeEntry && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-10 backdrop-blur-md animate-in fade-in duration-300"
-          role="button"
-          tabIndex={0}
+        <dialog
+          ref={dialogRef}
+          aria-labelledby="artwork-dialog-title"
+          onCancel={() => setActiveEntry(null)}
+          onKeyDown={(event) => {
+            if (event.key !== "Tab") return;
+            const controls = Array.from(
+              event.currentTarget.querySelectorAll<HTMLElement>(
+                'button:not([disabled]), a[href], [tabindex="0"]',
+              ),
+            ).filter((el) => el.getClientRects().length > 0);
+            const first = controls[0];
+            const last = controls.at(-1);
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first?.focus();
+            }
+          }}
+          className="fixed inset-0 m-0 h-screen w-screen max-h-none max-w-none border-0 flex items-center justify-center bg-black/80 px-4 py-10 backdrop-blur-md"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               setActiveEntry(null);
             }
           }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              setActiveEntry(null);
-            }
-            if (
-              (event.key === "Enter" || event.key === " ") &&
-              event.target === event.currentTarget
-            ) {
-              event.preventDefault();
-              setActiveEntry(null);
-            }
-          }}
         >
-          <div className="glass-card relative w-full max-w-5xl overflow-hidden shadow-2xl border-white/20 animate-in zoom-in-95 duration-300">
+          <div className="glass-card relative w-full max-w-5xl max-h-full overflow-y-auto shadow-2xl border-white/20 animate-in zoom-in-95 duration-300">
             <button
               type="button"
               className="absolute right-4 top-4 z-20 rounded-full bg-black/50 p-2 text-white shadow-lg transition hover:bg-black/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white backdrop-blur-md border border-white/10"
@@ -211,7 +214,7 @@ export default function CollectionPage() {
             >
               <XIcon size={20} />
             </button>
-            <div className="grid gap-6 p-6 md:grid-cols-[1.4fr,1fr]">
+            <div className="grid gap-6 p-6 md:grid-cols-[1.4fr_1fr]">
               <ProgressiveImage
                 lowSrc={
                   absoluteUrl(activeEntry.blur_img) ??
@@ -223,14 +226,17 @@ export default function CollectionPage() {
                   absoluteUrl(activeEntry.preview_img)
                 }
                 alt={activeEntry.animal ?? "Artwork"}
-                className="w-full overflow-hidden rounded-2xl bg-muted shadow-lg"
+                className="w-full max-h-[60vh] overflow-hidden rounded-2xl bg-muted shadow-lg"
                 imgStyle={{
                   objectPosition: `${activeEntry.focusX}% ${activeEntry.focusY}%`,
                 }}
               />
               <div className="flex flex-col gap-6 py-4">
                 <div>
-                  <h2 className="text-3xl font-bold capitalize text-gradient-collection inline-block">
+                  <h2
+                    id="artwork-dialog-title"
+                    className="text-3xl font-bold capitalize text-gradient-collection inline-block"
+                  >
                     {activeEntry.artist_name}
                   </h2>
                 </div>
@@ -272,7 +278,7 @@ export default function CollectionPage() {
               </div>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </main>
   );

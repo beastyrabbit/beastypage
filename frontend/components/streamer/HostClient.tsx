@@ -1,6 +1,7 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { SignInButton } from "@clerk/nextjs";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import {
   ClipboardCopy,
   Loader2,
@@ -126,6 +127,21 @@ function formatRelativeTime(timestamp?: number) {
 }
 
 export function HostClient() {
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  if (isLoading) return <p>Loading host account…</p>;
+  if (!isAuthenticated)
+    return (
+      <div className="p-8">
+        <p>Sign in to host a voting session.</p>
+        <SignInButton>
+          <button type="button">Sign in</button>
+        </SignInButton>
+      </div>
+    );
+  return <AuthenticatedHostClient />;
+}
+
+function AuthenticatedHostClient() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [localState, setLocalState] = useState<StreamerState>(() => ({
     params: getDefaultStreamParams(),
@@ -526,6 +542,11 @@ export function HostClient() {
         await updateSession({
           id: toId("stream_sessions", activeSessionId),
           params,
+          allowedOptions:
+            createStreamSteps({ params })
+              .find((step) => step.id === session.current_step)
+              ?.getOptions({ params, history: session.step_history ?? [] })
+              .map((option) => option.key) ?? [],
         });
       } catch (error) {
         console.error("Failed to update session params", error);
@@ -605,6 +626,7 @@ export function HostClient() {
           sessionId: toId("stream_sessions", activeSessionId),
           stepId: currentStep.id,
           optionKey: option.key,
+          voteRound: session.vote_round,
           optionMeta: {
             label: option.label,
             step: currentStep.title,
@@ -799,6 +821,7 @@ export function HostClient() {
           sessionId: toId("stream_sessions", activeSessionId),
           stepId: currentStep.id,
           optionKey: winnerRow.option.key,
+          voteRound: session?.vote_round,
           optionMeta: {
             label: winnerRow.option.label,
             step: currentStep.title,

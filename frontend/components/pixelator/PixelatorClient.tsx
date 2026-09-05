@@ -8,7 +8,14 @@ import {
   pointerWithin,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 import { ImageUploader } from "@/components/color-palette/ImageUploader";
@@ -19,6 +26,7 @@ import {
   loadImageFromUrl,
 } from "@/lib/color-extraction/image-processing";
 import { processImage } from "@/lib/pixelator/api";
+import { repairPipeline } from "@/lib/pixelator/pipeline";
 import {
   OPERATIONS,
   type OperationType,
@@ -89,6 +97,28 @@ export function PixelatorClient() {
   const [draggedOp, setDraggedOp] = useState<OperationType | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const imageLoadRef = useRef(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: These values identify the result to invalidate, even though the cleanup only reads refs.
+  useLayoutEffect(() => {
+    abortRef.current?.abort();
+    setState((prev) => ({
+      ...prev,
+      processing: false,
+      resultDataUrl: null,
+      lastDuration: null,
+      error: null,
+    }));
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, [state.imageDataUrl, state.steps, state.processMode]);
+  useEffect(
+    () => () => {
+      imageLoadRef.current++;
+    },
+    [],
+  );
+
   // ---- Variant system ----
   const variants = useVariants<PixelatorSettings>({
     storageKey: "pixelator-variants",
@@ -108,7 +138,7 @@ export function PixelatorClient() {
   const applyConfig = useCallback((settings: PixelatorSettings) => {
     setState((prev) => ({
       ...prev,
-      steps: settings.pipeline.steps,
+      steps: repairPipeline(settings.pipeline.steps),
       pixelArtMode: settings.pixelArtMode,
       pixelArtGridSize: settings.pixelArtGridSize,
       resultDataUrl: null,
@@ -125,13 +155,16 @@ export function PixelatorClient() {
 
   // ---- Image loading ----
   const handleImageLoad = useCallback(async (source: File | string) => {
+    const generation = ++imageLoadRef.current;
+    abortRef.current?.abort();
     try {
       const img =
         source instanceof File
           ? await loadImageFromFile(source)
           : await loadImageFromUrl(source);
 
-      const dataUrl = imageToDataUrl(img, 4000);
+      if (generation !== imageLoadRef.current) return;
+      const dataUrl = imageToDataUrl(img, 2000);
 
       setState((prev) => ({
         ...prev,
@@ -171,7 +204,7 @@ export function PixelatorClient() {
       if (steps.length > 1) {
         step.inputSource = steps[steps.length - 2]?.id;
       }
-      return { ...prev, steps };
+      return { ...prev, steps: repairPipeline(steps) };
     });
   }, []);
 
@@ -179,7 +212,9 @@ export function PixelatorClient() {
     (id: string, updates: Partial<PipelineStep>) => {
       setState((prev) => ({
         ...prev,
-        steps: prev.steps.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+        steps: repairPipeline(
+          prev.steps.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+        ),
       }));
     },
     [],
@@ -190,51 +225,43 @@ export function PixelatorClient() {
       const filtered = prev.steps.filter((s) => s.id !== id);
       return {
         ...prev,
-        steps: filtered.map((s) => ({
-          ...s,
-          inputSource:
-            s.inputSource !== "original" &&
-            !filtered.some((f) => f.id === s.inputSource)
-              ? "original"
-              : s.inputSource,
-          blendWith:
-            s.blendWith && !filtered.some((f) => f.id === s.blendWith?.stepId)
-              ? null
-              : s.blendWith,
-        })),
+        steps: repairPipeline(filtered),
       };
     });
   }, []);
 
   const reorderSteps = useCallback((steps: PipelineStep[]) => {
-    setState((prev) => ({ ...prev, steps }));
+    setState((prev) => ({ ...prev, steps: repairPipeline(steps) }));
   }, []);
 
   // ---- Processing ----
   const handleProcess = useCallback(
     async (mode: ProcessMode, image: string, steps: PipelineStep[]) => {
-      const enabledSteps = steps.filter((s) => s.enabled);
-      if (!image || enabledSteps.length === 0) return;
-
-      // Fix inputSource refs that point to disabled/missing steps
-      const enabledIds = new Set(enabledSteps.map((s) => s.id));
-      const sanitizedSteps = enabledSteps.map((s, i) => {
-        if (s.inputSource !== "original" && !enabledIds.has(s.inputSource)) {
-          // Fall back to previous enabled step or "original"
-          const prev = i > 0 ? enabledSteps[i - 1]! : null;
-          return { ...s, inputSource: prev?.id ?? "original" };
-        }
-        return s;
-      });
-
       abortRef.current?.abort();
+      const sanitizedSteps = repairPipeline(steps).filter((s) => s.enabled);
+      if (!image || sanitizedSteps.length === 0) {
+        setState((prev) => ({
+          ...prev,
+          resultDataUrl: null,
+          processing: false,
+          lastDuration: null,
+        }));
+        return;
+      }
       const controller = new AbortController();
       abortRef.current = controller;
 
       setState((prev) => ({ ...prev, processing: true, error: null }));
 
       try {
-        const res = await processImage(image, { steps: sanitizedSteps }, mode);
+        const res = await processImage(
+          image,
+          { steps: sanitizedSteps },
+          mode,
+          "png",
+          90,
+          controller.signal,
+        );
 
         if (controller.signal.aborted) return;
 
@@ -331,7 +358,10 @@ export function PixelatorClient() {
           const oldIndex = prev.steps.findIndex((s) => s.id === active.id);
           const newIndex = prev.steps.findIndex((s) => s.id === over.id);
           if (oldIndex === -1 || newIndex === -1) return prev;
-          return { ...prev, steps: arrayMove(prev.steps, oldIndex, newIndex) };
+          return {
+            ...prev,
+            steps: repairPipeline(arrayMove(prev.steps, oldIndex, newIndex)),
+          };
         });
       }
     },
@@ -368,14 +398,17 @@ export function PixelatorClient() {
               resultUrl={state.resultDataUrl}
               processing={state.processing}
               lastDuration={state.lastDuration}
-              onChangeImage={() =>
+              onChangeImage={() => {
+                imageLoadRef.current++;
+                abortRef.current?.abort();
                 setState((prev) => ({
                   ...prev,
                   imageDataUrl: null,
                   resultDataUrl: null,
                   lastDuration: null,
-                }))
-              }
+                  processing: false,
+                }));
+              }}
               showGrid={state.pixelArtMode}
               gridSize={state.pixelArtGridSize}
             />

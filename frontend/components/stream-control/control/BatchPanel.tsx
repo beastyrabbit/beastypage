@@ -300,6 +300,7 @@ export function BatchPanel() {
               label: `Cat ${index + 1}`,
               catData: catDataToLegacyPersistence(cat.catData),
               profileId: toId("cat_profile", mapperResult.id),
+              editToken: mapperResult.editToken ?? undefined,
               encoded: encodeCatShare(
                 cat.catData as unknown as Parameters<typeof encodeCatShare>[0],
               ),

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Tuple
-
-Colour = Tuple[int, int, int, int]
+Colour = tuple[int, int, int, int]
 
 # Approximate RGBA mappings for the most common Lifegen colour names.
 COLOUR_TABLE: dict[str, Colour] = {

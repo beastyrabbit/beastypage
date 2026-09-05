@@ -4,40 +4,32 @@ Next.js app that powers the Catdex, history tools, and collection gallery.
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 22+
+- [Node.js](https://nodejs.org/) 24+
 - [pnpm](https://pnpm.io/) 10+
 - [Convex CLI](https://docs.convex.dev/quickstart)
 
-## Local Setup
+## Local setup
+
+Use the [root setup guide](../README.md) for the full stack and secret configuration.
+The normal stack uses the configured Convex development deployment. It does not start a local database.
 
 ```bash
-cd frontend
-pnpm install
-pnpm run prepare   # runs `convex codegen`
-```
-
-In one terminal start the Convex dev server:
-
-```bash
-pnpm run convex:dev
-```
-
-In another terminal start the web+renderer stack:
-
-```bash
+pnpm install --frozen-lockfile --ignore-scripts
 pnpm run dev
 ```
 
-The site runs at http://localhost:3000, the renderer service at http://localhost:8001, and Convex at http://localhost:3210.
-
-## Key Scripts
+This starts Next.js through Portless. Use the URL printed in the terminal.
+The renderer runs separately through the root `pnpm dev` or `pnpm dev:renderer` command.
+`pnpm run convex:dev` synchronizes functions to the selected Convex deployment and requires authentication.
 
 | Command | Description |
 | ------- | ----------- |
-| `pnpm run dev` | Next.js app + renderer service (via `concurrently`). |
-| `pnpm run convex:dev` | Runs Convex dev server locally. |
-| `pnpm run lint` | Lint check. |
-| `pnpm run build` | Production build (Next.js + Convex bundling). |
+| `pnpm run dev` | Start Next.js through Portless. |
+| `pnpm run typecheck` | Generate local version metadata and check TypeScript, without network access. |
+| `pnpm run lint` | Check the configured first-party lint scope. |
+| `pnpm exec vitest run --project unit` | Unit tests without a renderer or Python dependency. |
+| `pnpm exec vitest run --project renderer` | Start one owned renderer on an ephemeral port, verify its contract, test, and await shutdown. |
+| `pnpm run build` | Generate local metadata and build Next.js. Does not deploy Convex. |
 
 ## Progressive Media Loading
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from .renderer.contracts import CatDocument
 
@@ -27,7 +27,7 @@ class LayerIdentifier(str, Enum):
 
 
 class RenderOptions(BaseModel):
-    output_format: Literal["png", "pil", "array"] = Field(
+    output_format: Literal["png"] = Field(
         "png",
         description="Desired render output format",
         alias="outputFormat",
@@ -121,7 +121,7 @@ class BatchVariant(BaseModel):
     )
     params: dict[str, JsonValue] | None = Field(
         default=None,
-        description="Full parameter object for this variant; takes precedence over overrides",
+        description="Parameters merged over the base; overrides are applied last",
     )
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
@@ -133,6 +133,7 @@ class BatchRenderOptions(BaseModel):
         alias="tileSize",
         description="Output tile size in pixels. Defaults to renderer tile size (50).",
         ge=1,
+        le=1024,
     )
     columns: int | None = Field(
         default=None,
@@ -159,10 +160,10 @@ class BatchRenderOptions(BaseModel):
         alias="layerId",
         description="When frameMode is 'layer', specify which layer identifier to extract.",
     )
-    expand_variants: bool = Field(
+    expand_variants: Literal[False] = Field(
         default=False,
         alias="expandVariants",
-        description="When true and variants are omitted, the backend expands all known variants for the requested layer.",
+        description="Deprecated. Supply explicit variants; automatic expansion is unsupported.",
     )
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
@@ -170,8 +171,25 @@ class BatchRenderOptions(BaseModel):
 
 class BatchRenderRequest(BaseModel):
     payload: RenderParams
-    variants: list[BatchVariant] = Field(default_factory=list)
+    variants: list[BatchVariant] = Field(default_factory=list, max_length=256)
     options: BatchRenderOptions | None = None
+
+    @model_validator(mode="after")
+    def validate_budget(self):
+        options = self.options or BatchRenderOptions()
+        frames = len(self.variants) + int(options.include_base)
+        if not 1 <= frames <= 256:
+            raise ValueError("Batch must contain between 1 and 256 frames")
+        tile = options.tile_size or 200  # Upper bound for configured canvas size.
+        columns = min(options.columns or max(1, int(frames**0.5 + 0.999)), frames)
+        rows = (frames + columns - 1) // columns
+        pixels = columns * rows * tile * tile
+        pixels += frames * 200 * 200 * (2 if options.include_sources else 1)
+        if options.frame_mode == "layer":
+            pixels += frames * 200 * 200
+        if pixels > 16_000_000:
+            raise ValueError("Batch exceeds the 16 million pixel working budget")
+        return self
 
 
 class SpritesheetFrame(BaseModel):

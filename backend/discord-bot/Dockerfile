@@ -10,6 +10,7 @@ COPY src/ src/
 RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
     || test "$(cat src/generated/catalog-hash.txt)" = "$CAT_SYSTEM_CATALOG_HASH"
 RUN npm run build
+RUN npm prune --omit=dev
 
 FROM node:22-alpine
 WORKDIR /app

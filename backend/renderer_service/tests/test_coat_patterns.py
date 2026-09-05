@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+
 from renderer_service.config import settings
 from renderer_service.models import BatchVariant, LayerIdentifier
 from renderer_service.renderer.coat_patterns import (

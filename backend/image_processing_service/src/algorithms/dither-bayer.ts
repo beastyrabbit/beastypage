@@ -14,24 +14,10 @@ const BAYER_4 = [
 
 const BAYER_8 = generateBayer8();
 
-function generateBayer8(): number[][] {
-  const size = 8;
-  const matrix: number[][] = Array.from({ length: size }, () => Array(size).fill(0));
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      let v = 0;
-      let xc = x;
-      let yc = y;
-      for (let bit = size >> 1; bit > 0; bit >>= 1) {
-        v = (v << 2) | (((xc & bit) !== 0 ? 2 : 0) ^ ((yc & bit) !== 0 ? 3 : 0));
-        xc >>= 1;
-        yc >>= 1;
-      }
-      matrix[y]![x] = v;
-    }
-  }
-  // Normalize to 0..1 range will happen at usage time
-  return matrix;
+export function generateBayer8(): number[][] {
+  return Array.from({ length: 8 }, (_, y) =>
+    Array.from({ length: 8 }, (_, x) => 4 * BAYER_4[y % 4]![x % 4]! + BAYER_2[Math.floor(y / 4)]![Math.floor(x / 4)]!),
+  );
 }
 
 function getMatrix(size: number): number[][] {

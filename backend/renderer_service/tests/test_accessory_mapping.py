@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from PIL import Image
+
 from renderer_service.config import settings
 from renderer_service.renderer.repository import SpriteRepository
 from renderer_service.renderer.sprite_mapper import SpriteMapper
@@ -174,7 +175,7 @@ def test_palette_map_uses_original_pixels_for_overlapping_targets():
         },
     )
 
-    assert list(mapped.getdata()) == [(2, 2, 2, 255), (3, 3, 3, 255)]
+    assert list(mapped.get_flattened_data()) == [(2, 2, 2, 255), (3, 3, 3, 255)]
 
 
 def test_generated_metadata_covers_upstream_sprite_dicts():

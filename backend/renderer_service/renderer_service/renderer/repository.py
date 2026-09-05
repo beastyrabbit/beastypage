@@ -23,13 +23,11 @@ class SpriteRepository:
         self.sprite_root = sprite_root or settings.sprite_root
         self.data_root = data_root or settings.data_root
         self.tile_size = tile_size
-        with open(self.data_root / "spritesIndex.json", "r", encoding="utf-8") as fh:
+        with open(self.data_root / "spritesIndex.json", encoding="utf-8") as fh:
             self.sprite_index: dict[str, dict] = json.load(fh)
-        with open(
-            self.data_root / "spritesOffsetMap.json", "r", encoding="utf-8"
-        ) as fh:
+        with open(self.data_root / "spritesOffsetMap.json", encoding="utf-8") as fh:
             self.sprite_offsets = json.load(fh)
-        with open(self.data_root / "poseData.json", "r", encoding="utf-8") as fh:
+        with open(self.data_root / "poseData.json", encoding="utf-8") as fh:
             self.pose_data: dict[str, Any] = json.load(fh)
 
         self.pose_names: list[str] = list(self.pose_data.get("poses", []))
@@ -343,7 +341,7 @@ class SpriteRepository:
         """Treat pure blue (#0000FF) pixels as transparent, mirroring Lifegen's colorkey usage."""
         if sprite.mode != "RGBA":
             sprite = sprite.convert("RGBA")
-        data = sprite.getdata()
+        data = sprite.get_flattened_data()
         if not any(
             px[2] == 255 and px[0] == 0 and px[1] == 0 and px[3] == 255 for px in data
         ):

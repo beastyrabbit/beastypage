@@ -5,8 +5,30 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    setupFiles: ["./vitest.setup.ts"],
-    exclude: ["**/node_modules/**", "**/.git/**", "**/.next/**"],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          exclude: [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/.next/**",
+            "tests/cat-v3/render.spec.ts",
+            "tests/browser/**",
+          ],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "renderer",
+          environment: "node",
+          include: ["tests/cat-v3/render.spec.ts"],
+          globalSetup: ["./tests/renderer.global-setup.ts"],
+        },
+      },
+    ],
     fileParallelism: false,
   },
   resolve: {

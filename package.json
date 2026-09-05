@@ -2,6 +2,8 @@
   "name": "beastypage",
   "private": true,
   "scripts": {
+    "image-processing:check": "pnpm --dir backend/image_processing_service run typecheck && pnpm --dir backend/image_processing_service exec vitest run",
+    "media:check": "pnpm --dir backend/media_service run lint && pnpm --dir backend/media_service run typecheck && pnpm --dir backend/media_service test",
     "cat-system:generate": "pnpm --dir frontend run cat-system:generate",
     "cat-system:check": "pnpm --dir frontend run cat-system:check",
     "cat-system:build": "pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run && sh frontend/scripts/write-version.sh && pnpm --dir frontend exec tsc --noEmit && NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_placeholder_CLERK_KEY pnpm --dir frontend run build && npm --prefix backend/discord-bot test && cd backend/renderer_service && uv run python -m renderer_service.render_contract --check && uv run --extra dev pytest -q",

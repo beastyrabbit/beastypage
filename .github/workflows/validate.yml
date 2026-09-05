@@ -1,0 +1,35 @@
+name: Validate pull request
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  applications:
+    runs-on: arc-beastypage
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.33.0 --activate
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+      - name: Install dependencies
+        run: |
+          pnpm --dir frontend install --frozen-lockfile --ignore-scripts
+          pnpm --dir backend/media_service install --frozen-lockfile --ignore-scripts
+          pnpm --dir backend/image_processing_service install --frozen-lockfile --ignore-scripts
+          npm --prefix backend/discord-bot ci --ignore-scripts
+          uv sync --project backend/renderer_service --extra dev --frozen
+      - run: pnpm cat-system:build
+      - run: pnpm media:check
+      - run: pnpm image-processing:check
+      - run: pnpm --dir frontend run lint
+      - name: Check first-party Python
+        run: |
+          uv run --project backend/renderer_service --frozen --extra dev ruff check backend/renderer_service/renderer_service backend/renderer_service/tests
+          uv run --project backend/renderer_service --frozen --extra dev ruff format --check backend/renderer_service/renderer_service backend/renderer_service/tests
+      - name: Check browser behavior with local fixtures
+        run: |
+          pnpm --dir frontend exec playwright install --with-deps chromium
+          pnpm --dir frontend exec playwright test

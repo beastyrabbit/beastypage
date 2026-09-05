@@ -158,6 +158,7 @@ export function EvolutionGeneratorClient() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSavedToken, setLastSavedToken] = useState<string | null>(null);
   const [lastSavedId, setLastSavedId] = useState<string | null>(null);
+  const [batchEditToken, setBatchEditToken] = useState<string>();
   const [savedMetadata, setSavedMetadata] =
     useState<AdoptionMetadata>(DEFAULT_METADATA);
   const [metadataMessage, setMetadataMessage] = useState<string | null>(null);
@@ -329,6 +330,7 @@ export function EvolutionGeneratorClient() {
           }),
         );
         setLastSavedId(saved.batchId);
+        setBatchEditToken(saved.batchEditToken);
         setLastSavedToken(saved.batchSlug);
         setSaveState("saved");
       } catch (saveError) {
@@ -470,6 +472,7 @@ export function EvolutionGeneratorClient() {
         setMetadataError(null);
         await updateBatchMeta({
           id: toId("adoption_batch", lastSavedId),
+          editToken: batchEditToken,
           title: nextMetadata.title,
           creatorName: nextMetadata.creator,
         });
@@ -483,7 +486,7 @@ export function EvolutionGeneratorClient() {
         setMetadataSaving(false);
       }
     },
-    [lastSavedId, savedMetadata, updateBatchMeta],
+    [lastSavedId, batchEditToken, savedMetadata, updateBatchMeta],
   );
 
   const handleCatNameSave = useCallback(

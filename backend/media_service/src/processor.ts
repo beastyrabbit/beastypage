@@ -41,6 +41,8 @@ class UnsupportedMediaError extends Error {
 	}
 }
 
+class ArtifactStorageError extends Error {}
+
 type ProcessResult = {
 	state: "ready" | "unsupported" | "failed";
 	detectedMime?: string;
@@ -155,8 +157,10 @@ async function processImage(
 	uploadId: string,
 	artifactId: string,
 	store: ObjectStore,
+	onValidated: () => void,
 ) {
 	const metadata = await validateImage(input);
+	onValidated();
 	if (PRESERVE_IMAGE_MIMES.has(mime)) {
 		const file = await stat(input);
 		return {
@@ -183,7 +187,9 @@ async function processImage(
 			.toFile(output);
 	}
 	const publicKey = `derivatives/${uploadId}-${artifactId}.${extension}`;
-	await store.putFile(publicKey, output, publicMime);
+	await store.putFile(publicKey, output, publicMime).catch(() => {
+		throw new ArtifactStorageError("Derivative storage failed");
+	});
 	const file = await stat(output);
 	return { publicKey, publicMime, publicSize: file.size };
 }
@@ -195,8 +201,10 @@ async function processVideo(
 	artifactId: string,
 	store: ObjectStore,
 	timeoutMs: number,
+	onValidated: () => void,
 ) {
 	const { probe, video } = await probeVideo(input, timeoutMs);
+	onValidated();
 	const audio = probe.streams?.find((stream) => stream.codec_type === "audio");
 	const formatNames = new Set((probe.format?.format_name ?? "").split(","));
 	const compatible =
@@ -250,12 +258,14 @@ async function processVideo(
 			];
 	await run("ffmpeg", args, timeoutMs);
 	const publicKey = `derivatives/${uploadId}-${artifactId}.mp4`;
-	await store.putFile(publicKey, output, "video/mp4");
+	await store.putFile(publicKey, output, "video/mp4").catch(() => {
+		throw new ArtifactStorageError("Derivative storage failed");
+	});
 	const file = await stat(output);
 	return { publicKey, publicMime: "video/mp4", publicSize: file.size };
 }
 
-async function processOriginal(
+export async function processOriginal(
 	job: ClaimedJob,
 	store: ObjectStore,
 	config: Config,
@@ -276,6 +286,10 @@ async function processOriginal(
 		};
 	}
 
+	let validated = false;
+	const onValidated = () => {
+		validated = true;
+	};
 	try {
 		const normalized = IMAGE_MIMES.has(mime)
 			? await processImage(
@@ -285,6 +299,7 @@ async function processOriginal(
 					job.upload.id,
 					artifactId,
 					store,
+					onValidated,
 				)
 			: await processVideo(
 					input,
@@ -293,6 +308,7 @@ async function processOriginal(
 					artifactId,
 					store,
 					config.processingTimeoutMs,
+					onValidated,
 				);
 		return {
 			state: "ready",
@@ -308,6 +324,16 @@ async function processOriginal(
 				detectedMime: mime,
 				failureCode: "UNSAFE_MEDIA",
 				failureMessage: error.message,
+			};
+		}
+		if (error instanceof ArtifactStorageError) throw error;
+		if (!validated) {
+			console.warn("[quick-share-worker] media validation failed");
+			return {
+				state: "failed",
+				detectedMime: mime,
+				failureCode: "VALIDATION_FAILED",
+				failureMessage: "The file could not be validated and cannot be shared.",
 			};
 		}
 		const file = await stat(input);
@@ -326,6 +352,18 @@ async function processOriginal(
 export class MediaWorker {
 	private running = false;
 	private accepting = true;
+	private idleWaiters: Array<() => void> = [];
+
+	private markIdle() {
+		this.running = false;
+		for (const resolve of this.idleWaiters.splice(0)) resolve();
+	}
+
+	async drain() {
+		this.stop();
+		if (this.running)
+			await new Promise<void>((resolve) => this.idleWaiters.push(resolve));
+	}
 	private readonly config: Config;
 	private readonly control: ConvexControlPlane;
 	private readonly store: ObjectStore;
@@ -353,13 +391,13 @@ export class MediaWorker {
 				leaseId,
 			});
 			if (!job) {
-				this.running = false;
+				this.markIdle();
 				return "not-claimable" as const;
 			}
 			void this.process(job, leaseId);
 			return "accepted" as const;
 		} catch (error) {
-			this.running = false;
+			this.markIdle();
 			throw error;
 		}
 	}
@@ -436,7 +474,7 @@ export class MediaWorker {
 					);
 			}
 		} finally {
-			this.running = false;
+			this.markIdle();
 		}
 	}
 }

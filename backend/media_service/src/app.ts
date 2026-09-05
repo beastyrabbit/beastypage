@@ -137,7 +137,8 @@ function unavailable() {
 	});
 }
 
-type WorkerDispatcher = Pick<MediaWorker, "dispatch" | "stop">;
+type WorkerDispatcher = Pick<MediaWorker, "dispatch" | "stop"> &
+	Partial<Pick<MediaWorker, "drain">>;
 
 export function createApp(
 	config: Config,
@@ -728,18 +729,10 @@ export function createApp(
 	});
 
 	async function servePublic(
-		slug: string,
+		upload: PublicUpload,
 		method: "GET" | "HEAD",
 		range?: string,
 	) {
-		if (!/^[1-9A-HJ-NP-Za-km-z]{8}$/.test(slug)) return unavailable();
-		let upload: PublicUpload;
-		try {
-			upload = await control.call<PublicUpload>("public", { slug });
-		} catch (error) {
-			if (statusCode(error) === 404) return unavailable();
-			throw error;
-		}
 		const headers = new Headers({
 			"content-type": upload.mime,
 			"content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(
@@ -830,8 +823,9 @@ export function createApp(
 				`<!doctype html><html><head><meta name="robots" content="noindex"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shared media</title><style>body{margin:0;background:#111;color:#eee;font-family:system-ui;padding:24px}main{max-width:1100px;margin:auto;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr))}img,video{display:block;width:100%;max-height:80vh;object-fit:contain;background:#000;border-radius:8px}</style></head><body><main>${cards}</main></body></html>`,
 			);
 		}
+		if (!items[0]) return unavailable();
 		return servePublic(
-			c.req.param("slug"),
+			items[0],
 			c.req.method === "HEAD" ? "HEAD" : "GET",
 			c.req.header("range"),
 		);

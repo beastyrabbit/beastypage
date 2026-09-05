@@ -63,18 +63,6 @@ function sanitizeName(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 40);
 }
 
-function buildViewerSessionId(name: string) {
-  const base = sanitizeName(name).toLowerCase();
-  if (!base) return generateViewerSessionId();
-  let hash = 0;
-  for (let i = 0; i < base.length; i += 1) {
-    hash = (hash << 5) - hash + base.charCodeAt(i);
-    hash |= 0;
-  }
-  const token = (hash >>> 0).toString(16).padStart(8, "0");
-  return `name-${token}`;
-}
-
 function extractErrorMessage(error: unknown): string | null {
   if (typeof error === "object" && error !== null) {
     if ("data" in error) {
@@ -340,7 +328,10 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
         setNameError("Please enter a name");
         return;
       }
-      const sessionToken = buildViewerSessionId(cleaned);
+      const sessionToken =
+        viewerSession && viewerSession.length >= 32
+          ? viewerSession
+          : crypto.randomUUID();
       if (typeof window !== "undefined") {
         const storage = window.sessionStorage ?? window.localStorage;
         const key = viewerKey
@@ -366,7 +357,14 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
         setNameError(message);
       }
     },
-    [sessionId, viewerKey, displayName, registerParticipant, fingerprint],
+    [
+      sessionId,
+      viewerKey,
+      viewerSession,
+      displayName,
+      registerParticipant,
+      fingerprint,
+    ],
   );
 
   const handleVote = useCallback(
@@ -383,6 +381,8 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
           sessionId: toId("stream_sessions", sessionId),
           stepId: currentStep.id,
           optionKey: option.key,
+          viewerSession: viewerSession ?? undefined,
+          voteRound: session?.vote_round,
           optionMeta: {
             participantId: participant.id,
             participantName: participant.display_name,
@@ -399,7 +399,15 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
         setStatusMessage(message);
       }
     },
-    [participant, sessionId, currentStep, votingStatus.code, createVote],
+    [
+      participant,
+      sessionId,
+      currentStep,
+      votingStatus.code,
+      createVote,
+      viewerSession,
+      session?.vote_round,
+    ],
   );
 
   const [optionSearch, setOptionSearch] = useState("");
