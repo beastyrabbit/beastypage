@@ -1,3 +1,4 @@
+// Temporary legacy API for the bridge release. Remove after old replicas are gone.
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server.js";
 

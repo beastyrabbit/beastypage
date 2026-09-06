@@ -5,6 +5,7 @@ import logging
 import os
 import time
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Literal, TypeVar
 
@@ -132,7 +133,9 @@ class RendererSupervisor:
         while True:
             job = await self.queue.get()
             try:
-                result = await anyio.to_thread.run_sync(job.execute, cancellable=True)
+                result = await anyio.to_thread.run_sync(
+                    job.execute, abandon_on_cancel=True
+                )
             except Exception as exc:  # noqa: BLE001
                 if not job.future.done():
                     job.future.set_exception(exc)
@@ -164,7 +167,16 @@ class RendererSupervisor:
 
 
 def create_app() -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        await supervisor.start()
+        try:
+            yield
+        finally:
+            await supervisor.stop()
+
     app = FastAPI(
+        lifespan=lifespan,
         title="Cat Generator V3 Renderer",
         version="1.3.3",
         description=(
@@ -209,14 +221,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    @app.on_event("startup")
-    async def _startup() -> None:
-        await supervisor.start()
-
-    @app.on_event("shutdown")
-    async def _shutdown() -> None:
-        await supervisor.stop()
 
     @app.get("/health", tags=["diagnostics"], summary="Service health check")
     def health() -> dict[str, Any]:
@@ -311,8 +315,12 @@ def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderRe
                 "id": layer.id,
                 "operationId": layer.operation_id,
                 "label": layer.label,
-                "duration_ms": layer.duration_ms,
-                "diagnostics": layer.diagnostics,
+                "duration_ms": layer.duration_ms
+                if not request.options or request.options.diagnostics
+                else 0,
+                "diagnostics": layer.diagnostics
+                if not request.options or request.options.diagnostics
+                else [],
                 "blend_mode": layer.blend_mode,
                 "image": _image_to_data_url(layer.image)
                 if include_layer_images

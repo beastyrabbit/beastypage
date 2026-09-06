@@ -84,7 +84,7 @@ function formatTimestamp(created?: number): string | null {
 }
 
 export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
-  const record = useQuery(api.adoption.getBySlug, { slugOrId: slug }) as
+  const record = useQuery(api.adoptionV2.getBySlug, { slugOrId: slug }) as
     | AdoptionBatchRecord
     | null
     | undefined;

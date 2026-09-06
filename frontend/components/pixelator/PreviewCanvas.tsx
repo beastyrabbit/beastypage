@@ -12,6 +12,7 @@ interface ImageDimensions {
 interface PreviewCanvasProps {
   originalUrl: string;
   resultUrl: string | null;
+  stale?: boolean;
   processing: boolean;
   lastDuration: number | null;
   onChangeImage: () => void;
@@ -22,6 +23,7 @@ interface PreviewCanvasProps {
 export function PreviewCanvas({
   originalUrl,
   resultUrl,
+  stale = false,
   processing,
   lastDuration,
   onChangeImage,
@@ -79,6 +81,11 @@ export function PreviewCanvas({
 
       {/* Controls bar */}
       <div className="flex items-center gap-3 border-t border-border/50 px-4 py-2">
+        {stale && (
+          <span role="status" className="text-xs text-amber-300">
+            Previous result. Current settings have not been rendered yet.
+          </span>
+        )}
         {resultUrl && (
           <button
             type="button"

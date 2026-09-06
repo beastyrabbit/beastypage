@@ -1,5 +1,6 @@
 "use client";
 
+import { useClerk, useUser } from "@clerk/nextjs";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import {
   ChevronDown,
@@ -17,19 +18,18 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useClerk, useUser } from "@clerk/nextjs";
-import { setAccountDeleting } from "@/components/auth/UserAuthButton";
 import { PageHero } from "@/components/common/PageHero";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
+  const [accountDeleting, setAccountDeleting] = useState(false);
   const clerk = useClerk();
   const { user: clerkUser } = useUser();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
   const viewer = useQuery(api.users.viewer);
   const updateProfile = useMutation(api.users.updateProfile);
-  const deleteAccount = useMutation(api.users.deleteAccount);
+  const resetSavedVariants = useMutation(api.users.resetSavedVariants);
   const regenerateApiKey = useMutation(api.users.regenerateApiKey);
   const allVariants = useQuery(
     api.userVariants.listAll,
@@ -62,25 +62,24 @@ export default function ProfilePage() {
   const handleDelete = async () => {
     if (
       !window.confirm(
-        "Are you sure you want to delete your account? This cannot be undone.",
+        "Remove all saved variants? Your account, profile, shared content, and sessions will remain. This cannot be undone.",
       )
     )
       return;
     setAccountDeleting(true);
     try {
-      await deleteAccount();
-      toast.success("Account deleted");
+      let remaining = true;
+      while (remaining) ({ remaining } = await resetSavedVariants());
+      toast.success("Saved variants reset");
+      setAccountDeleting(false);
     } catch (err) {
       setAccountDeleting(false);
       toast.error(
-        err instanceof Error ? err.message : "Failed to delete account",
+        err instanceof Error
+          ? err.message
+          : "Failed to reset saved variants. You can retry to remove the remaining variants.",
       );
       return;
-    }
-    try {
-      await clerk.signOut();
-    } catch {
-      window.location.href = "/";
     }
   };
 
@@ -95,7 +94,9 @@ export default function ProfilePage() {
           await clerkUser.update({ username: trimmed });
         } catch (err) {
           console.error("[Profile] Clerk username sync failed:", err);
-          toast.warning("Profile saved, but username sync to login provider failed.");
+          toast.warning(
+            "Profile saved, but username sync to login provider failed.",
+          );
         }
       }
       toast.success("Profile updated");
@@ -168,7 +169,11 @@ export default function ProfilePage() {
                   )}
                 >
                   {clerkUser?.imageUrl ? (
-                    <img src={clerkUser.imageUrl} alt="" className="size-full object-cover" />
+                    <img
+                      src={clerkUser.imageUrl}
+                      alt=""
+                      className="size-full object-cover"
+                    />
                   ) : initial ? (
                     <span className="text-xl font-bold text-primary">
                       {initial}
@@ -284,15 +289,17 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-red-400">
-                  Delete Account
+                  Reset saved variants
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Permanently delete your account and all associated data.
+                  Remove saved variants. Your account, profile, shared content,
+                  and sessions remain.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleDelete}
+                disabled={accountDeleting}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-lg border border-red-500/50 px-4 py-2",
                   "text-sm font-medium text-red-400 transition-colors",
@@ -300,7 +307,7 @@ export default function ProfilePage() {
                 )}
               >
                 <Trash2 className="size-4" />
-                Delete
+                Reset
               </button>
             </div>
           </section>

@@ -1,6 +1,8 @@
+// Temporary legacy API for the bridge release. Remove after old replicas are gone.
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
 import { mutation, query } from "./_generated/server.js";
+import { assertLegacySession } from "./rolloutLegacy.js";
 import { docIdToString } from "./utils.js";
 
 type ParticipantDoc = Doc<"stream_participants">;
@@ -12,7 +14,11 @@ export const list = query({
     limit: v.number(),
   },
   handler: async (ctx, args) => {
-    let participants = await ctx.db.query("stream_participants").collect();
+    await assertLegacySession(ctx, args.session);
+    let participants = await ctx.db
+      .query("stream_participants")
+      .withIndex("bySession", (q) => q.eq("sessionId", args.session))
+      .take(500);
     participants = participants.filter(
       (p) => docIdToString(p.sessionId) === docIdToString(args.session),
     );
@@ -32,6 +38,7 @@ export const get = query({
   },
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
+    if (doc) await assertLegacySession(ctx, doc.sessionId);
     return doc ? streamParticipantToClient(doc) : null;
   },
 });
@@ -45,6 +52,7 @@ export const create = mutation({
     fingerprint: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await assertLegacySession(ctx, args.sessionId);
     const nowTs = Date.now();
     const insertDoc = {
       sessionId: args.sessionId,
@@ -61,6 +69,7 @@ export const create = mutation({
     };
     const id = await ctx.db.insert("stream_participants", insertDoc);
     const doc = await ctx.db.get(id);
+    if (doc) await assertLegacySession(ctx, doc.sessionId);
     return doc ? streamParticipantToClient(doc) : null;
   },
 });
@@ -76,6 +85,7 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
     if (!doc) return null;
+    await assertLegacySession(ctx, doc.sessionId);
     const updated = {
       ...doc,
       displayName: args.displayName ?? doc.displayName,
@@ -97,10 +107,8 @@ function streamParticipantToClient(doc: ParticipantDoc) {
   return {
     id: docIdToString(doc._id),
     session: docIdToString(doc.sessionId),
-    viewer_session: doc.viewerSession,
     display_name: doc.displayName,
     status: doc.status,
-    fingerprint: doc.fingerprint,
     created: doc.createdAt,
     updated: doc.updatedAt,
   };

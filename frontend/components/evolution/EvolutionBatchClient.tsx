@@ -80,7 +80,7 @@ function formatTimestamp(value?: number | null) {
 }
 
 export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
-  const record = useQuery(api.adoption.getBySlug, { slugOrId: slug }) as
+  const record = useQuery(api.adoptionV2.getBySlug, { slugOrId: slug }) as
     | EvolutionBatchRecord
     | null
     | undefined;

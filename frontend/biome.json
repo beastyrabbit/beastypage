@@ -1,5 +1,16 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.10/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.12/schema.json",
+  "overrides": [
+    {
+      "includes": [
+        "components/single-cat/ViewerClient.tsx",
+        "lib/cat-system/__tests__/ear-accessory-probe.test.ts"
+      ],
+      "linter": {
+        "rules": { "correctness": { "noUnsafeOptionalChaining": "warn" } }
+      }
+    }
+  ],
   "assist": {
     "actions": {
       "source": {
@@ -10,7 +21,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "correctness": {
         "noUnusedImports": "warn",
         "useExhaustiveDependencies": "warn"

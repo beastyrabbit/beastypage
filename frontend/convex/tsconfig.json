@@ -1,11 +1,18 @@
 {
-  "extends": "../node_modules/convex/tsconfig.json",
   "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "target": "ESNext",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noEmit": true,
     "strict": true,
     "types": ["node"],
-    "rootDir": ".",
     "resolveJsonModule": true
   },
   "include": ["./**/*.ts"],

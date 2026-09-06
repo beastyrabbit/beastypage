@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from PIL import ImageChops, ImageOps
+
 from renderer_service.app import create_app
 from renderer_service.models import LayerIdentifier
 from renderer_service.renderer.document_schema import InvalidCatDocument
@@ -256,8 +257,8 @@ def test_missing_scar_masks_do_not_blank_sprite():
     scar_layers = [layer.id for layer in scar_result.layers]
     assert LayerIdentifier.scars_secondary in scar_layers
 
-    base_alpha_sum = base_result.composed.split()[3].getdata()
-    scar_alpha_sum = scar_result.composed.split()[3].getdata()
+    base_alpha_sum = base_result.composed.split()[3].get_flattened_data()
+    scar_alpha_sum = scar_result.composed.split()[3].get_flattened_data()
 
     base_total = sum(base_alpha_sum)
     scar_total = sum(scar_alpha_sum)

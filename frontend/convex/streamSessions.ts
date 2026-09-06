@@ -1,6 +1,8 @@
+// Temporary legacy API for the bridge release. Remove after old replicas are gone.
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
 import { mutation, query } from "./_generated/server.js";
+import { assertLegacySession } from "./rolloutLegacy.js";
 import { docIdToString } from "./utils.js";
 
 type SessionDoc = Doc<"stream_sessions">;
@@ -13,7 +15,14 @@ export const list = query({
     limit: v.number(),
   },
   handler: async (ctx, args) => {
-    let sessions = await ctx.db.query("stream_sessions").collect();
+    let sessions = await ctx.db
+      .query("stream_sessions")
+      .withIndex("by_ownerTokenIdentifier_and_updatedAt", (q) =>
+        q.eq("ownerTokenIdentifier", undefined),
+      )
+      .order("desc")
+      .take(500);
+    sessions = sessions.filter((s) => s.allowedOptions === undefined);
     if (args.status) {
       const target = args.status.toLowerCase();
       sessions = sessions.filter(
@@ -45,6 +54,7 @@ export const get = query({
   },
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
+    if (doc) await assertLegacySession(ctx, args.id);
     return doc ? streamSessionToClient(doc) : null;
   },
 });
@@ -94,6 +104,7 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
     if (!doc) return null;
+    await assertLegacySession(ctx, args.id);
     const updated = {
       ...doc,
       viewerKey: args.viewerKey ?? doc.viewerKey,

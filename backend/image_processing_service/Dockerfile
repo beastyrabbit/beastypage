@@ -1,4 +1,4 @@
-FROM node:22-slim AS builder
+FROM node:24-slim AS builder
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 WORKDIR /app
@@ -10,7 +10,7 @@ COPY tsconfig.json ./
 COPY src/ src/
 
 # ---- Runtime ----
-FROM node:22-slim
+FROM node:24-slim
 
 WORKDIR /app
 

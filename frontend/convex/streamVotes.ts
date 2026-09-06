@@ -1,6 +1,8 @@
+// Temporary legacy API for the bridge release. Remove after old replicas are gone.
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel.js";
 import { mutation, query } from "./_generated/server.js";
+import { assertLegacySession } from "./rolloutLegacy.js";
 import { docIdToString } from "./utils.js";
 
 type VoteDoc = Doc<"stream_votes">;
@@ -12,7 +14,11 @@ export const list = query({
     limit: v.number(),
   },
   handler: async (ctx, args) => {
-    let votes = await ctx.db.query("stream_votes").collect();
+    await assertLegacySession(ctx, args.session);
+    let votes = await ctx.db
+      .query("stream_votes")
+      .withIndex("bySession", (q) => q.eq("sessionId", args.session))
+      .take(500);
     votes = votes.filter(
       (vDoc) => docIdToString(vDoc.sessionId) === docIdToString(args.session),
     );
@@ -33,6 +39,12 @@ export const create = mutation({
     votedBy: v.optional(v.id("stream_participants")),
   },
   handler: async (ctx, args) => {
+    await assertLegacySession(ctx, args.sessionId);
+    if (args.votedBy) {
+      const participant = await ctx.db.get(args.votedBy);
+      if (!participant || participant.sessionId !== args.sessionId)
+        throw new Error("Invalid participant");
+    }
     const nowTs = Date.now();
     const insertDoc = {
       sessionId: args.sessionId,

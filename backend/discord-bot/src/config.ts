@@ -11,4 +11,5 @@ export const config = {
   discordClientId: requiredEnv("DISCORD_CLIENT_ID"),
   discordGuildId: process.env.DISCORD_GUILD_ID || undefined,
   frontendApiUrl: requiredEnv("FRONTEND_API_URL"),
+  discordApiToken: requiredEnv("DISCORD_API_TOKEN"),
 } as const;

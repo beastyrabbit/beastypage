@@ -1,6 +1,7 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { SignInButton } from "@clerk/nextjs";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import {
   ClipboardCopy,
   Loader2,
@@ -34,9 +35,9 @@ import {
 } from "@/lib/streamer/steps";
 import { cn } from "@/lib/utils";
 
-type SessionListItem = (typeof api.streamSessions.list._returnType)[number];
+type SessionListItem = (typeof api.streamSessionsV2.list._returnType)[number];
 type ParticipantRecord =
-  (typeof api.streamParticipants.list._returnType)[number];
+  (typeof api.streamParticipantsV2.list._returnType)[number];
 
 type LockedEntry = {
   step_id?: string;
@@ -126,6 +127,33 @@ function formatRelativeTime(timestamp?: number) {
 }
 
 export function HostClient() {
+  const { isLoading, isAuthenticated } = useConvexAuth();
+  if (isLoading) return <p>Loading host account…</p>;
+  if (!isAuthenticated)
+    return (
+      <div className="mx-auto max-w-xl px-4 py-16">
+        <div className="glass-card space-y-6 p-8 text-center">
+          <h1 className="text-2xl font-bold text-foreground">
+            Host a voting session
+          </h1>
+          <p className="text-muted-foreground">
+            Sign in to create a session and manage viewer votes.
+          </p>
+          <SignInButton>
+            <button
+              type="button"
+              className="rounded-full border border-primary/50 bg-primary/15 px-6 py-2.5 font-semibold text-primary transition hover:bg-primary/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              Sign in
+            </button>
+          </SignInButton>
+        </div>
+      </div>
+    );
+  return <AuthenticatedHostClient />;
+}
+
+function AuthenticatedHostClient() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [localState, setLocalState] = useState<StreamerState>(() => ({
     params: getDefaultStreamParams(),
@@ -164,10 +192,10 @@ export function HostClient() {
     return { id: toId("stream_sessions", activeSessionId) } as const;
   }, [activeSessionId]);
 
-  const session = useQuery(api.streamSessions.get, sessionArgs);
+  const session = useQuery(api.streamSessionsV2.getForHost, sessionArgs);
 
-  const sessionList = useQuery(api.streamSessions.list, {
-    exclude: "completed",
+  const sessionList = useQuery(api.streamSessionsV2.list, {
+    status: "live",
     limit: 20,
   });
   const sessionListResolved = sessionList ?? [];
@@ -192,36 +220,36 @@ export function HostClient() {
   }, []);
 
   const votesArgs = useMemo(() => {
-    if (!activeSessionId) return "skip" as const;
+    if (!activeSessionId || !session) return "skip" as const;
     return {
       session: toId("stream_sessions", activeSessionId),
       stepId: currentStepId ?? undefined,
       limit: 500,
     } as const;
-  }, [activeSessionId, currentStepId]);
+  }, [activeSessionId, currentStepId, session]);
 
-  const rawVotes = useQuery(api.streamVotes.list, votesArgs);
+  const rawVotes = useQuery(api.streamVotesV2.list, votesArgs);
   const votes = useMemo(() => rawVotes ?? [], [rawVotes]);
 
   const participantsArgs = useMemo(() => {
-    if (!activeSessionId) return "skip" as const;
+    if (!activeSessionId || !session) return "skip" as const;
     return {
       session: toId("stream_sessions", activeSessionId),
       limit: 200,
     } as const;
-  }, [activeSessionId]);
+  }, [activeSessionId, session]);
 
   const rawParticipants = useQuery(
-    api.streamParticipants.list,
+    api.streamParticipantsV2.list,
     participantsArgs,
   );
   const participants = useMemo(() => rawParticipants ?? [], [rawParticipants]);
 
-  const createSession = useMutation(api.streamSessions.create);
-  const updateSession = useMutation(api.streamSessions.update);
-  const completeSession = useMutation(api.streamSessions.update);
-  const createVote = useMutation(api.streamVotes.create);
-  const updateParticipant = useMutation(api.streamParticipants.update);
+  const createSession = useMutation(api.streamSessionsV2.create);
+  const updateSession = useMutation(api.streamSessionsV2.update);
+  const completeSession = useMutation(api.streamSessionsV2.update);
+  const createVote = useMutation(api.streamVotesV2.create);
+  const updateParticipant = useMutation(api.streamParticipantsV2.update);
   const createMapperRecord = useMutation(api.mapper.create);
 
   useEffect(() => {
@@ -271,10 +299,19 @@ export function HostClient() {
     const preselected = new URLSearchParams(window.location.search).get(
       "session",
     );
-    if (preselected && !activeSessionId) {
+    if (preselected) {
       setActiveSessionId(preselected);
     }
-  }, [activeSessionId]);
+  }, []);
+
+  useEffect(() => {
+    if (!activeSessionId || session !== null) return;
+    setActiveSessionId(null);
+    updateSessionQueryParam(null);
+    setStatusMessage(
+      "This session is unavailable to your account. Older sessions cannot be resumed. Create a new session to continue.",
+    );
+  }, [activeSessionId, session, updateSessionQueryParam]);
 
   useEffect(() => {
     updateSessionQueryParam(activeSessionId ?? null);
@@ -479,6 +516,10 @@ export function HostClient() {
         viewerKey,
         status: "live",
         currentStep: firstStepId,
+        allowedOptions:
+          initialSteps[0]
+            ?.getOptions({ params: initialParams, history: [] })
+            .map((option) => option.key) ?? [],
         stepIndex: 0,
         stepHistory: [],
         params: initialParams,
@@ -526,6 +567,11 @@ export function HostClient() {
         await updateSession({
           id: toId("stream_sessions", activeSessionId),
           params,
+          allowedOptions:
+            createStreamSteps({ params })
+              .find((step) => step.id === session.current_step)
+              ?.getOptions({ params, history: session.step_history ?? [] })
+              .map((option) => option.key) ?? [],
         });
       } catch (error) {
         console.error("Failed to update session params", error);
@@ -605,6 +651,7 @@ export function HostClient() {
           sessionId: toId("stream_sessions", activeSessionId),
           stepId: currentStep.id,
           optionKey: option.key,
+          voteRound: session.vote_round,
           optionMeta: {
             label: option.label,
             step: currentStep.title,
@@ -697,6 +744,11 @@ export function HostClient() {
           stepHistory: updatedHistory,
           stepIndex: nextStepIndex >= 0 ? nextStepIndex : 0,
           currentStep: nextStepId,
+          allowedOptions:
+            updatedSteps
+              .find((step) => step.id === nextStepId)
+              ?.getOptions({ params: draftParams, history: updatedHistory })
+              .map((option) => option.key) ?? [],
         });
         if (shouldFinalize && session?.status !== "completed") {
           setFinalShareInfo(null);
@@ -799,6 +851,7 @@ export function HostClient() {
           sessionId: toId("stream_sessions", activeSessionId),
           stepId: currentStep.id,
           optionKey: winnerRow.option.key,
+          voteRound: session?.vote_round,
           optionMeta: {
             label: winnerRow.option.label,
             step: currentStep.title,
@@ -834,6 +887,7 @@ export function HostClient() {
     }
   }, [
     coinWinner,
+    session?.vote_round,
     voteSent,
     currentStep,
     activeSessionId,
@@ -869,7 +923,9 @@ export function HostClient() {
         }
       }
     });
-    setStatusMessage("Tie-break filter cleared.");
+    setStatusMessage(
+      "Tie-break choices cleared. The current round's votes remain; earlier rounds are not restored.",
+    );
   }, [updateSessionParams]);
 
   const handleToggleOptionDisabled = useCallback(

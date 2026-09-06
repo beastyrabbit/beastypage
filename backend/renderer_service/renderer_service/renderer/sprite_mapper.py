@@ -201,7 +201,7 @@ class SpriteMapper:
 
         for palette_file in sorted(palettes_dir.glob("*.json")):
             try:
-                with open(palette_file, "r", encoding="utf-8") as f:
+                with open(palette_file, encoding="utf-8") as f:
                     palette_data = json.load(f)
 
                 palette_id = palette_data.get("id", palette_file.stem)

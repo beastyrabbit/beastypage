@@ -1,32 +1,25 @@
-# Backend Monorepo
+# Backend services
 
-This directory now hosts all backend-facing infrastructure for the BeastyRabbit tools stack.
+Use the [root setup guide](../README.md) for the development stack and delivery policy.
 
-## Layout
+| Directory | Responsibility |
+| --- | --- |
+| [renderer_service](renderer_service/README.md) | FastAPI cat renderer, generated contract, and sprite composition. |
+| image_processing_service | Pixelator processing and grid detection in bounded workers. |
+| [media_service](media_service/README.md) | Quick Share imports, validation, S3 storage, and event-driven processing. |
+| [discord-bot](discord-bot/README.md) | Discord commands and authenticated frontend API calls. |
 
-- `renderer_service/` – FastAPI + uv powered CatGenerator V3 renderer. The service is self-contained
-  (sprite atlases live under `renderer_service/sprites`) and is packaged for deployment via Docker/uvicorn.
+Convex functions live in `frontend/convex`. Catdex thumbnails use Jimp in a Convex Node action.
+The renderer prefers `frontend/public/sprites` and `frontend/public/sprite-data` in a checkout.
+Its container copies those same canonical assets. `CG3_SPRITE_ROOT` and `CG3_DATA_ROOT` override discovery.
 
-> **Note:** Image transformations (Catdex thumbnails) are now handled by `sharp` directly in Convex.
-
-## Renderer service
-
-```bash
-cd backend/renderer_service
-uv pip install --editable .[dev]  # one-off to fetch dev tooling
-uv run uvicorn renderer_service.app.main:app --reload --host 127.0.0.1 --port 8001
-```
-
-The service automatically loads sprites from `renderer_service/sprites`. Override with `CG3_SPRITE_ROOT` if you need to
-point at a different asset set.
-
-### Tests
+From the repository root:
 
 ```bash
-uv run --directory backend/renderer_service pytest
+uv sync --project backend/renderer_service --frozen --extra dev
+uv run --project backend/renderer_service --extra dev pytest backend/renderer_service/tests
+pnpm media:check
+pnpm image-processing:check
 ```
 
-### Docker
-
-A `Dockerfile` lives beside the project root. GitHub Actions builds and publishes `ghcr.io/<org>/<repo>/renderer-service` on
-pushes that touch the backend renderer.
+GitHub and Forgejo container workflows remain in the repository. Each publication job requires its applicable validation job to succeed. Production deployment requires separate approval.

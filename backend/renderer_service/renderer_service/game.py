@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 
 class GameConfig:
     def __init__(self) -> None:

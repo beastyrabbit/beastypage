@@ -1,6 +1,6 @@
 ARG CAT_SYSTEM_CATALOG_HASH=unknown
 
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 ARG CAT_SYSTEM_CATALOG_HASH
 WORKDIR /app
 COPY package.json package-lock.json* ./
@@ -10,8 +10,9 @@ COPY src/ src/
 RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
     || test "$(cat src/generated/catalog-hash.txt)" = "$CAT_SYSTEM_CATALOG_HASH"
 RUN npm run build
+RUN npm prune --omit=dev
 
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /app
 ARG CAT_SYSTEM_CATALOG_HASH
 LABEL dev.beastypage.cat-system.catalog-hash=${CAT_SYSTEM_CATALOG_HASH}

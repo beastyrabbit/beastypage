@@ -149,7 +149,7 @@ export function HistoryClient() {
   const previewCloseRef = useRef<HTMLButtonElement>(null);
 
   const profilesQuery = useQuery(api.mapper.listHistory, { limit: 200 });
-  const batchesQuery = useQuery(api.adoption.listBatches, { limit: 120 });
+  const batchesQuery = useQuery(api.adoptionV2.listBatches, { limit: 120 });
   const treesQuery = useQuery(api.ancestryTree.list, { limit: 50 });
   const closeFocusedPreview = useCallback(() => setFocusedPreview(null), []);
 

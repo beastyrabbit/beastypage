@@ -40,14 +40,7 @@ class Settings(BaseSettings):
         default_factory=lambda: _default_data_root(),
         description="Filesystem path to canonical sprite metadata",
     )
-    cache_dir: Path = Field(
-        default_factory=lambda: (
-            Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache")) / "cat-renderer"
-        ),
-        description="Directory used for hashed render caches (PNG)",
-    )
     default_canvas_size: int = Field(50, ge=32, le=200)
-    enable_cache: bool = Field(True)
     max_queue_size: int = Field(120, ge=10, le=1000)
     worker_count: int = Field(4, ge=1, le=32)
     circuit_failure_threshold: int = Field(8, ge=3, le=50)
@@ -81,22 +74,6 @@ class Settings(BaseSettings):
         if isinstance(value, Path):
             return value
         return Path(os.path.expanduser(value)).resolve()
-
-    @field_validator("cache_dir", mode="before")
-    def _expand_cache_dir(cls, value: str | Path | None) -> Path:
-        if value is None:
-            cache = (
-                Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache"))
-                / "cat-renderer"
-            )
-            cache.mkdir(parents=True, exist_ok=True)
-            return cache
-        if isinstance(value, Path):
-            value.mkdir(parents=True, exist_ok=True)
-            return value
-        path = Path(os.path.expanduser(value)).resolve()
-        path.mkdir(parents=True, exist_ok=True)
-        return path
 
 
 @lru_cache(maxsize=1)

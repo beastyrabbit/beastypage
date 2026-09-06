@@ -35,6 +35,7 @@ pnpm install --frozen-lockfile
 pnpm --dir frontend install --frozen-lockfile
 pnpm --dir backend/media_service install --frozen-lockfile
 npm --prefix backend/discord-bot ci
+pnpm --dir backend/image_processing_service install --frozen-lockfile
 (cd backend/renderer_service && uv sync --frozen --extra dev)
 pnpm dev
 ```
@@ -110,9 +111,13 @@ beastypage/
 └── .forgejo/workflows/     # Build and release pipelines
 ```
 
+See [review remediation and rollout notes](docs/review-remediation.md) for the new service credential, compatibility requirements, limits, and verification commands.
+
 ## Container Images
 
-Forgejo Actions builds and pushes images to the Forgejo registry on `main` and version-tag pushes:
+GitHub Actions builds GHCR images on `main` and version-tag pushes. The Forgejo workflow and registry path are retained for the migration; repository files alone do not establish whether that runner is active. Both paths gate publication on validation. Convex deploys through version tags or explicit manual deployment on `main`, so merging preparatory code does not change the live backend. A pull request runs validation only.
+
+The retained Forgejo image names are:
 
 - `git.heerlab.com/beasty/beastypage-frontend`
 - `git.heerlab.com/beasty/beastypage-renderer`

@@ -120,7 +120,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
 
@@ -175,12 +175,11 @@ jobs:
           fi
 
   deploy-convex:
-    needs: [changes, tag-convex-changes]
+    needs: [changes, tag-convex-changes, cat-system-contract]
     if: |
-      always() &&
-      ((github.ref == 'refs/heads/main' && needs.changes.outputs.convex == 'true') ||
-       (startsWith(github.ref, 'refs/tags/v') && needs.tag-convex-changes.outputs.convex == 'true') ||
-       github.event.inputs.deploy_convex == 'true')
+      always() && needs.cat-system-contract.result == 'success' &&
+      ((startsWith(github.ref, 'refs/tags/v') && needs.tag-convex-changes.outputs.convex == 'true') ||
+       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.deploy_convex == 'true'))
     runs-on: personal
     defaults:
       run:
@@ -429,10 +428,28 @@ jobs:
           build-args: |
             CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
 
-  build-image-processing:
+  check-image-processing:
     needs: changes
     if: |
       always() &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       needs.changes.outputs.image_processing == 'true' ||
+       github.event.inputs.build_image_processing == 'true')
+    runs-on: personal
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.33.0 --activate
+      - run: pnpm --dir backend/image_processing_service install --frozen-lockfile --ignore-scripts
+      - run: pnpm image-processing:check
+
+  build-image-processing:
+    needs: [changes, check-image-processing]
+    if: |
+      always() && needs.check-image-processing.result == 'success' &&
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.image_processing == 'true' ||
        github.event.inputs.build_image_processing == 'true')
@@ -531,10 +548,28 @@ jobs:
           build-args: |
             CAT_SYSTEM_CATALOG_HASH=${{ steps.cat-system.outputs.hash }}
 
-  build-media:
+  check-media:
     needs: changes
     if: |
       always() &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       needs.changes.outputs.media == 'true' ||
+       github.event.inputs.build_media == 'true')
+    runs-on: personal
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.33.0 --activate
+      - run: pnpm --dir backend/media_service install --frozen-lockfile --ignore-scripts
+      - run: pnpm media:check
+
+  build-media:
+    needs: [changes, check-media]
+    if: |
+      always() && needs.check-media.result == 'success' &&
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.media == 'true' ||
        github.event.inputs.build_media == 'true')

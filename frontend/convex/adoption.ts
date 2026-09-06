@@ -1,8 +1,10 @@
+// Temporary legacy mutations; no capability projection or profile association writes.
 import { v } from "convex/values";
-import type { Doc, Id } from "./_generated/dataModel.js";
-import type { MutationCtx, QueryCtx } from "./_generated/server.js";
-import { mutation, query } from "./_generated/server.js";
-import { docIdToString, toId } from "./utils.js";
+import type { Doc } from "./_generated/dataModel.js";
+import type { MutationCtx } from "./_generated/server.js";
+import { mutation } from "./_generated/server.js";
+import { batchRecordToClient } from "./adoptionV2.js";
+import { docIdToString } from "./utils.js";
 
 const SLUG_ALPHABET =
   "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -120,59 +122,13 @@ export const createBatch = mutation({
 
     const id = await ctx.db.insert("adoption_batch", base);
 
-    await Promise.all(
-      cats
-        .map((cat) => cat.profileId)
-        .filter((profileId): profileId is Id<"cat_profile"> =>
-          Boolean(profileId),
-        )
-        .map((profileId) =>
-          ctx.db.patch(profileId, { adoptionBatchId: id, updatedAt: now }),
-        ),
-    );
+    // Legacy clients lack profile edit authority; keep previews without modifying profiles.
 
     return { id: docIdToString(id), slug, shareToken: slug };
   },
 });
 
-export const getBySlug = query({
-  args: {
-    slugOrId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const bySlug = await ctx.db
-      .query("adoption_batch")
-      .withIndex("bySlug", (q) => q.eq("slug", args.slugOrId))
-      .unique();
-    if (bySlug) {
-      return batchRecordToClient(ctx, bySlug, { includeEditTokens: true });
-    }
-
-    try {
-      const asId = await ctx.db.get(toId("adoption_batch", args.slugOrId));
-      return asId
-        ? await batchRecordToClient(ctx, asId, { includeEditTokens: true })
-        : null;
-    } catch (_error) {
-      return null;
-    }
-  },
-});
-
-export const listBatches = query({
-  args: {
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = args.limit && args.limit > 0 ? Math.min(args.limit, 200) : 50;
-    const docs = await ctx.db
-      .query("adoption_batch")
-      .withIndex("byCreated")
-      .order("desc")
-      .take(limit);
-    return Promise.all(docs.map((doc) => batchRecordToClient(ctx, doc)));
-  },
-});
+export { getBySlug, listBatches } from "./adoptionV2.js";
 
 export const updateBatchMeta = mutation({
   args: {
@@ -186,6 +142,8 @@ export const updateBatchMeta = mutation({
       throw new Error("Adoption batch not found");
     }
 
+    if (doc.editToken || doc.ownerTokenIdentifier)
+      throw new Error("Reload to edit this batch");
     const title = sanitizeOptionalString(args.title ?? null);
     const creator = sanitizeOptionalString(args.creatorName ?? null);
 
@@ -198,129 +156,3 @@ export const updateBatchMeta = mutation({
     return updated ? await batchRecordToClient(ctx, updated) : null;
   },
 });
-
-async function batchRecordToClient(
-  ctx: QueryCtx | MutationCtx,
-  doc: AdoptionBatchDoc,
-  options: { includeEditTokens?: boolean } = {},
-) {
-  const includeEditTokens = options.includeEditTokens === true;
-  return {
-    id: docIdToString(doc._id),
-    slug: doc.slug ?? docIdToString(doc._id),
-    title: doc.title ?? null,
-    creatorName: doc.creatorName ?? null,
-    settings: doc.settings ?? null,
-    cats: await Promise.all(
-      (doc.cats ?? []).map(async (cat, index) => {
-        const profileInfo = cat.profileId
-          ? await resolveProfilePreview(ctx, cat.profileId, {
-              includeEditToken: includeEditTokens,
-            })
-          : null;
-        return {
-          index,
-          label: cat.label,
-          catData: cat.catData,
-          profileId: cat.profileId
-            ? docIdToString(cat.profileId)
-            : (profileInfo?.id ?? null),
-          encoded: cat.encoded ?? null,
-          shareToken: cat.shareToken ?? profileInfo?.slug ?? null,
-          editToken: includeEditTokens
-            ? (cat.editToken ?? profileInfo?.editToken ?? null)
-            : null,
-          catName: cat.catName ?? profileInfo?.catName ?? null,
-          creatorName: cat.creatorName ?? profileInfo?.creatorName ?? null,
-          previews: profileInfo?.previews ?? {
-            tiny: null,
-            preview: null,
-            full: null,
-            spriteSheet: null,
-            updatedAt: null,
-          },
-        };
-      }),
-    ),
-    created: doc.createdAt,
-    updated: doc.updatedAt,
-  };
-}
-
-/**
- * Resolve profile preview - returns cached storage URLs when available, null otherwise.
- * The frontend uses /api/preview/{id} for on-demand rendering when no cached URL exists.
- */
-async function resolveProfilePreview(
-  ctx: QueryCtx | MutationCtx,
-  profileId: Id<"cat_profile">,
-  options: { includeEditToken?: boolean } = {},
-) {
-  const profile = await ctx.db.get(profileId);
-  if (!profile) return null;
-
-  const images = await ctx.db
-    .query("cat_images")
-    .withIndex("byProfile", (q) => q.eq("catProfileId", profileId))
-    .collect();
-
-  const find = (kind: "tiny" | "preview" | "full" | "spriteSheet") =>
-    images.find((image) => image.kind === kind) ?? null;
-
-  const tinyImage = find("tiny");
-  const previewImage = find("preview");
-  const fullImage = find("full");
-  const sheetImage = find("spriteSheet");
-
-  const tinyUrl = tinyImage ? await safeGetUrl(ctx, tinyImage.storageId) : null;
-  const previewUrl = previewImage
-    ? await safeGetUrl(ctx, previewImage.storageId)
-    : null;
-  const fullUrl = fullImage ? await safeGetUrl(ctx, fullImage.storageId) : null;
-  const sheetUrl = sheetImage
-    ? await safeGetUrl(ctx, sheetImage.storageId)
-    : null;
-  const profileIdString = docIdToString(profile._id);
-
-  return {
-    id: profileIdString,
-    slug: profile.slug,
-    editToken: options.includeEditToken ? (profile.editToken ?? null) : null,
-    catName: profile.catName ?? null,
-    creatorName: profile.creatorName ?? null,
-    previews: {
-      tiny: tinyUrl
-        ? { url: tinyUrl, name: tinyImage?.filename ?? null }
-        : null,
-      preview: previewUrl
-        ? { url: previewUrl, name: previewImage?.filename ?? null }
-        : null,
-      full: fullUrl
-        ? { url: fullUrl, name: fullImage?.filename ?? null }
-        : null,
-      spriteSheet: sheetUrl
-        ? {
-            url: sheetUrl,
-            name: sheetImage?.filename ?? null,
-            meta: sheetImage?.meta ?? null,
-          }
-        : null,
-      updatedAt: profile.previewsUpdatedAt ?? null,
-    },
-  };
-}
-
-async function safeGetUrl(
-  ctx: QueryCtx | MutationCtx,
-  id: Id<"_storage">,
-): Promise<string | null> {
-  try {
-    // Convex Cloud returns proper absolute URLs from storage.getUrl()
-    // Return directly without normalization to avoid URL object property access restrictions
-    const url = await ctx.storage.getUrl(id);
-    return url ?? null;
-  } catch (error) {
-    console.warn("Failed to obtain storage URL", error);
-    return null;
-  }
-}

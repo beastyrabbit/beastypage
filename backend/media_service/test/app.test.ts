@@ -33,6 +33,36 @@ afterEach(() => {
 });
 
 describe("raw media delivery", () => {
+	it("serves the selected later survivor consistently for GET and HEAD", async () => {
+		const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
+			const request = JSON.parse(String(init?.body));
+			if (request.op === "public")
+				return controlResponse({ error: "unavailable" }, 404);
+			return controlResponse([
+				{
+					key: "later-item",
+					mime: "image/png",
+					size: 4,
+					name: "later.png",
+					expiresAt: Date.now() + 60_000,
+				},
+			]);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const get = vi.fn(async () => ({
+			body: new Blob(["safe"]).stream(),
+			contentLength: 4,
+		}));
+		const head = vi.fn(async () => ({ contentLength: 4 }));
+		const { app } = createApp(config, { get, head } as unknown as ObjectStore);
+		expect((await app.request("/i/Abcdefg1")).status).toBe(200);
+		expect((await app.request("/i/Abcdefg1", { method: "HEAD" })).status).toBe(
+			200,
+		);
+		expect(get).toHaveBeenCalledWith("later-item", undefined);
+		expect(head).toHaveBeenCalledWith("later-item");
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
 	it("returns media bytes directly with range and crawler headers", async () => {
 		vi.stubGlobal(
 			"fetch",

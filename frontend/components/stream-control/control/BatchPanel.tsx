@@ -46,7 +46,7 @@ export function BatchPanel() {
     batchLiveState,
   } = useStreamControl();
   const { generator, ready: generatorReady } = useCatGenerator();
-  const createBatch = useMutation(api.adoption.createBatch);
+  const createBatch = useMutation(api.adoptionV2.createBatch);
   const createMapper = useMutation(api.mapper.create);
   const triggerBatch = useMutation(api.catStream.triggerBatch);
   const attachBatchSlug = useMutation(api.catStream.attachBatchSlug);
@@ -300,6 +300,7 @@ export function BatchPanel() {
               label: `Cat ${index + 1}`,
               catData: catDataToLegacyPersistence(cat.catData),
               profileId: toId("cat_profile", mapperResult.id),
+              editToken: mapperResult.editToken ?? undefined,
               encoded: encodeCatShare(
                 cat.catData as unknown as Parameters<typeof encodeCatShare>[0],
               ),

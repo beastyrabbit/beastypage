@@ -26,6 +26,17 @@ export async function executePipeline(
   const original = await sharp(imageBuffer).ensureAlpha().png().toBuffer();
   const results = new Map<string, Buffer>();
   results.set("original", original);
+  const enabled = steps.filter(step => step.enabled);
+  const remaining = new Map<string, number>();
+  const seen = new Set(["original"]);
+  for (const step of enabled) {
+    if (!step.id || seen.has(step.id)) throw new ProcessingError("Step IDs must be unique and cannot be original");
+    for (const key of [step.inputSource || "original", ...(step.blendWith ? [step.blendWith.stepId] : [])]) {
+      if (!seen.has(key)) throw new ProcessingError(`Step ${step.id} must reference an earlier enabled step`);
+      remaining.set(key, (remaining.get(key) ?? 0) + 1);
+    }
+    seen.add(step.id);
+  }
 
   let lastResult: Buffer = original;
   let stepsProcessed = 0;
@@ -82,6 +93,12 @@ export async function executePipeline(
     }
 
     results.set(step.id, output);
+    for (const key of [inputKey, ...(step.blendWith ? [step.blendWith.stepId] : [])]) {
+      const left = (remaining.get(key) ?? 1) - 1;
+      remaining.set(key, left);
+      if (left === 0) results.delete(key);
+    }
+    if (!remaining.has(step.id)) results.delete(step.id);
     lastResult = output;
     stepsProcessed++;
   }

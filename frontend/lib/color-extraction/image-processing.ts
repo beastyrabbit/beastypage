@@ -84,6 +84,7 @@ export async function loadImageFromUrl(url: string): Promise<HTMLImageElement> {
 export function imageToDataUrl(
   img: HTMLImageElement,
   maxDimension = MAX_DIMENSION,
+  maxPixels = Number.POSITIVE_INFINITY,
 ): string {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
@@ -91,11 +92,14 @@ export function imageToDataUrl(
 
   // Calculate scaled dimensions
   let { width, height } = img;
-  if (width > maxDimension || height > maxDimension) {
-    const scale = maxDimension / Math.max(width, height);
-    width = Math.round(width * scale);
-    height = Math.round(height * scale);
-  }
+  const scale = Math.min(
+    1,
+    maxDimension / Math.max(width, height),
+    Math.sqrt(maxPixels / (width * height)),
+  );
+  const round = Number.isFinite(maxPixels) ? Math.floor : Math.round;
+  width = Math.max(1, round(width * scale));
+  height = Math.max(1, round(height * scale));
 
   canvas.width = width;
   canvas.height = height;

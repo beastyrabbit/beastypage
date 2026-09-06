@@ -26,6 +26,7 @@ export type PersistedEvolutionCat = {
 export type PersistEvolutionBatchOutcome = {
   batchId: string | null;
   batchSlug: string | null;
+  batchEditToken?: string;
   persistedCats: PersistedEvolutionCat[];
 };
 
@@ -50,6 +51,7 @@ type CreateBatchFn = (args: {
   creatorName: string;
 }) => Promise<{
   id?: string | null;
+  editToken?: string;
   slug?: string | null;
   shareToken?: string | null;
 }>;
@@ -109,6 +111,7 @@ export async function persistEvolutionBatch(options: {
   });
   return {
     batchId: batch.id ?? null,
+    batchEditToken: batch.editToken,
     batchSlug: batch.slug ?? batch.shareToken ?? null,
     persistedCats,
   };

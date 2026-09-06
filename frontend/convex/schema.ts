@@ -212,6 +212,8 @@ export default defineSchema({
     .index("byCreated", ["createdAt"]),
 
   adoption_batch: defineTable({
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     slug: v.optional(v.string()),
     title: v.optional(v.string()),
     creatorName: v.optional(v.string()),
@@ -235,6 +237,9 @@ export default defineSchema({
     .index("byCreated", ["createdAt"]),
 
   stream_sessions: defineTable({
+    ownerTokenIdentifier: v.optional(v.string()),
+    allowedOptions: v.optional(v.array(v.string())),
+    voteRound: v.optional(v.number()),
     viewerKey: v.string(),
     status: v.string(),
     currentStep: v.optional(v.string()),
@@ -246,7 +251,16 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("byViewerKey", ["viewerKey"])
-    .index("byStatus", ["status"]),
+    .index("byStatus", ["status"])
+    .index("by_ownerTokenIdentifier_and_updatedAt", [
+      "ownerTokenIdentifier",
+      "updatedAt",
+    ])
+    .index("by_ownerTokenIdentifier_and_status_and_updatedAt", [
+      "ownerTokenIdentifier",
+      "status",
+      "updatedAt",
+    ]),
 
   stream_participants: defineTable({
     sessionId: v.id("stream_sessions"),
@@ -258,9 +272,12 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("bySession", ["sessionId"])
-    .index("byViewerSession", ["viewerSession"]),
+    .index("byViewerSession", ["viewerSession"])
+    .index("by_sessionId_and_viewerSession", ["sessionId", "viewerSession"])
+    .index("by_sessionId_and_fingerprint", ["sessionId", "fingerprint"]),
 
   stream_votes: defineTable({
+    voteRound: v.optional(v.number()),
     sessionId: v.id("stream_sessions"),
     stepId: v.string(),
     optionKey: v.string(),
@@ -270,7 +287,13 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("bySession", ["sessionId"])
-    .index("byStep", ["sessionId", "stepId"]),
+    .index("byStep", ["sessionId", "stepId"])
+    .index("by_sessionId_and_voteRound", ["sessionId", "voteRound"])
+    .index("by_sessionId_and_voteRound_and_votedBy", [
+      "sessionId",
+      "voteRound",
+      "votedBy",
+    ]),
 
   wheel_spins: defineTable({
     prizeName: v.string(),

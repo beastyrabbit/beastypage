@@ -22,7 +22,12 @@ from .executor import (
     load_render_plan,
 )
 from .integrity import DEFAULT_INTEGRITY_PATH, verify_bundle_integrity
-from .legacy_adapter import LegacyCatAdapter
+from .legacy_adapter import (
+    BooleanAliasBinding,
+    LegacyCatAdapter,
+    ListBinding,
+    PoseBinding,
+)
 from .repository import SpriteRepository
 from .sprite_mapper import SpriteMapper
 from .strategies import STRATEGY_REGISTRY
@@ -273,7 +278,7 @@ class RenderPipeline:
             if image.size != (sheet_tile, sheet_tile):
                 tile = image.resize((sheet_tile, sheet_tile), Image.NEAREST)
 
-            sheet.paste(tile, (x, y), tile)
+            sheet.paste(tile, (x, y))
 
             frames.append(
                 BatchFrameResult(
@@ -328,7 +333,31 @@ class RenderPipeline:
     # ------------------------------------------------------------------
     def _prepare_variant_params(self, base_params: dict, variant: BatchVariant) -> dict:
         params = deepcopy(base_params)
+
+        def clear_overridden_aliases(update: dict) -> None:
+            for trait in self.adapter.manifest.traits:
+                binding = trait.legacy
+                keys: list[str] = []
+                if isinstance(binding, ListBinding):
+                    keys = [binding.key] + (
+                        [binding.single_key] if binding.single_key else []
+                    )
+                elif isinstance(binding, BooleanAliasBinding):
+                    keys = [binding.key, *binding.aliases]
+                elif isinstance(binding, PoseBinding):
+                    keys = [
+                        binding.key,
+                        binding.sprite_key,
+                        "pose_name",
+                        "sprite_number",
+                        "sprite",
+                    ]
+                if any(key in update for key in keys):
+                    for key in keys:
+                        params.pop(key, None)
+
         if variant.params:
+            clear_overridden_aliases(variant.params)
             variant_params = deepcopy(variant.params)
             legacy_coat_pattern = normalize_coat_pattern_name(
                 variant_params.get("peltName")
@@ -341,6 +370,7 @@ class RenderPipeline:
                     variant_params["coatPattern"] = None
             params.update(variant_params)
         if variant.overrides:
+            clear_overridden_aliases(variant.overrides)
             variant_overrides = deepcopy(variant.overrides)
             legacy_coat_pattern = normalize_coat_pattern_name(
                 variant_overrides.get("peltName")
@@ -358,6 +388,9 @@ class RenderPipeline:
         if variant.pose_name is not None:
             params["poseName"] = variant.pose_name
         if variant.sprite_number is not None:
+            if variant.pose_name is None:
+                params.pop("poseName", None)
+                params.pop("pose_name", None)
             params["spriteNumber"] = variant.sprite_number
         return self._normalize_params(params)
 

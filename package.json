@@ -2,6 +2,8 @@
   "name": "beastypage",
   "private": true,
   "scripts": {
+    "image-processing:check": "pnpm --dir backend/image_processing_service run typecheck && pnpm --dir backend/image_processing_service exec vitest run",
+    "media:check": "pnpm --dir backend/media_service run lint && pnpm --dir backend/media_service run typecheck && pnpm --dir backend/media_service test",
     "cat-system:generate": "pnpm --dir frontend run cat-system:generate",
     "cat-system:check": "pnpm --dir frontend run cat-system:check",
     "cat-system:build": "pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run && sh frontend/scripts/write-version.sh && pnpm --dir frontend exec tsc --noEmit && NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_placeholder_CLERK_KEY pnpm --dir frontend run build && npm --prefix backend/discord-bot test && cd backend/renderer_service && uv run python -m renderer_service.render_contract --check && uv run --extra dev pytest -q",
@@ -15,9 +17,9 @@
     "dev:bot": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/discord-bot -- pnpm --dir backend/discord-bot exec tsx src/index.ts",
     "dev:palettes": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/frontend -- pnpm --dir frontend exec tsx scripts/watch-renderer-palettes.ts",
     "env:check": "pnpm env:check:frontend && pnpm env:check:media && pnpm env:check:bot",
-    "env:check:frontend": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/frontend -- node scripts/check-required-env.mjs CONVEX_DEPLOYMENT NEXT_PUBLIC_CONVEX_URL NEXT_PUBLIC_CONVEX_SITE_URL NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY CLERK_SECRET_KEY RENDERER_INTERNAL_URL",
+    "env:check:frontend": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/frontend -- node scripts/check-required-env.mjs CONVEX_DEPLOYMENT NEXT_PUBLIC_CONVEX_URL NEXT_PUBLIC_CONVEX_SITE_URL NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY CLERK_SECRET_KEY RENDERER_INTERNAL_URL DISCORD_API_TOKEN",
     "env:check:media": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/media -- node scripts/check-required-env.mjs CONVEX_SITE_URL QUICK_SHARE_INTERNAL_TOKEN QUICK_SHARE_HMAC_KEY S3_ENDPOINT S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY",
-    "env:check:bot": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/discord-bot -- node scripts/check-required-env.mjs DISCORD_BOT_TOKEN DISCORD_CLIENT_ID FRONTEND_API_URL"
+    "env:check:bot": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/discord-bot -- node scripts/check-required-env.mjs DISCORD_BOT_TOKEN DISCORD_CLIENT_ID FRONTEND_API_URL DISCORD_API_TOKEN"
   },
   "dependencies": {
     "sharp": "^0.35.0"

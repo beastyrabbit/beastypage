@@ -16,10 +16,17 @@ const server = serve({
 
 console.log(`[quick-share] listening on port ${config.port}`);
 
-function shutdown() {
+let shuttingDown = false;
+async function shutdown() {
+	if (shuttingDown) return;
+	shuttingDown = true;
 	worker.stop();
-	server.close(() => process.exit(0));
 	setTimeout(() => process.exit(1), 10_000).unref();
+	await Promise.all([
+		worker.drain?.(),
+		new Promise<void>((resolve) => server.close(() => resolve())),
+	]);
+	process.exit(0);
 }
 
 process.on("SIGINT", shutdown);

@@ -1,21 +1,12 @@
 "use client";
 
+import { useClerk, useUser } from "@clerk/nextjs";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Loader2, LogIn, LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { useClerk, useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
-
-/**
- * Module-level flag to suppress getOrCreateUser after account deletion.
- * Set by the profile page before calling deleteAccount, cleared on sign-out.
- */
-let _accountDeleting = false;
-export function setAccountDeleting(v: boolean) {
-  _accountDeleting = v;
-}
 
 export function UserAuthButton() {
   const clerk = useClerk();
@@ -29,7 +20,7 @@ export function UserAuthButton() {
 
   // Ensure user doc exists in Convex after login
   useEffect(() => {
-    if (isAuthenticated && !hasCreatedRef.current && !_accountDeleting) {
+    if (isAuthenticated && !hasCreatedRef.current) {
       hasCreatedRef.current = true;
       getOrCreateUser().catch((err) => {
         console.error("[UserAuthButton] getOrCreateUser failed:", err);
@@ -38,7 +29,6 @@ export function UserAuthButton() {
     }
     if (!isAuthenticated) {
       hasCreatedRef.current = false;
-      _accountDeleting = false;
     }
   }, [isAuthenticated, getOrCreateUser]);
 
@@ -104,7 +94,11 @@ export function UserAuthButton() {
         aria-label="User menu"
       >
         {clerkUser?.imageUrl ? (
-          <img src={clerkUser.imageUrl} alt="" className="size-full object-cover" />
+          <img
+            src={clerkUser.imageUrl}
+            alt=""
+            className="size-full object-cover"
+          />
         ) : (
           <div className="flex size-full items-center justify-center bg-primary/15 text-primary">
             {initial ? (

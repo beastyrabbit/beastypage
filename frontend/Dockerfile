@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1.25
 
 # Stage 1: Install dependencies
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Build application
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
@@ -40,12 +40,11 @@ RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
     || test "$(cat public/cat-system/catalog-hash.txt)" = "$CAT_SYSTEM_CATALOG_HASH"
 
 # Build Next.js with standalone output
-# Note: convex codegen runs via the "prepare" script during pnpm install;
-# generated types are committed to git, so codegen is not needed during Docker build
+# Generated Convex types are committed; dependency installation skips scripts.
 RUN pnpm run build
 
 # Stage 3: Production image (Node-based for standalone compatibility)
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 ARG CAT_SYSTEM_CATALOG_HASH=unknown
