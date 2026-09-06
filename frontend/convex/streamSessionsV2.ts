@@ -75,6 +75,23 @@ export const get = query({
   },
 });
 
+/** Host links can outlive ownership rules; return an unavailable selection safely. */
+export const getForHost = query({
+  args: { id: v.string() },
+  handler: async (ctx, args) => {
+    const id = ctx.db.normalizeId("stream_sessions", args.id);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!id || !identity) return null;
+    const doc = await ctx.db.get(id);
+    if (
+      !doc?.ownerTokenIdentifier ||
+      doc.ownerTokenIdentifier !== identity.tokenIdentifier
+    )
+      return null;
+    return streamSessionToClient(doc);
+  },
+});
+
 export const create = mutation({
   args: {
     allowedOptions: v.optional(v.array(v.string())),

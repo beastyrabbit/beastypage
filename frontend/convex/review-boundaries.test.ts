@@ -53,6 +53,41 @@ describe("adoption authority", () => {
 });
 
 describe("legacy voting transactions", () => {
+  it("returns unavailable host selections safely for legacy, foreign, or malformed IDs", async () => {
+    const t = convexTest(schema, modules);
+    const host = t.withIdentity({
+      subject: "host",
+      issuer: "https://identity.example",
+    });
+    const other = t.withIdentity({
+      subject: "other",
+      issuer: "https://identity.example",
+    });
+    const modern = await host.mutation(api.streamSessionsV2.create, {
+      viewerKey: "host",
+      status: "live",
+    });
+    const legacy = await t.run((ctx) =>
+      ctx.db.insert("stream_sessions", {
+        viewerKey: "legacy",
+        status: "live",
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+    expect(
+      await host.query(api.streamSessionsV2.getForHost, { id: modern!.id }),
+    ).toMatchObject({ id: modern!.id });
+    expect(
+      await other.query(api.streamSessionsV2.getForHost, { id: modern!.id }),
+    ).toBeNull();
+    expect(
+      await host.query(api.streamSessionsV2.getForHost, { id: legacy }),
+    ).toBeNull();
+    expect(
+      await host.query(api.streamSessionsV2.getForHost, { id: "invalid" }),
+    ).toBeNull();
+  });
   it("preserves only verified host presentation metadata and ignores participant spoofing", async () => {
     const t = convexTest(schema, modules);
     const host = t.withIdentity({

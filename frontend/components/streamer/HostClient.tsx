@@ -192,7 +192,7 @@ function AuthenticatedHostClient() {
     return { id: toId("stream_sessions", activeSessionId) } as const;
   }, [activeSessionId]);
 
-  const session = useQuery(api.streamSessionsV2.get, sessionArgs);
+  const session = useQuery(api.streamSessionsV2.getForHost, sessionArgs);
 
   const sessionList = useQuery(api.streamSessionsV2.list, {
     status: "live",
@@ -220,24 +220,24 @@ function AuthenticatedHostClient() {
   }, []);
 
   const votesArgs = useMemo(() => {
-    if (!activeSessionId) return "skip" as const;
+    if (!activeSessionId || !session) return "skip" as const;
     return {
       session: toId("stream_sessions", activeSessionId),
       stepId: currentStepId ?? undefined,
       limit: 500,
     } as const;
-  }, [activeSessionId, currentStepId]);
+  }, [activeSessionId, currentStepId, session]);
 
   const rawVotes = useQuery(api.streamVotesV2.list, votesArgs);
   const votes = useMemo(() => rawVotes ?? [], [rawVotes]);
 
   const participantsArgs = useMemo(() => {
-    if (!activeSessionId) return "skip" as const;
+    if (!activeSessionId || !session) return "skip" as const;
     return {
       session: toId("stream_sessions", activeSessionId),
       limit: 200,
     } as const;
-  }, [activeSessionId]);
+  }, [activeSessionId, session]);
 
   const rawParticipants = useQuery(
     api.streamParticipantsV2.list,
@@ -299,10 +299,19 @@ function AuthenticatedHostClient() {
     const preselected = new URLSearchParams(window.location.search).get(
       "session",
     );
-    if (preselected && !activeSessionId) {
+    if (preselected) {
       setActiveSessionId(preselected);
     }
-  }, [activeSessionId]);
+  }, []);
+
+  useEffect(() => {
+    if (!activeSessionId || session !== null) return;
+    setActiveSessionId(null);
+    updateSessionQueryParam(null);
+    setStatusMessage(
+      "This session is unavailable to your account. Older sessions cannot be resumed. Create a new session to continue.",
+    );
+  }, [activeSessionId, session, updateSessionQueryParam]);
 
   useEffect(() => {
     updateSessionQueryParam(activeSessionId ?? null);

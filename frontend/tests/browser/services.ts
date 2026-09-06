@@ -27,7 +27,8 @@ const viewer = {
 export const useConvexAuth = () => ({
   isLoading: false,
   isAuthenticated:
-    new URL(location.href).searchParams.get("view") === "profile",
+    new URL(location.href).searchParams.get("view") === "profile" ||
+    new URL(location.href).searchParams.has("signedIn"),
 });
 export const useUser = () => ({
   user: { username: "Test account", imageUrl: null, update: async () => {} },
@@ -38,8 +39,16 @@ export const useClerk = () => ({
 });
 const getToken = async () => null;
 export const useAuth = () => ({ isLoaded: true, isSignedIn: true, getToken });
-export function useQuery(reference: Parameters<typeof getFunctionName>[0]) {
+export function useQuery(
+  reference: Parameters<typeof getFunctionName>[0],
+  args?: unknown,
+) {
+  if (args === "skip") return undefined;
   switch (getFunctionName(reference)) {
+    case "streamSessionsV2:getForHost":
+      return null;
+    case "streamParticipantsV2:list":
+      throw new Error("Protected participants queried before host eligibility");
     case "collection:list":
       return [artwork];
     case "users:viewer":

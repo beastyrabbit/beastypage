@@ -62,6 +62,25 @@ test("host sign-in gate has a visible sign-in control", async ({ page }) => {
   await page.screenshot({ path: "../.playwright-mcp/host-sign-in.png" });
 });
 
+test("host can recover from a legacy or unavailable session link", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    `${process.env.BROWSER_FIXTURE_URL}?view=host&signedIn=1&session=legacy-session`,
+  );
+  await expect(
+    page.getByText(
+      "This session is unavailable to your account. Older sessions cannot be resumed. Create a new session to continue.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Start new session", exact: true }),
+  ).toBeEnabled();
+  expect(errors).toEqual([]);
+});
+
 test("Catdex shows the styled load-more control", async ({ page }) => {
   await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=catdex`);
   await expect(
