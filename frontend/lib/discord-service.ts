@@ -1,7 +1,7 @@
 import type { internal } from "@/convex/_generated/api";
 
 export type DiscordUserConfig =
-  typeof internal.discordUserConfig.get._returnType;
+  typeof internal.discordUserConfigInternal.get._returnType;
 
 export async function discordConfig(
   operation: string,

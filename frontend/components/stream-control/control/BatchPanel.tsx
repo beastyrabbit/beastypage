@@ -46,7 +46,7 @@ export function BatchPanel() {
     batchLiveState,
   } = useStreamControl();
   const { generator, ready: generatorReady } = useCatGenerator();
-  const createBatch = useMutation(api.adoption.createBatch);
+  const createBatch = useMutation(api.adoptionV2.createBatch);
   const createMapper = useMutation(api.mapper.create);
   const triggerBatch = useMutation(api.catStream.triggerBatch);
   const attachBatchSlug = useMutation(api.catStream.attachBatchSlug);

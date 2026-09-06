@@ -1,14 +1,14 @@
 # September 2026 review remediation
 
-This change addresses the [project review](https://schaffa.dev/p/m8tcd0usfcrqvulf) against `1284343a6f78af9cc8b8481e57cd7c4ded20d8f0`. It prepares code and validation for a PR. It does not deploy services, migrate live data, configure secrets, or verify production behavior.
+This change addresses the [project review](https://schaffa.dev/p/m8tcd0usfcrqvulf) against `1284343a6f78af9cc8b8481e57cd7c4ded20d8f0`. The bridge candidate adds the secured clients and APIs while preserving temporary legacy entry points for a phased release. Full enforcement requires the cleanup release below; code checks do not establish production delivery.
 
 ## Finding map
 
 | Finding | Result and regression coverage |
 | --- | --- |
 | F01 | Adoption public projections omit editing capabilities. Linking an existing profile requires its owner or editing token. Batch metadata requires its creator identity or a newly issued private batch token. Synthetic Convex tests cover denial and public viewing. |
-| F02 | Legacy hosts must sign in. Mutations enforce host ownership, participant membership and token, live/current rounds, allowed choices, closed polls, removed participants, and one participant vote per round. Host tie-break votes remain supported. Queries use bounded indexes and omit participant capabilities. |
-| F03 | Next Discord preference routes require a service bearer credential. Convex config functions are internal and reachable through an authenticated HTTP action. The bot supplies the credential. Tests cover both boundaries with synthetic values. |
+| F02 | New hosts must sign in. Mutations enforce host ownership, participant membership and token, live/current rounds, allowed choices, closed polls, removed participants, and one participant vote per round. Host tie-break votes remain supported. Queries use bounded indexes and omit participant capabilities. |
+| F03 | Next Discord preference routes require a service bearer credential. New Convex config functions are internal and reachable through an authenticated HTTP action. Temporary legacy config functions remain until cleanup. The bot supplies the credential. Tests cover both boundaries with synthetic values. |
 | F04 | Image downloads validate every resolved address and redirect, pin the selected public address, reject nonstandard ports, and bound bytes and total time. Fake DNS and transport tests cover redirect rejection, pinning, and streamed byte limits. |
 | F05 | Both delivery workflows require a successful cat-system contract job before Convex deployment. A workflow regression checks the dependency and success predicate. |
 | F06 | Renderer batches admit at most 256 total frames, 1,024-pixel tiles, and a conservative 16-million-pixel working budget. Invalid work is rejected before queue admission. |
@@ -46,14 +46,17 @@ The renderer's budget includes padded output-sheet cells, retained source frames
 
 ## Compatibility and approved rollout
 
-Do not deploy this entire final state over legacy replicas in one step. Production rollout requires separate human approval and the repository's version-tag release flow.
+Production delivery uses explicit human approval and the version-tag release flow. A main-branch merge builds images but no longer deploys Convex; version tags and explicit main-branch dispatch retain the contract gate.
 
-1. Prepare an additive Convex release containing the new optional schema/index fields and the authenticated Discord HTTP endpoint plus internal config implementations under new names, while retaining the old function names for existing replicas. The final internal-only conversion in this PR belongs to phase 3, not this preparatory release. Provision `DISCORD_API_TOKEN`, at least 32 random characters, through the approved secret mechanism in the bot, frontend, and Convex environments. Configure the frontend's Convex HTTP site URL.
-2. Update the bot to send the bearer header, then update the frontend to use the authenticated HTTP config route and pass adoption/stream capabilities. Wait until every old bot/frontend replica has stopped. Do not infer this from image publication. Old browser tabs must reload before editing or voting under the new authority rules.
-3. Apply the final Convex enforcement and internal-only config functions. Old unauthenticated clients intentionally fail closed. Ownerless legacy stream sessions cannot be claimed by a caller-supplied identity; hosts create new signed-in sessions. Old batches without creator authority remain viewable but cannot have metadata edited. No automatic ownership migration is included.
-4. After all legacy replicas are gone, use time-filtered logs to check signature/authentication errors and verify Helm reconciliation in git-ops. No such production checks were run for this PR.
+1. Provision a single `DISCORD_API_TOKEN` of at least 32 random characters through the approved secret mechanism in the bot, frontend, and Convex environments. The frontend also needs `CONVEX_SITE_URL`. Verify equality without exposing values.
+2. Publish the bridge release, planned as `v7.5.0`. Its Convex deployment adds `adoptionV2`, `streamSessionsV2`, `streamParticipantsV2`, `streamVotesV2`, `discordUserConfigInternal`, the authenticated Discord HTTP route, Catdex pagination/pending APIs, and `users.resetSavedVariants`. New clients use those APIs. The old namespaces retain old argument validators during this phase. Public projections never return editing or participant capabilities.
+3. After the bridge backend is deployed, roll the bot first so it sends the service credential. Then roll the frontend and remaining services through GitOps. Confirm the live image identities and that every legacy service replica has stopped. Image publication alone is insufficient.
+4. Publish the enforcement release, planned as `v7.5.1`, removing temporary `adoption`, `streamSessions`, `streamParticipants`, `streamVotes`, `discordUserConfig`, `rolloutLegacy` and the `users.deleteAccount` placeholder. Keep the V2 and internal API names unchanged. New frontend replicas already use them, so removing legacy names cannot change their contracts.
+5. Reconcile the final version in GitOps, verify the public serving version at desktop and mobile sizes, and inspect time-filtered logs only after legacy replicas are gone.
 
-This document specifies required preparatory work; the final-state branch alone is not an additive rollout artifact. Do not roll back only the frontend while leaving incompatible Convex enforcement in place. Keep the secure endpoint and matching client together, or pause the affected feature while preparing a compatible rollback. Never restore public editing-token projections.
+The temporary stream APIs reject records with an owner or the V2 `allowedOptions` marker, including empty arrays. Legacy updates never introduce that marker, and legacy vote queries include records without a round field. Legacy adoption creation preserves previews but never patches referenced profiles. Its metadata mutation rejects batches with creator authority. During the bridge, legacy ownerless data and Discord config still have their former public access; this exposure ends only with cleanup. Old account-deletion calls throw a reload instruction without deleting data or falsely reporting success.
+
+Old browser tabs must reload after enforcement. Ownerless legacy streams cannot be claimed by caller-supplied identities; hosts create new signed-in sessions. Old batches without creator authority remain viewable through V2 but cannot have metadata edited. There is no automatic ownership migration. Rollback must keep a frontend with the V2 calls and its matching backend. Never restore public editing-token projections.
 
 ## Dependency advisory triage
 
@@ -69,10 +72,12 @@ Run the root `cat-system:build`, `media:check`, and `image-processing:check` com
 
 ## PR feedback
 
+- Quick Share catches failed history requests, shows a retryable error beside recent shares, and preserves existing items. A browser test verifies HTTP 500 recovery through refresh without an unhandled exception.
+
 - Pixelator preserves images up to 4,000 pixels on the longest side and four million pixels in total. A 4,000 × 800 image remains full size. Worker validation errors keep their safe hints; unexpected decoder errors remain masked.
 - Clearing tie-break choices retains the current round and its deciding votes. Earlier rounds are not restored. The host UI states this explicitly. Host votes retain only bounded label/step strings and recognized coin-flip provenance after authorization; participant metadata comes from the server.
 - The legacy `catdex.list` endpoint remains capped at 48 for compatibility. Clients needing every card must use `catdex.page` until pagination completes.
-- Configure the bot's `FRONTEND_API_URL` with the canonical HTTPS origin. Redirects are rejected so a bearer credential is never forwarded to a different endpoint. Set the same `DISCORD_API_TOKEN` through the approved secret mechanism in the bot, frontend, and Convex. Local frontend/bot environment checks require it. Frontend config reads use `CONVEX_SITE_URL` or `NEXT_PUBLIC_CONVEX_SITE_URL`; they do not depend on the separate Convex query URL.
+- Configure the bot's `FRONTEND_API_URL` with the canonical origin, using HTTPS publicly or the existing trusted in-cluster service address. Redirects are rejected so a bearer credential is never forwarded to a different endpoint. Set the same `DISCORD_API_TOKEN` through the approved secret mechanism in the bot, frontend, and Convex. Local frontend/bot environment checks require it. Frontend config reads use `CONVEX_SITE_URL` or `NEXT_PUBLIC_CONVEX_SITE_URL`; they do not depend on the separate Convex query URL.
 - Image download sources must return an `image/*` Content-Type. Missing headers are rejected intentionally. Temporary DNS abort listeners are removed as soon as resolution settles.
 - Frontend, bot, and image-processing Docker stages and contract CI use Node 24. Renderer test dependencies explicitly include PyYAML. `httpx2` remains because the installed Starlette test client imports it and deprecates its `httpx` fallback.
 - Convex declarations were regenerated locally with the installed CLI, including the new Discord and stream modules. No deployment was needed.

@@ -21,9 +21,9 @@ import {
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { cn } from "@/lib/utils";
 
-type SessionRecord = typeof api.streamSessions.get._returnType;
+type SessionRecord = typeof api.streamSessionsV2.get._returnType;
 type ParticipantRecord =
-  (typeof api.streamParticipants.list._returnType)[number];
+  (typeof api.streamParticipantsV2.list._returnType)[number];
 
 type StreamParams = StreamerParams;
 type StepOption = ReturnType<StreamStep["getOptions"]>[number];
@@ -156,7 +156,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   }, [viewerKey]);
 
   const sessionMatches =
-    useQuery(api.streamSessions.list, sessionLookupArgs) ?? [];
+    useQuery(api.streamSessionsV2.list, sessionLookupArgs) ?? [];
   const sessionId = sessionMatches[0]?.id ?? null;
 
   const sessionArgs = useMemo(() => {
@@ -165,7 +165,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   }, [sessionId]);
 
   const session = useQuery(
-    api.streamSessions.get,
+    api.streamSessionsV2.get,
     sessionArgs,
   ) as SessionRecord;
 
@@ -178,7 +178,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     } as const;
   }, [sessionId, session?.current_step]);
 
-  const rawVotes = useQuery(api.streamVotes.list, votesArgs);
+  const rawVotes = useQuery(api.streamVotesV2.list, votesArgs);
   const votes = useMemo(() => rawVotes ?? [], [rawVotes]);
 
   const participantArgs = useMemo(() => {
@@ -191,7 +191,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   }, [sessionId, viewerSession]);
 
   const rawParticipantList = useQuery(
-    api.streamParticipants.list,
+    api.streamParticipantsV2.list,
     participantArgs,
   );
   const participantList = useMemo(
@@ -209,8 +209,8 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     return () => window.clearTimeout(timer);
   }, [participant?.display_name]);
 
-  const registerParticipant = useMutation(api.streamParticipants.create);
-  const createVote = useMutation(api.streamVotes.create);
+  const registerParticipant = useMutation(api.streamParticipantsV2.create);
+  const createVote = useMutation(api.streamVotesV2.create);
 
   const currentStepId = session?.current_step ?? null;
   const params = useMemo(

@@ -21,32 +21,33 @@ describe("adoption authority", () => {
       profileId: profile.id as Id<"cat_profile">,
     };
     await expect(
-      t.mutation(api.adoption.createBatch, { cats: [cat] }),
+      t.mutation(api.adoptionV2.createBatch, { cats: [cat] }),
     ).rejects.toThrow("Not authorized");
-    const batch = await t.mutation(api.adoption.createBatch, {
+    const batch = await t.mutation(api.adoptionV2.createBatch, {
       cats: [{ ...cat, editToken: profile.editToken! }],
     });
     for (const result of [
-      await t.query(api.adoption.getBySlug, { slugOrId: batch.slug }),
-      ...(await t.query(api.adoption.listBatches, {})),
+      await t.query(api.adoptionV2.getBySlug, { slugOrId: batch.slug }),
+      ...(await t.query(api.adoptionV2.listBatches, {})),
     ]) {
       expect(JSON.stringify(result)).not.toContain(profile.editToken);
       expect(JSON.stringify(result)).not.toContain(batch.editToken);
       expect(result?.cats[0]).not.toHaveProperty("editToken");
     }
     await expect(
-      t.mutation(api.adoption.updateBatchMeta, {
+      t.mutation(api.adoptionV2.updateBatchMeta, {
         id: batch.id as Id<"adoption_batch">,
         title: "Changed",
       }),
     ).rejects.toThrow("Not authorized");
-    await t.mutation(api.adoption.updateBatchMeta, {
+    await t.mutation(api.adoptionV2.updateBatchMeta, {
       id: batch.id as Id<"adoption_batch">,
       editToken: batch.editToken,
       title: "Changed",
     });
     expect(
-      (await t.query(api.adoption.getBySlug, { slugOrId: batch.slug }))?.title,
+      (await t.query(api.adoptionV2.getBySlug, { slugOrId: batch.slug }))
+        ?.title,
     ).toBe("Changed");
   });
 });
@@ -58,7 +59,7 @@ describe("legacy voting transactions", () => {
       subject: "host",
       issuer: "https://identity.example",
     });
-    const session = await host.mutation(api.streamSessions.create, {
+    const session = await host.mutation(api.streamSessionsV2.create, {
       viewerKey: "fixture",
       status: "live",
       currentStep: "colour",
@@ -79,23 +80,23 @@ describe("legacy voting transactions", () => {
         arbitrary: "discard",
       },
     };
-    await expect(t.mutation(api.streamVotes.create, vote)).rejects.toThrow(
+    await expect(t.mutation(api.streamVotesV2.create, vote)).rejects.toThrow(
       "host",
     );
-    await host.mutation(api.streamVotes.create, vote);
+    await host.mutation(api.streamVotesV2.create, vote);
     const viewerSession = crypto.randomUUID();
-    const participant = await t.mutation(api.streamParticipants.create, {
+    const participant = await t.mutation(api.streamParticipantsV2.create, {
       sessionId,
       viewerSession,
       displayName: "Viewer",
       status: "active",
     });
-    await t.mutation(api.streamVotes.create, {
+    await t.mutation(api.streamVotesV2.create, {
       ...vote,
       viewerSession,
       votedBy: participant!.id as Id<"stream_participants">,
     });
-    const votes = await t.query(api.streamVotes.list, {
+    const votes = await t.query(api.streamVotesV2.list, {
       session: sessionId,
       limit: 20,
     });
@@ -117,7 +118,7 @@ describe("legacy voting transactions", () => {
       subject: "host",
       issuer: "https://identity.example",
     });
-    const created = await host.mutation(api.streamSessions.create, {
+    const created = await host.mutation(api.streamSessionsV2.create, {
       viewerKey: "fixture",
       status: "live",
       currentStep: "colour",
@@ -126,34 +127,34 @@ describe("legacy voting transactions", () => {
     });
     const sessionId = created!.id as Id<"stream_sessions">;
     await expect(
-      host.mutation(api.streamVotes.create, {
+      host.mutation(api.streamVotesV2.create, {
         sessionId,
         stepId: "colour",
         voteRound: 0,
         optionKey: "BLACK",
       }),
     ).rejects.toThrow("Choice");
-    await host.mutation(api.streamVotes.create, {
+    await host.mutation(api.streamVotesV2.create, {
       sessionId,
       stepId: "colour",
       voteRound: 0,
       optionKey: "WHITE",
     });
-    await host.mutation(api.streamSessions.update, {
+    await host.mutation(api.streamSessionsV2.update, {
       id: sessionId,
       currentStep: "pelt",
       stepIndex: 1,
       allowedOptions: ["SingleColour"],
       params: { _votesOpen: false },
     });
-    await host.mutation(api.streamVotes.create, {
+    await host.mutation(api.streamVotesV2.create, {
       sessionId,
       stepId: "pelt",
       voteRound: 1,
       optionKey: "SingleColour",
     });
     expect(
-      await t.query(api.streamVotes.list, { session: sessionId, limit: 500 }),
+      await t.query(api.streamVotesV2.list, { session: sessionId, limit: 500 }),
     ).toMatchObject([{ option_key: "SingleColour" }]);
   });
 
@@ -163,13 +164,13 @@ describe("legacy voting transactions", () => {
       subject: "host",
       issuer: "https://identity.example",
     });
-    const created = await host.mutation(api.streamSessions.create, {
+    const created = await host.mutation(api.streamSessionsV2.create, {
       viewerKey: "fixture",
       status: "live",
       currentStep: "colour",
     });
     const id = created!.id as Id<"stream_sessions">;
-    await host.mutation(api.streamSessions.update, {
+    await host.mutation(api.streamSessionsV2.update, {
       id,
       allowedOptions: ["WHITE", "BLACK"],
       params: {
@@ -180,13 +181,13 @@ describe("legacy voting transactions", () => {
     });
     for (const optionKey of ["WHITE", "BLACK"]) {
       const viewerSession = crypto.randomUUID();
-      const participant = await t.mutation(api.streamParticipants.create, {
+      const participant = await t.mutation(api.streamParticipantsV2.create, {
         sessionId: id,
         viewerSession,
         displayName: optionKey,
         status: "active",
       });
-      await t.mutation(api.streamVotes.create, {
+      await t.mutation(api.streamVotesV2.create, {
         sessionId: id,
         stepId: "colour",
         voteRound: 1,
@@ -195,19 +196,21 @@ describe("legacy voting transactions", () => {
         votedBy: participant!.id as Id<"stream_participants">,
       });
     }
-    await host.mutation(api.streamVotes.create, {
+    await host.mutation(api.streamVotesV2.create, {
       sessionId: id,
       stepId: "colour",
       voteRound: 1,
       optionKey: "BLACK",
     });
-    await host.mutation(api.streamSessions.update, {
+    await host.mutation(api.streamSessionsV2.update, {
       id,
       params: { _votesOpen: false },
       allowedOptions: ["WHITE", "BLACK"],
     });
-    expect((await t.query(api.streamSessions.get, { id }))?.vote_round).toBe(1);
-    const votes = await t.query(api.streamVotes.list, {
+    expect((await t.query(api.streamSessionsV2.get, { id }))?.vote_round).toBe(
+      1,
+    );
+    const votes = await t.query(api.streamVotesV2.list, {
       session: id,
       stepId: "colour",
       limit: 500,
@@ -222,19 +225,19 @@ describe("legacy voting transactions", () => {
       subject: "host",
       issuer: "https://identity.example",
     });
-    const active = await host.mutation(api.streamSessions.create, {
+    const active = await host.mutation(api.streamSessionsV2.create, {
       viewerKey: "active",
       status: "live",
     });
     for (let i = 0; i < 5; i++)
-      await host.mutation(api.streamSessions.create, {
+      await host.mutation(api.streamSessionsV2.create, {
         viewerKey: `completed-${i}`,
         status: "completed",
       });
     for (const filter of [{ status: "live" }, { exclude: "completed" }]) {
       expect(
         (
-          await host.query(api.streamSessions.list, { ...filter, limit: 2 })
+          await host.query(api.streamSessionsV2.list, { ...filter, limit: 2 })
         ).map((session) => session.id),
       ).toEqual([active!.id]);
     }
@@ -250,7 +253,7 @@ describe("legacy voting transactions", () => {
       subject: "other",
       issuer: "https://identity.example",
     });
-    const created = await host.mutation(api.streamSessions.create, {
+    const created = await host.mutation(api.streamSessionsV2.create, {
       viewerKey: "fixture",
       status: "live",
       currentStep: "colour",
@@ -258,7 +261,7 @@ describe("legacy voting transactions", () => {
     });
     const id = created!.id as Id<"stream_sessions">;
     const token = crypto.randomUUID();
-    const participant = await t.mutation(api.streamParticipants.create, {
+    const participant = await t.mutation(api.streamParticipantsV2.create, {
       sessionId: id,
       viewerSession: token,
       displayName: "Viewer",
@@ -275,57 +278,57 @@ describe("legacy voting transactions", () => {
       viewerSession: token,
     };
     await expect(
-      other.mutation(api.streamSessions.update, { id, status: "completed" }),
+      other.mutation(api.streamSessionsV2.update, { id, status: "completed" }),
     ).rejects.toThrow("host");
-    await host.mutation(api.streamSessions.update, {
+    await host.mutation(api.streamSessionsV2.update, {
       id,
       allowedOptions: ["WHITE"],
       params: { _votesOpen: false },
     });
-    await expect(t.mutation(api.streamVotes.create, voter)).rejects.toThrow(
+    await expect(t.mutation(api.streamVotesV2.create, voter)).rejects.toThrow(
       "closed",
     );
-    await host.mutation(api.streamSessions.update, {
+    await host.mutation(api.streamSessionsV2.update, {
       id,
       params: { _votesOpen: true },
     });
     await expect(
-      t.mutation(api.streamVotes.create, {
+      t.mutation(api.streamVotesV2.create, {
         ...voter,
         viewerSession: crypto.randomUUID(),
       }),
     ).rejects.toThrow("participant");
     await expect(
-      t.mutation(api.streamVotes.create, { ...voter, optionKey: "unlisted" }),
+      t.mutation(api.streamVotesV2.create, { ...voter, optionKey: "unlisted" }),
     ).rejects.toThrow("Choice");
     const results = await Promise.allSettled([
-      t.mutation(api.streamVotes.create, voter),
-      t.mutation(api.streamVotes.create, voter),
+      t.mutation(api.streamVotesV2.create, voter),
+      t.mutation(api.streamVotesV2.create, voter),
     ]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-    await host.mutation(api.streamVotes.create, {
+    await host.mutation(api.streamVotesV2.create, {
       sessionId: id,
       stepId: "colour",
       voteRound: 0,
       optionKey: "WHITE",
     });
     expect(
-      await t.query(api.streamVotes.list, { session: id, limit: 20 }),
+      await t.query(api.streamVotesV2.list, { session: id, limit: 20 }),
     ).toHaveLength(2);
-    await host.mutation(api.streamSessions.update, {
+    await host.mutation(api.streamSessionsV2.update, {
       id,
       params: { _votesOpen: true, _tieIteration: 1 },
       allowedOptions: ["WHITE"],
     });
-    await expect(t.mutation(api.streamVotes.create, voter)).rejects.toThrow(
+    await expect(t.mutation(api.streamVotesV2.create, voter)).rejects.toThrow(
       "round",
     );
-    await host.mutation(api.streamParticipants.update, {
+    await host.mutation(api.streamParticipantsV2.update, {
       id: voter.votedBy,
       status: "removed",
     });
     await expect(
-      t.mutation(api.streamVotes.create, { ...voter, voteRound: 1 }),
+      t.mutation(api.streamVotesV2.create, { ...voter, voteRound: 1 }),
     ).rejects.toThrow("participant");
   });
 });
@@ -353,14 +356,14 @@ it("requires the Discord service credential before config access", async () => {
   expect(response.status).toBe(200);
   expect(
     (
-      await t.query(internal.discordUserConfig.get, {
+      await t.query(internal.discordUserConfigInternal.get, {
         discordUserId: "fixture-user",
       })
     ).darkForest,
   ).toBe(true);
   expect(
     (
-      await t.query(internal.discordUserConfig.get, {
+      await t.query(internal.discordUserConfigInternal.get, {
         discordUserId: "other-user",
       })
     ).darkForest,

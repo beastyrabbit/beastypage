@@ -35,9 +35,9 @@ import {
 } from "@/lib/streamer/steps";
 import { cn } from "@/lib/utils";
 
-type SessionListItem = (typeof api.streamSessions.list._returnType)[number];
+type SessionListItem = (typeof api.streamSessionsV2.list._returnType)[number];
 type ParticipantRecord =
-  (typeof api.streamParticipants.list._returnType)[number];
+  (typeof api.streamParticipantsV2.list._returnType)[number];
 
 type LockedEntry = {
   step_id?: string;
@@ -192,9 +192,9 @@ function AuthenticatedHostClient() {
     return { id: toId("stream_sessions", activeSessionId) } as const;
   }, [activeSessionId]);
 
-  const session = useQuery(api.streamSessions.get, sessionArgs);
+  const session = useQuery(api.streamSessionsV2.get, sessionArgs);
 
-  const sessionList = useQuery(api.streamSessions.list, {
+  const sessionList = useQuery(api.streamSessionsV2.list, {
     status: "live",
     limit: 20,
   });
@@ -228,7 +228,7 @@ function AuthenticatedHostClient() {
     } as const;
   }, [activeSessionId, currentStepId]);
 
-  const rawVotes = useQuery(api.streamVotes.list, votesArgs);
+  const rawVotes = useQuery(api.streamVotesV2.list, votesArgs);
   const votes = useMemo(() => rawVotes ?? [], [rawVotes]);
 
   const participantsArgs = useMemo(() => {
@@ -240,16 +240,16 @@ function AuthenticatedHostClient() {
   }, [activeSessionId]);
 
   const rawParticipants = useQuery(
-    api.streamParticipants.list,
+    api.streamParticipantsV2.list,
     participantsArgs,
   );
   const participants = useMemo(() => rawParticipants ?? [], [rawParticipants]);
 
-  const createSession = useMutation(api.streamSessions.create);
-  const updateSession = useMutation(api.streamSessions.update);
-  const completeSession = useMutation(api.streamSessions.update);
-  const createVote = useMutation(api.streamVotes.create);
-  const updateParticipant = useMutation(api.streamParticipants.update);
+  const createSession = useMutation(api.streamSessionsV2.create);
+  const updateSession = useMutation(api.streamSessionsV2.update);
+  const completeSession = useMutation(api.streamSessionsV2.update);
+  const createVote = useMutation(api.streamVotesV2.create);
+  const updateParticipant = useMutation(api.streamParticipantsV2.update);
   const createMapperRecord = useMutation(api.mapper.create);
 
   useEffect(() => {

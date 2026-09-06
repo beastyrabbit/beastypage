@@ -9,6 +9,48 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
+test("Quick Share handles a history 500 and recovers on refresh", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/i/api/policy", (route) =>
+    route.fulfill({
+      json: {
+        maxBytes: 104857600,
+        hourlyStarts: 10,
+        dailyBytes: 1073741824,
+        active: 5,
+        smallCutoffBytes: 10485760,
+        smallLifetimeMs: 86400000,
+        largeLifetimeMs: 3600000,
+        chunkBytes: 5242880,
+      },
+    }),
+  );
+  let fail = true;
+  await page.route("**/i/api/account/uploads", (route) =>
+    route.fulfill({
+      status: fail ? 500 : 200,
+      json: fail ? { error: "Service unavailable" } : [],
+    }),
+  );
+  await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=quick-share`);
+  await expect(page.getByRole("alert")).toContainText(
+    "Recent shares could not be loaded",
+  );
+  await page.screenshot({
+    path: "../.playwright-mcp/quick-share-history-error.png",
+  });
+  fail = false;
+  await page.getByRole("button", { name: "Refresh recent shares" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(
+    page.getByText("Your active and recent shares will appear here."),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test("host sign-in gate has a visible sign-in control", async ({ page }) => {
   await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=host`);
   await expect(

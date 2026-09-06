@@ -169,6 +169,7 @@ export function QuickShareClient() {
   const [activeUpload, setActiveUpload] = useState<ActiveUpload | null>(null);
   const [history, setHistory] = useState<ShareStatus[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [now, setNow] = useState(0);
   const [currentItemCount, setCurrentItemCount] = useState(1);
 
@@ -236,6 +237,7 @@ export function QuickShareClient() {
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
+    setHistoryError(null);
     try {
       if (isLoaded && isSignedIn) {
         const uploads = await apiFetch<ShareStatus[]>("/i/api/account/uploads");
@@ -257,6 +259,10 @@ export function QuickShareClient() {
             .map(normalizeShare),
         );
       }
+    } catch (error) {
+      setHistoryError(
+        `Recent shares could not be loaded. ${errorMessage(error)}`,
+      );
     } finally {
       setHistoryLoading(false);
     }
@@ -1030,16 +1036,22 @@ export function QuickShareClient() {
               type="button"
               className="rounded-md p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"
               aria-label="Refresh recent shares"
+              disabled={historyLoading}
               onClick={() => void loadHistory()}
             >
               <RefreshCw className="size-4" />
             </button>
           </div>
+          {historyError ? (
+            <p role="alert" className="mb-3 text-sm text-destructive">
+              {historyError} Use refresh to try again.
+            </p>
+          ) : null}
           {historyLoading ? (
             <div className="flex items-center gap-2 rounded-lg border border-border/60 px-4 py-5 text-sm text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" /> Loading…
             </div>
-          ) : history.length === 0 ? (
+          ) : history.length === 0 && !historyError ? (
             <div className="rounded-lg border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
               Your active and recent shares will appear here.
             </div>

@@ -1,8 +1,7 @@
-// Temporary legacy API for the bridge release. Remove after old replicas are gone.
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
 import { mutation, query } from "./_generated/server.js";
-import { assertLegacySession } from "./rolloutLegacy.js";
+import { listLimit, requireHost } from "./streamAccess.js";
 import { docIdToString } from "./utils.js";
 
 type SessionDoc = Doc<"stream_sessions">;
@@ -15,14 +14,32 @@ export const list = query({
     limit: v.number(),
   },
   handler: async (ctx, args) => {
-    let sessions = await ctx.db
-      .query("stream_sessions")
-      .withIndex("by_ownerTokenIdentifier_and_updatedAt", (q) =>
-        q.eq("ownerTokenIdentifier", undefined),
-      )
-      .order("desc")
-      .take(500);
-    sessions = sessions.filter((s) => s.allowedOptions === undefined);
+    const identity = await ctx.auth.getUserIdentity();
+    // Older host clients request exclude=completed. Owned sessions have two
+    // supported states, so use the same indexed live query for that request.
+    const status =
+      args.status ?? (args.exclude === "completed" ? "live" : undefined);
+    const source = args.viewerKey
+      ? ctx.db
+          .query("stream_sessions")
+          .withIndex("byViewerKey", (q) => q.eq("viewerKey", args.viewerKey!))
+      : status
+        ? ctx.db
+            .query("stream_sessions")
+            .withIndex(
+              "by_ownerTokenIdentifier_and_status_and_updatedAt",
+              (q) =>
+                q
+                  .eq("ownerTokenIdentifier", identity?.tokenIdentifier)
+                  .eq("status", status),
+            )
+        : ctx.db
+            .query("stream_sessions")
+            .withIndex("by_ownerTokenIdentifier_and_updatedAt", (q) =>
+              q.eq("ownerTokenIdentifier", identity?.tokenIdentifier),
+            );
+    if (!args.viewerKey && !identity) return [];
+    let sessions = await source.order("desc").take(listLimit(args.limit));
     if (args.status) {
       const target = args.status.toLowerCase();
       sessions = sessions.filter(
@@ -54,15 +71,15 @@ export const get = query({
   },
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
-    if (doc) await assertLegacySession(ctx, args.id);
     return doc ? streamSessionToClient(doc) : null;
   },
 });
 
 export const create = mutation({
   args: {
+    allowedOptions: v.optional(v.array(v.string())),
     viewerKey: v.string(),
-    status: v.string(),
+    status: v.union(v.literal("live"), v.literal("completed")),
     currentStep: v.optional(v.string()),
     stepIndex: v.optional(v.number()),
     stepHistory: v.optional(v.any()),
@@ -71,7 +88,14 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const nowTs = Date.now();
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Sign in to host a session");
+    if (args.allowedOptions && args.allowedOptions.length > 2000)
+      throw new Error("Too many choices");
     const insertDoc = {
+      ownerTokenIdentifier: identity.tokenIdentifier,
+      voteRound: 0,
+      allowedOptions: args.allowedOptions ?? [],
       viewerKey: args.viewerKey,
       status: args.status,
       stepIndex: args.stepIndex ?? 0,
@@ -92,9 +116,10 @@ export const create = mutation({
 
 export const update = mutation({
   args: {
+    allowedOptions: v.optional(v.array(v.string())),
     id: v.id("stream_sessions"),
     viewerKey: v.optional(v.string()),
-    status: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("live"), v.literal("completed"))),
     currentStep: v.optional(v.string()),
     stepIndex: v.optional(v.number()),
     stepHistory: v.optional(v.any()),
@@ -104,9 +129,20 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
     if (!doc) return null;
-    await assertLegacySession(ctx, args.id);
+    await requireHost(ctx, doc);
+    if (args.allowedOptions && args.allowedOptions.length > 2000)
+      throw new Error("Too many choices");
+    const roundChanged =
+      (args.currentStep !== undefined &&
+        args.currentStep !== doc.currentStep) ||
+      (args.stepIndex !== undefined && args.stepIndex !== doc.stepIndex) ||
+      (args.params !== undefined &&
+        (args.params?._tieIteration ?? 0) > (doc.params?._tieIteration ?? 0));
     const updated = {
       ...doc,
+      voteRound: (doc.voteRound ?? 0) + (roundChanged ? 1 : 0),
+      allowedOptions:
+        args.allowedOptions ?? (roundChanged ? [] : doc.allowedOptions),
       viewerKey: args.viewerKey ?? doc.viewerKey,
       status: args.status ?? doc.status,
       updatedAt: Date.now(),
@@ -136,6 +172,7 @@ function streamSessionToClient(doc: SessionDoc) {
     step_index: doc.stepIndex ?? 0,
     step_history: doc.stepHistory ?? [],
     params: doc.params ?? {},
+    vote_round: doc.voteRound ?? 0,
     allow_repeat_ips: Boolean(doc.allowRepeatIps),
     created: doc.createdAt,
     updated: doc.updatedAt,

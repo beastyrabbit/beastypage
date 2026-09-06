@@ -36,6 +36,8 @@ export const useClerk = () => ({
   openSignIn: () => {},
   signOut: async () => {},
 });
+const getToken = async () => null;
+export const useAuth = () => ({ isLoaded: true, isSignedIn: true, getToken });
 export function useQuery(reference: Parameters<typeof getFunctionName>[0]) {
   switch (getFunctionName(reference)) {
     case "collection:list":

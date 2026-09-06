@@ -66,7 +66,7 @@ export function EvolutionPanel() {
     syncSessionSettings,
     rawSessionSettings,
   } = useStreamControl();
-  const createBatch = useMutation(api.adoption.createBatch);
+  const createBatch = useMutation(api.adoptionV2.createBatch);
   const createMapper = useMutation(api.mapper.create);
   const triggerEvolution = useMutation(api.catStream.triggerEvolution);
 

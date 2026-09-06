@@ -115,7 +115,7 @@ See [review remediation and rollout notes](docs/review-remediation.md) for the n
 
 ## Container Images
 
-GitHub Actions builds GHCR images on `main` and version-tag pushes. The Forgejo workflow and registry path are retained for the migration; repository files alone do not establish whether that runner is active. Both paths gate publication on validation, and manual Convex deployment is restricted to `main`. A pull request runs validation only.
+GitHub Actions builds GHCR images on `main` and version-tag pushes. The Forgejo workflow and registry path are retained for the migration; repository files alone do not establish whether that runner is active. Both paths gate publication on validation. Convex deploys through version tags or explicit manual deployment on `main`, so merging preparatory code does not change the live backend. A pull request runs validation only.
 
 The retained Forgejo image names are:
 

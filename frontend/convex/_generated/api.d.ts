@@ -14,6 +14,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as adoption from "../adoption.js";
+import type * as adoptionV2 from "../adoptionV2.js";
 import type * as ancestryTree from "../ancestryTree.js";
 import type * as catShares from "../catShares.js";
 import type * as catStream from "../catStream.js";
@@ -26,6 +27,7 @@ import type * as discord from "../discord.js";
 import type * as discordAuth from "../discordAuth.js";
 import type * as discordHttp from "../discordHttp.js";
 import type * as discordUserConfig from "../discordUserConfig.js";
+import type * as discordUserConfigInternal from "../discordUserConfigInternal.js";
 import type * as http from "../http.js";
 import type * as imageService from "../imageService.js";
 import type * as importer from "../importer.js";
@@ -40,12 +42,16 @@ import type * as quickShare from "../quickShare.js";
 import type * as quickShareHttp from "../quickShareHttp.js";
 import type * as quickSharePolicy from "../quickSharePolicy.js";
 import type * as rarities from "../rarities.js";
+import type * as rolloutLegacy from "../rolloutLegacy.js";
 import type * as seasons from "../seasons.js";
 import type * as singleCatSettings from "../singleCatSettings.js";
 import type * as streamAccess from "../streamAccess.js";
 import type * as streamParticipants from "../streamParticipants.js";
+import type * as streamParticipantsV2 from "../streamParticipantsV2.js";
 import type * as streamSessions from "../streamSessions.js";
+import type * as streamSessionsV2 from "../streamSessionsV2.js";
 import type * as streamVotes from "../streamVotes.js";
+import type * as streamVotesV2 from "../streamVotesV2.js";
 import type * as streamWheel from "../streamWheel.js";
 import type * as userVariants from "../userVariants.js";
 import type * as users from "../users.js";
@@ -62,6 +68,7 @@ import type * as wheel from "../wheel.js";
  */
 declare const fullApi: ApiFromModules<{
   adoption: typeof adoption;
+  adoptionV2: typeof adoptionV2;
   ancestryTree: typeof ancestryTree;
   catShares: typeof catShares;
   catStream: typeof catStream;
@@ -74,6 +81,7 @@ declare const fullApi: ApiFromModules<{
   discordAuth: typeof discordAuth;
   discordHttp: typeof discordHttp;
   discordUserConfig: typeof discordUserConfig;
+  discordUserConfigInternal: typeof discordUserConfigInternal;
   http: typeof http;
   imageService: typeof imageService;
   importer: typeof importer;
@@ -88,12 +96,16 @@ declare const fullApi: ApiFromModules<{
   quickShareHttp: typeof quickShareHttp;
   quickSharePolicy: typeof quickSharePolicy;
   rarities: typeof rarities;
+  rolloutLegacy: typeof rolloutLegacy;
   seasons: typeof seasons;
   singleCatSettings: typeof singleCatSettings;
   streamAccess: typeof streamAccess;
   streamParticipants: typeof streamParticipants;
+  streamParticipantsV2: typeof streamParticipantsV2;
   streamSessions: typeof streamSessions;
+  streamSessionsV2: typeof streamSessionsV2;
   streamVotes: typeof streamVotes;
+  streamVotesV2: typeof streamVotesV2;
   streamWheel: typeof streamWheel;
   userVariants: typeof userVariants;
   users: typeof users;

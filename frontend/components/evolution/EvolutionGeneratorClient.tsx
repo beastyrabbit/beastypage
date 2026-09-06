@@ -122,9 +122,9 @@ function imageDataFromCanvas(
 }
 
 export function EvolutionGeneratorClient() {
-  const createBatch = useMutation(api.adoption.createBatch);
+  const createBatch = useMutation(api.adoptionV2.createBatch);
   const createMapper = useMutation(api.mapper.create);
-  const updateBatchMeta = useMutation(api.adoption.updateBatchMeta);
+  const updateBatchMeta = useMutation(api.adoptionV2.updateBatchMeta);
   const updateProfileMeta = useMutation(api.mapper.updateMeta);
   const defaultCreator = useDefaultCreatorName();
   const generatorRef = useRef<CatGeneratorApi | null>(null);

@@ -74,9 +74,9 @@ const LegacyCatGrid = memo(
 );
 
 export function AdoptionGeneratorClient() {
-  const createBatch = useMutation(api.adoption.createBatch);
+  const createBatch = useMutation(api.adoptionV2.createBatch);
   const createMapper = useMutation(api.mapper.create);
-  const updateBatchMeta = useMutation(api.adoption.updateBatchMeta);
+  const updateBatchMeta = useMutation(api.adoptionV2.updateBatchMeta);
   const stylesheetRef = useRef<HTMLLinkElement | null>(null);
   const lastTokenRef = useRef<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");

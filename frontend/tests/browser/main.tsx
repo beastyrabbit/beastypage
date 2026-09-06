@@ -4,6 +4,7 @@ import Collection from "../../app/collection/CollectionPageClient";
 import Profile from "../../app/profile/page";
 import Catdex from "../../app/catdex/CatdexPageClient";
 import HostClient from "../../components/streamer/HostClient";
+import { QuickShareClient } from "../../components/quick-share/QuickShareClient";
 import { PixelatorClient } from "../../components/pixelator/PixelatorClient";
 import "../../app/globals.css";
 
@@ -16,6 +17,8 @@ createRoot(document.getElementById("root")!).render(
         <h1 className="text-3xl mb-6">Pixelator</h1>
         <PixelatorClient />
       </main>
+    ) : view === "quick-share" ? (
+      <QuickShareClient />
     ) : view === "host" ? (
       <HostClient />
     ) : view === "catdex" ? (

@@ -22,3 +22,7 @@ def test_publication_requires_successful_application_checks(provider):
             f"always() && needs.{check}.result == 'success' &&"
         )
     assert "refs/heads/main" in jobs["deploy-convex"]["if"]
+    deploy_condition = jobs["deploy-convex"]["if"]
+    assert "startsWith(github.ref, 'refs/tags/v')" in deploy_condition
+    assert "github.event_name == 'workflow_dispatch'" in deploy_condition
+    assert "needs.changes.outputs.convex" not in deploy_condition
