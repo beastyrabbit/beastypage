@@ -1,4 +1,4 @@
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { internalQuery, mutation, query } from "./_generated/server.js";
 
@@ -282,17 +282,5 @@ export const resetSavedVariants = mutation({
     }
 
     return { remaining: variants.length === 100 };
-  },
-});
-
-/** Bridge-only response for old browser tabs with the removed account action. */
-export const deleteAccount = mutation({
-  args: {},
-  handler: async (ctx) => {
-    if (!(await ctx.auth.getUserIdentity()))
-      throw new Error("Not authenticated");
-    throw new ConvexError(
-      "Please reload. Account deletion is unavailable; the new page offers Reset saved variants.",
-    );
   },
 });

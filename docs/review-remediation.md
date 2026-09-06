@@ -1,6 +1,6 @@
 # September 2026 review remediation
 
-This change addresses the [project review](https://schaffa.dev/p/m8tcd0usfcrqvulf) against `1284343a6f78af9cc8b8481e57cd7c4ded20d8f0`. The bridge candidate adds the secured clients and APIs while preserving temporary legacy entry points for a phased release. Full enforcement requires the cleanup release below; code checks do not establish production delivery.
+This change addresses the [project review](https://schaffa.dev/p/m8tcd0usfcrqvulf) against `1284343a6f78af9cc8b8481e57cd7c4ded20d8f0`. The enforcement candidate removes the temporary legacy entry points after the bridge rollout. The V2 clients and secured APIs remain unchanged. Code checks do not establish production delivery.
 
 ## Finding map
 
@@ -8,7 +8,7 @@ This change addresses the [project review](https://schaffa.dev/p/m8tcd0usfcrqvul
 | --- | --- |
 | F01 | Adoption public projections omit editing capabilities. Linking an existing profile requires its owner or editing token. Batch metadata requires its creator identity or a newly issued private batch token. Synthetic Convex tests cover denial and public viewing. |
 | F02 | New hosts must sign in. Mutations enforce host ownership, participant membership and token, live/current rounds, allowed choices, closed polls, removed participants, and one participant vote per round. Host tie-break votes remain supported. Queries use bounded indexes and omit participant capabilities. |
-| F03 | Next Discord preference routes require a service bearer credential. New Convex config functions are internal and reachable through an authenticated HTTP action. Temporary legacy config functions remain until cleanup. The bot supplies the credential. Tests cover both boundaries with synthetic values. |
+| F03 | Next Discord preference routes require a service bearer credential. New Convex config functions are internal and reachable through an authenticated HTTP action. The temporary public config functions are removed in this enforcement candidate. The bot supplies the credential. Tests cover both boundaries with synthetic values. |
 | F04 | Image downloads validate every resolved address and redirect, pin the selected public address, reject nonstandard ports, and bound bytes and total time. Fake DNS and transport tests cover redirect rejection, pinning, and streamed byte limits. |
 | F05 | Both delivery workflows require a successful cat-system contract job before Convex deployment. A workflow regression checks the dependency and success predicate. |
 | F06 | Renderer batches admit at most 256 total frames, 1,024-pixel tiles, and a conservative 16-million-pixel working budget. Invalid work is rejected before queue admission. |
@@ -45,6 +45,8 @@ The image service accepts at most 10 MB of decoded input bytes, four million dec
 The renderer's budget includes padded output-sheet cells, retained source frames, and extra layer-mode storage. Its queue and catalog integrity checks remain in place.
 
 ## Compatibility and approved rollout
+
+This candidate is phase 4 below. Its deletion of the temporary namespaces is safe only after the bridge client rollout has completed. The temporary behavior described below belongs to the 7.5.0 bridge, not this enforcement candidate.
 
 Production delivery uses explicit human approval and the version-tag release flow. A main-branch merge builds images but no longer deploys Convex; version tags and explicit main-branch dispatch retain the contract gate.
 
