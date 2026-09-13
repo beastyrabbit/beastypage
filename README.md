@@ -1,5 +1,10 @@
 # BeastyPage
 
+
+## At a glance
+
+A pixel-cat gacha site with generators, animated wheels, adoption tools, and a searchable Catdex.
+
 A pixel cat gacha platform featuring generators, wheels, and collection tools built with ClanGen sprites.
 
 ## Features
