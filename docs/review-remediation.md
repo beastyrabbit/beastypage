@@ -13,7 +13,7 @@ This change addresses the [project review](https://schaffa.dev/p/m8tcd0usfcrqvul
 | F05 | Both delivery workflows require a successful cat-system contract job before Convex deployment. A workflow regression checks the dependency and success predicate. |
 | F06 | Renderer batches admit at most 256 total frames, 1,024-pixel tiles, and a conservative 16-million-pixel working budget. Invalid work is rejected before queue admission. |
 | F07 | Image processing runs in at most two disposable worker threads, with cancellation, a deadline, a 256 MB JavaScript heap limit per worker, and byte/pixel/work admission limits. Small real-worker tests cover health responsiveness and cancellation. Native Sharp allocations are bounded by image/work limits, not the JavaScript heap setting. |
-| F08 | Metadata/probe failure leaves media private and failed. Explicit unsafe-media rejection stays unsupported. Only a validated original can be used after conversion failure; derivative storage failures remain retryable. |
+| F08 | Metadata/probe failure leaves media private and failed. Explicit unsafe-media rejection stays unsupported. Images must be normalized before publication; only a validated video original can be used after conversion failure. Derivative storage failures remain retryable. |
 | F09 | Batch overrides clear all related compatibility aliases before applying arrays, booleans, or pose changes. Pixel/parameter regressions cover empty arrays, false values, and pose replacement. |
 | F10 | Bayer 8×8 uses all 64 ordered thresholds. Tests verify the matrix and actual dithered pixels. |
 | F11 | Spritesheet packing copies RGBA pixels without applying alpha a second time. Pixel equality tests include translucent input. |
