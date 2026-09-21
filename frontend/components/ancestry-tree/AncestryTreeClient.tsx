@@ -881,7 +881,7 @@ export function AncestryTreeClient({
                 <h2 className="font-semibold text-xl flex items-center gap-2">
                   <span className="text-pink-400">♀</span>
                   <span className="text-blue-400">♂</span>
-                  <span>Founding Couple</span>
+                  Founding Couple
                 </h2>
 
                 <div className="flex justify-center items-center gap-8">

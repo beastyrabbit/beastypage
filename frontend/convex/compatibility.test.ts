@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import { isDiscordServiceRequest } from "./discordAuth";
 import schema from "./schema";
-import { normalizeStorageUrl } from "./utils";
+import { normalizeStorageUrl, randomSlug } from "./utils";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -16,6 +16,37 @@ afterEach(() => {
 });
 
 describe("stored data compatibility", () => {
+  it("keeps the slug alphabet, length, and per-character modulo mapping", () => {
+    const samples = [0, 1, 0xffffffff, 8];
+    let index = 0;
+    vi.stubGlobal("crypto", {
+      getRandomValues: (buffer: Uint32Array) => {
+        buffer[0] = samples[index++];
+        return buffer;
+      },
+    });
+    expect(randomSlug(4, "abcd")).toBe("abda");
+    expect(index).toBe(4);
+  });
+
+  it.each([
+    ["_- Alice_-Bob _-", "Alice_-Bob"],
+    ["_-_", undefined],
+    ["a".repeat(35), "a".repeat(30)],
+    [`${"_".repeat(10_000)}Cat${"-".repeat(10_000)}`, "Cat"],
+  ])(
+    "preserves username filtering and trimming (case %#)",
+    async (nickname, username) => {
+      const t = convexTest(schema, modules).withIdentity({
+        subject: "username-fixture",
+        issuer: "https://identity.example",
+        nickname,
+      });
+      const user = await t.mutation(api.users.getOrCreateUser, {});
+      expect(user?.username).toBe(username);
+    },
+  );
+
   it("accepts legacy ancestry passwords containing surrogate pairs", async () => {
     const t = convexTest(schema, modules);
     await t.run((ctx) =>

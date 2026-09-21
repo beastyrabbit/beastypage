@@ -69,7 +69,7 @@ async function requireAdmin(ctx: ActionCtx | MutationCtx) {
       return null;
     }
     return identity;
-  } catch (_error) {
+  } catch {
     // Missing admin identity is treated as an unauthenticated request.
     return null;
   }
@@ -328,6 +328,13 @@ function applyCatdexImages(
     if (thumb.height !== undefined)
       insertDoc.defaultCardThumbHeight = thumb.height;
   }
+  applyCustomCatdexImages(insertDoc, record);
+}
+
+function applyCustomCatdexImages(
+  insertDoc: Omit<Doc<"catdex">, "_id" | "_creationTime">,
+  record: CatdexRecordPayload,
+) {
   const custom = record.customCard;
   if (custom) {
     insertDoc.customCardStorageId = storageId(custom.storageId);

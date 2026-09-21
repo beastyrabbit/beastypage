@@ -631,7 +631,7 @@ export const retryDispatchJob = internalMutation({
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get("quick_share_jobs", args.jobId);
-    if (job?.status !== "pending") return null;
+    if (!job || job.status !== "pending") return null;
     await ctx.scheduler.runAfter(0, internal.quickShareHttp.dispatchJob, {
       jobId: job._id,
       attempt: args.attempt,

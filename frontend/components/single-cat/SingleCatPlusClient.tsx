@@ -796,7 +796,7 @@ function buildFlipSequence(
 
   const randomPool = cycleFrames.length > 0 ? cycleFrames : [targetFrame];
   for (let i = 0; i < 5; i += 1) {
-    const frame = randomPool[Math.floor(Math.random() * randomPool.length)]!;
+    const frame = randomPool[Math.floor(Math.random() * randomPool.length)];
     sequence.push({ frame, delay: 1 + i * 0.3, isFinal: false });
   }
 
@@ -5177,9 +5177,6 @@ export function SingleCatPlusClient({
 
       {spriteGalleryOpen && (
         <div
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
@@ -5189,6 +5186,9 @@ export function SingleCatPlusClient({
           onKeyDown={(event) =>
             handleManagedDialogKeyDown(event, closeSpriteGallery)
           }
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
           aria-labelledby="sprite-gallery-title"
         >
           <div className="relative flex max-h-[85vh] w-full max-w-5xl flex-col rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
@@ -5292,9 +5292,6 @@ export function SingleCatPlusClient({
 
       {timingModalOpen && (
         <div
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 py-10"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
@@ -5304,6 +5301,9 @@ export function SingleCatPlusClient({
           onKeyDown={(event) =>
             handleManagedDialogKeyDown(event, () => setTimingModalOpen(false))
           }
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
           aria-labelledby="spin-timing-title"
         >
           <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">

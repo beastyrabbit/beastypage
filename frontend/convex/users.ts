@@ -32,6 +32,20 @@ function validateUsername(raw: string): string {
   return trimmed;
 }
 
+function sanitizeUsername(raw: string): string {
+  const filtered = raw.replace(/[^a-zA-Z0-9_-]/g, "");
+  let start = 0;
+  let end = filtered.length;
+  while (start < end && (filtered[start] === "-" || filtered[start] === "_"))
+    start++;
+  while (
+    end > start &&
+    (filtered[end - 1] === "-" || filtered[end - 1] === "_")
+  )
+    end--;
+  return filtered.slice(start, end).slice(0, 30);
+}
+
 /** Derive a unique username from auth identity claims, or return undefined if none is available. */
 async function deriveUniqueUsername(
   ctx: MutationCtx,
@@ -43,11 +57,7 @@ async function deriveUniqueUsername(
     (identity.email ? identity.email.split("@")[0] : undefined);
   if (!raw) return undefined;
 
-  const sanitized = raw
-    .replace(/[^a-zA-Z0-9_-]/g, "")
-    .replace(/^[-_]+/, "")
-    .replace(/[-_]+$/, "")
-    .slice(0, 30);
+  const sanitized = sanitizeUsername(raw);
   if (sanitized.length === 0) return undefined;
 
   // Try the sanitized name first, then fall back to suffixed variants

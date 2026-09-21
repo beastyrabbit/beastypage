@@ -6,6 +6,31 @@ import { docIdToString } from "./utils.js";
 
 type VoteDoc = Doc<"stream_votes">;
 
+function requireAvailableChoice(
+  session: Doc<"stream_sessions"> | null,
+  args: { stepId: string; optionKey: string; voteRound?: number },
+): asserts session is Doc<"stream_sessions"> {
+  if (
+    session?.status !== "live" ||
+    session.currentStep !== args.stepId ||
+    args.voteRound !== (session.voteRound ?? 0)
+  )
+    throw new Error("This voting round is no longer active");
+  if (
+    !session.allowedOptions?.includes(args.optionKey) ||
+    session.params?._disabledOptions?.[args.stepId]?.includes(args.optionKey)
+  )
+    throw new Error("Choice is not available");
+  const tieFilter = session.params?._tieFilter;
+  if (
+    Array.isArray(tieFilter) &&
+    tieFilter.length &&
+    !tieFilter.includes(args.optionKey)
+  ) {
+    throw new Error("Choice is not in the tie-break");
+  }
+}
+
 export const list = query({
   args: {
     session: v.id("stream_sessions"),
@@ -44,23 +69,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
-    if (!session) throw new Error("This voting round is no longer active");
-    const isInactiveRound =
-      session.status !== "live" ||
-      session.currentStep !== args.stepId ||
-      args.voteRound !== (session.voteRound ?? 0);
-    if (isInactiveRound)
-      throw new Error("This voting round is no longer active");
-    const isUnavailableOption =
-      !session.allowedOptions?.includes(args.optionKey) ||
-      session.params?._disabledOptions?.[args.stepId]?.includes(args.optionKey);
-    if (isUnavailableOption) throw new Error("Choice is not available");
-    const tieFilter = session.params?._tieFilter;
-    const isOutsideTieBreak =
-      Array.isArray(tieFilter) &&
-      tieFilter.length &&
-      !tieFilter.includes(args.optionKey);
-    if (isOutsideTieBreak) throw new Error("Choice is not in the tie-break");
+    requireAvailableChoice(session, args);
     let optionMeta: Record<string, unknown>;
     if (args.votedBy) {
       if (session.params?._votesOpen !== true)

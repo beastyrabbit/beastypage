@@ -96,7 +96,7 @@ function buildVisualBuilderUrl(
   }
 }
 
-export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
+export function ViewerClient({ slug, encoded }: ViewerClientProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const router = useRouter();

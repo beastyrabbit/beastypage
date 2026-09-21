@@ -717,7 +717,7 @@ export function buildFlipSequence(
 
   const randomPool = cycleFrames.length > 0 ? cycleFrames : [targetFrame];
   for (let i = 0; i < 5; i += 1) {
-    const frame = randomPool[Math.floor(Math.random() * randomPool.length)]!;
+    const frame = randomPool[Math.floor(Math.random() * randomPool.length)];
     sequence.push({ frame, delay: 1 + i * 0.3, isFinal: false });
   }
 

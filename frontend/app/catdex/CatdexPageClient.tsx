@@ -526,20 +526,16 @@ export default function CatdexPage() {
             const numberShort = cat.card_number ? `#${cat.card_number}` : "—";
 
             return (
-              <div
+              <article
                 key={cat.id}
-                className="glass-card group flex cursor-pointer flex-col overflow-hidden transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-2xl"
-                role="button"
-                tabIndex={0}
-                onClick={() => handleCardClick(cat)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return;
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    handleCardClick(cat);
-                  }
-                }}
+                className="glass-card group relative flex flex-col overflow-hidden transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-2xl"
               >
+                <button
+                  type="button"
+                  aria-label={`Open ${cat.cat_name ?? "Unnamed cat"}`}
+                  className="absolute inset-0 z-10 cursor-pointer rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
+                  onClick={() => handleCardClick(cat)}
+                />
                 <div className="relative aspect-[3/4] overflow-hidden bg-muted">
                   <ProgressiveImage
                     lowSrc={sources.thumb}
@@ -570,7 +566,7 @@ export default function CatdexPage() {
                     </p>
                   </div>
                 </div>
-              </div>
+              </article>
             );
           })}
         </section>

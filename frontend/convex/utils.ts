@@ -2,6 +2,16 @@ import type { Id, TableNames } from "./_generated/dataModel.js";
 
 export type AnyId = Id<TableNames>;
 
+export function randomSlug(length: number, alphabet: string): string {
+  let slug = "";
+  const random = new Uint32Array(1);
+  for (let i = 0; i < length; i += 1) {
+    crypto.getRandomValues(random);
+    slug += alphabet[random[0] % alphabet.length];
+  }
+  return slug;
+}
+
 export function docIdToString(id: AnyId): string {
   return id as unknown as string;
 }

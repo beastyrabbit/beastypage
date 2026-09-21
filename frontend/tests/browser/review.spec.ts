@@ -150,9 +150,7 @@ test("Catdex cards open with Enter and Space", async ({ page }) => {
   await page.goto(
     `${process.env.BROWSER_FIXTURE_URL}?view=catdex&catdexCard=1`,
   );
-  const card = page.getByRole("button").filter({
-    has: page.getByRole("heading", { name: "Keyboard cat", level: 3 }),
-  });
+  const card = page.getByRole("button", { name: "Open Keyboard cat" });
   await expect(card).toBeVisible();
   await card.focus();
   await expect(card).toBeFocused();
