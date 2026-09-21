@@ -121,9 +121,7 @@ function errorStatus(message: string) {
   return 500;
 }
 
-// NOSONAR: This protocol endpoint intentionally dispatches a bounded operation switch.
 export const quickShareInternal = httpAction(async (ctx, request) => {
-  // NOSONAR
   const expected = process.env.QUICK_SHARE_INTERNAL_TOKEN;
   const received = request.headers.get("x-quick-share-internal-token");
   if (!expected || !received || expected !== received) {

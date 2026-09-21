@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   booleanValue,
   defineCatSystem,
@@ -113,6 +113,38 @@ function parentDocument(): EvolutionDocument {
 }
 
 describe("trait evolution", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each(["missing", "rejecting"])(
+    "keeps JSON documents independent when structuredClone is %s",
+    (mode) => {
+      vi.stubGlobal(
+        "structuredClone",
+        mode === "missing"
+          ? undefined
+          : () => {
+              throw new DOMException(
+                "Cannot clone this value",
+                "DataCloneError",
+              );
+            },
+      );
+      const parent = parentDocument();
+      const result = applyEvolutionTraitChanges({
+        parent,
+        system: probeSystem,
+        changes: [{ traitId: "__probe_earaccessory", value: "new-ear" }],
+      });
+      expect(result.traits).toMatchObject({
+        __probe_earaccessory: ["old-ear", "new-ear"],
+      });
+      expect(parent.traits).toMatchObject({
+        __probe_earaccessory: ["old-ear"],
+      });
+      expect(result.unknownTraits).not.toBe(parent.unknownTraits);
+    },
+  );
+
   it("automatically accumulates a new string-list trait by traitId", () => {
     const result = applyEvolutionTraitChanges({
       parent: parentDocument(),

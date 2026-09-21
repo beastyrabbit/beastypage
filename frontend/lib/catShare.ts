@@ -48,7 +48,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function cloneJson<T>(value: T): T {
   if (typeof structuredClone === "function") return structuredClone(value);
-  return structuredClone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function cleanString(value: unknown): string | undefined {

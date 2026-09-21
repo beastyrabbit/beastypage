@@ -1073,7 +1073,8 @@ export function AncestryTreeClient({
                       onChange={(e) =>
                         handleConfigChange({
                           ...config,
-                          genderRatio: Number.parseInt(e.target.value, 10) / 100,
+                          genderRatio:
+                            Number.parseInt(e.target.value, 10) / 100,
                         })
                       }
                       className="slider-amber w-full"
@@ -1130,7 +1131,8 @@ export function AncestryTreeClient({
                       onChange={(e) =>
                         handleConfigChange({
                           ...config,
-                          partnerChance: Number.parseInt(e.target.value, 10) / 100,
+                          partnerChance:
+                            Number.parseInt(e.target.value, 10) / 100,
                         })
                       }
                       className="slider-amber w-full"

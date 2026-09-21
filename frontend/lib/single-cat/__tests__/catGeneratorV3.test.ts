@@ -31,7 +31,11 @@ describe("CatGeneratorV3 batch coat variants", () => {
     expect(generator.buildCatURL(legacyShaped)).toBe("");
   });
 
-  it("explicitly clears a base derived coat for normal-pelt variants", async () => {
+  it.each(["available", "missing", "rejecting"])("clears derived coats with structuredClone %s", async (mode) => {
+    if (mode === "missing") vi.stubGlobal("structuredClone", undefined);
+    if (mode === "rejecting") vi.stubGlobal("structuredClone", () => {
+      throw new DOMException("Cannot clone this value", "DataCloneError");
+    });
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
       expect(body.variants[0].params).toMatchObject({

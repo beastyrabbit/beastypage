@@ -70,7 +70,11 @@ function packGrid(count: number): { columns: number; spriteSize: number } {
  * QR appears at the end. Progress is synced through the session's
  * batchState, so an overlay reload resumes where the show left off.
  */
-export function BatchScene({ command, liveState, apiKey }: Readonly<BatchSceneProps>) {
+export function BatchScene({
+  command,
+  liveState,
+  apiKey,
+}: Readonly<BatchSceneProps>) {
   const reportBatchStage = useMutation(api.catStream.reportBatchStage);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const placeholdersRef = useRef<BatchTortiePlaceholders>(

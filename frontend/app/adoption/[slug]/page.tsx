@@ -4,7 +4,9 @@ type AdoptionBatchPageProps = {
   params: Promise<{ slug: string }>;
 };
 
-export async function generateMetadata({ params }: Readonly<AdoptionBatchPageProps>) {
+export async function generateMetadata({
+  params,
+}: Readonly<AdoptionBatchPageProps>) {
   const resolved = await params;
   return {
     title: `Adoption Batch • ${resolved.slug}`,

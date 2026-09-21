@@ -37,7 +37,8 @@ export function CatSidebar({
   const genderColor = cat.gender === "F" ? "text-pink-400" : "text-blue-400";
   let tortieStatus = "None";
   if (cat.genetics.isTortie.expressed) tortieStatus = "Expressed";
-  else if (cat.genetics.isTortie.allele1 || cat.genetics.isTortie.allele2) tortieStatus = "Carried";
+  else if (cat.genetics.isTortie.allele1 || cat.genetics.isTortie.allele2)
+    tortieStatus = "Carried";
 
   const lifeStageLabel =
     {
@@ -222,7 +223,13 @@ export function CatSidebar({
             <div className="pt-2 border-t border-white/10">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Tortie Gene</span>
-                <span className={cat.genetics.isTortie.expressed ? "text-pink-400" : "text-muted-foreground"}>
+                <span
+                  className={
+                    cat.genetics.isTortie.expressed
+                      ? "text-pink-400"
+                      : "text-muted-foreground"
+                  }
+                >
                   {tortieStatus}
                 </span>
               </div>

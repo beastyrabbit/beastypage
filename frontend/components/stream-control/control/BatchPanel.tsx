@@ -74,7 +74,7 @@ export function BatchPanel() {
   // edits are never reverted by in-flight echoes.
   const { touch: touchLocalEdit, deferIfEditing, retryTick } = useFollowGuard();
   useEffect(() => {
-    if (retryTick === -1) return;
+    void retryTick;
     const info = rawSessionSettings?.batchInfo as
       | Record<string, unknown>
       | undefined;
@@ -272,7 +272,7 @@ export function BatchPanel() {
   const persistedSeqRef = useRef<number | null>(null);
   const [persistRetryTick, setPersistRetryTick] = useState(0);
   useEffect(() => {
-    if (persistRetryTick === -1) return; // re-runs the save after a scheduled retry
+    void persistRetryTick; // re-runs the save after a scheduled retry
     const command = currentBatchCommand;
     const state = batchLiveState;
     if (!command || !state || state.seq !== command.seq) return;

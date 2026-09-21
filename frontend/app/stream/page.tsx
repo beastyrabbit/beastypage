@@ -127,7 +127,7 @@ export default function StreamLanding() {
             <div className="glass-card group relative overflow-hidden p-6 h-full border-emerald-500/10">
               <div
                 className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-purple-500/10 opacity-50 transition-opacity duration-500 group-hover:opacity-100"
-                        aria-hidden="true"
+                aria-hidden="true"
               />
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 motion-safe:group-hover:animate-shine motion-reduce:hidden" />
 

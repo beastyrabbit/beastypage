@@ -150,7 +150,7 @@ export function getSystemInheritanceTraits(
 
 function clonePortableValue<T>(value: T): T {
   if (typeof structuredClone === "function") return structuredClone(value);
-  return structuredClone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function stableValueKey(value: unknown): string {

@@ -520,7 +520,10 @@ type HistorySingleCardProps = {
   onPreview: (title: string, url: string) => void;
 };
 
-function HistorySingleCard({ item, onPreview }: Readonly<HistorySingleCardProps>) {
+function HistorySingleCard({
+  item,
+  onPreview,
+}: Readonly<HistorySingleCardProps>) {
   const title = cleanDisplay(item.title);
   const previewUrl = item.previewUrl;
   const fullUrl = item.fullUrl ?? previewUrl;
@@ -595,7 +598,10 @@ type HistoryAdoptionCardProps = {
   onPreview: (title: string, url: string) => void;
 };
 
-function HistoryAdoptionCard({ item, onPreview }: Readonly<HistoryAdoptionCardProps>) {
+function HistoryAdoptionCard({
+  item,
+  onPreview,
+}: Readonly<HistoryAdoptionCardProps>) {
   const [activeIndex, setActiveIndex] = useState(0);
   const totalCats = item.cats.length;
   const safeIndex = totalCats

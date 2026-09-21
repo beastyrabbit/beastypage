@@ -28,8 +28,8 @@ function generateSalt(): Uint8Array {
  */
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCodePoint(byte);
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
   return btoa(binary);
 }
@@ -41,7 +41,7 @@ function fromBase64(base64: string): Uint8Array {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.codePointAt(i) ?? 0;
+    bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
 }
@@ -159,16 +159,17 @@ async function verifyPassword(
  * Legacy hash function for backwards compatibility during migration
  */
 function legacySimpleHash(str: string): string {
+  // Persisted legacy hashes use UTF-16 code units, including surrogate pairs.
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    const char = str.codePointAt(i) ?? 0;
+    const char = str.charCodeAt(i);
     hash = (hash << 5) - hash + char;
     hash = hash & hash;
   }
   const salt =
     str.length +
-    (str.codePointAt(0) ?? 0) +
-    (str.codePointAt(str.length - 1) ?? 0);
+    (str.charCodeAt(0) || 0) +
+    (str.charCodeAt(str.length - 1) || 0);
   return `${hash.toString(36)}-${salt.toString(36)}`;
 }
 

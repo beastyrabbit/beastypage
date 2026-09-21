@@ -49,7 +49,10 @@ type RenderedCat = EvolutionStreamCat & { previewUrl: string | null };
  * (hands-off mode), then shows a compact lineage board with a QR code to
  * the saved /evolution/[slug] page.
  */
-export function EvolutionScene({ command, initialPhase }: Readonly<EvolutionSceneProps>) {
+export function EvolutionScene({
+  command,
+  initialPhase,
+}: Readonly<EvolutionSceneProps>) {
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const renderTokenRef = useRef(0);
   const [phase, setPhase] = useState<"ceremony" | "tree">(initialPhase);

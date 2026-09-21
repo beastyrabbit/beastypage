@@ -45,7 +45,9 @@ export function PaletteControls({
           min={3}
           max={12}
           value={colorCount}
-          onChange={(e) => onColorCountChange(Number.parseInt(e.target.value, 10))}
+          onChange={(e) =>
+            onColorCountChange(Number.parseInt(e.target.value, 10))
+          }
           className="h-2 w-32 cursor-pointer appearance-none rounded-lg bg-border/50 accent-primary [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
           disabled={isProcessing}
         />

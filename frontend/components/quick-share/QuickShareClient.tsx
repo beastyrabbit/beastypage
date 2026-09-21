@@ -860,6 +860,7 @@ export function QuickShareClient() {
                     contentEditable={!busy}
                     suppressContentEditableWarning
                     inputMode="none"
+                    role="textbox"
                     tabIndex={0}
                     aria-label="Paste an image from the clipboard"
                     className="absolute inset-0 z-10 size-full cursor-text overflow-hidden bg-transparent text-transparent caret-transparent outline-none [&_img]:opacity-0"
@@ -933,8 +934,9 @@ export function QuickShareClient() {
                           </span>
                         </div>
                         <progress
-                          className="mt-3 h-2 w-full overflow-hidden rounded-full bg-background accent-amber-500"
+                          className="mt-3 h-2 w-full appearance-none overflow-hidden rounded-full bg-background [&::-moz-progress-bar]:bg-amber-500 [&::-webkit-progress-bar]:bg-background [&::-webkit-progress-value]:bg-amber-500"
                           aria-label="Upload progress"
+                          aria-valuetext={work.label}
                           max={100}
                           value={work.progress}
                         />

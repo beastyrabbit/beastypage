@@ -154,7 +154,7 @@ export const getBySlug = query({
       const asId = await ctx.db.get(toId("cat_profile", args.slugOrId));
       return asId ? await profileToClient(ctx, asId) : null;
     } catch (_error) {
-      // Admin identity is unavailable in non-admin runtimes; deny access.
+      // Invalid IDs are expected for slug lookups; treat them as a miss.
       return null;
     }
   },

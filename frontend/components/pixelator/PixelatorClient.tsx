@@ -526,7 +526,10 @@ const MODE_OPTIONS: Array<{
   },
 ];
 
-function ModeToggle({ current, onChange }: Readonly<ModeToggleProps>): React.ReactNode {
+function ModeToggle({
+  current,
+  onChange,
+}: Readonly<ModeToggleProps>): React.ReactNode {
   return (
     <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
       {MODE_OPTIONS.map(({ mode, label, activeClass }) => (

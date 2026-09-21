@@ -70,7 +70,9 @@ function formatTimestamp(created?: number): string | null {
   return date.toLocaleString();
 }
 
-export function AncestryTreeViewClient({ slug }: Readonly<AncestryTreeViewClientProps>) {
+export function AncestryTreeViewClient({
+  slug,
+}: Readonly<AncestryTreeViewClientProps>) {
   const record = useQuery(api.ancestryTree.getBySlug, { slug }) as
     | AncestryTreeRecord
     | null

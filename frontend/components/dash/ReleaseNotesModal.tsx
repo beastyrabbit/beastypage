@@ -11,7 +11,10 @@ interface ReleaseNotesModalProps {
   onClose: (latestTag: string | null) => void;
 }
 
-export function ReleaseNotesModal({ open, onClose }: Readonly<ReleaseNotesModalProps>) {
+export function ReleaseNotesModal({
+  open,
+  onClose,
+}: Readonly<ReleaseNotesModalProps>) {
   const [releases, setReleases] = useState<ReleaseNote[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

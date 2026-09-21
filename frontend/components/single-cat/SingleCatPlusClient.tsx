@@ -5176,8 +5176,10 @@ export function SingleCatPlusClient({
       </div>
 
       {spriteGalleryOpen && (
-        <dialog
-          open
+        <div
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
@@ -5285,12 +5287,14 @@ export function SingleCatPlusClient({
               )}
             </div>
           </div>
-        </dialog>
+        </div>
       )}
 
       {timingModalOpen && (
-        <dialog
-          open
+        <div
+          role="dialog"
+          aria-modal="true"
+          tabIndex={-1}
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 py-10"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
@@ -5520,7 +5524,7 @@ export function SingleCatPlusClient({
               </p>
             </div>
           </div>
-        </dialog>
+        </div>
       )}
 
       {toast && (

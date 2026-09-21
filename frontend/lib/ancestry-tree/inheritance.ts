@@ -32,7 +32,8 @@ interface MutationSelectionOptions {
 }
 
 function clonePortableValue<T>(value: T): T {
-  return structuredClone(value);
+  if (typeof structuredClone === "function") return structuredClone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function parseMutationCandidate(

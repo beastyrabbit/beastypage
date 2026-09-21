@@ -60,8 +60,21 @@ export function useQuery(
   }
 }
 export const useMutation = () => async () => ({ remaining: false });
+const catdexCard = {
+  id: "fixture-cat",
+  cat_name: "Keyboard cat",
+  twitch_user_name: "Test artist",
+  approved: true,
+  card_number: "1",
+  default_card_url: new URL("/sprites/fademask.png", location.origin).href,
+  season: "Fixture season",
+  rarity: "Common",
+  updated: 1,
+};
 export const usePaginatedQuery = () => ({
-  results: [],
+  results: new URL(location.href).searchParams.has("catdexCard")
+    ? [catdexCard]
+    : [],
   status: "CanLoadMore",
   loadMore: () => {},
 });

@@ -64,7 +64,7 @@ export function SettingsPanel() {
   const [bgOpacity, setBgOpacity] = useState(100);
   const { touch: touchLocalEdit, deferIfEditing, retryTick } = useFollowGuard();
   useEffect(() => {
-    if (retryTick === -1) return;
+    void retryTick;
     const raw = rawSessionSettings;
     if (!raw) return;
     const cancelRetry = deferIfEditing();

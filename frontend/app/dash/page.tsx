@@ -48,7 +48,9 @@ async function loadDashFromSlug(
   }
 }
 
-export default async function DashPage({ searchParams }: Readonly<DashPageProps>) {
+export default async function DashPage({
+  searchParams,
+}: Readonly<DashPageProps>) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const slug = firstSearchParam(resolvedSearchParams.slug)?.trim() || null;
 

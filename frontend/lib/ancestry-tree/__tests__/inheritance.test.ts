@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   defineCatSystem,
   defineCatTrait,
@@ -56,6 +56,26 @@ const probeSystem = defineCatSystem({
 });
 
 describe("registry-driven ancestry inheritance", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("copies mutation and inheritance values without structuredClone", () => {
+    vi.stubGlobal("structuredClone", undefined);
+    const mutations = selectAncestryTraitMutations(
+      probeSystem,
+      {},
+      { __probe_ancestry: ["EAR-FERN"] },
+      { mutationRate: 1, random: () => 0 },
+    );
+    const child = applySystemInheritanceStrategies(
+      probeSystem,
+      {},
+      {},
+      { mutations },
+    );
+    expect(child.__probe_ancestry).toEqual(["EAR-FERN"]);
+    expect(child.__probe_ancestry).not.toBe(mutations.__probe_ancestry);
+  });
+
   it("inherits a newly registered trait without a mutation-pool field", () => {
     const mutations = selectAncestryTraitMutations(
       probeSystem,

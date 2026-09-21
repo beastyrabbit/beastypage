@@ -4,9 +4,10 @@ import sharp from "sharp";
  * Simple seeded PRNG (mulberry32).
  */
 function mulberry32(seed: number) {
-  let a = Math.trunc(seed);
+  // Mulberry32 requires signed 32-bit wrapping, not numeric truncation.
+  let a = seed | 0;
   return () => {
-    a = Math.trunc(a + 0x6d2b79f5);
+    a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;

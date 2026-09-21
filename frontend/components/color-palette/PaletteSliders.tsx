@@ -35,7 +35,9 @@ export function PaletteSliders({
           min={1}
           max={20}
           value={topColorCount}
-          onChange={(e) => onTopColorCountChange(Number.parseInt(e.target.value, 10))}
+          onChange={(e) =>
+            onTopColorCountChange(Number.parseInt(e.target.value, 10))
+          }
           className="h-2 w-40 cursor-pointer appearance-none rounded-lg bg-border/50 accent-primary [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
           disabled={isProcessing}
         />

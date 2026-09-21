@@ -526,7 +526,7 @@ export default function CatdexPage() {
             const numberShort = cat.card_number ? `#${cat.card_number}` : "—";
 
             return (
-              <article
+              <div
                 key={cat.id}
                 className="glass-card group flex cursor-pointer flex-col overflow-hidden transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-2xl"
                 role="button"
@@ -570,7 +570,7 @@ export default function CatdexPage() {
                     </p>
                   </div>
                 </div>
-              </article>
+              </div>
             );
           })}
         </section>

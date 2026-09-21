@@ -232,7 +232,7 @@ class SpriteMapper:
 
                 self.experimental_categories[palette_id] = category_colors
 
-            except (OSError, json.JSONDecodeError, KeyError, TypeError):
+            except (OSError, ValueError, KeyError, TypeError):
                 logger.exception("Failed to load palette %s", palette_file)
 
         return result

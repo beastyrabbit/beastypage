@@ -62,6 +62,128 @@ test("host sign-in gate has a visible sign-in control", async ({ page }) => {
   await page.screenshot({ path: "../.playwright-mcp/host-sign-in.png" });
 });
 
+test("Quick Share exposes native upload progress and an accessible clipboard textbox", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/i/api/policy", (route) =>
+    route.fulfill({
+      json: {
+        maxBytes: 104857600,
+        hourlyStarts: 10,
+        dailyBytes: 1073741824,
+        active: 5,
+        smallCutoffBytes: 10485760,
+        smallLifetimeMs: 86400000,
+        largeLifetimeMs: 3600000,
+        chunkBytes: 4,
+      },
+    }),
+  );
+  await page.route("**/i/api/account/uploads", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.route("**/i/api/uploads", (route) =>
+    route.fulfill({
+      json: {
+        uploadId: "fixture-progress",
+        slug: "fixture-progress",
+        receipt: "fixture-only",
+        url: "/i/fixture-progress",
+        publicExpiresAt: Date.now() + 86400000,
+        chunkBytes: 4,
+      },
+    }),
+  );
+  await page.route("**/i/api/uploads/fixture-progress/status", (route) =>
+    route.fulfill({
+      json: {
+        state: "uploading",
+        parts: [{ partNumber: 1, size: 4 }],
+      },
+    }),
+  );
+  let heldPart: import("@playwright/test").Route | undefined;
+  await page.route("**/i/api/uploads/fixture-progress/parts/2", (route) => {
+    heldPart = route;
+  });
+  await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=quick-share`);
+  await page.getByRole("tab", { name: "Clipboard", exact: true }).click();
+  const clipboard = page.getByRole("textbox", {
+    name: "Paste an image from the clipboard",
+  });
+  await expect(clipboard).toBeVisible();
+  await expect(clipboard).toHaveAttribute("contenteditable", "true");
+  await clipboard.focus();
+  await expect(clipboard).toBeFocused();
+  await page.getByRole("tab", { name: "Photo/video", exact: true }).click();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "progress.png",
+    mimeType: "image/png",
+    buffer: Buffer.alloc(8),
+  });
+  await page.getByRole("button", { name: "Create link", exact: true }).click();
+  await expect.poll(() => Boolean(heldPart)).toBe(true);
+  const progress = page.getByRole("progressbar", { name: "Upload progress" });
+  await expect(progress).toBeVisible();
+  expect(await progress.evaluate((el) => el.tagName)).toBe("PROGRESS");
+  await expect(progress).toHaveAttribute("max", "100");
+  await expect(progress).toHaveAttribute("value", "50");
+  await expect(progress).toHaveAttribute(
+    "aria-valuetext",
+    "Uploading progress.png · 4 B of 8 B",
+  );
+  await expect(page.getByText("50%", { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: "../.playwright-mcp/sonar-quick-share-progress.png",
+    fullPage: true,
+  });
+  expect(errors).toEqual([]);
+  await page.goto("about:blank");
+});
+
+test("Catdex cards open with Enter and Space", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1400 });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(
+    `${process.env.BROWSER_FIXTURE_URL}?view=catdex&catdexCard=1`,
+  );
+  const card = page.getByRole("button").filter({
+    has: page.getByRole("heading", { name: "Keyboard cat", level: 3 }),
+  });
+  await expect(card).toBeVisible();
+  await card.focus();
+  await expect(card).toBeFocused();
+  await page.screenshot({
+    path: "../.playwright-mcp/sonar-catdex-keyboard-01.png",
+  });
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "Keyboard cat", level: 2 }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "../.playwright-mcp/sonar-catdex-keyboard-02.png",
+  });
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("heading", { name: "Keyboard cat", level: 2 }),
+  ).toHaveCount(0);
+  await expect(card).toBeFocused();
+  await page.screenshot({
+    path: "../.playwright-mcp/sonar-catdex-keyboard-03.png",
+  });
+  await page.keyboard.press("Space");
+  await expect(
+    page.getByRole("heading", { name: "Keyboard cat", level: 2 }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "../.playwright-mcp/sonar-catdex-keyboard-04.png",
+  });
+  expect(errors).toEqual([]);
+});
+
 test("host can recover from a legacy or unavailable session link", async ({
   page,
 }) => {
@@ -227,6 +349,11 @@ test("Pixelator cancels obsolete processing and clears results when steps are di
       "Previous result. Current settings have not been rendered yet.",
     ),
   ).toBeVisible();
+  const staleStatus = page
+    .getByRole("status")
+    .filter({ hasText: "Previous result." });
+  await expect(staleStatus).toBeVisible();
+  expect(await staleStatus.evaluate((el) => el.tagName)).toBe("OUTPUT");
   await expect(
     page.getByRole("img", { name: "Processed result" }),
   ).toHaveAttribute("src", original!);

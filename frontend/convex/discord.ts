@@ -50,9 +50,10 @@ async function hashAnswer(answer: string, salt: string) {
       .join("");
   }
   let hash = 0;
+  // Preserve the UTF-16 and signed 32-bit format of stored fallback hashes.
   for (let i = 0; i < payload.length; i += 1) {
-    hash = (hash << 5) - hash + (payload.codePointAt(i) ?? 0);
-    hash = Math.trunc(hash);
+    hash = (hash << 5) - hash + payload.charCodeAt(i);
+    hash |= 0;
   }
   return hash.toString(16);
 }

@@ -23,7 +23,9 @@ type PageProps = {
   }>;
 };
 
-export default async function VisualBuilderPage({ searchParams }: Readonly<PageProps>) {
+export default async function VisualBuilderPage({
+  searchParams,
+}: Readonly<PageProps>) {
   const resolvedSearch = searchParams ? await searchParams : undefined;
 
   const rawSlug =

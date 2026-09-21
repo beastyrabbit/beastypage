@@ -45,21 +45,22 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (!session) throw new Error("This voting round is no longer active");
-    const activeRound =
+    const isInactiveRound =
       session.status !== "live" ||
       session.currentStep !== args.stepId ||
       args.voteRound !== (session.voteRound ?? 0);
-    if (activeRound) throw new Error("This voting round is no longer active");
-    const optionAvailable =
+    if (isInactiveRound)
+      throw new Error("This voting round is no longer active");
+    const isUnavailableOption =
       !session.allowedOptions?.includes(args.optionKey) ||
       session.params?._disabledOptions?.[args.stepId]?.includes(args.optionKey);
-    if (optionAvailable) throw new Error("Choice is not available");
+    if (isUnavailableOption) throw new Error("Choice is not available");
     const tieFilter = session.params?._tieFilter;
-    const inTieBreak =
+    const isOutsideTieBreak =
       Array.isArray(tieFilter) &&
       tieFilter.length &&
       !tieFilter.includes(args.optionKey);
-    if (inTieBreak) throw new Error("Choice is not in the tie-break");
+    if (isOutsideTieBreak) throw new Error("Choice is not in the tie-break");
     let optionMeta: Record<string, unknown>;
     if (args.votedBy) {
       if (session.params?._votesOpen !== true)

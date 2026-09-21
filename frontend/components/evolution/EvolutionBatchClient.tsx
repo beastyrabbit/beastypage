@@ -79,7 +79,9 @@ function formatTimestamp(value?: number | null) {
   return new Date(value).toLocaleString();
 }
 
-export function EvolutionBatchClient({ slug }: Readonly<EvolutionBatchClientProps>) {
+export function EvolutionBatchClient({
+  slug,
+}: Readonly<EvolutionBatchClientProps>) {
   const record = useQuery(api.adoptionV2.getBySlug, { slugOrId: slug }) as
     | EvolutionBatchRecord
     | null

@@ -543,7 +543,7 @@ export function normalizeEvolutionControls(
 }
 
 function clone<T>(value: T): T {
-  return structuredClone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 export function resolveEvolutionStarterHair(

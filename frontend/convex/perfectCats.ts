@@ -21,7 +21,8 @@ function stableStringify(value: unknown): string {
   }
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
-    const keys = Object.keys(record).sort((a, b) => a.localeCompare(b));
+    // Stored hashes depend on locale-independent UTF-16 key ordering.
+    const keys = Object.keys(record).sort();
     return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(",")}}`;
   }
   return JSON.stringify(value);
@@ -31,7 +32,7 @@ function hashCatParams(params: unknown): string {
   const input = stableStringify(params);
   let hash = 5381;
   for (let i = 0; i < input.length; i += 1) {
-    hash = (hash * 33) ^ (input.codePointAt(i) ?? 0);
+    hash = (hash * 33) ^ input.charCodeAt(i);
     hash >>>= 0;
   }
   return hash.toString(16);
@@ -49,9 +50,10 @@ function sanitizeCat(doc: Doc<"perfect_cats">) {
 }
 
 function pairKey(a: Id<"perfect_cats">, b: Id<"perfect_cats">): string {
-  const [first, second] = [a as unknown as string, b as unknown as string].sort(
-    (a, b) => a.localeCompare(b),
-  );
+  const [first, second] = [
+    a as unknown as string,
+    b as unknown as string,
+  ].sort();
   return `${first}__${second}`;
 }
 

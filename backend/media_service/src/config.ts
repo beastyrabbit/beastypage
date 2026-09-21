@@ -17,7 +17,7 @@ const schema = z.object({
 	S3_ACCESS_KEY_ID: z.string().min(1),
 	S3_SECRET_ACCESS_KEY: z.string().min(1),
 	CORS_ORIGINS: z.string().default("http://frontend.localhost:1355"),
-	TRUSTED_PROXY_CIDRS: z.string().default(""),
+	TRUSTED_PROXY_CIDRS: z.string().default("10.0.0.0/8"),
 	WORKER_ENABLED: booleanFromEnv,
 	TEMP_DIR: z.string().default("/tmp/quick-share"),
 	PROCESSING_TIMEOUT_MS: z.coerce

@@ -35,7 +35,7 @@ export function normalizeStorageUrl(url: string | null): string | null {
     // Use JSON serialization to force conversion to primitive string
     // This completely avoids any URL object property access that Convex restricts
     // JSON.stringify will serialize the URL to a string, then we parse it back
-    const urlStr = structuredClone(url);
+    const urlStr = JSON.parse(JSON.stringify(url)) as string;
 
     // If we have a storage base, ensure the URL uses it
     const storageBase = STORAGE_BASE ? String(STORAGE_BASE) : null;
@@ -83,7 +83,7 @@ export function normalizeStorageUrl(url: string | null): string | null {
     // This ensures the function never throws and always returns a string or null
     try {
       // Last resort: try JSON serialization which should work even for URL objects
-      return structuredClone(url);
+      return JSON.parse(JSON.stringify(url)) as string;
     } catch {
       return null;
     }
