@@ -83,14 +83,34 @@ it("keeps rejected dimensions unsupported", async () => {
 	).toMatchObject({ state: "unsupported", failureCode: "UNSAFE_MEDIA" });
 });
 
-it("allows original fallback only after validation", async () => {
+it("normalizes compatible images before publishing them", async () => {
+	mocks.fileType.mockResolvedValue({ mime: "image/jpeg" });
+	const result = await processOriginal(
+		job,
+		store,
+		config,
+		"/tmp/fixture",
+		"artifact",
+	);
+	expect(result).toMatchObject({
+		state: "ready",
+		publicKey: "derivatives/fixture-artifact.jpg",
+		publicMime: "image/jpeg",
+	});
+	expect(putFile).toHaveBeenCalledWith(
+		"derivatives/fixture-artifact.jpg",
+		"/tmp/fixture/normalized.jpg",
+		"image/jpeg",
+	);
+});
+
+it("never publishes an image original when normalization fails", async () => {
 	mocks.toFile.mockRejectedValue(new Error("normalization unavailable"));
 	expect(
 		await processOriginal(job, store, config, "/tmp/fixture", "artifact"),
 	).toMatchObject({
-		state: "ready",
-		publicKey: job.upload.originalKey,
-		compatibilityWarning: expect.any(String),
+		state: "failed",
+		failureCode: "NORMALIZATION_FAILED",
 	});
 });
 

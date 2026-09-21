@@ -40,7 +40,7 @@ describe("raw media delivery", () => {
 				return controlResponse({ error: "unavailable" }, 404);
 			return controlResponse([
 				{
-					key: "later-item",
+					key: "derivatives/later-item.png",
 					mime: "image/png",
 					size: 4,
 					name: "later.png",
@@ -59,8 +59,8 @@ describe("raw media delivery", () => {
 		expect((await app.request("/i/Abcdefg1", { method: "HEAD" })).status).toBe(
 			200,
 		);
-		expect(get).toHaveBeenCalledWith("later-item", undefined);
-		expect(head).toHaveBeenCalledWith("later-item");
+		expect(get).toHaveBeenCalledWith("derivatives/later-item.png", undefined);
+		expect(head).toHaveBeenCalledWith("derivatives/later-item.png");
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 	it("returns media bytes directly with range and crawler headers", async () => {
@@ -113,7 +113,7 @@ describe("raw media delivery", () => {
 			"fetch",
 			vi.fn(async () =>
 				controlResponse({
-					key: "originals/example",
+					key: "derivatives/example.png",
 					mime: "image/png",
 					size: 123,
 					name: "image.png",
@@ -131,6 +131,25 @@ describe("raw media delivery", () => {
 		});
 		expect(response.status).toBe(200);
 		expect(response.headers.get("content-length")).toBe("123");
+		expect(store.get).not.toHaveBeenCalled();
+	});
+	it("does not publicly serve an image original", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				controlResponse({
+					key: "originals/example",
+					mime: "image/jpeg",
+					size: 123,
+					name: "image.jpg",
+					expiresAt: Date.now() + 60_000,
+				}),
+			),
+		);
+		const store = { get: vi.fn() } as unknown as ObjectStore;
+		const { app } = createApp(config, store);
+		const response = await app.request("https://beastyrabbit.com/i/AbCd1234");
+		expect(response.status).toBe(404);
 		expect(store.get).not.toHaveBeenCalled();
 	});
 

@@ -20,12 +20,6 @@ const IMAGE_MIMES = new Set([
 	"image/tiff",
 	"image/bmp",
 ]);
-const PRESERVE_IMAGE_MIMES = new Set([
-	"image/jpeg",
-	"image/png",
-	"image/gif",
-	"image/webp",
-]);
 const VIDEO_MIMES = new Set([
 	"video/mp4",
 	"video/quicktime",
@@ -152,7 +146,6 @@ async function probeVideo(input: string, timeoutMs: number) {
 
 async function processImage(
 	input: string,
-	mime: string,
 	outputDir: string,
 	uploadId: string,
 	artifactId: string,
@@ -161,24 +154,29 @@ async function processImage(
 ) {
 	const metadata = await validateImage(input);
 	onValidated();
-	if (PRESERVE_IMAGE_MIMES.has(mime)) {
-		const file = await stat(input);
-		return {
-			publicKey: undefined,
-			publicMime: mime,
-			publicSize: file.size,
-		};
-	}
 
-	const hasAlpha = metadata.hasAlpha === true;
-	const extension = hasAlpha ? "png" : "jpg";
-	const publicMime = hasAlpha ? "image/png" : "image/jpeg";
+	const format = metadata.format;
+	const extension =
+		format === "gif" || format === "webp" || format === "png"
+			? format
+			: metadata.hasAlpha === true
+				? "png"
+				: "jpg";
+	const publicMime = `image/${extension === "jpg" ? "jpeg" : extension}`;
 	const output = join(outputDir, `normalized.${extension}`);
+	// Sharp's encoders omit source metadata by default. Do not opt into
+	// keepMetadata/withMetadata here: EXIF, IPTC, XMP and embedded profiles
+	// must not reach the public derivative.
 	const pipeline = sharp(input, {
+		animated: format === "gif" || format === "webp",
 		limitInputPixels: 100_000_000,
 		failOn: "warning",
 	}).rotate();
-	if (hasAlpha) {
+	if (extension === "gif") {
+		await pipeline.gif().toFile(output);
+	} else if (extension === "webp") {
+		await pipeline.webp({ lossless: true }).toFile(output);
+	} else if (extension === "png") {
 		await pipeline.png({ compressionLevel: 9 }).toFile(output);
 	} else {
 		await pipeline
@@ -294,7 +292,6 @@ export async function processOriginal(
 		const normalized = IMAGE_MIMES.has(mime)
 			? await processImage(
 					input,
-					mime,
 					directory,
 					job.upload.id,
 					artifactId,
@@ -313,7 +310,7 @@ export async function processOriginal(
 		return {
 			state: "ready",
 			detectedMime: mime,
-			publicKey: normalized.publicKey ?? job.upload.originalKey,
+			publicKey: normalized.publicKey,
 			publicMime: normalized.publicMime,
 			publicSize: normalized.publicSize,
 		};
@@ -334,6 +331,15 @@ export async function processOriginal(
 				detectedMime: mime,
 				failureCode: "VALIDATION_FAILED",
 				failureMessage: "The file could not be validated and cannot be shared.",
+			};
+		}
+		if (IMAGE_MIMES.has(mime)) {
+			return {
+				state: "failed",
+				detectedMime: mime,
+				failureCode: "NORMALIZATION_FAILED",
+				failureMessage:
+					"The image could not be sanitized and cannot be shared.",
 			};
 		}
 		const file = await stat(input);

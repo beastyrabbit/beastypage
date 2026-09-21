@@ -784,7 +784,11 @@ export function createApp(
 			if (statusCode(error) < 500) throw error;
 			result = await control.call<PublicUpload>("public", { slug });
 		}
-		return Array.isArray(result) ? result : [result];
+		const items = Array.isArray(result) ? result : [result];
+		return items.filter(
+			(item) =>
+				!item.mime.startsWith("image/") || item.key.startsWith("derivatives/"),
+		);
 	}
 
 	app.get("/i/:slug/:item", async (c) => {
