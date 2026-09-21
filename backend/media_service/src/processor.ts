@@ -156,12 +156,14 @@ async function processImage(
 	onValidated();
 
 	const format = metadata.format;
-	const extension =
-		format === "gif" || format === "webp" || format === "png"
-			? format
-			: metadata.hasAlpha === true
-				? "png"
-				: "jpg";
+	let extension: "gif" | "webp" | "png" | "jpg";
+	if (format === "gif" || format === "webp" || format === "png") {
+		extension = format;
+	} else if (metadata.hasAlpha === true) {
+		extension = "png";
+	} else {
+		extension = "jpg";
+	}
 	const publicMime = `image/${extension === "jpg" ? "jpeg" : extension}`;
 	const output = join(outputDir, `normalized.${extension}`);
 	// Sharp's encoders omit source metadata by default. Do not opt into
