@@ -53,15 +53,16 @@ export const list = query({
     approved: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const approved = args.approved;
     const source =
-      typeof args.approved === "boolean"
+      typeof approved === "boolean"
         ? ctx.db
             .query("catdex")
-            .withIndex("byApproval", (q) => q.eq("approved", args.approved!))
+            .withIndex("byApproval", (q) => q.eq("approved", approved))
         : ctx.db.query("catdex");
     let cats = await source.order("desc").take(48);
-    if (typeof args.approved === "boolean") {
-      cats = cats.filter((c) => Boolean(c.approved) === args.approved);
+    if (typeof approved === "boolean") {
+      cats = cats.filter((c) => Boolean(c.approved) === approved);
     }
     cats.sort(
       (a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt),
@@ -156,18 +157,22 @@ export const create = mutation({
 async function catdexRecordToClient(
   ctx: QueryCtx,
   doc: CatdexDoc,
-  cache = {
-    seasons: new Map<string, Promise<SeasonDoc | null>>(),
-    rarities: new Map<string, Promise<RarityDoc | null>>(),
+  cache?: {
+    seasons: Map<string, Promise<SeasonDoc | null>>;
+    rarities: Map<string, Promise<RarityDoc | null>>;
   },
 ) {
+  const lookupCache = cache ?? {
+    seasons: new Map<string, Promise<SeasonDoc | null>>(),
+    rarities: new Map<string, Promise<RarityDoc | null>>(),
+  };
   const id = docIdToString(doc._id);
-  if (!cache.seasons.has(doc.seasonId))
-    cache.seasons.set(doc.seasonId, ctx.db.get(doc.seasonId));
-  if (!cache.rarities.has(doc.rarityId))
-    cache.rarities.set(doc.rarityId, ctx.db.get(doc.rarityId));
-  const seasonDoc = await cache.seasons.get(doc.seasonId);
-  const rarityDoc = await cache.rarities.get(doc.rarityId);
+  if (!lookupCache.seasons.has(doc.seasonId))
+    lookupCache.seasons.set(doc.seasonId, ctx.db.get(doc.seasonId));
+  if (!lookupCache.rarities.has(doc.rarityId))
+    lookupCache.rarities.set(doc.rarityId, ctx.db.get(doc.rarityId));
+  const seasonDoc = await lookupCache.seasons.get(doc.seasonId);
+  const rarityDoc = await lookupCache.rarities.get(doc.rarityId);
   const seasonInfo = seasonDoc ? seasonRecordToClient(seasonDoc) : null;
   const rarityInfo = rarityDoc ? rarityRecordToClient(rarityDoc) : null;
 

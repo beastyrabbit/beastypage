@@ -537,7 +537,7 @@ export class AdoptionGenerator {
 
   parseSelectValue(select, fallback) {
     if (!select) return fallback;
-    const parsed = parseInt(select.value, 10);
+    const parsed = Number.parseInt(select.value, 10);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
@@ -1848,7 +1848,7 @@ export class AdoptionGenerator {
       const copyButtons = item.querySelectorAll(".sprite-copy");
       copyButtons.forEach((button) => {
         button.addEventListener("click", async () => {
-          const size = parseInt(button.dataset.size, 10);
+          const size = Number.parseInt(button.dataset.size, 10);
           await this.copySpriteVariation(preview.poseName, size, button);
         });
       });

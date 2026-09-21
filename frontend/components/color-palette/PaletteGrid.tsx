@@ -41,7 +41,7 @@ export function PaletteGrid({
   highlightedIndex,
   onColorHover,
   onColorSelect,
-}: PaletteGridProps) {
+}: Readonly<PaletteGridProps>) {
   const ringColor = type === "dominant" ? "#8B5CF6" : "#38BDF8";
 
   const copyToClipboard = useCallback(async (hex: string) => {

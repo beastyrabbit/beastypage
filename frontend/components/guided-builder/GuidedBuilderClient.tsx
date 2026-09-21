@@ -278,7 +278,7 @@ type PaletteControlsProps = {
   onChange: (mode: PaletteMode) => void;
 };
 
-function PaletteControls({ mode, onChange }: PaletteControlsProps) {
+function PaletteControls({ mode, onChange }: Readonly<PaletteControlsProps>) {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
       <span className="font-medium text-neutral-300">Palette:</span>
@@ -330,7 +330,7 @@ function GuidedPreviewSprite({
   requestPreview,
   getCachedPreview,
   hasCachedPreview,
-}: GuidedPreviewSpriteProps) {
+}: Readonly<GuidedPreviewSpriteProps>) {
   const [src, setSrc] = useState<string | null>(() =>
     getCachedPreview(cacheKey),
   );
@@ -1995,7 +1995,7 @@ export function GuidedBuilderClient() {
                 const selected = chosen.has(option);
                 const currentAccessories = params.accessories ?? [];
                 const accessoryKey = [...currentAccessories, option]
-                  .sort()
+                  .sort((a, b) => String(a).localeCompare(String(b)))
                   .join("_");
                 const previewKey = `accessory-${group.label}-${option}-${accessoryKey}-${getPoseCacheKey(params)}`;
                 const label = formatName(option);

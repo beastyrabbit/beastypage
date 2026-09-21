@@ -22,7 +22,7 @@ const MAX_COUNT_OPTIONS = [1, 2, 3, 4];
 export function OffspringOptionsPanel({
   options,
   onChange,
-}: OffspringOptionsPanelProps) {
+}: Readonly<OffspringOptionsPanelProps>) {
   const handleAccessoryChanceChange = (value: number) => {
     onChange({ ...options, accessoryChance: value });
   };

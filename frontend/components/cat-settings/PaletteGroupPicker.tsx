@@ -191,7 +191,7 @@ interface PaletteGroupPickerProps {
 export function PaletteGroupPicker({
   selected,
   onChange,
-}: PaletteGroupPickerProps) {
+}: Readonly<PaletteGroupPickerProps>) {
   const [activeFilter, setActiveFilter] = useState<FilterValue>("all");
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 

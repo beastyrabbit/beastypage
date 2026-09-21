@@ -168,10 +168,11 @@ async function waitForHttp(label, check, signal) {
 		await delay(400, signal);
 	}
 
+	const detail = lastRetryableError ? `: ${lastRetryableError.message}` : "";
 	throw (
 		signal.reason ??
 		new Error(
-			`${label} did not become ready${lastRetryableError ? `: ${lastRetryableError.message}` : ""}`,
+			`${label} did not become ready${detail}`,
 		)
 	);
 }
@@ -311,7 +312,7 @@ async function run() {
 
 	const completion = result.then(
 		(events) => ({ ok: true, events }),
-		(events) => ({ ok: false, events }),
+		(error_) => ({ ok: false, events: error_ }),
 	);
 	const startupController = new AbortController();
 	const commandByName = Object.fromEntries(
@@ -429,7 +430,7 @@ async function run() {
 	}
 }
 
-run().catch((error) => {
+await run().catch((error) => {
 	console.error(
 		`[dev] Startup failed: ${error instanceof Error ? error.message : String(error)}`,
 	);

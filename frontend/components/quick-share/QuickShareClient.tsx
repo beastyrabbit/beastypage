@@ -933,20 +933,13 @@ export function QuickShareClient() {
                             {work.progress}%
                           </span>
                         </div>
-                        <div
-                          className="mt-3 h-2 overflow-hidden rounded-full bg-background"
-                          role="progressbar"
+                        <progress
+                          className="mt-3 h-2 w-full appearance-none overflow-hidden rounded-full bg-background [&::-moz-progress-bar]:bg-amber-500 [&::-webkit-progress-bar]:bg-background [&::-webkit-progress-value]:bg-amber-500"
                           aria-label="Upload progress"
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-valuenow={work.progress}
                           aria-valuetext={work.label}
-                        >
-                          <div
-                            className="h-full rounded-full bg-amber-500 transition-[width] duration-150 ease-out motion-reduce:transition-none"
-                            style={{ width: `${work.progress}%` }}
-                          />
-                        </div>
+                          max={100}
+                          value={work.progress}
+                        />
                       </>
                     ) : (
                       <p>{work.label}</p>

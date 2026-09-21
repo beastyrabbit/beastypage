@@ -67,7 +67,7 @@ function GalleryItem({ item }: { item: ScarPreview }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function ScarsStep(props: WizardStepProps) {
+export function ScarsStep(props: Readonly<WizardStepProps>) {
   const { settings, setScarRange, onNext, onBack } = props;
   const { options } = useSpriteMapperOptions();
   const { generator, ready } = useCatGenerator();

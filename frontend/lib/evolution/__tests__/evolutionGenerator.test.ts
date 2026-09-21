@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
   applyEvolutionStarterHairToPayload,
@@ -116,6 +116,16 @@ function cleanStarter() {
 }
 
 describe("evolution generation", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("normalizes starter payloads without structuredClone", () => {
+    vi.stubGlobal("structuredClone", undefined);
+    const normalized = normalizeEvolutionStarter(starterParams);
+    expect(normalized.params.colour).toBe("GINGER");
+    expect(normalized.params.tortie).toEqual(starterParams.tortie);
+    expect(normalized.params.tortie).not.toBe(starterParams.tortie);
+  });
+
   it("normalizes flat and wrapped starter payloads", () => {
     const flat = normalizeEvolutionStarter(starterParams);
     const wrapped = normalizeEvolutionStarter({

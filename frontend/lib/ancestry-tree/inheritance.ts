@@ -39,7 +39,7 @@ function clonePortableValue<T>(value: T): T {
 function parseMutationCandidate(
   trait: AnyCatTraitDefinition,
   candidate: unknown,
-): unknown | undefined {
+): unknown {
   const direct = trait.value.schema.safeParse(candidate);
   if (direct.success) return clonePortableValue(direct.data);
 

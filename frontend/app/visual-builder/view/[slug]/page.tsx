@@ -12,7 +12,7 @@ type PageProps = {
   params: { slug: string };
 };
 
-export default function VisualBuilderViewPage({ params }: PageProps) {
+export default function VisualBuilderViewPage({ params }: Readonly<PageProps>) {
   const slug = params.slug;
   if (!slug) {
     notFound();

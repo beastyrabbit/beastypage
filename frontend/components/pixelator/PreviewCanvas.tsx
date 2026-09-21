@@ -29,7 +29,7 @@ export function PreviewCanvas({
   onChangeImage,
   showGrid,
   gridSize,
-}: PreviewCanvasProps) {
+}: Readonly<PreviewCanvasProps>) {
   const [showOriginal, setShowOriginal] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const [imgDims, setImgDims] = useState<ImageDimensions | null>(null);
@@ -82,9 +82,9 @@ export function PreviewCanvas({
       {/* Controls bar */}
       <div className="flex items-center gap-3 border-t border-border/50 px-4 py-2">
         {stale && (
-          <span role="status" className="text-xs text-amber-300">
+          <output className="text-xs text-amber-300">
             Previous result. Current settings have not been rendered yet.
-          </span>
+          </output>
         )}
         {resultUrl && (
           <button
@@ -128,7 +128,7 @@ function GridOverlay({
   showGrid,
   gridSize,
   imgDims,
-}: GridOverlayProps): React.ReactNode {
+}: Readonly<GridOverlayProps>): React.ReactNode {
   const patternId = useId();
 
   if (!showGrid || !gridSize || !imgDims) return null;

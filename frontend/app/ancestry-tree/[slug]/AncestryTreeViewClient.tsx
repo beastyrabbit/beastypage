@@ -70,7 +70,9 @@ function formatTimestamp(created?: number): string | null {
   return date.toLocaleString();
 }
 
-export function AncestryTreeViewClient({ slug }: AncestryTreeViewClientProps) {
+export function AncestryTreeViewClient({
+  slug,
+}: Readonly<AncestryTreeViewClientProps>) {
   const record = useQuery(api.ancestryTree.getBySlug, { slug }) as
     | AncestryTreeRecord
     | null
@@ -312,7 +314,7 @@ type CatCardProps = {
   onPreview: (label: string, url: string) => void;
 };
 
-function CatCard({ cat, onPreview }: CatCardProps) {
+function CatCard({ cat, onPreview }: Readonly<CatCardProps>) {
   const displayName = cat.name.full || "Unnamed";
   const genderIcon = cat.gender === "F" ? "♀" : "♂";
   const genderColor = cat.gender === "F" ? "text-pink-400" : "text-blue-400";

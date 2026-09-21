@@ -25,7 +25,7 @@ export function PipelineStepCard({
   allSteps,
   onUpdate,
   onRemove,
-}: PipelineStepCardProps) {
+}: Readonly<PipelineStepCardProps>) {
   const [expanded, setExpanded] = useState(true);
 
   const {
@@ -105,7 +105,7 @@ export function PipelineStepCard({
             onChange={(e) => onUpdate(step.id, { enabled: e.target.checked })}
             className="accent-primary"
           />
-          On
+          <span>On</span>
         </label>
 
         <button

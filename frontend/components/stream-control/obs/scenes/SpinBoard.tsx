@@ -73,7 +73,7 @@ export function SpinBoard({
   spinDone,
   viewUrl,
   spread = false,
-}: SpinBoardProps) {
+}: Readonly<SpinBoardProps>) {
   // Build a map of revealed params for the fixed board
   const revealedMap = useMemo(() => {
     const map = new Map<string, ParamRow>();

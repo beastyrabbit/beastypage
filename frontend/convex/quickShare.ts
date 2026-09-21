@@ -647,7 +647,7 @@ export const recoverJobLease = internalMutation({
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get("quick_share_jobs", args.jobId);
-    if (!job || job.status !== "leased" || job.leaseId !== args.leaseId) {
+    if (job?.status !== "leased" || job.leaseId !== args.leaseId) {
       return null;
     }
     const now = Date.now();
@@ -693,7 +693,7 @@ export const finishProcessJob = internalMutation({
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get("quick_share_jobs", args.jobId);
-    if (!job || job.status !== "leased" || job.leaseId !== args.leaseId) {
+    if (job?.status !== "leased" || job.leaseId !== args.leaseId) {
       return { accepted: false };
     }
     const upload = await ctx.db.get("quick_share_uploads", job.uploadId);
@@ -1037,7 +1037,7 @@ export const finishDeleteJob = internalMutation({
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get("quick_share_jobs", args.jobId);
-    if (!job || job.status !== "leased" || job.leaseId !== args.leaseId) {
+    if (job?.status !== "leased" || job.leaseId !== args.leaseId) {
       throw new Error("LEASE_LOST");
     }
     const uploadId: Id<"quick_share_uploads"> = job.uploadId;

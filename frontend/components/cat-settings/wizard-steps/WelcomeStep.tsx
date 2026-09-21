@@ -2,7 +2,10 @@
 
 import type { WizardStepProps } from "./types";
 
-export function WelcomeStep({ onNext, hasInitialCode }: WizardStepProps) {
+export function WelcomeStep({
+  onNext,
+  hasInitialCode,
+}: Readonly<WizardStepProps>) {
   return (
     <div className="flex flex-col items-center justify-center gap-8 py-8 text-center">
       {/* Hero illustration area */}

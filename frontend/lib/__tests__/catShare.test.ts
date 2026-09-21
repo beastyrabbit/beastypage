@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   decodeCatShare,
   encodeCatShare,
@@ -17,6 +17,22 @@ function decodeStoredPayload(encoded: string): Record<string, unknown> {
 }
 
 describe("cat share codec", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("round-trips JSON shares without structuredClone", async () => {
+    vi.stubGlobal("structuredClone", undefined);
+    const params = {
+      spriteNumber: 8,
+      peltName: "SingleColour",
+      colour: "WHITE",
+      eyeColour: "BLUE",
+      skinColour: "PINK",
+    };
+    const decoded = await decodeCatShare(encodeCatShare({ params }));
+    expect(decoded?.params).toMatchObject(params);
+    expect(decoded?.params).not.toBe(params);
+  });
+
   it("preserves poseName through encode/decode", async () => {
     const encoded = encodeCatShare({
       params: {

@@ -169,7 +169,7 @@ export function PaletteExport({
   hueShifts,
   isProcessing,
   image,
-}: PaletteExportProps) {
+}: Readonly<PaletteExportProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);

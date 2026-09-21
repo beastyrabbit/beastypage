@@ -25,7 +25,7 @@ function LayerRangeSelectorRow({
   options,
   minValue,
   onSelect,
-}: LayerRangeSelectorRowProps) {
+}: Readonly<LayerRangeSelectorRowProps>) {
   return (
     <div
       className="flex items-center gap-2"
@@ -82,7 +82,7 @@ export function LayerRangeSelector({
   value,
   onChange,
   compact,
-}: LayerRangeSelectorProps) {
+}: Readonly<LayerRangeSelectorProps>) {
   const summary =
     value.min === value.max ? `${value.min}` : `${value.min} – ${value.max}`;
   const options = useMemo(

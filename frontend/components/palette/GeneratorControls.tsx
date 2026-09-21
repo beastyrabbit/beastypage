@@ -27,7 +27,7 @@ export function GeneratorControls({
   onFormatChange,
   onGenerate,
   generatingMode,
-}: GeneratorControlsProps) {
+}: Readonly<GeneratorControlsProps>) {
   const percent =
     ((paletteSize - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) * 100;
 

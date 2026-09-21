@@ -21,6 +21,7 @@ function stableStringify(value: unknown): string {
   }
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
+    // Stored hashes depend on locale-independent UTF-16 key ordering.
     const keys = Object.keys(record).sort();
     return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(",")}}`;
   }
@@ -58,8 +59,38 @@ function pairKey(a: Id<"perfect_cats">, b: Id<"perfect_cats">): string {
 
 function pickRandom<T>(items: T[]): T | null {
   if (!items.length) return null;
-  const index = Math.floor(Math.random() * items.length);
+  if (!globalThis.crypto?.getRandomValues) {
+    throw new Error("Secure random source unavailable");
+  }
+  const random = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(random);
+  const index = random[0] % items.length;
   return items[index] ?? null;
+}
+
+function addCandidates(
+  target: Map<string, Doc<"perfect_cats">>,
+  candidates: Doc<"perfect_cats">[],
+) {
+  for (const doc of candidates) {
+    target.set(doc._id as unknown as string, doc);
+  }
+}
+
+function chooseSecondCat(
+  pool: Doc<"perfect_cats">[],
+  first: Doc<"perfect_cats">,
+  seenPairs: Set<string>,
+) {
+  const attempts = Math.min(pool.length * 2, 40);
+  for (let i = 0; i < attempts; i += 1) {
+    const candidate = pickRandom(pool);
+    if (!candidate || candidate._id === first._id) continue;
+    const key = pairKey(first._id, candidate._id);
+    if (seenPairs.has(key) && pool.length > 2) continue;
+    return candidate;
+  }
+  return pool.find((candidate) => candidate._id !== first._id) ?? null;
 }
 
 export const registerCats = mutation({
@@ -126,22 +157,16 @@ export const requestMatchup = mutation({
       .withIndex("byRating", (q) => q)
       .order("desc")
       .take(24);
-    for (const doc of topRated) {
-      candidateMap.set(doc._id as unknown as string, doc);
-    }
+    addCandidates(candidateMap, topRated);
 
     const recentlyUpdated = await db
       .query("perfect_cats")
       .withIndex("byUpdated", (q) => q)
       .order("desc")
       .take(24);
-    for (const doc of recentlyUpdated) {
-      candidateMap.set(doc._id as unknown as string, doc);
-    }
+    addCandidates(candidateMap, recentlyUpdated);
 
-    for (const doc of allCats.slice(0, 40)) {
-      candidateMap.set(doc._id as unknown as string, doc);
-    }
+    addCandidates(candidateMap, allCats.slice(0, 40));
 
     const pool = Array.from(candidateMap.values());
     if (pool.length < 2) {
@@ -165,27 +190,7 @@ export const requestMatchup = mutation({
       return { cats: [], needsSeed, totalCats };
     }
 
-    let second: Doc<"perfect_cats"> | null = null;
-    const attempts = Math.min(pool.length * 2, 40);
-    for (let i = 0; i < attempts; i += 1) {
-      const candidate = pickRandom(pool);
-      if (!candidate || candidate._id === first._id) continue;
-      const key = pairKey(first._id, candidate._id);
-      if (seenPairs.has(key) && pool.length > 2) {
-        continue;
-      }
-      second = candidate;
-      break;
-    }
-
-    if (!second) {
-      for (const candidate of pool) {
-        if (candidate._id !== first._id) {
-          second = candidate;
-          break;
-        }
-      }
-    }
+    const second = chooseSecondCat(pool, first, seenPairs);
 
     if (!second) {
       return { cats: [], needsSeed, totalCats };

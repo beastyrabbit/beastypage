@@ -115,29 +115,37 @@ def _components(mask: np.ndarray) -> list[list[tuple[int, int]]]:
     seen = np.zeros((height, width), dtype=bool)
     found: list[list[tuple[int, int]]] = []
 
-    for y, x in zip(*np.where(mask)):
+    for y, x in zip(*np.nonzero(mask)):
         if seen[y, x]:
             continue
 
-        component: list[tuple[int, int]] = []
-        pending = [(int(y), int(x))]
-        seen[y, x] = True
-        while pending:
-            current_y, current_x = pending.pop()
-            component.append((current_y, current_x))
-            for y_offset, x_offset in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                next_y = current_y + y_offset
-                next_x = current_x + x_offset
-                if not (0 <= next_y < height and 0 <= next_x < width):
-                    continue
-                if not mask[next_y, next_x] or seen[next_y, next_x]:
-                    continue
-                seen[next_y, next_x] = True
-                pending.append((next_y, next_x))
-
-        found.append(component)
+        found.append(_component_from_seed(mask, seen, int(y), int(x)))
 
     return found
+
+
+def _component_from_seed(
+    mask: np.ndarray, seen: np.ndarray, start_y: int, start_x: int
+) -> list[tuple[int, int]]:
+    height, width = mask.shape
+    component: list[tuple[int, int]] = []
+    pending = [(start_y, start_x)]
+    seen[start_y, start_x] = True
+    while pending:
+        current_y, current_x = pending.pop()
+        component.append((current_y, current_x))
+        for y_offset, x_offset in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            next_y = current_y + y_offset
+            next_x = current_x + x_offset
+            if (
+                0 <= next_y < height
+                and 0 <= next_x < width
+                and mask[next_y, next_x]
+                and not seen[next_y, next_x]
+            ):
+                seen[next_y, next_x] = True
+                pending.append((next_y, next_x))
+    return component
 
 
 def _select_components(

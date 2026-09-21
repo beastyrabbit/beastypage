@@ -12,7 +12,7 @@ export const STREAM_WHEEL_PRIZES = [
 ] as const;
 
 const BUCKET_COUNT = 100;
-const UINT32_RANGE = 0x1_0000_0000;
+const UINT32_RANGE = 0x100000000;
 const REJECTION_LIMIT = Math.floor(UINT32_RANGE / BUCKET_COUNT) * BUCKET_COUNT;
 
 export type StreamWheelSpin = {
@@ -107,8 +107,7 @@ export function buildStreamWheelUpdate(
 ) {
   const sourceCommand = session.currentCommand;
   if (
-    !sourceCommand ||
-    sourceCommand.type !== "spin" ||
+    sourceCommand?.type !== "spin" ||
     sourceCommand.params === undefined ||
     typeof sourceCommand.seq !== "number"
   ) {

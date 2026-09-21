@@ -70,7 +70,7 @@ function inlineMarkdown(text: string): string {
   out = out.replace(
     // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional NUL byte sentinels
     /\x00CODE(\d+)\x00/g,
-    (_m, idx: string) => codeSpans[parseInt(idx, 10)],
+    (_m, idx: string) => codeSpans[Number.parseInt(idx, 10)],
   );
 
   return out;
@@ -216,7 +216,7 @@ interface MarkdownBodyProps {
   content: string;
 }
 
-export function MarkdownBody({ content }: MarkdownBodyProps) {
+export function MarkdownBody({ content }: Readonly<MarkdownBodyProps>) {
   // Content is sanitized (script tags, on* attrs, javascript: URLs removed)
   // before being set as innerHTML. Source is GitHub Releases API.
   const html = sanitize(markdownToHtml(content));

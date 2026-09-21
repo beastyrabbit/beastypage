@@ -755,7 +755,7 @@ export function EvolutionGeneratorClient() {
             </div>
             {starterMode === "history" ? (
               <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                Slug
+                <span>Slug</span>
                 <input
                   type="text"
                   value={historySlug}
@@ -970,7 +970,7 @@ export function EvolutionGeneratorClient() {
                     }
                     className="size-3.5 accent-primary"
                   />
-                  enabled
+                  <span>enabled</span>
                 </label>
               }
             />

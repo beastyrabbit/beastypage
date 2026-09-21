@@ -187,7 +187,7 @@ export async function getPaletteCatalog(): Promise<PaletteCatalogEntry[]> {
 
     const payload = (await res.json()) as unknown;
     if (!Array.isArray(payload)) {
-      throw new Error("palette catalog response was not an array");
+      throw new TypeError("palette catalog response was not an array");
     }
 
     const data = payload

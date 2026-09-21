@@ -42,7 +42,7 @@ export function PaletteMultiSelect({
   showSearch = true,
   className = "",
   compact = false,
-}: PaletteMultiSelectProps) {
+}: Readonly<PaletteMultiSelectProps>) {
   const options = usePaletteOptions();
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");

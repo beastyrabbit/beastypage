@@ -513,7 +513,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     link.download = filename;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
   }, []);
 
   const handleCopyMainSprite = useCallback(async () => {

@@ -17,7 +17,7 @@ export function QrBadge({
   url,
   label = "Scan to view",
   size = 190,
-}: QrBadgeProps) {
+}: Readonly<QrBadgeProps>) {
   return (
     <div
       style={{ animation: "obs-qr-fade-in 400ms ease", pointerEvents: "none" }}

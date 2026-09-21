@@ -1,7 +1,7 @@
 function envInt(key: string, fallback: number): number {
   const raw = process.env[key];
   if (!raw) return fallback;
-  const parsed = parseInt(raw, 10);
+  const parsed = Number.parseInt(raw, 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 

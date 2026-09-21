@@ -31,7 +31,7 @@ export function AddWidgetModal({
   onClose,
   onSelect,
   placedIds,
-}: AddWidgetModalProps) {
+}: Readonly<AddWidgetModalProps>) {
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {

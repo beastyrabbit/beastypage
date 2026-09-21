@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   defineCatSystem,
   defineCatTrait,
@@ -16,6 +16,31 @@ import {
 } from "../strategies";
 
 describe("xoshiro128** gacha RNG", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([
+    [
+      "beasty🐈",
+      [604755258, 1197458352, 3729279183, 995344053, 2618032922, 2441256731],
+    ],
+    [
+      "🐈‍⬛",
+      [2551882680, 1318634740, 67610428, 79438003, 608032208, 2589592176],
+    ],
+    [
+      "\ud800",
+      [362923826, 1855602986, 1115500754, 4225457782, 4128676963, 1573264667],
+    ],
+  ] as const)(
+    "preserves version-one UTF-16 seed output for %j",
+    (seed, expected) => {
+      const random = new Xoshiro128StarStar(seed);
+      expect(Array.from({ length: 6 }, () => random.nextUint32())).toEqual(
+        expected,
+      );
+    },
+  );
+
   it("keeps the version-one string seed vector stable", () => {
     const random = new Xoshiro128StarStar("beasty");
     expect(Array.from({ length: 6 }, () => random.nextUint32())).toEqual([
@@ -62,6 +87,7 @@ describe("xoshiro128** gacha RNG", () => {
   });
 
   it("makes every value in an explicit slot range reachable", () => {
+    vi.stubGlobal("structuredClone", undefined);
     const catalogs = createGachaCatalogsFromPublicCatalog({
       catalogs: {
         randomPoses: [{ id: "adult_short0" }],

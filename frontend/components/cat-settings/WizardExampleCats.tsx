@@ -54,7 +54,7 @@ export function WizardExampleCats({
   overrides,
   buttonLabel,
   bare = false,
-}: WizardExampleCatsProps) {
+}: Readonly<WizardExampleCatsProps>) {
   const [cats, setCats] = useState<(ExampleCat | null)[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);

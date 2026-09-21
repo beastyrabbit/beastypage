@@ -28,7 +28,7 @@ export function ToolCardGrid({
   hoverBorderClass,
   overlayGradientClass,
   gridClass = "md:grid-cols-2 xl:grid-cols-3",
-}: ToolCardGridProps) {
+}: Readonly<ToolCardGridProps>) {
   return (
     <section className={`grid gap-5 ${gridClass}`}>
       {cards.map((card, index) => {
@@ -46,7 +46,6 @@ export function ToolCardGrid({
           <>
             <div
               className={`absolute inset-0 bg-gradient-to-br ${overlayGradientClass} opacity-0 transition-opacity duration-500 group-hover:opacity-100`}
-              role="presentation"
               aria-hidden="true"
             />
             <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:animate-shine" />

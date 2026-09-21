@@ -21,7 +21,7 @@ function toBase64(value: string): string {
   if (nodeBuffer) return nodeBuffer.from(bytes).toString("base64");
   if (typeof btoa === "function") {
     let binary = "";
-    for (const byte of bytes) binary += String.fromCharCode(byte);
+    for (const byte of bytes) binary += String.fromCodePoint(byte);
     return btoa(binary);
   }
   throw new Error("Base64 encoding not supported in this environment");
@@ -33,8 +33,9 @@ function fromBase64(value: string): string {
   if (nodeBuffer) return nodeBuffer.from(value, "base64").toString("utf8");
   if (typeof atob === "function") {
     const binary = atob(value);
-    const bytes = Uint8Array.from(binary, (character) =>
-      character.charCodeAt(0),
+    const bytes = Uint8Array.from(
+      binary,
+      (character) => character.codePointAt(0) ?? 0,
     );
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   }
@@ -180,7 +181,7 @@ export interface CatSharePayload {
 }
 
 export type EncodePayload = {
-  document?: CatDocument | unknown;
+  document?: unknown;
   params?: Record<string, unknown>;
   traitSlots?: Readonly<Record<string, readonly JsonValue[]>>;
   accessorySlots?: (string | null)[];

@@ -69,7 +69,7 @@ function json(body: unknown, status = 200) {
 function requiredString(body: JsonObject, key: string) {
   const value = body[key];
   if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`INVALID_${key.toUpperCase()}`);
+    throw new TypeError(`INVALID_${key.toUpperCase()}`);
   }
   return value;
 }
@@ -78,7 +78,7 @@ function optionalString(body: JsonObject, key: string) {
   const value = body[key];
   if (value === undefined || value === null || value === "") return undefined;
   if (typeof value !== "string") {
-    throw new Error(`INVALID_${key.toUpperCase()}`);
+    throw new TypeError(`INVALID_${key.toUpperCase()}`);
   }
   return value;
 }
@@ -86,7 +86,7 @@ function optionalString(body: JsonObject, key: string) {
 function requiredNumber(body: JsonObject, key: string) {
   const value = body[key];
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error(`INVALID_${key.toUpperCase()}`);
+    throw new TypeError(`INVALID_${key.toUpperCase()}`);
   }
   return value;
 }

@@ -433,7 +433,7 @@ export function BatchPanel() {
           ))}
         </div>
         <label className="mt-4 flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-          Litter Title
+          <span>Litter Title</span>
           <input
             type="text"
             value={title}

@@ -25,7 +25,7 @@ export function ColorSwatch({
   isSelected,
   onHover,
   onSelect,
-}: ColorSwatchProps) {
+}: Readonly<ColorSwatchProps>) {
   const textColor = getContrastColor(color.rgb);
 
   const copyToClipboard = useCallback(async (text: string, format: string) => {

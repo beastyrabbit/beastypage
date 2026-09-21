@@ -1,22 +1,14 @@
 import { v } from "convex/values";
 import { type MutationCtx, mutation, query } from "./_generated/server.js";
+import { randomSlug } from "./utils.js";
 
 const SLUG_ALPHABET =
   "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const SLUG_LENGTH = 7;
 
-function randomSlug() {
-  let slug = "";
-  for (let i = 0; i < SLUG_LENGTH; i += 1) {
-    const index = Math.floor(Math.random() * SLUG_ALPHABET.length);
-    slug += SLUG_ALPHABET[index];
-  }
-  return slug;
-}
-
 async function generateUniqueSlug(ctx: MutationCtx) {
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    const candidate = randomSlug();
+    const candidate = randomSlug(SLUG_LENGTH, SLUG_ALPHABET);
     const existing = await ctx.db
       .query("dash_settings")
       .withIndex("bySlug", (q) => q.eq("slug", candidate))

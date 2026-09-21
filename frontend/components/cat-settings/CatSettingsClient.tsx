@@ -48,7 +48,7 @@ interface CatSettingsClientProps {
 export function CatSettingsClient({
   initialSettings,
   initialCode: _initialCode,
-}: CatSettingsClientProps) {
+}: Readonly<CatSettingsClientProps>) {
   const router = useRouter();
 
   // Settings state

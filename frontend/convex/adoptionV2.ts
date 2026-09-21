@@ -3,7 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { mutation, query } from "./_generated/server.js";
 import { requireProfileEditor } from "./mapper.js";
-import { docIdToString, toId } from "./utils.js";
+import { docIdToString, randomSlug, toId } from "./utils.js";
 
 const SLUG_ALPHABET =
   "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -14,18 +14,9 @@ type AdoptionBatchInsert = Omit<AdoptionBatchDoc, "_id" | "_creationTime">;
 
 type GenerateCtx = MutationCtx;
 
-function randomSlug(): string {
-  let slug = "";
-  for (let i = 0; i < SLUG_LENGTH; i += 1) {
-    const index = Math.floor(Math.random() * SLUG_ALPHABET.length);
-    slug += SLUG_ALPHABET[index];
-  }
-  return slug;
-}
-
 async function generateUniqueSlug(ctx: GenerateCtx): Promise<string> {
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    const candidate = randomSlug();
+    const candidate = randomSlug(SLUG_LENGTH, SLUG_ALPHABET);
     const existing = await ctx.db
       .query("adoption_batch")
       .withIndex("bySlug", (q) => q.eq("slug", candidate))
@@ -162,7 +153,8 @@ export const getBySlug = query({
     try {
       const asId = await ctx.db.get(toId("adoption_batch", args.slugOrId));
       return asId ? await batchRecordToClient(ctx, asId) : null;
-    } catch (_error) {
+    } catch {
+      // Invalid IDs are expected for slug lookups; treat them as a miss.
       return null;
     }
   },

@@ -24,7 +24,7 @@ export function FoundingParentCard({
   onReroll,
   isLoading = false,
   label,
-}: FoundingParentCardProps) {
+}: Readonly<FoundingParentCardProps>) {
   const previewUrl = useMemo(() => {
     if (!params) return null;
     return getParamsPreviewUrl(params);

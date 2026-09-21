@@ -1474,9 +1474,9 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           }
 
           if (frames.length > 0) {
-            drawCanvas(frames[frames.length - 1].canvas);
+            drawCanvas(frames.at(-1)!.canvas);
           }
-          const finalRaw = frames[frames.length - 1]?.option.raw;
+          const finalRaw = frames.at(-1)?.option.raw;
           if (typeof finalRaw === "string" && finalRaw !== "none") {
             committed.push(finalRaw);
             summary.push(formatValue(finalRaw));
@@ -1702,9 +1702,9 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           }
 
           if (frames.length > 0) {
-            drawCanvas(frames[frames.length - 1].canvas);
+            drawCanvas(frames.at(-1)!.canvas);
           }
-          const finalRaw = frames[frames.length - 1]?.option.raw;
+          const finalRaw = frames.at(-1)?.option.raw;
           if (typeof finalRaw === "string" && finalRaw !== "none") {
             committed.push(finalRaw);
             summary.push(formatValue(finalRaw));
@@ -2000,7 +2000,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
               });
             }
 
-            const finalStageValue = frames[frames.length - 1]?.option.raw;
+            const finalStageValue = frames.at(-1)?.option.raw;
             if (typeof finalStageValue === "string") {
               if (stage.kind === "mask")
                 working = { ...working, mask: finalStageValue };
@@ -2813,7 +2813,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
             }
           }
 
-          const finalFrame = frames[frames.length - 1];
+          const finalFrame = frames.at(-1)!;
           if (finalFrame) {
             drawCanvas(finalFrame.canvas);
           }
@@ -3167,7 +3167,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
       link.download = "cat.png";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
       showToast("Downloaded PNG");
       track("single_cat_exported", { format: "download-png" });

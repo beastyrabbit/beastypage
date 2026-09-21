@@ -22,6 +22,8 @@ COPY --from=builder /app/src src
 ENV NODE_ENV=production
 ENV PORT=8002
 
+USER node
+
 EXPOSE 8002
 
 CMD ["node", "--experimental-strip-types", "src/index.ts"]

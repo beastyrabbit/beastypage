@@ -4,7 +4,9 @@ type AncestryTreeViewPageProps = {
   params: Promise<{ slug: string }>;
 };
 
-export async function generateMetadata({ params }: AncestryTreeViewPageProps) {
+export async function generateMetadata({
+  params,
+}: Readonly<AncestryTreeViewPageProps>) {
   const resolved = await params;
   return {
     title: `Ancestry Tree • ${resolved.slug}`,
@@ -14,7 +16,7 @@ export async function generateMetadata({ params }: AncestryTreeViewPageProps) {
 
 export default async function AncestryTreeViewPage({
   params,
-}: AncestryTreeViewPageProps) {
+}: Readonly<AncestryTreeViewPageProps>) {
   const resolved = await params;
   return <AncestryTreeViewClient slug={resolved.slug} />;
 }

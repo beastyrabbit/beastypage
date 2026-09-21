@@ -74,7 +74,7 @@ export function ForceInitialRollInfo({
   range,
   layerName,
   exactLayerCounts,
-}: ForceInitialRollInfoProps) {
+}: Readonly<ForceInitialRollInfoProps>) {
   const state = deriveForceState(range, exactLayerCounts);
   const plural = pluralize(layerName);
 

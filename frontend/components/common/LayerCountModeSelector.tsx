@@ -12,7 +12,7 @@ export function LayerCountModeSelector({
   value,
   onChange,
   compact = false,
-}: LayerCountModeSelectorProps) {
+}: Readonly<LayerCountModeSelectorProps>) {
   return (
     <div>
       <button

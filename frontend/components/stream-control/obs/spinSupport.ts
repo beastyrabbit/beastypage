@@ -703,7 +703,7 @@ export function buildFlipSequence(
     return [];
   }
 
-  const targetFrame = frames[frames.length - 1];
+  const targetFrame = frames.at(-1)!;
   const cycleFrames = frames.slice();
   const sequence: { frame: VariationFrame; delay: number; isFinal: boolean }[] =
     [];
@@ -1286,7 +1286,7 @@ export async function copyCanvasToClipboard(
     link.download = `${fallbackFilename}.png`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     URL.revokeObjectURL(url);
     onSuccess("Image downloaded.");
   } catch (error) {

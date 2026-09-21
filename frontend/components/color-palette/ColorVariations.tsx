@@ -21,7 +21,7 @@ interface ColorVariationsProps {
 const BRIGHTNESS_STEPS = [-30, -15, 0, 15, 30];
 const HUE_STEPS = [-30, -20, -10, 0, 10, 20, 30];
 
-export function ColorVariations({ color }: ColorVariationsProps) {
+export function ColorVariations({ color }: Readonly<ColorVariationsProps>) {
   const brightnessVariations = useMemo(
     () =>
       BRIGHTNESS_STEPS.map((step) => {

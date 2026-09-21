@@ -43,6 +43,73 @@ function createArgs(
 }
 
 describe("Quick Share Convex policy", () => {
+  it("returns null for absent admin uploads and preserves mutation result contracts", async () => {
+    const t = convexTest(schema, modules);
+    const created = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Contract"),
+    );
+    expect(
+      await t.query(internal.quickShare.adminGet, { uploadId: created.id }),
+    ).toMatchObject({ slug: "Contract" });
+    await expect(
+      t.mutation(internal.quickShare.removeUpload, {
+        uploadId: created.id,
+        now: 1_800_000_000_001,
+      }),
+    ).resolves.toBeNull();
+    await t.run((ctx) => ctx.db.delete(created.id));
+    await expect(
+      t.query(internal.quickShare.adminGet, { uploadId: created.id }),
+    ).resolves.toBeNull();
+    await expect(
+      t.mutation(internal.quickShare.removeUpload, {
+        uploadId: created.id,
+        now: 1_800_000_000_002,
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it("keeps null retry and recovery results for pending and missing jobs", async () => {
+    const t = convexTest(schema, modules);
+    const created = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("JobCheck"),
+    );
+    await t.mutation(internal.quickShare.markComplete, {
+      uploadId: created.id,
+      receiptHash: "receipt-JobCheck",
+      now: 1_800_000_000_001,
+    });
+    const job = await t.run((ctx) => ctx.db.query("quick_share_jobs").first());
+    if (!job) throw new Error("Expected a processing job");
+    await expect(
+      t.mutation(internal.quickShare.retryDispatchJob, {
+        jobId: job._id,
+        attempt: 1,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      t.mutation(internal.quickShare.recoverJobLease, {
+        jobId: job._id,
+        leaseId: "missing",
+      }),
+    ).resolves.toBeNull();
+    await t.run((ctx) => ctx.db.delete(job._id));
+    await expect(
+      t.mutation(internal.quickShare.retryDispatchJob, {
+        jobId: job._id,
+        attempt: 1,
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      t.mutation(internal.quickShare.recoverJobLease, {
+        jobId: job._id,
+        leaseId: "missing",
+      }),
+    ).resolves.toBeNull();
+  });
+
   it("applies the anonymous retention boundary atomically", async () => {
     const t = convexTest(schema, modules);
     const now = 1_800_000_000_000;
@@ -106,12 +173,13 @@ describe("Quick Share Convex policy", () => {
       internal.quickShare.createUpload,
       createArgs("Abcdefg2", { ipHash: "blocked-ip" }),
     );
-    await t.mutation(internal.quickShare.banIp, {
+    const banResult = await t.mutation(internal.quickShare.banIp, {
       ipHash: "blocked-ip",
       rawIp: "192.0.2.44",
       createdBy: "moderator",
       now: 1_800_000_000_000,
     });
+    expect(banResult).toBeNull();
     await t.mutation(internal.quickShare.revokeIpBatch, {
       ipHash: "blocked-ip",
       now: 1_800_000_000_001,
@@ -201,10 +269,14 @@ describe("Quick Share Convex policy", () => {
       now: Date.now() - 30 * 60 * 1000,
     });
 
-    await t.mutation(internal.quickShare.recoverJobLease, {
-      jobId: job?._id as Id<"quick_share_jobs">,
-      leaseId: "expired-lease",
-    });
+    const recoveryResult = await t.mutation(
+      internal.quickShare.recoverJobLease,
+      {
+        jobId: job?._id as Id<"quick_share_jobs">,
+        leaseId: "expired-lease",
+      },
+    );
+    expect(recoveryResult).toBeNull();
 
     const recovered = await t.run(async (ctx) =>
       ctx.db.get(job?._id as Id<"quick_share_jobs">),

@@ -22,12 +22,10 @@ type ImageUpdatePayload = {
 
 type MapperPreviewUpdate = {
   id: Id<"cat_profile">;
-  tiny?: StoragePayload | undefined;
-  preview?: StoragePayload | undefined;
-  full?: StoragePayload | undefined;
-  spriteSheet?:
-    | { dataUrl: string; filename?: string; meta?: unknown }
-    | undefined;
+  tiny?: StoragePayload;
+  preview?: StoragePayload;
+  full?: StoragePayload;
+  spriteSheet?: { dataUrl: string; filename?: string; meta?: unknown };
   previewsUpdatedAt?: number;
 };
 

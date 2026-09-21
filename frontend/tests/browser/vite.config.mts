@@ -39,5 +39,9 @@ export default defineConfig({
     ),
     "process.env.NEXT_PUBLIC_POSTHOG_KEY": "undefined",
   },
-  server: { host: "127.0.0.1", port: 0 },
+  server: {
+    host: "127.0.0.1",
+    port: 0,
+    watch: { ignored: ["**/.next/**"] },
+  },
 });

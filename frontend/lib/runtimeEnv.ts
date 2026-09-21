@@ -17,7 +17,10 @@ export function getRuntimeConfig(): RuntimeConfig {
 }
 
 export function injectRuntimeConfig(config: RuntimeConfig): string {
-  const payload = JSON.stringify(config ?? {}).replace(/</g, "\\u003c");
+  const payload = JSON.stringify(config ?? {}).replace(
+    /</g,
+    String.raw`\u003c`,
+  );
   return `
     (function(){
       var key = ${JSON.stringify(CONFIG_KEY)};

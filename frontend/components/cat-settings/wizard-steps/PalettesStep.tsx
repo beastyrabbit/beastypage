@@ -4,7 +4,7 @@ import { PaletteGroupPicker } from "../PaletteGroupPicker";
 import { WizardExampleCats } from "../WizardExampleCats";
 import type { WizardStepProps } from "./types";
 
-export function PalettesStep(props: WizardStepProps) {
+export function PalettesStep(props: Readonly<WizardStepProps>) {
   const { settings, setIncludeBaseColours, setExtendedModes, onNext, onBack } =
     props;
 

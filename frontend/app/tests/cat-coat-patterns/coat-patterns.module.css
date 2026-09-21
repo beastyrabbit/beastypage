@@ -257,6 +257,8 @@
 .spriteStage img {
   display: block;
   image-rendering: pixelated;
+  width: 250px;
+  height: 250px;
 }
 
 .spritePlaceholder {
@@ -333,11 +335,6 @@
   color: #f3ede1;
   font-size: 15px;
   font-weight: 580;
-}
-
-.spriteStage img {
-  width: 250px;
-  height: 250px;
 }
 
 .cardCopy {

@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import { internalMutation, mutation, query } from "./_generated/server.js";
-import { docIdToString, toId } from "./utils.js";
+import { docIdToString, randomSlug, toId } from "./utils.js";
 
 const SLUG_ALPHABET =
   "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -13,15 +13,6 @@ type ProfileDoc = Doc<"cat_profile">;
 type ProfileInsert = Omit<ProfileDoc, "_id" | "_creationTime">;
 type ImageDoc = Doc<"cat_images">;
 type ImageInsert = Omit<ImageDoc, "_id" | "_creationTime">;
-
-function randomSlug(): string {
-  let slug = "";
-  for (let i = 0; i < SLUG_LENGTH; i += 1) {
-    const index = Math.floor(Math.random() * SLUG_ALPHABET.length);
-    slug += SLUG_ALPHABET[index];
-  }
-  return slug;
-}
 
 function randomEditToken(): string {
   const bytes = new Uint8Array(EDIT_TOKEN_LENGTH);
@@ -34,7 +25,7 @@ function randomEditToken(): string {
 
 async function generateUniqueSlug(ctx: MutationCtx): Promise<string> {
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    const candidate = randomSlug();
+    const candidate = randomSlug(SLUG_LENGTH, SLUG_ALPHABET);
     const existing = await ctx.db
       .query("cat_profile")
       .withIndex("bySlug", (q) => q.eq("slug", candidate))
@@ -151,7 +142,8 @@ export const getBySlug = query({
     try {
       const asId = await ctx.db.get(toId("cat_profile", args.slugOrId));
       return asId ? await profileToClient(ctx, asId) : null;
-    } catch (_error) {
+    } catch {
+      // Invalid IDs are expected for slug lookups; treat them as a miss.
       return null;
     }
   },

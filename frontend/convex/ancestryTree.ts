@@ -140,7 +140,7 @@ async function verifyPassword(
     return false;
   }
 
-  const iterations = parseInt(parts[1], 10);
+  const iterations = Number.parseInt(parts[1], 10);
   if (Number.isNaN(iterations) || iterations < 1) {
     return false;
   }
@@ -157,9 +157,9 @@ async function verifyPassword(
 
 /**
  * Legacy hash function for backwards compatibility during migration
- * @deprecated Use hashPassword instead
  */
 function legacySimpleHash(str: string): string {
+  // Persisted legacy hashes use UTF-16 code units, including surrogate pairs.
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
@@ -171,6 +171,17 @@ function legacySimpleHash(str: string): string {
     (str.charCodeAt(0) || 0) +
     (str.charCodeAt(str.length - 1) || 0);
   return `${hash.toString(36)}-${salt.toString(36)}`;
+}
+
+async function existingTreePasswordError(
+  passwordHash: string | undefined,
+  provided: string | undefined,
+): Promise<"password_required" | "invalid_password" | null> {
+  if (!passwordHash) return null;
+  if (!provided) return "password_required";
+  return (await verifyPassword(provided, passwordHash))
+    ? null
+    : "invalid_password";
 }
 
 const catValidator = v.object({
@@ -231,18 +242,12 @@ export const save = mutation({
       .first();
 
     if (existing) {
-      // Tree exists - check password if it has one
-      if (existing.passwordHash) {
-        if (!args.password) {
-          return { success: false, error: "password_required" } as const;
-        }
-        const isValid = await verifyPassword(
-          args.password,
-          existing.passwordHash,
-        );
-        if (!isValid) {
-          return { success: false, error: "invalid_password" } as const;
-        }
+      const passwordError = await existingTreePasswordError(
+        existing.passwordHash,
+        args.password,
+      );
+      if (passwordError) {
+        return { success: false, error: passwordError } as const;
       }
 
       // Update existing tree

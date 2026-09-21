@@ -86,7 +86,7 @@ function parseCatName(
 export function FoundingCoupleSelector({
   onSelect,
   onClose,
-}: FoundingCoupleSelectorProps) {
+}: Readonly<FoundingCoupleSelectorProps>) {
   const [selectedMother, setSelectedMother] = useState<HistoryCat | null>(null);
   const [selectedFather, setSelectedFather] = useState<HistoryCat | null>(null);
   const [searchTerm, setSearchTerm] = useState("");

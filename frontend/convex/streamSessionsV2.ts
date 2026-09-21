@@ -1,10 +1,36 @@
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
+import type { QueryCtx } from "./_generated/server.js";
 import { mutation, query } from "./_generated/server.js";
 import { listLimit, requireHost } from "./streamAccess.js";
 import { docIdToString } from "./utils.js";
 
 type SessionDoc = Doc<"stream_sessions">;
+
+function sessionQuery(
+  ctx: QueryCtx,
+  viewerKey: string | undefined,
+  status: string | undefined,
+  tokenIdentifier: string | undefined,
+) {
+  if (viewerKey) {
+    return ctx.db
+      .query("stream_sessions")
+      .withIndex("byViewerKey", (q) => q.eq("viewerKey", viewerKey));
+  }
+  if (status) {
+    return ctx.db
+      .query("stream_sessions")
+      .withIndex("by_ownerTokenIdentifier_and_status_and_updatedAt", (q) =>
+        q.eq("ownerTokenIdentifier", tokenIdentifier).eq("status", status),
+      );
+  }
+  return ctx.db
+    .query("stream_sessions")
+    .withIndex("by_ownerTokenIdentifier_and_updatedAt", (q) =>
+      q.eq("ownerTokenIdentifier", tokenIdentifier),
+    );
+}
 
 export const list = query({
   args: {
@@ -19,25 +45,12 @@ export const list = query({
     // supported states, so use the same indexed live query for that request.
     const status =
       args.status ?? (args.exclude === "completed" ? "live" : undefined);
-    const source = args.viewerKey
-      ? ctx.db
-          .query("stream_sessions")
-          .withIndex("byViewerKey", (q) => q.eq("viewerKey", args.viewerKey!))
-      : status
-        ? ctx.db
-            .query("stream_sessions")
-            .withIndex(
-              "by_ownerTokenIdentifier_and_status_and_updatedAt",
-              (q) =>
-                q
-                  .eq("ownerTokenIdentifier", identity?.tokenIdentifier)
-                  .eq("status", status),
-            )
-        : ctx.db
-            .query("stream_sessions")
-            .withIndex("by_ownerTokenIdentifier_and_updatedAt", (q) =>
-              q.eq("ownerTokenIdentifier", identity?.tokenIdentifier),
-            );
+    const source = sessionQuery(
+      ctx,
+      args.viewerKey,
+      status,
+      identity?.tokenIdentifier,
+    );
     if (!args.viewerKey && !identity) return [];
     let sessions = await source.order("desc").take(listLimit(args.limit));
     if (args.status) {

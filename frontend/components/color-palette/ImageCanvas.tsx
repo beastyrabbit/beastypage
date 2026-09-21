@@ -41,7 +41,7 @@ export function ImageCanvas({
   highlightedDotType,
   onCrosshairMove,
   onDotSelect,
-}: ImageCanvasProps) {
+}: Readonly<ImageCanvasProps>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loadedImage, setLoadedImage] = useState<HTMLImageElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);

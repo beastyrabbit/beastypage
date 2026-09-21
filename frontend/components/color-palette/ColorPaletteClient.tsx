@@ -76,7 +76,7 @@ export function ColorPaletteClient({
   initialImageUrl,
   toolbarLeft,
   isExternalLoading,
-}: ColorPaletteClientProps) {
+}: Readonly<ColorPaletteClientProps>) {
   const [state, setState] = useState<PaletteState>(INITIAL_STATE);
   const [selection, setSelection] = useState<SelectionState>(INITIAL_SELECTION);
   const extractionTimeoutRef = useRef<NodeJS.Timeout | null>(null);

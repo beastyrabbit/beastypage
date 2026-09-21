@@ -162,7 +162,7 @@ export function SettingsPanel() {
             {bgMode === "colour" && (
               <>
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                  Colour
+                  <span>Colour</span>
                   <input
                     type="color"
                     value={bgColour}

@@ -174,6 +174,13 @@ export default function CoinflipPage() {
     return "Call Heads or Tails to start your streak.";
   }, [gameState, lastChoice, lastResult]);
 
+  let submitLabel = "Submit score";
+  if (isSubmitting) {
+    submitLabel = "Saving…";
+  } else if (scoreSubmitted) {
+    submitLabel = "Score submitted";
+  }
+
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
@@ -289,11 +296,7 @@ export default function CoinflipPage() {
                 )}
                 disabled={isSubmitting || scoreSubmitted}
               >
-                {isSubmitting
-                  ? "Saving…"
-                  : scoreSubmitted
-                    ? "Score submitted"
-                    : "Submit score"}
+                {submitLabel}
               </button>
             </form>
           )}
@@ -327,7 +330,7 @@ type CoinDisplayProps = {
   seed: number;
 };
 
-function CoinDisplay({ face, animate, seed }: CoinDisplayProps) {
+function CoinDisplay({ face, animate, seed }: Readonly<CoinDisplayProps>) {
   return (
     <div
       key={seed}
@@ -344,7 +347,7 @@ type LeaderboardProps = {
   entries: LeaderboardRow[];
 };
 
-function LeaderboardTable({ entries }: LeaderboardProps) {
+function LeaderboardTable({ entries }: Readonly<LeaderboardProps>) {
   if (!entries.length) {
     return (
       <p className="text-sm text-muted-foreground">

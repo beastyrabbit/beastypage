@@ -189,7 +189,7 @@ function exactCompoundChoice(
   }
 
   const record = parsed as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
+  const keys = Object.keys(record).sort((left, right) => left.localeCompare(right));
   if (
     keys.length !== 3 ||
     !["mask", "pattern", "colour"].every((key) => keys.includes(key))

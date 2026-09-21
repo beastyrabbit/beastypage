@@ -518,7 +518,7 @@ export function EvolutionPanel() {
 
           {/* Title */}
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            Lineage Title
+            <span>Lineage Title</span>
             <input
               type="text"
               value={title}

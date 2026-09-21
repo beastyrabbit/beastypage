@@ -11,7 +11,7 @@ from pathlib import Path
 from PIL import Image, ImageOps
 from pydantic import JsonValue
 
-from .contracts import CatDocument, RenderOperation, RenderPlan
+from .contracts import RenderOperation, RenderPlan
 from .image_ops import (
     add,
     alpha_over,
@@ -263,7 +263,6 @@ class RenderExecutor:
 
     def execute(
         self,
-        document: CatDocument,
         params: dict[str, JsonValue],
     ) -> tuple[Image.Image, list[StageInfo]]:
         canvas = self.renderer.repo.blank_canvas()

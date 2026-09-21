@@ -209,8 +209,6 @@ export function applySystemEvolutionStrategies(
           trait.value.maxItems,
         );
         break;
-      case "preserve":
-      case "none":
       default:
         if (currentValue !== undefined) {
           result[trait.id] = clonePortableValue(currentValue);

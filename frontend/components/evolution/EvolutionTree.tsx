@@ -54,7 +54,7 @@ function trapDialogFocus(event: KeyboardEvent, container: HTMLElement | null) {
   );
   if (focusable.length === 0) return;
   const first = focusable[0];
-  const last = focusable[focusable.length - 1];
+  const last = focusable.at(-1)!;
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault();
     last.focus();
@@ -64,7 +64,10 @@ function trapDialogFocus(event: KeyboardEvent, container: HTMLElement | null) {
   }
 }
 
-export function EvolutionTree({ cats, animateIn = false }: EvolutionTreeProps) {
+export function EvolutionTree({
+  cats,
+  animateIn = false,
+}: Readonly<EvolutionTreeProps>) {
   const [focused, setFocused] = useState<EvolutionTreeCat | null>(null);
 
   const grouped = useMemo(() => {

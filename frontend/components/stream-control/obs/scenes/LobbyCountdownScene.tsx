@@ -23,7 +23,7 @@ export function LobbyCountdownScene({
   countdownPreview,
   countdownValue,
   spinBoardVisible,
-}: LobbyCountdownSceneProps) {
+}: Readonly<LobbyCountdownSceneProps>) {
   return (
     <div className="relative" style={{ width: "1920px", height: "1080px" }}>
       {/* Lobby layer — fades out when countdown starts */}

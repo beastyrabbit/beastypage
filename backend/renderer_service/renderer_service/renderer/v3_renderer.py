@@ -205,7 +205,7 @@ class CatRendererV3:
             layers.append(layer)
         return layers
 
-    def _stage_base(self, params: dict, canvas: Image.Image):
+    def _stage_base(self, params: dict, _canvas: Image.Image):
         layers = self._build_pelt_layers(params, self._base_pelt_specs(params))
 
         if not layers:
@@ -412,7 +412,7 @@ class CatRendererV3:
                 result = alpha_over(result, overlay)
         return result, diagnostics, "replace", LayerIdentifier.tint
 
-    def _stage_white_patches(self, params: dict, canvas: Image.Image):
+    def _stage_white_patches(self, params: dict, _canvas: Image.Image):
         pattern = params.get("whitePatches")
         if _is_empty_value(pattern):
             return None, [], "alpha", LayerIdentifier.white_patches
@@ -425,7 +425,7 @@ class CatRendererV3:
             overlay = tint_image(overlay, [int(c) for c in tint[:3]], mode="multiply")
         return overlay, [f"white:{pattern}"], "alpha", LayerIdentifier.white_patches
 
-    def _stage_points(self, params: dict, canvas: Image.Image):
+    def _stage_points(self, params: dict, _canvas: Image.Image):
         pattern = params.get("points")
         if _is_empty_value(pattern):
             return None, [], "alpha", LayerIdentifier.points
@@ -435,7 +435,7 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_name, params)
         return overlay, [f"points:{pattern}"], "alpha", LayerIdentifier.points
 
-    def _stage_vitiligo(self, params: dict, canvas: Image.Image):
+    def _stage_vitiligo(self, params: dict, _canvas: Image.Image):
         pattern = params.get("vitiligo")
         if _is_empty_value(pattern):
             return None, [], "alpha", LayerIdentifier.vitiligo
@@ -445,7 +445,7 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_name, params)
         return overlay, [f"vitiligo:{pattern}"], "alpha", LayerIdentifier.vitiligo
 
-    def _stage_eyes(self, params: dict, canvas: Image.Image):
+    def _stage_eyes(self, params: dict, _canvas: Image.Image):
         primary = params.get("eyeColour") or params.get("eyeColor")
         secondary = params.get("eyeColour2") or params.get("eyeColor2")
 
@@ -474,7 +474,7 @@ class CatRendererV3:
 
         return overlay, diagnostics, "alpha", LayerIdentifier.eyes
 
-    def _stage_shading(self, params: dict, canvas: Image.Image):
+    def _stage_shading(self, params: dict, _canvas: Image.Image):
         if not self._truthy(params.get("shading")):
             return None, [], "alpha", LayerIdentifier.tint
         sprite_key = "shaders"
@@ -490,7 +490,7 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_key, params)
         return overlay, ["shading"], "multiply", LayerIdentifier.tint
 
-    def _stage_lighting(self, params: dict, canvas: Image.Image):
+    def _stage_lighting(self, params: dict, _canvas: Image.Image):
         lighting_param = params.get("lighting")
         if lighting_param is None or not self._truthy(lighting_param):
             return None, [], "alpha", LayerIdentifier.lighting
@@ -518,7 +518,7 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_name, params)
         return overlay, [sprite_name.lower()], "alpha", LayerIdentifier.lineart
 
-    def _stage_skin(self, params: dict, canvas: Image.Image):
+    def _stage_skin(self, params: dict, _canvas: Image.Image):
         skin = params.get("skinColour") or params.get("skinColor")
         if _is_empty_value(skin):
             return None, [], "alpha", LayerIdentifier.skin
@@ -600,7 +600,7 @@ class CatRendererV3:
 
         return current, diagnostics, "replace", LayerIdentifier.scars_secondary
 
-    def _stage_accessories(self, params: dict, canvas: Image.Image):
+    def _stage_accessories(self, params: dict, _canvas: Image.Image):
         accessories_raw: list[str] = []
         if isinstance(params.get("accessories"), list):
             accessories_raw.extend(

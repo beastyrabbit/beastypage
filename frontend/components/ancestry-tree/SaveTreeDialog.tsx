@@ -36,7 +36,7 @@ export function SaveTreeDialog({
   hasPassword: initialHasPassword,
   onSave,
   onClose,
-}: SaveTreeDialogProps) {
+}: Readonly<SaveTreeDialogProps>) {
   const defaultCreatorName = useDefaultCreatorName();
   // Capture initial values once on mount; dialog is opened/closed by mounting.
   const initialValuesRef = useRef({

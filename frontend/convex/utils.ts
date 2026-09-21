@@ -2,6 +2,16 @@ import type { Id, TableNames } from "./_generated/dataModel.js";
 
 export type AnyId = Id<TableNames>;
 
+export function randomSlug(length: number, alphabet: string): string {
+  let slug = "";
+  const random = new Uint32Array(1);
+  for (let i = 0; i < length; i += 1) {
+    crypto.getRandomValues(random);
+    slug += alphabet[random[0] % alphabet.length];
+  }
+  return slug;
+}
+
 export function docIdToString(id: AnyId): string {
   return id as unknown as string;
 }
@@ -41,26 +51,26 @@ export function normalizeStorageUrl(url: string | null): string | null {
     const storageBase = STORAGE_BASE ? String(STORAGE_BASE) : null;
     if (storageBase && storageBase !== "null" && storageBase !== "undefined") {
       // Normalize storage base - remove trailing slash using regex
-      const baseMatch = storageBase.match(/^(.+?)\/?$/);
+      const baseMatch = /^(.+?)\/?$/.exec(storageBase);
       const base = baseMatch ? baseMatch[1] : storageBase;
 
       // Escape special regex characters in base for safe regex construction
-      const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
       // Check if URL starts with base using regex (avoiding indexOf/charAt which might trigger URL methods)
-      const startsWithBase = urlStr.match(new RegExp(`^${escapedBase}`));
+      const startsWithBase = new RegExp(`^${escapedBase}`).exec(urlStr);
       if (startsWithBase) {
         return urlStr;
       }
 
       // Check if URL is relative (starts with /) using regex
-      const isRelative = urlStr.match(/^\//);
+      const isRelative = /^\//.exec(urlStr);
       if (isRelative) {
         return base + urlStr;
       }
 
       // If URL is absolute but different origin, extract path manually using regex
-      const absoluteMatch = urlStr.match(/^https?:\/\/[^/]+(\/.*)$/);
+      const absoluteMatch = /^https?:\/\/[^/]+(\/.*)$/.exec(urlStr);
       if (absoluteMatch?.[1]) {
         return base + absoluteMatch[1];
       }
@@ -70,13 +80,13 @@ export function normalizeStorageUrl(url: string | null): string | null {
     }
 
     // No storage base - extract path from absolute URLs, keep relative as-is
-    const absoluteMatch = urlStr.match(/^https?:\/\/[^/]+(\/.*)$/);
+    const absoluteMatch = /^https?:\/\/[^/]+(\/.*)$/.exec(urlStr);
     if (absoluteMatch?.[1]) {
       return absoluteMatch[1];
     }
 
     // Check if already relative using regex
-    const isRelative = urlStr.match(/^\//);
+    const isRelative = /^\//.exec(urlStr);
     return isRelative ? urlStr : `/${urlStr}`;
   } catch (_error) {
     // If normalization fails (e.g., due to Convex restrictions), try direct conversion

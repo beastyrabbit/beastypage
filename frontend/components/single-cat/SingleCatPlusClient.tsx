@@ -549,7 +549,7 @@ function handleManagedDialogKeyDown(
   }
 
   const first = focusable[0];
-  const last = focusable[focusable.length - 1];
+  const last = focusable.at(-1)!;
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault();
     last.focus();
@@ -782,7 +782,7 @@ function buildFlipSequence(
     return [];
   }
 
-  const targetFrame = frames[frames.length - 1];
+  const targetFrame = frames.at(-1)!;
   const cycleFrames = frames.slice();
   const sequence: { frame: VariationFrame; delay: number; isFinal: boolean }[] =
     [];
@@ -1302,7 +1302,7 @@ async function copyCanvasToClipboard(
     link.download = `${fallbackFilename}.png`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     URL.revokeObjectURL(url);
     onSuccess("Image downloaded.");
   } catch (error) {
@@ -1503,7 +1503,7 @@ function SettingsCodeSection({
   includeNewSprites,
   extendedModes,
   onApply,
-}: SettingsCodeSectionProps) {
+}: Readonly<SettingsCodeSectionProps>) {
   const [codeInput, setCodeInput] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
@@ -1641,7 +1641,7 @@ export function SingleCatPlusClient({
   initialVariantSettings = null,
   initialVariantLoadError = null,
   initialCodeSettings = null,
-}: SingleCatPlusClientProps) {
+}: Readonly<SingleCatPlusClientProps>) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const mapperRef = useRef<SpriteMapperApi | null>(null);
@@ -2676,9 +2676,9 @@ export function SingleCatPlusClient({
           }
 
           if (frames.length > 0) {
-            drawCanvas(frames[frames.length - 1].canvas);
+            drawCanvas(frames.at(-1)!.canvas);
           }
-          const finalRaw = frames[frames.length - 1]?.option.raw;
+          const finalRaw = frames.at(-1)?.option.raw;
           if (typeof finalRaw === "string" && finalRaw !== "none") {
             committed.push(finalRaw);
             summary.push(formatValue(finalRaw));
@@ -2901,9 +2901,9 @@ export function SingleCatPlusClient({
           }
 
           if (frames.length > 0) {
-            drawCanvas(frames[frames.length - 1].canvas);
+            drawCanvas(frames.at(-1)!.canvas);
           }
-          const finalRaw = frames[frames.length - 1]?.option.raw;
+          const finalRaw = frames.at(-1)?.option.raw;
           if (typeof finalRaw === "string" && finalRaw !== "none") {
             committed.push(finalRaw);
             summary.push(formatValue(finalRaw));
@@ -3195,7 +3195,7 @@ export function SingleCatPlusClient({
               });
             }
 
-            const finalStageValue = frames[frames.length - 1]?.option.raw;
+            const finalStageValue = frames.at(-1)?.option.raw;
             if (typeof finalStageValue === "string") {
               if (stage.kind === "mask")
                 working = { ...working, mask: finalStageValue };
@@ -3944,7 +3944,7 @@ export function SingleCatPlusClient({
             }
           }
 
-          const finalFrame = frames[frames.length - 1];
+          const finalFrame = frames.at(-1)!;
           if (finalFrame) {
             drawCanvas(finalFrame.canvas);
           }
@@ -4237,7 +4237,7 @@ export function SingleCatPlusClient({
       link.download = "cat.png";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
       showToast("Downloaded PNG");
       track("single_cat_exported", { format: "download-png" });

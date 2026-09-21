@@ -340,7 +340,7 @@ export default function RendererStressHarness() {
                 value={totalRequests}
                 onChange={(event) =>
                   setTotalRequests(
-                    parseInt(event.target.value, 10) || DEFAULT_TOTAL,
+                    Number.parseInt(event.target.value, 10) || DEFAULT_TOTAL,
                   )
                 }
                 className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-foreground focus:border-primary focus:outline-none"
@@ -361,7 +361,8 @@ export default function RendererStressHarness() {
                 value={concurrency}
                 onChange={(event) =>
                   setConcurrency(
-                    parseInt(event.target.value, 10) || DEFAULT_CONCURRENCY,
+                    Number.parseInt(event.target.value, 10) ||
+                      DEFAULT_CONCURRENCY,
                   )
                 }
                 className="rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-foreground focus:border-primary focus:outline-none"

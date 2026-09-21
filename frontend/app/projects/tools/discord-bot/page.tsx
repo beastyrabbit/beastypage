@@ -126,7 +126,6 @@ export default function DiscordBotPage() {
             >
               <div
                 className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 via-transparent to-violet-500/5 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-                role="presentation"
                 aria-hidden="true"
               />
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:animate-shine" />

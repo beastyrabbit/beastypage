@@ -7,7 +7,7 @@ import { AFTERLIFE_OPTIONS } from "@/utils/catSettingsHelpers";
 import { WizardExampleCats } from "../WizardExampleCats";
 import type { WizardStepProps } from "./types";
 
-export function SummaryStep(props: WizardStepProps) {
+export function SummaryStep(props: Readonly<WizardStepProps>) {
   const { settings, liveCode, onBack } = props;
 
   const [copyFeedback, setCopyFeedback] = useState(false);

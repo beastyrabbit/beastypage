@@ -264,7 +264,7 @@ export const FamilyChartTree = forwardRef<
 
     // Clear previous chart
     while (container.firstChild) {
-      container.removeChild(container.firstChild);
+      container.firstChild?.remove();
     }
 
     // Create chart with proper spacing
@@ -409,7 +409,7 @@ export const FamilyChartTree = forwardRef<
     return () => {
       if (container) {
         while (container.firstChild) {
-          container.removeChild(container.firstChild);
+          container.firstChild?.remove();
         }
       }
       chartRef.current = null;

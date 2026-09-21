@@ -132,7 +132,7 @@ function estimateCatCount(
 export function AncestryTreeClient({
   initialTree,
   initialHasPassword,
-}: AncestryTreeClientProps) {
+}: Readonly<AncestryTreeClientProps>) {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>(
     initialTree ? "tree" : "config",
@@ -701,8 +701,7 @@ export function AncestryTreeClient({
             // Then generate a child with the correct gender
             const currentCat = manager.getCat(parentCat.id);
             if (currentCat && currentCat.partnerIds.length > 0) {
-              const newPartnerId =
-                currentCat.partnerIds[currentCat.partnerIds.length - 1];
+              const newPartnerId = currentCat.partnerIds.at(-1)!;
               const motherId =
                 currentCat.gender === "F" ? currentCat.id : newPartnerId;
               const fatherId =
@@ -866,14 +865,16 @@ export function AncestryTreeClient({
               Refresh Page
             </button>
           </div>
-        ) : !isSpriteMapperReady ? (
+        ) : null}
+        {!spriteMapperError && !isSpriteMapperReady && (
           <div className="flex items-center justify-center gap-3 py-20">
             <Loader2 className="size-8 animate-spin text-amber-500" />
             <span className="text-muted-foreground">
               Loading sprite data...
             </span>
           </div>
-        ) : (
+        )}
+        {!spriteMapperError && isSpriteMapperReady && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Column - Founding Couple */}
             <div className="space-y-6">
@@ -1074,7 +1075,8 @@ export function AncestryTreeClient({
                       onChange={(e) =>
                         handleConfigChange({
                           ...config,
-                          genderRatio: parseInt(e.target.value, 10) / 100,
+                          genderRatio:
+                            Number.parseInt(e.target.value, 10) / 100,
                         })
                       }
                       className="slider-amber w-full"
@@ -1131,7 +1133,8 @@ export function AncestryTreeClient({
                       onChange={(e) =>
                         handleConfigChange({
                           ...config,
-                          partnerChance: parseInt(e.target.value, 10) / 100,
+                          partnerChance:
+                            Number.parseInt(e.target.value, 10) / 100,
                         })
                       }
                       className="slider-amber w-full"

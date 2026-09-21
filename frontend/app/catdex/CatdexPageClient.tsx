@@ -258,7 +258,7 @@ export default function CatdexPage() {
     pageStatus === "LoadingFirstPage" ||
     !seasons ||
     !rarities ||
-    typeof hasPending === "undefined";
+    hasPending === undefined;
 
   const { filteredCats, stats } = useMemo(() => {
     if (!cats) {
@@ -528,16 +528,14 @@ export default function CatdexPage() {
             return (
               <article
                 key={cat.id}
-                className="glass-card group flex cursor-pointer flex-col overflow-hidden transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-2xl"
-                onClick={() => handleCardClick(cat)}
-                onKeyDown={(event) => {
-                  if (event.target !== event.currentTarget) return;
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    handleCardClick(cat);
-                  }
-                }}
+                className="glass-card group relative flex flex-col overflow-hidden transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-2xl"
               >
+                <button
+                  type="button"
+                  aria-label={`Open ${cat.cat_name ?? "Unnamed cat"}`}
+                  className="absolute inset-0 z-10 cursor-pointer rounded-[inherit] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary"
+                  onClick={() => handleCardClick(cat)}
+                />
                 <div className="relative aspect-[3/4] overflow-hidden bg-muted">
                   <ProgressiveImage
                     lowSrc={sources.thumb}
@@ -872,7 +870,7 @@ function inferEntryDefaults(fileName: string): {
   if (!parts.length) return { name: "", number: "" };
 
   let number = "";
-  const last = parts[parts.length - 1];
+  const last = parts.at(-1);
   if (last && /^(?:\d{1,4}|xx\d+|00x)$/i.test(last)) {
     number = last.toUpperCase();
     parts.pop();
@@ -894,7 +892,7 @@ function SubmitModal({
   seasons,
   rarities,
   onSubmit,
-}: SubmitModalProps) {
+}: Readonly<SubmitModalProps>) {
   const [seasonId, setSeasonId] = useState<string>("");
   const [rarityId, setRarityId] = useState<string>("");
   const [catName, setCatName] = useState("");
@@ -1155,7 +1153,7 @@ function MassUploadModal({
   seasons,
   rarities,
   onSubmit,
-}: MassUploadModalProps) {
+}: Readonly<MassUploadModalProps>) {
   const [owner, setOwner] = useState("");
   const [entries, setEntries] = useState<MassUploadEntry[]>([]);
   const [status, setStatus] = useState<string | null>(null);

@@ -813,6 +813,8 @@ body {
   pointer-events: all;
   transform: translateZ(0); /* Hardware acceleration */
   -webkit-transform: translateZ(0);
+  width: 100%;
+  height: 600px;
 }
 
 .family-tree svg {
@@ -852,11 +854,6 @@ body {
 
 .zoom-button:hover {
   background: rgba(255, 255, 255, 0.15);
-}
-
-.family-tree {
-  width: 100%;
-  height: 600px;
 }
 
 /* Cats Grid View */

@@ -16,6 +16,7 @@ function hashSeed(value: string): [number, number, number, number] {
   let h4 = 2_773_480_762;
 
   for (let index = 0; index < value.length; index += 1) {
+    // Version one hashes UTF-16 code units, including surrogate pairs.
     const code = value.charCodeAt(index);
     h1 = h2 ^ Math.imul(h1 ^ code, 597_399_067);
     h2 = h3 ^ Math.imul(h2 ^ code, 2_869_860_233);

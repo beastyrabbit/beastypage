@@ -675,7 +675,7 @@ export function ControlShell() {
         link.download = `${fallbackName}.png`;
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        link.remove();
         URL.revokeObjectURL(url);
         toast.success("Image downloaded.");
       } catch {
@@ -737,7 +737,7 @@ export function ControlShell() {
       link.download = "cat.png";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
       toast.success("Downloaded PNG");
     } catch {

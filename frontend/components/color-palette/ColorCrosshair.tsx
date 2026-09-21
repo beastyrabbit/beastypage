@@ -39,7 +39,7 @@ export function ColorCrosshair({
   onSelect,
   onDragStart,
   onDragEnd,
-}: ColorCrosshairProps) {
+}: Readonly<ColorCrosshairProps>) {
   const [isDragging, setIsDragging] = useState(false);
   const [loupePixels, setLoupePixels] = useState<string[][]>([]);
   const [showLoupe, setShowLoupe] = useState(false); // For smooth transition

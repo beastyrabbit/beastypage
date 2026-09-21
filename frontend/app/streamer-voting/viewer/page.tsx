@@ -18,7 +18,7 @@ function firstSearchParam(value: string | string[] | undefined): string | null {
 
 export default async function StreamerViewerPage({
   searchParams,
-}: StreamerViewerPageProps) {
+}: Readonly<StreamerViewerPageProps>) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const viewerKey =
     firstSearchParam(resolvedSearchParams.viewer)?.trim() ?? null;

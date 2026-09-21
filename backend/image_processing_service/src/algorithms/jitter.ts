@@ -4,6 +4,7 @@ import sharp from "sharp";
  * Simple seeded PRNG (mulberry32).
  */
 function mulberry32(seed: number) {
+  // Mulberry32 requires signed 32-bit wrapping, not numeric truncation.
   let a = seed | 0;
   return () => {
     a = (a + 0x6d2b79f5) | 0;

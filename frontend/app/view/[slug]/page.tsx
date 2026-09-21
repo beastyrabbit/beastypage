@@ -14,7 +14,7 @@ type ViewSlugPageProps = {
 export default async function ViewSlugPage({
   params,
   searchParams,
-}: ViewSlugPageProps) {
+}: Readonly<ViewSlugPageProps>) {
   const resolvedParams = await params;
   const resolvedSearch = searchParams ? await searchParams : undefined;
   const encoded =
