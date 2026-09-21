@@ -113,7 +113,7 @@ type PaletteDropdownProps = {
   onChange: (value: PaletteMode) => void;
 };
 
-function PaletteDropdown({ mode, onChange }: PaletteDropdownProps) {
+function PaletteDropdown({ mode, onChange }: Readonly<PaletteDropdownProps>) {
   return (
     <div className="flex items-center gap-2">
       <PaletteSingleSelect
@@ -172,7 +172,7 @@ function VisualBuilderPreviewSprite({
   requestPreview,
   getCachedPreview,
   hasCachedPreview,
-}: VisualBuilderPreviewSpriteProps) {
+}: Readonly<VisualBuilderPreviewSpriteProps>) {
   const [src, setSrc] = useState<string | null>(() =>
     getCachedPreview(cacheKey),
   );

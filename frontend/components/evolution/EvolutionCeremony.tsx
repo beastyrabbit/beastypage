@@ -158,7 +158,7 @@ export function EvolutionCeremony({
   chargeDurationMs = 8400,
   requestTeaserFrame,
   hideControls = false,
-}: EvolutionCeremonyProps) {
+}: Readonly<EvolutionCeremonyProps>) {
   const prefersReducedMotion = useReducedMotion();
   const sectionRef = useRef<HTMLElement | null>(null);
   const [step, setStep] = useState<CeremonyStep>({ kind: "summon" });

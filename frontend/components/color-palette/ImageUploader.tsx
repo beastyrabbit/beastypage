@@ -30,7 +30,7 @@ export function ImageUploader({
   onImageLoad,
   isLoading,
   error,
-}: ImageUploaderProps) {
+}: Readonly<ImageUploaderProps>) {
   const [isDragging, setIsDragging] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [loadingCategory, setLoadingCategory] = useState<ImageCategory | null>(

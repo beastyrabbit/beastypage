@@ -74,7 +74,7 @@ export function BatchPanel() {
   // edits are never reverted by in-flight echoes.
   const { touch: touchLocalEdit, deferIfEditing, retryTick } = useFollowGuard();
   useEffect(() => {
-    void retryTick;
+    if (retryTick === -1) return;
     const info = rawSessionSettings?.batchInfo as
       | Record<string, unknown>
       | undefined;
@@ -272,7 +272,7 @@ export function BatchPanel() {
   const persistedSeqRef = useRef<number | null>(null);
   const [persistRetryTick, setPersistRetryTick] = useState(0);
   useEffect(() => {
-    void persistRetryTick; // re-runs the save after a scheduled retry
+    if (persistRetryTick === -1) return; // re-runs the save after a scheduled retry
     const command = currentBatchCommand;
     const state = batchLiveState;
     if (!command || !state || state.seq !== command.seq) return;
@@ -433,7 +433,7 @@ export function BatchPanel() {
           ))}
         </div>
         <label className="mt-4 flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-          Litter Title
+          <span>Litter Title</span>
           <input
             type="text"
             value={title}

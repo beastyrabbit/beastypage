@@ -703,7 +703,7 @@ export function buildFlipSequence(
     return [];
   }
 
-  const targetFrame = frames[frames.length - 1];
+  const targetFrame = frames.at(-1)!;
   const cycleFrames = frames.slice();
   const sequence: { frame: VariationFrame; delay: number; isFinal: boolean }[] =
     [];
@@ -717,7 +717,7 @@ export function buildFlipSequence(
 
   const randomPool = cycleFrames.length > 0 ? cycleFrames : [targetFrame];
   for (let i = 0; i < 5; i += 1) {
-    const frame = randomPool[Math.floor(Math.random() * randomPool.length)];
+    const frame = randomPool[Math.floor(Math.random() * randomPool.length)]!;
     sequence.push({ frame, delay: 1 + i * 0.3, isFinal: false });
   }
 
@@ -1286,7 +1286,7 @@ export async function copyCanvasToClipboard(
     link.download = `${fallbackFilename}.png`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     URL.revokeObjectURL(url);
     onSuccess("Image downloaded.");
   } catch (error) {

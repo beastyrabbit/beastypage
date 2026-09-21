@@ -98,7 +98,7 @@ async function loadVariantSettings(
 
 export default async function SingleCatPlusPage({
   searchParams,
-}: SingleCatPlusPageProps) {
+}: Readonly<SingleCatPlusPageProps>) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const mode: "flashy" | "calm" =
     firstSearchParam(resolvedSearchParams.mode) === "calm" ? "calm" : "flashy";

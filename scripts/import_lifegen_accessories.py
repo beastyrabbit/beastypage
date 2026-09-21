@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LIFEGEN_UPSTREAM = ROOT / ".ref" / "lifegen" / "sprites"
 SOURCE_MANIFEST = ROOT / "scripts" / "lifegen-accessories-source.json"
 ADAPTED_SHEET = "acc_lifegen_adapted"
+SPRITES_INDEX_FILENAME = "spritesIndex.json"
 
 ACCESSORY_DICTS = (
     "alive_insect_data.json",
@@ -435,8 +436,8 @@ def build_adapted_sheet(
 
 def write_sprite_index(index: OrderedDict[str, dict[str, Any]]) -> None:
     for target in (
-        FRONTEND_DATA / "spritesIndex.json",
-        BACKEND_DATA / "spritesIndex.json",
+        FRONTEND_DATA / SPRITES_INDEX_FILENAME,
+        BACKEND_DATA / SPRITES_INDEX_FILENAME,
     ):
         write_json(target, index)
 
@@ -508,7 +509,7 @@ def main() -> None:
     copy_lifegen_assets(groups)
     pose_data = read_json(BACKEND_DATA / "poseData.json")
     layout = list(pose_data["sheetLayout"])
-    old_index = read_json(BACKEND_DATA / "spritesIndex.json")
+    old_index = read_json(BACKEND_DATA / SPRITES_INDEX_FILENAME)
 
     generated: OrderedDict[str, dict[str, Any]] = OrderedDict()
     for name, group in groups.items():

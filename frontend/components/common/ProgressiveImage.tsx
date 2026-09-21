@@ -26,7 +26,7 @@ export function ProgressiveImage({
   imgClassName,
   imgStyle,
   loading = "lazy",
-}: ProgressiveImageProps) {
+}: Readonly<ProgressiveImageProps>) {
   const [state, setState] = useState(() => ({
     src: lowSrc ?? highSrc ?? FALLBACK_IMG,
     sharp: !lowSrc || lowSrc === highSrc,

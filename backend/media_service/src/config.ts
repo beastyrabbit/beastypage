@@ -17,7 +17,7 @@ const schema = z.object({
 	S3_ACCESS_KEY_ID: z.string().min(1),
 	S3_SECRET_ACCESS_KEY: z.string().min(1),
 	CORS_ORIGINS: z.string().default("http://frontend.localhost:1355"),
-	TRUSTED_PROXY_CIDRS: z.string().default("10.0.0.0/8"),
+	TRUSTED_PROXY_CIDRS: z.string().default(""),
 	WORKER_ENABLED: booleanFromEnv,
 	TEMP_DIR: z.string().default("/tmp/quick-share"),
 	PROCESSING_TIMEOUT_MS: z.coerce
@@ -49,8 +49,8 @@ export function loadConfig(environment = process.env): Config {
 	const parsed = schema.parse(environment);
 	return {
 		port: parsed.PORT,
-		publicBaseUrl: parsed.PUBLIC_BASE_URL.replace(/\/+$/, ""),
-		convexSiteUrl: parsed.CONVEX_SITE_URL.replace(/\/+$/, ""),
+		publicBaseUrl: trimTrailingSlashes(parsed.PUBLIC_BASE_URL),
+		convexSiteUrl: trimTrailingSlashes(parsed.CONVEX_SITE_URL),
 		internalToken: parsed.QUICK_SHARE_INTERNAL_TOKEN,
 		hmacKey: parsed.QUICK_SHARE_HMAC_KEY,
 		s3Endpoint: parsed.S3_ENDPOINT,
@@ -68,4 +68,10 @@ export function loadConfig(environment = process.env): Config {
 		tempDir: parsed.TEMP_DIR,
 		processingTimeoutMs: parsed.PROCESSING_TIMEOUT_MS,
 	};
+}
+
+function trimTrailingSlashes(value: string): string {
+	let end = value.length;
+	while (end > 0 && value[end - 1] === "/") end -= 1;
+	return value.slice(0, end);
 }

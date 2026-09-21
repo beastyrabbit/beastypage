@@ -402,9 +402,7 @@ export function formatCatDisplayRows(
   });
 }
 
-export function getCatViewDisplayRows(
-  input: CanonicalCatViewPayload | CatDocument | unknown,
-): CatTraitDisplayRow[] {
+export function getCatViewDisplayRows(input: unknown): CatTraitDisplayRow[] {
   const document =
     isRecord(input) && "document" in input
       ? normalizeCatViewPayload(input).document

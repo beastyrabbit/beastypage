@@ -220,11 +220,7 @@ export const triggerWheel = mutation({
   handler: async (ctx) => {
     const session = await requireSession(ctx);
     const sourceCommand = session.currentCommand;
-    if (
-      !sourceCommand ||
-      sourceCommand.type !== "spin" ||
-      sourceCommand.params === undefined
-    ) {
+    if (sourceCommand?.type !== "spin" || sourceCommand.params === undefined) {
       throw new Error("Spin a cat before spinning the wheel.");
     }
     if (session.lastWheelSpinForSeq === sourceCommand.seq) {
@@ -322,7 +318,7 @@ export const reportBatchStage = mutation({
       .unique();
     if (!session) throw new Error("No stream session found");
     const command = session.currentCommand;
-    if (!command || command.type !== "batch" || command.seq !== args.seq) {
+    if (command?.type !== "batch" || command?.seq !== args.seq) {
       return;
     }
     const previous =
@@ -370,9 +366,8 @@ export const markBatchCat = mutation({
     const command = session.currentCommand;
     const state = session.batchState;
     if (
-      !command ||
-      command.type !== "batch" ||
-      command.seq !== args.seq ||
+      command?.type !== "batch" ||
+      command?.seq !== args.seq ||
       !state ||
       state.seq !== args.seq
     ) {
@@ -407,9 +402,8 @@ export const setBatchHighlight = mutation({
     const command = session.currentCommand;
     const state = session.batchState;
     if (
-      !command ||
-      command.type !== "batch" ||
-      command.seq !== args.seq ||
+      command?.type !== "batch" ||
+      command?.seq !== args.seq ||
       !state ||
       state.seq !== args.seq
     ) {
@@ -446,7 +440,7 @@ export const cullBatchCat = mutation({
   handler: async (ctx, args) => {
     const session = await requireSession(ctx);
     const command = session.currentCommand;
-    if (!command || command.type !== "batch" || command.seq !== args.seq) {
+    if (command?.type !== "batch" || command?.seq !== args.seq) {
       throw new Error("No matching batch is running.");
     }
     const batch = command.batch;
@@ -496,9 +490,8 @@ export const attachBatchSlug = mutation({
     const session = await requireSession(ctx);
     const command = session.currentCommand;
     if (
-      !command ||
-      command.type !== "batch" ||
-      command.seq !== args.seq ||
+      command?.type !== "batch" ||
+      command?.seq !== args.seq ||
       !command.batch
     ) {
       return;

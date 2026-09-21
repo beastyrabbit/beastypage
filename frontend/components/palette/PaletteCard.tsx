@@ -76,7 +76,7 @@ export function PaletteCard({
   onRemove,
   onUpdateColor,
   showToast,
-}: PaletteCardProps) {
+}: Readonly<PaletteCardProps>) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [pickerIndex, setPickerIndex] = useState<number | null>(null);

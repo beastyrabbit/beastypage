@@ -185,7 +185,7 @@ function AfterlifeComparison({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function AfterlifeStep(props: WizardStepProps) {
+export function AfterlifeStep(props: Readonly<WizardStepProps>) {
   const { settings, setAfterlifeMode, onNext, onBack } = props;
 
   return (

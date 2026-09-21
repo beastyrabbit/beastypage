@@ -9,7 +9,7 @@ interface BrbSceneProps {
 }
 
 /** BRB mode — lobby cats without the settings panel. */
-export function BrbScene({ settings, generator }: BrbSceneProps) {
+export function BrbScene({ settings, generator }: Readonly<BrbSceneProps>) {
   return (
     <div className="relative" style={{ width: "1920px", height: "1080px" }}>
       <OBSLobby settings={settings} generator={generator} hideSettings />

@@ -21,7 +21,7 @@ function firstParam(value: string | string[] | undefined): string | null {
   return null;
 }
 
-export default async function GuidedSettingsPage({ searchParams }: PageProps) {
+export default async function GuidedSettingsPage({ searchParams }: Readonly<PageProps>) {
   const resolved = searchParams ? await searchParams : {};
   const codeParam = firstParam(resolved.code)?.trim() ?? null;
 

@@ -642,13 +642,6 @@ body.stream-page--host {
   word-break: break-all;
 }
 
-.stream-link-box {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
 .stream-link-actions {
   display: flex;
   gap: 8px;

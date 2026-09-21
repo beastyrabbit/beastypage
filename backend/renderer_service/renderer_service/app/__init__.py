@@ -68,7 +68,7 @@ class RendererSupervisor:
         self.max_observed_queue = 0
         self.logger = logging.getLogger("renderer.queue")
 
-    async def start(self) -> None:
+    def start(self) -> None:
         for _ in range(self.worker_count):
             task = asyncio.create_task(self._worker(), name="renderer-worker")
             self._workers.append(task)
@@ -169,7 +169,7 @@ class RendererSupervisor:
 def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
-        await supervisor.start()
+        supervisor.start()
         try:
             yield
         finally:
@@ -237,7 +237,6 @@ def create_app() -> FastAPI:
 
     @app.post(
         "/render",
-        response_model=RenderResponse,
         tags=["rendering"],
         summary="Render a single cat sprite",
     )
@@ -260,7 +259,6 @@ def create_app() -> FastAPI:
 
     @app.post(
         "/render/batch",
-        response_model=BatchRenderResponse,
         tags=["rendering"],
         summary="Render a batch spritesheet",
     )

@@ -20,7 +20,7 @@ export function PixelArtDetector({
   gridSize,
   onToggle,
   onGridSizeChange,
-}: PixelArtDetectorProps) {
+}: Readonly<PixelArtDetectorProps>) {
   const [detecting, setDetecting] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [confidence, setConfidence] = useState<number | null>(null);
@@ -78,7 +78,7 @@ export function PixelArtDetector({
                 onChange={(e) => onToggle(e.target.checked)}
                 className="accent-primary"
               />
-              Pixel Art Mode
+              <span>Pixel Art Mode</span>
             </label>
 
             {confidence !== null && (
@@ -103,7 +103,7 @@ export function PixelArtDetector({
                 max={128}
                 value={gridSize ?? ""}
                 onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
+                  const v = Number.parseInt(e.target.value, 10);
                   onGridSizeChange(Number.isFinite(v) && v > 0 ? v : null);
                 }}
                 className="w-20 rounded border border-border bg-background px-2 py-1 text-xs text-foreground"

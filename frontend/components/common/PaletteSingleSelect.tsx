@@ -37,7 +37,7 @@ export function PaletteSingleSelect({
   showSearch = true,
   className = "",
   label,
-}: PaletteSingleSelectProps) {
+}: Readonly<PaletteSingleSelectProps>) {
   const additionalOptions = usePaletteOptions();
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");

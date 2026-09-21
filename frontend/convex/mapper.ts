@@ -17,7 +17,9 @@ type ImageInsert = Omit<ImageDoc, "_id" | "_creationTime">;
 function randomSlug(): string {
   let slug = "";
   for (let i = 0; i < SLUG_LENGTH; i += 1) {
-    const index = Math.floor(Math.random() * SLUG_ALPHABET.length);
+    const random = new Uint32Array(1);
+    crypto.getRandomValues(random);
+    const index = random[0] % SLUG_ALPHABET.length;
     slug += SLUG_ALPHABET[index];
   }
   return slug;
@@ -152,6 +154,7 @@ export const getBySlug = query({
       const asId = await ctx.db.get(toId("cat_profile", args.slugOrId));
       return asId ? await profileToClient(ctx, asId) : null;
     } catch (_error) {
+      // Admin identity is unavailable in non-admin runtimes; deny access.
       return null;
     }
   },

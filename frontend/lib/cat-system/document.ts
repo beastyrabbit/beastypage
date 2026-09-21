@@ -395,7 +395,7 @@ export function readCatDocument(
 }
 
 export function catDocumentToLegacyParams(
-  documentInput: CatDocument | unknown,
+  documentInput: unknown,
 ): Record<string, unknown> {
   const document = readCatDocument(documentInput);
   const params: Record<string, unknown> = document.unknownTraits
@@ -596,7 +596,7 @@ export function catDataToLegacyPersistence(
   return catData;
 }
 
-export function createDualCatPayload(documentInput: CatDocument | unknown): {
+export function createDualCatPayload(documentInput: unknown): {
   document: CatDocument;
   params: Record<string, unknown>;
   poseName?: string;
@@ -614,7 +614,7 @@ export function createDualCatPayload(documentInput: CatDocument | unknown): {
 }
 
 export function setCatTrait(
-  documentInput: CatDocument | unknown,
+  documentInput: unknown,
   traitId: string,
   value: unknown,
 ): CatDocument {
@@ -634,17 +634,14 @@ export function setCatTrait(
   );
 }
 
-export function getCatTrait(
-  documentInput: CatDocument | unknown,
-  traitId: string,
-): unknown {
+export function getCatTrait(documentInput: unknown, traitId: string): unknown {
   const document = readCatDocument(documentInput);
   const canonicalId = catSystem.aliases[traitId] ?? traitId;
   return (document.traits as Record<string, unknown>)[canonicalId];
 }
 
 export function clearCatTrait(
-  documentInput: CatDocument | unknown,
+  documentInput: unknown,
   traitId: string,
 ): CatDocument {
   const document = readCatDocument(documentInput);
@@ -662,7 +659,7 @@ export function clearCatTrait(
 }
 
 export function preserveUnknownTraits(
-  documentInput: CatDocument | unknown,
+  documentInput: unknown,
   unknownTraits: Readonly<Record<string, JsonValue>>,
 ): CatDocument {
   const document = readCatDocument(documentInput);

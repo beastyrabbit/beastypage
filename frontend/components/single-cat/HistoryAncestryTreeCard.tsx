@@ -52,7 +52,7 @@ function getPreviewUrlFromParams(
 export function HistoryAncestryTreeCard({
   item,
   onPreview,
-}: HistoryAncestryTreeCardProps) {
+}: Readonly<HistoryAncestryTreeCardProps>) {
   const [activeIndex, setActiveIndex] = useState(0);
   const totalCats = item.previewCats.length;
   const safeIndex = totalCats

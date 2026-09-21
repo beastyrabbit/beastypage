@@ -26,16 +26,16 @@ function normalizeHostname(hostname: string): string {
 
 function isPrivateOrReservedIpv4Address(ipAddress: string): boolean {
   // IPv4 loopback / private / link-local / CGNAT / benchmarking / docs / multicast.
-  if (/^127\./.test(ipAddress)) return true;
-  if (/^10\./.test(ipAddress)) return true;
+  if (ipAddress.startsWith("127.")) return true;
+  if (ipAddress.startsWith("10.")) return true;
   if (/^172\.(1[6-9]|2\d|3[01])\./.test(ipAddress)) return true;
-  if (/^192\.168\./.test(ipAddress)) return true;
-  if (/^169\.254\./.test(ipAddress)) return true;
+  if (ipAddress.startsWith("192.168.")) return true;
+  if (ipAddress.startsWith("169.254.")) return true;
   if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ipAddress)) return true;
   if (/^198\.(1[89])\./.test(ipAddress)) return true;
-  if (/^192\.0\.2\./.test(ipAddress)) return true;
-  if (/^198\.51\.100\./.test(ipAddress)) return true;
-  if (/^203\.0\.113\./.test(ipAddress)) return true;
+  if (ipAddress.startsWith("192.0.2.")) return true;
+  if (ipAddress.startsWith("198.51.100.")) return true;
+  if (ipAddress.startsWith("203.0.113.")) return true;
   if (/^(22[4-9]|23\d|24\d|25[0-5])\./.test(ipAddress)) return true;
   if (ipAddress === "0.0.0.0") return true;
   return false;

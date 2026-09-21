@@ -155,12 +155,12 @@ export function buildAdditionChips(
   idPrefix: string,
 ): AdditionChip[] {
   return additions.map((addition, index) => {
-    const label =
-      addition.kind === "replacement"
-        ? `${ADDITION_KIND_LABEL.replacement} ${formatValue(addition.slot)}`
-        : addition.kind === "trait"
-          ? traitLabel(addition)
-          : ADDITION_KIND_LABEL[addition.kind];
+    let label = ADDITION_KIND_LABEL[addition.kind];
+    if (addition.kind === "replacement") {
+      label = `${ADDITION_KIND_LABEL.replacement} ${formatValue(addition.slot)}`;
+    } else if (addition.kind === "trait") {
+      label = traitLabel(addition);
+    }
     return {
       id: `${idPrefix}-chip-${index}`,
       kind: addition.kind,

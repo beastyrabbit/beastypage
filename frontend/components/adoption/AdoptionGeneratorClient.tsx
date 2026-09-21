@@ -251,7 +251,7 @@ export function AdoptionGeneratorClient() {
     if (typeof document === "undefined") return;
     const group = document.getElementById("speedGroup");
     if (!group) return;
-    group.setAttribute("data-value", speed);
+    group.dataset.value = speed;
     const detail = { value: speed };
     group.dispatchEvent(
       new CustomEvent("sl-change", { detail, bubbles: true }),

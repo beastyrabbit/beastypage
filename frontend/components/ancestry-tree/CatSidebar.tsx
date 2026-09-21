@@ -25,7 +25,7 @@ export function CatSidebar({
   onEditRelations,
   isEditingRelations,
   onChangePose,
-}: CatSidebarProps) {
+}: Readonly<CatSidebarProps>) {
   const previewUrl = useMemo(() => {
     if (!cat) return null;
     return getCatPreviewUrl(cat);
@@ -35,6 +35,9 @@ export function CatSidebar({
 
   const genderIcon = cat.gender === "F" ? "♀" : "♂";
   const genderColor = cat.gender === "F" ? "text-pink-400" : "text-blue-400";
+  let tortieStatus = "None";
+  if (cat.genetics.isTortie.expressed) tortieStatus = "Expressed";
+  else if (cat.genetics.isTortie.allele1 || cat.genetics.isTortie.allele2) tortieStatus = "Carried";
 
   const lifeStageLabel =
     {
@@ -219,19 +222,8 @@ export function CatSidebar({
             <div className="pt-2 border-t border-white/10">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Tortie Gene</span>
-                <span
-                  className={
-                    cat.genetics.isTortie.expressed
-                      ? "text-pink-400"
-                      : "text-muted-foreground"
-                  }
-                >
-                  {cat.genetics.isTortie.expressed
-                    ? "Expressed"
-                    : cat.genetics.isTortie.allele1 ||
-                        cat.genetics.isTortie.allele2
-                      ? "Carried"
-                      : "None"}
+                <span className={cat.genetics.isTortie.expressed ? "text-pink-400" : "text-muted-foreground"}>
+                  {tortieStatus}
                 </span>
               </div>
               {cat.gender === "M" &&

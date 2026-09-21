@@ -6,12 +6,12 @@ const CHALLENGE_EXPIRY_MS = 5 * 60 * 1000;
 
 const rawInviteSecret = (process.env.DISCORD_INVITE_SECRET ?? "").trim();
 
-const INVITE_URL =
-  rawInviteSecret.length === 0
-    ? null
-    : rawInviteSecret.includes("://")
-      ? rawInviteSecret
-      : `https://discord.gg/${rawInviteSecret}`;
+let INVITE_URL: string | null = null;
+if (rawInviteSecret.length > 0) {
+  INVITE_URL = rawInviteSecret.includes("://")
+    ? rawInviteSecret
+    : `https://discord.gg/${rawInviteSecret}`;
+}
 
 function randomIntInclusive(min: number, max: number) {
   if (max <= min) {
@@ -23,7 +23,7 @@ function randomIntInclusive(min: number, max: number) {
     globalThis.crypto.getRandomValues(buffer);
     return min + (buffer[0] % range);
   }
-  return min + Math.floor(Math.random() * range);
+  throw new Error("Secure random source unavailable");
 }
 
 function randomHex(bytes: number) {
@@ -37,13 +37,7 @@ function randomHex(bytes: number) {
       byte.toString(16).padStart(2, "0"),
     ).join("");
   }
-  let output = "";
-  for (let i = 0; i < bytes; i += 1) {
-    output += Math.floor(Math.random() * 256)
-      .toString(16)
-      .padStart(2, "0");
-  }
-  return output;
+  throw new Error("Secure random source unavailable");
 }
 
 async function hashAnswer(answer: string, salt: string) {
@@ -57,8 +51,8 @@ async function hashAnswer(answer: string, salt: string) {
   }
   let hash = 0;
   for (let i = 0; i < payload.length; i += 1) {
-    hash = (hash << 5) - hash + payload.charCodeAt(i);
-    hash |= 0;
+    hash = (hash << 5) - hash + (payload.codePointAt(i) ?? 0);
+    hash = Math.trunc(hash);
   }
   return hash.toString(16);
 }

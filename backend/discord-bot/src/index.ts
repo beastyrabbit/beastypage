@@ -69,7 +69,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.login(config.discordBotToken).catch((error) => {
+await client.login(config.discordBotToken).catch((error) => {
   console.error("Failed to login to Discord:", error);
   process.exit(1);
 });

@@ -79,7 +79,7 @@ function formatTimestamp(value?: number | null) {
   return new Date(value).toLocaleString();
 }
 
-export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
+export function EvolutionBatchClient({ slug }: Readonly<EvolutionBatchClientProps>) {
   const record = useQuery(api.adoptionV2.getBySlug, { slugOrId: slug }) as
     | EvolutionBatchRecord
     | null
@@ -99,11 +99,9 @@ export function EvolutionBatchClient({ slug }: EvolutionBatchClientProps) {
           encoded = null;
         }
       }
-      const href = cat.shareToken
-        ? `/view/${cat.shareToken}`
-        : encoded
-          ? `/view?cat=${encoded}`
-          : null;
+      let href: string | null = null;
+      if (cat.shareToken) href = `/view/${cat.shareToken}`;
+      else if (encoded) href = `/view?cat=${encoded}`;
       const meta = getEvolutionMeta(cat.catData);
       return {
         key: `${cat.index}-${cat.label}`,

@@ -44,7 +44,7 @@ function clonePlain<T extends Record<string, unknown>>(input: T): Record<string,
   try {
     return structuredClone(input);
   } catch {
-    return JSON.parse(JSON.stringify(input));
+    return structuredClone(input);
   }
 }
 

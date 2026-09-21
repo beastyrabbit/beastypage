@@ -22,7 +22,7 @@ export function SliderWithInput({
   step = 1,
   suffix = "",
   description,
-}: SliderWithInputProps) {
+}: Readonly<SliderWithInputProps>) {
   const [inputValue, setInputValue] = useState(String(value));
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +48,7 @@ export function SliderWithInput({
 
   const handleInputBlur = useCallback(() => {
     setIsEditing(false);
-    const parsed = parseFloat(inputValue);
+    const parsed = Number.parseFloat(inputValue);
     if (!Number.isNaN(parsed)) {
       // Clamp and snap to step
       const clamped = Math.max(min, Math.min(max, parsed));
@@ -80,7 +80,7 @@ export function SliderWithInput({
 
   const handleSliderChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const newValue = parseFloat(e.target.value);
+      const newValue = Number.parseFloat(e.target.value);
       onChange(newValue);
     },
     [onChange],

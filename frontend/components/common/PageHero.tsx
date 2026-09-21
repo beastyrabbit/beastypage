@@ -12,7 +12,7 @@ export function PageHero({
   title,
   description,
   children,
-}: PageHeroProps) {
+}: Readonly<PageHeroProps>) {
   return (
     <section className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(245,158,11,0.15)]">
       <p className="text-xs uppercase tracking-widest text-amber-200/90">

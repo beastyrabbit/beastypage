@@ -258,7 +258,7 @@ export default function CatdexPage() {
     pageStatus === "LoadingFirstPage" ||
     !seasons ||
     !rarities ||
-    typeof hasPending === "undefined";
+    hasPending === undefined;
 
   const { filteredCats, stats } = useMemo(() => {
     if (!cats) {
@@ -529,6 +529,8 @@ export default function CatdexPage() {
               <article
                 key={cat.id}
                 className="glass-card group flex cursor-pointer flex-col overflow-hidden transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-2xl"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleCardClick(cat)}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
@@ -872,7 +874,7 @@ function inferEntryDefaults(fileName: string): {
   if (!parts.length) return { name: "", number: "" };
 
   let number = "";
-  const last = parts[parts.length - 1];
+  const last = parts.at(-1);
   if (last && /^(?:\d{1,4}|xx\d+|00x)$/i.test(last)) {
     number = last.toUpperCase();
     parts.pop();
@@ -894,7 +896,7 @@ function SubmitModal({
   seasons,
   rarities,
   onSubmit,
-}: SubmitModalProps) {
+}: Readonly<SubmitModalProps>) {
   const [seasonId, setSeasonId] = useState<string>("");
   const [rarityId, setRarityId] = useState<string>("");
   const [catName, setCatName] = useState("");
@@ -1155,7 +1157,7 @@ function MassUploadModal({
   seasons,
   rarities,
   onSubmit,
-}: MassUploadModalProps) {
+}: Readonly<MassUploadModalProps>) {
   const [owner, setOwner] = useState("");
   const [entries, setEntries] = useState<MassUploadEntry[]>([]);
   const [status, setStatus] = useState<string | null>(null);

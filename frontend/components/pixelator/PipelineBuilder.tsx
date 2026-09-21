@@ -20,7 +20,7 @@ export function PipelineBuilder({
   onUpdateStep,
   onRemoveStep,
   onReorderSteps: _onReorderSteps,
-}: PipelineBuilderProps) {
+}: Readonly<PipelineBuilderProps>) {
   const { setNodeRef, isOver } = useDroppable({ id: "pipeline-droppable" });
 
   return (

@@ -28,7 +28,7 @@ interface ExampleCatGridProps {
 
 const CAT_COUNT = 5;
 
-export function ExampleCatGrid({ settings }: ExampleCatGridProps) {
+export function ExampleCatGrid({ settings }: Readonly<ExampleCatGridProps>) {
   const [cats, setCats] = useState<(ExampleCat | null)[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);

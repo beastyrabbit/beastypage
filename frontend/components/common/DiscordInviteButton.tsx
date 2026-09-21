@@ -48,7 +48,7 @@ function getCooldownDuration(attempt: number): number {
     return schedule[attempt - 1];
   }
   const extra = attempt - schedule.length;
-  const base = schedule[schedule.length - 1];
+  const base = schedule.at(-1)!;
   return base * 2 ** extra;
 }
 
@@ -434,7 +434,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
                       </p>
                     ) : null}
                     <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
-                      Your answer
+                      <span>Your answer</span>
                       <input
                         type="number"
                         inputMode="numeric"

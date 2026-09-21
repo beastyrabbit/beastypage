@@ -19,7 +19,7 @@ export function WidgetCard({
   editing,
   onRemove,
   index,
-}: WidgetCardProps) {
+}: Readonly<WidgetCardProps>) {
   const {
     attributes,
     listeners,

@@ -32,14 +32,13 @@ interface MutationSelectionOptions {
 }
 
 function clonePortableValue<T>(value: T): T {
-  if (typeof structuredClone === "function") return structuredClone(value);
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 function parseMutationCandidate(
   trait: AnyCatTraitDefinition,
   candidate: unknown,
-): unknown | undefined {
+): unknown {
   const direct = trait.value.schema.safeParse(candidate);
   if (direct.success) return clonePortableValue(direct.data);
 

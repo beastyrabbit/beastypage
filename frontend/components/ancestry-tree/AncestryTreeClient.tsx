@@ -132,7 +132,7 @@ function estimateCatCount(
 export function AncestryTreeClient({
   initialTree,
   initialHasPassword,
-}: AncestryTreeClientProps) {
+}: Readonly<AncestryTreeClientProps>) {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>(
     initialTree ? "tree" : "config",
@@ -701,8 +701,7 @@ export function AncestryTreeClient({
             // Then generate a child with the correct gender
             const currentCat = manager.getCat(parentCat.id);
             if (currentCat && currentCat.partnerIds.length > 0) {
-              const newPartnerId =
-                currentCat.partnerIds[currentCat.partnerIds.length - 1];
+              const newPartnerId = currentCat.partnerIds.at(-1)!;
               const motherId =
                 currentCat.gender === "F" ? currentCat.id : newPartnerId;
               const fatherId =
@@ -882,7 +881,7 @@ export function AncestryTreeClient({
                 <h2 className="font-semibold text-xl flex items-center gap-2">
                   <span className="text-pink-400">♀</span>
                   <span className="text-blue-400">♂</span>
-                  Founding Couple
+                  <span>Founding Couple</span>
                 </h2>
 
                 <div className="flex justify-center items-center gap-8">
@@ -1074,7 +1073,7 @@ export function AncestryTreeClient({
                       onChange={(e) =>
                         handleConfigChange({
                           ...config,
-                          genderRatio: parseInt(e.target.value, 10) / 100,
+                          genderRatio: Number.parseInt(e.target.value, 10) / 100,
                         })
                       }
                       className="slider-amber w-full"
@@ -1131,7 +1130,7 @@ export function AncestryTreeClient({
                       onChange={(e) =>
                         handleConfigChange({
                           ...config,
-                          partnerChance: parseInt(e.target.value, 10) / 100,
+                          partnerChance: Number.parseInt(e.target.value, 10) / 100,
                         })
                       }
                       className="slider-amber w-full"

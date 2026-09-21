@@ -188,7 +188,7 @@ export function OptionPreview({
   allOptions,
   chunkSize = 12,
   size = 96,
-}: OptionPreviewProps) {
+}: Readonly<OptionPreviewProps>) {
   const [src, setSrc] = useState<string | null>(() => null);
   const [loading, setLoading] = useState<boolean>(true);
   const requestRef = useRef(0);

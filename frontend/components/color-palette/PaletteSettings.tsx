@@ -41,7 +41,7 @@ export function PaletteSettings({
   onBrightnessFactorsChange,
   onHueShiftsChange,
   onFilterToggle,
-}: PaletteSettingsProps) {
+}: Readonly<PaletteSettingsProps>) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showCustomBrightness, setShowCustomBrightness] = useState(false);
   const [showCustomHue, setShowCustomHue] = useState(false);
@@ -71,7 +71,7 @@ export function PaletteSettings({
   const handleCustomBrightnessSubmit = useCallback(() => {
     const values = customBrightnessInput
       .split(/[,/\s]+/)
-      .map((v) => parseFloat(v.trim()))
+      .map((v) => Number.parseFloat(v.trim()))
       .filter((v) => !Number.isNaN(v) && v > 0 && v <= 5);
 
     if (values.length > 0) {
@@ -83,7 +83,7 @@ export function PaletteSettings({
   const handleCustomHueSubmit = useCallback(() => {
     const values = customHueInput
       .split(/[,/\s]+/)
-      .map((v) => parseFloat(v.trim()))
+      .map((v) => Number.parseFloat(v.trim()))
       .filter((v) => !Number.isNaN(v) && v >= -180 && v <= 360);
 
     if (values.length > 0) {

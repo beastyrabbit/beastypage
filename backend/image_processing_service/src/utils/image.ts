@@ -10,7 +10,7 @@ export class ProcessingError extends Error {
 
 /** Parse a data-URL into its MIME type and a raw Buffer. */
 export function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } {
-  const match = dataUrl.match(/^data:(image\/[a-z+]+);base64,(.+)$/i);
+  const match = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(dataUrl);
   if (!match || !match[1] || !match[2]) {
     throw new ProcessingError("Invalid data URL format");
   }
@@ -25,7 +25,9 @@ export function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } 
 
 /** Encode a Buffer to a base64 data-URL. */
 export function bufferToDataUrl(buffer: Buffer, format: string): string {
-  const mime = format === "jpeg" ? "image/jpeg" : format === "webp" ? "image/webp" : "image/png";
+  let mime = "image/png";
+  if (format === "jpeg") mime = "image/jpeg";
+  else if (format === "webp") mime = "image/webp";
   return `data:${mime};base64,${buffer.toString("base64")}`;
 }
 

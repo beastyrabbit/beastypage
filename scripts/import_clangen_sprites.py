@@ -17,6 +17,8 @@ FRONTEND_SPRITES = ROOT / "frontend" / "public" / "sprites"
 BACKEND_SPRITES = ROOT / "backend" / "renderer_service" / "sprites"
 FRONTEND_DATA = ROOT / "frontend" / "public" / "sprite-data"
 BACKEND_DATA = ROOT / "backend" / "renderer_service" / "renderer_service" / "data"
+SPRITES_INDEX_FILENAME = "spritesIndex.json"
+PELT_INFO_FILENAME = "peltInfo.json"
 
 TILE_SIZE = 50
 LEGACY_SPRITE_COUNT = 21
@@ -231,9 +233,9 @@ def build_legacy_pose_map(
         )
         if match is None:
 
-            def score(candidate: tuple[str, bytes]) -> int:
+            def score(candidate: tuple[str, bytes], previous_crop: bytes = old_crop) -> int:
                 _pose, crop = candidate
-                return sum(abs(a - b) for a, b in zip(old_crop, crop))
+                return sum(abs(a - b) for a, b in zip(previous_crop, crop))
 
             candidates = [item for item in new_crops.items() if item[0] not in used]
             if candidates:
@@ -630,8 +632,8 @@ def main() -> None:
     if not UPSTREAM.exists():
         raise SystemExit(f"Missing ClanGen reference checkout: {UPSTREAM}")
 
-    old_index = read_json(FRONTEND_DATA / "spritesIndex.json")
-    old_pelt_info = read_json(FRONTEND_DATA / "peltInfo.json")
+    old_index = read_json(FRONTEND_DATA / SPRITES_INDEX_FILENAME)
+    old_pelt_info = read_json(FRONTEND_DATA / PELT_INFO_FILENAME)
 
     write_pose_data()
     copy_upstream_assets()
@@ -640,12 +642,12 @@ def main() -> None:
     pelt_info = build_pelt_info(old_pelt_info, collar_aliases)
 
     for target in (
-        FRONTEND_DATA / "spritesIndex.json",
-        BACKEND_DATA / "spritesIndex.json",
+        FRONTEND_DATA / SPRITES_INDEX_FILENAME,
+        BACKEND_DATA / SPRITES_INDEX_FILENAME,
     ):
         write_json(target, sprite_index)
 
-    for target in (FRONTEND_DATA / "peltInfo.json", BACKEND_DATA / "peltInfo.json"):
+    for target in (FRONTEND_DATA / PELT_INFO_FILENAME, BACKEND_DATA / PELT_INFO_FILENAME):
         write_json(target, pelt_info)
 
     for src_name, dst_names in (

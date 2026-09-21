@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default async function GuidedBuilderViewerPage({
   params,
   searchParams,
-}: ViewerPageProps) {
+}: Readonly<ViewerPageProps>) {
   const resolvedParams = await params;
   const slug =
     Array.isArray(resolvedParams.slug) && resolvedParams.slug.length > 0

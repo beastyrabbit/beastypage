@@ -32,7 +32,7 @@ export function WidgetGrid({
   onAddClick,
   onRemove,
   onReorder,
-}: WidgetGridProps) {
+}: Readonly<WidgetGridProps>) {
   // Require 5px of movement before starting a drag to prevent accidental drags
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

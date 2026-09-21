@@ -54,7 +54,7 @@ function trapDialogFocus(event: KeyboardEvent, container: HTMLElement | null) {
   );
   if (focusable.length === 0) return;
   const first = focusable[0];
-  const last = focusable[focusable.length - 1];
+  const last = focusable.at(-1)!;
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault();
     last.focus();
@@ -64,7 +64,7 @@ function trapDialogFocus(event: KeyboardEvent, container: HTMLElement | null) {
   }
 }
 
-export function EvolutionTree({ cats, animateIn = false }: EvolutionTreeProps) {
+export function EvolutionTree({ cats, animateIn = false }: Readonly<EvolutionTreeProps>) {
   const [focused, setFocused] = useState<EvolutionTreeCat | null>(null);
 
   const grouped = useMemo(() => {
@@ -380,7 +380,7 @@ function CatDetailModal({
     cat.additions,
     `${cat.key}-modal`,
   );
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = `${cat.key}-preview-title`;
 
@@ -410,10 +410,9 @@ function CatDetailModal({
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <div
+      <dialog
+        open
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
         aria-labelledby={titleId}
         className="relative flex max-h-full w-full max-w-3xl flex-col gap-5 overflow-y-auto rounded-2xl border bg-slate-950/95 p-6 shadow-2xl sm:p-8"
         style={{ borderColor: withAlpha(theme.from, 0.4) }}
@@ -484,7 +483,7 @@ function CatDetailModal({
             Open cat page <ArrowUpRight className="size-4" />
           </Link>
         ) : null}
-      </div>
+      </dialog>
     </div>
   );
 }

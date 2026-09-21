@@ -631,12 +631,12 @@ export const retryDispatchJob = internalMutation({
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get("quick_share_jobs", args.jobId);
-    if (!job || job.status !== "pending") return null;
+    if (job?.status !== "pending") return { scheduled: false };
     await ctx.scheduler.runAfter(0, internal.quickShareHttp.dispatchJob, {
       jobId: job._id,
       attempt: args.attempt,
     });
-    return null;
+    return { scheduled: true };
   },
 });
 
@@ -647,8 +647,8 @@ export const recoverJobLease = internalMutation({
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get("quick_share_jobs", args.jobId);
-    if (!job || job.status !== "leased" || job.leaseId !== args.leaseId) {
-      return null;
+    if (job?.status !== "leased" || job.leaseId !== args.leaseId) {
+      return { recovered: false };
     }
     const now = Date.now();
     if ((job.leaseExpiresAt ?? 0) > now) {
@@ -657,7 +657,7 @@ export const recoverJobLease = internalMutation({
         internal.quickShare.recoverJobLease,
         args,
       );
-      return null;
+      return { recovered: false };
     }
     await ctx.db.patch(job._id, {
       status: "pending",
@@ -669,7 +669,7 @@ export const recoverJobLease = internalMutation({
       jobId: job._id,
       attempt: 0,
     });
-    return null;
+    return { recovered: true };
   },
 });
 
@@ -693,7 +693,7 @@ export const finishProcessJob = internalMutation({
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get("quick_share_jobs", args.jobId);
-    if (!job || job.status !== "leased" || job.leaseId !== args.leaseId) {
+    if (job?.status !== "leased" || job.leaseId !== args.leaseId) {
       return { accepted: false };
     }
     const upload = await ctx.db.get("quick_share_uploads", job.uploadId);
@@ -762,7 +762,7 @@ export const adminGet = internalQuery({
   args: { uploadId: v.id("quick_share_uploads") },
   handler: async (ctx, args) => {
     const upload = await ctx.db.get("quick_share_uploads", args.uploadId);
-    if (!upload) return null;
+    if (!upload) return { removed: false };
     return {
       ...publicUpload(upload),
       rawIp: upload.rawIp,
@@ -803,7 +803,7 @@ export const banIp = internalMutation({
       ipHash: args.ipHash,
       now: args.now,
     });
-    return null;
+    return { removed: true };
   },
 });
 
@@ -857,7 +857,7 @@ export const removeUpload = internalMutation({
   args: { uploadId: v.id("quick_share_uploads"), now: v.number() },
   handler: async (ctx, args) => {
     const upload = await ctx.db.get("quick_share_uploads", args.uploadId);
-    if (!upload) return null;
+    if (!upload) return { removed: false };
     await ctx.db.patch(upload._id, {
       active: false,
       state: "removed",
@@ -875,7 +875,7 @@ export const removeUpload = internalMutation({
     if (!existing) {
       await enqueueJob(ctx, upload._id, "delete", args.now);
     }
-    return null;
+    return { removed: true };
   },
 });
 
@@ -1037,7 +1037,7 @@ export const finishDeleteJob = internalMutation({
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get("quick_share_jobs", args.jobId);
-    if (!job || job.status !== "leased" || job.leaseId !== args.leaseId) {
+    if (job?.status !== "leased" || job.leaseId !== args.leaseId) {
       throw new Error("LEASE_LOST");
     }
     const uploadId: Id<"quick_share_uploads"> = job.uploadId;

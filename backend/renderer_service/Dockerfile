@@ -44,10 +44,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g \
     libfreetype6 \
     libcairo2 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash appuser
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /bin/bash appuser
 
 # Copy virtual environment and application from builder
 COPY --from=builder /app/.venv /app/.venv

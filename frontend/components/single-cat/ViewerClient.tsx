@@ -96,7 +96,7 @@ function buildVisualBuilderUrl(
   }
 }
 
-export function ViewerClient({ slug, encoded }: ViewerClientProps) {
+export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const router = useRouter();
@@ -513,7 +513,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     link.download = filename;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
   }, []);
 
   const handleCopyMainSprite = useCallback(async () => {

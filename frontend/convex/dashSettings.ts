@@ -8,7 +8,9 @@ const SLUG_LENGTH = 7;
 function randomSlug() {
   let slug = "";
   for (let i = 0; i < SLUG_LENGTH; i += 1) {
-    const index = Math.floor(Math.random() * SLUG_ALPHABET.length);
+    const random = new Uint32Array(1);
+    crypto.getRandomValues(random);
+    const index = random[0] % SLUG_ALPHABET.length;
     slug += SLUG_ALPHABET[index];
   }
   return slug;

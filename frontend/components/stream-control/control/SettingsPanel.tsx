@@ -64,7 +64,7 @@ export function SettingsPanel() {
   const [bgOpacity, setBgOpacity] = useState(100);
   const { touch: touchLocalEdit, deferIfEditing, retryTick } = useFollowGuard();
   useEffect(() => {
-    void retryTick;
+    if (retryTick === -1) return;
     const raw = rawSessionSettings;
     if (!raw) return;
     const cancelRetry = deferIfEditing();
@@ -162,7 +162,7 @@ export function SettingsPanel() {
             {bgMode === "colour" && (
               <>
                 <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                  Colour
+                  <span>Colour</span>
                   <input
                     type="color"
                     value={bgColour}

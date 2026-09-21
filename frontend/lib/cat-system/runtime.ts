@@ -150,7 +150,7 @@ export function getSystemInheritanceTraits(
 
 function clonePortableValue<T>(value: T): T {
   if (typeof structuredClone === "function") return structuredClone(value);
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 function stableValueKey(value: unknown): string {
@@ -209,8 +209,6 @@ export function applySystemEvolutionStrategies(
           trait.value.maxItems,
         );
         break;
-      case "preserve":
-      case "none":
       default:
         if (currentValue !== undefined) {
           result[trait.id] = clonePortableValue(currentValue);

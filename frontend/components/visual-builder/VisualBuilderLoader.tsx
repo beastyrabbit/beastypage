@@ -250,7 +250,7 @@ type VisualBuilderLoaderProps = {
   slug: string;
 };
 
-export function VisualBuilderLoader({ slug }: VisualBuilderLoaderProps) {
+export function VisualBuilderLoader({ slug }: Readonly<VisualBuilderLoaderProps>) {
   const record = useQuery(
     api.mapper.getBySlug,
     slug ? { slugOrId: slug } : "skip",

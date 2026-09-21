@@ -232,14 +232,8 @@ class SpriteMapper:
 
                 self.experimental_categories[palette_id] = category_colors
 
-            except (
-                OSError,
-                json.JSONDecodeError,
-                KeyError,
-                TypeError,
-                ValueError,
-            ) as e:
-                logger.error("Failed to load palette %s: %s", palette_file, e)
+            except (OSError, json.JSONDecodeError, KeyError, TypeError):
+                logger.exception("Failed to load palette %s", palette_file)
 
         return result
 
@@ -447,7 +441,7 @@ class SpriteMapper:
         return _dedupe(combined)
 
     # ------------------------------------------------------------------
-    def _collect_list(self, label: str, keys: Iterable[str]) -> list[str]:
+    def _collect_list(self, _label: str, keys: Iterable[str]) -> list[str]:
         combined: list[str] = []
         for key in keys:
             values = self.pelt_info.get(key, []) if self.pelt_info else []

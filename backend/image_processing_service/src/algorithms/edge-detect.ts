@@ -40,7 +40,7 @@ export async function edgeDetect(
         -getGrey(x - 1, y - 1) - 2 * getGrey(x, y - 1) - getGrey(x + 1, y - 1) +
         getGrey(x - 1, y + 1) + 2 * getGrey(x, y + 1) + getGrey(x + 1, y + 1);
 
-      let magnitude = Math.sqrt(gx * gx + gy * gy);
+      let magnitude = Math.hypot(gx, gy);
       magnitude = magnitude > threshold ? Math.min(255, magnitude) : 0;
 
       if (invert) magnitude = 255 - magnitude;

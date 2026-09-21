@@ -234,6 +234,7 @@
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s ease;
+  animation: placeholderPulse 2s ease-in-out infinite;
 }
 
 .family-chart-wrapper .f3 .card.f3-placeholder:hover,
@@ -292,11 +293,6 @@
   50% {
     opacity: 1;
   }
-}
-
-.family-chart-wrapper .f3 .card.f3-placeholder,
-.family-chart-wrapper .f3 .card[data-new-rel] {
-  animation: placeholderPulse 2s ease-in-out infinite;
 }
 
 /* Edit mode indicator on the current main card */

@@ -19,7 +19,7 @@ type EvolutionBatchPageProps = {
 
 export default async function EvolutionBatchPage({
   params,
-}: EvolutionBatchPageProps) {
+}: Readonly<EvolutionBatchPageProps>) {
   const resolved = await params;
   return (
     <div className={pixelFont.variable}>

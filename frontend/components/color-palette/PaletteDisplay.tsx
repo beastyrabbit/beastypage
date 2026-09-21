@@ -16,7 +16,7 @@ export function PaletteDisplay({
   onColorHover,
   selectedIndex,
   onColorSelect,
-}: PaletteDisplayProps) {
+}: Readonly<PaletteDisplayProps>) {
   if (colors.length === 0) {
     return (
       <div className="glass-card flex flex-col items-center justify-center gap-3 p-8 text-center">

@@ -19,7 +19,7 @@ const EXPORT_FORMATS: { key: ExportFormat; label: string; desc: string }[] = [
 export function PaletteExportMenu({
   onExport,
   label = "Export",
-}: PaletteExportMenuProps) {
+}: Readonly<PaletteExportMenuProps>) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

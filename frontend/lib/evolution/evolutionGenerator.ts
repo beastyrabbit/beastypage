@@ -543,7 +543,7 @@ export function normalizeEvolutionControls(
 }
 
 function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 export function resolveEvolutionStarterHair(
@@ -1203,7 +1203,7 @@ function pickEvolutionColour(
 }
 
 function branchLabel(index: number) {
-  return String.fromCharCode("A".charCodeAt(0) + index);
+  return String.fromCodePoint(("A".codePointAt(0) ?? 65) + index);
 }
 
 function formatTortieLayer(layer: TortieLayer) {

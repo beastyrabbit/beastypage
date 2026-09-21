@@ -83,7 +83,7 @@ function formatTimestamp(created?: number): string | null {
   return date.toLocaleString();
 }
 
-export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
+export function AdoptionBatchClient({ slug }: Readonly<AdoptionBatchClientProps>) {
   const record = useQuery(api.adoptionV2.getBySlug, { slugOrId: slug }) as
     | AdoptionBatchRecord
     | null
@@ -112,15 +112,12 @@ export function AdoptionBatchClient({ slug }: AdoptionBatchClientProps) {
           encoded = null;
         }
       }
-      const viewerUrl = cat.shareToken
-        ? origin
-          ? `${origin}/view/${cat.shareToken}`
-          : `/view/${cat.shareToken}`
-        : encoded
-          ? origin
-            ? `${origin}/view?cat=${encoded}`
-            : `/view?cat=${encoded}`
-          : null;
+      let viewerUrl: string | null = null;
+      if (cat.shareToken) {
+        viewerUrl = origin ? `${origin}/view/${cat.shareToken}` : `/view/${cat.shareToken}`;
+      } else if (encoded) {
+        viewerUrl = origin ? `${origin}/view?cat=${encoded}` : `/view?cat=${encoded}`;
+      }
 
       const previewUrl = getPreviewUrl(
         cat.profileId ?? null,

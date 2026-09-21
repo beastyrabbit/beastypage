@@ -549,7 +549,7 @@ function handleManagedDialogKeyDown(
   }
 
   const first = focusable[0];
-  const last = focusable[focusable.length - 1];
+  const last = focusable.at(-1)!;
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault();
     last.focus();
@@ -782,7 +782,7 @@ function buildFlipSequence(
     return [];
   }
 
-  const targetFrame = frames[frames.length - 1];
+  const targetFrame = frames.at(-1)!;
   const cycleFrames = frames.slice();
   const sequence: { frame: VariationFrame; delay: number; isFinal: boolean }[] =
     [];
@@ -796,7 +796,7 @@ function buildFlipSequence(
 
   const randomPool = cycleFrames.length > 0 ? cycleFrames : [targetFrame];
   for (let i = 0; i < 5; i += 1) {
-    const frame = randomPool[Math.floor(Math.random() * randomPool.length)];
+    const frame = randomPool[Math.floor(Math.random() * randomPool.length)]!;
     sequence.push({ frame, delay: 1 + i * 0.3, isFinal: false });
   }
 
@@ -1302,7 +1302,7 @@ async function copyCanvasToClipboard(
     link.download = `${fallbackFilename}.png`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
     URL.revokeObjectURL(url);
     onSuccess("Image downloaded.");
   } catch (error) {
@@ -1503,7 +1503,7 @@ function SettingsCodeSection({
   includeNewSprites,
   extendedModes,
   onApply,
-}: SettingsCodeSectionProps) {
+}: Readonly<SettingsCodeSectionProps>) {
   const [codeInput, setCodeInput] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
@@ -1641,7 +1641,7 @@ export function SingleCatPlusClient({
   initialVariantSettings = null,
   initialVariantLoadError = null,
   initialCodeSettings = null,
-}: SingleCatPlusClientProps) {
+}: Readonly<SingleCatPlusClientProps>) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const mapperRef = useRef<SpriteMapperApi | null>(null);
@@ -2676,9 +2676,9 @@ export function SingleCatPlusClient({
           }
 
           if (frames.length > 0) {
-            drawCanvas(frames[frames.length - 1].canvas);
+            drawCanvas(frames.at(-1)!.canvas);
           }
-          const finalRaw = frames[frames.length - 1]?.option.raw;
+          const finalRaw = frames.at(-1)?.option.raw;
           if (typeof finalRaw === "string" && finalRaw !== "none") {
             committed.push(finalRaw);
             summary.push(formatValue(finalRaw));
@@ -2901,9 +2901,9 @@ export function SingleCatPlusClient({
           }
 
           if (frames.length > 0) {
-            drawCanvas(frames[frames.length - 1].canvas);
+            drawCanvas(frames.at(-1)!.canvas);
           }
-          const finalRaw = frames[frames.length - 1]?.option.raw;
+          const finalRaw = frames.at(-1)?.option.raw;
           if (typeof finalRaw === "string" && finalRaw !== "none") {
             committed.push(finalRaw);
             summary.push(formatValue(finalRaw));
@@ -3195,7 +3195,7 @@ export function SingleCatPlusClient({
               });
             }
 
-            const finalStageValue = frames[frames.length - 1]?.option.raw;
+            const finalStageValue = frames.at(-1)?.option.raw;
             if (typeof finalStageValue === "string") {
               if (stage.kind === "mask")
                 working = { ...working, mask: finalStageValue };
@@ -3944,7 +3944,7 @@ export function SingleCatPlusClient({
             }
           }
 
-          const finalFrame = frames[frames.length - 1];
+          const finalFrame = frames.at(-1)!;
           if (finalFrame) {
             drawCanvas(finalFrame.canvas);
           }
@@ -4237,7 +4237,7 @@ export function SingleCatPlusClient({
       link.download = "cat.png";
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
       showToast("Downloaded PNG");
       track("single_cat_exported", { format: "download-png" });
@@ -5176,7 +5176,8 @@ export function SingleCatPlusClient({
       </div>
 
       {spriteGalleryOpen && (
-        <div
+        <dialog
+          open
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
@@ -5186,9 +5187,6 @@ export function SingleCatPlusClient({
           onKeyDown={(event) =>
             handleManagedDialogKeyDown(event, closeSpriteGallery)
           }
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
           aria-labelledby="sprite-gallery-title"
         >
           <div className="relative flex max-h-[85vh] w-full max-w-5xl flex-col rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
@@ -5287,11 +5285,12 @@ export function SingleCatPlusClient({
               )}
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
       {timingModalOpen && (
-        <div
+        <dialog
+          open
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 py-10"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
@@ -5301,9 +5300,6 @@ export function SingleCatPlusClient({
           onKeyDown={(event) =>
             handleManagedDialogKeyDown(event, () => setTimingModalOpen(false))
           }
-          role="dialog"
-          aria-modal="true"
-          tabIndex={-1}
           aria-labelledby="spin-timing-title"
         >
           <div className="relative w-full max-w-5xl rounded-3xl border border-border/40 bg-background/95 shadow-2xl">
@@ -5524,7 +5520,7 @@ export function SingleCatPlusClient({
               </p>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
 
       {toast && (

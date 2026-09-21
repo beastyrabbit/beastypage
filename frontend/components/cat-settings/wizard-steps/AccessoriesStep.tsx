@@ -68,7 +68,7 @@ function GalleryItem({ item }: { item: AccessoryPreview }) {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function AccessoriesStep(props: WizardStepProps) {
+export function AccessoriesStep(props: Readonly<WizardStepProps>) {
   const { settings, setAccessoryRange, onNext, onBack } = props;
   const { mapper, options } = useSpriteMapperOptions();
   const { generator, ready } = useCatGenerator();

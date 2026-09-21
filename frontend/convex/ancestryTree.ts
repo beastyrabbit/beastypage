@@ -28,8 +28,8 @@ function generateSalt(): Uint8Array {
  */
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  for (const byte of bytes) {
+    binary += String.fromCodePoint(byte);
   }
   return btoa(binary);
 }
@@ -41,7 +41,7 @@ function fromBase64(base64: string): Uint8Array {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+    bytes[i] = binary.codePointAt(i) ?? 0;
   }
   return bytes;
 }
@@ -140,7 +140,7 @@ async function verifyPassword(
     return false;
   }
 
-  const iterations = parseInt(parts[1], 10);
+  const iterations = Number.parseInt(parts[1], 10);
   if (Number.isNaN(iterations) || iterations < 1) {
     return false;
   }
@@ -157,20 +157,30 @@ async function verifyPassword(
 
 /**
  * Legacy hash function for backwards compatibility during migration
- * @deprecated Use hashPassword instead
  */
 function legacySimpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
+    const char = str.codePointAt(i) ?? 0;
     hash = (hash << 5) - hash + char;
     hash = hash & hash;
   }
   const salt =
     str.length +
-    (str.charCodeAt(0) || 0) +
-    (str.charCodeAt(str.length - 1) || 0);
+    (str.codePointAt(0) ?? 0) +
+    (str.codePointAt(str.length - 1) ?? 0);
   return `${hash.toString(36)}-${salt.toString(36)}`;
+}
+
+async function existingTreePasswordError(
+  passwordHash: string | undefined,
+  provided: string | undefined,
+): Promise<"password_required" | "invalid_password" | null> {
+  if (!passwordHash) return null;
+  if (!provided) return "password_required";
+  return (await verifyPassword(provided, passwordHash))
+    ? null
+    : "invalid_password";
 }
 
 const catValidator = v.object({
@@ -231,18 +241,12 @@ export const save = mutation({
       .first();
 
     if (existing) {
-      // Tree exists - check password if it has one
-      if (existing.passwordHash) {
-        if (!args.password) {
-          return { success: false, error: "password_required" } as const;
-        }
-        const isValid = await verifyPassword(
-          args.password,
-          existing.passwordHash,
-        );
-        if (!isValid) {
-          return { success: false, error: "invalid_password" } as const;
-        }
+      const passwordError = await existingTreePasswordError(
+        existing.passwordHash,
+        args.password,
+      );
+      if (passwordError) {
+        return { success: false, error: passwordError } as const;
       }
 
       // Update existing tree

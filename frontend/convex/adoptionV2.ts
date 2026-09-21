@@ -17,7 +17,9 @@ type GenerateCtx = MutationCtx;
 function randomSlug(): string {
   let slug = "";
   for (let i = 0; i < SLUG_LENGTH; i += 1) {
-    const index = Math.floor(Math.random() * SLUG_ALPHABET.length);
+    const random = new Uint32Array(1);
+    crypto.getRandomValues(random);
+    const index = random[0] % SLUG_ALPHABET.length;
     slug += SLUG_ALPHABET[index];
   }
   return slug;
@@ -163,6 +165,7 @@ export const getBySlug = query({
       const asId = await ctx.db.get(toId("adoption_batch", args.slugOrId));
       return asId ? await batchRecordToClient(ctx, asId) : null;
     } catch (_error) {
+      // Invalid IDs are expected for slug lookups; treat them as a miss.
       return null;
     }
   },

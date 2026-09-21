@@ -65,7 +65,7 @@ function parseDiscordObjectListOverride(
   if (!item || typeof item !== "object" || Array.isArray(item)) return null;
 
   const record = item as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
+  const keys = Object.keys(record).sort((a, b) => a.localeCompare(b));
   if (
     keys.length !== TORTIE_LAYER_KEYS.length ||
     !TORTIE_LAYER_KEYS.every((key) => keys.includes(key))

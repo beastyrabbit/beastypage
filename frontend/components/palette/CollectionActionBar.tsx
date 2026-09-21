@@ -29,7 +29,7 @@ export function CollectionActionBar({
   displayFormat,
   onClear,
   showToast,
-}: CollectionActionBarProps) {
+}: Readonly<CollectionActionBarProps>) {
   const [confirming, setConfirming] = useState(false);
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 

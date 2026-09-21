@@ -61,7 +61,7 @@ interface GuidedSettingsWizardProps {
 export function GuidedSettingsWizard({
   initialSettings,
   hasInitialCode,
-}: GuidedSettingsWizardProps) {
+}: Readonly<GuidedSettingsWizardProps>) {
   const init = initialSettings ?? DEFAULTS;
 
   // ─── Settings state ───

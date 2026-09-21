@@ -36,7 +36,7 @@ export function CategoryCard({
   toolPreviews,
   toolCount,
   index,
-}: CategoryCardProps) {
+}: Readonly<CategoryCardProps>) {
   const Icon = CATEGORY_ICONS[category.key];
 
   return (
@@ -49,7 +49,6 @@ export function CategoryCard({
       {/* Category-specific gradient overlay */}
       <div
         className={`category-card-gradient category-card-gradient--${category.key} absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100`}
-        role="presentation"
         aria-hidden="true"
       />
 

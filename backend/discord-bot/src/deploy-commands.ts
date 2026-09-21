@@ -244,7 +244,7 @@ async function deployCommands() {
   console.log("Registered global commands");
 }
 
-deployCommands().catch((error) => {
+await deployCommands().catch((error) => {
   console.error("Failed to deploy commands:", error);
   process.exit(1);
 });

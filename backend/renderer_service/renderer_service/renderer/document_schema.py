@@ -226,30 +226,21 @@ class CatDocumentSchema:
                 first_index_by_value[key] = index
 
     @classmethod
-    def _json_semantic_key(cls, value: Any) -> tuple[Any, ...]:
-        if value is None:
-            return ("null",)
-        if isinstance(value, bool):
-            return ("boolean", value)
-        if cls._is_number(value):
-            return ("number", value)
-        if isinstance(value, str):
-            return ("string", value)
-        if isinstance(value, list):
-            return ("array", *(cls._json_semantic_key(entry) for entry in value))
-        if isinstance(value, dict):
-            return (
-                "object",
-                *(
-                    (str(key), cls._json_semantic_key(entry))
-                    for key, entry in sorted(
-                        value.items(), key=lambda item: str(item[0])
-                    )
-                ),
+    def _json_semantic_key(cls, value: Any) -> str:
+        if value is not None and not isinstance(
+            value, (bool, int, float, str, list, dict)
+        ):
+            raise InvalidCatDocument(
+                f"Unsupported JSON value for uniqueItems: {type(value).__name__}"
             )
-        raise InvalidCatDocument(
-            f"Unsupported JSON value for uniqueItems: {type(value).__name__}"
-        )
+        try:
+            return json.dumps(
+                value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            )
+        except (TypeError, ValueError) as exc:
+            raise InvalidCatDocument(
+                f"Unsupported JSON value for uniqueItems: {type(value).__name__}"
+            ) from exc
 
     @staticmethod
     def _validate_string(

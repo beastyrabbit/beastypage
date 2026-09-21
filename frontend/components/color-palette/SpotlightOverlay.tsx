@@ -14,7 +14,7 @@ export function SpotlightOverlay({
   image,
   targetColor,
   threshold = 30,
-}: SpotlightOverlayProps) {
+}: Readonly<SpotlightOverlayProps>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {

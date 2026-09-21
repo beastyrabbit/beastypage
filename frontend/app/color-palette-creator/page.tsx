@@ -26,7 +26,7 @@ function firstSearchParam(value: string | string[] | undefined): string | null {
 
 export default async function ColorPaletteCreatorPage({
   searchParams,
-}: ColorPaletteCreatorPageProps) {
+}: Readonly<ColorPaletteCreatorPageProps>) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const slug = firstSearchParam(resolvedSearchParams.slug)?.trim() ?? null;
   const darkForestParam =

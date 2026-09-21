@@ -28,7 +28,7 @@ export function DashHero({
   hasVariant,
   opening,
   onOpen,
-}: DashHeroProps) {
+}: Readonly<DashHeroProps>) {
   return (
     <section className="relative rounded-3xl overflow-hidden">
       {/* Banner Background */}

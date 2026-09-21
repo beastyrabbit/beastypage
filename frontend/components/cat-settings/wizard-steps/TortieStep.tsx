@@ -137,7 +137,7 @@ function TortieComparison({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function TortieStep(props: WizardStepProps) {
+export function TortieStep(props: Readonly<WizardStepProps>) {
   const { settings, setTortieRange, onNext, onBack } = props;
 
   return (

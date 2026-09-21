@@ -352,7 +352,7 @@ export async function processOriginal(
 export class MediaWorker {
 	private running = false;
 	private accepting = true;
-	private idleWaiters: Array<() => void> = [];
+	private readonly idleWaiters: Array<() => void> = [];
 
 	private markIdle() {
 		this.running = false;

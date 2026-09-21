@@ -70,6 +70,7 @@ async function requireAdmin(ctx: ActionCtx | MutationCtx) {
     }
     return identity;
   } catch (_error) {
+    // Missing admin identity is treated as an unauthenticated request.
     return null;
   }
 }
@@ -165,14 +166,8 @@ async function upsertSeasons(
       .withIndex("byName", (q) => q.eq("seasonName", seasonName))
       .first();
 
-    const cardBack = season.cardBack ?? null;
-    const patch: Record<string, unknown> = {};
-    if (cardBack) {
-      patch.cardBackStorageId = storageId(cardBack.storageId);
-      patch.cardBackName = cardBack.fileName;
-      if (cardBack.width !== undefined) patch.cardBackWidth = cardBack.width;
-      if (cardBack.height !== undefined) patch.cardBackHeight = cardBack.height;
-    }
+    const cardBack = season.cardBack;
+    const patch = buildSeasonPatch(cardBack);
 
     if (existing) {
       if (existing.shortName !== (season.shortName ?? null)) {
@@ -208,6 +203,16 @@ async function upsertSeasons(
   }
 
   return map;
+}
+
+function buildSeasonPatch(cardBack: SeasonPayload["cardBack"]) {
+  const patch: Record<string, unknown> = {};
+  if (!cardBack) return patch;
+  patch.cardBackStorageId = storageId(cardBack.storageId);
+  patch.cardBackName = cardBack.fileName;
+  if (cardBack.width !== undefined) patch.cardBackWidth = cardBack.width;
+  if (cardBack.height !== undefined) patch.cardBackHeight = cardBack.height;
+  return patch;
 }
 
 async function upsertRarities(
@@ -296,49 +301,49 @@ async function insertCatdexRecords(
       defaultCardStorageId: storageId(record.defaultCard.storageId),
       defaultCardName: record.defaultCard.fileName,
     };
-    if (record.cardNumber) insertDoc.cardNumber = record.cardNumber;
-    if (record.defaultCard.width !== undefined)
-      insertDoc.defaultCardWidth = record.defaultCard.width;
-    if (record.defaultCard.height !== undefined)
-      insertDoc.defaultCardHeight = record.defaultCard.height;
-    if (record.defaultCardThumb) {
-      insertDoc.defaultCardThumbStorageId = storageId(
-        record.defaultCardThumb.storageId,
-      );
-      insertDoc.defaultCardThumbName = record.defaultCardThumb.fileName;
-      if (record.defaultCardThumb.width !== undefined) {
-        insertDoc.defaultCardThumbWidth = record.defaultCardThumb.width;
-      }
-      if (record.defaultCardThumb.height !== undefined) {
-        insertDoc.defaultCardThumbHeight = record.defaultCardThumb.height;
-      }
-    }
-    if (record.customCard) {
-      insertDoc.customCardStorageId = storageId(record.customCard.storageId);
-      insertDoc.customCardName = record.customCard.fileName;
-      if (record.customCard.width !== undefined)
-        insertDoc.customCardWidth = record.customCard.width;
-      if (record.customCard.height !== undefined)
-        insertDoc.customCardHeight = record.customCard.height;
-    }
-    if (record.customCardThumb) {
-      insertDoc.customCardThumbStorageId = storageId(
-        record.customCardThumb.storageId,
-      );
-      insertDoc.customCardThumbName = record.customCardThumb.fileName;
-      if (record.customCardThumb.width !== undefined) {
-        insertDoc.customCardThumbWidth = record.customCardThumb.width;
-      }
-      if (record.customCardThumb.height !== undefined) {
-        insertDoc.customCardThumbHeight = record.customCardThumb.height;
-      }
-    }
+    applyCatdexImages(insertDoc, record);
 
     await ctx.db.insert("catdex", insertDoc);
     inserted += 1;
   }
 
   return inserted;
+}
+
+function applyCatdexImages(
+  insertDoc: Omit<Doc<"catdex">, "_id" | "_creationTime">,
+  record: CatdexRecordPayload,
+) {
+  if (record.cardNumber) insertDoc.cardNumber = record.cardNumber;
+  if (record.defaultCard.width !== undefined)
+    insertDoc.defaultCardWidth = record.defaultCard.width;
+  if (record.defaultCard.height !== undefined)
+    insertDoc.defaultCardHeight = record.defaultCard.height;
+  const thumb = record.defaultCardThumb;
+  if (thumb) {
+    insertDoc.defaultCardThumbStorageId = storageId(thumb.storageId);
+    insertDoc.defaultCardThumbName = thumb.fileName;
+    if (thumb.width !== undefined)
+      insertDoc.defaultCardThumbWidth = thumb.width;
+    if (thumb.height !== undefined)
+      insertDoc.defaultCardThumbHeight = thumb.height;
+  }
+  const custom = record.customCard;
+  if (custom) {
+    insertDoc.customCardStorageId = storageId(custom.storageId);
+    insertDoc.customCardName = custom.fileName;
+    if (custom.width !== undefined) insertDoc.customCardWidth = custom.width;
+    if (custom.height !== undefined) insertDoc.customCardHeight = custom.height;
+  }
+  const customThumb = record.customCardThumb;
+  if (customThumb) {
+    insertDoc.customCardThumbStorageId = storageId(customThumb.storageId);
+    insertDoc.customCardThumbName = customThumb.fileName;
+    if (customThumb.width !== undefined)
+      insertDoc.customCardThumbWidth = customThumb.width;
+    if (customThumb.height !== undefined)
+      insertDoc.customCardThumbHeight = customThumb.height;
+  }
 }
 
 async function insertCollectionRecords(
@@ -359,30 +364,37 @@ async function insertCollectionRecords(
       createdAt,
       updatedAt,
     };
-    if (record.blurImage) {
-      insertDoc.blurImgStorageId = storageId(record.blurImage.storageId);
-      insertDoc.blurImgName = record.blurImage.fileName;
-    }
-    if (record.previewImage) {
-      insertDoc.previewImgStorageId = storageId(record.previewImage.storageId);
-      insertDoc.previewImgName = record.previewImage.fileName;
-      if (record.previewImage.width !== undefined)
-        insertDoc.previewImgWidth = record.previewImage.width;
-      if (record.previewImage.height !== undefined)
-        insertDoc.previewImgHeight = record.previewImage.height;
-    }
-    if (record.fullImage) {
-      insertDoc.fullImgStorageId = storageId(record.fullImage.storageId);
-      insertDoc.fullImgName = record.fullImage.fileName;
-      if (record.fullImage.width !== undefined)
-        insertDoc.fullImgWidth = record.fullImage.width;
-      if (record.fullImage.height !== undefined)
-        insertDoc.fullImgHeight = record.fullImage.height;
-    }
+    applyCollectionImages(insertDoc, record);
 
     await ctx.db.insert("collection", insertDoc);
     inserted += 1;
   }
 
   return inserted;
+}
+
+function applyCollectionImages(
+  insertDoc: Omit<Doc<"collection">, "_id" | "_creationTime">,
+  record: CollectionRecordPayload,
+) {
+  const blur = record.blurImage;
+  if (blur) {
+    insertDoc.blurImgStorageId = storageId(blur.storageId);
+    insertDoc.blurImgName = blur.fileName;
+  }
+  const preview = record.previewImage;
+  if (preview) {
+    insertDoc.previewImgStorageId = storageId(preview.storageId);
+    insertDoc.previewImgName = preview.fileName;
+    if (preview.width !== undefined) insertDoc.previewImgWidth = preview.width;
+    if (preview.height !== undefined)
+      insertDoc.previewImgHeight = preview.height;
+  }
+  const full = record.fullImage;
+  if (full) {
+    insertDoc.fullImgStorageId = storageId(full.storageId);
+    insertDoc.fullImgName = full.fileName;
+    if (full.width !== undefined) insertDoc.fullImgWidth = full.width;
+    if (full.height !== undefined) insertDoc.fullImgHeight = full.height;
+  }
 }

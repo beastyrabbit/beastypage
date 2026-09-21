@@ -355,7 +355,7 @@ class SpriteRepository:
         sprite.putdata(new_data)
         return sprite
 
-    def has_sprite(self, sprite_name: str, sprite_number: int | None = None) -> bool:
+    def has_sprite(self, sprite_name: str, _sprite_number: int | None = None) -> bool:
         info = self.sprite_index.get(sprite_name)
         if info:
             sheet_path = self.sprite_root / f"{info['spritesheet']}.png"

@@ -222,7 +222,7 @@ export function PixelatorClient() {
     setState((prev) => {
       const steps = [...prev.steps, step];
       if (steps.length > 1) {
-        step.inputSource = steps[steps.length - 2]?.id;
+        step.inputSource = steps.at(-2)!.id;
       }
       return { ...prev, steps: repairPipeline(steps) };
     });
@@ -526,7 +526,7 @@ const MODE_OPTIONS: Array<{
   },
 ];
 
-function ModeToggle({ current, onChange }: ModeToggleProps): React.ReactNode {
+function ModeToggle({ current, onChange }: Readonly<ModeToggleProps>): React.ReactNode {
   return (
     <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
       {MODE_OPTIONS.map(({ mode, label, activeClass }) => (

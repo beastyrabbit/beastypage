@@ -17,7 +17,7 @@ export type AdoptionMetadataPanelProps = {
   canSave?: boolean;
 };
 
-export function AdoptionMetadataPanel(props: AdoptionMetadataPanelProps) {
+export function AdoptionMetadataPanel(props: Readonly<AdoptionMetadataPanelProps>) {
   const { savedValue } = props;
   const resetKey = `${savedValue.title}::${savedValue.creator}`;
   return <AdoptionMetadataPanelInner key={resetKey} {...props} />;
@@ -30,7 +30,7 @@ function AdoptionMetadataPanelInner({
   error,
   message,
   canSave,
-}: AdoptionMetadataPanelProps) {
+}: Readonly<AdoptionMetadataPanelProps>) {
   const [title, setTitle] = useState(() => savedValue.title);
   const [creator, setCreator] = useState(() => savedValue.creator);
 

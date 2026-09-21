@@ -169,7 +169,7 @@ class RenderPipeline:
         layer_results: list[LayerResult] = []
         start_time = time.perf_counter()
 
-        composed, stage_infos = self.executor.execute(document, params)
+        composed, stage_infos = self.executor.execute(params)
 
         if collect_layers:
             for info in stage_infos:
@@ -243,7 +243,7 @@ class RenderPipeline:
             )
             render_params = {**document.traits, **render_params}
             render_params = self._normalize_params(render_params)
-            composed, stages = self.executor.execute(document, render_params)
+            composed, stages = self.executor.execute(render_params)
             if frame_mode == "layer" and layer_identifier is not None:
                 overlay = self._extract_layer_image(stages, layer_identifier)
                 if overlay is not None:

@@ -74,7 +74,7 @@ const PREVIEW_SIZE = 420;
 export function GuidedTimelineViewer({
   slug,
   encoded,
-}: GuidedTimelineViewerProps) {
+}: Readonly<GuidedTimelineViewerProps>) {
   const mapperRecord = useQuery(
     api.mapper.getBySlug,
     slug ? { slugOrId: slug } : "skip",

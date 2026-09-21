@@ -38,7 +38,7 @@ function cloneJson<T>(value: T): T {
       // Cat documents are JSON, so the fallback remains lossless here.
     }
   }
-  return JSON.parse(JSON.stringify(value)) as T;
+  return structuredClone(value);
 }
 
 function canonicalJson(value: unknown): string {
