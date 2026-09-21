@@ -865,14 +865,16 @@ export function AncestryTreeClient({
               Refresh Page
             </button>
           </div>
-        ) : !isSpriteMapperReady ? (
+        ) : null}
+        {!spriteMapperError && !isSpriteMapperReady && (
           <div className="flex items-center justify-center gap-3 py-20">
             <Loader2 className="size-8 animate-spin text-amber-500" />
             <span className="text-muted-foreground">
               Loading sprite data...
             </span>
           </div>
-        ) : (
+        )}
+        {!spriteMapperError && isSpriteMapperReady && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Column - Founding Couple */}
             <div className="space-y-6">
