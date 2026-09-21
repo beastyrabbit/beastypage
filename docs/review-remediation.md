@@ -66,7 +66,7 @@ Package-manager updates refresh the reachable Jimp file parser and compatible fr
 
 Compatible patch overrides update old `brace-expansion` and `js-yaml` transitive branches. Remaining frontend audit matches are in Clerk's Solana wallet/mobile tree: `uuid` 8, `stream-json` 1, and Metro's `image-size` 1. Patched versions require unsupported transitive major upgrades. Inspected application code does not invoke those mobile build parsers or wallet JSON streaming APIs. Reachability through third-party code is not proven absent; retain these as upstream dependency follow-ups instead of forcing incompatible replacements. No live or malformed-input exploitation tests were performed.
 
-Recheck registry advisories before release. Native libraries, operating-system images, and production configuration are outside these package audits.
+The September 21 release audit found new Next.js and js-yaml advisories. Next.js 16.3.3 disables vulnerable AVIF optimization and includes the Windows-hosted server fix. The js-yaml override now selects 3.15.2. The remaining frontend audit matches are the upstream dependency follow-ups described above. Native libraries, operating-system images, and production configuration are outside these package audits.
 
 ## Verification scope
 
