@@ -60,7 +60,7 @@ The tag is the deployment: `.github/workflows/build-images.yml` publishes all im
 
 > Replacing/overhauling an existing route (e.g., palette-spinner → palette-generator) is minor, not major.
 
-Frontend build-time values (`NEXT_PUBLIC_*`, `CONVEX_DEPLOYMENT`) come from Infisical `prod` `/ci` and are baked into the image; change them there, not only in code.
+The CI frontend build takes `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` from Infisical `prod` `/ci` and bakes them into the image; change them there, not only in code. `NEXT_PUBLIC_CONVEX_URL` is a placeholder that `frontend/docker-entrypoint.sh` replaces at container start.
 
 ## Icons
 
