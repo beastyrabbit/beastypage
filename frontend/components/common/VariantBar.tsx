@@ -68,6 +68,16 @@ export function VariantBar<T>({
     }
   }, [manageOpen]);
 
+  // Close manage popup on Escape
+  useEffect(() => {
+    if (!manageOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setManageOpen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [manageOpen]);
+
   useEffect(() => {
     return () => {
       if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
@@ -245,18 +255,14 @@ export function VariantBar<T>({
         <dialog
           open
           aria-modal="true"
-          tabIndex={-1}
           className="fixed inset-0 z-[70] flex h-full max-h-none w-full max-w-none items-center justify-center bg-black/70 text-inherit"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setManageOpen(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.preventDefault();
-              setManageOpen(false);
-            }
-          }}
         >
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => setManageOpen(false)}
+            className="absolute inset-0 cursor-default"
+          />
           <div className="relative mx-4 w-full max-w-md rounded-3xl border border-border/40 bg-background/95 p-6 shadow-2xl backdrop-blur">
             <button
               type="button"

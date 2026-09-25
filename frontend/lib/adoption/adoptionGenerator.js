@@ -43,8 +43,8 @@ const CONFIG = {
 const AFTERLIFE_DEFAULT = "both10";
 
 function mapFirstArray(primary, fallback, mapValue) {
-  if (Array.isArray(primary)) return primary.map(mapValue);
-  if (Array.isArray(fallback)) return fallback.map(mapValue);
+  if (Array.isArray(primary)) return primary.map((value) => mapValue(value));
+  if (Array.isArray(fallback)) return fallback.map((value) => mapValue(value));
   return [];
 }
 
@@ -2117,7 +2117,7 @@ export class AdoptionGenerator {
 
   async copyCanvasToClipboard(canvas, size = null) {
     if (!canvas) throw new Error("Canvas missing");
-    if (!navigator.clipboard || window.ClipboardItem === undefined) {
+    if (!navigator.clipboard || !("ClipboardItem" in window)) {
       throw new Error("Clipboard API unavailable");
     }
 

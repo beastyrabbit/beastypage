@@ -1109,14 +1109,15 @@ export function GuidedBuilderClient() {
       if (ensuredCount !== desiredTortieLayers) {
         setDesiredTortieLayers(ensuredCount);
       }
-      const nextLayers = [
-        ...new Array(Math.max(tortieLayers.length, layerIndex + 1)),
-      ].map((_, idx) => {
-        const existing = tortieLayers[idx];
-        return {
-          ...(existing ?? computeDefaultTortieLayer(idx, params)),
-        } as TortieLayer;
-      });
+      const nextLayers = Array.from(
+        { length: Math.max(tortieLayers.length, layerIndex + 1) },
+        (_, idx) => {
+          const existing = tortieLayers[idx];
+          return {
+            ...(existing ?? computeDefaultTortieLayer(idx, params)),
+          } as TortieLayer;
+        },
+      );
       const target =
         nextLayers[layerIndex] ?? computeDefaultTortieLayer(layerIndex, params);
       const mutated = { ...target };

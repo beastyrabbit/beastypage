@@ -20,9 +20,6 @@ const GRID_COLS = 5;
 const SPRITE_SIZE = 50;
 const GRID_WIDTH = GRID_COLS * SPRITE_SIZE;
 
-// A pose name, or "all" to render every pose.
-type SpriteSelection = string;
-
 type ColorPaletteContentProps = {
   slug?: string | null;
   darkForestParam?: string | null;
@@ -59,8 +56,9 @@ export function ColorPaletteContent({
 }: ColorPaletteContentProps = {}) {
   const [initialImage, setInitialImage] = useState<string | null>(null);
   const [generatorReady, setGeneratorReady] = useState(false);
+  // A pose name, or "all" to render every pose.
   const [selectedSprite, setSelectedSprite] =
-    useState<SpriteSelection>(DEFAULT_POSE_NAME);
+    useState<string>(DEFAULT_POSE_NAME);
   const [poseOptions, setPoseOptions] = useState<string[]>([DEFAULT_POSE_NAME]);
   const [isRendering, setIsRendering] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
