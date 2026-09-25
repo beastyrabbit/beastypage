@@ -17,9 +17,6 @@ Frontend and renderer service for BeastyPage with Docker/Kubernetes deploy flow.
 - Renderer service: `8001`
 - Image processing: `8002`
 
-## Required Commands
-- Approved Docker/deploy and release steps are done via project scripts; prefer repo commands over ad-hoc shell scripts.
-
 <!-- convex-ai-start -->
 
 This project uses [Convex](https://convex.dev) as its backend.
