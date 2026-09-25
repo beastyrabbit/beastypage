@@ -98,7 +98,9 @@ export function weightedDiscrete(
     running += entry.weight;
     if (target < running) return entry.value;
   }
-  return entries[entries.length - 1].value;
+  const last = entries.at(-1);
+  if (!last) throw new Error("Weighted distribution has no valid entries");
+  return last.value;
 }
 
 export function resolveCount(

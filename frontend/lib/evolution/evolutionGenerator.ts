@@ -653,14 +653,20 @@ function normalizeStringSlots(
   paramsValues: unknown,
   primaryValue: unknown,
 ): string[] {
-  const source = Array.isArray(slotValues)
-    ? slotValues
-    : Array.isArray(paramsValues)
-      ? paramsValues
-      : primaryValue
-        ? [primaryValue]
-        : [];
-  return uniqueClean(source);
+  return uniqueClean(
+    pickStringSlotSource(slotValues, paramsValues, primaryValue),
+  );
+}
+
+function pickStringSlotSource(
+  slotValues: unknown,
+  paramsValues: unknown,
+  primaryValue: unknown,
+): unknown[] {
+  if (Array.isArray(slotValues)) return slotValues;
+  if (Array.isArray(paramsValues)) return paramsValues;
+  if (primaryValue) return [primaryValue];
+  return [];
 }
 
 function normalizeTortieLayer(value: unknown): TortieLayer | null {
@@ -674,11 +680,9 @@ function normalizeTortieLayer(value: unknown): TortieLayer | null {
 }
 
 function normalizeTortieSlots(data: Record<string, unknown>): TortieLayer[] {
-  const rawSlots = Array.isArray(data.tortieSlots)
-    ? data.tortieSlots
-    : Array.isArray(data.tortie)
-      ? data.tortie
-      : [];
+  let rawSlots: unknown[] = [];
+  if (Array.isArray(data.tortieSlots)) rawSlots = data.tortieSlots;
+  else if (Array.isArray(data.tortie)) rawSlots = data.tortie;
   const layers = rawSlots
     .map((value) => normalizeTortieLayer(value))
     .filter((value): value is TortieLayer => Boolean(value));
@@ -787,8 +791,8 @@ function normalizeDocumentForEvolutionSystem(
     ...(productDocument.traits as Record<string, unknown>),
   };
   const unknownTraits = {
-    ...(document.unknownTraits ?? {}),
-    ...(productDocument.unknownTraits ?? {}),
+    ...document.unknownTraits,
+    ...productDocument.unknownTraits,
   };
 
   for (const trait of system.traits) {
@@ -865,6 +869,12 @@ function projectEvolutionCatData(
   };
 }
 
+function resolveParamsCoatPattern(params: CatParams) {
+  if (isCoatPatternId(params.coatPattern)) return params.coatPattern;
+  if (isCoatPatternId(params.peltName)) return params.peltName;
+  return undefined;
+}
+
 export function normalizeEvolutionStarter(
   input: unknown,
   options: { system?: CatSystemDefinition } = {},
@@ -887,11 +897,7 @@ export function normalizeEvolutionStarter(
   const params = hasCanonicalDocument
     ? documentToEvolutionParams(document)
     : (clone(legacyParamsSource) as unknown as CatParams);
-  const coatPattern = isCoatPatternId(params.coatPattern)
-    ? params.coatPattern
-    : isCoatPatternId(params.peltName)
-      ? params.peltName
-      : undefined;
+  const coatPattern = resolveParamsCoatPattern(params);
   if (coatPattern) {
     Object.assign(params, resolveCoatChoice(coatPattern));
   }
@@ -948,7 +954,7 @@ function weightedPick<T extends string | number>(
     running += weight;
     if (target <= running) return value;
   }
-  return viable[viable.length - 1][0];
+  return (viable.at(-1) as [T, number])[0];
 }
 
 function pickCount(
@@ -986,9 +992,7 @@ function pickUniqueString(
 }
 
 function rgbDistance(a: [number, number, number], b: [number, number, number]) {
-  return Math.sqrt(
-    (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2,
-  );
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
 function getColourRgb(

@@ -145,7 +145,7 @@ export function HistoryClient() {
   } | null>(null);
   const hasTrackedView = useRef(false);
   const searchDebounceRef = useRef<number | null>(null);
-  const previewDialogRef = useRef<HTMLDivElement>(null);
+  const previewDialogRef = useRef<HTMLDialogElement>(null);
   const previewCloseRef = useRef<HTMLButtonElement>(null);
 
   const profilesQuery = useQuery(api.mapper.listHistory, { limit: 200 });
@@ -216,12 +216,7 @@ export function HistoryClient() {
           console.warn("Failed to normalize history cat metadata", error);
         }
       }
-      const variant: "single" | "guided" | "discordkitten" =
-        source === "discordkitten"
-          ? "discordkitten"
-          : mode === "wizard-timeline"
-            ? "guided"
-            : "single";
+      const variant = historyVariant(source, mode);
       const slug = profile.slug ?? profile.shareToken ?? profile.id;
       const href =
         variant === "guided" ? `/guided-builder/view/${slug}` : `/view/${slug}`;
@@ -262,15 +257,7 @@ export function HistoryClient() {
           encoded = null;
         }
       }
-      const viewerUrl = cat.shareToken
-        ? origin
-          ? `${origin}/view/${cat.shareToken}`
-          : `/view/${cat.shareToken}`
-        : encoded
-          ? origin
-            ? `${origin}/view?cat=${encoded}`
-            : `/view?cat=${encoded}`
-          : null;
+      const viewerUrl = buildViewerUrl(origin, cat.shareToken, encoded);
       const previewUrl = getPreviewUrl(
         cat.profileId ?? null,
         encoded,
@@ -459,12 +446,12 @@ export function HistoryClient() {
             className="absolute inset-0 cursor-default"
             onClick={closeFocusedPreview}
           />
-          <div
+          <dialog
             ref={previewDialogRef}
-            role="dialog"
+            open
             aria-modal="true"
             aria-labelledby="history-preview-title"
-            className="relative w-full max-w-4xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl"
+            className="relative w-full max-w-4xl rounded-3xl border border-border/40 bg-background/95 p-8 text-inherit shadow-2xl"
           >
             <button
               ref={previewCloseRef}
@@ -493,11 +480,41 @@ export function HistoryClient() {
                 />
               </div>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
     </div>
   );
+}
+
+type HistoryVariant = "single" | "guided" | "discordkitten";
+
+const VARIANT_LABELS: Record<HistoryVariant, string> = {
+  single: "Single",
+  guided: "Guided",
+  discordkitten: "Discord Kitten",
+};
+
+function historyVariant(source: unknown, mode: string | null): HistoryVariant {
+  if (source === "discordkitten") return "discordkitten";
+  if (mode === "wizard-timeline") return "guided";
+  return "single";
+}
+
+function buildViewerUrl(
+  origin: string,
+  shareToken: string | null | undefined,
+  encoded: string | null,
+): string | null {
+  let path: string;
+  if (shareToken) {
+    path = `/view/${shareToken}`;
+  } else if (encoded) {
+    path = `/view?cat=${encoded}`;
+  } else {
+    return null;
+  }
+  return origin ? `${origin}${path}` : path;
 }
 
 type HistoryCardProps = {
@@ -529,12 +546,7 @@ function HistorySingleCard({
   const fullUrl = item.fullUrl ?? previewUrl;
   const creator = cleanDisplay(item.creator);
   const href = item.href;
-  const variantLabel =
-    item.variant === "guided"
-      ? "Guided"
-      : item.variant === "discordkitten"
-        ? "Discord Kitten"
-        : "Single";
+  const variantLabel = VARIANT_LABELS[item.variant];
   const actionLabel = item.variant === "guided" ? "Open tour" : "View";
 
   return (

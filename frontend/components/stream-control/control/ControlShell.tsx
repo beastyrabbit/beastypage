@@ -21,6 +21,7 @@ import {
   catParamsToLegacyPersistence,
 } from "@/lib/cat-system";
 import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
+import type { SlotSelections } from "@/lib/cat-v3/types";
 import { normalizePortableSettingsCode } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
 import { withResolvedAfterlifeParams } from "@/utils/catSettingsHelpers";
@@ -53,6 +54,32 @@ import { StatusBar } from "./StatusBar";
 import { useFollowGuard } from "./useFollowGuard";
 
 type ControlTabId = "spin" | "evolution" | "batch" | "settings";
+
+/** Saved result auto-clear seconds, falling back to the legacy field, then 30. */
+function resolveResultAutoClearSeconds(s: Record<string, unknown>): number {
+  if (isPositiveFiniteNumber(s.resultAutoClearSeconds)) {
+    return s.resultAutoClearSeconds;
+  }
+  if (isPositiveFiniteNumber(s.autoClearSeconds)) return s.autoClearSeconds;
+  return 30;
+}
+
+/** cat_profile payload for a spin (same shape as SingleCatPlus). */
+function buildSpinCatData(params: unknown, slots: SlotSelections | undefined) {
+  return {
+    params,
+    accessorySlots: slots?.accessories ?? [],
+    scarSlots: slots?.scars ?? [],
+    tortieSlots: slots?.tortie ?? [],
+    counts: {
+      accessories: (slots?.accessories ?? []).filter(
+        (s: string) => s !== "none",
+      ).length,
+      scars: (slots?.scars ?? []).filter((s: string) => s !== "none").length,
+      tortie: (slots?.tortie ?? []).filter(Boolean).length,
+    },
+  };
+}
 
 const TABS: Array<{
   id: ControlTabId;
@@ -186,7 +213,7 @@ export function ControlShell() {
       // Start from the stored settings so fields synced by other panels
       // (lobbyInfoMode, evolutionInfo, batchInfo, obs appearance, …) survive
       // writes that don't know about them.
-      ...((sessionRef.current?.settings as Record<string, unknown>) ?? {}),
+      ...(sessionRef.current?.settings as Record<string, unknown> | undefined),
       ...baseSettings,
       lobbyMode: lobbyModeRef.current,
       lobbyCatCount: lobbyCatCountRef.current,
@@ -295,14 +322,7 @@ export function ControlShell() {
       }
       if (isPaletteDisplayMode(s.paletteDisplayMode))
         setPaletteDisplayMode(s.paletteDisplayMode);
-      const savedResultAutoClearSeconds = isPositiveFiniteNumber(
-        s.resultAutoClearSeconds,
-      )
-        ? s.resultAutoClearSeconds
-        : isPositiveFiniteNumber(s.autoClearSeconds)
-          ? s.autoClearSeconds
-          : 30;
-      setResultAutoClearSeconds(savedResultAutoClearSeconds);
+      setResultAutoClearSeconds(resolveResultAutoClearSeconds(s));
       if (typeof s.resultAutoClearEnabled === "boolean") {
         setResultAutoClearEnabled(s.resultAutoClearEnabled);
       } else if (typeof s.autoClearEnabled === "boolean") {
@@ -469,22 +489,7 @@ export function ControlShell() {
       setHistorySaving(true);
       try {
         // Persist to cat_profile (same as SingleCatPlus)
-        const catData = {
-          params: resolvedParams,
-          accessorySlots: result.slotSelections?.accessories ?? [],
-          scarSlots: result.slotSelections?.scars ?? [],
-          tortieSlots: result.slotSelections?.tortie ?? [],
-          counts: {
-            accessories: (result.slotSelections?.accessories ?? []).filter(
-              (s: string) => s !== "none",
-            ).length,
-            scars: (result.slotSelections?.scars ?? []).filter(
-              (s: string) => s !== "none",
-            ).length,
-            tortie: (result.slotSelections?.tortie ?? []).filter(Boolean)
-              .length,
-          },
-        };
+        const catData = buildSpinCatData(resolvedParams, result.slotSelections);
         const profile = await createMapper({
           catData: catDataToLegacyPersistence(catData),
           creatorName: creatorNameDraft.trim() || undefined,
@@ -597,7 +602,8 @@ export function ControlShell() {
       });
       setMetaDirty(false);
       toast.success("Saved to history!");
-    } catch (_err) {
+    } catch (err) {
+      console.error("[StreamControl] Failed to save history meta", err);
       toast.error("Unable to save history entry. Please try again.");
     } finally {
       setMetaSaving(false);
@@ -784,8 +790,10 @@ export function ControlShell() {
   }
 
   const apiKey = viewer?.apiKey;
+  const pageOrigin =
+    typeof window !== "undefined" ? window.location.origin : "";
   const obsUrl = apiKey
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/single-cat-stream/obs?key=${apiKey}`
+    ? `${pageOrigin}/single-cat-stream/obs?key=${apiKey}`
     : null;
   const fallbackCommand =
     (session?.currentCommand as

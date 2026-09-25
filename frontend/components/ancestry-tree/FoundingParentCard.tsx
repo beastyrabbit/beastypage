@@ -2,7 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import type { CatName } from "@/lib/ancestry-tree/types";
 import { getParamsPreviewUrl } from "@/lib/ancestry-tree/utils";
@@ -36,6 +36,32 @@ export function FoundingParentCard({
   const borderColor =
     gender === "F" ? "border-pink-500/30" : "border-blue-500/30";
 
+  let preview: ReactNode;
+  if (isLoading) {
+    preview = (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="size-10 animate-spin text-muted-foreground" />
+      </div>
+    );
+  } else if (params && previewUrl) {
+    preview = (
+      <Image
+        src={previewUrl}
+        alt={name?.full ?? (gender === "F" ? "Mother" : "Father")}
+        width={192}
+        height={192}
+        className="pixelated"
+        unoptimized
+      />
+    );
+  } else {
+    preview = (
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm text-center px-2">
+        Click &quot;Random Couple&quot; to get started
+      </div>
+    );
+  }
+
   return (
     <div
       className={`flex flex-col items-center gap-4 rounded-2xl p-5 ${bgColor} border ${borderColor}`}
@@ -45,24 +71,7 @@ export function FoundingParentCard({
       </span>
 
       <div className="relative w-48 h-48 rounded-xl bg-black/30 overflow-hidden shadow-xl">
-        {isLoading ? (
-          <div className="flex h-full items-center justify-center">
-            <Loader2 className="size-10 animate-spin text-muted-foreground" />
-          </div>
-        ) : params && previewUrl ? (
-          <Image
-            src={previewUrl}
-            alt={name?.full ?? (gender === "F" ? "Mother" : "Father")}
-            width={192}
-            height={192}
-            className="pixelated"
-            unoptimized
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-muted-foreground text-sm text-center px-2">
-            Click &quot;Random Couple&quot; to get started
-          </div>
-        )}
+        {preview}
       </div>
 
       {params && name && (

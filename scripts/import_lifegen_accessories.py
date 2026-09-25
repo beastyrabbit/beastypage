@@ -159,6 +159,26 @@ def shifted_mask(mask: np.ndarray[Any, np.dtype[np.bool_]], dx: int, dy: int):
     return shifted
 
 
+def best_mask_shift(
+    source_mask: np.ndarray, target_mask: np.ndarray
+) -> tuple[float, int, int]:
+    best_score = -1.0
+    best_dx = 0
+    best_dy = 0
+    for dy in range(-12, 13):
+        for dx in range(-12, 13):
+            candidate = shifted_mask(source_mask, dx, dy)
+            union = np.logical_or(candidate, target_mask).sum()
+            if union == 0:
+                continue
+            score = float(np.logical_and(candidate, target_mask).sum() / union)
+            if score > best_score:
+                best_score = score
+                best_dx = dx
+                best_dy = dy
+    return best_score, best_dx, best_dy
+
+
 def best_reference_translation(
     reference_sheet: Image.Image,
     reference_col: int,
@@ -192,16 +212,10 @@ def best_reference_translation(
         source_mask = alpha_mask(source)
         if not source_mask.any():
             continue
-        for dy in range(-12, 13):
-            for dx in range(-12, 13):
-                candidate = shifted_mask(source_mask, dx, dy)
-                union = np.logical_or(candidate, target_mask).sum()
-                if union == 0:
-                    continue
-                score = float(np.logical_and(candidate, target_mask).sum() / union)
-                if score > best_score:
-                    best_score = score
-                    best = (source_pose, dx, dy)
+        score, dx, dy = best_mask_shift(source_mask, target_mask)
+        if score > best_score:
+            best_score = score
+            best = (source_pose, dx, dy)
     return best
 
 
@@ -314,6 +328,23 @@ def copy_lifegen_assets(groups: OrderedDict[str, dict[str, Any]]) -> None:
         )
 
 
+def legacy_tile(
+    old_sheet: Image.Image, old_entry: dict[str, Any], sprite_number: int
+) -> Image.Image:
+    source_x = int(old_entry.get("xOffset", 0)) + (sprite_number % 3) * TILE_SIZE
+    source_y = int(old_entry.get("yOffset", 0)) + (sprite_number // 3) * TILE_SIZE
+    return remove_colorkey(
+        old_sheet.crop(
+            (
+                source_x,
+                source_y,
+                source_x + TILE_SIZE,
+                source_y + TILE_SIZE,
+            )
+        )
+    )
+
+
 def build_adapted_sheet(
     old_index: dict[str, Any],
     groups: OrderedDict[str, dict[str, Any]],
@@ -362,23 +393,7 @@ def build_adapted_sheet(
 
         for pose in poses:
             if pose in legacy_pose_to_number:
-                sprite_number = legacy_pose_to_number[pose]
-                source_x = (
-                    int(old_entry.get("xOffset", 0)) + (sprite_number % 3) * TILE_SIZE
-                )
-                source_y = (
-                    int(old_entry.get("yOffset", 0)) + (sprite_number // 3) * TILE_SIZE
-                )
-                tile = remove_colorkey(
-                    old_sheet.crop(
-                        (
-                            source_x,
-                            source_y,
-                            source_x + TILE_SIZE,
-                            source_y + TILE_SIZE,
-                        )
-                    )
-                )
+                tile = legacy_tile(old_sheet, old_entry, legacy_pose_to_number[pose])
             else:
                 translation = best_reference_translation(
                     reference_sheet,
@@ -393,24 +408,8 @@ def build_adapted_sheet(
                     tile = Image.new("RGBA", (TILE_SIZE, TILE_SIZE))
                 else:
                     source_pose, dx, dy = translation
-                    sprite_number = legacy_pose_to_number[source_pose]
-                    source_x = (
-                        int(old_entry.get("xOffset", 0))
-                        + (sprite_number % 3) * TILE_SIZE
-                    )
-                    source_y = (
-                        int(old_entry.get("yOffset", 0))
-                        + (sprite_number // 3) * TILE_SIZE
-                    )
-                    source = remove_colorkey(
-                        old_sheet.crop(
-                            (
-                                source_x,
-                                source_y,
-                                source_x + TILE_SIZE,
-                                source_y + TILE_SIZE,
-                            )
-                        )
+                    source = legacy_tile(
+                        old_sheet, old_entry, legacy_pose_to_number[source_pose]
                     )
                     tile = shift_tile(source, dx, dy)
 

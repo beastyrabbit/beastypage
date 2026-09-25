@@ -63,7 +63,7 @@ export class Xoshiro128StarStar implements RandomSource {
 
   constructor(seed: GachaSeed) {
     if (typeof seed === "number" && !Number.isFinite(seed)) {
-      throw new Error("Gacha seed numbers must be finite");
+      throw new TypeError("Gacha seed numbers must be finite");
     }
     const prefix = typeof seed === "number" ? "number:" : "string:";
     this.state = Uint32Array.from(hashSeed(`${prefix}${String(seed)}`));

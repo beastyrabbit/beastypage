@@ -31,6 +31,9 @@ export default async function GuidedSettingsPage({
   if (codeParam) {
     initialSettings = decodePortableSettings(codeParam);
   }
+  const advancedQuery = codeParam
+    ? `?code=${encodeURIComponent(codeParam)}`
+    : "";
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-4 py-12 sm:px-6 lg:px-8">
@@ -40,7 +43,7 @@ export default async function GuidedSettingsPage({
         description="Walk through each setting step-by-step with visual examples and live previews."
       >
         <a
-          href={`/single-cat-plus/settings${codeParam ? `?code=${encodeURIComponent(codeParam)}` : ""}`}
+          href={`/single-cat-plus/settings${advancedQuery}`}
           className="rounded-lg border border-border/50 bg-background/70 px-4 py-2 text-xs font-medium text-muted-foreground transition hover:text-foreground"
         >
           Switch to Advanced View

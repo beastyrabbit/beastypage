@@ -147,6 +147,13 @@ export function SaveTreeDialog({
 
   // Success state
   if (saveSuccess) {
+    let copyIcon = <CopyIcon size={16} />;
+    if (copied) {
+      copyIcon = <CheckedIcon size={16} className="text-emerald-400" />;
+    } else if (copyError) {
+      copyIcon = <XIcon size={16} />;
+    }
+
     return (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
@@ -202,13 +209,7 @@ export function SaveTreeDialog({
                   className={`shrink-0 rounded-md p-2 transition-colors hover:bg-white/10 ${copyError ? "text-red-400" : ""}`}
                   title={copyError ? "Failed to copy" : "Copy URL"}
                 >
-                  {copied ? (
-                    <CheckedIcon size={16} className="text-emerald-400" />
-                  ) : copyError ? (
-                    <XIcon size={16} />
-                  ) : (
-                    <CopyIcon size={16} />
-                  )}
+                  {copyIcon}
                 </button>
                 <button
                   type="button"

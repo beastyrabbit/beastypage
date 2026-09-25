@@ -59,7 +59,7 @@ function mapLegacyOptions(options: LegacyRandomParamsOptions): RandomGenerationO
   const { accessoryCount, scarCount, tortieCount, slotOverrides, ...rest } = options;
 
   const overrides: Partial<Record<SlotOverrideKey, number>> = {
-    ...(slotOverrides ?? {}),
+    ...slotOverrides,
   };
 
   const accCount = sanitizeSlotCount(accessoryCount);
@@ -90,16 +90,18 @@ function coerceSpriteNumber(value: unknown, fallback = 0): number {
   return fallback;
 }
 
+function resolveCoatPatternId(working: Record<string, unknown>) {
+  if (isCoatPatternId(working.coatPattern)) return working.coatPattern;
+  if (isCoatPatternId(working.peltName)) return working.peltName;
+  return undefined;
+}
+
 function splitPayload(
   params: CatParams | Partial<CatParams>,
   includeDocument = true,
 ): CatRenderParams {
   const working = clonePlain(params as Record<string, unknown>);
-  const coatPattern = isCoatPatternId(working.coatPattern)
-    ? working.coatPattern
-    : isCoatPatternId(working.peltName)
-      ? working.peltName
-      : undefined;
+  const coatPattern = resolveCoatPatternId(working);
   if (coatPattern) {
     Object.assign(working, resolveCoatChoice(coatPattern));
   }
@@ -253,7 +255,7 @@ export class CatGeneratorV3 {
       // that preview frame.
       if (
         payload.params.coatPattern &&
-        Object.prototype.hasOwnProperty.call(variant.params, 'peltName') &&
+        Object.hasOwn(variant.params, 'peltName') &&
         variantParams.coatPattern === undefined
       ) {
         variantParams.coatPattern = null;

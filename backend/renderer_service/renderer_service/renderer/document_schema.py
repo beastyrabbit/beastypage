@@ -214,7 +214,7 @@ class CatDocumentSchema:
             for index, entry in enumerate(value):
                 self._validate_node(entry, item_schema, f"{path}[{index}]")
         if schema.get("uniqueItems") is True:
-            first_index_by_value: dict[tuple[Any, ...], int] = {}
+            first_index_by_value: dict[tuple[str, Any], int] = {}
             for index, entry in enumerate(value):
                 key = self._json_semantic_key(entry)
                 first_index = first_index_by_value.get(key)
@@ -226,9 +226,9 @@ class CatDocumentSchema:
                 first_index_by_value[key] = index
 
     @classmethod
-    def _json_semantic_key(cls, value: Any) -> tuple[Any, ...]:
+    def _json_semantic_key(cls, value: Any) -> tuple[str, Any]:
         if value is None:
-            return ("null",)
+            return ("null", None)
         if isinstance(value, bool):
             return ("boolean", value)
         if cls._is_number(value):
@@ -236,11 +236,11 @@ class CatDocumentSchema:
         if isinstance(value, str):
             return ("string", value)
         if isinstance(value, list):
-            return ("array", *(cls._json_semantic_key(entry) for entry in value))
+            return ("array", tuple(cls._json_semantic_key(entry) for entry in value))
         if isinstance(value, dict):
             return (
                 "object",
-                *(
+                tuple(
                     (str(key), cls._json_semantic_key(entry))
                     for key, entry in sorted(
                         value.items(), key=lambda item: str(item[0])

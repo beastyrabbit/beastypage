@@ -40,8 +40,6 @@ function tartanCss(p: PatternDefinition): CSSPatternStyle {
 
     layers.push(
       `repeating-linear-gradient(0deg, transparent 0px, transparent ${off}px, ${c} ${off}px, ${c} ${end}px, transparent ${end}px, transparent ${ts}px)`,
-    );
-    layers.push(
       `repeating-linear-gradient(90deg, transparent 0px, transparent ${off}px, ${c} ${off}px, ${c} ${end}px, transparent ${end}px, transparent ${ts}px)`,
     );
   }

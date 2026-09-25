@@ -261,6 +261,19 @@ const DEFAULT_PARAMS: CatParams = {
   whitePatchesTint: "none",
 };
 
+function getStepNavClass(unlocked: boolean, active: boolean): string {
+  if (!unlocked) {
+    return "cursor-not-allowed border-slate-900 bg-slate-900/40 text-neutral-500";
+  }
+  return active
+    ? "border-amber-400 bg-amber-500/20 text-amber-100"
+    : "border-slate-800 bg-slate-900/60 text-neutral-200 hover:border-amber-400/60 hover:text-amber-100";
+}
+
+function isNonNullString(value: string | null): value is string {
+  return value !== null;
+}
+
 function getPoseCacheKey(params: Partial<CatParams>): string {
   const pose =
     params.poseName ??
@@ -973,23 +986,25 @@ export function GuidedBuilderClient() {
     [ensureTortieSync, markStepState],
   );
 
+  const seedTortieLayers = useCallback(
+    (count: number) => {
+      const layers = tortieLayers.slice(0, count).map((layer, idx) => ({
+        ...(layer ?? computeDefaultTortieLayer(idx, params)),
+      }));
+      while (layers.length < count) {
+        layers.push(computeDefaultTortieLayer(layers.length, params));
+      }
+      return layers;
+    },
+    [computeDefaultTortieLayer, params, tortieLayers],
+  );
+
   const forceUnlockLayer = useCallback(
     (targetIndex: number) => {
       if (targetIndex < 0 || targetIndex >= MAX_TORTIE_LAYERS) return;
       const desiredCount = Math.min(MAX_TORTIE_LAYERS, targetIndex + 1);
       setDesiredTortieLayers(desiredCount);
-      const seededLayers = (() => {
-        const layers = tortieLayers
-          .slice(0, desiredCount)
-          .map((layer, idx) => ({
-            ...(layer ?? computeDefaultTortieLayer(idx, params)),
-          }));
-        while (layers.length < desiredCount) {
-          layers.push(computeDefaultTortieLayer(layers.length, params));
-        }
-        return layers;
-      })();
-      applyTortieLayers(seededLayers, true);
+      applyTortieLayers(seedTortieLayers(desiredCount), true);
       for (
         let i = 0;
         i <= targetIndex && i < TORTIE_LAYER_STEPS.length;
@@ -1006,14 +1021,7 @@ export function GuidedBuilderClient() {
         ],
       );
     },
-    [
-      applyTortieLayers,
-      computeDefaultTortieLayer,
-      lockStep,
-      params,
-      tortieLayers,
-      unlockStep,
-    ],
+    [applyTortieLayers, lockStep, seedTortieLayers, unlockStep],
   );
 
   const updateParams = useCallback(
@@ -1102,7 +1110,7 @@ export function GuidedBuilderClient() {
         setDesiredTortieLayers(ensuredCount);
       }
       const nextLayers = [
-        ...Array(Math.max(tortieLayers.length, layerIndex + 1)),
+        ...new Array(Math.max(tortieLayers.length, layerIndex + 1)),
       ].map((_, idx) => {
         const existing = tortieLayers[idx];
         return {
@@ -1421,21 +1429,7 @@ export function GuidedBuilderClient() {
                     )}
                     onClick={() => {
                       setDesiredTortieLayers(count);
-                      const seededLayers = (() => {
-                        const existing = tortieLayers
-                          .slice(0, count)
-                          .map((layer, idx) => ({
-                            ...(layer ??
-                              computeDefaultTortieLayer(idx, params)),
-                          }));
-                        while (existing.length < count) {
-                          existing.push(
-                            computeDefaultTortieLayer(existing.length, params),
-                          );
-                        }
-                        return existing;
-                      })();
-                      applyTortieLayers(seededLayers, true);
+                      applyTortieLayers(seedTortieLayers(count), true);
                       TORTIE_LAYER_STEPS.forEach((stepId, index) => {
                         if (index === 0 && count > 0) {
                           unlockStep(stepId);
@@ -2016,9 +2010,7 @@ export function GuidedBuilderClient() {
                       cacheKey={previewKey}
                       mutate={(draft) => {
                         const set = new Set(
-                          (draft.accessories ?? []).filter(
-                            (x): x is string => x !== null,
-                          ),
+                          (draft.accessories ?? []).filter(isNonNullString),
                         );
                         set.add(option);
                         draft.accessories = Array.from(set);
@@ -2276,11 +2268,7 @@ export function GuidedBuilderClient() {
                 type="button"
                 className={cn(
                   "w-full rounded-xl border border-transparent px-3 py-2.5 text-left text-sm transition",
-                  unlocked
-                    ? activeStep === step.id
-                      ? "border-amber-400 bg-amber-500/20 text-amber-100"
-                      : "border-slate-800 bg-slate-900/60 text-neutral-200 hover:border-amber-400/60 hover:text-amber-100"
-                    : "cursor-not-allowed border-slate-900 bg-slate-900/40 text-neutral-500",
+                  getStepNavClass(unlocked, activeStep === step.id),
                 )}
                 onClick={() => unlocked && setActiveStep(step.id)}
                 disabled={!unlocked}

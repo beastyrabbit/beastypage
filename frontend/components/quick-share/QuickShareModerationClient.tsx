@@ -72,8 +72,9 @@ export function QuickShareModerationClient() {
     async (search = "") => {
       setLoading(true);
       try {
+        const query = search ? `?q=${encodeURIComponent(search)}` : "";
         const items = await request<ModerationUpload[]>(
-          `/i/api/admin/uploads${search ? `?q=${encodeURIComponent(search)}` : ""}`,
+          `/i/api/admin/uploads${query}`,
         );
         setUploads(items);
         setForbidden(false);

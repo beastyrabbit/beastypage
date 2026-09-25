@@ -80,8 +80,8 @@ export function formatDisplayName(value) {
     if (coatPatternName) return coatPatternName;
     return value
         .toString()
-        .replace(/_/g, ' ')
-        .replace(/-/g, ' ')
+        .replaceAll('_', ' ')
+        .replaceAll('-', ' ')
         .toLowerCase()
         .replace(/\b\w/g, char => char.toUpperCase());
 }
@@ -217,6 +217,40 @@ function buildCompoundListVotingOptions(
     return options;
 }
 
+function buildCatalogVotingOptions(definition) {
+    const isSingleChoice =
+        definition.kind === 'select' && definition.valueKind === 'string';
+    const isListChoice =
+        definition.kind === 'list' && definition.valueKind === 'stringList';
+    if (!isSingleChoice && !isListChoice) {
+        throw new Error(
+            `Streamer voting has no generic editor for ${definition.traitId} (${definition.kind}/${definition.valueKind})`
+        );
+    }
+    const catalogOptions = definition.options.filter(
+        element => !element.deprecated && element.id.toLowerCase() !== 'none'
+    );
+    if (catalogOptions.length === 0) {
+        throw new Error(
+            `Streamer voting trait ${definition.traitId} has no catalog options`
+        );
+    }
+
+    const options = catalogOptions.map(element => ({
+        value: isListChoice ? [element.id] : element.id,
+        keyValue: element.id,
+        label: element.label || formatDisplayName(element.id),
+    }));
+    if (!definition.required) {
+        options.unshift({
+            value: isListChoice ? [] : undefined,
+            keyValue: 'none',
+            label: 'None',
+        });
+    }
+    return options;
+}
+
 function buildRegistryVotingOptions(
     source,
     trait,
@@ -257,36 +291,7 @@ function buildRegistryVotingOptions(
             });
         }
     } else {
-        const isSingleChoice =
-            definition.kind === 'select' && definition.valueKind === 'string';
-        const isListChoice =
-            definition.kind === 'list' && definition.valueKind === 'stringList';
-        if (!isSingleChoice && !isListChoice) {
-            throw new Error(
-                `Streamer voting has no generic editor for ${definition.traitId} (${definition.kind}/${definition.valueKind})`
-            );
-        }
-        const catalogOptions = definition.options.filter(
-            element => !element.deprecated && element.id.toLowerCase() !== 'none'
-        );
-        if (catalogOptions.length === 0) {
-            throw new Error(
-                `Streamer voting trait ${definition.traitId} has no catalog options`
-            );
-        }
-
-        options = catalogOptions.map(element => ({
-            value: isListChoice ? [element.id] : element.id,
-            keyValue: element.id,
-            label: element.label || formatDisplayName(element.id),
-        }));
-        if (!definition.required) {
-            options.unshift({
-                value: isListChoice ? [] : undefined,
-                keyValue: 'none',
-                label: 'None',
-            });
-        }
+        options = buildCatalogVotingOptions(definition);
     }
     return options.map(option => ({
         key: registryOptionKey(definition.traitId, option.keyValue),
@@ -308,7 +313,7 @@ function buildRegistryVotingOptions(
  */
 export function createRegistryTraitVotingSteps(
     source,
-    state = { params: getDefaultStreamParams() },
+    state,
     handledTraitIds = STREAMER_BASELINE_TRAIT_IDS
 ) {
     const params = state?.params || getDefaultStreamParams();
@@ -942,8 +947,72 @@ function createStep(
     };
 }
 
+function createTortieSteps(tortieLayers) {
+    const steps = [];
+    for (let i = 0; i < tortieLayers; i += 1) {
+        const layerIndex = i + 1;
+        steps.push(
+            createStep(
+                `tortie_layer_${layerIndex}_mask`,
+                `Tortie Layer ${layerIndex}: Mask`,
+                'Choose the mask that controls where this layer appears.',
+                stepState => buildTortieMaskOptions(stepState, i),
+                ['tortie']
+            ),
+            createStep(
+                `tortie_layer_${layerIndex}_pattern`,
+                `Tortie Layer ${layerIndex}: Pattern`,
+                'Select the pattern that shapes this tortie overlay.',
+                stepState => buildTortiePatternOptions(stepState, i),
+                ['tortie']
+            ),
+            createStep(
+                `tortie_layer_${layerIndex}_colour`,
+                `Tortie Layer ${layerIndex}: Colour`,
+                'Pick the colour for this tortie overlay.',
+                stepState => buildTortieColourOptions(stepState, i),
+                ['tortie']
+            )
+        );
+    }
+
+    if (tortieLayers < MAX_TORTIE_LAYERS) {
+        const nextLayer = tortieLayers + 1;
+        steps.push(createStep(
+            `tortie_add_layer_${nextLayer}`,
+            `Add tortie layer ${nextLayer}?`,
+            'Viewers can add up to four tortie overlays.',
+            state => buildTortieMoreOptions(state, tortieLayers),
+            ['tortie']
+        ));
+    }
+    return steps;
+}
+
+function createAccessorySteps(accessorySlots) {
+    const steps = [];
+    for (let i = 0; i < accessorySlots; i += 1) {
+        steps.push(createStep(`accessory_slot_${i + 1}`, `Accessory Slot ${i + 1}`, 'Select an accessory for this slot.', state => buildAccessorySelectionOptions(state, i), ['accessories']));
+    }
+    if (accessorySlots < MAX_ACCESSORY_SLOTS) {
+        steps.push(createStep(`accessory_more_${accessorySlots + 1}`, 'Add another accessory?', 'Viewers can queue up to ten accessories.', () => buildAccessoryMoreOptions(accessorySlots), ['accessories']));
+    }
+    return steps;
+}
+
+function createScarSteps(scarSlots) {
+    const steps = [];
+    for (let i = 0; i < scarSlots; i += 1) {
+        steps.push(createStep(`scar_slot_${i + 1}`, `Scar Slot ${i + 1}`, 'Pick a scar for this slot.', state => buildScarSelectionOptions(state, i), ['scars']));
+    }
+    if (scarSlots < MAX_SCAR_SLOTS) {
+        steps.push(createStep(`scar_more_${scarSlots + 1}`, 'Add another scar?', 'Viewers can queue several scars, up to six slots.', () => buildScarMoreOptions(scarSlots), ['scars']));
+    }
+    return steps;
+}
+
 export function createStreamSteps(
-    state = { params: getDefaultStreamParams() },
+    state,
     catalogSource = publicCatCatalog
 ) {
     const workingState = state || { params: getDefaultStreamParams() };
@@ -954,84 +1023,40 @@ export function createStreamSteps(
     projectCanonicalRegistryTraitsToLegacy(workingState.params);
     syncDerivedState(workingState.params);
 
-    const steps = [];
-
-    steps.push(createStep('colour', 'Base Colour', 'Choose the base coat colour that defines the cat.', buildColourOptions, ['colour']));
-    steps.push(createStep('pattern', 'Pattern', 'Select the main fur pattern.', buildPatternOptions, ['pelt', 'coatPattern']));
-
-    steps.push(createStep('tortie_toggle', 'Tortie Layers', 'Decide whether to layer tortie patterns.', () => buildTortieToggleOptions(), ['tortie']));
+    const steps = [
+        createStep('colour', 'Base Colour', 'Choose the base coat colour that defines the cat.', buildColourOptions, ['colour']),
+        createStep('pattern', 'Pattern', 'Select the main fur pattern.', buildPatternOptions, ['pelt', 'coatPattern']),
+        createStep('tortie_toggle', 'Tortie Layers', 'Decide whether to layer tortie patterns.', () => buildTortieToggleOptions(), ['tortie']),
+    ];
 
     const tortieLayers = workingState.params._tortieLayers ?? 0;
     if (tortieLayers > 0) {
-        for (let i = 0; i < tortieLayers; i += 1) {
-            const layerIndex = i + 1;
-            steps.push(createStep(
-                `tortie_layer_${layerIndex}_mask`,
-                `Tortie Layer ${layerIndex}: Mask`,
-                'Choose the mask that controls where this layer appears.',
-                stepState => buildTortieMaskOptions(stepState, i),
-                ['tortie']
-            ));
-            steps.push(createStep(
-                `tortie_layer_${layerIndex}_pattern`,
-                `Tortie Layer ${layerIndex}: Pattern`,
-                'Select the pattern that shapes this tortie overlay.',
-                stepState => buildTortiePatternOptions(stepState, i),
-                ['tortie']
-            ));
-            steps.push(createStep(
-                `tortie_layer_${layerIndex}_colour`,
-                `Tortie Layer ${layerIndex}: Colour`,
-                'Pick the colour for this tortie overlay.',
-                stepState => buildTortieColourOptions(stepState, i),
-                ['tortie']
-            ));
-        }
-
-        if (tortieLayers < MAX_TORTIE_LAYERS) {
-            const nextLayer = tortieLayers + 1;
-            steps.push(createStep(
-                `tortie_add_layer_${nextLayer}`,
-                `Add tortie layer ${nextLayer}?`,
-                'Viewers can add up to four tortie overlays.',
-                state => buildTortieMoreOptions(state, tortieLayers),
-                ['tortie']
-            ));
-        }
+        steps.push(...createTortieSteps(tortieLayers));
     }
 
-    steps.push(createStep('eye_primary', 'Primary Eye Colour', 'Pick the main eye colour.', buildEyePrimaryOptions, ['eyeColour', 'eyeColour2']));
-    steps.push(createStep('eye_secondary', 'Secondary Eye Colour', 'Choose a secondary eye colour or keep them matching.', buildEyeSecondaryOptions, ['eyeColour2']));
-    steps.push(createStep('white_patches', 'White Patches', 'Choose a white patch overlay.', buildWhitePatchOptions, ['whitePatches']));
-    steps.push(createStep('points_pattern', 'Points Pattern', 'Select a points (siamese-style) highlight.', buildPointsOptions, ['points']));
-    steps.push(createStep('vitiligo_pattern', 'Vitiligo', 'Add vitiligo overlays if desired.', buildVitiligoOptions, ['vitiligo']));
-    steps.push(createStep('skin', 'Skin Tone', 'Select nose and ear skin colour.', buildSkinOptions, ['skinColour']));
-    steps.push(createStep('tint', 'Overall Tint', 'Choose an optional tint overlay.', buildTintOptions, ['tint']));
-
-    steps.push(createStep('accessories_toggle', 'Accessories', 'Decide whether to add accessories.', () => buildAccessoryToggleOptions(), ['accessories']));
+    steps.push(
+        createStep('eye_primary', 'Primary Eye Colour', 'Pick the main eye colour.', buildEyePrimaryOptions, ['eyeColour', 'eyeColour2']),
+        createStep('eye_secondary', 'Secondary Eye Colour', 'Choose a secondary eye colour or keep them matching.', buildEyeSecondaryOptions, ['eyeColour2']),
+        createStep('white_patches', 'White Patches', 'Choose a white patch overlay.', buildWhitePatchOptions, ['whitePatches']),
+        createStep('points_pattern', 'Points Pattern', 'Select a points (siamese-style) highlight.', buildPointsOptions, ['points']),
+        createStep('vitiligo_pattern', 'Vitiligo', 'Add vitiligo overlays if desired.', buildVitiligoOptions, ['vitiligo']),
+        createStep('skin', 'Skin Tone', 'Select nose and ear skin colour.', buildSkinOptions, ['skinColour']),
+        createStep('tint', 'Overall Tint', 'Choose an optional tint overlay.', buildTintOptions, ['tint']),
+        createStep('accessories_toggle', 'Accessories', 'Decide whether to add accessories.', () => buildAccessoryToggleOptions(), ['accessories'])
+    );
     const accessorySlots = workingState.params._accessorySlots ?? 0;
     if (accessorySlots > 0) {
-        for (let i = 0; i < accessorySlots; i += 1) {
-            steps.push(createStep(`accessory_slot_${i + 1}`, `Accessory Slot ${i + 1}`, 'Select an accessory for this slot.', state => buildAccessorySelectionOptions(state, i), ['accessories']));
-        }
-        if (accessorySlots < MAX_ACCESSORY_SLOTS) {
-            steps.push(createStep(`accessory_more_${accessorySlots + 1}`, 'Add another accessory?', 'Viewers can queue up to ten accessories.', () => buildAccessoryMoreOptions(accessorySlots), ['accessories']));
-        }
+        steps.push(...createAccessorySteps(accessorySlots));
     }
 
     steps.push(createStep('scars_toggle', 'Scars', 'Choose whether to add scars.', () => buildScarToggleOptions(), ['scars']));
     const scarSlots = workingState.params._scarSlots ?? 0;
     if (scarSlots > 0) {
-        for (let i = 0; i < scarSlots; i += 1) {
-            steps.push(createStep(`scar_slot_${i + 1}`, `Scar Slot ${i + 1}`, 'Pick a scar for this slot.', state => buildScarSelectionOptions(state, i), ['scars']));
-        }
-        if (scarSlots < MAX_SCAR_SLOTS) {
-            steps.push(createStep(`scar_more_${scarSlots + 1}`, 'Add another scar?', 'Viewers can queue several scars, up to six slots.', () => buildScarMoreOptions(scarSlots), ['scars']));
-        }
+        steps.push(...createScarSteps(scarSlots));
     }
 
-    steps.push(createStep('pose', 'Pose', 'Choose the final sprite pose to present the cat.', buildPoseOptions, ['pose']));
     steps.push(
+        createStep('pose', 'Pose', 'Choose the final sprite pose to present the cat.', buildPoseOptions, ['pose']),
         ...createRegistryTraitVotingSteps(
             catalogSource,
             workingState,

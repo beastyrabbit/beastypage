@@ -1303,7 +1303,7 @@ body {
   font-weight: 600;
   color: var(--text);
   text-align: center;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .clan-cat-id {

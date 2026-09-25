@@ -19,10 +19,10 @@ const CATEGORY_ORDER = ["pixelate", "dither", "color", "effect"];
 function OperationTile({
   type,
   label,
-}: {
+}: Readonly<{
   type: OperationType;
   label: string;
-}) {
+}>) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `toolbox-${type}`,
     data: { operationType: type },
@@ -48,9 +48,9 @@ function OperationTile({
 
 export function ToolboxDragOverlay({
   operationType,
-}: {
+}: Readonly<{
   operationType: OperationType;
-}) {
+}>) {
   const def = OPERATIONS.find((o) => o.type === operationType);
   if (!def) return null;
 

@@ -53,7 +53,12 @@ export function canvasToPngBlob(canvas: CanvasExportSource): Promise<Blob> {
 
 /** Format a multiplier value like 1 -> "1x", 0.25 -> "0.25x", 2.50 -> "2.5x" */
 export function formatMultiplier(v: number): string {
-  return `${v.toFixed(2).replace(/\.?0+$/, "")}x`;
+  const text = v.toFixed(2);
+  // Drop trailing zeros, then the decimal point if nothing follows it.
+  let end = text.length;
+  while (end > 0 && text[end - 1] === "0") end--;
+  if (end < text.length && text[end - 1] === ".") end--;
+  return `${text.slice(0, end)}x`;
 }
 
 export function encodePortableCodeFromSettings(

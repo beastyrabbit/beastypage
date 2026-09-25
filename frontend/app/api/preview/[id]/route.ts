@@ -32,7 +32,7 @@ function isAbortError(error: unknown) {
 }
 
 function dataUrlToPngBuffer(dataUrl: string): Buffer | null {
-  const matches = dataUrl.match(PNG_DATA_URL_REGEX);
+  const matches = PNG_DATA_URL_REGEX.exec(dataUrl);
   if (!matches) {
     return null;
   }

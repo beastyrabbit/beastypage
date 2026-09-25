@@ -237,8 +237,10 @@ export function CoatPatternLab() {
 
         <footer className={styles.footerNote}>
           <span aria-hidden="true" className={styles.pixelMark} />
-          These are renderer-made 50 × 50 sprites. The page uses
-          nearest-neighbour scaling and no generated images.
+          <span>
+            These are renderer-made 50 × 50 sprites. The page uses
+            nearest-neighbour scaling and no generated images.
+          </span>
         </footer>
       </div>
     </main>
@@ -254,7 +256,7 @@ function PatternCard({
   sourcePelts,
   pose,
   loading,
-}: {
+}: Readonly<{
   id: CoatPatternId;
   index: number;
   name: string;
@@ -263,7 +265,7 @@ function PatternCard({
   sourcePelts: readonly string[];
   pose: string;
   loading: boolean;
-}) {
+}>) {
   return (
     <article className={styles.patternCard} data-loading={loading}>
       <header>

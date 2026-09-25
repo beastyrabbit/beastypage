@@ -20,7 +20,8 @@ const GRID_COLS = 5;
 const SPRITE_SIZE = 50;
 const GRID_WIDTH = GRID_COLS * SPRITE_SIZE;
 
-type SpriteSelection = string | "all";
+// A pose name, or "all" to render every pose.
+type SpriteSelection = string;
 
 type ColorPaletteContentProps = {
   slug?: string | null;
@@ -28,6 +29,27 @@ type ColorPaletteContentProps = {
   imageUrl?: string | null;
   paletteSlug?: string | null;
 };
+
+function extractCatParams(
+  data: Record<string, unknown>,
+  darkForestParam: string | null,
+): Record<string, unknown> | null {
+  let sourceParams: Record<string, unknown>;
+  if (data.params && typeof data.params === "object") {
+    sourceParams = data.params as Record<string, unknown>;
+  } else if (data.spriteNumber !== undefined) {
+    // Flat format — the entire catData IS the params
+    sourceParams = data;
+  } else {
+    return null;
+  }
+  let params = { ...sourceParams };
+  if (darkForestParam === "false") {
+    params = { ...params, darkForest: false, darkMode: false };
+    syncChangedRegistryTraitsFromLegacy(params, ["darkForest"]);
+  }
+  return params;
+}
 
 export function ColorPaletteContent({
   slug = null,
@@ -74,22 +96,10 @@ export function ColorPaletteContent({
   // Handles both wrapped format ({ params: {...} }) and flat format (pre-v4.2.3 Discord cats)
   const catParams = useMemo(() => {
     if (!mapperRecord?.cat_data) return null;
-    const data = mapperRecord.cat_data as Record<string, unknown>;
-    let sourceParams: Record<string, unknown>;
-    if (data.params && typeof data.params === "object") {
-      sourceParams = data.params as Record<string, unknown>;
-    } else if (data.spriteNumber !== undefined) {
-      // Flat format — the entire catData IS the params
-      sourceParams = data;
-    } else {
-      return null;
-    }
-    let params = { ...sourceParams };
-    if (darkForestParam === "false") {
-      params = { ...params, darkForest: false, darkMode: false };
-      syncChangedRegistryTraitsFromLegacy(params, ["darkForest"]);
-    }
-    return params;
+    return extractCatParams(
+      mapperRecord.cat_data as Record<string, unknown>,
+      darkForestParam,
+    );
   }, [mapperRecord, darkForestParam]);
 
   // Load cat generator module

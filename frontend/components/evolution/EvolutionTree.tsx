@@ -85,7 +85,7 @@ export function EvolutionTree({
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([branch, list]) => ({
           branch,
-          cats: list.sort((a, b) => a.level - b.level),
+          cats: list.toSorted((a, b) => a.level - b.level),
         })),
     };
   }, [cats]);
@@ -181,7 +181,7 @@ export function EvolutionTree({
   );
 }
 
-function Connector({ theme }: { theme: ArchetypeTheme }) {
+function Connector({ theme }: Readonly<{ theme: ArchetypeTheme }>) {
   return (
     <div
       className="flex items-center justify-center self-center py-0.5 sm:py-0"
@@ -208,10 +208,10 @@ function Connector({ theme }: { theme: ArchetypeTheme }) {
 function StarterCard({
   cat,
   onPreview,
-}: {
+}: Readonly<{
   cat: EvolutionTreeCat;
   onPreview: () => void;
-}) {
+}>) {
   return (
     <div
       className="flex w-full max-w-xs flex-col items-center gap-3 rounded-2xl border p-4"
@@ -283,11 +283,11 @@ function TreeCard({
   cat,
   theme,
   onPreview,
-}: {
+}: Readonly<{
   cat: EvolutionTreeCat;
   theme: ArchetypeTheme;
   onPreview: () => void;
-}) {
+}>) {
   const chips = buildAdditionChips(cat.additions, cat.key);
   const visibleChips = chips.slice(0, MAX_VISIBLE_CHIPS);
   const hiddenCount = chips.length - visibleChips.length;
@@ -373,10 +373,10 @@ function TreeCard({
 function CatDetailModal({
   cat,
   onClose,
-}: {
+}: Readonly<{
   cat: EvolutionTreeCat;
   onClose: () => void;
-}) {
+}>) {
   const theme = getArchetypeTheme(cat.archetype);
   const rows = buildRollDisplayRows(
     cat.rolls,

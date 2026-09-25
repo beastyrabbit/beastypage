@@ -70,17 +70,15 @@ let spriteMapperReady: Promise<SpriteMapperApi> | null = null;
 
 export async function ensureSpriteMapper(): Promise<SpriteMapperApi> {
   if (spriteMapperInstance?.loaded) return spriteMapperInstance;
-  if (!spriteMapperReady) {
-    spriteMapperReady = (async () => {
-      const mod = (await import("@/lib/single-cat/spriteMapper")) as {
-        default: SpriteMapperApi;
-      };
-      const mapper = mod.default;
-      if (!mapper.loaded) await mapper.init();
-      spriteMapperInstance = mapper;
-      return mapper;
-    })();
-  }
+  spriteMapperReady ??= (async () => {
+    const mod = (await import("@/lib/single-cat/spriteMapper")) as {
+      default: SpriteMapperApi;
+    };
+    const mapper = mod.default;
+    if (!mapper.loaded) await mapper.init();
+    spriteMapperInstance = mapper;
+    return mapper;
+  })();
   return spriteMapperReady;
 }
 
@@ -121,7 +119,7 @@ function withLegacyCountOptions(
   options: RandomGenerationOptions,
 ): GachaSlotOverrides | undefined {
   const slotOverrides: GachaSlotOverrides = {
-    ...(options.slotOverrides ?? {}),
+    ...options.slotOverrides,
   };
   const legacyCounts: Array<
     [

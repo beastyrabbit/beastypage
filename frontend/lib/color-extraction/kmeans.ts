@@ -336,8 +336,7 @@ function findBestPosition(
     return { x: centroid.x, y: centroid.y };
   }
 
-  const maxSpatialDist =
-    Math.sqrt(imageWidth * imageWidth + imageHeight * imageHeight) || 1;
+  const maxSpatialDist = Math.hypot(imageWidth, imageHeight) || 1;
 
   let bestScore = Infinity;
   let bestPixel = clusterPixels[0];
@@ -345,7 +344,7 @@ function findBestPosition(
   for (const p of clusterPixels) {
     const dx = p.x - centroid.x;
     const dy = p.y - centroid.y;
-    const spatialDist = Math.sqrt(dx * dx + dy * dy) / maxSpatialDist;
+    const spatialDist = Math.hypot(dx, dy) / maxSpatialDist;
     const normalizedColorDist = colorDistance(p, centroid) / MAX_COLOR_DIST;
 
     // Weight spatial proximity (0.6) more than color (0.4) since
@@ -487,6 +486,38 @@ export function createSpotlightImage(
 }
 
 /**
+ * Paint every source pixel within `threshold` of `targetColor` with that color
+ */
+function paintMatchingPixels(
+  data: Uint8ClampedArray,
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  targetColor: RGB,
+  threshold: number,
+): void {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const sourceAlpha = data[i + 3];
+
+      // Skip fully transparent pixels
+      if (sourceAlpha === 0) continue;
+
+      const pixelColor = { r: data[i], g: data[i + 1], b: data[i + 2] };
+      const dist = colorDistance(pixelColor, targetColor);
+
+      // If pixel matches this target color, paint it with the target color
+      if (dist <= threshold) {
+        pixels[i] = targetColor.r;
+        pixels[i + 1] = targetColor.g;
+        pixels[i + 2] = targetColor.b;
+      }
+    }
+  }
+}
+
+/**
  * Create a spotlight image with multiple colors highlighted as layers
  * Each color's matching areas are painted with that color, with later colors
  * layered on top (dominant 1 at bottom, then dominant 2, ..., accent colors on top)
@@ -521,25 +552,7 @@ export function createMultiColorSpotlightImage(
 
   // Second pass: paint matching colors in order (later colors overlay earlier ones)
   for (const targetColor of targetColors) {
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const i = (y * width + x) * 4;
-        const sourceAlpha = data[i + 3];
-
-        // Skip fully transparent pixels
-        if (sourceAlpha === 0) continue;
-
-        const pixelColor = { r: data[i], g: data[i + 1], b: data[i + 2] };
-        const dist = colorDistance(pixelColor, targetColor);
-
-        // If pixel matches this target color, paint it with the target color
-        if (dist <= threshold) {
-          pixels[i] = targetColor.r;
-          pixels[i + 1] = targetColor.g;
-          pixels[i + 2] = targetColor.b;
-        }
-      }
-    }
+    paintMatchingPixels(data, pixels, width, height, targetColor, threshold);
   }
 
   ctx.putImageData(imageData, 0, 0);
@@ -574,37 +587,8 @@ export function extractFamilyColors(
 
   // Recursive inner function (matches Python's recursive_group_colors)
   function recursiveExtract(threshold: number): ExtractedColor[] {
-    // Validate sampleStep
-    const step = opts.sampleStep;
-    if (!Number.isInteger(step) || step < 1) {
-      throw new Error(`sampleStep must be a positive integer, got: ${step}`);
-    }
-
     // Sample ALL pixels (don't filter by similarity yet - that comes after k-means)
-    const pixels: PixelData[] = [];
-
-    for (let y = 0; y < height; y += step) {
-      for (let x = 0; x < width; x += step) {
-        const i = (y * width + x) * 4;
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const a = data[i + 3];
-
-        // Skip transparent pixels
-        if (a < 128) continue;
-
-        // Skip black/white if filtering
-        if (
-          opts.filterBlackWhite &&
-          isBlackOrWhite({ r, g, b }, opts.blackWhiteThreshold)
-        ) {
-          continue;
-        }
-
-        pixels.push({ r, g, b, x, y });
-      }
-    }
+    const pixels = samplePixels(data, width, height, opts);
 
     // Check unique color count
     const uniqueCount = countUniqueColors(pixels);

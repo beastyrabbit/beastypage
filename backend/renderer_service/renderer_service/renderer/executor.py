@@ -67,28 +67,42 @@ def load_render_plan(path: Path = DEFAULT_PLAN_PATH) -> RenderPlan:
         raise InvalidRenderPlan(f"Render plan validation failed: {exc}") from exc
 
 
-def _sort_operations(operations: list[RenderOperation]) -> tuple[RenderOperation, ...]:
+def _index_operations(
+    operations: list[RenderOperation],
+) -> dict[str, RenderOperation]:
     by_id: dict[str, RenderOperation] = {}
     for operation in operations:
         if operation.id in by_id:
             raise InvalidRenderPlan(f"Duplicate render operation '{operation.id}'")
         by_id[operation.id] = operation
+    return by_id
+
+
+def _check_dependencies(
+    operation: RenderOperation, by_id: dict[str, RenderOperation]
+) -> None:
+    unique_dependencies = set(operation.depends_on)
+    if len(unique_dependencies) != len(operation.depends_on):
+        raise InvalidRenderPlan(
+            f"Operation '{operation.id}' contains duplicate dependencies"
+        )
+    if operation.id in unique_dependencies:
+        raise InvalidRenderPlan(f"Operation '{operation.id}' depends on itself")
+    for dependency in operation.depends_on:
+        if dependency not in by_id:
+            raise InvalidRenderPlan(
+                f"Operation '{operation.id}' depends on unknown '{dependency}'"
+            )
+
+
+def _sort_operations(operations: list[RenderOperation]) -> tuple[RenderOperation, ...]:
+    by_id = _index_operations(operations)
 
     indegree: dict[str, int] = {operation.id: 0 for operation in operations}
     dependents: dict[str, list[str]] = {}
     for operation in operations:
-        unique_dependencies = set(operation.depends_on)
-        if len(unique_dependencies) != len(operation.depends_on):
-            raise InvalidRenderPlan(
-                f"Operation '{operation.id}' contains duplicate dependencies"
-            )
-        if operation.id in unique_dependencies:
-            raise InvalidRenderPlan(f"Operation '{operation.id}' depends on itself")
+        _check_dependencies(operation, by_id)
         for dependency in operation.depends_on:
-            if dependency not in by_id:
-                raise InvalidRenderPlan(
-                    f"Operation '{operation.id}' depends on unknown '{dependency}'"
-                )
             dependents.setdefault(dependency, []).append(operation.id)
             indegree[operation.id] += 1
 
@@ -120,6 +134,73 @@ def _sort_operations(operations: list[RenderOperation]) -> tuple[RenderOperation
     return tuple(ordered)
 
 
+def _check_catalog_hash(plan: RenderPlan, expected_catalog_hash: str | None) -> None:
+    configured_catalog_hash = (
+        expected_catalog_hash
+        if expected_catalog_hash is not None
+        else os.getenv("CAT_SYSTEM_CATALOG_HASH", "unknown")
+    ).strip()
+    if (
+        configured_catalog_hash != "unknown"
+        and re.fullmatch(r"[a-f0-9]{64}", configured_catalog_hash) is None
+    ):
+        raise InvalidRenderPlan(
+            "CAT_SYSTEM_CATALOG_HASH must be 'unknown' for local runs or a "
+            "64-character lowercase SHA-256 hash"
+        )
+    if configured_catalog_hash not in {"unknown", plan.catalog_hash}:
+        raise InvalidRenderPlan(
+            "CAT_SYSTEM_CATALOG_HASH does not match render plan catalogHash "
+            f"({configured_catalog_hash} != {plan.catalog_hash})"
+        )
+
+
+def _check_operation_config(
+    operation: RenderOperation, registry: StrategyRegistry
+) -> None:
+    definition = registry.resolve(
+        operation.strategy,
+        operation.strategy_version,
+    )
+    if not isinstance(operation.config, definition.config_model):
+        raise InvalidRenderPlan(
+            f"Operation '{operation.id}' config does not match "
+            f"{operation.strategy}@{operation.strategy_version}"
+        )
+    declared_reads = set(operation.reads)
+    config_dump = operation.config.model_dump(by_alias=True)
+    for input_key in ("valueTrait", "tintTrait"):
+        value = config_dump.get(input_key)
+        if isinstance(value, str) and value not in declared_reads:
+            raise InvalidRenderPlan(
+                f"Operation '{operation.id}' reads '{value}' through config "
+                "but does not declare it in reads"
+            )
+
+
+def _plan_sprite_references(
+    plan: RenderPlan,
+) -> tuple[set[str], list[tuple[str, list[str]]]]:
+    sprite_keys: set[str] = set()
+    fallback_groups: list[tuple[str, list[str]]] = []
+    for entries in plan.catalogs.values():
+        sprite_keys.update(
+            entry.sprite_key for entry in entries if entry.sprite_key is not None
+        )
+    for operation in plan.operations:
+        config = operation.config.model_dump(by_alias=True)
+        raw_keys = config.get("spriteKeys")
+        if isinstance(raw_keys, list):
+            fallback_groups.append((operation.id, [str(key) for key in raw_keys]))
+        for mapping_key in ("spriteByValue", "sprites"):
+            mapping = config.get(mapping_key)
+            if isinstance(mapping, dict):
+                sprite_keys.update(
+                    str(key) for key in mapping.values() if isinstance(key, str)
+                )
+    return sprite_keys, fallback_groups
+
+
 class RenderExecutor:
     def __init__(
         self,
@@ -147,44 +228,9 @@ class RenderExecutor:
                 f"strategies ({plan.manifest_hash} != {actual_manifest_hash})"
             )
 
-        configured_catalog_hash = (
-            expected_catalog_hash
-            if expected_catalog_hash is not None
-            else os.getenv("CAT_SYSTEM_CATALOG_HASH", "unknown")
-        ).strip()
-        if (
-            configured_catalog_hash != "unknown"
-            and re.fullmatch(r"[a-f0-9]{64}", configured_catalog_hash) is None
-        ):
-            raise InvalidRenderPlan(
-                "CAT_SYSTEM_CATALOG_HASH must be 'unknown' for local runs or a "
-                "64-character lowercase SHA-256 hash"
-            )
-        if configured_catalog_hash not in {"unknown", plan.catalog_hash}:
-            raise InvalidRenderPlan(
-                "CAT_SYSTEM_CATALOG_HASH does not match render plan catalogHash "
-                f"({configured_catalog_hash} != {plan.catalog_hash})"
-            )
-
+        _check_catalog_hash(plan, expected_catalog_hash)
         for operation in plan.operations:
-            definition = registry.resolve(
-                operation.strategy,
-                operation.strategy_version,
-            )
-            if not isinstance(operation.config, definition.config_model):
-                raise InvalidRenderPlan(
-                    f"Operation '{operation.id}' config does not match "
-                    f"{operation.strategy}@{operation.strategy_version}"
-                )
-            declared_reads = set(operation.reads)
-            config_dump = operation.config.model_dump(by_alias=True)
-            for input_key in ("valueTrait", "tintTrait"):
-                value = config_dump.get(input_key)
-                if isinstance(value, str) and value not in declared_reads:
-                    raise InvalidRenderPlan(
-                        f"Operation '{operation.id}' reads '{value}' through config "
-                        "but does not declare it in reads"
-                    )
+            _check_operation_config(operation, registry)
 
         self.operations = _sort_operations(plan.operations)
         if verify_static_assets:
@@ -216,23 +262,7 @@ class RenderExecutor:
                 f"Sample: {sample}"
             )
 
-        sprite_keys: set[str] = set()
-        fallback_groups: list[tuple[str, list[str]]] = []
-        for entries in plan.catalogs.values():
-            sprite_keys.update(
-                entry.sprite_key for entry in entries if entry.sprite_key is not None
-            )
-        for operation in plan.operations:
-            config = operation.config.model_dump(by_alias=True)
-            raw_keys = config.get("spriteKeys")
-            if isinstance(raw_keys, list):
-                fallback_groups.append((operation.id, [str(key) for key in raw_keys]))
-            for mapping_key in ("spriteByValue", "sprites"):
-                mapping = config.get(mapping_key)
-                if isinstance(mapping, dict):
-                    sprite_keys.update(
-                        str(key) for key in mapping.values() if isinstance(key, str)
-                    )
+        sprite_keys, fallback_groups = _plan_sprite_references(plan)
 
         missing_keys = sorted(
             sprite_key

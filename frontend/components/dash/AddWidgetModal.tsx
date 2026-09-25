@@ -54,10 +54,10 @@ export function AddWidgetModal({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70"
-      role="button"
-      tabIndex={0}
+    <dialog
+      open
+      aria-modal="true"
+      className="fixed inset-0 z-[70] flex h-full max-h-none w-full max-w-none items-center justify-center bg-black/70 text-inherit"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -136,6 +136,6 @@ export function AddWidgetModal({
           );
         })}
       </div>
-    </div>
+    </dialog>
   );
 }

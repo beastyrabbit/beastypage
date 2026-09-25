@@ -1355,6 +1355,13 @@ function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
+function fallbackBaseSuffix(lifeStage: LifeStage): string {
+  if (lifeStage === "kit") return "kit";
+  if (lifeStage === "apprentice") return "paw";
+  if (lifeStage === "leader") return "star";
+  return pickOne(SUFFIXES);
+}
+
 export function generateWarriorName(
   lifeStage: LifeStage,
   usedNames?: Set<string>,
@@ -1388,14 +1395,7 @@ export function generateWarriorName(
   // Fallback: add a timestamp suffix to guarantee uniqueness
   const prefix = pickOne(PREFIXES);
   const uniqueSuffix = Date.now().toString(36).slice(-4);
-  const baseSuffix =
-    lifeStage === "kit"
-      ? "kit"
-      : lifeStage === "apprentice"
-        ? "paw"
-        : lifeStage === "leader"
-          ? "star"
-          : pickOne(SUFFIXES);
+  const baseSuffix = fallbackBaseSuffix(lifeStage);
   // Include uniqueSuffix in suffix to maintain invariant: full === capitalize(prefix) + suffix
   const suffix = `${baseSuffix}${uniqueSuffix}`;
   const full = capitalize(prefix) + suffix;

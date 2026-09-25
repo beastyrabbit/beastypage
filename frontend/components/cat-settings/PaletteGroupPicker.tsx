@@ -38,24 +38,25 @@ function MiniColorCard({
   rgb,
   screen,
   pattern,
-}: {
+}: Readonly<{
   name: string;
   rgb: [number, number, number];
   screen?: [number, number, number, number];
   pattern?: PatternDefinition;
-}) {
+}>) {
   const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
   const textColor = luminance > 0.5 ? "text-black/80" : "text-white/90";
 
   const bgStyle: React.CSSProperties = pattern
     ? patternToCssBackground(pattern)
     : { backgroundColor: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})` };
+  const patternSuffix = pattern ? ` (${pattern.type})` : "";
 
   return (
     <div
       className="group/card relative aspect-square overflow-hidden rounded border border-border/30 transition-transform duration-200 hover:z-30 hover:scale-[4] hover:shadow-xl hover:rounded-lg"
       style={bgStyle}
-      title={`${name.replace(/_/g, " ")}${pattern ? ` (${pattern.type})` : ""}`}
+      title={`${name.replace(/_/g, " ")}${patternSuffix}`}
     >
       {/* Detail overlay — only visible on hover (when scaled up) */}
       <div
@@ -106,11 +107,11 @@ function PaletteCard({
   palette,
   isSelected,
   onToggle,
-}: {
+}: Readonly<{
   palette: PaletteCategory;
   isSelected: boolean;
   onToggle: () => void;
-}) {
+}>) {
   const colors = Object.entries(palette.colors);
 
   return (

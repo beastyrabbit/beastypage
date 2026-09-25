@@ -23,39 +23,22 @@ type PageProps = {
   }>;
 };
 
-export default async function VisualBuilderPage({ searchParams }: PageProps) {
+function firstParam(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value[0];
+  return undefined;
+}
+
+export default async function VisualBuilderPage({
+  searchParams,
+}: Readonly<PageProps>) {
   const resolvedSearch = searchParams ? await searchParams : undefined;
 
-  const rawSlug =
-    typeof resolvedSearch?.slug === "string"
-      ? resolvedSearch.slug
-      : Array.isArray(resolvedSearch?.slug)
-        ? resolvedSearch?.slug[0]
-        : undefined;
-  const rawShare =
-    typeof resolvedSearch?.share === "string"
-      ? resolvedSearch.share
-      : Array.isArray(resolvedSearch?.share)
-        ? resolvedSearch?.share[0]
-        : undefined;
-  const rawCat =
-    typeof resolvedSearch?.cat === "string"
-      ? resolvedSearch.cat
-      : Array.isArray(resolvedSearch?.cat)
-        ? resolvedSearch?.cat[0]
-        : undefined;
-  const rawName =
-    typeof resolvedSearch?.name === "string"
-      ? resolvedSearch.name
-      : Array.isArray(resolvedSearch?.name)
-        ? resolvedSearch?.name[0]
-        : undefined;
-  const rawCreator =
-    typeof resolvedSearch?.creator === "string"
-      ? resolvedSearch.creator
-      : Array.isArray(resolvedSearch?.creator)
-        ? resolvedSearch?.creator[0]
-        : undefined;
+  const rawSlug = firstParam(resolvedSearch?.slug);
+  const rawShare = firstParam(resolvedSearch?.share);
+  const rawCat = firstParam(resolvedSearch?.cat);
+  const rawName = firstParam(resolvedSearch?.name);
+  const rawCreator = firstParam(resolvedSearch?.creator);
 
   const slugParam = rawSlug?.trim();
   const shareValue = (rawShare ?? rawCat)?.trim();

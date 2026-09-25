@@ -56,7 +56,12 @@ function generateViewerSessionId() {
   ) {
     return crypto.randomUUID();
   }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const buffer = new Uint8Array(8);
+  crypto.getRandomValues(buffer);
+  const randomPart = Array.from(buffer)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  return `${Date.now().toString(36)}-${randomPart}`;
 }
 
 function sanitizeName(value: string) {
@@ -541,7 +546,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
             <span className="font-semibold text-emerald-50">
               {participant.display_name || "Viewer"}
             </span>
-            .
+            {"."}
           </div>
         ) : (
           <form onSubmit={handleNameSubmit} className="space-y-2">

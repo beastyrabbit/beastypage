@@ -208,6 +208,53 @@ function assertCatalogValue(
   }
 }
 
+type CatSystemTrait = (typeof catSystem.traits)[number];
+
+function assertTraitValueCatalog(trait: CatSystemTrait, value: unknown): void {
+  const catalog = trait.value.catalog;
+  if (!catalog) return;
+  if (trait.value.kind === "string") {
+    assertCatalogValue(trait.id, `traits.${trait.id}`, catalog, value);
+  } else if (trait.value.kind === "stringList") {
+    for (const [index, entry] of (value as unknown[]).entries()) {
+      assertCatalogValue(
+        trait.id,
+        `traits.${trait.id}[${index}]`,
+        catalog,
+        entry,
+      );
+    }
+  }
+}
+
+function assertTortieLayerCatalogs(
+  trait: CatSystemTrait,
+  value: unknown,
+): void {
+  if (trait.gacha.strategy !== "tortieList") return;
+  for (const [index, layer] of (value as unknown[]).entries()) {
+    if (!isRecord(layer)) continue;
+    assertCatalogValue(
+      trait.id,
+      `traits.${trait.id}[${index}].mask`,
+      trait.gacha.maskCatalog,
+      layer.mask,
+    );
+    assertCatalogValue(
+      trait.id,
+      `traits.${trait.id}[${index}].pattern`,
+      trait.gacha.peltCatalog,
+      layer.pattern,
+    );
+    assertCatalogValue(
+      trait.id,
+      `traits.${trait.id}[${index}].colour`,
+      trait.gacha.colourCatalog,
+      layer.colour,
+    );
+  }
+}
+
 /** Mirrors the generated JSON-Schema catalog enums at synchronous TS boundaries. */
 function assertCatalogTraitValues(
   traits: Readonly<Record<string, unknown>>,
@@ -215,49 +262,8 @@ function assertCatalogTraitValues(
   for (const trait of catSystem.traits) {
     const value = traits[trait.id];
     if (value === undefined) continue;
-
-    if (trait.value.catalog) {
-      if (trait.value.kind === "string") {
-        assertCatalogValue(
-          trait.id,
-          `traits.${trait.id}`,
-          trait.value.catalog,
-          value,
-        );
-      } else if (trait.value.kind === "stringList") {
-        for (const [index, entry] of (value as unknown[]).entries()) {
-          assertCatalogValue(
-            trait.id,
-            `traits.${trait.id}[${index}]`,
-            trait.value.catalog,
-            entry,
-          );
-        }
-      }
-    }
-
-    if (trait.gacha.strategy !== "tortieList") continue;
-    for (const [index, layer] of (value as unknown[]).entries()) {
-      if (!isRecord(layer)) continue;
-      assertCatalogValue(
-        trait.id,
-        `traits.${trait.id}[${index}].mask`,
-        trait.gacha.maskCatalog,
-        layer.mask,
-      );
-      assertCatalogValue(
-        trait.id,
-        `traits.${trait.id}[${index}].pattern`,
-        trait.gacha.peltCatalog,
-        layer.pattern,
-      );
-      assertCatalogValue(
-        trait.id,
-        `traits.${trait.id}[${index}].colour`,
-        trait.gacha.colourCatalog,
-        layer.colour,
-      );
-    }
+    assertTraitValueCatalog(trait, value);
+    assertTortieLayerCatalogs(trait, value);
   }
 }
 
@@ -517,7 +523,7 @@ export function syncChangedRegistryTraitsFromLegacy<T extends object>(
     schemaVersion: catSystem.schemaVersion,
     traits,
     unknownTraits: {
-      ...(legacyDocument.unknownTraits ?? {}),
+      ...legacyDocument.unknownTraits,
       ...canonicalUnknown,
     },
   });
@@ -666,7 +672,7 @@ export function preserveUnknownTraits(
   return parseCatDocumentStrict({
     ...document,
     unknownTraits: {
-      ...(document.unknownTraits ?? {}),
+      ...document.unknownTraits,
       ...cloneJson(unknownTraits),
     },
   });

@@ -37,7 +37,7 @@ function inlineMarkdown(text: string): string {
     codeSpans.push(
       `<code class="rounded bg-white/10 px-1 py-0.5 text-[0.85em]">${escapeHtml(code)}</code>`,
     );
-    return `\x00CODE${idx}\x00`;
+    return `\uE000CODE${idx}\uE000`;
   });
 
   // HTML-escape remaining text before applying markdown transformations
@@ -66,10 +66,9 @@ function inlineMarkdown(text: string): string {
     },
   );
 
-  // Restore code spans (uses NUL byte sentinels to mark placeholders)
+  // Restore code spans (uses private-use U+E000 sentinels to mark placeholders)
   out = out.replace(
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional NUL byte sentinels
-    /\x00CODE(\d+)\x00/g,
+    /\uE000CODE(\d+)\uE000/g,
     (_m, idx: string) => codeSpans[Number.parseInt(idx, 10)],
   );
 
@@ -113,16 +112,16 @@ function markdownToHtml(md: string): string {
       }
       if (i < lines.length) i++; // skip closing ``` (guard unclosed blocks)
       const safeLang = lang.replace(/"/g, "&quot;");
+      const langAttr = safeLang ? ` data-lang="${safeLang}"` : "";
       out.push(
-        `<pre class="rounded-lg bg-black/40 p-3 text-xs overflow-x-auto"><code${safeLang ? ` data-lang="${safeLang}"` : ""}>${codeLines.join("\n")}</code></pre>`,
+        `<pre class="rounded-lg bg-black/40 p-3 text-xs overflow-x-auto"><code${langAttr}>${codeLines.join("\n")}</code></pre>`,
       );
       continue;
     }
 
     // GitHub-style admonitions: > [!NOTE], > [!WARNING], etc.
-    const admonitionMatch = line.match(
-      /^>\s*\[!(NOTE|TIP|WARNING|CAUTION|IMPORTANT)\]/,
-    );
+    const admonitionMatch =
+      /^>\s*\[!(NOTE|TIP|WARNING|CAUTION|IMPORTANT)\]/.exec(line);
     if (admonitionMatch) {
       const type = admonitionMatch[1].toLowerCase();
       const bodyLines: string[] = [];
@@ -151,7 +150,7 @@ function markdownToHtml(md: string): string {
     }
 
     // Headings
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)/);
+    const headingMatch = /^(#{1,6})\s+(.+)/.exec(line);
     if (headingMatch) {
       const level = headingMatch[1].length;
       out.push(

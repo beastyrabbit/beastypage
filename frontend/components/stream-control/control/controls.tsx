@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -15,7 +16,7 @@ export function SliderControl({
   format,
   disabled = false,
   onChange,
-}: {
+}: Readonly<{
   label: string;
   value: number;
   min: number;
@@ -24,23 +25,26 @@ export function SliderControl({
   format: (v: number) => string;
   disabled?: boolean;
   onChange: (v: number) => void;
-}) {
+}>) {
+  const inputId = useId();
   return (
-    <label className="block">
+    <div className="block">
       <div className="mb-1 flex items-baseline justify-between gap-2">
-        <span
+        <label
+          htmlFor={inputId}
           className={cn(
             "text-xs text-muted-foreground",
             disabled && "text-muted-foreground/50",
           )}
         >
           {label}
-        </span>
+        </label>
         <span className="tabular-nums text-sm font-semibold text-foreground">
           {format(value)}
         </span>
       </div>
       <input
+        id={inputId}
         type="range"
         min={min}
         max={max}
@@ -56,7 +60,7 @@ export function SliderControl({
           !disabled && "cursor-pointer",
         )}
       />
-    </label>
+    </div>
   );
 }
 
@@ -65,12 +69,12 @@ export function ToggleControl({
   description,
   checked,
   onChange,
-}: {
+}: Readonly<{
   label: string;
   description?: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
-}) {
+}>) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-border/40 bg-background/40 px-3 py-2">
       <div className="min-w-0">

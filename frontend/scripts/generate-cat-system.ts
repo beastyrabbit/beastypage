@@ -762,7 +762,7 @@ function readStrategyManifest(): {
   }
   const manifest = readJson<StrategyManifest>(manifestPath);
   if (!Array.isArray(manifest.strategies)) {
-    throw new Error("Python strategy manifest has no strategies array");
+    throw new TypeError("Python strategy manifest has no strategies array");
   }
   const hash = createHash("sha256")
     .update(readFileSync(manifestPath))
@@ -1048,12 +1048,14 @@ export function validateRenderStrategyAssets(
     }
     for (const element of elements) {
       if (isEmptyRenderableValue(element.id)) continue;
-      const spriteKey =
-        operation.config.resolver === "direct"
-          ? element.id
-          : operation.config.resolver === "mapping"
-            ? (operation.config.sprites?.[element.id] ?? element.spriteKey)
-            : element.spriteKey;
+      let spriteKey: string | undefined;
+      if (operation.config.resolver === "direct") {
+        spriteKey = element.id;
+      } else if (operation.config.resolver === "mapping") {
+        spriteKey = operation.config.sprites?.[element.id] ?? element.spriteKey;
+      } else {
+        spriteKey = element.spriteKey;
+      }
       if (!spriteKey) {
         throw new Error(
           `${operation.operationId} has no ${operation.config.resolver} sprite mapping for ${element.id}`,

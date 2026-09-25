@@ -237,9 +237,7 @@ function extractInitialPayload(
       : undefined,
     slug: slugValue,
     shareUrl: slugValue
-      ? shareSlug
-        ? `/visual-builder?share=${encodeURIComponent(slugValue)}`
-        : `/visual-builder?slug=${encodeURIComponent(slugValue)}`
+      ? `/visual-builder?${shareSlug ? "share" : "slug"}=${encodeURIComponent(slugValue)}`
       : null,
     catName: record.catName ?? null,
     creatorName: record.creatorName ?? null,

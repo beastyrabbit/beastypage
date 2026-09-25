@@ -53,6 +53,15 @@ interface CustomData {
   catData: AncestryTreeCat;
 }
 
+// Map family-chart's rel_type to our RelativeType (defaults to "son")
+function toRelativeType(relType: string): RelativeType {
+  if (relType === "daughter") return "daughter";
+  if (relType === "spouse") return "spouse";
+  if (relType === "father") return "father";
+  if (relType === "mother") return "mother";
+  return "son";
+}
+
 export const FamilyChartTree = forwardRef<
   FamilyChartTreeRef,
   FamilyChartTreeProps
@@ -127,6 +136,34 @@ export const FamilyChartTree = forwardRef<
     }
   }, []);
 
+  // Fall back to the current main ID (or the first cat) when no main datum exists
+  const recoverFallbackMainDatum = useCallback((): ReturnType<
+    typeof safeGetMainDatum
+  > => {
+    if (!chartRef.current || chartData.length === 0) return null;
+    const fallbackId = currentMainIdRef.current || chartData[0].id;
+    let mainDatum: ReturnType<typeof safeGetMainDatum> = null;
+    try {
+      chartRef.current.updateMainId(fallbackId);
+      chartRef.current.updateTree({ tree_position: "main_to_middle" });
+      mainDatum = safeGetMainDatum();
+      if (mainDatum) {
+        currentMainIdRef.current = fallbackId;
+        onMainIdChangeRef.current?.(fallbackId);
+      }
+    } catch (error) {
+      // Fallback also failed
+      console.error(
+        "[FamilyChartTree] Failed fallback main ID recovery for add-relative mode:",
+        error,
+      );
+      onAddRelativeErrorRef.current?.(
+        "Couldn't recover tree focus for add-relative mode. Please try selecting a cat first.",
+      );
+    }
+    return mainDatum;
+  }, [chartData, safeGetMainDatum]);
+
   // Expose methods via ref
   useImperativeHandle(
     ref,
@@ -172,26 +209,8 @@ export const FamilyChartTree = forwardRef<
         }
 
         // Step 4: If still no main datum, fall back to first cat in data
-        if (!mainDatum && chartData.length > 0) {
-          const fallbackId = currentMainIdRef.current || chartData[0].id;
-          try {
-            chartRef.current.updateMainId(fallbackId);
-            chartRef.current.updateTree({ tree_position: "main_to_middle" });
-            mainDatum = safeGetMainDatum();
-            if (mainDatum) {
-              currentMainIdRef.current = fallbackId;
-              onMainIdChangeRef.current?.(fallbackId);
-            }
-          } catch (error) {
-            // Fallback also failed
-            console.error(
-              "[FamilyChartTree] Failed fallback main ID recovery for add-relative mode:",
-              error,
-            );
-            onAddRelativeErrorRef.current?.(
-              "Couldn't recover tree focus for add-relative mode. Please try selecting a cat first.",
-            );
-          }
+        if (!mainDatum) {
+          mainDatum = recoverFallbackMainDatum();
         }
 
         // Step 5: Start add-relative mode if we have a valid datum
@@ -246,7 +265,7 @@ export const FamilyChartTree = forwardRef<
       },
       getCurrentMainId: () => currentMainIdRef.current,
     }),
-    [rootId, chartData, safeGetMainDatum],
+    [rootId, safeGetMainDatum, recoverFallbackMainDatum],
   );
 
   // Initialize chart
@@ -328,11 +347,7 @@ export const FamilyChartTree = forwardRef<
 
         if (parentCatData?.catData) {
           // Map rel_type from library to our RelativeType
-          let relType: RelativeType = "son";
-          if (newRelData.rel_type === "daughter") relType = "daughter";
-          else if (newRelData.rel_type === "spouse") relType = "spouse";
-          else if (newRelData.rel_type === "father") relType = "father";
-          else if (newRelData.rel_type === "mother") relType = "mother";
+          const relType = toRelativeType(newRelData.rel_type);
 
           // Cancel the add-relative mode after generating
           if (editTreeRef.current?.isAddingRelative()) {

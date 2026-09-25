@@ -137,7 +137,59 @@ import {
 } from "./spinSupport";
 import { useObsSession } from "./useObsSession";
 
-export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
+type TortieStageKind = "mask" | "pattern" | "colour";
+
+function compareCodeUnits(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+const COUNT_GROUP_TRAIT_IDS = {
+  accessory: "accessories",
+  scar: "scars",
+  tortieMask: "tortie",
+} as const;
+
+function selectForTortieStage<T>(
+  kind: TortieStageKind,
+  values: Readonly<Record<TortieStageKind, T>>,
+): T {
+  return values[kind];
+}
+
+function tortieStageColour(
+  kind: TortieStageKind,
+  candidateColour: string,
+  maskPatternColour: string,
+): string {
+  return kind === "colour" ? candidateColour : maskPatternColour;
+}
+
+function formatRevealedLayerValue(
+  definition: (typeof LAYER_GROUPS)[number],
+  slot: unknown,
+): string {
+  if (definition.compoundMode === "tortieParts") {
+    return formatTortieLayer((slot as TortieSlot | null) ?? null);
+  }
+  if (typeof slot === "string" && slot.toLowerCase() !== "none") {
+    return formatValue(slot);
+  }
+  return "None";
+}
+
+function pickStringSlots(primary: unknown, fallback: unknown): string[] {
+  let source: unknown[] = [];
+  if (Array.isArray(primary)) {
+    source = primary;
+  } else if (Array.isArray(fallback)) {
+    source = fallback;
+  }
+  return source.filter((entry): entry is string => typeof entry === "string");
+}
+
+export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   const {
     session,
     sessionSettingsRecord,
@@ -206,7 +258,6 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
     removeVariant: (_id: string) => {},
     renameVariant: (_id: string, _name: string) => {},
   };
-  const [_timingModalOpen, _setTimingModalOpen] = useState(false);
   const [_lastTimingSnapshot, setLastTimingSnapshot] =
     useState<TimingSnapshot | null>(null);
   const [speedMultiplier, setSpeedMultiplier] = useState(
@@ -469,7 +520,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
       tortieRange,
       exactLayerCounts,
       afterlifeMode,
-      extendedModes: [...extendedModes].sort(),
+      extendedModes: [...extendedModes].sort(compareCodeUnits),
       includeBaseColours,
       includeNewSprites,
       catName: catNameDraft,
@@ -782,7 +833,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
       const torties = Array.isArray(tortiesInput) ? tortiesInput : [];
 
       const valuesByTrait: Readonly<Record<string, unknown>> = {
-        ...(traitsInput ?? {}),
+        ...traitsInput,
         accessories,
         scars,
         tortie: torties,
@@ -860,14 +911,14 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
     setLayerRows(
       Object.fromEntries(
         LAYER_GROUPS.map((definition) => {
-          const configuredMax =
-            definition.traitId === "accessories"
-              ? accessoryRange.max
-              : definition.traitId === "scars"
-                ? scarRange.max
-                : definition.traitId === "tortie"
-                  ? tortieRange.max
-                  : 0;
+          let configuredMax = 0;
+          if (definition.traitId === "accessories") {
+            configuredMax = accessoryRange.max;
+          } else if (definition.traitId === "scars") {
+            configuredMax = scarRange.max;
+          } else if (definition.traitId === "tortie") {
+            configuredMax = tortieRange.max;
+          }
           return [
             definition.layerKey,
             placeholderRows(
@@ -1038,7 +1089,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
       );
 
       const valuesByTrait: Readonly<Record<string, unknown>> = {
-        ...(params.traits ?? {}),
+        ...params.traits,
         accessories: accessorySlots,
         scars: scarSlots,
         tortie: tortieSlots,
@@ -1052,12 +1103,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
               definition.layerKey,
               slots.map((slot, index) => ({
                 label: `${definition.label} ${index + 1}`,
-                value:
-                  definition.compoundMode === "tortieParts"
-                    ? formatTortieLayer((slot as TortieSlot | null) ?? null)
-                    : typeof slot === "string" && slot.toLowerCase() !== "none"
-                      ? formatValue(slot)
-                      : "None",
+                value: formatRevealedLayerValue(definition, slot),
                 status: "revealed" as const,
               })),
             ];
@@ -1099,49 +1145,41 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
             })
           : undefined;
 
-      const accessorySlots = Array.isArray(slotRecord?.accessories)
-        ? slotRecord.accessories.filter(
-            (entry): entry is string => typeof entry === "string",
-          )
-        : Array.isArray(params.accessories)
-          ? params.accessories.filter(
-              (entry): entry is string => typeof entry === "string",
-            )
-          : [];
-      const scarSlots = Array.isArray(slotRecord?.scars)
-        ? slotRecord.scars.filter(
-            (entry): entry is string => typeof entry === "string",
-          )
-        : Array.isArray(params.scars)
-          ? params.scars.filter(
-              (entry): entry is string => typeof entry === "string",
-            )
-          : [];
-      const tortieSlots = Array.isArray(slotRecord?.tortie)
-        ? slotRecord.tortie.map((slot) =>
-            slot &&
-            typeof slot === "object" &&
-            "mask" in slot &&
-            "pattern" in slot &&
-            "colour" in slot
-              ? {
-                  mask: String((slot as TortieSlot).mask),
-                  pattern: String((slot as TortieSlot).pattern),
-                  colour: String((slot as TortieSlot).colour),
-                }
-              : null,
-          )
-        : Array.isArray(params.tortie)
-          ? params.tortie.map((slot) =>
-              slot?.mask && slot?.pattern && slot?.colour
-                ? {
-                    mask: String(slot.mask),
-                    pattern: String(slot.pattern),
-                    colour: String(slot.colour),
-                  }
-                : null,
-            )
-          : [];
+      const accessorySlots = pickStringSlots(
+        slotRecord?.accessories,
+        params.accessories,
+      );
+      const scarSlots = pickStringSlots(slotRecord?.scars, params.scars);
+      let tortieSlots: ({
+        mask: string;
+        pattern: string;
+        colour: string;
+      } | null)[] = [];
+      if (Array.isArray(slotRecord?.tortie)) {
+        tortieSlots = slotRecord.tortie.map((slot) =>
+          slot &&
+          typeof slot === "object" &&
+          "mask" in slot &&
+          "pattern" in slot &&
+          "colour" in slot
+            ? {
+                mask: String((slot as TortieSlot).mask),
+                pattern: String((slot as TortieSlot).pattern),
+                colour: String((slot as TortieSlot).colour),
+              }
+            : null,
+        );
+      } else if (Array.isArray(params.tortie)) {
+        tortieSlots = params.tortie.map((slot) =>
+          slot?.mask && slot?.pattern && slot?.colour
+            ? {
+                mask: String(slot.mask),
+                pattern: String(slot.pattern),
+                colour: String(slot.colour),
+              }
+            : null,
+        );
+      }
 
       await showStaticCatState({
         params,
@@ -1886,23 +1924,21 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
             Math.max(stageConfigs.length, 1);
 
           for (const stage of stageConfigs) {
-            const stageKey: ParamTimingKey =
-              stage.kind === "mask"
-                ? "tortieMask"
-                : stage.kind === "pattern"
-                  ? "tortiePattern"
-                  : "tortieColour";
+            const stageKey: ParamTimingKey = selectForTortieStage(stage.kind, {
+              mask: "tortieMask",
+              pattern: "tortiePattern",
+              colour: "tortieColour",
+            });
             const stageStart =
               typeof performance !== "undefined"
                 ? performance.now()
                 : Date.now();
             setRollerLabel(`Tortie Layer ${i + 1} – ${stage.label}`);
-            const stageTargetValue =
-              stage.kind === "mask"
-                ? working.mask
-                : stage.kind === "pattern"
-                  ? working.pattern
-                  : target.colour;
+            const stageTargetValue = selectForTortieStage(stage.kind, {
+              mask: working.mask,
+              pattern: working.pattern,
+              colour: target.colour,
+            });
             const options = buildLayerOptionStrings(
               stage.source,
               stageTargetValue,
@@ -1924,12 +1960,11 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
                     stage.kind === "pattern"
                       ? (option.raw as string)
                       : working.pattern,
-                  colour:
-                    stage.kind === "colour"
-                      ? (option.raw as string)
-                      : stage.kind === "mask" || stage.kind === "pattern"
-                        ? maskPatternColour
-                        : working.colour,
+                  colour: tortieStageColour(
+                    stage.kind,
+                    option.raw as string,
+                    maskPatternColour,
+                  ),
                 };
                 const tortieList = committed.map((layer) => ({ ...layer }));
                 tortieList.push(candidateLayer);
@@ -1983,12 +2018,11 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
                   stage.kind === "pattern"
                     ? (step.frame.option.raw as string)
                     : working.pattern,
-                colour:
-                  stage.kind === "colour"
-                    ? (step.frame.option.raw as string)
-                    : stage.kind === "mask" || stage.kind === "pattern"
-                      ? maskPatternColour
-                      : working.colour,
+                colour: tortieStageColour(
+                  stage.kind,
+                  step.frame.option.raw as string,
+                  maskPatternColour,
+                ),
               };
 
               const drawStep = () => drawCanvas(step.frame.canvas);
@@ -2319,11 +2353,7 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
           try {
             syncChangedRegistryTraitsFromLegacy(previewParams, [
               "pose",
-              group.key === "accessory"
-                ? "accessories"
-                : group.key === "scar"
-                  ? "scars"
-                  : "tortie",
+              COUNT_GROUP_TRAIT_IDS[group.key],
             ]);
             const result = await generator.generateCat(previewParams);
             const catCanvas = cloneSourceCanvas(
@@ -2609,8 +2639,8 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
 
       // Count reveal done — resize layer rows from max-prefill to actual slot counts
       resetLayerRows(accessorySlots, scarSlots, tortieSlots, {
-        ...(params.traits ?? {}),
-        ...(randomResult.slotSelections ?? {}),
+        ...params.traits,
+        ...randomResult.slotSelections,
       });
 
       for (const definition of PARAM_SEQUENCE) {
@@ -3407,12 +3437,11 @@ export function ObsOverlayClient({ apiKey }: { apiKey: string }) {
       ? Number(currentState.params.spriteNumber)
       : DEFAULT_SPRITE_NUMBER;
   const canCopySprite = Boolean(currentState && generatorRef.current);
+  const currentPoseLabel = currentState?.params.poseName
+    ? formatPoseName(currentState.params.poseName)
+    : `Sprite ${currentSpriteNumber}`;
   const _spriteToolsSubtitle = canCopySprite
-    ? `Current pose: ${
-        currentState?.params.poseName
-          ? formatPoseName(currentState.params.poseName)
-          : `Sprite ${currentSpriteNumber}`
-      }`
+    ? `Current pose: ${currentPoseLabel}`
     : "Roll a cat to unlock sprite tools";
   const existingCatName = (currentState?.catName ?? "").trim();
   const existingCreatorName = (currentState?.creatorName ?? "").trim();

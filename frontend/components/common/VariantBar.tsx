@@ -20,7 +20,7 @@ export function VariantBar<T>({
   applyConfig,
   isDirty,
   showToast,
-}: VariantBarProps<T>) {
+}: Readonly<VariantBarProps<T>>) {
   const { isAuthenticated } = useConvexAuth();
   const {
     store,
@@ -242,10 +242,11 @@ export function VariantBar<T>({
 
       {/* Manage popup */}
       {manageOpen && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70"
-          role="button"
-          tabIndex={0}
+        <dialog
+          open
+          aria-modal="true"
+          tabIndex={-1}
+          className="fixed inset-0 z-[70] flex h-full max-h-none w-full max-w-none items-center justify-center bg-black/70 text-inherit"
           onClick={(e) => {
             if (e.target === e.currentTarget) setManageOpen(false);
           }}
@@ -359,7 +360,7 @@ export function VariantBar<T>({
               </p>
             )}
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );
