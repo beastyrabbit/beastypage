@@ -7,6 +7,7 @@ import {
   withAlpha,
 } from "@/components/evolution/archetypes";
 import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
+import type { RandomGenerationOptions } from "@/lib/cat-v3/types";
 import {
   estimateCeremonySeconds,
   formatDuration,
@@ -98,6 +99,142 @@ interface FlyingCat {
   size: number; // lobbyCatMinSize..lobbyCatMaxSize (default 1–2)
 }
 
+/** Generation-relevant lobby settings — changing these restarts the spawn loop. */
+interface LobbyGenSettings {
+  accessoryMax: number;
+  scarMax: number;
+  tortieMax: number;
+  exactLayerCounts: boolean;
+  extendedModes: string[];
+  includeBaseColours: boolean;
+  includeNewSprites: boolean;
+}
+
+function lobbyRandomCatOptions(gs: LobbyGenSettings): RandomGenerationOptions {
+  return {
+    accessoryCount: gs.accessoryMax,
+    scarCount: gs.scarMax,
+    tortieCount: gs.tortieMax,
+    exactLayerCounts: gs.exactLayerCounts,
+    experimentalColourMode:
+      gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
+    includeBaseColours: gs.includeBaseColours,
+    includeNewSprites: gs.includeNewSprites,
+  };
+}
+
+/** Render one extra animation frame — same sprite and pose, new params. */
+async function renderLobbyFrame(
+  generator: CatGeneratorApi,
+  gs: LobbyGenSettings,
+  fixedPose: string | undefined,
+  fixedSprite: number,
+): Promise<string | null> {
+  const r = await generator.generateRandomCat?.(lobbyRandomCatOptions(gs));
+  if (!(r?.canvas instanceof HTMLCanvasElement)) return null;
+  const overrideParams = {
+    ...r.params,
+    poseName: fixedPose ?? r.params.poseName,
+    spriteNumber: fixedSprite,
+    reverse: false,
+  };
+  syncChangedRegistryTraitsFromLegacy(overrideParams, ["pose", "reverse"]);
+  const rendered = await generator.generateCat(overrideParams);
+  return rendered.canvas instanceof HTMLCanvasElement
+    ? rendered.canvas.toDataURL("image/png")
+    : null;
+}
+
+type LobbyInfoMode = NonNullable<LobbySettings["lobbyInfoMode"]>;
+type LobbyChip = { label: string; value: string };
+
+function lobbyCardTitle(infoMode: LobbyInfoMode): string {
+  if (infoMode === "evolution") return "Evolution Ceremony";
+  if (infoMode === "batch") return "Adoption Elimination";
+  return "Spin Settings";
+}
+
+const rangeStr = (r: LayerRange) => `${r.min}–${r.max}`;
+
+/** Info chips for the settings card — follows the control page's mode. */
+function buildLobbyChips(
+  settings: LobbySettings,
+  infoMode: LobbyInfoMode,
+): LobbyChip[] {
+  const evolutionInfo = settings.evolutionInfo;
+  const batchInfo = settings.batchInfo;
+  if (infoMode === "evolution" && evolutionInfo) {
+    return [
+      { label: "Clans", value: String(evolutionInfo.clans.length) },
+      { label: "Target Level", value: String(evolutionInfo.targetLevel) },
+      { label: "Spin Time", value: `${evolutionInfo.spinSeconds}s` },
+      {
+        label: "Evolutions",
+        value: String(evolutionInfo.clans.length * evolutionInfo.targetLevel),
+      },
+      {
+        label: "Starter",
+        value:
+          evolutionInfo.starterMode === "history" ? "Saved cat" : "Mystery egg",
+      },
+      {
+        label: "Est. Length",
+        value: formatDuration(
+          estimateCeremonySeconds(
+            evolutionInfo.clans.length,
+            evolutionInfo.targetLevel,
+            evolutionInfo.spinSeconds,
+          ),
+        ),
+      },
+    ];
+  }
+  if (infoMode === "batch" && batchInfo) {
+    return [
+      { label: "Starting Pool", value: String(batchInfo.startCount) },
+      { label: "Finalists", value: String(batchInfo.finalCount) },
+      {
+        label: "Culls",
+        value: String(batchInfo.startCount - batchInfo.finalCount),
+      },
+      { label: "Accessories", value: String(batchInfo.accessoryCount) },
+      { label: "Scars", value: String(batchInfo.scarCount) },
+      { label: "Torties", value: String(batchInfo.tortieCount) },
+    ];
+  }
+  const afterlifeLabel =
+    AFTERLIFE_OPTIONS.find((o) => o.value === settings.afterlifeMode)?.label ??
+    "Off";
+  return [
+    // Top row: toggles/modes
+    { label: "Afterlife", value: afterlifeLabel },
+    {
+      label: "Exact Count",
+      value: settings.exactLayerCounts ? "Yes" : "No",
+    },
+    {
+      label: "Base Colours",
+      value: settings.includeBaseColours ? "On" : "Off",
+    },
+    // Bottom row: range values
+    { label: "Accessories", value: rangeStr(settings.accessoryRange) },
+    { label: "Scars", value: rangeStr(settings.scarRange) },
+    { label: "Torties", value: rangeStr(settings.tortieRange) },
+  ];
+}
+
+/** Linear fade in over [0, fadeIn), fade out after fadeOutStart over fadeOutLen. */
+function fadeOpacity(
+  t: number,
+  fadeIn: number,
+  fadeOutStart: number,
+  fadeOutLen: number,
+): number {
+  if (t < fadeIn) return t / fadeIn;
+  if (t > fadeOutStart) return (1 - t) / fadeOutLen;
+  return 1;
+}
+
 // ---------------------------------------------------------------------------
 // OBS Lobby — settings overview + flying cats
 // ---------------------------------------------------------------------------
@@ -106,11 +243,11 @@ export function OBSLobby({
   settings,
   generator,
   hideSettings = false,
-}: {
+}: Readonly<{
   settings: LobbySettings;
   generator: CatGeneratorApi | null;
   hideSettings?: boolean;
-}) {
+}>) {
   const lobbyMode = settings.lobbyMode ?? "fruit-ninja";
   const maxCats = settings.lobbyCatCount ?? 4;
   const moveSpeed = settings.lobbyMoveSpeed ?? 1.0;
@@ -150,7 +287,7 @@ export function OBSLobby({
   lobbyAutoClearSecondsRef.current = lobbyAutoClearSeconds;
 
   // Generation-relevant settings — only these should restart the spawn loop
-  const genSettings = useMemo(
+  const genSettings = useMemo<LobbyGenSettings>(
     () => ({
       accessoryMax: settings.accessoryRange.max,
       scarMax: settings.scarRange.max,
@@ -170,11 +307,6 @@ export function OBSLobby({
       settings.includeNewSprites,
     ],
   );
-
-  const afterlifeLabel =
-    AFTERLIFE_OPTIONS.find((o) => o.value === settings.afterlifeMode)?.label ??
-    "Off";
-  const rangeStr = (r: LayerRange) => `${r.min}–${r.max}`;
 
   // The card follows the mode selected on the control page.
   const infoMode = settings.lobbyInfoMode ?? "spin";
@@ -211,16 +343,9 @@ export function OBSLobby({
       if (cancelled) return;
       const gs = genSettings;
       // biome-ignore lint/style/noNonNullAssertion: generator is guaranteed available here
-      const firstResult = await generator.generateRandomCat!({
-        accessoryCount: gs.accessoryMax,
-        scarCount: gs.scarMax,
-        tortieCount: gs.tortieMax,
-        exactLayerCounts: gs.exactLayerCounts,
-        experimentalColourMode:
-          gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
-        includeBaseColours: gs.includeBaseColours,
-        includeNewSprites: gs.includeNewSprites,
-      }).catch(() => null);
+      const firstResult = await generator.generateRandomCat!(
+        lobbyRandomCatOptions(gs),
+      ).catch(() => null);
       if (cancelled || !firstResult) return;
 
       const fixedPose = firstResult.params.poseName;
@@ -235,32 +360,13 @@ export function OBSLobby({
       for (let i = 0; i < 5; i++) {
         if (cancelled) return;
         try {
-          const r = await generator.generateRandomCat?.({
-            accessoryCount: gs.accessoryMax,
-            scarCount: gs.scarMax,
-            tortieCount: gs.tortieMax,
-            exactLayerCounts: gs.exactLayerCounts,
-            experimentalColourMode:
-              gs.extendedModes.length > 0 ? gs.extendedModes : undefined,
-            includeBaseColours: gs.includeBaseColours,
-            includeNewSprites: gs.includeNewSprites,
-          });
-          if (r && r.canvas instanceof HTMLCanvasElement) {
-            const overrideParams = {
-              ...r.params,
-              poseName: fixedPose ?? r.params.poseName,
-              spriteNumber: fixedSprite,
-              reverse: false,
-            };
-            syncChangedRegistryTraitsFromLegacy(overrideParams, [
-              "pose",
-              "reverse",
-            ]);
-            const rendered = await generator.generateCat(overrideParams);
-            if (rendered.canvas instanceof HTMLCanvasElement) {
-              frames.push(rendered.canvas.toDataURL("image/png"));
-            }
-          }
+          const frame = await renderLobbyFrame(
+            generator,
+            gs,
+            fixedPose,
+            fixedSprite,
+          );
+          if (frame) frames.push(frame);
         } catch {
           /* skip */
         }
@@ -321,69 +427,8 @@ export function OBSLobby({
     }
   }, [settings.lobbyClearSeq]);
 
-  const cardTitle =
-    infoMode === "evolution"
-      ? "Evolution Ceremony"
-      : infoMode === "batch"
-        ? "Adoption Elimination"
-        : "Spin Settings";
-
-  let chips: Array<{ label: string; value: string }>;
-  if (infoMode === "evolution" && evolutionInfo) {
-    chips = [
-      { label: "Clans", value: String(evolutionInfo.clans.length) },
-      { label: "Target Level", value: String(evolutionInfo.targetLevel) },
-      { label: "Spin Time", value: `${evolutionInfo.spinSeconds}s` },
-      {
-        label: "Evolutions",
-        value: String(evolutionInfo.clans.length * evolutionInfo.targetLevel),
-      },
-      {
-        label: "Starter",
-        value:
-          evolutionInfo.starterMode === "history" ? "Saved cat" : "Mystery egg",
-      },
-      {
-        label: "Est. Length",
-        value: formatDuration(
-          estimateCeremonySeconds(
-            evolutionInfo.clans.length,
-            evolutionInfo.targetLevel,
-            evolutionInfo.spinSeconds,
-          ),
-        ),
-      },
-    ];
-  } else if (infoMode === "batch" && batchInfo) {
-    chips = [
-      { label: "Starting Pool", value: String(batchInfo.startCount) },
-      { label: "Finalists", value: String(batchInfo.finalCount) },
-      {
-        label: "Culls",
-        value: String(batchInfo.startCount - batchInfo.finalCount),
-      },
-      { label: "Accessories", value: String(batchInfo.accessoryCount) },
-      { label: "Scars", value: String(batchInfo.scarCount) },
-      { label: "Torties", value: String(batchInfo.tortieCount) },
-    ];
-  } else {
-    chips = [
-      // Top row: toggles/modes
-      { label: "Afterlife", value: afterlifeLabel },
-      {
-        label: "Exact Count",
-        value: settings.exactLayerCounts ? "Yes" : "No",
-      },
-      {
-        label: "Base Colours",
-        value: settings.includeBaseColours ? "On" : "Off",
-      },
-      // Bottom row: range values
-      { label: "Accessories", value: rangeStr(settings.accessoryRange) },
-      { label: "Scars", value: rangeStr(settings.scarRange) },
-      { label: "Torties", value: rangeStr(settings.tortieRange) },
-    ];
-  }
+  const cardTitle = lobbyCardTitle(infoMode);
+  const chips = buildLobbyChips(settings, infoMode);
 
   const settingsCode = useMemo(
     () =>
@@ -495,31 +540,7 @@ export function OBSLobby({
           {infoMode !== "evolution" && selectedPalettes.length > 0 && (
             <div className="mt-5 border-t border-zinc-800 pt-4">
               {paletteDisplayMode === "all" ? (
-                // Under 10: show fixed list. 10+: infinite scrolling marquee.
-                selectedPalettes.length < 10 ? (
-                  <div className="space-y-2.5">
-                    {selectedPalettes.map((palette) => (
-                      <div key={palette.id}>
-                        <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-amber-500/70">
-                          {palette.label}
-                        </span>
-                        <div className="flex flex-wrap gap-0.5">
-                          {Object.entries(palette.colors)
-                            .slice(0, 24)
-                            .map(([name, def]) => (
-                              <div
-                                key={name}
-                                style={swatchStyle(def, 22)}
-                                title={name.replace(/_/g, " ")}
-                              />
-                            ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <PaletteMarquee palettes={selectedPalettes} />
-                )
+                <AllPalettes palettes={selectedPalettes} />
               ) : (
                 // Cycle through palettes one at a time (carousel)
                 <>
@@ -578,6 +599,35 @@ export function OBSLobby({
   );
 }
 
+/** Every selected palette — a fixed list under 10, an infinite marquee at 10+. */
+function AllPalettes({ palettes }: Readonly<{ palettes: PaletteCategory[] }>) {
+  if (palettes.length >= 10) {
+    return <PaletteMarquee palettes={palettes} />;
+  }
+  return (
+    <div className="space-y-2.5">
+      {palettes.map((palette) => (
+        <div key={palette.id}>
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-amber-500/70">
+            {palette.label}
+          </span>
+          <div className="flex flex-wrap gap-0.5">
+            {Object.entries(palette.colors)
+              .slice(0, 24)
+              .map(([name, def]) => (
+                <div
+                  key={name}
+                  style={swatchStyle(def, 22)}
+                  title={name.replace(/_/g, " ")}
+                />
+              ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // FlyingCatSprite — animates a single lobby cat
 // ---------------------------------------------------------------------------
@@ -611,13 +661,13 @@ function FlyingCatSprite({
   mode,
   swapSpeed = 1,
   moveSpeed = 1,
-}: {
+}: Readonly<{
   cat: FlyingCat;
   /** Live animation mode — switching it moves the cat, no respawn. */
   mode: LobbyAnimationMode;
   swapSpeed?: number;
   moveSpeed?: number;
-}) {
+}>) {
   const ref = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const frameRef = useRef(0);
@@ -659,7 +709,7 @@ function FlyingCatSprite({
       if (curMode === "matrix") {
         // Fall from top to bottom
         const yPos = t * 1200 - 120;
-        const opacity = t < 0.05 ? t / 0.05 : t > 0.9 ? (1 - t) / 0.1 : 1;
+        const opacity = fadeOpacity(t, 0.05, 0.9, 0.1);
         return {
           x: (cat.x / 100) * 1920,
           y: yPos,
@@ -703,7 +753,7 @@ function FlyingCatSprite({
             : 1920 - progress * (1920 + spriteW);
         const lane = ((cat.peakY - 250) / 500) * 110;
         const bob = Math.sin(progress * Math.PI * 14) * 7;
-        const opacity = t < 0.05 ? t / 0.05 : t > 0.92 ? (1 - t) / 0.08 : 1;
+        const opacity = fadeOpacity(t, 0.05, 0.92, 0.08);
         return {
           x,
           y: 1080 - spriteW - 24 - lane + bob,
@@ -720,7 +770,7 @@ function FlyingCatSprite({
         const angle = startAngle + t * Math.PI * 2 * 1.25 * moveK * direction;
         const radiusX = 520 + cat.peakY * 0.6;
         const radiusY = 280 + cat.peakY * 0.35;
-        const opacity = t < 0.08 ? t / 0.08 : t > 0.92 ? (1 - t) / 0.08 : 1;
+        const opacity = fadeOpacity(t, 0.08, 0.92, 0.08);
         return {
           x: 960 + Math.cos(angle) * radiusX - spriteW / 2,
           y: 540 + Math.sin(angle) * radiusY - spriteW / 2,
@@ -736,7 +786,7 @@ function FlyingCatSprite({
         const yPos = 1080 - tm * (1080 + 280);
         const sway = Math.sin(tm * Math.PI * 5 + cat.id) * 4;
         const pulse = 1 + Math.sin(tm * Math.PI * 8) * 0.04;
-        const opacity = tm < 0.08 ? tm / 0.08 : tm > 0.88 ? (1 - tm) / 0.12 : 1;
+        const opacity = fadeOpacity(tm, 0.08, 0.88, 0.12);
         return {
           x: ((cat.x + sway) / 100) * 1920,
           y: yPos,
@@ -749,7 +799,7 @@ function FlyingCatSprite({
       // Fruit ninja — arc from the bottom
       const arcY = -4 * cat.peakY * t * (t - 1);
       const xDrift = t * 30 * (cat.rotation > 0 ? 1 : -1);
-      const opacity = t < 0.1 ? t / 0.1 : t > 0.9 ? (1 - t) / 0.1 : 1;
+      const opacity = fadeOpacity(t, 0.1, 0.9, 0.1);
       return {
         x: ((cat.x + xDrift) / 100) * 1920,
         y: 1080 - spriteW - arcY,
@@ -853,7 +903,9 @@ function FlyingCatSprite({
 
 const SCROLL_SPEED_MS = 1500; // ms per palette row
 
-function PaletteMarquee({ palettes }: { palettes: PaletteCategory[] }) {
+function PaletteMarquee({
+  palettes,
+}: Readonly<{ palettes: PaletteCategory[] }>) {
   const count = palettes.length;
   // Total duration = scroll through one full copy
   const durationS = (count * SCROLL_SPEED_MS) / 1000;

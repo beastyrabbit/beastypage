@@ -205,33 +205,37 @@ def test_executor_sorts_dag_stably_and_rejects_invalid_graphs():
         "third",
     ]
 
+    unknown_plan = _plan([_operation("only", depends_on=["missing"])])
     with pytest.raises(InvalidRenderPlan, match="unknown"):
         RenderExecutor(
             renderer,
-            _plan([_operation("only", depends_on=["missing"])]),
+            unknown_plan,
             STRATEGY_REGISTRY,
             verify_manifest_file=False,
         )
 
+    cycle_plan = _plan(
+        [
+            _operation("first", depends_on=["second"]),
+            _operation("second", depends_on=["first"]),
+        ]
+    )
     with pytest.raises(InvalidRenderPlan, match="cycle"):
         RenderExecutor(
             renderer,
-            _plan(
-                [
-                    _operation("first", depends_on=["second"]),
-                    _operation("second", depends_on=["first"]),
-                ]
-            ),
+            cycle_plan,
             STRATEGY_REGISTRY,
             verify_manifest_file=False,
         )
 
 
 def test_executor_rejects_a_plan_built_for_another_manifest():
+    renderer = _renderer()
+    plan = _plan([_operation("base")], manifest_hash="f" * 64)
     with pytest.raises(InvalidRenderPlan, match="manifestHash"):
         RenderExecutor(
-            _renderer(),
-            _plan([_operation("base")], manifest_hash="f" * 64),
+            renderer,
+            plan,
             STRATEGY_REGISTRY,
             verify_manifest_file=False,
         )
@@ -253,10 +257,11 @@ def test_executor_validates_static_mappings_and_fallback_groups():
             "spriteByValue": {"future-value": "__missing_static_sprite__"},
         },
     }
+    missing_mapping_plan = _plan([missing_mapping])
     with pytest.raises(InvalidRenderPlan, match="sprite references are missing"):
         RenderExecutor(
             renderer,
-            _plan([missing_mapping]),
+            missing_mapping_plan,
             STRATEGY_REGISTRY,
             verify_manifest_file=False,
         )
@@ -286,10 +291,11 @@ def test_executor_validates_static_mappings_and_fallback_groups():
         "__missing_static_sprite__",
         "__also_missing__",
     ]
+    missing_fallback_plan = _plan([fallback])
     with pytest.raises(InvalidRenderPlan, match="fallback groups"):
         RenderExecutor(
             renderer,
-            _plan([fallback]),
+            missing_fallback_plan,
             STRATEGY_REGISTRY,
             verify_manifest_file=False,
         )
@@ -386,11 +392,14 @@ def test_custom_pipeline_requires_matching_contract_versions():
     plan_payload = _plan([_operation("base")]).model_dump(by_alias=True)
     plan_payload["schemaVersion"] = 2
 
+    repository = SpriteRepository()
+    plan = RenderPlan.model_validate(plan_payload)
+    adapter = LegacyCatAdapter(_compatibility_manifest())
     with pytest.raises(InvalidRenderPlan, match="schemaVersion must match"):
         RenderPipeline(
-            repository=SpriteRepository(),
-            plan=RenderPlan.model_validate(plan_payload),
-            adapter=LegacyCatAdapter(_compatibility_manifest()),
+            repository=repository,
+            plan=plan,
+            adapter=adapter,
             verify_bundle=False,
             verify_manifest_file=False,
         )
@@ -399,30 +408,28 @@ def test_custom_pipeline_requires_matching_contract_versions():
 def test_generated_schema_rejects_invalid_known_trait_values():
     adapter = LegacyCatAdapter.from_path()
 
+    invalid_colour = CatDocument(
+        schemaVersion=1,
+        traits={
+            "pose": "adult_short1",
+            "pelt": "SingleColour",
+            "colour": ["GINGER"],
+        },
+    )
     with pytest.raises(InvalidCatDocument, match=r"traits\.colour"):
-        adapter.normalize_document(
-            CatDocument(
-                schemaVersion=1,
-                traits={
-                    "pose": "adult_short1",
-                    "pelt": "SingleColour",
-                    "colour": ["GINGER"],
-                },
-            )
-        )
+        adapter.normalize_document(invalid_colour)
 
+    missing_tortie_colour = CatDocument(
+        schemaVersion=1,
+        traits={
+            "pose": "adult_short1",
+            "pelt": "SingleColour",
+            "colour": "GINGER",
+            "tortie": [{"mask": "ONE", "pattern": "SingleColour"}],
+        },
+    )
     with pytest.raises(InvalidCatDocument, match=r"tortie\[0\]\.colour is required"):
-        adapter.normalize_document(
-            CatDocument(
-                schemaVersion=1,
-                traits={
-                    "pose": "adult_short1",
-                    "pelt": "SingleColour",
-                    "colour": "GINGER",
-                    "tortie": [{"mask": "ONE", "pattern": "SingleColour"}],
-                },
-            )
-        )
+        adapter.normalize_document(missing_tortie_colour)
 
 
 def test_generated_schema_rejects_structurally_duplicate_unique_items():
@@ -433,35 +440,33 @@ def test_generated_schema_rejects_structurally_duplicate_unique_items():
         "colour": "GINGER",
     }
 
+    duplicate_accessories = CatDocument(
+        schemaVersion=1,
+        traits={**base_traits, "accessories": ["FERN", "FERN"]},
+    )
     with pytest.raises(InvalidCatDocument, match=r"accessories.*requires unique items"):
-        adapter.normalize_document(
-            CatDocument(
-                schemaVersion=1,
-                traits={**base_traits, "accessories": ["FERN", "FERN"]},
-            )
-        )
+        adapter.normalize_document(duplicate_accessories)
 
-    with pytest.raises(InvalidCatDocument, match=r"tortie.*requires unique items"):
-        adapter.normalize_document(
-            CatDocument(
-                schemaVersion=1,
-                traits={
-                    **base_traits,
-                    "tortie": [
-                        {
-                            "mask": "ONE",
-                            "pattern": "SingleColour",
-                            "colour": "BLACK",
-                        },
-                        {
-                            "colour": "BLACK",
-                            "pattern": "SingleColour",
-                            "mask": "ONE",
-                        },
-                    ],
+    duplicate_tortie = CatDocument(
+        schemaVersion=1,
+        traits={
+            **base_traits,
+            "tortie": [
+                {
+                    "mask": "ONE",
+                    "pattern": "SingleColour",
+                    "colour": "BLACK",
                 },
-            )
-        )
+                {
+                    "colour": "BLACK",
+                    "pattern": "SingleColour",
+                    "mask": "ONE",
+                },
+            ],
+        },
+    )
+    with pytest.raises(InvalidCatDocument, match=r"tortie.*requires unique items"):
+        adapter.normalize_document(duplicate_tortie)
 
 
 def test_future_document_traits_are_preserved_but_not_activated():

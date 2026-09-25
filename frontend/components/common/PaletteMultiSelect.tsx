@@ -20,7 +20,18 @@ interface PaletteMultiSelectProps {
   compact?: boolean;
 }
 
-function ColorSwatch({ colors }: { colors: Array<[number, number, number]> }) {
+function getSelectAllCheckboxClass(
+  allSelected: boolean,
+  selectedCount: number,
+): string {
+  if (allSelected) return "border-primary bg-primary text-primary-foreground";
+  if (selectedCount > 0) return "border-primary/50 bg-primary/20";
+  return "border-border bg-background";
+}
+
+function ColorSwatch({
+  colors,
+}: Readonly<{ colors: Array<[number, number, number]> }>) {
   return (
     <div className="flex gap-0.5">
       {colors.map((rgb, i) => (
@@ -295,13 +306,10 @@ export function PaletteMultiSelect({
                 className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-muted"
               >
                 <div
-                  className={`flex size-4 shrink-0 items-center justify-center rounded border ${
-                    allSelected
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : selectedCount > 0
-                        ? "border-primary/50 bg-primary/20"
-                        : "border-border bg-background"
-                  }`}
+                  className={`flex size-4 shrink-0 items-center justify-center rounded border ${getSelectAllCheckboxClass(
+                    allSelected,
+                    selectedCount,
+                  )}`}
                 >
                   {allSelected && <CheckedIcon size={12} />}
                   {!allSelected && selectedCount > 0 && (

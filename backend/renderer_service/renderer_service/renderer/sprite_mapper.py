@@ -98,63 +98,33 @@ class SpriteMapper:
 
         self.experimental_defs = self._load_experimental_defs()
 
-        self.pelt_names = (
-            list(self.pelt_info.get("patterns", [])) if self.pelt_info else []
-        )
-        self.colours = list(self.pelt_info.get("colors", [])) if self.pelt_info else []
-        self.eye_colours = (
-            list(self.pelt_info.get("eyes", [])) if self.pelt_info else []
-        )
-        self.skin_colours = (
-            list(self.pelt_info.get("skin", [])) if self.pelt_info else []
-        )
-        self.accessories = (
-            list(self.pelt_info.get("accessories", [])) if self.pelt_info else []
-        )
-        self.scars = list(self.pelt_info.get("scars", [])) if self.pelt_info else []
-        self.white_patches = (
-            list(self.pelt_info.get("white", [])) if self.pelt_info else []
-        )
-        self.points = (
-            list(self.pelt_info.get("point_markings", [])) if self.pelt_info else []
-        )
-        self.vitiligo = (
-            list(self.pelt_info.get("vitiligo", [])) if self.pelt_info else []
-        )
+        pelt_info = self.pelt_info or {}
+        self.pelt_names = list(pelt_info.get("patterns", []))
+        self.colours = list(pelt_info.get("colors", []))
+        self.eye_colours = list(pelt_info.get("eyes", []))
+        self.skin_colours = list(pelt_info.get("skin", []))
+        self.accessories = list(pelt_info.get("accessories", []))
+        self.scars = list(pelt_info.get("scars", []))
+        self.white_patches = list(pelt_info.get("white", []))
+        self.points = list(pelt_info.get("point_markings", []))
+        self.vitiligo = list(pelt_info.get("vitiligo", []))
 
         self.plant_accessories = {
-            str(x).upper()
-            for x in (
-                self.pelt_info.get("plant_accessories", []) if self.pelt_info else []
-            )
+            str(x).upper() for x in pelt_info.get("plant_accessories", [])
         }
         self.wild_accessories = {
-            str(x).upper()
-            for x in (
-                self.pelt_info.get("wild_accessories", []) if self.pelt_info else []
-            )
+            str(x).upper() for x in pelt_info.get("wild_accessories", [])
         }
         self.tail_accessories = {
-            str(x).upper()
-            for x in (
-                self.pelt_info.get("tail_accessories", []) if self.pelt_info else []
-            )
+            str(x).upper() for x in pelt_info.get("tail_accessories", [])
         }
         self.collar_sprite_aliases = {
             str(key).upper(): str(value)
-            for key, value in (
-                self.pelt_info.get("collar_sprite_aliases", {})
-                if self.pelt_info
-                else {}
-            ).items()
+            for key, value in pelt_info.get("collar_sprite_aliases", {}).items()
         }
         self.accessory_sprite_aliases = {
             str(key).upper(): str(value)
-            for key, value in (
-                self.pelt_info.get("accessory_sprite_aliases", {})
-                if self.pelt_info
-                else {}
-            ).items()
+            for key, value in pelt_info.get("accessory_sprite_aliases", {}).items()
         }
 
         sprite_keys = set(self.sprites_index.keys()) if self.sprites_index else set()

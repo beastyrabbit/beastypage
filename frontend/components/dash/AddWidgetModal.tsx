@@ -54,27 +54,17 @@ export function AddWidgetModal({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70"
-      role="button"
-      tabIndex={0}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          onClose();
-        }
-        if (
-          (e.key === "Enter" || e.key === " ") &&
-          e.target === e.currentTarget
-        ) {
-          e.preventDefault();
-          onClose();
-        }
-      }}
+    <dialog
+      open
+      aria-modal="true"
+      className="fixed inset-0 z-[70] flex h-full max-h-none w-full max-w-none items-center justify-center bg-black/70 text-inherit"
     >
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 cursor-default"
+      />
       <div className="relative mx-4 w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-3xl border border-border/40 bg-background/95 p-6 shadow-2xl backdrop-blur">
         <button
           type="button"
@@ -136,6 +126,6 @@ export function AddWidgetModal({
           );
         })}
       </div>
-    </div>
+    </dialog>
   );
 }

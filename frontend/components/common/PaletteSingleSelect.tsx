@@ -17,7 +17,9 @@ interface PaletteSingleSelectProps {
   label?: string;
 }
 
-function ColorSwatch({ colors }: { colors: Array<[number, number, number]> }) {
+function ColorSwatch({
+  colors,
+}: Readonly<{ colors: Array<[number, number, number]> }>) {
   return (
     <div className="flex gap-0.5">
       {colors.map((rgb, i) => (

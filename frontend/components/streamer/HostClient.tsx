@@ -12,7 +12,14 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import OptionPreview from "@/components/streamer/OptionPreview";
 import ArrowNarrowRightIcon from "@/components/ui/arrow-narrow-right-icon";
@@ -94,14 +101,49 @@ function generateViewerKey() {
   ) {
     return crypto.randomUUID();
   }
-  if (typeof crypto !== "undefined" && crypto?.getRandomValues) {
-    const buffer = new Uint8Array(16);
-    crypto.getRandomValues(buffer);
-    return Array.from(buffer)
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("");
+  const buffer = new Uint8Array(16);
+  crypto.getRandomValues(buffer);
+  return Array.from(buffer)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function resolveNextStep(
+  steps: { id: string }[],
+  currentStepId: string,
+  lockedIds: ReadonlySet<string | undefined>,
+  moveToNextUnlocked: boolean,
+): { nextStepId: string; nextStepIndex: number } {
+  const locatedIndex = steps.findIndex((step) => step.id === currentStepId);
+  let nextStepId = currentStepId;
+  let nextStepIndex = Math.max(locatedIndex, 0);
+
+  if (moveToNextUnlocked) {
+    const nextUnlocked = steps.find((step) => !lockedIds.has(step.id));
+    if (nextUnlocked) {
+      nextStepId = nextUnlocked.id;
+      const idx = steps.findIndex((step) => step.id === nextStepId);
+      nextStepIndex = idx >= 0 ? idx : nextStepIndex;
+    }
   }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+  return { nextStepId, nextStepIndex };
+}
+
+function sessionStatusBadgeClass(status: string | undefined): string {
+  if (status === "live") {
+    return "border-emerald-400/40 bg-emerald-400/10 text-emerald-200";
+  }
+  if (status === "completed") {
+    return "border-slate-500/50 bg-slate-500/10 text-slate-200";
+  }
+  return "border-amber-400/40 bg-amber-400/10 text-amber-100";
+}
+
+function coinFlipButtonLabel(coinFlipping: boolean, voteSent: boolean): string {
+  if (coinFlipping) return "Flipping";
+  if (voteSent) return "Vote recorded";
+  return "Flip coin";
 }
 
 function buildStepState(
@@ -464,12 +506,12 @@ function AuthenticatedHostClient() {
   const coinOrientation = useMemo(() => {
     const frontKey = frontOption?.key;
     if (!frontKey) return "show-front";
-    const targetKey =
-      coinFlipping && coinWinner
-        ? coinWinner.option.key
-        : coinResult
-          ? coinResult.option.key
-          : frontKey;
+    let targetKey = frontKey;
+    if (coinFlipping && coinWinner) {
+      targetKey = coinWinner.option.key;
+    } else if (coinResult) {
+      targetKey = coinResult.option.key;
+    }
     return targetKey === frontKey ? "show-front" : "show-back";
   }, [frontOption?.key, coinFlipping, coinWinner, coinResult]);
 
@@ -715,22 +757,12 @@ function AuthenticatedHostClient() {
       const allStepsComplete = lockedIds.size >= updatedSteps.length;
       const shouldFinalize = advance && allStepsComplete;
 
-      const locatedIndex = updatedSteps.findIndex(
-        (step) => step.id === currentStep.id,
+      const { nextStepId, nextStepIndex } = resolveNextStep(
+        updatedSteps,
+        currentStep.id,
+        lockedIds,
+        advance && !shouldFinalize,
       );
-      let nextStepId = currentStep.id;
-      let nextStepIndex = locatedIndex >= 0 ? locatedIndex : 0;
-
-      if (advance && !shouldFinalize) {
-        const nextUnlocked = updatedSteps.find(
-          (step) => !lockedIds.has(step.id),
-        );
-        if (nextUnlocked) {
-          nextStepId = nextUnlocked.id;
-          const idx = updatedSteps.findIndex((step) => step.id === nextStepId);
-          nextStepIndex = idx >= 0 ? idx : nextStepIndex;
-        }
-      }
 
       finalParamsRef.current = cloneParams<StreamParams>(draftParams);
       finalHistoryRef.current = updatedHistory.map((entry) => ({ ...entry }));
@@ -742,7 +774,7 @@ function AuthenticatedHostClient() {
           id: toId("stream_sessions", activeSessionId),
           params: draftParams,
           stepHistory: updatedHistory,
-          stepIndex: nextStepIndex >= 0 ? nextStepIndex : 0,
+          stepIndex: Math.max(nextStepIndex, 0),
           currentStep: nextStepId,
           allowedOptions:
             updatedSteps
@@ -1105,6 +1137,35 @@ function AuthenticatedHostClient() {
   const finalCatName = sessionParams?._finalName ?? null;
   const finalCreatorName = sessionParams?._finalCreator ?? null;
 
+  let leaderPreview: ReactNode;
+  if (leaderOption) {
+    leaderPreview = (
+      <OptionPreview
+        generator={generator}
+        ready={generatorReady}
+        baseParams={localState.params}
+        step={currentStep}
+        option={leaderOption}
+        allOptions={displayOptions}
+        size={PREVIEW_SIZE}
+      />
+    );
+  } else if (tieOptions.length > 1) {
+    leaderPreview = (
+      <div className="flex h-full w-full flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
+        Voting is currently tied between{" "}
+        {tieOptions.map((row) => row.option.label).join(", ")}. Resolve the tie
+        to preview the result.
+      </div>
+    );
+  } else {
+    leaderPreview = (
+      <div className="flex h-full w-full items-center justify-center px-4 text-sm text-muted-foreground">
+        No votes yet.
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <section className="glass-card grid gap-8 p-6 lg:grid-cols-[1.1fr,1fr]">
@@ -1120,11 +1181,7 @@ function AuthenticatedHostClient() {
               <span
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold",
-                  session?.status === "live"
-                    ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
-                    : session?.status === "completed"
-                      ? "border-slate-500/50 bg-slate-500/10 text-slate-200"
-                      : "border-amber-400/40 bg-amber-400/10 text-amber-100",
+                  sessionStatusBadgeClass(session?.status),
                 )}
               >
                 {session?.status ? session.status.toUpperCase() : "NO SESSION"}
@@ -1284,27 +1341,7 @@ function AuthenticatedHostClient() {
                 className="relative overflow-hidden rounded-xl border border-border/40 bg-background/70"
                 style={{ width: PREVIEW_SIZE, height: PREVIEW_SIZE }}
               >
-                {leaderOption ? (
-                  <OptionPreview
-                    generator={generator}
-                    ready={generatorReady}
-                    baseParams={localState.params}
-                    step={currentStep}
-                    option={leaderOption}
-                    allOptions={displayOptions}
-                    size={PREVIEW_SIZE}
-                  />
-                ) : tieOptions.length > 1 ? (
-                  <div className="flex h-full w-full flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
-                    Voting is currently tied between{" "}
-                    {tieOptions.map((row) => row.option.label).join(", ")}.
-                    Resolve the tie to preview the result.
-                  </div>
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center px-4 text-sm text-muted-foreground">
-                    No votes yet.
-                  </div>
-                )}
+                {leaderPreview}
               </div>
             </div>
           </div>
@@ -1871,11 +1908,7 @@ function AuthenticatedHostClient() {
                 disabled={coinFlipping || voteSent}
                 className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:translate-y-0.5 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {coinFlipping
-                  ? "Flipping"
-                  : voteSent
-                    ? "Vote recorded"
-                    : "Flip coin"}
+                {coinFlipButtonLabel(coinFlipping, voteSent)}
               </button>
             </div>
             <style>{`

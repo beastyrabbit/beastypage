@@ -114,7 +114,7 @@ interface GenerationCounts {
 }
 
 interface ParamRow {
-  id: ParamId;
+  id: string;
   label: string;
   value: string;
   status: "active" | "revealed";
@@ -167,7 +167,6 @@ const DEFAULT_SPRITE_NUMBER = 8;
 const PLACEHOLDER_COLOUR = "GINGER";
 const GLOBAL_PRESETS: Array<keyof TimingPresetSet> = ["slow", "normal", "fast"];
 const SUBSET_LIMIT = 20;
-type LayerGroup = string;
 
 interface LayerRowState {
   label: string;
@@ -203,14 +202,14 @@ interface ParameterOptions {
   tortieColour: string[];
   tint: string[];
   eyeColour: string[];
-  eyeColour2: (string | "none")[];
+  eyeColour2: string[];
   skinColour: string[];
-  whitePatches: (string | "none")[];
-  points: (string | "none")[];
-  whitePatchesTint: (string | "none")[];
-  vitiligo: (string | "none")[];
-  accessory: (string | "none")[];
-  scar: (string | "none")[];
+  whitePatches: string[];
+  points: string[];
+  whitePatchesTint: string[];
+  vitiligo: string[];
+  accessory: string[];
+  scar: string[];
   shading: boolean[];
   reverse: boolean[];
 }
@@ -346,12 +345,46 @@ interface SpriteMapperApi {
   getRenderablePoseNames?: () => string[];
 }
 
-type ParamId = string;
 type ParamDefinition = RegistryRevealDefinition;
 
 const DISPLAY_SIZE = 720;
 const FULL_EXPORT_SIZE = 700;
-const INSTANT_PARAMS: ParamId[] = ["whitePatchesTint"];
+const INSTANT_PARAMS = new Set<string>(["whitePatchesTint"]);
+
+type TortieStageKind = "mask" | "pattern" | "colour";
+
+const TORTIE_STAGE_TIMING_KEYS: Record<TortieStageKind, ParamTimingKey> = {
+  mask: "tortieMask",
+  pattern: "tortiePattern",
+  colour: "tortieColour",
+};
+
+const LAYER_ROW_STATUS_CLASSES: Record<LayerRowState["status"], string> = {
+  active: "border-primary/60 bg-primary/10 text-primary",
+  revealed: "border-border/40 text-foreground",
+  idle: "border-border/20 text-muted-foreground",
+};
+
+function registryTraitForLayerGroup(key: string) {
+  if (key === "accessory") return "accessories";
+  if (key === "scar") return "scars";
+  return "tortie";
+}
+
+function getGlobalPresetLabel(preset: keyof TimingPresetSet): string {
+  if (preset === "slow") return "Slow";
+  if (preset === "fast") return "Fast";
+  return "Normal";
+}
+
+function getGenerateButtonLabel(
+  initializing: boolean,
+  isGenerating: boolean,
+): string {
+  if (initializing) return "Loading";
+  if (isGenerating) return "Rolling...";
+  return "Generate Cat";
+}
 const MIN_FRAME_DURATION = 45;
 
 function computeStepDurations(
@@ -503,7 +536,7 @@ function getSpeedSettings(durationMs: number) {
   return scaleProfile(SPEED_PRESETS.slow, ratio, duration);
 }
 
-const layerGroupLabels: Record<LayerGroup, string> = Object.fromEntries(
+const layerGroupLabels: Record<string, string> = Object.fromEntries(
   PARAM_SEQUENCE.filter((definition) => definition.strategy !== "single").map(
     (definition) => [definition.layerKey, definition.groupLabel],
   ),
@@ -568,9 +601,10 @@ function formatValue(value: unknown): string {
   ) {
     return "None";
   }
-  const str = String(value)
+  const raw = typeof value === "object" ? JSON.stringify(value) : String(value);
+  const str = raw
     .replace(/_/g, " ")
-    .replace(/^[0-9]+\s*-\s*/, "")
+    .replace(/^\d+\s*-\s*/, "")
     .toLowerCase();
   return str.replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -580,7 +614,7 @@ function coerceSpriteNumber(value: unknown): number | undefined {
     return value;
   }
   if (typeof value === "string") {
-    const match = value.match(/(-?\d+)/);
+    const match = /(-?\d+)/.exec(value);
     if (match) {
       const parsed = Number.parseInt(match[1], 10);
       if (Number.isFinite(parsed)) {
@@ -642,7 +676,7 @@ function waitForIdle(): Promise<void> {
 async function preRenderVariationFrames(
   generator: CatGeneratorApi,
   baseParams: Partial<CatParams>,
-  paramId: ParamId,
+  paramId: string,
   variationOptions: VariationOption[],
 ): Promise<VariationFrame[]> {
   const descriptors: VariantDescriptor[] = variationOptions.map(
@@ -942,7 +976,7 @@ function formatTortieLayer(layer: TortieSlot | null): string {
 }
 
 function getParameterRawValue(
-  paramId: ParamId,
+  paramId: string,
   params: Partial<CatParams>,
 ): unknown {
   switch (paramId) {
@@ -989,7 +1023,7 @@ function getParameterRawValue(
   }
 }
 
-function formatOptionDisplay(paramId: ParamId, raw: unknown): string {
+function formatOptionDisplay(paramId: string, raw: unknown): string {
   if (paramId === "sprite") {
     if (typeof raw === "string" && !/^-?\d+$/.test(raw.trim())) {
       return formatPoseName(raw);
@@ -1021,7 +1055,7 @@ function formatOptionDisplay(paramId: ParamId, raw: unknown): string {
 
 function applyParamValue(
   params: Partial<CatParams>,
-  paramId: ParamId,
+  paramId: string,
   value: unknown,
 ) {
   const definition = getRegistryRevealDefinition(paramId);
@@ -1135,7 +1169,7 @@ function applyParamValue(
 }
 
 function getParameterValueForDisplay(
-  paramId: ParamId,
+  paramId: string,
   params: Partial<CatParams>,
 ): string {
   switch (paramId) {
@@ -1209,6 +1243,22 @@ function buildSharePayload(state: CatState) {
   };
 }
 
+function compareCodeUnits(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+function firstLayerValue(list: unknown, single: unknown): string | null {
+  if (Array.isArray(list) && list.length > 0) {
+    return list[0] as string;
+  }
+  if (typeof single === "string") {
+    return single;
+  }
+  return null;
+}
+
 function sanitizeForBuilder(
   baseParams: Partial<CatParams>,
   overrides?: {
@@ -1220,12 +1270,7 @@ function sanitizeForBuilder(
   const next = cloneParams(baseParams ?? {});
 
   const accessoryValue =
-    overrides?.accessory ??
-    (Array.isArray(next.accessories) && next.accessories.length > 0
-      ? (next.accessories[0] as string)
-      : typeof next.accessory === "string"
-        ? (next.accessory as string)
-        : null);
+    overrides?.accessory ?? firstLayerValue(next.accessories, next.accessory);
 
   if (accessoryValue) {
     next.accessory = accessoryValue;
@@ -1235,13 +1280,7 @@ function sanitizeForBuilder(
     next.accessories = [];
   }
 
-  const scarValue =
-    overrides?.scar ??
-    (Array.isArray(next.scars) && next.scars.length > 0
-      ? (next.scars[0] as string)
-      : typeof next.scar === "string"
-        ? (next.scar as string)
-        : null);
+  const scarValue = overrides?.scar ?? firstLayerValue(next.scars, next.scar);
 
   if (scarValue) {
     next.scar = scarValue;
@@ -1392,7 +1431,7 @@ async function buildParameterOptions(
 
 function sampleValues(
   options: ParameterOptions | null,
-  id: ParamId,
+  id: string,
   finalRawValue: unknown,
   finalDisplay: string,
   limit = 8,
@@ -1401,7 +1440,7 @@ function sampleValues(
     return [{ raw: finalRawValue, display: finalDisplay }];
   }
 
-  const rawList = ((options as Record<ParamId, unknown[]>)[id] ?? []).filter(
+  const rawList = ((options as Record<string, unknown[]>)[id] ?? []).filter(
     (entry) => entry !== undefined && entry !== null,
   );
 
@@ -1671,7 +1710,7 @@ export function SingleCatPlusClient({
         timing: {
           ...DEFAULT_TIMING_CONFIG,
           delays: { ...DEFAULT_TIMING_CONFIG.delays },
-          subsetLimits: { ...(DEFAULT_TIMING_CONFIG.subsetLimits ?? {}) },
+          subsetLimits: { ...DEFAULT_TIMING_CONFIG.subsetLimits },
           pauseDelays: DEFAULT_TIMING_CONFIG.pauseDelays
             ? {
                 flashyMs: DEFAULT_TIMING_CONFIG.pauseDelays.flashyMs,
@@ -1831,9 +1870,9 @@ export function SingleCatPlusClient({
   );
   const [rollerHighlight, setRollerHighlight] = useState(false);
   const [paramRows, setParamRows] = useState<ParamRow[]>([]);
-  const [activeParamId, setActiveParamId] = useState<ParamId | null>(null);
+  const [activeParamId, setActiveParamId] = useState<string | null>(null);
   const [layerRows, setLayerRows] = useState<
-    Record<LayerGroup, LayerRowState[]>
+    Record<string, LayerRowState[]>
   >(() =>
     Object.fromEntries(
       Object.keys(layerGroupLabels).map((group) => [group, []]),
@@ -1954,7 +1993,7 @@ export function SingleCatPlusClient({
       tortieRange,
       exactLayerCounts,
       afterlifeMode,
-      extendedModes: [...extendedModes].sort(),
+      extendedModes: [...extendedModes].sort(compareCodeUnits),
       includeBaseColours,
       includeNewSprites,
       catName: catNameDraft,
@@ -2314,7 +2353,7 @@ export function SingleCatPlusClient({
   );
 
   const updateLayerRow = useCallback(
-    (group: LayerGroup, index: number, updates: Partial<LayerRowState>) => {
+    (group: string, index: number, updates: Partial<LayerRowState>) => {
       setLayerRows((prev) => {
         const groupRows = prev[group];
         if (!groupRows || index < 0 || index >= groupRows.length) {
@@ -3066,7 +3105,7 @@ export function SingleCatPlusClient({
           updateLayerRow("tortie", i, { value: "—", status: "active" });
 
           const stageConfigs: Array<{
-            kind: "mask" | "pattern" | "colour";
+            kind: TortieStageKind;
             label: string;
             source: string[];
           }> = [
@@ -3081,23 +3120,18 @@ export function SingleCatPlusClient({
             Math.max(stageConfigs.length, 1);
 
           for (const stage of stageConfigs) {
-            const stageKey: ParamTimingKey =
-              stage.kind === "mask"
-                ? "tortieMask"
-                : stage.kind === "pattern"
-                  ? "tortiePattern"
-                  : "tortieColour";
+            const stageKey: ParamTimingKey = TORTIE_STAGE_TIMING_KEYS[stage.kind];
             const stageStart =
               typeof performance !== "undefined"
                 ? performance.now()
                 : Date.now();
             setRollerLabel(`Tortie Layer ${i + 1} – ${stage.label}`);
-            const stageTargetValue =
-              stage.kind === "mask"
-                ? working.mask
-                : stage.kind === "pattern"
-                  ? working.pattern
-                  : target.colour;
+            const stageTargetValues: Record<TortieStageKind, string> = {
+              mask: working.mask,
+              pattern: working.pattern,
+              colour: target.colour,
+            };
+            const stageTargetValue = stageTargetValues[stage.kind];
             const options = buildLayerOptionStrings(
               stage.source,
               stageTargetValue,
@@ -3122,9 +3156,7 @@ export function SingleCatPlusClient({
                   colour:
                     stage.kind === "colour"
                       ? (option.raw as string)
-                      : stage.kind === "mask" || stage.kind === "pattern"
-                        ? maskPatternColour
-                        : working.colour,
+                      : maskPatternColour,
                 };
                 const tortieList = committed.map((layer) => ({ ...layer }));
                 tortieList.push(candidateLayer);
@@ -3181,9 +3213,7 @@ export function SingleCatPlusClient({
                 colour:
                   stage.kind === "colour"
                     ? (step.frame.option.raw as string)
-                    : stage.kind === "mask" || stage.kind === "pattern"
-                      ? maskPatternColour
-                      : working.colour,
+                    : maskPatternColour,
               };
 
               const drawStep = () => drawCanvas(step.frame.canvas);
@@ -3497,11 +3527,7 @@ export function SingleCatPlusClient({
           try {
             syncChangedRegistryTraitsFromLegacy(previewParams, [
               "pose",
-              group.key === "accessory"
-                ? "accessories"
-                : group.key === "scar"
-                  ? "scars"
-                  : "tortie",
+              registryTraitForLayerGroup(group.key),
             ]);
             const result = await generator.generateCat(previewParams);
             const catCanvas = cloneSourceCanvas(
@@ -3671,8 +3697,8 @@ export function SingleCatPlusClient({
       const tortieLayers = tortieSlots.filter(Boolean) as TortieSlot[];
 
       resetLayerRows(accessorySlots, scarSlots, tortieSlots, {
-        ...(params.traits ?? {}),
-        ...(randomResult.slotSelections ?? {}),
+        ...params.traits,
+        ...randomResult.slotSelections,
       });
 
       const { darkForest: enableDarkForest, dead: enableDead } =
@@ -3807,7 +3833,7 @@ export function SingleCatPlusClient({
           PARAM_REVEAL_PAUSE,
           basePause / speedMultiplierRef.current,
         );
-        const isInstantParam = INSTANT_PARAMS.includes(definition.id);
+        const isInstantParam = INSTANT_PARAMS.has(definition.id);
         const isTortieToggle = definition.compoundMode === "tortieParts";
         const shouldAnimate =
           spinState.spinny &&
@@ -4704,11 +4730,7 @@ export function SingleCatPlusClient({
                 disabled={generationDisabled || isGenerating}
               >
                 <RefreshIcon size={16} />
-                {initializing
-                  ? "Loading"
-                  : isGenerating
-                    ? "Rolling..."
-                    : "Generate Cat"}
+                {getGenerateButtonLabel(initializing, isGenerating)}
               </button>
               <button
                 type="button"
@@ -4799,7 +4821,7 @@ export function SingleCatPlusClient({
                 Layered Details
               </h3>
               <div className="grid gap-3 md:grid-cols-3">
-                {(Object.keys(layerGroupLabels) as LayerGroup[]).map(
+                {Object.keys(layerGroupLabels).map(
                   (group) => {
                     const rows = layerRows[group];
                     return (
@@ -4814,11 +4836,7 @@ export function SingleCatPlusClient({
                                 key={`${group}-${row.label}`}
                                 className={cn(
                                   "rounded-xl border px-3 py-2 transition",
-                                  row.status === "active"
-                                    ? "border-primary/60 bg-primary/10 text-primary"
-                                    : row.status === "revealed"
-                                      ? "border-border/40 text-foreground"
-                                      : "border-border/20 text-muted-foreground",
+                                  LAYER_ROW_STATUS_CLASSES[row.status],
                                 )}
                               >
                                 <span className="block text-[0.65rem] uppercase tracking-wide text-muted-foreground/70">
@@ -5214,15 +5232,17 @@ export function SingleCatPlusClient({
                   exports.
                 </p>
               </div>
-              {spritePreviewLoading ? (
+              {spritePreviewLoading && (
                 <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
                   Generating sprite previews...
                 </div>
-              ) : spriteVariations.length === 0 ? (
+              )}
+              {!spritePreviewLoading && spriteVariations.length === 0 && (
                 <div className="rounded-2xl border border-border/40 bg-background/70 p-6 text-sm text-muted-foreground">
                   No sprite previews available.
                 </div>
-              ) : (
+              )}
+              {!spritePreviewLoading && spriteVariations.length > 0 && (
                 <div className="min-h-0 overflow-y-auto pr-1">
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {spriteVariations.map((variation) => (
@@ -5344,12 +5364,7 @@ export function SingleCatPlusClient({
 
               <div className="mt-5 flex flex-wrap items-center gap-2">
                 {GLOBAL_PRESETS.map((preset) => {
-                  const label =
-                    preset === "slow"
-                      ? "Slow"
-                      : preset === "fast"
-                        ? "Fast"
-                        : "Normal";
+                  const label = getGlobalPresetLabel(preset);
                   const active = activeGlobalPreset === preset;
                   return (
                     <button

@@ -48,7 +48,7 @@ const MODE_COLORS: Record<string, string> = {
   quad: "from-rose-400 to-pink-500",
 };
 
-function PipetteIcon({ color }: { color: string }) {
+function PipetteIcon({ color }: Readonly<{ color: string }>) {
   return (
     <svg
       aria-hidden="true"

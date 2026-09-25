@@ -25,8 +25,34 @@ export default function CollectionPage() {
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const controls = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], [tabindex="0"]',
+        ),
+      ).filter((el) => el.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    const closeOnBackdrop = (event: MouseEvent) => {
+      if (event.target === dialog) {
+        setActiveEntry(null);
+      }
+    };
+    dialog.addEventListener("keydown", trapFocus);
+    dialog.addEventListener("click", closeOnBackdrop);
     dialog.showModal();
     return () => {
+      dialog.removeEventListener("keydown", trapFocus);
+      dialog.removeEventListener("click", closeOnBackdrop);
       dialog.close();
       opener?.focus();
     };
@@ -181,29 +207,7 @@ export default function CollectionPage() {
           ref={dialogRef}
           aria-labelledby="artwork-dialog-title"
           onCancel={() => setActiveEntry(null)}
-          onKeyDown={(event) => {
-            if (event.key !== "Tab") return;
-            const controls = Array.from(
-              event.currentTarget.querySelectorAll<HTMLElement>(
-                'button:not([disabled]), a[href], [tabindex="0"]',
-              ),
-            ).filter((el) => el.getClientRects().length > 0);
-            const first = controls[0];
-            const last = controls.at(-1);
-            if (event.shiftKey && document.activeElement === first) {
-              event.preventDefault();
-              last?.focus();
-            } else if (!event.shiftKey && document.activeElement === last) {
-              event.preventDefault();
-              first?.focus();
-            }
-          }}
           className="fixed inset-0 m-0 h-screen w-screen max-h-none max-w-none border-0 flex items-center justify-center bg-black/80 px-4 py-10 backdrop-blur-md"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setActiveEntry(null);
-            }
-          }}
         >
           <div className="glass-card relative w-full max-w-5xl max-h-full overflow-y-auto shadow-2xl border-white/20 animate-in zoom-in-95 duration-300">
             <button
@@ -303,11 +307,11 @@ function InfoRow({
   label,
   value,
   isLink,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   isLink?: boolean;
-}) {
+}>) {
   const content = isLink ? (
     <Link
       href={normalizeLink(value)}

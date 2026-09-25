@@ -188,13 +188,18 @@ function clampPauseMs(value: unknown, fallback: number): number {
   return Math.min(10000, Math.max(1000, clamped));
 }
 
-function sanitizeTiming(raw: unknown): SpinTimingConfig {
-  if (!raw || typeof raw !== "object") return DEFAULT_TIMING_CONFIG;
-  const t = raw as Partial<SpinTimingConfig>;
+function compareCodeUnits(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
 
+function sanitizeDelays(
+  raw: SpinTimingConfig["delays"] | undefined,
+): Partial<Record<ParamTimingKey, number>> {
   const delays: Partial<Record<ParamTimingKey, number>> = {};
-  if (t.delays && typeof t.delays === "object") {
-    for (const [key, value] of Object.entries(t.delays)) {
+  if (raw && typeof raw === "object") {
+    for (const [key, value] of Object.entries(raw)) {
       if (
         isParamTimingKey(key) &&
         typeof value === "number" &&
@@ -204,15 +209,29 @@ function sanitizeTiming(raw: unknown): SpinTimingConfig {
       }
     }
   }
+  return delays;
+}
 
+function sanitizeSubsetLimits(
+  raw: SpinTimingConfig["subsetLimits"],
+): Partial<Record<ParamTimingKey, boolean>> {
   const subsetLimits: Partial<Record<ParamTimingKey, boolean>> = {};
-  if (t.subsetLimits && typeof t.subsetLimits === "object") {
-    for (const [key, value] of Object.entries(t.subsetLimits)) {
+  if (raw && typeof raw === "object") {
+    for (const [key, value] of Object.entries(raw)) {
       if (isParamTimingKey(key) && Boolean(value)) {
         subsetLimits[key] = true;
       }
     }
   }
+  return subsetLimits;
+}
+
+function sanitizeTiming(raw: unknown): SpinTimingConfig {
+  if (!raw || typeof raw !== "object") return DEFAULT_TIMING_CONFIG;
+  const t = raw as Partial<SpinTimingConfig>;
+
+  const delays = sanitizeDelays(t.delays);
+  const subsetLimits = sanitizeSubsetLimits(t.subsetLimits);
 
   const defaultFlashy = DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ?? 1000;
   const defaultCalm = DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ?? 1000;
@@ -304,7 +323,7 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
                 EXTENDED_MODE_VALUES.has(m),
               ),
             ),
-          ].sort()
+          ].sort(compareCodeUnits)
         : [],
       includeBaseColours:
         typeof data.includeBaseColours === "boolean"

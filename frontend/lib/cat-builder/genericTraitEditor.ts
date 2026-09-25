@@ -96,7 +96,7 @@ export function builderParamsToCatDocument(params: CatParams): CatDocument {
     ...projected,
     unknownTraits: {
       ...params.unknownTraits,
-      ...(projected.unknownTraits ?? {}),
+      ...projected.unknownTraits,
     },
   });
 }

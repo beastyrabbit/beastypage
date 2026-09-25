@@ -31,7 +31,7 @@ const RANGE_FALLBACKS = {
 
 function parseRange(value: string | null, fallback: RangeParam): RangeParam {
   if (!value) return fallback;
-  const match = value.match(/^(\d+)-(\d+)$/);
+  const match = /^(\d+)-(\d+)$/.exec(value);
   if (!match) return fallback;
   const min = Number(match[1]);
   const max = Number(match[2]);
@@ -40,23 +40,21 @@ function parseRange(value: string | null, fallback: RangeParam): RangeParam {
   return { min, max };
 }
 
-const AFTERLIFE_OPTIONS: AfterlifeOption[] = [
+const AFTERLIFE_OPTIONS: ReadonlySet<string> = new Set<AfterlifeOption>([
   "off",
   "dark10",
   "star10",
   "both10",
   "darkForce",
   "starForce",
-];
+]);
 
 function parseAfterlife(
   value: string | null,
   fallback: AfterlifeOption,
 ): AfterlifeOption {
   if (!value) return fallback;
-  return AFTERLIFE_OPTIONS.includes(value as AfterlifeOption)
-    ? (value as AfterlifeOption)
-    : fallback;
+  return AFTERLIFE_OPTIONS.has(value) ? (value as AfterlifeOption) : fallback;
 }
 
 type SingleCatPlusPageProps = {

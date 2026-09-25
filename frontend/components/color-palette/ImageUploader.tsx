@@ -18,12 +18,12 @@ interface ImageUploaderProps {
   error: string | null;
 }
 
-const VALID_IMAGE_TYPES = [
+const VALID_IMAGE_TYPES = new Set([
   "image/png",
   "image/jpeg",
   "image/webp",
   "image/gif",
-];
+]);
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export function ImageUploader({
@@ -76,7 +76,7 @@ export function ImageUploader({
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         const file = files[0];
-        if (!VALID_IMAGE_TYPES.includes(file.type)) {
+        if (!VALID_IMAGE_TYPES.has(file.type)) {
           toast.error("Invalid image format. Use PNG, JPEG, WebP, or GIF.");
           return;
         }
@@ -95,7 +95,7 @@ export function ImageUploader({
       const files = e.target.files;
       if (files && files.length > 0) {
         const file = files[0];
-        if (!VALID_IMAGE_TYPES.includes(file.type)) {
+        if (!VALID_IMAGE_TYPES.has(file.type)) {
           toast.error("Invalid image format. Use PNG, JPEG, WebP, or GIF.");
           return;
         }

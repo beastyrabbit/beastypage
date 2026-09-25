@@ -31,6 +31,25 @@ interface PaletteGridProps {
   onColorSelect: (index: number) => void;
 }
 
+function getRowBackgroundClass(
+  isSelected: boolean,
+  isHighlighted: boolean,
+): string {
+  if (isSelected) return "bg-primary/10";
+  if (isHighlighted) return "bg-primary/5";
+  return "";
+}
+
+function getRowBoxShadow(
+  isSelected: boolean,
+  isHighlighted: boolean,
+  ringColor: string,
+): string {
+  if (isSelected) return `inset 0 0 0 1px ${ringColor}40`;
+  if (isHighlighted) return `inset 0 0 0 1px ${ringColor}20`;
+  return "none";
+}
+
 export function PaletteGrid({
   colors,
   brightnessFactors,
@@ -183,20 +202,17 @@ export function PaletteGrid({
             return (
               <div
                 key={`${colors[rowIndex]?.hex ?? "row"}-brightness`}
-                className={`grid gap-1 p-1 -m-1 rounded-lg transition-all duration-200 ${
-                  isRowSelected
-                    ? "bg-primary/10"
-                    : isRowHighlighted
-                      ? "bg-primary/5"
-                      : ""
-                }`}
+                className={`grid gap-1 p-1 -m-1 rounded-lg transition-all duration-200 ${getRowBackgroundClass(
+                  isRowSelected,
+                  isRowHighlighted,
+                )}`}
                 style={{
                   gridTemplateColumns: `repeat(${brightnessFactors.length}, 1fr)`,
-                  boxShadow: isRowSelected
-                    ? `inset 0 0 0 1px ${ringColor}40`
-                    : isRowHighlighted
-                      ? `inset 0 0 0 1px ${ringColor}20`
-                      : "none",
+                  boxShadow: getRowBoxShadow(
+                    isRowSelected,
+                    isRowHighlighted,
+                    ringColor,
+                  ),
                 }}
               >
                 {row.map((cell) => {
@@ -250,20 +266,17 @@ export function PaletteGrid({
             return (
               <div
                 key={`${colors[rowIndex]?.hex ?? "row"}-hue`}
-                className={`grid gap-1 p-1 -m-1 rounded-lg transition-all duration-200 ${
-                  isRowSelected
-                    ? "bg-primary/10"
-                    : isRowHighlighted
-                      ? "bg-primary/5"
-                      : ""
-                }`}
+                className={`grid gap-1 p-1 -m-1 rounded-lg transition-all duration-200 ${getRowBackgroundClass(
+                  isRowSelected,
+                  isRowHighlighted,
+                )}`}
                 style={{
                   gridTemplateColumns: `repeat(${hueShifts.length}, 1fr)`,
-                  boxShadow: isRowSelected
-                    ? `inset 0 0 0 1px ${ringColor}40`
-                    : isRowHighlighted
-                      ? `inset 0 0 0 1px ${ringColor}20`
-                      : "none",
+                  boxShadow: getRowBoxShadow(
+                    isRowSelected,
+                    isRowHighlighted,
+                    ringColor,
+                  ),
                 }}
               >
                 {row.map((cell) => {

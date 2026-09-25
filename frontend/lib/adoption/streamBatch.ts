@@ -172,7 +172,7 @@ function genericStageCount(
   if (cats !== undefined) {
     const values = cats.flatMap((cat) => {
       const traits = canonicalTraits(cat, system);
-      return traits && traits[trait.id] !== undefined ? [traits[trait.id]] : [];
+      return traits?.[trait.id] !== undefined ? [traits[trait.id]] : [];
     });
     if (reveal.strategy === "single") return values.length > 0 ? 1 : 0;
     return values.reduce<number>(
@@ -232,85 +232,90 @@ export function buildBatchStagePlan(
   cats?: readonly BatchStreamCat[],
   system: CatSystemDefinition = catSystem,
 ): BatchStage[] {
-  const stages: BatchStage[] = [];
-  stages.push({
-    id: "colour",
-    label: "Colour",
-    type: "simple",
-    param: "colour",
-  });
-  stages.push({
-    id: "peltName",
-    label: "Pelt",
-    type: "simple",
-    param: "peltName",
-  });
-  stages.push({
-    id: "eyeColour",
-    label: "Eyes",
-    type: "simple",
-    param: "eyeColour",
-  });
-  stages.push({
-    id: "eyeColour2",
-    label: "Eye Colour 2",
-    type: "simple",
-    param: "eyeColour2",
-  });
+  const stages: BatchStage[] = [
+    {
+      id: "colour",
+      label: "Colour",
+      type: "simple",
+      param: "colour",
+    },
+    {
+      id: "peltName",
+      label: "Pelt",
+      type: "simple",
+      param: "peltName",
+    },
+    {
+      id: "eyeColour",
+      label: "Eyes",
+      type: "simple",
+      param: "eyeColour",
+    },
+    {
+      id: "eyeColour2",
+      label: "Eye Colour 2",
+      type: "simple",
+      param: "eyeColour2",
+    },
+  ];
   for (let i = 0; i < config.tortieCount; i++) {
-    stages.push({
-      id: `tortie-${i}-mask`,
-      label: `Tortie ${i + 1} Mask`,
-      type: "tortie-sub",
-      layerIndex: i,
-      subElement: "mask",
-    });
-    stages.push({
-      id: `tortie-${i}-pattern`,
-      label: `Tortie ${i + 1} Pelt`,
-      type: "tortie-sub",
-      layerIndex: i,
-      subElement: "pattern",
-    });
-    stages.push({
-      id: `tortie-${i}-colour`,
-      label: `Tortie ${i + 1} Colour`,
-      type: "tortie-sub",
-      layerIndex: i,
-      subElement: "colour",
-    });
+    stages.push(
+      {
+        id: `tortie-${i}-mask`,
+        label: `Tortie ${i + 1} Mask`,
+        type: "tortie-sub",
+        layerIndex: i,
+        subElement: "mask",
+      },
+      {
+        id: `tortie-${i}-pattern`,
+        label: `Tortie ${i + 1} Pelt`,
+        type: "tortie-sub",
+        layerIndex: i,
+        subElement: "pattern",
+      },
+      {
+        id: `tortie-${i}-colour`,
+        label: `Tortie ${i + 1} Colour`,
+        type: "tortie-sub",
+        layerIndex: i,
+        subElement: "colour",
+      },
+    );
   }
-  stages.push({ id: "tint", label: "Tint", type: "simple", param: "tint" });
-  stages.push({
-    id: "skinColour",
-    label: "Skin",
-    type: "simple",
-    param: "skinColour",
-  });
-  stages.push({
-    id: "whitePatches",
-    label: "White Patches",
-    type: "simple",
-    param: "whitePatches",
-  });
-  stages.push({
-    id: "points",
-    label: "Points",
-    type: "simple",
-    param: "points",
-  });
-  stages.push({
-    id: "whitePatchesTint",
-    label: "Patches Tint",
-    type: "simple",
-    param: "whitePatchesTint",
-  });
-  stages.push({
-    id: "vitiligo",
-    label: "Vitiligo",
-    type: "simple",
-    param: "vitiligo",
-  });
+  stages.push(
+    { id: "tint", label: "Tint", type: "simple", param: "tint" },
+    {
+      id: "skinColour",
+      label: "Skin",
+      type: "simple",
+      param: "skinColour",
+    },
+    {
+      id: "whitePatches",
+      label: "White Patches",
+      type: "simple",
+      param: "whitePatches",
+    },
+    {
+      id: "points",
+      label: "Points",
+      type: "simple",
+      param: "points",
+    },
+    {
+      id: "whitePatchesTint",
+      label: "Patches Tint",
+      type: "simple",
+      param: "whitePatchesTint",
+    },
+    {
+      id: "vitiligo",
+      label: "Vitiligo",
+      type: "simple",
+      param: "vitiligo",
+    },
+  );
   for (let i = 0; i < config.accessoryCount; i++) {
     stages.push({
       id: `accessory-${i}`,
@@ -327,25 +332,27 @@ export function buildBatchStagePlan(
       slotIndex: i,
     });
   }
-  stages.push(...buildGenericBatchStages(cats, system));
-  stages.push({
-    id: "shading",
-    label: "Shading",
-    type: "simple",
-    param: "shading",
-  });
-  stages.push({
-    id: "reverse",
-    label: "Reverse",
-    type: "simple",
-    param: "reverse",
-  });
-  stages.push({
-    id: "poseName",
-    label: "Pose",
-    type: "simple",
-    param: "poseName",
-  });
+  stages.push(
+    ...buildGenericBatchStages(cats, system),
+    {
+      id: "shading",
+      label: "Shading",
+      type: "simple",
+      param: "shading",
+    },
+    {
+      id: "reverse",
+      label: "Reverse",
+      type: "simple",
+      param: "reverse",
+    },
+    {
+      id: "poseName",
+      label: "Pose",
+      type: "simple",
+      param: "poseName",
+    },
+  );
   return stages;
 }
 

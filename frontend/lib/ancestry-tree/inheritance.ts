@@ -36,6 +36,24 @@ function clonePortableValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function wrapListCandidate(
+  trait: AnyCatTraitDefinition,
+  candidate: unknown,
+): unknown[] | undefined {
+  if (trait.value.kind === "stringList" && typeof candidate === "string") {
+    return [candidate];
+  }
+  if (
+    trait.value.kind === "objectList" &&
+    candidate !== null &&
+    typeof candidate === "object" &&
+    !Array.isArray(candidate)
+  ) {
+    return [candidate];
+  }
+  return undefined;
+}
+
 function parseMutationCandidate(
   trait: AnyCatTraitDefinition,
   candidate: unknown,
@@ -43,19 +61,34 @@ function parseMutationCandidate(
   const direct = trait.value.schema.safeParse(candidate);
   if (direct.success) return clonePortableValue(direct.data);
 
-  const listCandidate =
-    trait.value.kind === "stringList" && typeof candidate === "string"
-      ? [candidate]
-      : trait.value.kind === "objectList" &&
-          candidate !== null &&
-          typeof candidate === "object" &&
-          !Array.isArray(candidate)
-        ? [candidate]
-        : undefined;
+  const listCandidate = wrapListCandidate(trait, candidate);
   if (listCandidate === undefined) return undefined;
 
   const list = trait.value.schema.safeParse(listCandidate);
   return list.success ? clonePortableValue(list.data) : undefined;
+}
+
+/**
+ * Starting at a random index, returns the first candidate that parses for the
+ * trait, or undefined when none do.
+ */
+function pickMutationCandidate(
+  trait: AnyCatTraitDefinition,
+  candidates: readonly unknown[],
+  random: () => number,
+): unknown {
+  const startIndex = Math.min(
+    candidates.length - 1,
+    Math.max(0, Math.floor(random() * candidates.length)),
+  );
+  for (let offset = 0; offset < candidates.length; offset++) {
+    const candidate = parseMutationCandidate(
+      trait,
+      candidates[(startIndex + offset) % candidates.length],
+    );
+    if (candidate !== undefined) return candidate;
+  }
+  return undefined;
 }
 
 /**
@@ -92,18 +125,9 @@ export function selectAncestryTraitMutations(
     const candidates = pools[trait.id] ?? [];
     if (candidates.length === 0 || random() >= mutationRate) continue;
 
-    const startIndex = Math.min(
-      candidates.length - 1,
-      Math.max(0, Math.floor(random() * candidates.length)),
-    );
-    for (let offset = 0; offset < candidates.length; offset++) {
-      const candidate = parseMutationCandidate(
-        trait,
-        candidates[(startIndex + offset) % candidates.length],
-      );
-      if (candidate === undefined) continue;
+    const candidate = pickMutationCandidate(trait, candidates, random);
+    if (candidate !== undefined) {
       mutations[trait.id] = candidate;
-      break;
     }
   }
 

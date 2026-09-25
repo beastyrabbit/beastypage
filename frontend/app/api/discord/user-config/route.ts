@@ -21,20 +21,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function PATCH(request: NextRequest) {
-  if (!isDiscordServiceRequest(request))
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-    if (!body || typeof body.discordUserId !== "string")
-      throw new Error("Invalid body");
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid config request" },
-      { status: 400 },
-    );
-  }
+function resolveConfigUpdate(body: Record<string, unknown>): {
+  operation: string;
+  fields: Record<string, unknown>;
+} {
   const fields: Record<string, unknown> = { discordUserId: body.discordUserId };
   let operation = "upsert";
   if (body.reset === true) operation = "reset";
@@ -59,6 +49,24 @@ export async function PATCH(request: NextRequest) {
       if (typeof body[key] === "boolean") fields[key] = body[key];
     }
   }
+  return { operation, fields };
+}
+
+export async function PATCH(request: NextRequest) {
+  if (!isDiscordServiceRequest(request))
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+    if (!body || typeof body.discordUserId !== "string")
+      throw new Error("Invalid body");
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid config request" },
+      { status: 400 },
+    );
+  }
+  const { operation, fields } = resolveConfigUpdate(body);
   try {
     await discordConfig(operation, fields);
     return NextResponse.json({ ok: true, action: operation });

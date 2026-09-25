@@ -153,6 +153,67 @@ function normalizeShare<T extends ShareStatus>(item: T): T {
   return { ...item, url: shareUrl(item.slug, item.url) };
 }
 
+function workStatusClass(kind: WorkState["kind"]) {
+  if (kind === "error") return "border-red-500/30 bg-red-500/10 text-red-200";
+  if (kind === "done") {
+    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-100";
+  }
+  return "border-border bg-muted/40 text-foreground";
+}
+
+function WorkStatusIcon({ kind }: Readonly<{ kind: WorkState["kind"] }>) {
+  if (kind === "error") {
+    return <AlertTriangle className="mt-0.5 size-4 shrink-0" />;
+  }
+  if (kind === "done") return <Check className="mt-0.5 size-4 shrink-0" />;
+  return <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin" />;
+}
+
+function SharePreviewMedia({
+  item,
+  itemCount,
+}: Readonly<{ item: ShareStatus; itemCount: number }>) {
+  if (itemCount > 1) {
+    return (
+      <div className="mb-4 flex min-h-32 items-center justify-center rounded-md border border-border bg-background/60 px-6 text-center text-sm text-muted-foreground">
+        {itemCount} photos and videos are collected on this link.
+      </div>
+    );
+  }
+  if (item.publicMime?.startsWith("video/")) {
+    return (
+      // biome-ignore lint/a11y/useMediaCaption: arbitrary user-supplied media has no caption track available
+      <video
+        src={item.url}
+        controls
+        playsInline
+        preload="metadata"
+        className="mb-4 max-h-80 w-full rounded-md bg-black object-contain"
+      />
+    );
+  }
+  return (
+    // The URL intentionally points directly to user media.
+    // biome-ignore lint/performance/noImgElement: raw media URLs have unknown dimensions and must not be transformed
+    <img
+      src={item.url}
+      alt=""
+      className="mb-4 max-h-80 w-full rounded-md bg-black/30 object-contain"
+    />
+  );
+}
+
+function historyView(loading: boolean, empty: boolean) {
+  if (loading) return "loading";
+  if (empty) return "empty";
+  return "list";
+}
+
+async function copyLink(url: string) {
+  await navigator.clipboard.writeText(url);
+  toast.success("Link copied");
+}
+
 export function QuickShareClient() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -532,11 +593,6 @@ export function QuickShareClient() {
     }
   }
 
-  async function copyLink(url: string) {
-    await navigator.clipboard.writeText(url);
-    toast.success("Link copied");
-  }
-
   async function shareLink(item: ShareStatus) {
     if (navigator.share) {
       await navigator.share({ title: item.originalName, url: item.url });
@@ -700,6 +756,12 @@ export function QuickShareClient() {
     [policy],
   );
 
+  const deviceFilesSuffix = deviceFiles.length === 1 ? "" : "s";
+  const historyState = historyView(
+    historyLoading,
+    history.length === 0 && !historyError,
+  );
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
       <header className="mb-8 max-w-2xl">
@@ -789,7 +851,7 @@ export function QuickShareClient() {
                   <FileUp className="mb-4 size-7 text-amber-400" />
                   <span className="font-medium">
                     {deviceFiles.length > 0
-                      ? `${deviceFiles.length} media file${deviceFiles.length === 1 ? "" : "s"} selected`
+                      ? `${deviceFiles.length} media file${deviceFilesSuffix} selected`
                       : "Choose photos or videos"}
                   </span>
                   <span className="mt-2 text-xs text-muted-foreground">
@@ -809,7 +871,8 @@ export function QuickShareClient() {
                   Create link
                 </button>
               </form>
-            ) : mode === "url" ? (
+            ) : null}
+            {mode === "url" ? (
               <form onSubmit={startImport} className="space-y-5">
                 <label
                   className="block text-sm font-medium"
@@ -845,7 +908,8 @@ export function QuickShareClient() {
                   Create link
                 </button>
               </form>
-            ) : (
+            ) : null}
+            {mode === "clipboard" ? (
               <form
                 onSubmit={(event) =>
                   startFileUpload(event, pastedFile ? [pastedFile] : [])
@@ -902,28 +966,18 @@ export function QuickShareClient() {
                   Create link
                 </button>
               </form>
-            )}
+            ) : null}
 
             {work.kind !== "idle" ? (
               <div
                 className={cn(
                   "mt-5 rounded-lg border px-4 py-3 text-sm",
-                  work.kind === "error"
-                    ? "border-red-500/30 bg-red-500/10 text-red-200"
-                    : work.kind === "done"
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
-                      : "border-border bg-muted/40 text-foreground",
+                  workStatusClass(work.kind),
                 )}
                 aria-live={work.kind === "uploading" ? "off" : "polite"}
               >
                 <div className="flex items-start gap-3">
-                  {work.kind === "error" ? (
-                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                  ) : work.kind === "done" ? (
-                    <Check className="mt-0.5 size-4 shrink-0" />
-                  ) : (
-                    <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin" />
-                  )}
+                  <WorkStatusIcon kind={work.kind} />
                   <div className="min-w-0 flex-1">
                     {work.kind === "uploading" ? (
                       <>
@@ -964,29 +1018,10 @@ export function QuickShareClient() {
 
             {current?.state === "ready" && current.publicExpiresAt > now ? (
               <div className="mt-5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
-                {currentItemCount > 1 ? (
-                  <div className="mb-4 flex min-h-32 items-center justify-center rounded-md border border-border bg-background/60 px-6 text-center text-sm text-muted-foreground">
-                    {currentItemCount} photos and videos are collected on this
-                    link.
-                  </div>
-                ) : current.publicMime?.startsWith("video/") ? (
-                  // biome-ignore lint/a11y/useMediaCaption: arbitrary user-supplied media has no caption track available
-                  <video
-                    src={current.url}
-                    controls
-                    playsInline
-                    preload="metadata"
-                    className="mb-4 max-h-80 w-full rounded-md bg-black object-contain"
-                  />
-                ) : (
-                  // The URL intentionally points directly to user media.
-                  // biome-ignore lint/performance/noImgElement: raw media URLs have unknown dimensions and must not be transformed
-                  <img
-                    src={current.url}
-                    alt=""
-                    className="mb-4 max-h-80 w-full rounded-md bg-black/30 object-contain"
-                  />
-                )}
+                <SharePreviewMedia
+                  item={current}
+                  itemCount={currentItemCount}
+                />
                 <p className="truncate font-mono text-sm">{current.url}</p>
                 <p className="mt-2 text-xs text-muted-foreground">
                   {formatExpiry(current.publicExpiresAt)}
@@ -1040,15 +1075,17 @@ export function QuickShareClient() {
               {historyError} Use refresh to try again.
             </p>
           ) : null}
-          {historyLoading ? (
+          {historyState === "loading" ? (
             <div className="flex items-center gap-2 rounded-lg border border-border/60 px-4 py-5 text-sm text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" /> Loading…
             </div>
-          ) : history.length === 0 && !historyError ? (
+          ) : null}
+          {historyState === "empty" ? (
             <div className="rounded-lg border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
               Your active and recent shares will appear here.
             </div>
-          ) : (
+          ) : null}
+          {historyState === "list" ? (
             <div className="space-y-2">
               {history.map((item) => (
                 <article
@@ -1103,7 +1140,7 @@ export function QuickShareClient() {
                 </article>
               ))}
             </div>
-          )}
+          ) : null}
           <p className="mt-4 text-xs leading-5 text-muted-foreground">
             There is no uploader delete button. Moderators can remove abusive
             media early.

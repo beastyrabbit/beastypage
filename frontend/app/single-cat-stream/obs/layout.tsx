@@ -5,9 +5,9 @@
  */
 export default function OBSOverlayLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div
       className="fixed left-0 top-0 z-[9999] overflow-hidden"

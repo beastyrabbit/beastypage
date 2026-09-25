@@ -62,6 +62,23 @@ function packGrid(count: number): { columns: number; spriteSize: number } {
   return best;
 }
 
+function phaseStatusLabel(
+  phase: ScenePhase,
+  saved: boolean,
+  stageLabel: string,
+): string {
+  if (phase === "loading") return "Summoning…";
+  if (phase === "done") return saved ? "✨ Complete ✨" : "Saving…";
+  if (phase === "awaitingCull") return "Choosing who leaves…";
+  return `Rolling ${stageLabel}…`;
+}
+
+function catLabelColourClass(marked: boolean, potential: boolean): string {
+  if (marked) return "text-red-300";
+  if (potential) return "text-yellow-200";
+  return "text-white/90";
+}
+
 /**
  * The adoption elimination show: every cat starts as a bare kit; each stage
  * reveals one more parameter on all survivors, then the show waits for the
@@ -338,15 +355,11 @@ export function BatchScene({
             /{stages.length}
           </span>
           <span className="text-amber-300">
-            {phase === "loading"
-              ? "Summoning…"
-              : phase === "done"
-                ? command.slug
-                  ? "✨ Complete ✨"
-                  : "Saving…"
-                : phase === "awaitingCull"
-                  ? "Choosing who leaves…"
-                  : `Rolling ${currentStage?.label ?? ""}…`}
+            {phaseStatusLabel(
+              phase,
+              Boolean(command.slug),
+              currentStage?.label ?? "",
+            )}
           </span>
         </div>
       </div>
@@ -413,11 +426,7 @@ export function BatchScene({
                 <span
                   className={cn(
                     "max-w-full truncate text-base font-bold",
-                    marked
-                      ? "text-red-300"
-                      : potential
-                        ? "text-yellow-200"
-                        : "text-white/90",
+                    catLabelColourClass(marked, potential),
                   )}
                 >
                   {cat.label}

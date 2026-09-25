@@ -236,8 +236,8 @@ export function evolveCatDocument(
       incoming.traits,
     ),
     unknownTraits: {
-      ...(current.unknownTraits ?? {}),
-      ...(incoming.unknownTraits ?? {}),
+      ...current.unknownTraits,
+      ...incoming.unknownTraits,
     },
   }) as CatDocument;
 }
@@ -248,6 +248,24 @@ export interface InheritanceOptions {
   /** Trait values already computed by a genetics or mutation plugin. */
   mutations?: Readonly<Record<string, unknown>>;
   random?: () => number;
+}
+
+function pickParentValue(
+  motherValue: unknown,
+  fatherValue: unknown,
+  random: () => number,
+): unknown {
+  if (motherValue === undefined) return fatherValue;
+  if (fatherValue === undefined || random() < 0.5) return motherValue;
+  return fatherValue;
+}
+
+function fallbackTraitValue(
+  trait: AnyCatTraitDefinition,
+  generated: unknown,
+): unknown {
+  if (generated !== undefined) return generated;
+  return trait.value.default;
 }
 
 /** Applies copy/mutate/none policies; genetics remains an optional plugin input. */
@@ -262,11 +280,9 @@ export function applySystemInheritanceStrategies(
   for (const trait of system.traits) {
     const strategy = trait.capabilities.inherit;
     if (strategy === "none" || strategy === undefined) {
-      const generated = options.generated?.[trait.id];
-      if (generated !== undefined) {
-        result[trait.id] = clonePortableValue(generated);
-      } else if (trait.value.default !== undefined) {
-        result[trait.id] = clonePortableValue(trait.value.default);
+      const fallback = fallbackTraitValue(trait, options.generated?.[trait.id]);
+      if (fallback !== undefined) {
+        result[trait.id] = clonePortableValue(fallback);
       }
       continue;
     }
@@ -275,20 +291,12 @@ export function applySystemInheritanceStrategies(
       result[trait.id] = clonePortableValue(mutation);
       continue;
     }
-    const motherValue = mother[trait.id];
-    const fatherValue = father[trait.id];
-    const inherited =
-      motherValue === undefined
-        ? fatherValue
-        : fatherValue === undefined || random() < 0.5
-          ? motherValue
-          : fatherValue;
+    let inherited = pickParentValue(mother[trait.id], father[trait.id], random);
+    if (inherited === undefined) {
+      inherited = fallbackTraitValue(trait, options.generated?.[trait.id]);
+    }
     if (inherited !== undefined) {
       result[trait.id] = clonePortableValue(inherited);
-    } else if (options.generated?.[trait.id] !== undefined) {
-      result[trait.id] = clonePortableValue(options.generated[trait.id]);
-    } else if (trait.value.default !== undefined) {
-      result[trait.id] = clonePortableValue(trait.value.default);
     }
   }
   return result;
@@ -308,8 +316,8 @@ export function inheritCatDocument(
       options,
     ),
     unknownTraits: {
-      ...(mother.unknownTraits ?? {}),
-      ...(father.unknownTraits ?? {}),
+      ...mother.unknownTraits,
+      ...father.unknownTraits,
     },
   }) as CatDocument;
 }
@@ -444,13 +452,12 @@ export function getSystemRenderOperations(
     );
 }
 
-export function topologicallySort<T>(
+function buildDependencyGraph<T>(
   values: readonly T[],
   getId: (value: T) => string,
   getDependencies: (value: T) => readonly string[],
-  getOrder: (value: T) => number,
-): T[] {
-  const byId = new Map(values.map((value) => [getId(value), value]));
+  byId: ReadonlyMap<string, T>,
+): { indegree: Map<string, number>; dependents: Map<string, string[]> } {
   const indegree = new Map<string, number>();
   const dependents = new Map<string, string[]>();
 
@@ -467,6 +474,22 @@ export function topologicallySort<T>(
       dependents.set(dependency, entries);
     }
   }
+  return { indegree, dependents };
+}
+
+export function topologicallySort<T>(
+  values: readonly T[],
+  getId: (value: T) => string,
+  getDependencies: (value: T) => readonly string[],
+  getOrder: (value: T) => number,
+): T[] {
+  const byId = new Map(values.map((value) => [getId(value), value]));
+  const { indegree, dependents } = buildDependencyGraph(
+    values,
+    getId,
+    getDependencies,
+    byId,
+  );
 
   const compareIds = (left: string, right: string): number => {
     const leftValue = byId.get(left);

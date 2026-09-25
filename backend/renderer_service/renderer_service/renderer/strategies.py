@@ -74,6 +74,47 @@ def _values(value: JsonValue | None) -> Iterable[str]:
             yield entry
 
 
+def _sprite_layer_name(
+    cat_renderer: CatRendererV3, config: SpriteLayerConfig, value: str
+) -> str | None:
+    sprite_name = config.sprite_by_value.get(value)
+    if sprite_name:
+        return sprite_name
+    if config.sprite_family in {"eyes", "skin"}:
+        return cat_renderer.mapper.build_sprite_name(
+            config.sprite_family,
+            None,
+            value,
+        )
+    return cat_renderer.mapper.build_sprite_name(
+        config.sprite_family,
+        value,
+        None,
+    )
+
+
+def _apply_sprite_layer_tint(
+    cat_renderer: CatRendererV3,
+    config: SpriteLayerConfig,
+    params: dict[str, JsonValue],
+    sprite: Image.Image,
+) -> Image.Image:
+    if not (config.tint_trait and config.tint_resolver == "whitePatch"):
+        return sprite
+    tint = cat_renderer.mapper.get_white_patch_tint(
+        params.get(config.tint_trait)
+        if isinstance(params.get(config.tint_trait), str)
+        else None
+    )
+    if not tint:
+        return sprite
+    return tint_image(
+        sprite,
+        [int(component) for component in tint[:3]],
+        mode="multiply",
+    )
+
+
 def _sprite_layer(
     renderer: object,
     operation: OperationBase,
@@ -87,36 +128,12 @@ def _sprite_layer(
     diagnostics: list[str] = []
 
     for value in _values(params.get(config.value_trait)):
-        sprite_name = config.sprite_by_value.get(value)
-        if not sprite_name:
-            if config.sprite_family in {"eyes", "skin"}:
-                sprite_name = cat_renderer.mapper.build_sprite_name(
-                    config.sprite_family,
-                    None,
-                    value,
-                )
-            else:
-                sprite_name = cat_renderer.mapper.build_sprite_name(
-                    config.sprite_family,
-                    value,
-                    None,
-                )
+        sprite_name = _sprite_layer_name(cat_renderer, config, value)
         if not sprite_name or not cat_renderer.repo.has_sprite(sprite_name):
             diagnostics.append(f"missing:{value}")
             continue
         sprite = cat_renderer._get_sprite(sprite_name, params)
-        if config.tint_trait and config.tint_resolver == "whitePatch":
-            tint = cat_renderer.mapper.get_white_patch_tint(
-                params.get(config.tint_trait)
-                if isinstance(params.get(config.tint_trait), str)
-                else None
-            )
-            if tint:
-                sprite = tint_image(
-                    sprite,
-                    [int(component) for component in tint[:3]],
-                    mode="multiply",
-                )
+        sprite = _apply_sprite_layer_tint(cat_renderer, config, params, sprite)
         overlay = alpha_over(overlay, sprite)
         diagnostics.append(f"{config.diagnostic_prefix}:{value}")
 

@@ -108,6 +108,34 @@ interface SectionDefinition {
   render: () => ReactNode;
 }
 
+function toAbsoluteShareUrl(shareUrl: string, origin: string): string {
+  if (shareUrl.startsWith("http") || !origin) return shareUrl;
+  return `${origin.replace(/\/$/, "")}${shareUrl}`;
+}
+
+function shareButtonLabel(shareBusy: boolean, isShareLocked: boolean): string {
+  if (shareBusy) return "Preparing link…";
+  if (isShareLocked) return "Loaded share (read-only)";
+  return "Save & Copy Link";
+}
+
+type TortieSubSection = "pattern" | "colour" | "mask";
+
+function toggleTortieSub(layerIndex: number, subId: TortieSubSection) {
+  return (
+    prev: Record<number, TortieSubSection | null>,
+  ): Record<number, TortieSubSection | null> => ({
+    ...prev,
+    [layerIndex]: prev[layerIndex] === subId ? null : subId,
+  });
+}
+
+function assignLayerFields(patch: Partial<TortieLayer>) {
+  return (draft: TortieLayer) => {
+    Object.assign(draft, patch);
+  };
+}
+
 type PaletteDropdownProps = {
   mode: PaletteMode;
   onChange: (value: PaletteMode) => void;
@@ -299,7 +327,7 @@ export function VisualBuilderClient({
     "skin" | "tint" | null
   >(null);
   const [expandedTortieSub, setExpandedTortieSub] = useState<
-    Record<number, "pattern" | "colour" | "mask" | null>
+    Record<number, TortieSubSection | null>
   >({});
   const initialisedRef = useRef(false);
   const [, startMetaTransition] = useTransition();
@@ -438,7 +466,7 @@ export function VisualBuilderClient({
       ),
     );
     setExpandedTortieSub(() => {
-      const mapping: Record<number, "pattern" | "colour" | "mask" | null> = {};
+      const mapping: Record<number, TortieSubSection | null> = {};
       (synced.tortie ?? []).forEach((_, idx) => {
         mapping[idx] = "colour";
       });
@@ -461,11 +489,7 @@ export function VisualBuilderClient({
       if (initialCat.shareUrl) {
         const origin =
           typeof window !== "undefined" ? window.location.origin : "";
-        const absolute = initialCat.shareUrl.startsWith("http")
-          ? initialCat.shareUrl
-          : origin
-            ? `${origin.replace(/\/$/, "")}${initialCat.shareUrl}`
-            : initialCat.shareUrl;
+        const absolute = toAbsoluteShareUrl(initialCat.shareUrl, origin);
         return { slug: initialCat.slug ?? initialCat.shareUrl, url: absolute };
       }
       if (initialCat.slug) {
@@ -682,8 +706,7 @@ export function VisualBuilderClient({
       setTortieLayers(layers);
       setExpandedTortieSub((previous) => {
         if (!enabled || layers.length === 0) return {};
-        const mapping: Record<number, "pattern" | "colour" | "mask" | null> =
-          {};
+        const mapping: Record<number, TortieSubSection | null> = {};
         layers.forEach((_, idx) => {
           if (Object.hasOwn(previous, idx)) {
             mapping[idx] = previous[idx] ?? null;
@@ -1085,9 +1108,10 @@ export function VisualBuilderClient({
                           type="button"
                           className="text-left"
                           onClick={() =>
-                            handleUpdateLayer(layerIndex, (draft) => {
-                              draft.pattern = pattern;
-                            })
+                            handleUpdateLayer(
+                              layerIndex,
+                              assignLayerFields({ pattern }),
+                            )
                           }
                         >
                           <VisualBuilderPreviewSprite
@@ -1139,9 +1163,10 @@ export function VisualBuilderClient({
                             type="button"
                             className="text-left"
                             onClick={() =>
-                              handleUpdateLayer(layerIndex, (draft) => {
-                                draft.colour = colour;
-                              })
+                              handleUpdateLayer(
+                                layerIndex,
+                                assignLayerFields({ colour }),
+                              )
                             }
                           >
                             <VisualBuilderPreviewSprite
@@ -1188,9 +1213,10 @@ export function VisualBuilderClient({
                           type="button"
                           className="text-left"
                           onClick={() =>
-                            handleUpdateLayer(layerIndex, (draft) => {
-                              draft.mask = mask;
-                            })
+                            handleUpdateLayer(
+                              layerIndex,
+                              assignLayerFields({ mask }),
+                            )
                           }
                         >
                           <VisualBuilderPreviewSprite
@@ -1258,11 +1284,9 @@ export function VisualBuilderClient({
                           <button
                             type="button"
                             onClick={() =>
-                              setExpandedTortieSub((prev) => ({
-                                ...prev,
-                                [layerIndex]:
-                                  prev[layerIndex] === sub.id ? null : sub.id,
-                              }))
+                              setExpandedTortieSub(
+                                toggleTortieSub(layerIndex, sub.id),
+                              )
                             }
                             className="flex w-full items-center justify-between rounded-lg border border-slate-800/70 bg-slate-900/60 px-4 py-2 text-left transition hover:border-amber-300/70 focus:outline-none focus:ring-2 focus:ring-amber-300/40"
                             aria-expanded={subExpanded}
@@ -2508,11 +2532,8 @@ export function VisualBuilderClient({
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
       const preferredSlug = shareSlug ?? mapperSlug;
-      const url = origin
-        ? `${origin}/visual-builder?${shareSlug ? "share" : "slug"}=${encodeURIComponent(preferredSlug)}`
-        : shareSlug
-          ? `/visual-builder?share=${encodeURIComponent(preferredSlug)}`
-          : `/visual-builder?slug=${encodeURIComponent(preferredSlug)}`;
+      const shareParam = shareSlug ? "share" : "slug";
+      const url = `${origin}/visual-builder?${shareParam}=${encodeURIComponent(preferredSlug)}`;
 
       setShareInfo({ slug: preferredSlug, url });
       setShareStale(false);
@@ -2786,11 +2807,7 @@ export function VisualBuilderClient({
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <CopyIcon size={16} />
-                {shareBusy
-                  ? "Preparing link…"
-                  : isShareLocked
-                    ? "Loaded share (read-only)"
-                    : "Save & Copy Link"}
+                {shareButtonLabel(shareBusy, isShareLocked)}
               </button>
               <button
                 type="button"

@@ -3,7 +3,14 @@
 import { useMutation, useQuery } from "convex/react";
 import { ClipboardCopy, Loader2, Trophy } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import XIcon from "@/components/ui/x-icon";
@@ -63,12 +70,47 @@ type MatchupResponse = {
   totalCats: number;
 };
 
-type LeaderboardEntry = MatchupCat;
 type SeedResult = {
   requested: number;
   generated: number;
   failed: number;
 };
+
+async function seedForMatchup(
+  needsSeed: number,
+  seedCats: (count: number) => Promise<SeedResult>,
+): Promise<boolean> {
+  if (needsSeed > 0) {
+    const extra = Math.max(2, Math.ceil(needsSeed * 0.5));
+    const requested = needsSeed + extra;
+    const seedResult = await seedCats(requested);
+    if (seedResult.generated === 0) {
+      const failure = "Unable to seed new cats for matchup generation.";
+      track("perfect_cat_seed_failed", {
+        requested: seedResult.requested,
+        generated: seedResult.generated,
+        failed: seedResult.failed,
+        reason: "no_cats_generated",
+      });
+      throw new Error(failure);
+    }
+    return true;
+  }
+  if (Math.random() < NEW_CAT_PROBABILITY) {
+    const seedResult = await seedCats(1 + Math.floor(Math.random() * 2));
+    if (seedResult.generated === 0) {
+      track("perfect_cat_seed_failed", {
+        requested: seedResult.requested,
+        generated: seedResult.generated,
+        failed: seedResult.failed,
+        reason: "probabilistic_seed_failed",
+      });
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
 
 function useClientToken(key: string): string | null {
   const [token] = useState<string | null>(() => {
@@ -78,7 +120,7 @@ function useClientToken(key: string): string | null {
     if (!existing) {
       existing =
         window.crypto?.randomUUID?.() ??
-        `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
+        `${Date.now()}-${window.crypto.getRandomValues(new Uint32Array(1))[0]}`;
       window.localStorage.setItem(storageKey, existing);
     }
     return existing;
@@ -171,13 +213,34 @@ function CatCard({
   disabled,
   onVote,
   onInspect,
-}: {
+}: Readonly<{
   cat: MatchupCat;
   preview: PreviewState;
   disabled: boolean;
   onVote: (cat: MatchupCat) => Promise<void>;
   onInspect: (cat: MatchupCat) => void;
-}) {
+}>) {
+  let previewContent: ReactNode;
+  if (preview.loading) {
+    previewContent = <Loader2 className="size-6 animate-spin text-primary" />;
+  } else if (preview.url) {
+    previewContent = (
+      <Image
+        src={preview.url}
+        alt="Cat preview"
+        width={640}
+        height={640}
+        unoptimized
+        className="h-full w-full object-contain"
+        style={{ imageRendering: "pixelated" }}
+      />
+    );
+  } else {
+    previewContent = (
+      <span className="text-xs text-muted-foreground">Preview unavailable</span>
+    );
+  }
+
   return (
     <div className="glass-card flex h-full flex-col gap-4 rounded-3xl border border-border/60 bg-background/70 p-6 shadow-inner">
       <div className="text-xs uppercase tracking-[0.35em] text-muted-foreground">
@@ -191,23 +254,7 @@ function CatCard({
         >
           <ExternalLinkIcon size={12} /> Inspect
         </button>
-        {preview.loading ? (
-          <Loader2 className="size-6 animate-spin text-primary" />
-        ) : preview.url ? (
-          <Image
-            src={preview.url}
-            alt="Cat preview"
-            width={640}
-            height={640}
-            unoptimized
-            className="h-full w-full object-contain"
-            style={{ imageRendering: "pixelated" }}
-          />
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            Preview unavailable
-          </span>
-        )}
+        {previewContent}
       </div>
       <div className="text-xs text-muted-foreground/80">
         Rating {formatRating(cat.rating)} · {cat.wins} wins · {cat.losses}{" "}
@@ -299,34 +346,8 @@ export default function PerfectCatFinderPage() {
         clientId,
       })) as unknown as MatchupResponse;
       let seeded = false;
-
-      if (response.needsSeed > 0 && ready && generator) {
-        const extra = Math.max(2, Math.ceil(response.needsSeed * 0.5));
-        const requested = response.needsSeed + extra;
-        const seedResult = await seedCats(requested);
-        if (seedResult.generated === 0) {
-          const failure = "Unable to seed new cats for matchup generation.";
-          track("perfect_cat_seed_failed", {
-            requested: seedResult.requested,
-            generated: seedResult.generated,
-            failed: seedResult.failed,
-            reason: "no_cats_generated",
-          });
-          throw new Error(failure);
-        }
-        seeded = true;
-      } else if (ready && generator && Math.random() < NEW_CAT_PROBABILITY) {
-        const seedResult = await seedCats(1 + Math.floor(Math.random() * 2));
-        if (seedResult.generated === 0) {
-          track("perfect_cat_seed_failed", {
-            requested: seedResult.requested,
-            generated: seedResult.generated,
-            failed: seedResult.failed,
-            reason: "probabilistic_seed_failed",
-          });
-        } else {
-          seeded = true;
-        }
+      if (ready && generator) {
+        seeded = await seedForMatchup(response.needsSeed, seedCats);
       }
 
       if (seeded) {
@@ -415,7 +436,7 @@ export default function PerfectCatFinderPage() {
           link.download = "perfect-cat.png";
           document.body.appendChild(link);
           link.click();
-          document.body.removeChild(link);
+          link.remove();
           showMessage("Sprite downloaded");
           track("perfect_cat_downloaded", {});
         }
@@ -457,26 +478,21 @@ export default function PerfectCatFinderPage() {
     }
   }, []);
 
-  const leaderboardEntries: LeaderboardEntry[] = useMemo(
+  const leaderboardEntries: MatchupCat[] = useMemo(
     () =>
-      ((leaderboard as LeaderboardEntry[] | undefined) ?? []).flatMap(
-        (entry) => {
-          try {
-            return [
-              {
-                ...entry,
-                params: toCanonicalRenderPayload(entry.params),
-              },
-            ];
-          } catch (error) {
-            console.warn(
-              "Skipping invalid perfect-cat leaderboard entry",
-              error,
-            );
-            return [];
-          }
-        },
-      ),
+      ((leaderboard as MatchupCat[] | undefined) ?? []).flatMap((entry) => {
+        try {
+          return [
+            {
+              ...entry,
+              params: toCanonicalRenderPayload(entry.params),
+            },
+          ];
+        } catch (error) {
+          console.warn("Skipping invalid perfect-cat leaderboard entry", error);
+          return [];
+        }
+      }),
     [leaderboard],
   );
 
@@ -579,6 +595,30 @@ export default function PerfectCatFinderPage() {
               ) : (
                 leaderboardEntries.map((entry, index) => {
                   const preview = getPreview(entry);
+                  let thumbnail: ReactNode;
+                  if (preview.loading) {
+                    thumbnail = (
+                      <Loader2 className="size-4 animate-spin text-primary" />
+                    );
+                  } else if (preview.url) {
+                    thumbnail = (
+                      <Image
+                        src={preview.url}
+                        alt="Cat preview"
+                        width={128}
+                        height={128}
+                        unoptimized
+                        className="h-16 w-16 object-contain transition group-hover:scale-105"
+                        style={{ imageRendering: "pixelated" }}
+                      />
+                    );
+                  } else {
+                    thumbnail = (
+                      <span className="text-[10px] text-muted-foreground">
+                        No preview
+                      </span>
+                    );
+                  }
                   return (
                     <tr
                       key={String(entry.id)}
@@ -599,23 +639,7 @@ export default function PerfectCatFinderPage() {
                           }}
                           className="group flex items-center justify-center rounded-xl border border-border/50 bg-background/80 p-1 transition hover:border-primary/50"
                         >
-                          {preview.loading ? (
-                            <Loader2 className="size-4 animate-spin text-primary" />
-                          ) : preview.url ? (
-                            <Image
-                              src={preview.url}
-                              alt="Cat preview"
-                              width={128}
-                              height={128}
-                              unoptimized
-                              className="h-16 w-16 object-contain transition group-hover:scale-105"
-                              style={{ imageRendering: "pixelated" }}
-                            />
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">
-                              No preview
-                            </span>
-                          )}
+                          {thumbnail}
                         </button>
                       </td>
                       <td className="px-4 py-3 font-semibold text-foreground">

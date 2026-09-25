@@ -89,7 +89,7 @@ function formatColor(
   }
 }
 
-function PaletteDownload({ palette }: { palette: PaletteCategory }) {
+function PaletteDownload({ palette }: Readonly<{ palette: PaletteCategory }>) {
   const handleExport = useCallback(() => {
     const colors = Object.entries(palette.colors)
       .filter(([, def]) => def.multiply)
@@ -149,13 +149,13 @@ function ColorCard({
   screen,
   pattern,
   colorFormat,
-}: {
+}: Readonly<{
   name: string;
   rgb: [number, number, number];
   screen?: [number, number, number, number];
   pattern?: PatternDefinition;
   colorFormat: ColorFormat;
-}) {
+}>) {
   const [copied, setCopied] = useState(false);
   const { display, clipboard } = formatColor(rgb, colorFormat);
 
@@ -175,6 +175,8 @@ function ColorCard({
   const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
   const textColor = luminance > 0.5 ? "text-black/80" : "text-white/90";
 
+  const titleDetail = pattern ? `${pattern.type} pattern` : clipboard;
+
   const bgStyle: React.CSSProperties = pattern
     ? patternToCssBackground(pattern)
     : { backgroundColor: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})` };
@@ -185,7 +187,7 @@ function ColorCard({
       onClick={copyToClipboard}
       className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-lg border border-border/30 transition hover:scale-105 hover:shadow-lg"
       style={bgStyle}
-      title={`${name}\n${pattern ? `${pattern.type} pattern` : clipboard}\nClick to copy`}
+      title={`${name}\n${titleDetail}\nClick to copy`}
     >
       <div className={`text-center ${textColor}`}>
         <div className="text-[10px] font-bold uppercase tracking-wide opacity-80 group-hover:opacity-100">
@@ -228,10 +230,10 @@ function ColorCard({
 function PaletteSection({
   palette,
   colorFormat,
-}: {
+}: Readonly<{
   palette: PaletteCategory;
   colorFormat: ColorFormat;
-}) {
+}>) {
   const colors = Object.entries(palette.colors);
 
   return (

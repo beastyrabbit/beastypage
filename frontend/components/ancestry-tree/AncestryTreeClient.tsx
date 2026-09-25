@@ -129,6 +129,33 @@ function estimateCatCount(
   return total;
 }
 
+function getEstimateClassName(isHuge: boolean, isLarge: boolean): string {
+  if (isHuge) return "text-red-400";
+  if (isLarge) return "text-amber-400";
+  return "text-muted-foreground";
+}
+
+function renderEstimateMessage(
+  estimated: number,
+  isHuge: boolean,
+  isLarge: boolean,
+) {
+  if (isHuge) {
+    return (
+      <span>
+        🚫 ~{estimated.toLocaleString()} cats — too large to render, will not
+        load
+      </span>
+    );
+  }
+  if (isLarge) {
+    return (
+      <span>⚠️ ~{estimated.toLocaleString()} cats — may not load properly</span>
+    );
+  }
+  return <span>~{estimated.toLocaleString()} cats estimated</span>;
+}
+
 export function AncestryTreeClient({
   initialTree,
   initialHasPassword,
@@ -882,8 +909,7 @@ export function AncestryTreeClient({
               <div className="glass-card p-6 space-y-6">
                 <h2 className="font-semibold text-xl flex items-center gap-2">
                   <span className="text-pink-400">♀</span>
-                  <span className="text-blue-400">♂</span>
-                  Founding Couple
+                  <span className="text-blue-400">♂</span> Founding Couple
                 </h2>
 
                 <div className="flex justify-center items-center gap-8">
@@ -974,23 +1000,9 @@ export function AncestryTreeClient({
                     return (
                       <>
                         <div
-                          className={`text-center text-sm ${isHuge ? "text-red-400" : isLarge ? "text-amber-400" : "text-muted-foreground"}`}
+                          className={`text-center text-sm ${getEstimateClassName(isHuge, isLarge)}`}
                         >
-                          {isHuge ? (
-                            <span>
-                              🚫 ~{estimated.toLocaleString()} cats — too large
-                              to render, will not load
-                            </span>
-                          ) : isLarge ? (
-                            <span>
-                              ⚠️ ~{estimated.toLocaleString()} cats — may not
-                              load properly
-                            </span>
-                          ) : (
-                            <span>
-                              ~{estimated.toLocaleString()} cats estimated
-                            </span>
-                          )}
+                          {renderEstimateMessage(estimated, isHuge, isLarge)}
                         </div>
                         <button
                           type="button"

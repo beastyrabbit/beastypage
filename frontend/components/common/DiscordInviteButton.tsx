@@ -68,7 +68,9 @@ function formatDuration(ms: number): string {
   return `${seconds}s`;
 }
 
-export function DiscordInviteButton({ className }: { className?: string }) {
+export function DiscordInviteButton({
+  className,
+}: Readonly<{ className?: string }>) {
   const issueChallenge = useMutation(api.discord.issueChallenge);
   const redeemChallenge = useMutation(api.discord.redeemChallenge);
 
@@ -167,41 +169,39 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         answer,
       });
 
-      if (result && typeof result === "object") {
-        if ("status" in result) {
-          if (result.status === "success") {
-            setInviteUrl(result.inviteUrl);
-            setStatus("success");
-            setChallenge(null);
-            setAnswer("");
-            setAttemptCount(0);
-            setCooldownUntil(null);
-            return;
-          }
+      if (result && typeof result === "object" && "status" in result) {
+        if (result.status === "success") {
+          setInviteUrl(result.inviteUrl);
+          setStatus("success");
+          setChallenge(null);
+          setAnswer("");
+          setAttemptCount(0);
+          setCooldownUntil(null);
+          return;
+        }
 
-          if (result.status === "retry") {
-            const nextAttempt = attemptCount + 1;
-            setAttemptCount(nextAttempt);
-            const waitSeconds = getCooldownDuration(nextAttempt);
-            const now = Date.now();
-            setCooldownUntil(() => now + waitSeconds * 1000);
-            setNowMs(now);
-            setStatus("error");
-            setInviteUrl(null);
-            setChallenge(null);
-            setAnswer("");
-            setError(
-              `${result.message ?? "Incorrect answer."} Try again in ${formatDuration(waitSeconds * 1000)}.`,
-            );
-            return;
-          }
-
+        if (result.status === "retry") {
+          const nextAttempt = attemptCount + 1;
+          setAttemptCount(nextAttempt);
+          const waitSeconds = getCooldownDuration(nextAttempt);
+          const now = Date.now();
+          setCooldownUntil(() => now + waitSeconds * 1000);
+          setNowMs(now);
           setStatus("error");
           setInviteUrl(null);
           setChallenge(null);
-          setError(result.message);
+          setAnswer("");
+          setError(
+            `${result.message ?? "Incorrect answer."} Try again in ${formatDuration(waitSeconds * 1000)}.`,
+          );
           return;
         }
+
+        setStatus("error");
+        setInviteUrl(null);
+        setChallenge(null);
+        setError(result.message);
+        return;
       }
     } catch (err) {
       const message =
@@ -356,11 +356,11 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         onClick={closeDialog}
       />
       <div className="relative z-[81] flex w-full max-w-xl justify-center">
-        <div
-          role="dialog"
+        <dialog
+          open
           aria-modal="true"
           aria-labelledby="discord-invite-title"
-          className="relative w-full max-w-md transform overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-b from-background via-background/95 to-background shadow-[0_40px_120px_-30px_rgba(15,15,45,0.65)] ring-1 ring-border/40 transition-all duration-200 ease-out"
+          className="relative w-full max-w-md transform bg-transparent text-inherit overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-b from-background via-background/95 to-background shadow-[0_40px_120px_-30px_rgba(15,15,45,0.65)] ring-1 ring-border/40 transition-all duration-200 ease-out"
         >
           <div
             ref={contentRef}
@@ -521,7 +521,7 @@ export function DiscordInviteButton({ className }: { className?: string }) {
               </div>
             </div>
           </div>
-        </div>
+        </dialog>
       </div>
     </div>
   );

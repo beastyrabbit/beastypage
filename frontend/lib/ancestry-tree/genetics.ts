@@ -226,6 +226,12 @@ function expressedSimple<T>(allele1: T, allele2: T): T {
   return roll(0.5) ? allele1 : allele2;
 }
 
+function pushIfMissing(values: string[], value: string | undefined): void {
+  if (value && !values.includes(value)) {
+    values.push(value);
+  }
+}
+
 /**
  * Extract tortie genetics from cat params
  */
@@ -239,23 +245,16 @@ function extractTortieGenetics(params: CatParams): TortieGenetics | null {
   const colours: string[] = [];
 
   for (const layer of params.tortie) {
-    if (layer) {
-      if (layer.pattern) patterns.push(layer.pattern);
-      if (layer.mask) masks.push(layer.mask);
-      if (layer.colour) colours.push(layer.colour);
-    }
+    if (!layer) continue;
+    if (layer.pattern) patterns.push(layer.pattern);
+    if (layer.mask) masks.push(layer.mask);
+    if (layer.colour) colours.push(layer.colour);
   }
 
   // Also include legacy single-layer fields
-  if (params.tortiePattern && !patterns.includes(params.tortiePattern)) {
-    patterns.push(params.tortiePattern);
-  }
-  if (params.tortieMask && !masks.includes(params.tortieMask)) {
-    masks.push(params.tortieMask);
-  }
-  if (params.tortieColour && !colours.includes(params.tortieColour)) {
-    colours.push(params.tortieColour);
-  }
+  pushIfMissing(patterns, params.tortiePattern);
+  pushIfMissing(masks, params.tortieMask);
+  pushIfMissing(colours, params.tortieColour);
 
   return {
     hasTortieGene: true,
@@ -346,6 +345,43 @@ function inheritTortieData(
 }
 
 /**
+ * Pick an inherited value, or (on mutation / empty inheritance) a pool value,
+ * falling back to a default when the pool is empty.
+ */
+function inheritOrMutate(
+  inherited: string[],
+  pool: string[],
+  fallback: string,
+): string {
+  if (inherited.length > 0 && !roll(MUTATION_RATE)) {
+    return pickOne(inherited);
+  }
+  if (pool.length > 0) {
+    return pickOne(pool);
+  }
+  return fallback;
+}
+
+/**
+ * Mask - inherit or mutate (try to use unique masks)
+ */
+function pickLayerMask(
+  inherited: string[],
+  pool: string[],
+  usedMasks: Set<string>,
+): string {
+  const availableMasks = inherited.filter((m) => !usedMasks.has(m));
+  if (availableMasks.length > 0 && !roll(MUTATION_RATE)) {
+    return pickOne(availableMasks);
+  }
+  if (pool.length > 0) {
+    const poolMasks = pool.filter((m) => !usedMasks.has(m));
+    return poolMasks.length > 0 ? pickOne(poolMasks) : pickOne(pool);
+  }
+  return "ONE";
+}
+
+/**
  * Generate tortie layers from inherited genetics
  * Returns 1-4 layers randomly, using inherited patterns/masks/colours
  */
@@ -364,44 +400,18 @@ export function generateTortieLayers(
 
   for (let i = 0; i < numLayers; i++) {
     // Pick from inherited or mutate
-    let pattern: string;
-    let mask: string;
-    let colour: string;
-
-    // Pattern - inherit or mutate
-    if (tortieData.patterns.length > 0 && !roll(MUTATION_RATE)) {
-      pattern = pickOne(tortieData.patterns);
-    } else if (tortiePelts.length > 0) {
-      pattern = pickOne(tortiePelts);
-    } else {
-      pattern = "Tabby";
-    }
-
-    // Mask - inherit or mutate (try to use unique masks)
-    const availableMasks = tortieData.masks.filter((m) => !usedMasks.has(m));
-    if (availableMasks.length > 0 && !roll(MUTATION_RATE)) {
-      mask = pickOne(availableMasks);
-    } else if (mutationPool.tortieMasks.length > 0) {
-      const poolMasks = mutationPool.tortieMasks.filter(
-        (m) => !usedMasks.has(m),
-      );
-      mask =
-        poolMasks.length > 0
-          ? pickOne(poolMasks)
-          : pickOne(mutationPool.tortieMasks);
-    } else {
-      mask = "ONE";
-    }
+    const pattern = inheritOrMutate(tortieData.patterns, tortiePelts, "Tabby");
+    const mask = pickLayerMask(
+      tortieData.masks,
+      mutationPool.tortieMasks,
+      usedMasks,
+    );
     usedMasks.add(mask);
-
-    // Colour - inherit or mutate
-    if (tortieData.colours.length > 0 && !roll(MUTATION_RATE)) {
-      colour = pickOne(tortieData.colours);
-    } else if (mutationPool.colours.length > 0) {
-      colour = pickOne(mutationPool.colours);
-    } else {
-      colour = "BLACK";
-    }
+    const colour = inheritOrMutate(
+      tortieData.colours,
+      mutationPool.colours,
+      "BLACK",
+    );
 
     layers.push({ pattern, mask, colour });
   }
@@ -441,6 +451,10 @@ export function createGeneticsFromParams(
     ),
     tortieData: createTrait(tortieData, tortieData, tortieData),
   };
+}
+
+function mutateWhitePatches(pool: string[]): string | null {
+  return roll(0.5) ? pickOne(pool) : null;
 }
 
 export function inheritGenetics(
@@ -546,15 +560,11 @@ export function inheritGenetics(
 
   const childWhiteA1 =
     roll(MUTATION_RATE) && mutationPool.whitePatches.length > 0
-      ? roll(0.5)
-        ? pickOne(mutationPool.whitePatches)
-        : null
+      ? mutateWhitePatches(mutationPool.whitePatches)
       : motherWhite;
   const childWhiteA2 =
     roll(MUTATION_RATE) && mutationPool.whitePatches.length > 0
-      ? roll(0.5)
-        ? pickOne(mutationPool.whitePatches)
-        : null
+      ? mutateWhitePatches(mutationPool.whitePatches)
       : fatherWhite;
 
   // Tortie gene mutation is rare

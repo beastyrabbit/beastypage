@@ -54,6 +54,48 @@ type MapperRecord = {
   creatorName?: string | null;
 };
 
+type StarterSource =
+  | { type: "random" }
+  | {
+      type: "history";
+      slug: string;
+      profileId?: string | null;
+      catName?: string | null;
+      creatorName?: string | null;
+    };
+
+/** Load a saved cat as the evolution starter, with the chosen hair sprite. */
+async function resolveHistoryStarter(
+  historyRecord: MapperRecord | null | undefined,
+  trimmedHistorySlug: string,
+  hairSprite: EvolutionStarterHair,
+): Promise<{ starterPayload: unknown; starterSource: StarterSource }> {
+  if (!trimmedHistorySlug) {
+    throw new Error("Enter a history slug first");
+  }
+  if (historyRecord === undefined) {
+    throw new Error("History starter is still loading");
+  }
+  if (!historyRecord?.cat_data) {
+    throw new Error("No saved cat was found for that slug");
+  }
+  const { applyEvolutionStarterHairToPayload, resolveEvolutionStarterHair } =
+    await import("@/lib/evolution/evolutionGenerator");
+  return {
+    starterPayload: applyEvolutionStarterHairToPayload(
+      historyRecord.cat_data,
+      resolveEvolutionStarterHair(hairSprite),
+    ),
+    starterSource: {
+      type: "history",
+      slug: historyRecord.slug ?? trimmedHistorySlug,
+      profileId: historyRecord.id,
+      catName: historyRecord.catName ?? null,
+      creatorName: historyRecord.creatorName ?? null,
+    },
+  };
+}
+
 /**
  * Evolution tab: configure and start an evolution ceremony on the OBS
  * overlay. Generation and persistence happen here (the authed surface);
@@ -70,8 +112,8 @@ export function EvolutionPanel() {
   const createMapper = useMutation(api.mapper.create);
   const triggerEvolution = useMutation(api.catStream.triggerEvolution);
 
-  const [selectedClans, setSelectedClans] = useState<EvolutionArchetype[]>(
-    () => [...CONTROLLED_ARCHETYPES.slice(0, 3)],
+  const [selectedClans, setSelectedClans] = useState<EvolutionArchetype[]>(() =>
+    CONTROLLED_ARCHETYPES.slice(0, 3),
   );
   const [targetLevel, setTargetLevel] = useState<EvolutionLevel>(2);
   const [spinSeconds, setSpinSeconds] =
@@ -213,40 +255,13 @@ export function EvolutionPanel() {
       if (startTokenRef.current !== token) return;
 
       let starterPayload: unknown;
-      let starterSource:
-        | { type: "random" }
-        | {
-            type: "history";
-            slug: string;
-            profileId?: string | null;
-            catName?: string | null;
-            creatorName?: string | null;
-          };
+      let starterSource: StarterSource;
       if (starterMode === "history") {
-        if (!trimmedHistorySlug) {
-          throw new Error("Enter a history slug first");
-        }
-        if (historyRecord === undefined) {
-          throw new Error("History starter is still loading");
-        }
-        if (!historyRecord?.cat_data) {
-          throw new Error("No saved cat was found for that slug");
-        }
-        const {
-          applyEvolutionStarterHairToPayload,
-          resolveEvolutionStarterHair,
-        } = await import("@/lib/evolution/evolutionGenerator");
-        starterPayload = applyEvolutionStarterHairToPayload(
-          historyRecord.cat_data,
-          resolveEvolutionStarterHair(hairSprite),
-        );
-        starterSource = {
-          type: "history",
-          slug: historyRecord.slug ?? trimmedHistorySlug,
-          profileId: historyRecord.id,
-          catName: historyRecord.catName ?? null,
-          creatorName: historyRecord.creatorName ?? null,
-        };
+        ({ starterPayload, starterSource } = await resolveHistoryStarter(
+          historyRecord,
+          trimmedHistorySlug,
+          hairSprite,
+        ));
       } else {
         starterPayload = await buildRandomEvolutionStarter(hairSprite);
         starterSource = { type: "random" };

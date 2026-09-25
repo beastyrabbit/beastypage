@@ -7,7 +7,7 @@ source pixels. They never stamp a repeating texture across the cat.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 import numpy as np
 from PIL import Image
@@ -186,176 +186,265 @@ def _marking_mask(flat: np.ndarray, source: np.ndarray) -> np.ndarray:
     return shared_shape & (luma_delta < -_MARKING_THRESHOLD)
 
 
+def _recipe_bengal_rosettes(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    rosettes = masks["Rosette"]
+    small_accents = _select_components(
+        masks["Speckled"] & ~_dilate(rosettes),
+        maximum_size=3,
+        step=2,
+    )
+    return (("Rosette", rosettes), ("Speckled", small_accents))
+
+
+def _recipe_clouded_leopard(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    cloud_rims = _outline(masks["Classic"])
+    lower_echo = _outline(masks["Sokoke"]) & ~_dilate(cloud_rims)
+    return (("Classic", cloud_rims), ("Sokoke", lower_echo))
+
+
+def _recipe_ocelot_chains(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    chain_rims = _outline(
+        _select_components(
+            masks["Rosette"],
+            minimum_size=4,
+            step=2,
+        )
+    )
+    chain_links = _select_components(
+        masks["Bengal"] & ~_dilate(chain_rims),
+        maximum_size=5,
+    )
+    return (("Rosette", chain_rims), ("Bengal", chain_links))
+
+
+def _recipe_serval_spots(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    spots = _select_components(masks["Speckled"], maximum_size=6)
+    face_and_leg_marks = _select_components(
+        masks["Ticked"] & ~_dilate(spots),
+        maximum_size=3,
+        step=2,
+    )
+    return (("Speckled", spots), ("Ticked", face_and_leg_marks))
+
+
+def _recipe_snow_leopard(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    sparse_rosettes = _select_components(
+        masks["Rosette"],
+        maximum_size=12,
+        step=2,
+    )
+    dust = _select_components(
+        masks["Ticked"] & ~_dilate(sparse_rosettes),
+        maximum_size=3,
+        step=3,
+    )
+    return (("Rosette", sparse_rosettes), ("Ticked", dust))
+
+
+def _recipe_tiger_stripes(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    stripe_cores = masks["Mackerel"] & _dilate(masks["Tabby"])
+    short_tips = _select_components(
+        masks["Mackerel"] & ~_dilate(stripe_cores),
+        maximum_size=4,
+        step=2,
+    )
+    return (("Mackerel", stripe_cores), ("Mackerel", short_tips))
+
+
+def _recipe_king_cheetah(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    spots = _select_components(
+        masks["Speckled"],
+        maximum_size=6,
+        step=2,
+    )
+    dorsal_blots = masks["Bengal"] & _dilate(masks["Mackerel"]) & ~_dilate(spots)
+    return (("Speckled", spots), ("Bengal", dorsal_blots))
+
+
+def _recipe_lynx_fleck(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    ticks = masks["Ticked"]
+    flecks = _select_components(
+        masks["Speckled"] & ~_dilate(ticks),
+        maximum_size=2,
+        step=2,
+    )
+    return (("Ticked", ticks), ("Speckled", flecks))
+
+
+def _recipe_marble_swirl(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    lace = _outline(masks["Marbled"])
+    knots = masks["Sokoke"] & masks["Marbled"] & ~lace
+    return (("Marbled", lace), ("Sokoke", knots))
+
+
+def _recipe_brindle(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    mackerel_only = masks["Mackerel"] & ~masks["Tabby"]
+    tabby_only = masks["Tabby"] & ~masks["Mackerel"]
+    crossed_marks = _outline(masks["Mackerel"] & masks["Tabby"])
+    return (
+        ("Tabby", tabby_only),
+        ("Mackerel", mackerel_only),
+        ("Mackerel", crossed_marks),
+    )
+
+
+def _recipe_jaguar_mosaic(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    broken_rims = _outline(masks["Bengal"])
+    centres = masks["Rosette"] & _dilate(masks["Bengal"]) & ~broken_rims
+    return ((_DARKEST_SOURCE, broken_rims), ("Rosette", centres))
+
+
+def _recipe_cheetah_dots(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    dot_cores = _erode(masks["Speckled"])
+    loose_dots = _select_components(
+        masks["Rosette"] & ~_dilate(dot_cores),
+        maximum_size=3,
+        step=2,
+    )
+    return (
+        (_DARKEST_SOURCE, dot_cores),
+        (_DARKEST_SOURCE, loose_dots),
+    )
+
+
+def _recipe_fishing_cat(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    short_bars = masks["Mackerel"] & masks["Speckled"]
+    spots = _select_components(
+        masks["Speckled"] & ~_dilate(short_bars),
+        maximum_size=5,
+        step=2,
+    )
+    return (
+        (_DARKEST_SOURCE, short_bars),
+        (_DARKEST_SOURCE, spots),
+    )
+
+
+def _recipe_toyger_braids(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    curved_bars = masks["Bengal"] & _dilate(masks["Mackerel"])
+    bridges = masks["Masked"] & masks["Mackerel"] & ~_dilate(curved_bars)
+    return (
+        (_DARKEST_SOURCE, curved_bars),
+        (_DARKEST_SOURCE, bridges),
+    )
+
+
+def _recipe_sandcat_bars(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    quiet_bars = masks["Mackerel"] & masks["Ticked"]
+    small_points = masks["Agouti"] & ~_dilate(quiet_bars)
+    return (("Mackerel", quiet_bars), ("Agouti", small_points))
+
+
+def _recipe_classic_bullseye(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    outer_rings = _outline(masks["Classic"])
+    dark_centres = _erode(masks["Marbled"]) & masks["Classic"]
+    return (
+        (_DARKEST_SOURCE, outer_rings),
+        (_DARKEST_SOURCE, dark_centres),
+    )
+
+
+def _recipe_ridgeback(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    ridge = masks["Singlestripe"]
+    edge_ticks = masks["Ticked"] & ~_dilate(ridge)
+    return (("Singlestripe", ridge), ("Ticked", edge_ticks))
+
+
+def _recipe_masked_mantle(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    mantle = masks["Masked"] & ~_dilate(masks["Ticked"])
+    smoke_points = masks["Smoke"] & masks["Agouti"]
+    return (("Masked", mantle), ("Smoke", smoke_points))
+
+
+def _recipe_ghost_stripes(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    stripe_shape = masks["Mackerel"] & masks["Tabby"]
+    return (("Smoke", stripe_shape),)
+
+
+def _recipe_split_marble(
+    masks: Mapping[str, np.ndarray],
+) -> Sequence[tuple[str, np.ndarray]]:
+    classic_half = masks["Classic"] & ~masks["Sokoke"]
+    sokoke_half = masks["Sokoke"] & ~masks["Classic"]
+    shared_knots = _erode(masks["Marbled"]) & masks["Classic"]
+    return (
+        (_DARKEST_SOURCE, classic_half),
+        (_DARKEST_SOURCE, sokoke_half),
+        (_DARKEST_SOURCE, shared_knots),
+    )
+
+
+_RECIPES: dict[
+    str, Callable[[Mapping[str, np.ndarray]], Sequence[tuple[str, np.ndarray]]]
+] = {
+    "bengal-rosettes": _recipe_bengal_rosettes,
+    "clouded-leopard": _recipe_clouded_leopard,
+    "ocelot-chains": _recipe_ocelot_chains,
+    "serval-spots": _recipe_serval_spots,
+    "snow-leopard": _recipe_snow_leopard,
+    "tiger-stripes": _recipe_tiger_stripes,
+    "king-cheetah": _recipe_king_cheetah,
+    "lynx-fleck": _recipe_lynx_fleck,
+    "marble-swirl": _recipe_marble_swirl,
+    "brindle": _recipe_brindle,
+    "jaguar-mosaic": _recipe_jaguar_mosaic,
+    "cheetah-dots": _recipe_cheetah_dots,
+    "fishing-cat": _recipe_fishing_cat,
+    "toyger-braids": _recipe_toyger_braids,
+    "sandcat-bars": _recipe_sandcat_bars,
+    "classic-bullseye": _recipe_classic_bullseye,
+    "ridgeback": _recipe_ridgeback,
+    "masked-mantle": _recipe_masked_mantle,
+    "ghost-stripes": _recipe_ghost_stripes,
+    "split-marble": _recipe_split_marble,
+}
+
+
 def _recipe(
     pattern_name: str, masks: Mapping[str, np.ndarray]
 ) -> Sequence[tuple[str, np.ndarray]]:
-    if pattern_name == "bengal-rosettes":
-        rosettes = masks["Rosette"]
-        small_accents = _select_components(
-            masks["Speckled"] & ~_dilate(rosettes),
-            maximum_size=3,
-            step=2,
-        )
-        return (("Rosette", rosettes), ("Speckled", small_accents))
-
-    if pattern_name == "clouded-leopard":
-        cloud_rims = _outline(masks["Classic"])
-        lower_echo = _outline(masks["Sokoke"]) & ~_dilate(cloud_rims)
-        return (("Classic", cloud_rims), ("Sokoke", lower_echo))
-
-    if pattern_name == "ocelot-chains":
-        chain_rims = _outline(
-            _select_components(
-                masks["Rosette"],
-                minimum_size=4,
-                step=2,
-            )
-        )
-        chain_links = _select_components(
-            masks["Bengal"] & ~_dilate(chain_rims),
-            maximum_size=5,
-        )
-        return (("Rosette", chain_rims), ("Bengal", chain_links))
-
-    if pattern_name == "serval-spots":
-        spots = _select_components(masks["Speckled"], maximum_size=6)
-        face_and_leg_marks = _select_components(
-            masks["Ticked"] & ~_dilate(spots),
-            maximum_size=3,
-            step=2,
-        )
-        return (("Speckled", spots), ("Ticked", face_and_leg_marks))
-
-    if pattern_name == "snow-leopard":
-        sparse_rosettes = _select_components(
-            masks["Rosette"],
-            maximum_size=12,
-            step=2,
-        )
-        dust = _select_components(
-            masks["Ticked"] & ~_dilate(sparse_rosettes),
-            maximum_size=3,
-            step=3,
-        )
-        return (("Rosette", sparse_rosettes), ("Ticked", dust))
-
-    if pattern_name == "tiger-stripes":
-        stripe_cores = masks["Mackerel"] & _dilate(masks["Tabby"])
-        short_tips = _select_components(
-            masks["Mackerel"] & ~_dilate(stripe_cores),
-            maximum_size=4,
-            step=2,
-        )
-        return (("Mackerel", stripe_cores), ("Mackerel", short_tips))
-
-    if pattern_name == "king-cheetah":
-        spots = _select_components(
-            masks["Speckled"],
-            maximum_size=6,
-            step=2,
-        )
-        dorsal_blots = masks["Bengal"] & _dilate(masks["Mackerel"]) & ~_dilate(spots)
-        return (("Speckled", spots), ("Bengal", dorsal_blots))
-
-    if pattern_name == "lynx-fleck":
-        ticks = masks["Ticked"]
-        flecks = _select_components(
-            masks["Speckled"] & ~_dilate(ticks),
-            maximum_size=2,
-            step=2,
-        )
-        return (("Ticked", ticks), ("Speckled", flecks))
-
-    if pattern_name == "marble-swirl":
-        lace = _outline(masks["Marbled"])
-        knots = masks["Sokoke"] & masks["Marbled"] & ~lace
-        return (("Marbled", lace), ("Sokoke", knots))
-
-    if pattern_name == "brindle":
-        mackerel_only = masks["Mackerel"] & ~masks["Tabby"]
-        tabby_only = masks["Tabby"] & ~masks["Mackerel"]
-        crossed_marks = _outline(masks["Mackerel"] & masks["Tabby"])
-        return (
-            ("Tabby", tabby_only),
-            ("Mackerel", mackerel_only),
-            ("Mackerel", crossed_marks),
-        )
-
-    if pattern_name == "jaguar-mosaic":
-        broken_rims = _outline(masks["Bengal"])
-        centres = masks["Rosette"] & _dilate(masks["Bengal"]) & ~broken_rims
-        return ((_DARKEST_SOURCE, broken_rims), ("Rosette", centres))
-
-    if pattern_name == "cheetah-dots":
-        dot_cores = _erode(masks["Speckled"])
-        loose_dots = _select_components(
-            masks["Rosette"] & ~_dilate(dot_cores),
-            maximum_size=3,
-            step=2,
-        )
-        return (
-            (_DARKEST_SOURCE, dot_cores),
-            (_DARKEST_SOURCE, loose_dots),
-        )
-
-    if pattern_name == "fishing-cat":
-        short_bars = masks["Mackerel"] & masks["Speckled"]
-        spots = _select_components(
-            masks["Speckled"] & ~_dilate(short_bars),
-            maximum_size=5,
-            step=2,
-        )
-        return (
-            (_DARKEST_SOURCE, short_bars),
-            (_DARKEST_SOURCE, spots),
-        )
-
-    if pattern_name == "toyger-braids":
-        curved_bars = masks["Bengal"] & _dilate(masks["Mackerel"])
-        bridges = masks["Masked"] & masks["Mackerel"] & ~_dilate(curved_bars)
-        return (
-            (_DARKEST_SOURCE, curved_bars),
-            (_DARKEST_SOURCE, bridges),
-        )
-
-    if pattern_name == "sandcat-bars":
-        quiet_bars = masks["Mackerel"] & masks["Ticked"]
-        small_points = masks["Agouti"] & ~_dilate(quiet_bars)
-        return (("Mackerel", quiet_bars), ("Agouti", small_points))
-
-    if pattern_name == "classic-bullseye":
-        outer_rings = _outline(masks["Classic"])
-        dark_centres = _erode(masks["Marbled"]) & masks["Classic"]
-        return (
-            (_DARKEST_SOURCE, outer_rings),
-            (_DARKEST_SOURCE, dark_centres),
-        )
-
-    if pattern_name == "ridgeback":
-        ridge = masks["Singlestripe"]
-        edge_ticks = masks["Ticked"] & ~_dilate(ridge)
-        return (("Singlestripe", ridge), ("Ticked", edge_ticks))
-
-    if pattern_name == "masked-mantle":
-        mantle = masks["Masked"] & ~_dilate(masks["Ticked"])
-        smoke_points = masks["Smoke"] & masks["Agouti"]
-        return (("Masked", mantle), ("Smoke", smoke_points))
-
-    if pattern_name == "ghost-stripes":
-        stripe_shape = masks["Mackerel"] & masks["Tabby"]
-        return (("Smoke", stripe_shape),)
-
-    if pattern_name == "split-marble":
-        classic_half = masks["Classic"] & ~masks["Sokoke"]
-        sokoke_half = masks["Sokoke"] & ~masks["Classic"]
-        shared_knots = _erode(masks["Marbled"]) & masks["Classic"]
-        return (
-            (_DARKEST_SOURCE, classic_half),
-            (_DARKEST_SOURCE, sokoke_half),
-            (_DARKEST_SOURCE, shared_knots),
-        )
-
-    return ()
+    recipe = _RECIPES.get(pattern_name)
+    if recipe is None:
+        return ()
+    return recipe(masks)
 
 
 def apply_coat_pattern(

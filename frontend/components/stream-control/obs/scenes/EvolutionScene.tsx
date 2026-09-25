@@ -205,7 +205,7 @@ export function EvolutionScene({
   return <LineageBoard command={command} renderedCats={renderedCats} />;
 }
 
-function LineageQr({ slug }: { slug: string }) {
+function LineageQr({ slug }: Readonly<{ slug: string }>) {
   const url =
     typeof window !== "undefined"
       ? `${window.location.origin}/evolution/${slug}`
@@ -226,10 +226,10 @@ const BOARD_HEIGHT = 1080 - 56 - 44 - 48;
 function LineageBoard({
   command,
   renderedCats,
-}: {
+}: Readonly<{
   command: EvolutionStreamCommand;
   renderedCats: RenderedCat[];
-}) {
+}>) {
   const byKey = new Map(renderedCats.map((cat) => [cat.key, cat]));
   const cats = command.cats.map(
     (cat) => byKey.get(cat.key) ?? { ...cat, previewUrl: null },
@@ -443,7 +443,10 @@ function LineageBoard({
   );
 }
 
-function LineageSprite({ cat, size }: { cat: RenderedCat; size: number }) {
+function LineageSprite({
+  cat,
+  size,
+}: Readonly<{ cat: RenderedCat; size: number }>) {
   if (!cat.previewUrl) {
     return (
       <div

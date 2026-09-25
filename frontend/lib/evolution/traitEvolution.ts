@@ -95,6 +95,25 @@ function parseAccumulatedItem(
   return parsed[0];
 }
 
+/**
+ * Replaces the item equivalent to `previous` in place, or appends when there
+ * is no previous value or no equivalent item.
+ */
+function insertAccumulatedItems(
+  result: unknown[],
+  previous: unknown,
+  items: unknown[],
+): void {
+  if (previous !== undefined) {
+    const index = findEquivalent(result, previous);
+    if (index >= 0) {
+      result.splice(index, 1, ...items);
+      return;
+    }
+  }
+  result.push(...items);
+}
+
 function applyAccumulatedChanges(
   trait: AnyCatTraitDefinition,
   currentValue: unknown,
@@ -108,7 +127,7 @@ function applyAccumulatedChanges(
 
   const parsedCurrent = parseTraitValue(trait, currentValue ?? []);
   if (!Array.isArray(parsedCurrent)) {
-    throw new Error(`Evolution trait ${trait.id} did not parse as a list`);
+    throw new TypeError(`Evolution trait ${trait.id} did not parse as a list`);
   }
   let result = [...parsedCurrent];
 
@@ -118,16 +137,7 @@ function applyAccumulatedChanges(
       : [change.value];
     const items = rawItems.map((item) => parseAccumulatedItem(trait, item));
 
-    if (change.previous !== undefined) {
-      const index = findEquivalent(result, change.previous);
-      if (index >= 0) {
-        result.splice(index, 1, ...items);
-      } else {
-        result.push(...items);
-      }
-    } else {
-      result.push(...items);
-    }
+    insertAccumulatedItems(result, change.previous, items);
 
     if (trait.value.unique) result = uniqueValues(result);
     if (trait.value.maxItems !== undefined) {
@@ -136,6 +146,30 @@ function applyAccumulatedChanges(
   }
 
   return parseTraitValue(trait, result) as unknown[];
+}
+
+function groupChangesByTrait(
+  changes: readonly EvolutionTraitChange[],
+  system: EvolutionSystem,
+  definitionById: ReadonlyMap<string, AnyCatTraitDefinition>,
+): Map<string, EvolutionTraitChange[]> {
+  const grouped = new Map<string, EvolutionTraitChange[]>();
+
+  for (const change of changes) {
+    const canonicalId = system.aliases[change.traitId] ?? change.traitId;
+    const trait = definitionById.get(canonicalId);
+    if (!trait) {
+      throw new Error(`Unknown evolution trait ${change.traitId}`);
+    }
+    if (trait.capabilities.evolution === undefined) {
+      throw new Error(`Trait ${canonicalId} has no evolution capability`);
+    }
+    const entries = grouped.get(canonicalId) ?? [];
+    entries.push({ ...change, traitId: canonicalId });
+    grouped.set(canonicalId, entries);
+  }
+
+  return grouped;
 }
 
 /**
@@ -154,21 +188,7 @@ export function applyEvolutionTraitChanges<
   const definitionById = new Map(
     system.traits.map((trait) => [trait.id, trait] as const),
   );
-  const grouped = new Map<string, EvolutionTraitChange[]>();
-
-  for (const change of changes) {
-    const canonicalId = system.aliases[change.traitId] ?? change.traitId;
-    const trait = definitionById.get(canonicalId);
-    if (!trait) {
-      throw new Error(`Unknown evolution trait ${change.traitId}`);
-    }
-    if (trait.capabilities.evolution === undefined) {
-      throw new Error(`Trait ${canonicalId} has no evolution capability`);
-    }
-    const entries = grouped.get(canonicalId) ?? [];
-    entries.push({ ...change, traitId: canonicalId });
-    grouped.set(canonicalId, entries);
-  }
+  const grouped = groupChangesByTrait(changes, system, definitionById);
 
   for (const [traitId, traitChanges] of grouped) {
     const trait = definitionById.get(traitId);

@@ -41,7 +41,7 @@ function pickRandom<T>(arr: readonly T[], count: number): T[] {
 // Gallery item
 // ---------------------------------------------------------------------------
 
-function GalleryItem({ item }: { item: AccessoryPreview }) {
+function GalleryItem({ item }: Readonly<{ item: AccessoryPreview }>) {
   return (
     <div className="group relative flex flex-col items-center gap-1">
       <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border border-border/30 bg-background/50">

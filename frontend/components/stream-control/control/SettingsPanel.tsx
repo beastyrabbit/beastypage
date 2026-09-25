@@ -240,7 +240,7 @@ export function SettingsPanel() {
             min={1}
             max={12}
             step={1}
-            format={(v) => String(v)}
+            format={String}
             onChange={(v) => {
               setLobbyCatCount(v);
               syncSessionSettings({ lobbyCatCount: v });

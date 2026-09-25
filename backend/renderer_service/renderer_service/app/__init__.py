@@ -287,21 +287,37 @@ def create_app() -> FastAPI:
     return app
 
 
-def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderResponse:
+def _single_render_source(request: RenderRequest):
     payload = request.payload
     if payload.document is not None:
-        render_source = payload.document
-    else:
-        params = {**payload.params}
-        if payload.poseName is not None:
-            params["poseName"] = payload.poseName
-        if payload.spriteNumber is not None:
-            params.setdefault("spriteNumber", payload.spriteNumber)
-        render_source = params
+        return payload.document
+    params = {**payload.params}
+    if payload.poseName is not None:
+        params["poseName"] = payload.poseName
+    if payload.spriteNumber is not None:
+        params.setdefault("spriteNumber", payload.spriteNumber)
+    return params
+
+
+def _layer_payload(layer, show_diagnostics: bool, include_image: bool) -> dict:
+    return {
+        "id": layer.id,
+        "operationId": layer.operation_id,
+        "label": layer.label,
+        "duration_ms": layer.duration_ms if show_diagnostics else 0,
+        "diagnostics": layer.diagnostics if show_diagnostics else [],
+        "blend_mode": layer.blend_mode,
+        "image": _image_to_data_url(layer.image) if include_image else None,
+    }
+
+
+def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderResponse:
+    render_source = _single_render_source(request)
     collect_layers = request.options.collect_layers if request.options else False
     include_layer_images = (
         request.options.include_layer_images if request.options else False
     )
+    show_diagnostics = not request.options or request.options.diagnostics
 
     result = pipeline.render(render_source, collect_layers=collect_layers)
     image_bytes = _image_to_data_url(result.composed)
@@ -309,21 +325,7 @@ def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderRe
         image=image_bytes,
         meta=result.meta,
         layers=[
-            {
-                "id": layer.id,
-                "operationId": layer.operation_id,
-                "label": layer.label,
-                "duration_ms": layer.duration_ms
-                if not request.options or request.options.diagnostics
-                else 0,
-                "diagnostics": layer.diagnostics
-                if not request.options or request.options.diagnostics
-                else [],
-                "blend_mode": layer.blend_mode,
-                "image": _image_to_data_url(layer.image)
-                if include_layer_images
-                else None,
-            }
+            _layer_payload(layer, show_diagnostics, include_layer_images)
             for layer in result.layers
         ]
         if collect_layers

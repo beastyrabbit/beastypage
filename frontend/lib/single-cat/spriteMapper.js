@@ -75,7 +75,7 @@ class SpriteMapper {
             for (const p of paths) {
                 try {
                     const res = await fetch(p);
-                    if (res && res.ok) {
+                    if (res?.ok) {
                         return await res.json();
                     }
                 } catch (_) {
@@ -533,7 +533,7 @@ class SpriteMapper {
      */
     hasSprite(spriteName, spriteNumber) {
         // Check if sprite exists in spritesIndex
-        return this.spritesIndex && this.spritesIndex[spriteName] !== undefined;
+        return this.spritesIndex?.[spriteName] !== undefined;
     }
     
     /**
@@ -577,14 +577,13 @@ class SpriteMapper {
         if (Array.isArray(mode)) {
             return mode
                 .filter(Boolean)
-                .map(value => this.normalizeExperimentalModes(value))
-                .flat();
+                .flatMap(value => this.normalizeExperimentalModes(value));
         }
         const normalized = String(mode).toLowerCase();
         if (normalized === 'off') return [];
         if (normalized === 'soft') return ['mood'];
         // Check if it's a valid palette category from our centralized module
-        if (this.experimentalColourCategories && this.experimentalColourCategories[normalized]) {
+        if (this.experimentalColourCategories?.[normalized]) {
             return [normalized];
         }
         return [];
@@ -635,7 +634,7 @@ class SpriteMapper {
 
     isExperimentalColour(name) {
         if (!name) return false;
-        return Object.prototype.hasOwnProperty.call(this.experimentalColourDefs, name.toUpperCase());
+        return Object.hasOwn(this.experimentalColourDefs, name.toUpperCase());
     }
 
     isBaseColour(name) {

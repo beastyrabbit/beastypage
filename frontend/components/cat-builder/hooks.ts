@@ -15,11 +15,11 @@ export function useSpriteMapperOptions() {
     (async () => {
       try {
         setLoading(true);
-        const [{ default: spriteMapper }] = await Promise.all([
-          import("@/lib/single-cat/spriteMapper") as Promise<{
-            default: SpriteMapperApi;
-          }>,
-        ]);
+        const { default: spriteMapper } = await (import(
+          "@/lib/single-cat/spriteMapper"
+        ) as Promise<{
+          default: SpriteMapperApi;
+        }>);
         if (cancelled) return;
 
         if (!spriteMapper.loaded) {
