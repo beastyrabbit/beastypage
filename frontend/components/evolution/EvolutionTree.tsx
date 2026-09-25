@@ -85,7 +85,7 @@ export function EvolutionTree({
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([branch, list]) => ({
           branch,
-          cats: list.toSorted((a, b) => a.level - b.level),
+          cats: [...list].sort((a, b) => a.level - b.level),
         })),
     };
   }, [cats]);
