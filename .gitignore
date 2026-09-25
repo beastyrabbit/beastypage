@@ -16,8 +16,9 @@ frontend/.env.local
 # MCP config (contains API keys)
 .mcp.json
 
-# Claude Code local settings
-.claude/
+# Claude Code local state; only the shared root settings.json is committed
+**/.claude/*
+!/.claude/settings.json
 
 
 # Frontend build artifacts
