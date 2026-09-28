@@ -257,31 +257,10 @@ function sanitizeTiming(raw: unknown): SpinTimingConfig {
 }
 
 // ---------------------------------------------------------------------------
-// v1 migration
-// ---------------------------------------------------------------------------
-
-interface V1Payload {
-  v: number;
-  timing: SpinTimingConfig;
-}
-
-/** Converts a v1 payload (or any unknown input) into a v2 SingleCatSettings, using defaults for all non-timing fields. */
-export function migrateV1ToV2(v1Payload: unknown): SingleCatSettings {
-  const data =
-    v1Payload && typeof v1Payload === "object"
-      ? (v1Payload as V1Payload)
-      : { v: 1, timing: DEFAULT_TIMING_CONFIG };
-  return {
-    ...DEFAULT_SINGLE_CAT_SETTINGS,
-    timing: sanitizeTiming(data.timing),
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Payload parsing (Convex / import)
 // ---------------------------------------------------------------------------
 
-/** Detects v1 vs v2 payloads from Convex and returns a valid SingleCatSettings. */
+/** Parses a v2 payload from Convex into a valid SingleCatSettings; anything else yields defaults. */
 export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
   if (!payload || typeof payload !== "object") {
     return { ...DEFAULT_SINGLE_CAT_SETTINGS };
@@ -339,8 +318,7 @@ export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
     };
   }
 
-  // v1 payload: { v: 1, timing: SpinTimingConfig }
-  return migrateV1ToV2(payload);
+  return { ...DEFAULT_SINGLE_CAT_SETTINGS };
 }
 
 // ---------------------------------------------------------------------------
@@ -372,33 +350,4 @@ export function singleCatSettingsEqual(
     sortedStringify(stripMeta(parseSingleCatPayload(a))) ===
     sortedStringify(stripMeta(parseSingleCatPayload(b)))
   );
-}
-
-// ---------------------------------------------------------------------------
-// Migration callback for useVariants
-// ---------------------------------------------------------------------------
-
-const OLD_TIMING_KEY = "singleCatPlus.paramTiming";
-
-/** One-time migration: reads old singleCatPlus.paramTiming from localStorage and converts to a variant. The old key is removed via the returned cleanup callback only after the caller has persisted the migrated data. */
-export function migrateSingleCatTiming(): {
-  name: string;
-  settings: SingleCatSettings;
-  cleanup?: () => void;
-} | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const oldRaw = localStorage.getItem(OLD_TIMING_KEY);
-    if (!oldRaw) return null;
-    const oldConfig = JSON.parse(oldRaw);
-    const settings = migrateV1ToV2({ v: 1, timing: oldConfig });
-    return {
-      name: "Migrated Timing",
-      settings,
-      cleanup: () => localStorage.removeItem(OLD_TIMING_KEY),
-    };
-  } catch (error) {
-    console.error("Failed to migrate v1 timing config", error);
-    return null;
-  }
 }

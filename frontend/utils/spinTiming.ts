@@ -342,8 +342,6 @@ export const PARAM_TIMING_PRESETS: Record<ParamTimingKey, TimingPresetSet> = {
   ...legacyTimingPresets,
 };
 
-const STORAGE_KEY = "singleCatPlus.paramTiming";
-
 export const DEFAULT_TIMING_CONFIG: SpinTimingConfig = {
   allowFastFlips: false,
   delays: Object.fromEntries(
@@ -442,52 +440,4 @@ export function stepCountsToMetrics(
     },
   );
   return metrics;
-}
-
-export function loadTimingConfig(): SpinTimingConfig {
-  if (typeof window === "undefined") return DEFAULT_TIMING_CONFIG;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_TIMING_CONFIG;
-    const parsed = JSON.parse(raw) as SpinTimingConfig;
-    if (!parsed || typeof parsed !== "object") return DEFAULT_TIMING_CONFIG;
-    const hydrated: SpinTimingConfig = {
-      allowFastFlips: false,
-      delays: { ...DEFAULT_TIMING_CONFIG.delays, ...parsed.delays },
-      subsetLimits: {
-        ...DEFAULT_TIMING_CONFIG.subsetLimits,
-        ...parsed.subsetLimits,
-      },
-      pauseDelays: {
-        flashyMs:
-          parsed.pauseDelays?.flashyMs ??
-          DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ??
-          1000,
-        calmMs:
-          parsed.pauseDelays?.calmMs ??
-          DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ??
-          1000,
-      },
-    };
-    return hydrated;
-  } catch (error) {
-    console.warn("Failed to load spin timing config", error);
-    return DEFAULT_TIMING_CONFIG;
-  }
-}
-
-export function saveTimingConfig(config: SpinTimingConfig) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        ...config,
-        subsetLimits: config.subsetLimits ?? {},
-        pauseDelays: config.pauseDelays ?? DEFAULT_TIMING_CONFIG.pauseDelays,
-      }),
-    );
-  } catch (error) {
-    console.warn("Failed to persist spin timing config", error);
-  }
 }

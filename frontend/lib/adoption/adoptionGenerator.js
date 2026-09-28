@@ -141,6 +141,9 @@ export class AdoptionGenerator {
       document.querySelectorAll("[data-sprite-gallery-close]"),
     );
 
+    // Aborted by destroy() to drop listeners registered on window/document.
+    this.globalListeners = new AbortController();
+
     this.quickPreviewPopup = null;
     this.quickPreviewCanvas = null;
     this.createQuickPreviewPopup();
@@ -165,6 +168,14 @@ export class AdoptionGenerator {
       this.stageStatusEl.textContent =
         "Initialization error. Try refreshing the page.";
     });
+  }
+
+  destroy() {
+    this.globalListeners.abort();
+    this.quickPreviewPopup?.remove();
+    this.quickPreviewPopup = null;
+    this.quickPreviewCanvas = null;
+    document.body.classList.remove("overlay-open");
   }
 
   async init() {
@@ -199,17 +210,21 @@ export class AdoptionGenerator {
     }
 
     // Listen for palette changes from React PaletteMultiSelect component
-    window.addEventListener("adoption-palette-change", (event) => {
-      const { selectedModes, includeBase } = event.detail ?? {};
-      this.includeBaseColours = includeBase ?? true;
-      this.selectedExtendedModes.clear();
-      if (Array.isArray(selectedModes)) {
-        selectedModes.forEach((mode) => {
-          this.selectedExtendedModes.add(mode);
-        });
-      }
-      this.onPaletteChange();
-    });
+    window.addEventListener(
+      "adoption-palette-change",
+      (event) => {
+        const { selectedModes, includeBase } = event.detail ?? {};
+        this.includeBaseColours = includeBase ?? true;
+        this.selectedExtendedModes.clear();
+        if (Array.isArray(selectedModes)) {
+          selectedModes.forEach((mode) => {
+            this.selectedExtendedModes.add(mode);
+          });
+        }
+        this.onPaletteChange();
+      },
+      { signal: this.globalListeners.signal },
+    );
 
     if (this.catGrid) {
       this.catGrid.addEventListener("click", (event) => {
@@ -229,15 +244,19 @@ export class AdoptionGenerator {
         el.addEventListener("click", () => this.closeDetailOverlay());
       });
 
-      document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape") {
-          if (this.spriteGalleryOverlay?.classList.contains("open")) {
-            this.closeSpriteGallery();
-            return;
+      document.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Escape") {
+            if (this.spriteGalleryOverlay?.classList.contains("open")) {
+              this.closeSpriteGallery();
+              return;
+            }
+            this.closeDetailOverlay();
           }
-          this.closeDetailOverlay();
-        }
-      });
+        },
+        { signal: this.globalListeners.signal },
+      );
 
       if (this.overlayCopyBigBtn) {
         this.overlayCopyBigBtn.addEventListener("click", async () => {
@@ -2083,18 +2102,23 @@ export class AdoptionGenerator {
     this.quickPreviewPopup = popup;
     this.quickPreviewCanvas = canvas;
 
-    document.addEventListener("keydown", (event) => {
-      if (
-        event.key === "Escape" &&
-        this.quickPreviewPopup?.classList.contains("open")
-      ) {
-        this.closeQuickPreview();
-      }
-    });
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (
+          event.key === "Escape" &&
+          this.quickPreviewPopup?.classList.contains("open")
+        ) {
+          this.closeQuickPreview();
+        }
+      },
+      { signal: this.globalListeners.signal },
+    );
   }
 
   async openQuickPreview(plan) {
-    if (!this.quickPreviewPopup || !this.quickPreviewCanvas || !plan) return;
+    const canvas = this.quickPreviewCanvas;
+    if (!this.quickPreviewPopup || !canvas || !plan) return;
 
     this.quickPreviewPopup.classList.add("open");
     this.quickPreviewPopup.setAttribute("aria-hidden", "false");
@@ -2102,8 +2126,8 @@ export class AdoptionGenerator {
     // Draw at full canvas size (700x700)
     const params = this.buildRenderParams(plan.state);
     const result = await catGenerator.generateCat(params);
-    const ctx = this.quickPreviewCanvas.getContext("2d");
-    const size = this.quickPreviewCanvas.width;
+    const ctx = canvas.getContext("2d");
+    const size = canvas.width;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, size, size);
     ctx.drawImage(result.canvas, 0, 0, size, size);

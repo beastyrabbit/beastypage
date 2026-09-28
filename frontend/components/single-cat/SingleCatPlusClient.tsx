@@ -66,7 +66,6 @@ import {
   DEFAULT_SINGLE_CAT_SETTINGS,
   type ExtendedMode,
   type LayerRange,
-  migrateSingleCatTiming,
   type SingleCatSettings,
   singleCatSettingsEqual,
 } from "../../utils/singleCatVariants";
@@ -1777,7 +1776,6 @@ export function SingleCatPlusClient({
   const variants = useVariants<SingleCatSettings>({
     storageKey: "singleCatPlus.variants",
     toolKey: "singleCatPlus",
-    migrate: migrateSingleCatTiming,
   });
   const [timingModalOpen, setTimingModalOpen] = useState(false);
   const [lastTimingSnapshot, setLastTimingSnapshot] =
