@@ -127,6 +127,7 @@ export function AdoptionGeneratorClient() {
 
   useEffect(() => {
     let cancelled = false;
+    let generator: { destroy: () => void } | null = null;
 
     (async () => {
       const { createAdoptionGenerator } = await import(
@@ -134,7 +135,7 @@ export function AdoptionGeneratorClient() {
       );
       if (cancelled) return;
 
-      createAdoptionGenerator({
+      generator = createAdoptionGenerator({
         viewerBasePath: "/view",
         onGenerationStart: () => {
           setGenerationComplete(false);
@@ -244,6 +245,7 @@ export function AdoptionGeneratorClient() {
 
     return () => {
       cancelled = true;
+      generator?.destroy();
     };
   }, [createBatch, createMapper]);
 

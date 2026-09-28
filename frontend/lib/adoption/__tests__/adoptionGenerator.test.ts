@@ -182,3 +182,19 @@ describe("AdoptionGenerator coat reveal", () => {
     generateSpy.mockRestore();
   });
 });
+
+describe("AdoptionGenerator lifecycle", () => {
+  it("removes the body-level quick preview popup and global listeners on destroy", () => {
+    const generator = new AdoptionGenerator();
+    const popup = document.querySelector(".quick-preview-popup");
+    expect(popup).not.toBeNull();
+    popup?.classList.add("open");
+    const closeSpy = vi.spyOn(generator, "closeQuickPreview");
+
+    generator.destroy();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+
+    expect(document.querySelector(".quick-preview-popup")).toBeNull();
+    expect(closeSpy).not.toHaveBeenCalled();
+  });
+});
