@@ -592,6 +592,18 @@ function handleManagedDialogKeyDown(
   }
 }
 
+function stringifyValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  return JSON.stringify(value) ?? "";
+}
+
 function formatValue(value: unknown): string {
   if (
     value === undefined ||
@@ -601,8 +613,7 @@ function formatValue(value: unknown): string {
   ) {
     return "None";
   }
-  const raw = typeof value === "object" ? JSON.stringify(value) : String(value);
-  const str = raw
+  const str = stringifyValue(value)
     .replace(/_/g, " ")
     .replace(/^\d+\s*-\s*/, "")
     .toLowerCase();

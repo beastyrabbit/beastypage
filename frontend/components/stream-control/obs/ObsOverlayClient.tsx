@@ -189,6 +189,51 @@ function pickStringSlots(primary: unknown, fallback: unknown): string[] {
   return source.filter((entry): entry is string => typeof entry === "string");
 }
 
+type ObsBackgroundSettings = {
+  obsBgMode: "colour" | "transparent";
+  obsBgColour: string;
+  obsBgOpacity: number;
+};
+
+function resolveObsBackgroundSettings(
+  record: Record<string, unknown> | undefined,
+): ObsBackgroundSettings {
+  return {
+    obsBgMode: record?.obsBgMode === "colour" ? "colour" : "transparent",
+    obsBgColour:
+      typeof record?.obsBgColour === "string" ? record.obsBgColour : "#00ff00",
+    obsBgOpacity:
+      typeof record?.obsBgOpacity === "number" ? record.obsBgOpacity : 100,
+  };
+}
+
+function buildViewUrl(viewSlug: unknown): string | null {
+  return typeof viewSlug === "string" && typeof window !== "undefined"
+    ? `${window.location.origin}/view/${viewSlug}`
+    : null;
+}
+
+type ObsLiveCommand = NonNullable<
+  ReturnType<typeof useObsSession>["session"]
+>["currentCommand"];
+
+type SeqBatchCommand = BatchStreamCommand & { seq: number };
+
+// The saved slug is patched onto the live command without a seq bump —
+// read it from the session so the QR appears as soon as the save lands.
+function withLiveBatchSlug(
+  batchCommand: SeqBatchCommand,
+  liveCommand: ObsLiveCommand | undefined,
+): SeqBatchCommand {
+  const liveBatchSlug =
+    liveCommand?.type === "batch" && liveCommand.seq === batchCommand.seq
+      ? liveCommand.batch?.slug
+      : undefined;
+  return liveBatchSlug
+    ? { ...batchCommand, slug: liveBatchSlug }
+    : batchCommand;
+}
+
 export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   const {
     session,
@@ -3462,16 +3507,9 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   // (transparent for OBS, dev art in the browser, or a solid colour for
   // chroma keying / custom looks).
   // =======================================================================
-  const obsBgMode =
-    sessionSettingsRecord?.obsBgMode === "colour" ? "colour" : "transparent";
-  const obsBgColour =
-    typeof sessionSettingsRecord?.obsBgColour === "string"
-      ? sessionSettingsRecord.obsBgColour
-      : "#00ff00";
-  const obsBgOpacity =
-    typeof sessionSettingsRecord?.obsBgOpacity === "number"
-      ? sessionSettingsRecord.obsBgOpacity
-      : 100;
+  const { obsBgMode, obsBgColour, obsBgOpacity } = resolveObsBackgroundSettings(
+    sessionSettingsRecord,
+  );
   const obsLayoutSpread = sessionSettingsRecord?.obsLayoutMode === "spread";
   useEffect(() => {
     const isOBS = typeof window !== "undefined" && "obsstudio" in window;
@@ -4082,10 +4120,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   // Share QR for the current result — the slug is stamped onto the command
   // by the control page after the history save (same seq, no re-dispatch).
   const commandViewSlug = session?.currentCommand?.viewSlug;
-  const viewUrl =
-    typeof commandViewSlug === "string" && typeof window !== "undefined"
-      ? `${window.location.origin}/view/${commandViewSlug}`
-      : null;
+  const viewUrl = buildViewUrl(commandViewSlug);
 
   // Test mode — layout guide for OBS positioning
   if (session?.testMode) {
@@ -4117,21 +4152,10 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
 
   // Batch elimination show → final grid + QR
   if (obsPhase === "batch" && batchCommand) {
-    // The saved slug is patched onto the live command without a seq bump —
-    // read it from the session so the QR appears as soon as the save lands.
-    const liveCommand = session?.currentCommand;
-    const liveBatchSlug =
-      liveCommand?.type === "batch" && liveCommand.seq === batchCommand.seq
-        ? liveCommand.batch?.slug
-        : undefined;
     return (
       <BatchScene
         key={`batch-${batchCommand.seq}`}
-        command={
-          liveBatchSlug
-            ? { ...batchCommand, slug: liveBatchSlug }
-            : batchCommand
-        }
+        command={withLiveBatchSlug(batchCommand, session?.currentCommand)}
         liveState={session?.batchState ?? null}
         apiKey={apiKey}
       />

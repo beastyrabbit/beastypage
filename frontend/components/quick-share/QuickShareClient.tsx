@@ -214,6 +214,170 @@ async function copyLink(url: string) {
   toast.success("Link copied");
 }
 
+function tabClass(active: boolean) {
+  return cn(
+    "flex-1 border-b-2 px-2 py-3 text-xs font-medium transition sm:px-4 sm:text-sm",
+    active
+      ? "border-amber-500 text-foreground"
+      : "border-transparent text-muted-foreground hover:text-foreground",
+  );
+}
+
+function CreateLinkButton({
+  disabled,
+  busy,
+}: Readonly<{ disabled: boolean; busy: boolean }>) {
+  return (
+    <button
+      type="submit"
+      disabled={disabled}
+      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {busy ? <LoaderCircle className="size-4 animate-spin" /> : null}
+      Create link
+    </button>
+  );
+}
+
+function SelectedFilesLabel({ files }: Readonly<{ files: File[] }>) {
+  const suffix = files.length === 1 ? "" : "s";
+  return (
+    <>
+      <span className="font-medium">
+        {files.length > 0
+          ? `${files.length} media file${suffix} selected`
+          : "Choose photos or videos"}
+      </span>
+      <span className="mt-2 text-xs text-muted-foreground">
+        {files.length > 0
+          ? `${formatBytes(files.reduce((sum, item) => sum + item.size, 0))} total · tap to change selection`
+          : "Camera, photo library, or files"}
+      </span>
+    </>
+  );
+}
+
+function PastedFileLabel({ file }: Readonly<{ file: File | null }>) {
+  return (
+    <>
+      <span className="font-medium">
+        {file ? file.name : "Paste an image here"}
+      </span>
+      <span className="mt-2 text-xs text-muted-foreground">
+        {file
+          ? `${formatBytes(file.size)} · paste again to replace`
+          : "Tap and choose Paste, or press Ctrl/⌘+V"}
+      </span>
+    </>
+  );
+}
+
+function WorkStatusPanel({
+  work,
+  files,
+  activeUpload,
+  onResume,
+}: Readonly<{
+  work: WorkState;
+  files: File[];
+  activeUpload: ActiveUpload | null;
+  onResume: () => Promise<void>;
+}>) {
+  if (work.kind === "idle") return null;
+  return (
+    <div
+      className={cn(
+        "mt-5 rounded-lg border px-4 py-3 text-sm",
+        workStatusClass(work.kind),
+      )}
+      aria-live={work.kind === "uploading" ? "off" : "polite"}
+    >
+      <div className="flex items-start gap-3">
+        <WorkStatusIcon kind={work.kind} />
+        <div className="min-w-0 flex-1">
+          {work.kind === "uploading" ? (
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <p>{work.label}</p>
+                <span className="shrink-0 font-mono text-xs font-semibold text-amber-300 tabular-nums">
+                  {work.progress}%
+                </span>
+              </div>
+              <progress
+                className="mt-3 h-2 w-full appearance-none overflow-hidden rounded-full bg-background [&::-moz-progress-bar]:bg-amber-500 [&::-webkit-progress-bar]:bg-background [&::-webkit-progress-value]:bg-amber-500"
+                aria-label="Upload progress"
+                aria-valuetext={work.label}
+                max={100}
+                value={work.progress}
+              />
+            </>
+          ) : (
+            <p>{work.label}</p>
+          )}
+        </div>
+      </div>
+      {work.kind === "error" &&
+      files.length === 1 &&
+      activeUpload &&
+      files[0]?.size === activeUpload.size ? (
+        <button
+          type="button"
+          className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-300/30 px-3 py-2 text-xs font-semibold hover:bg-red-500/10"
+          onClick={() => void onResume()}
+        >
+          <RefreshCw className="size-3.5" />
+          Resume
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function CurrentSharePanel({
+  current,
+  now,
+  itemCount,
+  onShare,
+}: Readonly<{
+  current: ShareStatus | null;
+  now: number;
+  itemCount: number;
+  onShare: (item: ShareStatus) => Promise<void>;
+}>) {
+  const live = current?.state === "ready" && current.publicExpiresAt > now;
+  if (!live) return null;
+  return (
+    <div className="mt-5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+      <SharePreviewMedia item={current} itemCount={itemCount} />
+      <p className="truncate font-mono text-sm">{current.url}</p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {formatExpiry(current.publicExpiresAt)}
+      </p>
+      {current.compatibilityWarning ? (
+        <p className="mt-2 text-xs text-amber-200">
+          {current.compatibilityWarning}
+        </p>
+      ) : null}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-foreground px-3 text-sm font-semibold text-background"
+          onClick={() => void copyLink(current.url)}
+        >
+          <Copy className="size-4" /> Copy link
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold"
+          onClick={() => void onShare(current)}
+        >
+          <Share2 className="size-4" /> Share
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function QuickShareClient() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -756,7 +920,6 @@ export function QuickShareClient() {
     [policy],
   );
 
-  const deviceFilesSuffix = deviceFiles.length === 1 ? "" : "s";
   const historyState = historyView(
     historyLoading,
     history.length === 0 && !historyError,
@@ -782,12 +945,7 @@ export function QuickShareClient() {
               type="button"
               role="tab"
               aria-selected={mode === "file"}
-              className={cn(
-                "flex-1 border-b-2 px-2 py-3 text-xs font-medium transition sm:px-4 sm:text-sm",
-                mode === "file"
-                  ? "border-amber-500 text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
+              className={tabClass(mode === "file")}
               onClick={() => setMode("file")}
             >
               Photo/video
@@ -796,12 +954,7 @@ export function QuickShareClient() {
               type="button"
               role="tab"
               aria-selected={mode === "url"}
-              className={cn(
-                "flex-1 border-b-2 px-2 py-3 text-xs font-medium transition sm:px-4 sm:text-sm",
-                mode === "url"
-                  ? "border-amber-500 text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
+              className={tabClass(mode === "url")}
               onClick={() => setMode("url")}
             >
               From a link
@@ -810,12 +963,7 @@ export function QuickShareClient() {
               type="button"
               role="tab"
               aria-selected={mode === "clipboard"}
-              className={cn(
-                "flex-1 border-b-2 px-2 py-3 text-xs font-medium transition sm:px-4 sm:text-sm",
-                mode === "clipboard"
-                  ? "border-amber-500 text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
+              className={tabClass(mode === "clipboard")}
               onClick={() => setMode("clipboard")}
             >
               Clipboard
@@ -849,27 +997,12 @@ export function QuickShareClient() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <FileUp className="mb-4 size-7 text-amber-400" />
-                  <span className="font-medium">
-                    {deviceFiles.length > 0
-                      ? `${deviceFiles.length} media file${deviceFilesSuffix} selected`
-                      : "Choose photos or videos"}
-                  </span>
-                  <span className="mt-2 text-xs text-muted-foreground">
-                    {deviceFiles.length > 0
-                      ? `${formatBytes(deviceFiles.reduce((sum, item) => sum + item.size, 0))} total · tap to change selection`
-                      : "Camera, photo library, or files"}
-                  </span>
+                  <SelectedFilesLabel files={deviceFiles} />
                 </button>
-                <button
-                  type="submit"
+                <CreateLinkButton
                   disabled={deviceFiles.length === 0 || !policy || busy}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busy ? (
-                    <LoaderCircle className="size-4 animate-spin" />
-                  ) : null}
-                  Create link
-                </button>
+                  busy={busy}
+                />
               </form>
             ) : null}
             {mode === "url" ? (
@@ -897,16 +1030,10 @@ export function QuickShareClient() {
                 <p className="text-xs leading-5 text-muted-foreground">
                   The link must point to a publicly reachable photo or video.
                 </p>
-                <button
-                  type="submit"
+                <CreateLinkButton
                   disabled={!remoteUrl.trim() || !policy || busy}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busy ? (
-                    <LoaderCircle className="size-4 animate-spin" />
-                  ) : null}
-                  Create link
-                </button>
+                  busy={busy}
+                />
               </form>
             ) : null}
             {mode === "clipboard" ? (
@@ -932,14 +1059,7 @@ export function QuickShareClient() {
                   />
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 py-8 text-center">
                     <ClipboardPaste className="mb-4 size-7 text-amber-400" />
-                    <span className="font-medium">
-                      {pastedFile ? pastedFile.name : "Paste an image here"}
-                    </span>
-                    <span className="mt-2 text-xs text-muted-foreground">
-                      {pastedFile
-                        ? `${formatBytes(pastedFile.size)} · paste again to replace`
-                        : "Tap and choose Paste, or press Ctrl/⌘+V"}
-                    </span>
+                    <PastedFileLabel file={pastedFile} />
                   </div>
                 </div>
                 <button
@@ -955,100 +1075,26 @@ export function QuickShareClient() {
                   Clipboard access depends on your browser. The paste area works
                   when direct access is unavailable.
                 </p>
-                <button
-                  type="submit"
+                <CreateLinkButton
                   disabled={!pastedFile || !policy || busy}
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-stone-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {busy ? (
-                    <LoaderCircle className="size-4 animate-spin" />
-                  ) : null}
-                  Create link
-                </button>
+                  busy={busy}
+                />
               </form>
             ) : null}
 
-            {work.kind !== "idle" ? (
-              <div
-                className={cn(
-                  "mt-5 rounded-lg border px-4 py-3 text-sm",
-                  workStatusClass(work.kind),
-                )}
-                aria-live={work.kind === "uploading" ? "off" : "polite"}
-              >
-                <div className="flex items-start gap-3">
-                  <WorkStatusIcon kind={work.kind} />
-                  <div className="min-w-0 flex-1">
-                    {work.kind === "uploading" ? (
-                      <>
-                        <div className="flex items-baseline justify-between gap-3">
-                          <p>{work.label}</p>
-                          <span className="shrink-0 font-mono text-xs font-semibold text-amber-300 tabular-nums">
-                            {work.progress}%
-                          </span>
-                        </div>
-                        <progress
-                          className="mt-3 h-2 w-full appearance-none overflow-hidden rounded-full bg-background [&::-moz-progress-bar]:bg-amber-500 [&::-webkit-progress-bar]:bg-background [&::-webkit-progress-value]:bg-amber-500"
-                          aria-label="Upload progress"
-                          aria-valuetext={work.label}
-                          max={100}
-                          value={work.progress}
-                        />
-                      </>
-                    ) : (
-                      <p>{work.label}</p>
-                    )}
-                  </div>
-                </div>
-                {work.kind === "error" &&
-                files.length === 1 &&
-                activeUpload &&
-                files[0]?.size === activeUpload.size ? (
-                  <button
-                    type="button"
-                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-300/30 px-3 py-2 text-xs font-semibold hover:bg-red-500/10"
-                    onClick={() => void retryCurrent()}
-                  >
-                    <RefreshCw className="size-3.5" />
-                    Resume
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
+            <WorkStatusPanel
+              work={work}
+              files={files}
+              activeUpload={activeUpload}
+              onResume={retryCurrent}
+            />
 
-            {current?.state === "ready" && current.publicExpiresAt > now ? (
-              <div className="mt-5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
-                <SharePreviewMedia
-                  item={current}
-                  itemCount={currentItemCount}
-                />
-                <p className="truncate font-mono text-sm">{current.url}</p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {formatExpiry(current.publicExpiresAt)}
-                </p>
-                {current.compatibilityWarning ? (
-                  <p className="mt-2 text-xs text-amber-200">
-                    {current.compatibilityWarning}
-                  </p>
-                ) : null}
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-foreground px-3 text-sm font-semibold text-background"
-                    onClick={() => void copyLink(current.url)}
-                  >
-                    <Copy className="size-4" /> Copy link
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 text-sm font-semibold"
-                    onClick={() => void shareLink(current)}
-                  >
-                    <Share2 className="size-4" /> Share
-                  </button>
-                </div>
-              </div>
-            ) : null}
+            <CurrentSharePanel
+              current={current}
+              now={now}
+              itemCount={currentItemCount}
+              onShare={shareLink}
+            />
           </div>
 
           <div className="border-t border-border/70 bg-muted/20 px-4 py-4 text-xs leading-5 text-muted-foreground sm:px-6">

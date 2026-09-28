@@ -168,6 +168,114 @@ function formatRelativeTime(timestamp?: number) {
   return `${days}d ago`;
 }
 
+type ToggleAppearance = { tone: string; label: string };
+
+type ToggleAppearances = Readonly<{
+  on: ToggleAppearance;
+  off: ToggleAppearance;
+}>;
+
+const SIGNUPS_TOGGLE: ToggleAppearances = {
+  on: {
+    tone: "border-emerald-400/40 bg-emerald-400/10 text-emerald-200",
+    label: "Sign ups open",
+  },
+  off: {
+    tone: "border-amber-400/40 bg-amber-400/10 text-amber-100",
+    label: "Sign ups closed",
+  },
+};
+
+const VOTES_TOGGLE: ToggleAppearances = {
+  on: {
+    tone: "border-primary/60 bg-primary/10 text-primary",
+    label: "Votes open",
+  },
+  off: {
+    tone: "border-slate-500/50 bg-slate-500/10 text-slate-200",
+    label: "Votes closed",
+  },
+};
+
+const DUPLICATE_DEVICES_TOGGLE: ToggleAppearances = {
+  on: {
+    tone: "border-emerald-400/40 bg-emerald-400/10 text-emerald-200",
+    label: "Duplicate devices allowed",
+  },
+  off: {
+    tone: "border-slate-500/50 bg-slate-500/10 text-slate-200",
+    label: "Block duplicate devices",
+  },
+};
+
+function pickToggleAppearance(
+  active: boolean,
+  appearances: ToggleAppearances,
+): ToggleAppearance {
+  return active ? appearances.on : appearances.off;
+}
+
+function coinClassName(
+  orientation: string,
+  flipping: boolean,
+  winner: VoteRow | null,
+): string {
+  return `coin-3d ${orientation} ${flipping && winner ? "coin-flipping" : ""}`.trim();
+}
+
+function coinSideClass(resultKey: unknown, sideKey: unknown): string {
+  return cn(
+    "rounded-xl border border-border/40 bg-background/60 px-3 py-2 text-center",
+    resultKey === sideKey && "border-primary/60 text-primary font-semibold",
+  );
+}
+
+function renderLeaderPreview({
+  leaderOption,
+  tieOptions,
+  generator,
+  generatorReady,
+  baseParams,
+  currentStep,
+  displayOptions,
+}: Readonly<{
+  leaderOption: StepOption | null;
+  tieOptions: VoteRow[];
+  generator: ReturnType<typeof useCatGenerator>["generator"];
+  generatorReady: boolean;
+  baseParams: StreamParams;
+  currentStep: StepDefinition | null;
+  displayOptions: StepOption[];
+}>): ReactNode {
+  if (leaderOption) {
+    return (
+      <OptionPreview
+        generator={generator}
+        ready={generatorReady}
+        baseParams={baseParams}
+        step={currentStep}
+        option={leaderOption}
+        allOptions={displayOptions}
+        size={PREVIEW_SIZE}
+      />
+    );
+  }
+  if (tieOptions.length > 1) {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
+        Voting is currently tied between{" "}
+        {tieOptions.map((row) => row.option.label).join(", ")}. Resolve the tie
+        to preview the result.
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-full w-full items-center justify-center px-4 text-sm text-muted-foreground">
+      No votes yet.
+    </div>
+  );
+}
+
 export function HostClient() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   if (isLoading) return <p>Loading host account…</p>;
@@ -1137,34 +1245,21 @@ function AuthenticatedHostClient() {
   const finalCatName = sessionParams?._finalName ?? null;
   const finalCreatorName = sessionParams?._finalCreator ?? null;
 
-  let leaderPreview: ReactNode;
-  if (leaderOption) {
-    leaderPreview = (
-      <OptionPreview
-        generator={generator}
-        ready={generatorReady}
-        baseParams={localState.params}
-        step={currentStep}
-        option={leaderOption}
-        allOptions={displayOptions}
-        size={PREVIEW_SIZE}
-      />
-    );
-  } else if (tieOptions.length > 1) {
-    leaderPreview = (
-      <div className="flex h-full w-full flex-col items-center justify-center px-4 text-center text-sm text-muted-foreground">
-        Voting is currently tied between{" "}
-        {tieOptions.map((row) => row.option.label).join(", ")}. Resolve the tie
-        to preview the result.
-      </div>
-    );
-  } else {
-    leaderPreview = (
-      <div className="flex h-full w-full items-center justify-center px-4 text-sm text-muted-foreground">
-        No votes yet.
-      </div>
-    );
-  }
+  const leaderPreview = renderLeaderPreview({
+    leaderOption,
+    tieOptions,
+    generator,
+    generatorReady,
+    baseParams: localState.params,
+    currentStep,
+    displayOptions,
+  });
+  const signupsToggle = pickToggleAppearance(signupsOpen, SIGNUPS_TOGGLE);
+  const votesToggle = pickToggleAppearance(votesOpen, VOTES_TOGGLE);
+  const duplicateDevicesToggle = pickToggleAppearance(
+    allowDuplicateDevices,
+    DUPLICATE_DEVICES_TOGGLE,
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -1368,13 +1463,10 @@ function AuthenticatedHostClient() {
                 }
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                  signupsOpen
-                    ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
-                    : "border-amber-400/40 bg-amber-400/10 text-amber-100",
+                  signupsToggle.tone,
                 )}
               >
-                <UsersIcon size={14} />{" "}
-                {signupsOpen ? "Sign ups open" : "Sign ups closed"}
+                <UsersIcon size={14} /> {signupsToggle.label}
               </button>
               <button
                 type="button"
@@ -1384,13 +1476,10 @@ function AuthenticatedHostClient() {
                 }
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                  votesOpen
-                    ? "border-primary/60 bg-primary/10 text-primary"
-                    : "border-slate-500/50 bg-slate-500/10 text-slate-200",
+                  votesToggle.tone,
                 )}
               >
-                <Vote className="size-3.5" />{" "}
-                {votesOpen ? "Votes open" : "Votes closed"}
+                <Vote className="size-3.5" /> {votesToggle.label}
               </button>
               <button
                 type="button"
@@ -1400,14 +1489,10 @@ function AuthenticatedHostClient() {
                 }
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                  allowDuplicateDevices
-                    ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200"
-                    : "border-slate-500/50 bg-slate-500/10 text-slate-200",
+                  duplicateDevicesToggle.tone,
                 )}
               >
-                {allowDuplicateDevices
-                  ? "Duplicate devices allowed"
-                  : "Block duplicate devices"}
+                {duplicateDevicesToggle.label}
               </button>
             </div>
           </div>
@@ -1847,7 +1932,11 @@ function AuthenticatedHostClient() {
               <div className="coin-stage">
                 <div
                   key={coinFlipId}
-                  className={`coin-3d ${coinOrientation} ${coinFlipping && coinWinner ? "coin-flipping" : ""}`.trim()}
+                  className={coinClassName(
+                    coinOrientation,
+                    coinFlipping,
+                    coinWinner,
+                  )}
                   onAnimationEnd={handleCoinAnimationEnd}
                   aria-live="polite"
                 >
@@ -1881,19 +1970,17 @@ function AuthenticatedHostClient() {
               </div>
               <div className="grid w-full grid-cols-2 gap-4 text-sm text-muted-foreground">
                 <div
-                  className={cn(
-                    "rounded-xl border border-border/40 bg-background/60 px-3 py-2 text-center",
-                    coinResult?.option.key === frontOption?.key &&
-                      "border-primary/60 text-primary font-semibold",
+                  className={coinSideClass(
+                    coinResult?.option.key,
+                    frontOption?.key,
                   )}
                 >
                   Heads: {frontOption?.label ?? "—"}
                 </div>
                 <div
-                  className={cn(
-                    "rounded-xl border border-border/40 bg-background/60 px-3 py-2 text-center",
-                    coinResult?.option.key === backOption?.key &&
-                      "border-primary/60 text-primary font-semibold",
+                  className={coinSideClass(
+                    coinResult?.option.key,
+                    backOption?.key,
                   )}
                 >
                   Tails: {backOption?.label ?? "—"}
