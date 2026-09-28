@@ -1,7 +1,7 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api.js";
-import type { Doc } from "./_generated/dataModel.js";
+import type { Doc, Id } from "./_generated/dataModel.js";
 import type { QueryCtx } from "./_generated/server.js";
 import { mutation, query } from "./_generated/server.js";
 import { docIdToString } from "./utils.js";
@@ -254,6 +254,55 @@ function rarityRecordToClient(doc: RarityDoc) {
   };
 }
 
+type ThumbnailUpdate = {
+  thumbStorageId: Id<"_storage">;
+  thumbName: string;
+  thumbWidth?: number;
+  thumbHeight?: number;
+  width?: number;
+  height?: number;
+};
+
+function applyDefaultCardThumbnail(
+  updates: Partial<CatdexDoc>,
+  card: ThumbnailUpdate,
+) {
+  updates.defaultCardThumbStorageId = card.thumbStorageId;
+  updates.defaultCardThumbName = card.thumbName;
+  if (card.thumbWidth !== undefined) {
+    updates.defaultCardThumbWidth = card.thumbWidth;
+  }
+  if (card.thumbHeight !== undefined) {
+    updates.defaultCardThumbHeight = card.thumbHeight;
+  }
+  if (card.width !== undefined) {
+    updates.defaultCardWidth = card.width;
+  }
+  if (card.height !== undefined) {
+    updates.defaultCardHeight = card.height;
+  }
+}
+
+function applyCustomCardThumbnail(
+  updates: Partial<CatdexDoc>,
+  card: ThumbnailUpdate,
+) {
+  updates.customCardThumbStorageId = card.thumbStorageId;
+  updates.customCardThumbName = card.thumbName;
+  if (card.thumbWidth !== undefined) {
+    updates.customCardThumbWidth = card.thumbWidth;
+  }
+  if (card.thumbHeight !== undefined) {
+    updates.customCardThumbHeight = card.thumbHeight;
+  }
+  if (card.width !== undefined) {
+    updates.customCardWidth = card.width;
+  }
+  if (card.height !== undefined) {
+    updates.customCardHeight = card.height;
+  }
+}
+
 export const applyThumbnailUpdates = mutation({
   args: {
     id: v.id("catdex"),
@@ -284,37 +333,11 @@ export const applyThumbnailUpdates = mutation({
     };
 
     if (args.defaultCard) {
-      updates.defaultCardThumbStorageId = args.defaultCard.thumbStorageId;
-      updates.defaultCardThumbName = args.defaultCard.thumbName;
-      if (args.defaultCard.thumbWidth !== undefined) {
-        updates.defaultCardThumbWidth = args.defaultCard.thumbWidth;
-      }
-      if (args.defaultCard.thumbHeight !== undefined) {
-        updates.defaultCardThumbHeight = args.defaultCard.thumbHeight;
-      }
-      if (args.defaultCard.width !== undefined) {
-        updates.defaultCardWidth = args.defaultCard.width;
-      }
-      if (args.defaultCard.height !== undefined) {
-        updates.defaultCardHeight = args.defaultCard.height;
-      }
+      applyDefaultCardThumbnail(updates, args.defaultCard);
     }
 
     if (args.customCard) {
-      updates.customCardThumbStorageId = args.customCard.thumbStorageId;
-      updates.customCardThumbName = args.customCard.thumbName;
-      if (args.customCard.thumbWidth !== undefined) {
-        updates.customCardThumbWidth = args.customCard.thumbWidth;
-      }
-      if (args.customCard.thumbHeight !== undefined) {
-        updates.customCardThumbHeight = args.customCard.thumbHeight;
-      }
-      if (args.customCard.width !== undefined) {
-        updates.customCardWidth = args.customCard.width;
-      }
-      if (args.customCard.height !== undefined) {
-        updates.customCardHeight = args.customCard.height;
-      }
+      applyCustomCardThumbnail(updates, args.customCard);
     }
 
     await ctx.db.patch(args.id, updates);

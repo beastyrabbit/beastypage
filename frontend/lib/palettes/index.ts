@@ -26,10 +26,8 @@ import { titanicPalette } from "./titanic";
 import type {
   FullPaletteColorDef,
   PaletteCategory,
-  PaletteColorDef,
   PaletteGroup,
   PaletteId,
-  PaletteMode,
 } from "./types";
 import { toFullColorDef } from "./types";
 
@@ -308,13 +306,11 @@ export function getPalettesByGroup(group: PaletteGroup): PaletteCategory[] {
 }
 
 export { patternToCssBackground } from "./pattern-css";
-export type { PatternDefinition, PatternStripe } from "./types";
-// Re-export types and utilities
 export type {
-  FullPaletteColorDef,
-  PaletteCategory,
   PaletteColorDef,
-  PaletteGroup,
-  PaletteId,
   PaletteMode,
-};
+  PatternDefinition,
+  PatternStripe,
+} from "./types";
+// Re-export types and utilities
+export type { FullPaletteColorDef, PaletteCategory, PaletteGroup, PaletteId };

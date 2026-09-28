@@ -344,8 +344,8 @@ export function SpriteAssetExplorer() {
             <code className="ml-1 rounded bg-slate-800 px-1 py-0.5 text-[10px] text-neutral-200">
               frontend/public/sprites
             </code>
-            . No bread/toast/blanket accessories showed up in this drop, the new
-            material is mostly crowns, rain gear, fruit/flower sets, snakes,
+            {"."} No bread/toast/blanket accessories showed up in this drop, the
+            new material is mostly crowns, rain gear, fruit/flower sets, snakes,
             insects, and genemod overlays.
           </p>
         </section>

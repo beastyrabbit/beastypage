@@ -307,14 +307,14 @@ function GeneticTraitDisplay({
   expressed,
   getDominance,
   formatValue = (value) => value,
-}: {
+}: Readonly<{
   label: string;
   allele1: string;
   allele2: string;
   expressed: string;
   getDominance?: (allele: string) => "D" | "R" | null;
   formatValue?: (value: string) => string;
-}) {
+}>) {
   const isHeterozygous = allele1 !== allele2;
   const dom1 = getDominance?.(allele1);
   const dom2 = getDominance?.(allele2);

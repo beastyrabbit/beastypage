@@ -69,6 +69,34 @@ function stripInternalFields(params: StreamerParams): Partial<CatParams> {
   return result;
 }
 
+function cropFrameToDataUrl(
+  sheetCanvas: CanvasImageSource,
+  frame: VariantSheetFrame,
+  size: number,
+): string | null {
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return null;
+  }
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, size, size);
+  ctx.drawImage(
+    sheetCanvas,
+    frame.x,
+    frame.y,
+    frame.width,
+    frame.height,
+    0,
+    0,
+    size,
+    size,
+  );
+  return canvas.toDataURL("image/png");
+}
+
 async function renderChunkPreviews(
   generator: CatGeneratorApi,
   baseParams: StreamerParams,
@@ -124,32 +152,10 @@ async function renderChunkPreviews(
 
         for (const descriptor of descriptors) {
           const frame = frameMap.get(descriptor.key);
-          if (!frame) {
-            result.set(descriptor.key, null);
-            continue;
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            result.set(descriptor.key, null);
-            continue;
-          }
-          ctx.imageSmoothingEnabled = false;
-          ctx.clearRect(0, 0, size, size);
-          ctx.drawImage(
-            sheetCanvas,
-            frame.x,
-            frame.y,
-            frame.width,
-            frame.height,
-            0,
-            0,
-            size,
-            size,
+          result.set(
+            descriptor.key,
+            frame ? cropFrameToDataUrl(sheetCanvas, frame, size) : null,
           );
-          result.set(descriptor.key, canvas.toDataURL("image/png"));
         }
 
         return result;

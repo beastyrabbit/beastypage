@@ -9,6 +9,37 @@ import {
 } from "@/utils/singleCatVariants";
 import { DEFAULT_TIMING_CONFIG } from "@/utils/spinTiming";
 
+function resolveAutoClearSeconds(
+  record: Record<string, unknown> | undefined,
+): number {
+  if (
+    typeof record?.resultAutoClearSeconds === "number" &&
+    record.resultAutoClearSeconds > 0
+  ) {
+    return record.resultAutoClearSeconds;
+  }
+  if (
+    typeof record?.autoClearSeconds === "number" &&
+    record.autoClearSeconds > 0
+  ) {
+    return record.autoClearSeconds;
+  }
+  return 30;
+}
+
+function resolveAutoClearEnabled(
+  record: Record<string, unknown> | undefined,
+  autoClearSeconds: number,
+): boolean {
+  if (typeof record?.resultAutoClearEnabled === "boolean") {
+    return record.resultAutoClearEnabled;
+  }
+  if (typeof record?.autoClearEnabled === "boolean") {
+    return record.autoClearEnabled;
+  }
+  return autoClearSeconds > 0;
+}
+
 /**
  * Subscribes to the stream session by API key and derives the overlay's
  * settings: the initial generator settings snapshot plus the resolved
@@ -63,7 +94,7 @@ export function useObsSession(apiKey: string) {
         timing: {
           ...DEFAULT_TIMING_CONFIG,
           delays: { ...DEFAULT_TIMING_CONFIG.delays },
-          subsetLimits: { ...(DEFAULT_TIMING_CONFIG.subsetLimits ?? {}) },
+          subsetLimits: { ...DEFAULT_TIMING_CONFIG.subsetLimits },
           pauseDelays: DEFAULT_TIMING_CONFIG.pauseDelays
             ? {
                 flashyMs: DEFAULT_TIMING_CONFIG.pauseDelays.flashyMs,
@@ -83,20 +114,13 @@ export function useObsSession(apiKey: string) {
     initialVariantSettings,
   ]);
 
-  const resolvedResultAutoClear =
-    typeof sessionSettingsRecord?.resultAutoClearSeconds === "number" &&
-    sessionSettingsRecord.resultAutoClearSeconds > 0
-      ? sessionSettingsRecord.resultAutoClearSeconds
-      : typeof sessionSettingsRecord?.autoClearSeconds === "number" &&
-          sessionSettingsRecord.autoClearSeconds > 0
-        ? sessionSettingsRecord.autoClearSeconds
-        : 30;
-  const resolvedResultAutoClearEnabled =
-    typeof sessionSettingsRecord?.resultAutoClearEnabled === "boolean"
-      ? sessionSettingsRecord.resultAutoClearEnabled
-      : typeof sessionSettingsRecord?.autoClearEnabled === "boolean"
-        ? sessionSettingsRecord.autoClearEnabled
-        : resolvedResultAutoClear > 0;
+  const resolvedResultAutoClear = resolveAutoClearSeconds(
+    sessionSettingsRecord,
+  );
+  const resolvedResultAutoClearEnabled = resolveAutoClearEnabled(
+    sessionSettingsRecord,
+    resolvedResultAutoClear,
+  );
 
   return {
     session,

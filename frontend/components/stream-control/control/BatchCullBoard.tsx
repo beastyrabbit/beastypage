@@ -16,6 +16,30 @@ import {
 import { cn } from "@/lib/utils";
 import { useStreamControl } from "./context";
 
+function cullStatusLabel(awaiting: boolean, cullsLeft: number): string {
+  if (awaiting) return `Pick one (${cullsLeft} culls left)`;
+  return cullsLeft > 0 ? "Revealing…" : "Finalists locked";
+}
+
+function cullCardStateClass(
+  marked: boolean,
+  potential: boolean,
+  favorite: boolean,
+): string {
+  if (marked) {
+    return "border-red-500/70 bg-red-500/10 shadow-[0_0_18px_rgba(239,68,68,0.35)]";
+  }
+  if (potential) {
+    return "border-yellow-400/70 bg-yellow-400/10 shadow-[0_0_14px_rgba(250,204,21,0.3)]";
+  }
+  return favorite ? "border-pink-400/50 bg-pink-400/5" : "border-border/30";
+}
+
+function cullLabelClass(marked: boolean, potential: boolean): string {
+  if (marked) return "text-red-300";
+  return potential ? "text-yellow-300" : "text-foreground";
+}
+
 /**
  * Full-width live mirror of the elimination show, rendered below the
  * preview so the streamer can actually see the cats. Survivors render at
@@ -41,7 +65,7 @@ export function BatchCullBoard() {
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [culling, setCulling] = useState(false);
 
-  const active = Boolean(command && liveState && liveState.seq === command.seq);
+  const active = Boolean(command && liveState?.seq === command.seq);
   const stages = useMemo(
     () => (command ? buildBatchStagePlan(command.config, command.cats) : []),
     [command],
@@ -189,11 +213,7 @@ export function BatchCullBoard() {
                 : "border-border/40 text-muted-foreground",
             )}
           >
-            {awaiting
-              ? `Pick one (${cullsLeft} culls left)`
-              : cullsLeft > 0
-                ? "Revealing…"
-                : "Finalists locked"}
+            {cullStatusLabel(awaiting, cullsLeft)}
           </span>
         </div>
       </div>
@@ -247,13 +267,7 @@ export function BatchCullBoard() {
                 disabled={!awaiting}
                 className={cn(
                   "flex w-full flex-col items-center rounded-xl border p-2 transition",
-                  marked
-                    ? "border-red-500/70 bg-red-500/10 shadow-[0_0_18px_rgba(239,68,68,0.35)]"
-                    : potential
-                      ? "border-yellow-400/70 bg-yellow-400/10 shadow-[0_0_14px_rgba(250,204,21,0.3)]"
-                      : favorite
-                        ? "border-pink-400/50 bg-pink-400/5"
-                        : "border-border/30",
+                  cullCardStateClass(marked, potential, favorite),
                   spotlighted && "ring-2 ring-sky-400/70",
                   awaiting
                     ? "cursor-pointer hover:border-amber-500/50 hover:bg-amber-500/5"
@@ -275,11 +289,7 @@ export function BatchCullBoard() {
                 <span
                   className={cn(
                     "mt-1 text-sm font-bold",
-                    marked
-                      ? "text-red-300"
-                      : potential
-                        ? "text-yellow-300"
-                        : "text-foreground",
+                    cullLabelClass(marked, potential),
                   )}
                 >
                   {cat.label}

@@ -121,6 +121,38 @@ function imageDataFromCanvas(
   return null;
 }
 
+function resolveHistoryStarter(
+  historyRecord: MapperRecord | null | undefined,
+  trimmedHistorySlug: string,
+  starterHair: Parameters<typeof applyEvolutionStarterHairToPayload>[1],
+): {
+  payload: unknown;
+  source: Parameters<typeof buildEvolutionBatchSettings>[1];
+} {
+  if (!trimmedHistorySlug) {
+    throw new Error("Enter a history slug first");
+  }
+  if (historyRecord === undefined) {
+    throw new Error("History starter is still loading");
+  }
+  if (!historyRecord?.cat_data) {
+    throw new Error("No saved cat was found for that slug");
+  }
+  return {
+    payload: applyEvolutionStarterHairToPayload(
+      historyRecord.cat_data,
+      starterHair,
+    ),
+    source: {
+      type: "history",
+      slug: historyRecord.slug ?? trimmedHistorySlug,
+      profileId: historyRecord.id,
+      catName: historyRecord.catName ?? null,
+      creatorName: historyRecord.creatorName ?? null,
+    },
+  };
+}
+
 export function EvolutionGeneratorClient() {
   const createBatch = useMutation(api.adoptionV2.createBatch);
   const createMapper = useMutation(api.mapper.create);
@@ -370,26 +402,13 @@ export function EvolutionGeneratorClient() {
       const starterHair = resolveEvolutionStarterHair(hairSprite);
 
       if (starterMode === "history") {
-        if (!trimmedHistorySlug) {
-          throw new Error("Enter a history slug first");
-        }
-        if (historyRecord === undefined) {
-          throw new Error("History starter is still loading");
-        }
-        if (!historyRecord?.cat_data) {
-          throw new Error("No saved cat was found for that slug");
-        }
-        starterPayload = applyEvolutionStarterHairToPayload(
-          historyRecord.cat_data,
+        const historyStarter = resolveHistoryStarter(
+          historyRecord,
+          trimmedHistorySlug,
           starterHair,
         );
-        starterSource = {
-          type: "history",
-          slug: historyRecord.slug ?? trimmedHistorySlug,
-          profileId: historyRecord.id,
-          catName: historyRecord.catName ?? null,
-          creatorName: historyRecord.creatorName ?? null,
-        };
+        starterPayload = historyStarter.payload;
+        starterSource = historyStarter.source;
       } else {
         starterPayload = await buildRandomEvolutionStarter(hairSprite);
         starterSource = { type: "random" };
@@ -1067,14 +1086,14 @@ function RangeControl({
   steps = LAYER_STEPS,
   disabled = false,
   trailing,
-}: {
+}: Readonly<{
   label: string;
   range: EvolutionRange;
   onChange: (range: EvolutionRange) => void;
   steps?: readonly number[];
   disabled?: boolean;
   trailing?: React.ReactNode;
-}) {
+}>) {
   return (
     <fieldset
       className={cn("flex flex-col gap-2 transition", disabled && "opacity-50")}
@@ -1123,12 +1142,12 @@ function CatNameEditor({
   onSave,
   onAutoname,
   autonaming = false,
-}: {
+}: Readonly<{
   records: UiEvolutionCat[];
   onSave: (record: UiEvolutionCat, catName: string) => Promise<void>;
   onAutoname?: () => Promise<void>;
   autonaming?: boolean;
-}) {
+}>) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingAll, setSavingAll] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);

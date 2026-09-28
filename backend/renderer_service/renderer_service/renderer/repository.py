@@ -182,20 +182,22 @@ class SpriteRepository:
 
         # Tint simple gradients for heterochromia approximation.
         if primary or secondary:
-            eye_layer = self.blank_canvas()
             left_colour = resolve_colour(primary, (255, 255, 255, 180))
             right_colour = resolve_colour(secondary or primary, (255, 255, 255, 180))
-            for x in range(self.tile_size):
-                for y in range(self.tile_size):
-                    px = eyes.getpixel((x, y))
-                    if px[3] == 0:
-                        continue
-                    if x < self.tile_size // 2:
-                        eye_layer.putpixel((x, y), left_colour)
-                    else:
-                        eye_layer.putpixel((x, y), right_colour)
+            eye_layer = self._split_eye_layer(eyes, left_colour, right_colour)
             eyes = Image.alpha_composite(eye_layer, eyes)
         return eyes
+
+    def _split_eye_layer(
+        self, eyes: Image.Image, left_colour, right_colour
+    ) -> Image.Image:
+        eye_layer = self.blank_canvas()
+        for x in range(self.tile_size):
+            colour = left_colour if x < self.tile_size // 2 else right_colour
+            for y in range(self.tile_size):
+                if eyes.getpixel((x, y))[3] != 0:
+                    eye_layer.putpixel((x, y), colour)
+        return eye_layer
 
     def get_sprite(
         self,

@@ -14,7 +14,7 @@ if (!clerkPublishableKey) {
   );
 }
 
-export function AppProviders({ children }: { children: ReactNode }) {
+export function AppProviders({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <ClerkProvider
       publishableKey={clerkPublishableKey}

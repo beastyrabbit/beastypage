@@ -9,13 +9,13 @@ export function NameField({
   placeholder,
   previewUrl,
   onChange,
-}: {
+}: Readonly<{
   value: string;
   label: string;
   placeholder: string;
   previewUrl: string | null;
   onChange: (value: string) => void;
-}) {
+}>) {
   return (
     <div className="group/name relative min-w-0 flex-1">
       <input

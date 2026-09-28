@@ -83,6 +83,16 @@ function parseCatName(
   return { prefix: trimmed, suffix: "", full: trimmed };
 }
 
+function getSelectionClassName(
+  catId: string,
+  motherId: string | undefined,
+  fatherId: string | undefined,
+): string {
+  if (motherId === catId) return "ring-2 ring-pink-500 bg-pink-500/10";
+  if (fatherId === catId) return "ring-2 ring-blue-500 bg-blue-500/10";
+  return "";
+}
+
 export function FoundingCoupleSelector({
   onSelect,
   onClose,
@@ -295,26 +305,26 @@ export function FoundingCoupleSelector({
 
         {/* Cat grid */}
         <div className="flex-1 overflow-y-auto p-4">
-          {isLoading ? (
+          {isLoading && (
             <p className="text-center text-muted-foreground py-8">Loading...</p>
-          ) : filteredCats.length === 0 ? (
+          )}
+          {!isLoading && filteredCats.length === 0 && (
             <p className="text-center text-muted-foreground py-8">
               No cats found in history
             </p>
-          ) : (
+          )}
+          {!isLoading && filteredCats.length > 0 && (
             <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 md:grid-cols-6">
               {filteredCats.map((cat) => (
                 <button
                   key={cat.id}
                   type="button"
                   onClick={() => handleCatClick(cat)}
-                  className={`flex flex-col items-center gap-1 rounded-lg p-2 transition-all hover:bg-white/10 ${
-                    selectedMother?.id === cat.id
-                      ? "ring-2 ring-pink-500 bg-pink-500/10"
-                      : selectedFather?.id === cat.id
-                        ? "ring-2 ring-blue-500 bg-blue-500/10"
-                        : ""
-                  }`}
+                  className={`flex flex-col items-center gap-1 rounded-lg p-2 transition-all hover:bg-white/10 ${getSelectionClassName(
+                    cat.id,
+                    selectedMother?.id,
+                    selectedFather?.id,
+                  )}`}
                 >
                   <Image
                     src={cat.previewUrl}

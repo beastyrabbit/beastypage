@@ -221,7 +221,7 @@ export function setRegistryRevealValue(
   const legacyDocument = partialParamsToCatDocument(params);
   const traits: Record<string, unknown> = {
     ...legacyDocument.traits,
-    ...(params.traits ?? {}),
+    ...params.traits,
   };
   const absent =
     rawValue === undefined ||
@@ -453,10 +453,10 @@ export function loadTimingConfig(): SpinTimingConfig {
     if (!parsed || typeof parsed !== "object") return DEFAULT_TIMING_CONFIG;
     const hydrated: SpinTimingConfig = {
       allowFastFlips: false,
-      delays: { ...DEFAULT_TIMING_CONFIG.delays, ...(parsed.delays ?? {}) },
+      delays: { ...DEFAULT_TIMING_CONFIG.delays, ...parsed.delays },
       subsetLimits: {
-        ...(DEFAULT_TIMING_CONFIG.subsetLimits ?? {}),
-        ...(parsed.subsetLimits ?? {}),
+        ...DEFAULT_TIMING_CONFIG.subsetLimits,
+        ...parsed.subsetLimits,
       },
       pauseDelays: {
         flashyMs:

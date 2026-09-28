@@ -28,8 +28,8 @@ function generateSalt(): Uint8Array {
  */
 function toBase64(bytes: Uint8Array): string {
   let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  for (const byte of bytes) {
+    binary += String.fromCodePoint(byte);
   }
   return btoa(binary);
 }
@@ -41,7 +41,8 @@ function fromBase64(base64: string): Uint8Array {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+    // atob yields Latin-1 characters, so each code point fits in one byte.
+    bytes[i] = binary.codePointAt(i) ?? 0;
   }
   return bytes;
 }

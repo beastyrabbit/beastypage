@@ -177,14 +177,14 @@ export interface ParameterOptions {
   tortieColour: string[];
   tint: string[];
   eyeColour: string[];
-  eyeColour2: (string | "none")[];
+  eyeColour2: string[];
   skinColour: string[];
-  whitePatches: (string | "none")[];
-  points: (string | "none")[];
-  whitePatchesTint: (string | "none")[];
-  vitiligo: (string | "none")[];
-  accessory: (string | "none")[];
-  scar: (string | "none")[];
+  whitePatches: string[];
+  points: string[];
+  whitePatchesTint: string[];
+  vitiligo: string[];
+  accessory: string[];
+  scar: string[];
   shading: boolean[];
   reverse: boolean[];
 }
@@ -502,7 +502,7 @@ export function formatValue(value: unknown): string {
   }
   const str = String(value)
     .replace(/_/g, " ")
-    .replace(/^[0-9]+\s*-\s*/, "")
+    .replace(/^\d+\s*-\s*/, "")
     .toLowerCase();
   return str.replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -512,7 +512,7 @@ export function coerceSpriteNumber(value: unknown): number | undefined {
     return value;
   }
   if (typeof value === "string") {
-    const match = value.match(/(-?\d+)/);
+    const match = /(-?\d+)/.exec(value);
     if (match) {
       const parsed = Number.parseInt(match[1], 10);
       if (Number.isFinite(parsed)) {
@@ -1193,6 +1193,12 @@ export function buildSharePayload(state: CatState) {
   };
 }
 
+function firstSlotValue(list: unknown, single: unknown): string | null {
+  if (Array.isArray(list) && list.length > 0) return list[0] as string;
+  if (typeof single === "string") return single;
+  return null;
+}
+
 export function sanitizeForBuilder(
   baseParams: Partial<CatParams>,
   overrides?: {
@@ -1204,12 +1210,7 @@ export function sanitizeForBuilder(
   const next = cloneParams(baseParams ?? {});
 
   const accessoryValue =
-    overrides?.accessory ??
-    (Array.isArray(next.accessories) && next.accessories.length > 0
-      ? (next.accessories[0] as string)
-      : typeof next.accessory === "string"
-        ? (next.accessory as string)
-        : null);
+    overrides?.accessory ?? firstSlotValue(next.accessories, next.accessory);
 
   if (accessoryValue) {
     next.accessory = accessoryValue;
@@ -1219,13 +1220,7 @@ export function sanitizeForBuilder(
     next.accessories = [];
   }
 
-  const scarValue =
-    overrides?.scar ??
-    (Array.isArray(next.scars) && next.scars.length > 0
-      ? (next.scars[0] as string)
-      : typeof next.scar === "string"
-        ? (next.scar as string)
-        : null);
+  const scarValue = overrides?.scar ?? firstSlotValue(next.scars, next.scar);
 
   if (scarValue) {
     next.scar = scarValue;

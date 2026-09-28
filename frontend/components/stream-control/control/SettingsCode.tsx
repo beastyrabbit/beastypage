@@ -17,10 +17,10 @@ import { encodePortableCodeFromSettings } from "./helpers";
 export function SettingsCode({
   settings,
   onApply,
-}: {
+}: Readonly<{
   settings: SingleCatSettings;
   onApply: (next: Partial<SingleCatSettings>) => void;
-}) {
+}>) {
   const [codeInput, setCodeInput] = useState("");
   const [copyFeedback, setCopyFeedback] = useState(false);
 

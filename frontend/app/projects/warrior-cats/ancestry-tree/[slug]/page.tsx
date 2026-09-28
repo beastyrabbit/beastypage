@@ -54,7 +54,9 @@ export async function generateMetadata({
   }
 }
 
-export default async function ViewAncestryTreePage({ params }: PageParams) {
+export default async function ViewAncestryTreePage({
+  params,
+}: Readonly<PageParams>) {
   const { slug } = await params;
   const convexUrl = getServerConvexUrl();
 

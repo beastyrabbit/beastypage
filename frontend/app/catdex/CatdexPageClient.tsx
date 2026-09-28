@@ -102,7 +102,7 @@ export default function CatdexPage() {
       window.clearTimeout(searchTrackTimerRef.current);
     }
     searchTrackTimerRef.current = window.setTimeout(() => {
-      const isRange = /\d+\s*-\s*\d+/.test(search);
+      const isRange = /\d\s*-\s*\d/.test(search);
       track("catdex_searched", {
         query_type: isRange ? "number_range" : "text",
       });
@@ -691,7 +691,7 @@ function matchesSearchTerm(cat: CatdexPayload, term: string): boolean {
   const trimmed = term.trim();
   if (!trimmed) return true;
 
-  const range = trimmed.match(/^(\d+)\s*-\s*(\d+)$/);
+  const range = /^(\d+)\s*-\s*(\d+)$/.exec(trimmed);
   const cardNumberValue = cardNumberToInt(cat);
   if (range && cardNumberValue !== null) {
     const start = Number(range[1]);
@@ -814,7 +814,7 @@ function absoluteUrl(url?: string | null): string | null {
   return `${base}/${url}`;
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
   return (
     <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/60 px-3 py-2">
       <span className="text-muted-foreground">{label}</span>
@@ -977,34 +977,16 @@ function SubmitModal({
     }
   };
 
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget && !busy) {
-      onClose();
-    }
-  };
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-10"
-      role="button"
-      tabIndex={0}
-      onClick={handleBackdropClick}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !busy) {
-          event.preventDefault();
-          onClose();
-        }
-        if (
-          (event.key === "Enter" || event.key === " ") &&
-          event.target === event.currentTarget &&
-          !busy
-        ) {
-          event.preventDefault();
-          onClose();
-        }
-      }}
-    >
-      <div className="glass-card w-full max-w-xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
+      <button
+        type="button"
+        aria-label="Close"
+        disabled={busy}
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-black/70"
+      />
+      <div className="glass-card relative w-full max-w-xl overflow-hidden">
         <header className="flex items-center justify-between border-b border-border/40 px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
@@ -1205,7 +1187,9 @@ function MassUploadModal({
     const newEntries = files.map((file) => {
       const defaults = inferEntryDefaults(file.name);
       return {
-        id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`,
+        id:
+          crypto.randomUUID?.() ??
+          `${Date.now()}-${crypto.getRandomValues(new Uint32Array(1))[0]}`,
         defaultFile: file,
         previewUrl: URL.createObjectURL(file),
         catName: defaults.name,
@@ -1321,7 +1305,6 @@ function MassUploadModal({
         });
         return [];
       });
-      setOwner(owner);
     } else {
       const summary = [`${success} succeeded`, `${failed} failed`].join(", ");
       setStatus(summary);
@@ -1333,34 +1316,16 @@ function MassUploadModal({
     setBusy(false);
   };
 
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget && !busy) {
-      onClose();
-    }
-  };
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-3 py-8"
-      role="button"
-      tabIndex={0}
-      onClick={handleBackdropClick}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && !busy) {
-          event.preventDefault();
-          onClose();
-        }
-        if (
-          (event.key === "Enter" || event.key === " ") &&
-          event.target === event.currentTarget &&
-          !busy
-        ) {
-          event.preventDefault();
-          onClose();
-        }
-      }}
-    >
-      <div className="glass-card w-full max-w-5xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-3 py-8">
+      <button
+        type="button"
+        aria-label="Close"
+        disabled={busy}
+        onClick={onClose}
+        className="absolute inset-0 cursor-default bg-black/75"
+      />
+      <div className="glass-card relative w-full max-w-5xl overflow-hidden">
         <header className="flex items-center justify-between border-b border-border/40 px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">
@@ -1572,11 +1537,7 @@ function MassUploadModal({
                           <span
                             className={cn(
                               "text-xs",
-                              entry.status === "error"
-                                ? "text-red-500"
-                                : entry.status === "success"
-                                  ? "text-emerald-500"
-                                  : "text-muted-foreground",
+                              entryStatusTextClass(entry.status),
                             )}
                           >
                             {entry.message}
@@ -1645,12 +1606,18 @@ function seasonShortLabel(cat: CatdexPayload, fallback: string): string {
   return deriveSeasonShort(seasonName);
 }
 
+function entryStatusTextClass(status: MassUploadEntry["status"]): string {
+  if (status === "error") return "text-red-500";
+  if (status === "success") return "text-emerald-500";
+  return "text-muted-foreground";
+}
+
 function deriveSeasonShort(seasonName: string | null | undefined): string {
   if (!seasonName) return "—";
   const trimmed = seasonName.trim();
   if (!trimmed) return "—";
   if (/^pending/i.test(trimmed)) return "Pending";
-  const seasonMatch = trimmed.match(/season\s*(\d+)/i);
+  const seasonMatch = /season\s*(\d+)/i.exec(trimmed);
   if (seasonMatch) {
     return `S${seasonMatch[1]}`;
   }

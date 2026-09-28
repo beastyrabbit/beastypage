@@ -4,6 +4,7 @@ import { useMutation } from "convex/react";
 import { Loader2, ShieldQuestion } from "lucide-react";
 import {
   type FormEvent,
+  type RefObject,
   useCallback,
   useEffect,
   useMemo,
@@ -68,7 +69,131 @@ function formatDuration(ms: number): string {
   return `${seconds}s`;
 }
 
-export function DiscordInviteButton({ className }: { className?: string }) {
+function ChallengeForm({
+  challenge,
+  status,
+  expiresLabel,
+  answer,
+  error,
+  inputRef,
+  cooldownActive,
+  cooldownLabel,
+  onAnswerChange,
+  onSubmit,
+  onNewChallenge,
+}: Readonly<{
+  challenge: ChallengePayload;
+  status: InviteStatus;
+  expiresLabel: string | null;
+  answer: string;
+  error: string | null;
+  inputRef: RefObject<HTMLInputElement | null>;
+  cooldownActive: boolean;
+  cooldownLabel: string | null;
+  onAnswerChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onNewChallenge: () => Promise<void>;
+}>) {
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <p>
+        What is <span className="font-semibold">{challenge.prompt}</span>? Enter
+        the answer to reveal the invite.
+      </p>
+      {expiresLabel ? (
+        <p className="text-xs text-muted-foreground">{expiresLabel}</p>
+      ) : null}
+      <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
+        <span>Your answer</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={answer}
+          onChange={(event) => onAnswerChange(event.target.value)}
+          ref={inputRef}
+          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          required
+          aria-describedby={error ? "discord-invite-error" : undefined}
+        />
+      </label>
+      {error && status === "ready" ? (
+        <p id="discord-invite-error" className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button
+          type="submit"
+          disabled={status === "submitting"}
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {status === "submitting" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : null}
+          Reveal invite
+        </button>
+        <button
+          type="button"
+          onClick={() => void onNewChallenge()}
+          disabled={cooldownActive}
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshIcon size={14} />
+          {cooldownActive && cooldownLabel
+            ? `Wait ${cooldownLabel}`
+            : "New challenge"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function InviteSuccessPanel({
+  inviteUrl,
+  copied,
+  onCopy,
+}: Readonly<{
+  inviteUrl: string;
+  copied: boolean;
+  onCopy: () => Promise<void>;
+}>) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 rounded-2xl border border-primary/40 bg-primary/12 px-4 py-3 text-sm text-foreground shadow-inner">
+        <FilledCheckedIcon size={16} className="text-primary" />
+        <div>
+          <p className="font-semibold">Invite unlocked</p>
+          <p className="text-xs text-muted-foreground">
+            Open the invite in a new tab or copy it for later.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          onClick={() =>
+            window.open(inviteUrl, "_blank", "noopener,noreferrer")
+          }
+          className="inline-flex flex-1 items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90"
+        >
+          Open Discord
+        </button>
+        <button
+          type="button"
+          onClick={() => void onCopy()}
+          className="inline-flex flex-1 items-center justify-center rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted"
+        >
+          {copied ? "Copied!" : "Copy link"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function DiscordInviteButton({
+  className,
+}: Readonly<{ className?: string }>) {
   const issueChallenge = useMutation(api.discord.issueChallenge);
   const redeemChallenge = useMutation(api.discord.redeemChallenge);
 
@@ -167,41 +292,39 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         answer,
       });
 
-      if (result && typeof result === "object") {
-        if ("status" in result) {
-          if (result.status === "success") {
-            setInviteUrl(result.inviteUrl);
-            setStatus("success");
-            setChallenge(null);
-            setAnswer("");
-            setAttemptCount(0);
-            setCooldownUntil(null);
-            return;
-          }
+      if (result && typeof result === "object" && "status" in result) {
+        if (result.status === "success") {
+          setInviteUrl(result.inviteUrl);
+          setStatus("success");
+          setChallenge(null);
+          setAnswer("");
+          setAttemptCount(0);
+          setCooldownUntil(null);
+          return;
+        }
 
-          if (result.status === "retry") {
-            const nextAttempt = attemptCount + 1;
-            setAttemptCount(nextAttempt);
-            const waitSeconds = getCooldownDuration(nextAttempt);
-            const now = Date.now();
-            setCooldownUntil(() => now + waitSeconds * 1000);
-            setNowMs(now);
-            setStatus("error");
-            setInviteUrl(null);
-            setChallenge(null);
-            setAnswer("");
-            setError(
-              `${result.message ?? "Incorrect answer."} Try again in ${formatDuration(waitSeconds * 1000)}.`,
-            );
-            return;
-          }
-
+        if (result.status === "retry") {
+          const nextAttempt = attemptCount + 1;
+          setAttemptCount(nextAttempt);
+          const waitSeconds = getCooldownDuration(nextAttempt);
+          const now = Date.now();
+          setCooldownUntil(() => now + waitSeconds * 1000);
+          setNowMs(now);
           setStatus("error");
           setInviteUrl(null);
           setChallenge(null);
-          setError(result.message);
+          setAnswer("");
+          setError(
+            `${result.message ?? "Incorrect answer."} Try again in ${formatDuration(waitSeconds * 1000)}.`,
+          );
           return;
         }
+
+        setStatus("error");
+        setInviteUrl(null);
+        setChallenge(null);
+        setError(result.message);
+        return;
       }
     } catch (err) {
       const message =
@@ -356,11 +479,11 @@ export function DiscordInviteButton({ className }: { className?: string }) {
         onClick={closeDialog}
       />
       <div className="relative z-[81] flex w-full max-w-xl justify-center">
-        <div
-          role="dialog"
+        <dialog
+          open
           aria-modal="true"
           aria-labelledby="discord-invite-title"
-          className="relative w-full max-w-md transform overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-b from-background via-background/95 to-background shadow-[0_40px_120px_-30px_rgba(15,15,45,0.65)] ring-1 ring-border/40 transition-all duration-200 ease-out"
+          className="relative w-full max-w-md transform bg-transparent text-inherit overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-b from-background via-background/95 to-background shadow-[0_40px_120px_-30px_rgba(15,15,45,0.65)] ring-1 ring-border/40 transition-all duration-200 ease-out"
         >
           <div
             ref={contentRef}
@@ -422,106 +545,32 @@ export function DiscordInviteButton({ className }: { className?: string }) {
 
                 {(status === "ready" || status === "submitting") &&
                 challenge ? (
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <p>
-                      What is{" "}
-                      <span className="font-semibold">{challenge.prompt}</span>?
-                      Enter the answer to reveal the invite.
-                    </p>
-                    {expiresLabel ? (
-                      <p className="text-xs text-muted-foreground">
-                        {expiresLabel}
-                      </p>
-                    ) : null}
-                    <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
-                      <span>Your answer</span>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={answer}
-                        onChange={(event) => setAnswer(event.target.value)}
-                        ref={inputRef}
-                        className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                        required
-                        aria-describedby={
-                          error ? "discord-invite-error" : undefined
-                        }
-                      />
-                    </label>
-                    {error && status === "ready" ? (
-                      <p
-                        id="discord-invite-error"
-                        className="text-xs text-destructive"
-                      >
-                        {error}
-                      </p>
-                    ) : null}
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <button
-                        type="submit"
-                        disabled={status === "submitting"}
-                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {status === "submitting" ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : null}
-                        Reveal invite
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void requestChallenge()}
-                        disabled={cooldownActive}
-                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <RefreshIcon size={14} />
-                        {cooldownActive && cooldownLabel
-                          ? `Wait ${cooldownLabel}`
-                          : "New challenge"}
-                      </button>
-                    </div>
-                  </form>
+                  <ChallengeForm
+                    challenge={challenge}
+                    status={status}
+                    expiresLabel={expiresLabel}
+                    answer={answer}
+                    error={error}
+                    inputRef={inputRef}
+                    cooldownActive={cooldownActive}
+                    cooldownLabel={cooldownLabel}
+                    onAnswerChange={setAnswer}
+                    onSubmit={handleSubmit}
+                    onNewChallenge={requestChallenge}
+                  />
                 ) : null}
 
                 {status === "success" && inviteUrl ? (
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3 rounded-2xl border border-primary/40 bg-primary/12 px-4 py-3 text-sm text-foreground shadow-inner">
-                      <FilledCheckedIcon size={16} className="text-primary" />
-                      <div>
-                        <p className="font-semibold">Invite unlocked</p>
-                        <p className="text-xs text-muted-foreground">
-                          Open the invite in a new tab or copy it for later.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          window.open(
-                            inviteUrl,
-                            "_blank",
-                            "noopener,noreferrer",
-                          )
-                        }
-                        className="inline-flex flex-1 items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition hover:opacity-90"
-                      >
-                        Open Discord
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleCopy()}
-                        className="inline-flex flex-1 items-center justify-center rounded-full border border-border px-4 py-2 text-xs font-semibold text-foreground transition hover:bg-muted"
-                      >
-                        {copied ? "Copied!" : "Copy link"}
-                      </button>
-                    </div>
-                  </div>
+                  <InviteSuccessPanel
+                    inviteUrl={inviteUrl}
+                    copied={copied}
+                    onCopy={handleCopy}
+                  />
                 ) : null}
               </div>
             </div>
           </div>
-        </div>
+        </dialog>
       </div>
     </div>
   );

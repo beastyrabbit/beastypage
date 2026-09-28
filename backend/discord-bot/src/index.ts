@@ -1,4 +1,10 @@
-import { Client, Events, GatewayIntentBits } from "discord.js";
+import {
+  type AutocompleteInteraction,
+  type ChatInputCommandInteraction,
+  Client,
+  Events,
+  GatewayIntentBits,
+} from "discord.js";
 import { config } from "./config.js";
 import { handleCatCommand, handleCatAutocomplete } from "./commands/cat.js";
 import {
@@ -23,32 +29,40 @@ client.once(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
 });
 
+async function handleChatInputCommand(interaction: ChatInputCommandInteraction) {
+  switch (interaction.commandName) {
+    case "gen-discord-kitten":
+    case "cat":
+      await handleCatCommand(interaction);
+      break;
+    case "palette":
+      await handlePaletteCommand(interaction);
+      break;
+    case "config":
+      await handleConfigCommand(interaction);
+      break;
+    case "homepage":
+      await handleHomepageCommand(interaction);
+      break;
+    default:
+      console.warn(`Unknown command: ${interaction.commandName}`);
+  }
+}
+
+async function handleAutocomplete(interaction: AutocompleteInteraction) {
+  if (interaction.commandName === "gen-discord-kitten" || interaction.commandName === "cat") {
+    await handleCatAutocomplete(interaction);
+  } else if (interaction.commandName === "config") {
+    await handleConfigAutocomplete(interaction);
+  }
+}
+
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.isChatInputCommand()) {
-      switch (interaction.commandName) {
-        case "gen-discord-kitten":
-        case "cat":
-          await handleCatCommand(interaction);
-          break;
-        case "palette":
-          await handlePaletteCommand(interaction);
-          break;
-        case "config":
-          await handleConfigCommand(interaction);
-          break;
-        case "homepage":
-          await handleHomepageCommand(interaction);
-          break;
-        default:
-          console.warn(`Unknown command: ${interaction.commandName}`);
-      }
+      await handleChatInputCommand(interaction);
     } else if (interaction.isAutocomplete()) {
-      if (interaction.commandName === "gen-discord-kitten" || interaction.commandName === "cat") {
-        await handleCatAutocomplete(interaction);
-      } else if (interaction.commandName === "config") {
-        await handleConfigAutocomplete(interaction);
-      }
+      await handleAutocomplete(interaction);
     } else if (interaction.isMessageContextMenuCommand()) {
       if (interaction.commandName === "Extract Palette") {
         await handlePaletteContextMenu(interaction);

@@ -7,6 +7,12 @@ const K_FACTOR = 24;
 const MINIMUM_POOL_SIZE = 16;
 const RECENT_VOTE_SAMPLE = 40;
 
+/** Default sort order (UTF-16 code units), independent of locale. */
+function compareCodeUnits(a: string, b: string): number {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
+}
+
 function stableStringify(value: unknown): string {
   if (
     value === null ||
@@ -22,8 +28,11 @@ function stableStringify(value: unknown): string {
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
     // Stored hashes depend on locale-independent UTF-16 key ordering.
-    const keys = Object.keys(record).sort();
-    return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(",")}}`;
+    const keys = Object.keys(record).sort(compareCodeUnits);
+    const entries = keys.map(
+      (key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`,
+    );
+    return `{${entries.join(",")}}`;
   }
   return JSON.stringify(value);
 }
@@ -53,7 +62,7 @@ function pairKey(a: Id<"perfect_cats">, b: Id<"perfect_cats">): string {
   const [first, second] = [
     a as unknown as string,
     b as unknown as string,
-  ].sort();
+  ].sort(compareCodeUnits);
   return `${first}__${second}`;
 }
 

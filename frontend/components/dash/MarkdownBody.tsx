@@ -37,7 +37,7 @@ function inlineMarkdown(text: string): string {
     codeSpans.push(
       `<code class="rounded bg-white/10 px-1 py-0.5 text-[0.85em]">${escapeHtml(code)}</code>`,
     );
-    return `\x00CODE${idx}\x00`;
+    return `\uE000CODE${idx}\uE000`;
   });
 
   // HTML-escape remaining text before applying markdown transformations
@@ -66,10 +66,9 @@ function inlineMarkdown(text: string): string {
     },
   );
 
-  // Restore code spans (uses NUL byte sentinels to mark placeholders)
+  // Restore code spans (uses private-use U+E000 sentinels to mark placeholders)
   out = out.replace(
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: intentional NUL byte sentinels
-    /\x00CODE(\d+)\x00/g,
+    /\uE000CODE(\d+)\uE000/g,
     (_m, idx: string) => codeSpans[Number.parseInt(idx, 10)],
   );
 
@@ -94,119 +93,160 @@ const HEADING_SIZES = [
   "text-xs font-medium",
 ];
 
+// A parsed block: the HTML to emit (null emits nothing) and the next line index.
+interface Block {
+  html: string | null;
+  next: number;
+}
+
+type BlockParser = (lines: string[], i: number) => Block | null;
+
+// Collect consecutive lines from `start` while `test` holds.
+function collectWhile(
+  lines: string[],
+  start: number,
+  test: (line: string) => boolean,
+): { taken: string[]; next: number } {
+  const taken: string[] = [];
+  let i = start;
+  while (i < lines.length && test(lines[i])) {
+    taken.push(lines[i]);
+    i++;
+  }
+  return { taken, next: i };
+}
+
+// Fenced code block
+function parseFencedCode(lines: string[], i: number): Block | null {
+  const line = lines[i];
+  if (!line.startsWith("```")) return null;
+  const lang = line.slice(3).trim();
+  const { taken, next } = collectWhile(
+    lines,
+    i + 1,
+    (l) => !l.startsWith("```"),
+  );
+  const codeLines = taken.map(escapeHtml);
+  // skip closing ``` (guard unclosed blocks)
+  const end = next < lines.length ? next + 1 : next;
+  const safeLang = lang.replaceAll('"', "&quot;");
+  const langAttr = safeLang ? ` data-lang="${safeLang}"` : "";
+  return {
+    html: `<pre class="rounded-lg bg-black/40 p-3 text-xs overflow-x-auto"><code${langAttr}>${codeLines.join("\n")}</code></pre>`,
+    next: end,
+  };
+}
+
+// GitHub-style admonitions: > [!NOTE], > [!WARNING], etc.
+function parseAdmonition(lines: string[], i: number): Block | null {
+  const admonitionMatch = /^>\s*\[!(NOTE|TIP|WARNING|CAUTION|IMPORTANT)\]/.exec(
+    lines[i],
+  );
+  if (!admonitionMatch) return null;
+  const type = admonitionMatch[1].toLowerCase();
+  const { taken, next } = collectWhile(lines, i + 1, (l) => l.startsWith(">"));
+  const bodyLines = taken.map((l) => l.replace(/^>\s?/, ""));
+  return {
+    html: `<div class="border-l-2 ${ADMONITION_COLORS[type] ?? ""} rounded-r px-3 py-2 text-sm my-2"><strong class="capitalize">${type}</strong><br/>${inlineMarkdown(bodyLines.join("<br/>"))}</div>`,
+    next,
+  };
+}
+
+// Blockquote
+function parseBlockquote(lines: string[], i: number): Block | null {
+  if (!lines[i].startsWith("> ")) return null;
+  const { taken, next } = collectWhile(lines, i, (l) => l.startsWith("> "));
+  const quoteLines = taken.map((l) => l.slice(2));
+  return {
+    html: `<blockquote class="border-l-2 border-white/20 pl-3 text-muted-foreground italic my-2">${inlineMarkdown(quoteLines.join("<br/>"))}</blockquote>`,
+    next,
+  };
+}
+
+// Headings
+function parseHeading(lines: string[], i: number): Block | null {
+  const headingMatch = /^(#{1,6})\s+(.+)/.exec(lines[i]);
+  if (!headingMatch) return null;
+  const level = headingMatch[1].length;
+  return {
+    html: `<h${level} class="${HEADING_SIZES[level]} mt-3 mb-1">${inlineMarkdown(headingMatch[2])}</h${level}>`,
+    next: i + 1,
+  };
+}
+
+// Build a list parser for lines whose marker matches `marker`.
+function listParser(marker: RegExp, tag: "ul" | "ol", cls: string) {
+  return (lines: string[], i: number): Block | null => {
+    if (!marker.test(lines[i])) return null;
+    const { taken, next } = collectWhile(lines, i, (l) => marker.test(l));
+    const items = taken.map(
+      (l) => `<li>${inlineMarkdown(l.replace(marker, ""))}</li>`,
+    );
+    return {
+      html: `<${tag} class="${cls}">${items.join("")}</${tag}>`,
+      next,
+    };
+  };
+}
+
+// Unordered list
+const parseUnorderedList = listParser(
+  /^[-*+]\s/,
+  "ul",
+  "list-disc pl-5 space-y-0.5 my-2",
+);
+
+// Ordered list
+const parseOrderedList = listParser(
+  /^\d+\.\s/,
+  "ol",
+  "list-decimal pl-5 space-y-0.5 my-2",
+);
+
+// Horizontal rule
+function parseHorizontalRule(lines: string[], i: number): Block | null {
+  if (!/^---+$/.test(lines[i].trim())) return null;
+  return { html: '<hr class="border-white/10 my-3" />', next: i + 1 };
+}
+
+// Blank line
+function parseBlankLine(lines: string[], i: number): Block | null {
+  if (lines[i].trim() !== "") return null;
+  return { html: null, next: i + 1 };
+}
+
+const BLOCK_PARSERS: BlockParser[] = [
+  parseFencedCode,
+  parseAdmonition,
+  parseBlockquote,
+  parseHeading,
+  parseUnorderedList,
+  parseOrderedList,
+  parseHorizontalRule,
+  parseBlankLine,
+];
+
+function parseBlock(lines: string[], i: number): Block {
+  for (const parser of BLOCK_PARSERS) {
+    const block = parser(lines, i);
+    if (block) return block;
+  }
+  // Paragraph
+  return {
+    html: `<p class="my-1.5">${inlineMarkdown(lines[i])}</p>`,
+    next: i + 1,
+  };
+}
+
 function markdownToHtml(md: string): string {
   const lines = md.split("\n");
   const out: string[] = [];
   let i = 0;
 
   while (i < lines.length) {
-    const line = lines[i];
-
-    // Fenced code block
-    if (line.startsWith("```")) {
-      const lang = line.slice(3).trim();
-      const codeLines: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i].startsWith("```")) {
-        codeLines.push(escapeHtml(lines[i]));
-        i++;
-      }
-      if (i < lines.length) i++; // skip closing ``` (guard unclosed blocks)
-      const safeLang = lang.replace(/"/g, "&quot;");
-      out.push(
-        `<pre class="rounded-lg bg-black/40 p-3 text-xs overflow-x-auto"><code${safeLang ? ` data-lang="${safeLang}"` : ""}>${codeLines.join("\n")}</code></pre>`,
-      );
-      continue;
-    }
-
-    // GitHub-style admonitions: > [!NOTE], > [!WARNING], etc.
-    const admonitionMatch = line.match(
-      /^>\s*\[!(NOTE|TIP|WARNING|CAUTION|IMPORTANT)\]/,
-    );
-    if (admonitionMatch) {
-      const type = admonitionMatch[1].toLowerCase();
-      const bodyLines: string[] = [];
-      i++;
-      while (i < lines.length && lines[i].startsWith(">")) {
-        bodyLines.push(lines[i].replace(/^>\s?/, ""));
-        i++;
-      }
-      out.push(
-        `<div class="border-l-2 ${ADMONITION_COLORS[type] ?? ""} rounded-r px-3 py-2 text-sm my-2"><strong class="capitalize">${type}</strong><br/>${inlineMarkdown(bodyLines.join("<br/>"))}</div>`,
-      );
-      continue;
-    }
-
-    // Blockquote
-    if (line.startsWith("> ")) {
-      const quoteLines: string[] = [];
-      while (i < lines.length && lines[i].startsWith("> ")) {
-        quoteLines.push(lines[i].slice(2));
-        i++;
-      }
-      out.push(
-        `<blockquote class="border-l-2 border-white/20 pl-3 text-muted-foreground italic my-2">${inlineMarkdown(quoteLines.join("<br/>"))}</blockquote>`,
-      );
-      continue;
-    }
-
-    // Headings
-    const headingMatch = line.match(/^(#{1,6})\s+(.+)/);
-    if (headingMatch) {
-      const level = headingMatch[1].length;
-      out.push(
-        `<h${level} class="${HEADING_SIZES[level]} mt-3 mb-1">${inlineMarkdown(headingMatch[2])}</h${level}>`,
-      );
-      i++;
-      continue;
-    }
-
-    // Unordered list
-    if (/^[-*+]\s/.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && /^[-*+]\s/.test(lines[i])) {
-        items.push(
-          `<li>${inlineMarkdown(lines[i].replace(/^[-*+]\s/, ""))}</li>`,
-        );
-        i++;
-      }
-      out.push(
-        `<ul class="list-disc pl-5 space-y-0.5 my-2">${items.join("")}</ul>`,
-      );
-      continue;
-    }
-
-    // Ordered list
-    if (/^\d+\.\s/.test(line)) {
-      const items: string[] = [];
-      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
-        items.push(
-          `<li>${inlineMarkdown(lines[i].replace(/^\d+\.\s/, ""))}</li>`,
-        );
-        i++;
-      }
-      out.push(
-        `<ol class="list-decimal pl-5 space-y-0.5 my-2">${items.join("")}</ol>`,
-      );
-      continue;
-    }
-
-    // Horizontal rule
-    if (/^---+$/.test(line.trim())) {
-      out.push('<hr class="border-white/10 my-3" />');
-      i++;
-      continue;
-    }
-
-    // Blank line
-    if (line.trim() === "") {
-      i++;
-      continue;
-    }
-
-    // Paragraph
-    out.push(`<p class="my-1.5">${inlineMarkdown(line)}</p>`);
-    i++;
+    const block = parseBlock(lines, i);
+    if (block.html !== null) out.push(block.html);
+    i = block.next;
   }
 
   return out.join("\n");

@@ -235,14 +235,14 @@ function AccessoryMatrix({
   entries,
   images,
   loading,
-}: {
+}: Readonly<{
   section: SectionId;
   title: string;
   description: string;
   entries: readonly ExampleEntry[];
   images: Record<string, string>;
   loading: boolean;
-}) {
+}>) {
   return (
     <section className={styles.matrixSection}>
       <div className={styles.sectionHeading}>

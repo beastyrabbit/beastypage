@@ -45,7 +45,7 @@ function cloneValue<T>(value: T): T {
 function cleanString(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
+  return trimmed || undefined;
 }
 
 function firstNumber(...values: unknown[]): number | undefined {
@@ -88,14 +88,16 @@ function getRawParams(root: Record<string, unknown>): Record<string, unknown> {
   return root;
 }
 
+function getRawSlots(root: Record<string, unknown>): Record<string, unknown> {
+  if (isRecord(root.traitSlots)) return root.traitSlots;
+  if (isRecord(root.slots)) return root.slots;
+  return {};
+}
+
 function getInputSlots(
   root: Record<string, unknown>,
 ): Record<string, unknown[]> {
-  const rawSlots = isRecord(root.traitSlots)
-    ? root.traitSlots
-    : isRecord(root.slots)
-      ? root.slots
-      : {};
+  const rawSlots = getRawSlots(root);
   const result: Record<string, unknown[]> = {};
   for (const [traitId, value] of Object.entries(rawSlots)) {
     if (Array.isArray(value)) result[traitId] = cloneValue(value);
@@ -202,6 +204,40 @@ export function catDocumentToViewParams(
   };
 }
 
+function getLegacyParamSource(
+  root: Record<string, unknown>,
+  rawParams: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...rawParams,
+    ...(rawParams.poseName === undefined && root.poseName !== undefined
+      ? { poseName: root.poseName }
+      : {}),
+    ...(rawParams.spriteNumber === undefined && root.spriteNumber !== undefined
+      ? { spriteNumber: root.spriteNumber }
+      : {}),
+  };
+}
+
+function getExplicitDocument(
+  root: Record<string, unknown>,
+  rawParams: Record<string, unknown>,
+): Record<string, unknown> | null {
+  if (isRecord(root.document)) return root.document;
+  if (isRecord(rawParams.document)) return rawParams.document;
+  return null;
+}
+
+function getLegacyDocumentInput(
+  root: Record<string, unknown>,
+  rawParams: Record<string, unknown>,
+  legacySource: Record<string, unknown>,
+): Record<string, unknown> {
+  if (isRecord(legacySource.traits)) return legacySource;
+  if (rawParams === root) return legacySource;
+  return { ...root, params: legacySource };
+}
+
 /**
  * Tolerant boundary for saved cats. Legacy wrappers and slot projections are
  * accepted once, then every consumer receives the same canonical document.
@@ -214,28 +250,15 @@ export function normalizeCatViewPayload(
   const rawParams = getRawParams(root);
   const inputSlots = getInputSlots(root);
   const legacySource = mergeLegacySlots(
-    {
-      ...rawParams,
-      ...(rawParams.poseName === undefined && root.poseName !== undefined
-        ? { poseName: root.poseName }
-        : {}),
-      ...(rawParams.spriteNumber === undefined &&
-      root.spriteNumber !== undefined
-        ? { spriteNumber: root.spriteNumber }
-        : {}),
-    },
+    getLegacyParamSource(root, rawParams),
     inputSlots,
   );
-  const explicitDocument = isRecord(root.document)
-    ? root.document
-    : isRecord(rawParams.document)
-      ? rawParams.document
-      : null;
-  const legacyDocumentInput = isRecord(legacySource.traits)
-    ? legacySource
-    : rawParams === root
-      ? legacySource
-      : { ...root, params: legacySource };
+  const explicitDocument = getExplicitDocument(root, rawParams);
+  const legacyDocumentInput = getLegacyDocumentInput(
+    root,
+    rawParams,
+    legacySource,
+  );
   const document = mergeCanonicalSlots(
     readCatDocument(explicitDocument ?? legacyDocumentInput),
     inputSlots,
@@ -402,13 +425,20 @@ export function formatCatDisplayRows(
   });
 }
 
+function readDisplayDocument(input: unknown): CatDocument {
+  if (
+    isRecord(input) &&
+    !("document" in input) &&
+    "schemaVersion" in input &&
+    "traits" in input
+  ) {
+    return readCatDocument(input);
+  }
+  return normalizeCatViewPayload(input).document;
+}
+
 export function getCatViewDisplayRows(input: unknown): CatTraitDisplayRow[] {
-  const document =
-    isRecord(input) && "document" in input
-      ? normalizeCatViewPayload(input).document
-      : isRecord(input) && "schemaVersion" in input && "traits" in input
-        ? readCatDocument(input)
-        : normalizeCatViewPayload(input).document;
+  const document = readDisplayDocument(input);
   return formatCatDisplayRows(
     getDisplayRows(document.traits as Record<string, unknown>),
   );

@@ -205,7 +205,7 @@ function slotOverrides(
   overrides: DiscordCatOverrides,
   options: RandomGenerationOptions,
 ): GachaSlotOverrides | undefined {
-  const result: GachaSlotOverrides = { ...(options.slotOverrides ?? {}) };
+  const result: GachaSlotOverrides = { ...options.slotOverrides };
   if (overrides.accessories !== undefined) {
     result.accessories = overrides.accessories;
   }

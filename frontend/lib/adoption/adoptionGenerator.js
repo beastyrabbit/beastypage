@@ -42,6 +42,12 @@ const CONFIG = {
 
 const AFTERLIFE_DEFAULT = "both10";
 
+function mapFirstArray(primary, fallback, mapValue) {
+  if (Array.isArray(primary)) return primary.map((value) => mapValue(value));
+  if (Array.isArray(fallback)) return fallback.map((value) => mapValue(value));
+  return [];
+}
+
 export class AdoptionGenerator {
   constructor(options = {}) {
     this.options = options || {};
@@ -151,6 +157,9 @@ export class AdoptionGenerator {
     this.spriteGalleryPreviews = [];
 
     this.setupEventListeners();
+  }
+
+  start() {
     this.init().catch((err) => {
       console.error("Failed to initialize adoption generator", err);
       this.stageStatusEl.textContent =
@@ -714,10 +723,10 @@ export class AdoptionGenerator {
       dead: params.dead,
       darkForest: false,
       isTortie: false,
-      accessorySlots: Array(accessoryCount).fill("none"),
-      scarSlots: Array(scarCount).fill("none"),
-      tortieLayers: Array(tortieCount).fill(null),
-      tortieRevealed: Array(tortieCount)
+      accessorySlots: new Array(accessoryCount).fill("none"),
+      scarSlots: new Array(scarCount).fill("none"),
+      tortieLayers: new Array(tortieCount).fill(null),
+      tortieRevealed: new Array(tortieCount)
         .fill(null)
         .map(() => ({ mask: false, pattern: false, colour: false })),
     };
@@ -916,7 +925,7 @@ export class AdoptionGenerator {
     const layer = plan.tortieSlots[stage.layerIndex];
     if (!layer) {
       plan.state.tortieLayers[stage.layerIndex] = null;
-      plan.state.isTortie = plan.state.tortieLayers.some((l) => l);
+      plan.state.isTortie = plan.state.tortieLayers.some(Boolean);
       await this.drawCat(plan.state, plan.canvas);
       plan.valueEl.textContent = `${stage.label}: None`;
       return;
@@ -966,26 +975,13 @@ export class AdoptionGenerator {
     }
 
     plan.state.tortieLayers[stage.layerIndex] = { ...layer };
-    plan.state.isTortie = plan.state.tortieLayers.some((l) => l);
+    plan.state.isTortie = plan.state.tortieLayers.some(Boolean);
     await this.drawCat(plan.state, plan.canvas);
     plan.valueEl.textContent = this.describeTortieLayer(stage, layer);
   }
 
-  async animateTortieSubElement(plan, stage) {
-    const { layerIndex, subElement } = stage;
-    const layer = plan.tortieSlots[layerIndex];
-
-    if (!layer) {
-      plan.state.tortieLayers[layerIndex] = null;
-      plan.state.isTortie = plan.state.tortieLayers.some((l) => l);
-      await this.drawCat(plan.state, plan.canvas);
-      plan.valueEl.textContent = `Tortie Layer ${layerIndex + 1}: None`;
-      return;
-    }
-
-    const revealed = plan.state.tortieRevealed[layerIndex];
-
-    // Get or initialize placeholder values for this layer
+  // Get or initialize placeholder values for this layer
+  getTortiePlaceholders(plan, layerIndex, layer) {
     if (!plan.tortiePlaceholders) {
       plan.tortiePlaceholders = {};
     }
@@ -998,20 +994,43 @@ export class AdoptionGenerator {
         colour: "WHITE",
       };
     }
-    const placeholders = plan.tortiePlaceholders[layerIndex];
+    return plan.tortiePlaceholders[layerIndex];
+  }
 
-    // Build current layer state with revealed values + placeholders for unrevealed
-    const currentLayer = {
-      mask: revealed.mask
-        ? plan.state.tortieLayers[layerIndex]?.mask || layer.mask
-        : placeholders.mask,
+  // Build current layer state with revealed values + placeholders for unrevealed
+  buildCurrentTortieLayer(stateLayer, layer, revealed, placeholders) {
+    return {
+      mask: revealed.mask ? stateLayer?.mask || layer.mask : placeholders.mask,
       pattern: revealed.pattern
-        ? plan.state.tortieLayers[layerIndex]?.pattern || layer.pattern
+        ? stateLayer?.pattern || layer.pattern
         : placeholders.pattern,
       colour: revealed.colour
-        ? plan.state.tortieLayers[layerIndex]?.colour || layer.colour
+        ? stateLayer?.colour || layer.colour
         : placeholders.colour,
     };
+  }
+
+  async animateTortieSubElement(plan, stage) {
+    const { layerIndex, subElement } = stage;
+    const layer = plan.tortieSlots[layerIndex];
+
+    if (!layer) {
+      plan.state.tortieLayers[layerIndex] = null;
+      plan.state.isTortie = plan.state.tortieLayers.some(Boolean);
+      await this.drawCat(plan.state, plan.canvas);
+      plan.valueEl.textContent = `Tortie Layer ${layerIndex + 1}: None`;
+      return;
+    }
+
+    const revealed = plan.state.tortieRevealed[layerIndex];
+
+    const placeholders = this.getTortiePlaceholders(plan, layerIndex, layer);
+    const currentLayer = this.buildCurrentTortieLayer(
+      plan.state.tortieLayers[layerIndex],
+      layer,
+      revealed,
+      placeholders,
+    );
 
     const paramMap = {
       mask: "tortieMask",
@@ -1185,10 +1204,10 @@ export class AdoptionGenerator {
       const j = Math.floor(Math.random() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
-    if (arr[arr.length - 1] !== finalValue) {
+    if (arr.at(-1) !== finalValue) {
       const idx = arr.indexOf(finalValue);
       if (idx !== -1) {
-        [arr[idx], arr[arr.length - 1]] = [arr[arr.length - 1], arr[idx]];
+        [arr[idx], arr[arr.length - 1]] = [arr.at(-1), arr[idx]];
       } else {
         arr[arr.length - 1] = finalValue;
       }
@@ -1266,23 +1285,23 @@ export class AdoptionGenerator {
       ? { ...preparedParams }
       : this.buildRenderParams(plan.state);
 
-    const accessorySlots = Array.isArray(plan?.state?.accessorySlots)
-      ? plan.state.accessorySlots.map((value) => value || "none")
-      : Array.isArray(plan?.accessorySlots)
-        ? plan.accessorySlots.map((value) => value || "none")
-        : [];
+    const accessorySlots = mapFirstArray(
+      plan?.state?.accessorySlots,
+      plan?.accessorySlots,
+      (value) => value || "none",
+    );
 
-    const scarSlots = Array.isArray(plan?.state?.scarSlots)
-      ? plan.state.scarSlots.map((value) => value || "none")
-      : Array.isArray(plan?.scarSlots)
-        ? plan.scarSlots.map((value) => value || "none")
-        : [];
+    const scarSlots = mapFirstArray(
+      plan?.state?.scarSlots,
+      plan?.scarSlots,
+      (value) => value || "none",
+    );
 
-    const tortieSlots = Array.isArray(plan?.state?.tortieLayers)
-      ? plan.state.tortieLayers.map((layer) => (layer ? { ...layer } : null))
-      : Array.isArray(plan?.tortieSlots)
-        ? plan.tortieSlots.map((layer) => (layer ? { ...layer } : null))
-        : [];
+    const tortieSlots = mapFirstArray(
+      plan?.state?.tortieLayers,
+      plan?.tortieSlots,
+      (layer) => (layer ? { ...layer } : null),
+    );
 
     const counts = {
       accessories: accessorySlots.length,
@@ -1411,16 +1430,17 @@ export class AdoptionGenerator {
     };
   }
 
-  getColourOptions(mode = this.getExperimentalModeValue(), includeBase) {
+  getColourOptions(
+    mode = this.getExperimentalModeValue(),
+    includeBase = this.includeBaseColours,
+  ) {
     const experimental =
       typeof spriteMapper.getExperimentalColoursByMode === "function"
         ? spriteMapper.getExperimentalColoursByMode(mode) || []
         : [];
-    // Use includeBase parameter if provided, otherwise fall back to this.includeBaseColours
-    const shouldIncludeBase =
-      includeBase !== undefined ? includeBase : this.includeBaseColours;
+    // includeBase falls back to this.includeBaseColours when not provided
     const base =
-      shouldIncludeBase && typeof spriteMapper.getColours === "function"
+      includeBase && typeof spriteMapper.getColours === "function"
         ? spriteMapper.getColours()
         : [];
     const combined = new Set();
@@ -2097,7 +2117,7 @@ export class AdoptionGenerator {
 
   async copyCanvasToClipboard(canvas, size = null) {
     if (!canvas) throw new Error("Canvas missing");
-    if (!navigator.clipboard || typeof window.ClipboardItem === "undefined") {
+    if (!navigator.clipboard || !("ClipboardItem" in window)) {
       throw new Error("Clipboard API unavailable");
     }
 
@@ -2152,7 +2172,7 @@ export class AdoptionGenerator {
 
   formatValue(value) {
     if (!value || value === "none") return "None";
-    let text = value.toString().replace(/_/g, " ");
+    let text = value.toString().replaceAll("_", " ");
     let prefixEnd = 0;
     while (
       prefixEnd < text.length &&
@@ -2183,6 +2203,8 @@ export class AdoptionGenerator {
 }
 
 export function createAdoptionGenerator(options = {}) {
-  return new AdoptionGenerator(options);
+  const generator = new AdoptionGenerator(options);
+  generator.start();
+  return generator;
 }
 export default AdoptionGenerator;

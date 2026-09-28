@@ -21,7 +21,9 @@ function resolveRendererBase(baseUrl?: string): string {
 }
 
 function stripTrailingSlash(input: string): string {
-  return input.replace(/\/+$/, "");
+  let end = input.length;
+  while (end > 0 && input[end - 1] === "/") end -= 1;
+  return input.slice(0, end);
 }
 
 function buildRendererUrl(base: string, pathname: string): string {
@@ -182,7 +184,8 @@ export async function decodeImageFromDataUrl(
       resolve(canvas);
     };
     image.onerror = (event) => {
-      reject(new Error(`Failed to load image: ${event}`));
+      const reason = typeof event === "string" ? event : event.type;
+      reject(new Error(`Failed to load image: ${reason}`));
     };
     image.src = dataUrl;
   });

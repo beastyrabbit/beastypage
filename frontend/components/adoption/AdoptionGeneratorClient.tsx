@@ -129,9 +129,9 @@ export function AdoptionGeneratorClient() {
     let cancelled = false;
 
     (async () => {
-      const [{ createAdoptionGenerator }] = await Promise.all([
-        import("@/lib/adoption/adoptionGenerator"),
-      ]);
+      const { createAdoptionGenerator } = await import(
+        "@/lib/adoption/adoptionGenerator"
+      );
       if (cancelled) return;
 
       createAdoptionGenerator({
@@ -205,7 +205,7 @@ export function AdoptionGeneratorClient() {
 
             const currentMeta = savedMetadataRef.current;
             const settingsPayload = {
-              ...(payload.settings ?? {}),
+              ...payload.settings,
               totalFinalCats: payload.totalFinalCats ?? payload.cats.length,
               generatedAt: payload.createdAt ?? Date.now(),
               source: "adoption-generator",

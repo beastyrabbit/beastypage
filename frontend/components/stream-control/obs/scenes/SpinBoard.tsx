@@ -52,6 +52,89 @@ const flapChars = `${Presets.ALPHANUM} .-()_/•–:`;
 // sub-params). Those have their own bottom panel.
 const boardSlots = PARAM_SEQUENCE.filter((def) => !LAYER_PARAM_IDS.has(def.id));
 
+const LAYER_ROW_BORDER_COLOR: Record<LayerRowState["status"], string> = {
+  active: "#f59e0b",
+  revealed: "#3f3f46",
+  idle: "rgba(113,113,122,0.3)",
+};
+
+const LAYER_ROW_LABEL_CLASS: Record<LayerRowState["status"], string> = {
+  active: "font-semibold text-amber-400",
+  revealed: "text-zinc-300",
+  idle: "text-zinc-600",
+};
+
+const LAYER_ROW_VALUE_CLASS: Record<LayerRowState["status"], string> = {
+  active: "text-white",
+  revealed: "text-white",
+  idle: "text-zinc-600",
+};
+
+function boardRowBorderLeft(isActive: boolean, isPending: boolean): string {
+  if (isActive) return "3px solid #f59e0b";
+  if (isPending) return "3px solid rgba(113,113,122,0.3)";
+  return "3px solid transparent";
+}
+
+function boardRowLabelClass(isActive: boolean, isPending: boolean): string {
+  if (isActive) return "text-amber-400";
+  if (isPending) return "text-zinc-600";
+  return "text-zinc-400";
+}
+
+function RollerStatus({
+  rollerLabel,
+  rollerActiveValue,
+  spinDone,
+}: Readonly<{
+  rollerLabel: string | null;
+  rollerActiveValue: string | null;
+  spinDone: boolean;
+}>) {
+  if (rollerLabel) {
+    return (
+      <>
+        <div className="flex items-center gap-2.5">
+          <div
+            className="size-2 rounded-full bg-amber-500"
+            style={{ animation: "obs-dot-pulse 1s ease-in-out infinite" }}
+          />
+          <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-500/60">
+            {rollerLabel}
+          </span>
+        </div>
+        {rollerActiveValue && (
+          <div className="mt-2 truncate font-mono text-3xl font-bold text-white">
+            {rollerActiveValue}
+          </div>
+        )}
+      </>
+    );
+  }
+  if (spinDone) {
+    return (
+      <div className="flex items-center gap-2.5">
+        <span
+          className="text-lg font-black uppercase tracking-[0.3em]"
+          style={{
+            color: "#f59e0b",
+            textShadow:
+              "0 0 12px rgba(245,158,11,0.5), 0 0 24px rgba(245,158,11,0.25)",
+            animation: "obs-done-pulse 2s ease-in-out infinite",
+          }}
+        >
+          Done
+        </span>
+      </div>
+    );
+  }
+  return (
+    <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
+      Ready
+    </span>
+  );
+}
+
 /**
  * The spin result board — fixed-position overlay where nothing moves:
  * cat canvas top-left, roller + param board right column, layer details
@@ -316,22 +399,13 @@ export function SpinBoard({
                           isFlashing && "obs-row-flash",
                         )}
                         style={{
-                          borderColor:
-                            row.status === "active"
-                              ? "#f59e0b"
-                              : row.status === "revealed"
-                                ? "#3f3f46"
-                                : "rgba(113,113,122,0.3)",
+                          borderColor: LAYER_ROW_BORDER_COLOR[row.status],
                         }}
                       >
                         <span
                           className={cn(
                             "w-[80px] shrink-0 text-sm",
-                            row.status === "active"
-                              ? "font-semibold text-amber-400"
-                              : row.status === "revealed"
-                                ? "text-zinc-300"
-                                : "text-zinc-600",
+                            LAYER_ROW_LABEL_CLASS[row.status],
                           )}
                         >
                           {row.label}
@@ -339,11 +413,7 @@ export function SpinBoard({
                         <span
                           className={cn(
                             "truncate font-mono text-sm font-bold",
-                            row.status === "active"
-                              ? "text-white"
-                              : row.status === "revealed"
-                                ? "text-white"
-                                : "text-zinc-600",
+                            LAYER_ROW_VALUE_CLASS[row.status],
                           )}
                         >
                           {row.value}
@@ -379,42 +449,11 @@ export function SpinBoard({
             padding: "20px 28px",
           }}
         >
-          {rollerLabel ? (
-            <>
-              <div className="flex items-center gap-2.5">
-                <div
-                  className="size-2 rounded-full bg-amber-500"
-                  style={{ animation: "obs-dot-pulse 1s ease-in-out infinite" }}
-                />
-                <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-500/60">
-                  {rollerLabel}
-                </span>
-              </div>
-              {rollerActiveValue && (
-                <div className="mt-2 truncate font-mono text-3xl font-bold text-white">
-                  {rollerActiveValue}
-                </div>
-              )}
-            </>
-          ) : spinDone ? (
-            <div className="flex items-center gap-2.5">
-              <span
-                className="text-lg font-black uppercase tracking-[0.3em]"
-                style={{
-                  color: "#f59e0b",
-                  textShadow:
-                    "0 0 12px rgba(245,158,11,0.5), 0 0 24px rgba(245,158,11,0.25)",
-                  animation: "obs-done-pulse 2s ease-in-out infinite",
-                }}
-              >
-                Done
-              </span>
-            </div>
-          ) : (
-            <span className="text-xs uppercase tracking-[0.3em] text-zinc-700">
-              Ready
-            </span>
-          )}
+          <RollerStatus
+            rollerLabel={rollerLabel}
+            rollerActiveValue={rollerActiveValue}
+            spinDone={spinDone}
+          />
         </div>
 
         {/* Param board — all slots, always visible */}
@@ -463,11 +502,7 @@ export function SpinBoard({
                 )}
                 style={{
                   padding: "8px 24px",
-                  borderLeft: isActive
-                    ? "3px solid #f59e0b"
-                    : isPending
-                      ? "3px solid rgba(113,113,122,0.3)"
-                      : "3px solid transparent",
+                  borderLeft: boardRowBorderLeft(isActive, isPending),
                   background: isActive
                     ? "rgba(245,158,11,0.05)"
                     : "transparent",
@@ -476,11 +511,7 @@ export function SpinBoard({
                 <span
                   className={cn(
                     "w-[130px] shrink-0 text-sm font-bold uppercase tracking-wide",
-                    isActive
-                      ? "text-amber-400"
-                      : isPending
-                        ? "text-zinc-600"
-                        : "text-zinc-400",
+                    boardRowLabelClass(isActive, isPending),
                   )}
                 >
                   {def.label}

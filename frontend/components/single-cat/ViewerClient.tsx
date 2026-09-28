@@ -96,7 +96,17 @@ function buildVisualBuilderUrl(
   }
 }
 
-export function ViewerClient({ slug, encoded }: ViewerClientProps) {
+function pluralize(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function getSpriteVariantsSubtitle(loading: boolean, count: number): string {
+  if (loading) return "Rendering preview sprites…";
+  if (count > 0) return `${pluralize(count, "sprite")} available`;
+  return "Sprite previews unavailable";
+}
+
+export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const router = useRouter();
@@ -481,11 +491,10 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
     return getCatViewDisplayRows(catPayload);
   }, [catPayload]);
 
-  const spriteVariantsSubtitle = spriteVariantsLoading
-    ? "Rendering preview sprites…"
-    : spriteVariants.length > 0
-      ? `${spriteVariants.length} sprite${spriteVariants.length === 1 ? "" : "s"} available`
-      : "Sprite previews unavailable";
+  const spriteVariantsSubtitle = getSpriteVariantsSubtitle(
+    spriteVariantsLoading,
+    spriteVariants.length,
+  );
 
   const showLoader = !!loadingMessage || (slug && mapperRecord === undefined);
   const showCanvas = !showLoader && !error && !!catPayload;
@@ -736,7 +745,7 @@ export function ViewerClient({ slug, encoded }: ViewerClientProps) {
                       </h2>
                       <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
                         {traitRows.length > 0
-                          ? `${traitRows.length} trait${traitRows.length !== 1 ? "s" : ""}`
+                          ? pluralize(traitRows.length, "trait")
                           : "No traits available"}
                       </p>
                     </div>

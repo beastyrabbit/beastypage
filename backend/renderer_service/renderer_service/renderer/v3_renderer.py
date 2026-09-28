@@ -122,6 +122,44 @@ def _deduplicate(items: list[str]) -> list[str]:
     return result
 
 
+def _parse_tint_values(values):
+    colour = np.array([values[0], values[1], values[2]], dtype=np.float32) / 255.0
+    if len(values) >= 4:
+        raw_alpha = values[3]
+        blend_alpha = raw_alpha / 255.0 if raw_alpha > 1 else raw_alpha
+    else:
+        blend_alpha = 1.0
+    blend_alpha = np.clip(blend_alpha, 0.0, 1.0)
+    return colour, blend_alpha
+
+
+def _blend_rgb(rgb, colour, blend_alpha, mode):
+    if mode == "multiply":
+        blend_rgb = rgb * colour
+    elif mode == "screen":
+        blend_rgb = 1.0 - (1.0 - rgb) * (1.0 - colour)
+    elif mode == "overlay":
+        blend_rgb = np.where(
+            rgb <= 0.5,
+            2.0 * rgb * colour,
+            1.0 - 2.0 * (1.0 - rgb) * (1.0 - colour),
+        )
+    else:
+        blend_rgb = rgb
+    return (1.0 - blend_alpha) * rgb + blend_alpha * blend_rgb
+
+
+def _collect_scars(params: dict) -> list[str]:
+    scars_raw: list[str] = []
+    if isinstance(params.get("scars"), list):
+        scars_raw.extend(str(s) for s in params["scars"] if not _is_empty_value(s))
+    if isinstance(params.get("scarSlots"), list):
+        scars_raw.extend(str(s) for s in params["scarSlots"] if not _is_empty_value(s))
+    if not _is_empty_value(params.get("scar")):
+        scars_raw.append(str(params.get("scar")))
+    return _deduplicate(scars_raw)
+
+
 class CatRendererV3:
     def __init__(self, repository: SpriteRepository, mapper: SpriteMapper) -> None:
         self.repo = repository
@@ -322,33 +360,6 @@ class CatRendererV3:
         rgb = arr[..., :3]
         alpha = arr[..., 3:4]
 
-        def parse(values):
-            colour = (
-                np.array([values[0], values[1], values[2]], dtype=np.float32) / 255.0
-            )
-            if len(values) >= 4:
-                raw_alpha = values[3]
-                blend_alpha = raw_alpha / 255.0 if raw_alpha > 1 else raw_alpha
-            else:
-                blend_alpha = 1.0
-            blend_alpha = np.clip(blend_alpha, 0.0, 1.0)
-            return colour, blend_alpha
-
-        def blend(rgb, colour, blend_alpha, mode):
-            if mode == "multiply":
-                blend_rgb = rgb * colour
-            elif mode == "screen":
-                blend_rgb = 1.0 - (1.0 - rgb) * (1.0 - colour)
-            elif mode == "overlay":
-                blend_rgb = np.where(
-                    rgb <= 0.5,
-                    2.0 * rgb * colour,
-                    1.0 - 2.0 * (1.0 - rgb) * (1.0 - colour),
-                )
-            else:
-                blend_rgb = rgb
-            return (1.0 - blend_alpha) * rgb + blend_alpha * blend_rgb
-
         if definition.pattern:
             try:
                 h, w = rgb.shape[:2]
@@ -361,15 +372,15 @@ class CatRendererV3:
                     definition.pattern,
                 )
         elif definition.multiply:
-            colour, blend_alpha = parse(definition.multiply)
-            rgb = blend(rgb, colour, blend_alpha, "multiply")
+            colour, blend_alpha = _parse_tint_values(definition.multiply)
+            rgb = _blend_rgb(rgb, colour, blend_alpha, "multiply")
 
         if definition.screen:
-            colour, blend_alpha = parse(definition.screen)
-            rgb = blend(rgb, colour, blend_alpha, "screen")
+            colour, blend_alpha = _parse_tint_values(definition.screen)
+            rgb = _blend_rgb(rgb, colour, blend_alpha, "screen")
         if definition.overlay:
-            colour, blend_alpha = parse(definition.overlay)
-            rgb = blend(rgb, colour, blend_alpha, "overlay")
+            colour, blend_alpha = _parse_tint_values(definition.overlay)
+            rgb = _blend_rgb(rgb, colour, blend_alpha, "overlay")
 
         rgb = np.clip(rgb, 0.0, 1.0)
         arr[..., :3] = rgb
@@ -506,7 +517,7 @@ class CatRendererV3:
         overlay = fill_with_colour(canvas.size, (120, 30, 30, 200), canvas)
         return overlay, ["darkForest"], "multiply", LayerIdentifier.tint
 
-    def _stage_lineart(self, params: dict, canvas: Image.Image):
+    def _stage_lineart(self, params: dict, _canvas: Image.Image):
         if params.get("dead"):
             sprite_name = "lineartdead"
         elif params.get("darkForest") or params.get("darkMode"):
@@ -528,17 +539,8 @@ class CatRendererV3:
         overlay = self._get_sprite(sprite_name, params)
         return overlay, [f"skin:{skin}"], "alpha", LayerIdentifier.skin
 
-    def _stage_scar_primary(self, params: dict, canvas: Image.Image):
-        scars_raw: list[str] = []
-        if isinstance(params.get("scars"), list):
-            scars_raw.extend(str(s) for s in params["scars"] if not _is_empty_value(s))
-        if isinstance(params.get("scarSlots"), list):
-            scars_raw.extend(
-                str(s) for s in params["scarSlots"] if not _is_empty_value(s)
-            )
-        if not _is_empty_value(params.get("scar")):
-            scars_raw.append(str(params.get("scar")))
-        scars = _deduplicate(scars_raw)
+    def _stage_scar_primary(self, params: dict, _canvas: Image.Image):
+        scars = _collect_scars(params)
         if not scars:
             return None, [], "alpha", LayerIdentifier.scars_primary
         overlay = self.repo.blank_canvas()
@@ -547,37 +549,31 @@ class CatRendererV3:
             normalized = _normalize_scar(scar)
             if normalized not in SCARS_PRIMARY:
                 continue
-            candidates = [
-                self.mapper.build_sprite_name("scars", normalized, None),
-                self.mapper.build_sprite_name("scar", normalized, None),
-                f"scars{normalized}",
-                f"scar{normalized}",
-            ]
-            sprite = None
-            for candidate in candidates:
-                if candidate and self.repo.has_sprite(candidate):
-                    sprite = self._get_sprite(candidate, params)
-                    diagnostics.append(candidate)
-                    break
-            if sprite is None:
+            candidate = self._resolve_scar_sprite(normalized)
+            if candidate is None:
                 diagnostics.append(f"missing:{scar}")
                 continue
+            sprite = self._get_sprite(candidate, params)
+            diagnostics.append(candidate)
             overlay = alpha_over(overlay, sprite)
         if not diagnostics:
             return None, [], "alpha", LayerIdentifier.scars_primary
         return overlay, diagnostics, "alpha", LayerIdentifier.scars_primary
 
+    def _resolve_scar_sprite(self, normalized: str) -> str | None:
+        candidates = [
+            self.mapper.build_sprite_name("scars", normalized, None),
+            self.mapper.build_sprite_name("scar", normalized, None),
+            f"scars{normalized}",
+            f"scar{normalized}",
+        ]
+        for candidate in candidates:
+            if candidate and self.repo.has_sprite(candidate):
+                return candidate
+        return None
+
     def _stage_scar_secondary(self, params: dict, canvas: Image.Image):
-        scars_raw: list[str] = []
-        if isinstance(params.get("scars"), list):
-            scars_raw.extend(str(s) for s in params["scars"] if not _is_empty_value(s))
-        if isinstance(params.get("scarSlots"), list):
-            scars_raw.extend(
-                str(s) for s in params["scarSlots"] if not _is_empty_value(s)
-            )
-        if not _is_empty_value(params.get("scar")):
-            scars_raw.append(str(params.get("scar")))
-        scars = _deduplicate(scars_raw)
+        scars = _collect_scars(params)
         if not scars:
             return None, [], "alpha", LayerIdentifier.scars_secondary
 

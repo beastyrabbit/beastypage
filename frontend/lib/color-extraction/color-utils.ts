@@ -188,7 +188,7 @@ export function rgbToOklch(rgb: RGB): OKLCH {
   const bVal = 0.0259040371 * l1 + 0.7827717662 * m1 - 0.808675766 * s1;
 
   // OKLAB to OKLCH
-  const C = Math.sqrt(a * a + bVal * bVal);
+  const C = Math.hypot(a, bVal);
   // Hue is undefined for achromatic colors; default to 0
   let H = C < 0.002 ? 0 : (Math.atan2(bVal, a) * 180) / Math.PI;
   if (H < 0) H += 360;

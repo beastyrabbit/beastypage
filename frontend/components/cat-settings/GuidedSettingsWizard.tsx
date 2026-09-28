@@ -167,11 +167,11 @@ export function GuidedSettingsWizard({
               onClick={() => goToStep(i)}
               className={cn(
                 "flex size-8 items-center justify-center rounded-full text-xs font-semibold transition",
-                i === activeStepIndex
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : i < activeStepIndex
-                    ? "bg-primary/20 text-primary"
-                    : "bg-muted/30 text-muted-foreground/50 hover:text-muted-foreground",
+                i === activeStepIndex &&
+                  "bg-primary text-primary-foreground shadow-sm",
+                i < activeStepIndex && "bg-primary/20 text-primary",
+                i > activeStepIndex &&
+                  "bg-muted/30 text-muted-foreground/50 hover:text-muted-foreground",
               )}
               aria-current={i === activeStepIndex ? "step" : undefined}
               title={step.label}
@@ -196,22 +196,23 @@ export function GuidedSettingsWizard({
                 onClick={() => goToStep(i)}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition",
-                  i === activeStepIndex
-                    ? "bg-primary/10 font-semibold text-foreground"
-                    : i < activeStepIndex
-                      ? "text-muted-foreground hover:bg-primary/5 hover:text-foreground"
-                      : "text-muted-foreground/50 hover:text-muted-foreground",
+                  i === activeStepIndex &&
+                    "bg-primary/10 font-semibold text-foreground",
+                  i < activeStepIndex &&
+                    "text-muted-foreground hover:bg-primary/5 hover:text-foreground",
+                  i > activeStepIndex &&
+                    "text-muted-foreground/50 hover:text-muted-foreground",
                 )}
                 aria-current={i === activeStepIndex ? "step" : undefined}
               >
                 <span
                   className={cn(
                     "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                    i === activeStepIndex
-                      ? "bg-primary text-primary-foreground"
-                      : i < activeStepIndex
-                        ? "bg-primary/20 text-primary"
-                        : "bg-muted/30 text-muted-foreground/50",
+                    i === activeStepIndex &&
+                      "bg-primary text-primary-foreground",
+                    i < activeStepIndex && "bg-primary/20 text-primary",
+                    i > activeStepIndex &&
+                      "bg-muted/30 text-muted-foreground/50",
                   )}
                 >
                   {i < activeStepIndex ? (

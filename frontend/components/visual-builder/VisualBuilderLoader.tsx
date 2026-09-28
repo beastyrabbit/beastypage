@@ -224,6 +224,7 @@ function extractInitialPayload(
   const tortiePalette = coerceString(catData.tortiePalette)?.toLowerCase();
 
   const slugValue = shareSlug ?? record.slug ?? record.shareToken ?? null;
+  const shareParam = shareSlug ? "share" : "slug";
   return {
     params,
     tortie: tortieLayers,
@@ -237,9 +238,7 @@ function extractInitialPayload(
       : undefined,
     slug: slugValue,
     shareUrl: slugValue
-      ? shareSlug
-        ? `/visual-builder?share=${encodeURIComponent(slugValue)}`
-        : `/visual-builder?slug=${encodeURIComponent(slugValue)}`
+      ? `/visual-builder?${shareParam}=${encodeURIComponent(slugValue)}`
       : null,
     catName: record.catName ?? null,
     creatorName: record.creatorName ?? null,

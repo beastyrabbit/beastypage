@@ -316,6 +316,23 @@ function hasTortieConsumerContract(definition: CatTraitDefinition): boolean {
   );
 }
 
+function getRequiredValueKind(
+  legacyStrategy: LegacyBinding["strategy"],
+): TraitValueKind | undefined {
+  switch (legacyStrategy) {
+    case "pose":
+      return "string";
+    case "list":
+      return "stringList";
+    case "tortie":
+      return "objectList";
+    case "booleanAlias":
+      return "boolean";
+    default:
+      return undefined;
+  }
+}
+
 function assertValueContract(definition: CatTraitDefinition): void {
   const { id, value } = definition;
   if (value.kind === "integer") {
@@ -330,16 +347,7 @@ function assertValueContract(definition: CatTraitDefinition): void {
   }
 
   const legacyStrategy = definition.legacy.strategy;
-  const requiredKind =
-    legacyStrategy === "pose"
-      ? "string"
-      : legacyStrategy === "list"
-        ? "stringList"
-        : legacyStrategy === "tortie"
-          ? "objectList"
-          : legacyStrategy === "booleanAlias"
-            ? "boolean"
-            : undefined;
+  const requiredKind = getRequiredValueKind(legacyStrategy);
   if (requiredKind !== undefined && value.kind !== requiredKind) {
     throw new Error(
       `${id}.legacy ${legacyStrategy} requires value kind ${requiredKind}`,
@@ -528,7 +536,7 @@ function validateCount(
   maxItems?: number,
 ): void {
   if (!Number.isInteger(count.min) || !Number.isInteger(count.max)) {
-    throw new Error(`${label} count bounds must be integers`);
+    throw new TypeError(`${label} count bounds must be integers`);
   }
   if (count.min < 0 || count.max < count.min) {
     throw new Error(`${label} has an invalid count range`);
@@ -537,26 +545,28 @@ function validateCount(
     throw new Error(`${label} can generate more than maxItems=${maxItems}`);
   }
   if (count.strategy === "weightedDiscrete") {
-    const entries = Object.entries(count.weights);
-    if (entries.length === 0) {
-      throw new Error(`${label} needs at least one count weight`);
+    validateCountWeights(count, label);
+  }
+}
+
+function validateCountWeights(count: WeightedCount, label: string): void {
+  const entries = Object.entries(count.weights);
+  if (entries.length === 0) {
+    throw new Error(`${label} needs at least one count weight`);
+  }
+  let total = 0;
+  for (const [rawValue, weight] of entries) {
+    const value = Number(rawValue);
+    if (!Number.isInteger(value) || value < count.min || value > count.max) {
+      throw new Error(`${label} has an unreachable weighted value ${rawValue}`);
     }
-    let total = 0;
-    for (const [rawValue, weight] of entries) {
-      const value = Number(rawValue);
-      if (!Number.isInteger(value) || value < count.min || value > count.max) {
-        throw new Error(
-          `${label} has an unreachable weighted value ${rawValue}`,
-        );
-      }
-      if (!Number.isFinite(weight) || weight <= 0) {
-        throw new Error(`${label} has a non-positive weight for ${rawValue}`);
-      }
-      total += weight;
+    if (!Number.isFinite(weight) || weight <= 0) {
+      throw new Error(`${label} has a non-positive weight for ${rawValue}`);
     }
-    if (total <= 0) {
-      throw new Error(`${label} has an empty weight sum`);
-    }
+    total += weight;
+  }
+  if (total <= 0) {
+    throw new Error(`${label} has an empty weight sum`);
   }
 }
 
@@ -998,7 +1008,9 @@ export function defineCatSystem<
     ): void => {
       const traitId = config[configKey];
       if (typeof traitId !== "string") {
-        throw new Error(`${id}.config.${configKey} must reference a trait`);
+        throw new TypeError(
+          `${id}.config.${configKey} must reference a trait`,
+        );
       }
       const configuredTrait = traitById.get(traitId);
       if (!configuredTrait) return;

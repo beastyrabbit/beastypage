@@ -168,19 +168,10 @@ export default function ProfilePage() {
                     "border border-border/50 bg-primary/15",
                   )}
                 >
-                  {clerkUser?.imageUrl ? (
-                    <img
-                      src={clerkUser.imageUrl}
-                      alt=""
-                      className="size-full object-cover"
-                    />
-                  ) : initial ? (
-                    <span className="text-xl font-bold text-primary">
-                      {initial}
-                    </span>
-                  ) : (
-                    <User className="size-8 text-primary" />
-                  )}
+                  <AvatarContent
+                    imageUrl={clerkUser?.imageUrl}
+                    initial={initial}
+                  />
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground">
@@ -317,6 +308,19 @@ export default function ProfilePage() {
   );
 }
 
+function AvatarContent({
+  imageUrl,
+  initial,
+}: Readonly<{ imageUrl?: string; initial?: string }>) {
+  if (imageUrl) {
+    return <img src={imageUrl} alt="" className="size-full object-cover" />;
+  }
+  if (initial) {
+    return <span className="text-xl font-bold text-primary">{initial}</span>;
+  }
+  return <User className="size-8 text-primary" />;
+}
+
 // ---------------------------------------------------------------------------
 // API Key section
 // ---------------------------------------------------------------------------
@@ -324,10 +328,10 @@ export default function ProfilePage() {
 function ApiKeySection({
   apiKey,
   onRegenerate,
-}: {
+}: Readonly<{
   apiKey: string | null;
   onRegenerate: () => Promise<void>;
-}) {
+}>) {
   const [revealed, setRevealed] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
 
@@ -452,7 +456,7 @@ function VariantsSection({
   onToggleTool,
   onDeleteVariant,
   onImportBatch,
-}: {
+}: Readonly<{
   variants: VariantDoc[];
   expandedTools: Set<string>;
   onToggleTool: (tool: string) => void;
@@ -469,7 +473,7 @@ function VariantsSection({
       updatedAt: number;
     }[];
   }) => Promise<{ imported: number; total: number }>;
-}) {
+}>) {
   const [importing, setImporting] = useState(false);
   const [slugImporting, setSlugImporting] = useState(false);
   const [slugValue, setSlugValue] = useState("");

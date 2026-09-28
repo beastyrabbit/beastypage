@@ -21,6 +21,20 @@ interface WidgetModule {
   extras?: ToolWidgetMeta[];
 }
 
+function addUniqueEntry(
+  entry: ToolWidgetMeta,
+  source: string,
+  entries: ToolWidgetMeta[],
+  seenIds: Set<string>,
+) {
+  if (seenIds.has(entry.id)) {
+    console.error(`Duplicate widget ID "${entry.id}" in ${source}`);
+    process.exit(1);
+  }
+  seenIds.add(entry.id);
+  entries.push(entry);
+}
+
 async function main() {
   const entries: ToolWidgetMeta[] = [];
   const seenIds = new Set<string>();
@@ -33,26 +47,12 @@ async function main() {
       );
       continue;
     }
-    if (seenIds.has(mod.default.id)) {
-      console.error(
-        `Duplicate widget ID "${mod.default.id}" in ${relative(ROOT, abs)}`,
-      );
-      process.exit(1);
-    }
-    seenIds.add(mod.default.id);
-    entries.push(mod.default);
+    addUniqueEntry(mod.default, relative(ROOT, abs), entries, seenIds);
     // Support additional widget entries (e.g. preset variants) via named export
     if (Array.isArray(mod.extras)) {
       for (const extra of mod.extras) {
         if (!extra?.id) continue;
-        if (seenIds.has(extra.id)) {
-          console.error(
-            `Duplicate widget ID "${extra.id}" in ${relative(ROOT, abs)} extras`,
-          );
-          process.exit(1);
-        }
-        seenIds.add(extra.id);
-        entries.push(extra);
+        addUniqueEntry(extra, `${relative(ROOT, abs)} extras`, entries, seenIds);
       }
     }
   }

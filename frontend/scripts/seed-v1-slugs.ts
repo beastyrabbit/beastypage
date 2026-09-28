@@ -275,33 +275,34 @@ for (let i = 0; i < 10; i++) {
 }
 
 // Edge cases (~15)
-// All-45ms (minimum)
-configs.push({
-  category: "edge-all-min",
-  config: {
-    v: 1,
-    timing: {
-      allowFastFlips: true,
-      delays: Object.fromEntries(PARAM_TIMING_ORDER.map((k) => [k, 45])),
-      subsetLimits: {},
-      pauseDelays: { flashyMs: 1000, calmMs: 1000 },
+configs.push(
+  // All-45ms (minimum)
+  {
+    category: "edge-all-min",
+    config: {
+      v: 1,
+      timing: {
+        allowFastFlips: true,
+        delays: Object.fromEntries(PARAM_TIMING_ORDER.map((k) => [k, 45])),
+        subsetLimits: {},
+        pauseDelays: { flashyMs: 1000, calmMs: 1000 },
+      },
     },
   },
-});
-
-// All-500ms (maximum)
-configs.push({
-  category: "edge-all-max",
-  config: {
-    v: 1,
-    timing: {
-      allowFastFlips: false,
-      delays: Object.fromEntries(PARAM_TIMING_ORDER.map((k) => [k, 500])),
-      subsetLimits: {},
-      pauseDelays: { flashyMs: 1000, calmMs: 1000 },
+  // All-500ms (maximum)
+  {
+    category: "edge-all-max",
+    config: {
+      v: 1,
+      timing: {
+        allowFastFlips: false,
+        delays: Object.fromEntries(PARAM_TIMING_ORDER.map((k) => [k, 500])),
+        subsetLimits: {},
+        pauseDelays: { flashyMs: 1000, calmMs: 1000 },
+      },
     },
   },
-});
+);
 
 // Only 1 param set (rest omitted)
 for (let i = 0; i < 3; i++) {
@@ -338,31 +339,32 @@ for (let i = 0; i < 3; i++) {
 }
 
 // pauseDelays at min/max boundaries
-configs.push({
-  category: "edge-pause-min",
-  config: {
-    v: 1,
-    timing: {
-      allowFastFlips: false,
-      delays: randomDelays(),
-      subsetLimits: {},
-      pauseDelays: { flashyMs: 1000, calmMs: 1000 },
+configs.push(
+  {
+    category: "edge-pause-min",
+    config: {
+      v: 1,
+      timing: {
+        allowFastFlips: false,
+        delays: randomDelays(),
+        subsetLimits: {},
+        pauseDelays: { flashyMs: 1000, calmMs: 1000 },
+      },
     },
   },
-});
-
-configs.push({
-  category: "edge-pause-max",
-  config: {
-    v: 1,
-    timing: {
-      allowFastFlips: false,
-      delays: randomDelays(),
-      subsetLimits: {},
-      pauseDelays: { flashyMs: 10000, calmMs: 10000 },
+  {
+    category: "edge-pause-max",
+    config: {
+      v: 1,
+      timing: {
+        allowFastFlips: false,
+        delays: randomDelays(),
+        subsetLimits: {},
+        pauseDelays: { flashyMs: 10000, calmMs: 10000 },
+      },
     },
   },
-});
+);
 
 // Mixed edge cases: very fast + very slow params
 for (let i = 0; i < 4; i++) {

@@ -6,7 +6,7 @@ export function isDiscordServiceRequest(request: Request): boolean {
   const expected = `Bearer ${token}`;
   let difference = actual.length ^ expected.length;
   for (let i = 0; i < expected.length; i++) {
-    difference |= expected.charCodeAt(i) ^ (actual.charCodeAt(i) || 0);
+    difference |= (expected.codePointAt(i) ?? 0) ^ (actual.codePointAt(i) ?? 0);
   }
   return difference === 0;
 }

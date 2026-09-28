@@ -206,7 +206,7 @@ export function GuidedTimelineViewer({
     if (!encoded) return;
     try {
       const decoded = decodeSharePayload(encoded);
-      if (!decoded || decoded.mode !== "wizard-timeline") {
+      if (decoded?.mode !== "wizard-timeline") {
         throw new Error("Invalid payload");
       }
       setPayload(decoded);
@@ -289,14 +289,7 @@ export function GuidedTimelineViewer({
     const params = activeStep?.params ?? payload?.finalParams;
     if (!params) return [];
     const entries: Array<[string, string]> = [
-      [
-        "Pose",
-        params.poseName
-          ? formatName(params.poseName)
-          : params.spriteNumber !== undefined
-            ? `Pose ${params.spriteNumber}`
-            : "—",
-      ],
+      ["Pose", formatPose(params)],
       [
         "Pattern",
         getCoatPatternName(getCoatChoiceValue(params)) ??
@@ -648,7 +641,13 @@ async function renderParams(
   });
 }
 
-function formatName(value: unknown): string {
+function formatPose(params: CatParams): string {
+  if (params.poseName) return formatName(params.poseName);
+  if (params.spriteNumber !== undefined) return `Pose ${params.spriteNumber}`;
+  return "—";
+}
+
+function formatName(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "None";
   if (typeof value === "number") return `#${value}`;
   return (

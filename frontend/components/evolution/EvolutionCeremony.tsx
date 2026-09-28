@@ -102,7 +102,7 @@ function enterIndex(
   const cat = cats[index];
   if (!cat) return { kind: "waiting", index };
   const previous = cats[index - 1];
-  if (!previous || cat.branchLabel !== previous.branchLabel) {
+  if (cat.branchLabel !== previous?.branchLabel) {
     return { kind: "banner", index };
   }
   return { kind: "charge", index };
@@ -148,6 +148,28 @@ function revealColours(
   }
   if (hexes.length === 0) return { from: theme.from, to: theme.to };
   return { from: hexes[0], to: hexes[1] ?? theme.to };
+}
+
+function getActiveCat(
+  step: CeremonyStep,
+  cats: CeremonyCat[],
+): CeremonyCat | null {
+  if (step.kind === "summon") return cats[0];
+  if ("index" in step) return cats[step.index] ?? null;
+  return null;
+}
+
+function getRevealedCount(step: CeremonyStep, totalCount: number): number {
+  if (step.kind === "finale") return totalCount;
+  if (step.kind === "summon") return 1;
+  if ("index" in step) return step.index + (step.kind === "reveal" ? 1 : 0);
+  return 0;
+}
+
+function getProgressHint(hideControls: boolean, autoPlay: boolean): string {
+  if (hideControls) return "EVOLUTION CEREMONY";
+  if (autoPlay) return "TAP TO SKIP AHEAD";
+  return "TAP TO ADVANCE";
 }
 
 export function EvolutionCeremony({
@@ -247,21 +269,9 @@ export function EvolutionCeremony({
     return () => window.clearTimeout(encore);
   }, [step, prefersReducedMotion, pools]);
 
-  const activeCat =
-    step.kind === "summon"
-      ? cats[0]
-      : "index" in step
-        ? (cats[step.index] ?? null)
-        : null;
+  const activeCat = getActiveCat(step, cats);
   const theme = getArchetypeTheme(activeCat?.archetype ?? null);
-  const revealedCount =
-    step.kind === "finale"
-      ? totalCount
-      : step.kind === "summon"
-        ? 1
-        : "index" in step
-          ? step.index + (step.kind === "reveal" ? 1 : 0)
-          : 0;
+  const revealedCount = getRevealedCount(step, totalCount);
   const progress = Math.min(1, revealedCount / Math.max(1, totalCount));
 
   const hudLabel = (() => {
@@ -302,6 +312,61 @@ export function EvolutionCeremony({
     };
   }, [step, requestTeaserFrame, chargeDurationMs, speed]);
 
+  const handleSectionClick = step.kind === "finale" ? onFinish : advance;
+
+  const renderStage = () => {
+    if (step.kind === "summon") {
+      return <SummonScene key="summon" cat={cats[0] ?? null} />;
+    }
+    if (step.kind === "banner") {
+      return (
+        <BannerScene
+          key={`banner-${step.index}`}
+          branchLabel={cats[step.index]?.branchLabel ?? "?"}
+          theme={theme}
+        />
+      );
+    }
+    if (step.kind === "charge") {
+      return (
+        <ChargeScene
+          key={`charge-${step.index}-${speed}`}
+          parent={
+            (cats[step.index]?.level ?? 1) <= 1
+              ? (cats[0] ?? null)
+              : (cats[step.index - 1] ?? null)
+          }
+          frames={teaserFrames}
+          upcoming={cats[step.index] ?? null}
+          theme={theme}
+          durationSeconds={chargeDurationMs / speed / 1000}
+          reduced={Boolean(prefersReducedMotion)}
+        />
+      );
+    }
+    if (step.kind === "reveal") {
+      return (
+        <RevealScene
+          key={`reveal-${step.index}`}
+          cat={cats[step.index] ?? null}
+          colours={revealColours(cats[step.index] ?? null, pools, theme)}
+          reduced={Boolean(prefersReducedMotion)}
+        />
+      );
+    }
+    if (step.kind === "waiting") {
+      return <WaitingScene key={`waiting-${step.index}`} />;
+    }
+    return (
+      <FinaleScene
+        key="finale"
+        totalCount={totalCount}
+        onFinish={onFinish}
+        hideButton={hideControls}
+      />
+    );
+  };
+
   return (
     <motion.section
       ref={sectionRef}
@@ -312,9 +377,7 @@ export function EvolutionCeremony({
         !hideControls && "cursor-pointer",
       )}
       style={{ minHeight: "min(620px, calc(100vh - 7rem))" }}
-      onClick={
-        hideControls ? undefined : step.kind === "finale" ? onFinish : advance
-      }
+      onClick={hideControls ? undefined : handleSectionClick}
       aria-live="polite"
     >
       {/* Atmosphere */}
@@ -412,58 +475,14 @@ export function EvolutionCeremony({
 
       {/* Stage */}
       <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-4 py-2 sm:px-6 sm:py-4">
-        <AnimatePresence mode="wait">
-          {step.kind === "summon" ? (
-            <SummonScene key="summon" cat={cats[0] ?? null} />
-          ) : step.kind === "banner" ? (
-            <BannerScene
-              key={`banner-${step.index}`}
-              branchLabel={cats[step.index]?.branchLabel ?? "?"}
-              theme={theme}
-            />
-          ) : step.kind === "charge" ? (
-            <ChargeScene
-              key={`charge-${step.index}-${speed}`}
-              parent={
-                (cats[step.index]?.level ?? 1) <= 1
-                  ? (cats[0] ?? null)
-                  : (cats[step.index - 1] ?? null)
-              }
-              frames={teaserFrames}
-              upcoming={cats[step.index] ?? null}
-              theme={theme}
-              durationSeconds={chargeDurationMs / speed / 1000}
-              reduced={Boolean(prefersReducedMotion)}
-            />
-          ) : step.kind === "reveal" ? (
-            <RevealScene
-              key={`reveal-${step.index}`}
-              cat={cats[step.index] ?? null}
-              colours={revealColours(cats[step.index] ?? null, pools, theme)}
-              reduced={Boolean(prefersReducedMotion)}
-            />
-          ) : step.kind === "waiting" ? (
-            <WaitingScene key={`waiting-${step.index}`} />
-          ) : (
-            <FinaleScene
-              key="finale"
-              totalCount={totalCount}
-              onFinish={onFinish}
-              hideButton={hideControls}
-            />
-          )}
-        </AnimatePresence>
+        <AnimatePresence mode="wait">{renderStage()}</AnimatePresence>
       </div>
 
       {/* Progress */}
       <div className="relative z-10 flex flex-col gap-2 px-5 pb-5">
         <div className="flex items-center justify-between">
           <span className={cn(pixelFontClass, "text-[9px] text-white/50")}>
-            {hideControls
-              ? "EVOLUTION CEREMONY"
-              : autoPlay
-                ? "TAP TO SKIP AHEAD"
-                : "TAP TO ADVANCE"}
+            {getProgressHint(hideControls, autoPlay)}
           </span>
           <div className="flex items-center gap-2">
             {!hideControls && (
@@ -510,12 +529,12 @@ function SpriteOnAura({
   alt,
   size = 340,
   displaySize = CEREMONY_SPRITE_FRAME_SIZE,
-}: {
+}: Readonly<{
   url: string | null;
   alt: string;
   size?: number;
   displaySize?: string;
-}) {
+}>) {
   if (!url) {
     return (
       <div
@@ -544,7 +563,7 @@ function SpriteOnAura({
   );
 }
 
-function SummonScene({ cat }: { cat: CeremonyCat | null }) {
+function SummonScene({ cat }: Readonly<{ cat: CeremonyCat | null }>) {
   return (
     <motion.div
       className="grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_auto] items-center justify-items-center gap-3 text-center sm:gap-4"
@@ -583,10 +602,10 @@ function SummonScene({ cat }: { cat: CeremonyCat | null }) {
 function BannerScene({
   branchLabel,
   theme,
-}: {
+}: Readonly<{
   branchLabel: string;
   theme: ArchetypeTheme;
-}) {
+}>) {
   return (
     <motion.div
       className="flex flex-col items-center gap-4 text-center"
@@ -805,12 +824,12 @@ function ContenderFlight({
   url,
   anchorRef,
   falling,
-}: {
+}: Readonly<{
   spec: ContenderSpec;
   url: string;
   anchorRef: React.RefObject<HTMLDivElement | null>;
   falling: boolean;
-}) {
+}>) {
   const [geo] = useState(() => flightGeometry(spec, anchorRef));
   const half = spec.size / 2;
   const holdX = geo.cx + spec.missX;
@@ -879,14 +898,14 @@ function ChosenContender({
   glowColour,
   approachMs,
   selected,
-}: {
+}: Readonly<{
   spec: ContenderSpec;
   url: string;
   anchorRef: React.RefObject<HTMLDivElement | null>;
   glowColour: string;
   approachMs: number;
   selected: boolean;
-}) {
+}>) {
   const [geo] = useState(() => flightGeometry(spec, anchorRef));
   const half = spec.size / 2;
   // Grow to a hero size on selection, whatever was rolled for the flight.
@@ -973,7 +992,7 @@ function ChargeScene({
   theme,
   durationSeconds,
   reduced,
-}: {
+}: Readonly<{
   parent: CeremonyCat | null;
   frames: string[];
   upcoming: CeremonyCat | null;
@@ -981,7 +1000,7 @@ function ChargeScene({
   /** Real charge length at the current speed — the white-out scales to it. */
   durationSeconds: number;
   reduced: boolean;
-}) {
+}>) {
   const rank = stageRank(upcoming?.level ?? 1).toUpperCase();
   const stageRef = useRef<HTMLDivElement | null>(null);
 
@@ -1081,11 +1100,11 @@ function RevealScene({
   cat,
   colours,
   reduced,
-}: {
+}: Readonly<{
   cat: CeremonyCat | null;
   colours: { from: string; to: string };
   reduced: boolean;
-}) {
+}>) {
   const chips = useMemo(
     () => buildAdditionChips(cat?.additions ?? [], cat?.key ?? "reveal"),
     [cat],
@@ -1242,11 +1261,11 @@ function FinaleScene({
   totalCount,
   onFinish,
   hideButton = false,
-}: {
+}: Readonly<{
   totalCount: number;
   onFinish: () => void;
   hideButton?: boolean;
-}) {
+}>) {
   return (
     <motion.div
       className="flex flex-col items-center gap-5 text-center"

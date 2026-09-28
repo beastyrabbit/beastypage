@@ -61,8 +61,8 @@ export default async function setup(project: TestProject) {
       let output = "";
       const read = (chunk: Buffer) => {
         output = (output + chunk.toString()).slice(-8192);
-        const url = output.match(
-          /Uvicorn running on (http:\/\/127\.0\.0\.1:\d+)/,
+        const url = /Uvicorn running on (http:\/\/127\.0\.0\.1:\d+)/.exec(
+          output,
         )?.[1];
         if (url) {
           clearTimeout(timeout);

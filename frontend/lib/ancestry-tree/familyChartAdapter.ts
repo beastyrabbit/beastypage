@@ -106,6 +106,23 @@ export function findCatById(
   return tree.cats.find((cat) => cat.id === id);
 }
 
+function childIdsOf(cat: AncestryTreeCat): string[] {
+  return Array.isArray(cat.childrenIds) ? cat.childrenIds : [];
+}
+
+function enqueueUnvisitedParents(
+  cat: AncestryTreeCat,
+  visited: Set<string>,
+  queue: string[],
+): void {
+  for (const parentId of [cat.motherId, cat.fatherId]) {
+    if (parentId && !visited.has(parentId)) {
+      visited.add(parentId);
+      queue.push(parentId);
+    }
+  }
+}
+
 export function getDescendants(
   tree: SerializedAncestryTree,
   catId: string,
@@ -115,7 +132,7 @@ export function getDescendants(
 
   const descendants: AncestryTreeCat[] = [];
   const visited = new Set<string>([catId]);
-  const queue = Array.isArray(cat.childrenIds) ? [...cat.childrenIds] : [];
+  const queue = [...childIdsOf(cat)];
 
   while (queue.length > 0) {
     const childId = queue.shift()!;
@@ -123,15 +140,11 @@ export function getDescendants(
     visited.add(childId);
 
     const child = findCatById(tree, childId);
-    if (child) {
-      descendants.push(child);
-      const childChildren = Array.isArray(child.childrenIds)
-        ? child.childrenIds
-        : [];
-      for (const grandchildId of childChildren) {
-        if (!visited.has(grandchildId)) {
-          queue.push(grandchildId);
-        }
+    if (!child) continue;
+    descendants.push(child);
+    for (const grandchildId of childIdsOf(child)) {
+      if (!visited.has(grandchildId)) {
+        queue.push(grandchildId);
       }
     }
   }
@@ -150,28 +163,14 @@ export function getAncestors(
   const visited = new Set<string>([catId]);
   const queue: string[] = [];
 
-  if (cat.motherId && !visited.has(cat.motherId)) {
-    visited.add(cat.motherId);
-    queue.push(cat.motherId);
-  }
-  if (cat.fatherId && !visited.has(cat.fatherId)) {
-    visited.add(cat.fatherId);
-    queue.push(cat.fatherId);
-  }
+  enqueueUnvisitedParents(cat, visited, queue);
 
   while (queue.length > 0) {
     const parentId = queue.shift()!;
     const parent = findCatById(tree, parentId);
     if (parent) {
       ancestors.push(parent);
-      if (parent.motherId && !visited.has(parent.motherId)) {
-        visited.add(parent.motherId);
-        queue.push(parent.motherId);
-      }
-      if (parent.fatherId && !visited.has(parent.fatherId)) {
-        visited.add(parent.fatherId);
-        queue.push(parent.fatherId);
-      }
+      enqueueUnvisitedParents(parent, visited, queue);
     }
   }
 

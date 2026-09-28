@@ -255,7 +255,7 @@ function colorBrightness(color: RGB): number {
 
 export async function extractColorsServer(
   imageBuffer: Buffer,
-  options: KMeansOptions = { k: 6 },
+  options?: KMeansOptions,
 ): Promise<ExtractedColor[]> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const { data, width, height } = await getImagePixelsServer(imageBuffer);
@@ -289,7 +289,7 @@ export async function extractColorsServer(
 export async function extractFamilyColorsServer(
   imageBuffer: Buffer,
   topColors: ExtractedColor[],
-  options: KMeansOptions = { k: 6 },
+  options?: KMeansOptions,
   similarityThreshold = 50,
 ): Promise<ExtractedColor[]> {
   const opts = { ...DEFAULT_OPTIONS, ...options };

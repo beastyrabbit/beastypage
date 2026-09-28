@@ -44,7 +44,7 @@ describe("getImagePixelsServer", () => {
     expect(result.width).toBe(20);
     expect(result.height).toBe(20);
     expect(result.data).toBeInstanceOf(Uint8ClampedArray);
-    expect(result.data.length).toBe(20 * 20 * 4);
+    expect(result.data).toHaveLength(20 * 20 * 4);
   });
 });
 
@@ -53,7 +53,7 @@ describe("extractColorsServer", () => {
     // Use colors that are NOT near-black or near-white (they get filtered)
     const buf = makeTwoTonePng(200, 50, 50, 50, 50, 200);
     const colors = await extractColorsServer(buf, { k: 2 });
-    expect(colors.length).toBe(2);
+    expect(colors).toHaveLength(2);
     for (const c of colors) {
       expect(c).toHaveProperty("hex");
       expect(c).toHaveProperty("rgb");

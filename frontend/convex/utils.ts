@@ -38,6 +38,39 @@ const STORAGE_BASE =
   process.env.NEXT_PUBLIC_CONVEX_URL ||
   null;
 
+function resolveAgainstStorageBase(
+  urlStr: string,
+  storageBase: string,
+): string {
+  // Normalize storage base - remove trailing slash using regex
+  const baseMatch = /^(.+?)\/?$/.exec(storageBase);
+  const base = baseMatch ? baseMatch[1] : storageBase;
+
+  // Escape special regex characters in base for safe regex construction
+  const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+
+  // Check if URL starts with base using regex (avoiding indexOf/charAt which might trigger URL methods)
+  const startsWithBase = new RegExp(`^${escapedBase}`).exec(urlStr);
+  if (startsWithBase) {
+    return urlStr;
+  }
+
+  // Check if URL is relative (starts with /) using regex
+  const isRelative = /^\//.exec(urlStr);
+  if (isRelative) {
+    return base + urlStr;
+  }
+
+  // If URL is absolute but different origin, extract path manually using regex
+  const absoluteMatch = /^https?:\/\/[^/]+(\/.*)$/.exec(urlStr);
+  if (absoluteMatch?.[1]) {
+    return base + absoluteMatch[1];
+  }
+
+  // Fallback: treat as relative
+  return `${base}/${urlStr}`;
+}
+
 export function normalizeStorageUrl(url: string | null): string | null {
   if (!url) return null;
 
@@ -50,33 +83,7 @@ export function normalizeStorageUrl(url: string | null): string | null {
     // If we have a storage base, ensure the URL uses it
     const storageBase = STORAGE_BASE ? String(STORAGE_BASE) : null;
     if (storageBase && storageBase !== "null" && storageBase !== "undefined") {
-      // Normalize storage base - remove trailing slash using regex
-      const baseMatch = /^(.+?)\/?$/.exec(storageBase);
-      const base = baseMatch ? baseMatch[1] : storageBase;
-
-      // Escape special regex characters in base for safe regex construction
-      const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-
-      // Check if URL starts with base using regex (avoiding indexOf/charAt which might trigger URL methods)
-      const startsWithBase = new RegExp(`^${escapedBase}`).exec(urlStr);
-      if (startsWithBase) {
-        return urlStr;
-      }
-
-      // Check if URL is relative (starts with /) using regex
-      const isRelative = /^\//.exec(urlStr);
-      if (isRelative) {
-        return base + urlStr;
-      }
-
-      // If URL is absolute but different origin, extract path manually using regex
-      const absoluteMatch = /^https?:\/\/[^/]+(\/.*)$/.exec(urlStr);
-      if (absoluteMatch?.[1]) {
-        return base + absoluteMatch[1];
-      }
-
-      // Fallback: treat as relative
-      return `${base}/${urlStr}`;
+      return resolveAgainstStorageBase(urlStr, storageBase);
     }
 
     // No storage base - extract path from absolute URLs, keep relative as-is
@@ -88,7 +95,7 @@ export function normalizeStorageUrl(url: string | null): string | null {
     // Check if already relative using regex
     const isRelative = /^\//.exec(urlStr);
     return isRelative ? urlStr : `/${urlStr}`;
-  } catch (_error) {
+  } catch {
     // If normalization fails (e.g., due to Convex restrictions), try direct conversion
     // This ensures the function never throws and always returns a string or null
     try {

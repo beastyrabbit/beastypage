@@ -3,6 +3,7 @@ import type {
   AnyCatTraitDefinition,
   CatSystemDefinition,
   CountDistribution,
+  GachaBinding,
 } from "../definition";
 import { parseCatDocumentStrict } from "../document";
 import { type CatTraitId, catSystem } from "../registry";
@@ -196,6 +197,12 @@ function probabilityForTrait(
   return Number.isFinite(candidate)
     ? Math.min(1, Math.max(0, candidate))
     : fallback;
+}
+
+function declaredProbabilityOf(binding: GachaBinding): number | undefined {
+  if (binding.strategy === "boolean") return binding.probability;
+  if (binding.strategy === "catalogChoice") return binding.optionalProbability;
+  return undefined;
 }
 
 function hasGateOverride(
@@ -401,12 +408,7 @@ export function rollCatFromSystem(
     }
     if (fixedIds.has(trait.id)) continue;
 
-    const declaredProbability =
-      binding.strategy === "boolean"
-        ? binding.probability
-        : binding.strategy === "catalogChoice"
-          ? binding.optionalProbability
-          : undefined;
+    const declaredProbability = declaredProbabilityOf(binding);
     if (
       binding.gate &&
       !hasGateOverride(trait.id, declaredProbability, options)

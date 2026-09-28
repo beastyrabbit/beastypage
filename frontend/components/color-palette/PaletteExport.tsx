@@ -323,7 +323,7 @@ export function PaletteExport({
     if (filteredFamilyColors.length > 0) {
       yOffset = drawColorStrip(filteredFamilyColors, yOffset);
       yOffset = drawBrightnessGrid(filteredFamilyColors, yOffset);
-      yOffset = drawHueGrid(filteredFamilyColors, yOffset);
+      drawHueGrid(filteredFamilyColors, yOffset);
     }
 
     // Trigger download
@@ -384,7 +384,8 @@ export function PaletteExport({
       link.click();
 
       toast.success("Spotlight image downloaded!");
-    } catch (_err) {
+    } catch (err) {
+      console.error("Failed to create spotlight image:", err);
       toast.error("Failed to create spotlight image");
     }
   }, [image, topColors, familyColors]);

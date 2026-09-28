@@ -3,6 +3,14 @@ import { NextResponse } from "next/server";
 const GITHUB_RELEASES_URL =
   "https://api.github.com/repos/beastyrabbit/beastypage/releases";
 
+function toText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return "";
+}
+
 export async function GET() {
   try {
     const res = await fetch(GITHUB_RELEASES_URL, {
@@ -32,11 +40,11 @@ export async function GET() {
     const releases = items.map((entry: unknown) => {
       const r = entry as Record<string, unknown>;
       return {
-        tag: String(r.tag_name ?? ""),
-        name: String(r.name ?? r.tag_name ?? ""),
-        body: String(r.body ?? ""),
-        publishedAt: String(r.published_at ?? ""),
-        htmlUrl: String(r.html_url ?? ""),
+        tag: toText(r.tag_name),
+        name: toText(r.name ?? r.tag_name),
+        body: toText(r.body),
+        publishedAt: toText(r.published_at),
+        htmlUrl: toText(r.html_url),
       };
     });
 

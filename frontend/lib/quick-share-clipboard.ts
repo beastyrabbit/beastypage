@@ -157,16 +157,20 @@ export async function readClipboardMedia(
     for (const item of items) {
       if (!item.types.includes(type)) continue;
       const value = await (await item.getType(type)).text();
-      const url =
-        type === "text/uri-list"
-          ? firstUriListUrl(value)
-          : type === "text/html"
-            ? urlFromHtml(value)
-            : httpUrl(value);
+      const url = urlFromClipboardText(type, value);
       if (url) return { kind: "url", url };
     }
   }
   return null;
+}
+
+function urlFromClipboardText(
+  type: "text/uri-list" | "text/html" | "text/plain",
+  value: string,
+) {
+  if (type === "text/uri-list") return firstUriListUrl(value);
+  if (type === "text/html") return urlFromHtml(value);
+  return httpUrl(value);
 }
 
 export async function readClipboardImage(

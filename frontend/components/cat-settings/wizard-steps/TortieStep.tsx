@@ -20,9 +20,9 @@ interface ComparisonCat {
 
 function TortieComparison({
   settings,
-}: {
+}: Readonly<{
   settings: WizardStepProps["settings"];
-}) {
+}>) {
   const { generator, ready } = useCatGenerator();
   const [cats, setCats] = useState<(ComparisonCat | null)[]>([
     null,

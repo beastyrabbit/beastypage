@@ -3,7 +3,6 @@ import type { PaletteMode } from "@/lib/palettes";
 
 export type { PaletteMode };
 
-export type CatId = string;
 export type Gender = "M" | "F";
 export type LifeStage = "kit" | "apprentice" | "warrior" | "leader" | "elder";
 export type CatSource = "history" | "generated" | "edited";
@@ -41,15 +40,15 @@ export interface CatGenetics {
 }
 
 export interface AncestryTreeCat {
-  id: CatId;
+  id: string;
   name: CatName;
   gender: Gender;
   lifeStage: LifeStage;
   params: CatParams;
-  motherId: CatId | null;
-  fatherId: CatId | null;
-  partnerIds: CatId[];
-  childrenIds: CatId[];
+  motherId: string | null;
+  fatherId: string | null;
+  partnerIds: string[];
+  childrenIds: string[];
   genetics: CatGenetics;
   source: CatSource;
   historyProfileId?: string;
@@ -112,9 +111,9 @@ export interface AncestryTree {
   id: string;
   slug: string;
   name: string;
-  foundingMotherId: CatId;
-  foundingFatherId: CatId;
-  cats: Map<CatId, AncestryTreeCat>;
+  foundingMotherId: string;
+  foundingFatherId: string;
+  cats: Map<string, AncestryTreeCat>;
   config: TreeGenerationConfig;
   createdAt: number;
   updatedAt: number;
@@ -125,8 +124,8 @@ export interface SerializedAncestryTree {
   id: string;
   slug: string;
   name: string;
-  foundingMotherId: CatId;
-  foundingFatherId: CatId;
+  foundingMotherId: string;
+  foundingFatherId: string;
   cats: AncestryTreeCat[];
   config: TreeGenerationConfig;
   createdAt: number;

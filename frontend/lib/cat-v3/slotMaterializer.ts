@@ -23,6 +23,8 @@ interface BaseSlotOptions<TChoice, TValue, TSlot> {
   mapValueToSlot?(value: TValue): TSlot;
 }
 
+type StringSlotValue<TChoice, TValue> = TValue | TChoice | string;
+
 interface TortieSlotOptions {
   random?: RandomFloatSource;
   slotCount: number;
@@ -71,16 +73,16 @@ export function materializeStringSlots<TChoice, TValue = TChoice>({
 }: BaseSlotOptions<
   TChoice,
   TValue,
-  TValue | TChoice | string
->): MaterializedSlotsResult<TValue, TValue | TChoice | string> {
+  StringSlotValue<TChoice, TValue>
+>): MaterializedSlotsResult<TValue, StringSlotValue<TChoice, TValue>> {
   const identity = <T>(x: T): T => x;
   const mapChoice = mapChoiceFn ?? (identity as (choice: TChoice) => TValue);
   const mapValueToSlot =
     mapValueToSlotFn ??
-    (identity as (value: TValue) => TValue | TChoice | string);
+    (identity as (value: TValue) => StringSlotValue<TChoice, TValue>);
 
   const selectedValues: TValue[] = [];
-  const slotSelections: Array<TValue | TChoice | string> = [];
+  const slotSelections: Array<StringSlotValue<TChoice, TValue>> = [];
   const available = [...availableChoices];
 
   if (slotCount <= 0 || available.length === 0) {

@@ -212,7 +212,7 @@ export function prepareCatShare(data: EncodePayload): CatShareStoredPayload {
     document = parseCatDocumentStrict({
       ...document,
       unknownTraits: {
-        ...(document.unknownTraits ?? {}),
+        ...document.unknownTraits,
         spriteNumber: legacySpriteNumber,
       },
     });

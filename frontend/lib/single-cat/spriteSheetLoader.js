@@ -45,7 +45,7 @@ class SpriteSheetLoader {
             for (const p of paths) {
                 try {
                     const res = await fetch(p);
-                    if (res && res.ok) {
+                    if (res?.ok) {
                         return await res.json();
                     }
                 } catch (_) {
@@ -165,7 +165,7 @@ class SpriteSheetLoader {
     }
 
     legacyOffsetForPoseName(poseName) {
-        const match = String(poseName || '').match(/^(newborn|kitten|adolescent_short|adult_short|adult_long|senior)([0-2])$/);
+        const match = /^(newborn|kitten|adolescent_short|adult_short|adult_long|senior)([0-2])$/.exec(String(poseName || ''));
         if (!match) {
             return SPECIAL_LEGACY_POSE_OFFSETS[poseName] ?? null;
         }
@@ -331,7 +331,7 @@ class SpriteSheetLoader {
      */
     findSpriteGroup(spriteName) {
         // First, try exact match in spritesIndex (for accessories with spaces)
-        if (this.spritesIndex && this.spritesIndex[spriteName]) {
+        if (this.spritesIndex?.[spriteName]) {
             return spriteName;
         }
         
@@ -398,7 +398,7 @@ class SpriteSheetLoader {
                 if (typeof handler === 'function') {
                     const result = handler(spriteName);
                     // Check if the result exists in spritesIndex
-                    if (this.spritesIndex && this.spritesIndex[result]) {
+                    if (this.spritesIndex?.[result]) {
                         return result;
                     }
                     // If function result doesn't exist, continue searching
@@ -412,11 +412,11 @@ class SpriteSheetLoader {
         
         // Try lowercase as last resort
         const lower = spriteName.toLowerCase();
-        if (this.spritesIndex && this.spritesIndex[lower]) {
+        if (this.spritesIndex?.[lower]) {
             return lower;
         }
 
-        if (this.normalizedIndex && this.normalizedIndex.has(lower)) {
+        if (this.normalizedIndex?.has(lower)) {
             return this.normalizedIndex.get(lower);
         }
 

@@ -4,7 +4,13 @@ import { useQuery } from "convex/react";
 import { ArrowUpRight, Loader2, Trees } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import ArrowBackIcon from "@/components/ui/arrow-back-icon";
 import LockIcon from "@/components/ui/lock-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
@@ -150,6 +156,51 @@ export function AncestryTreeViewClient({
     );
   }
 
+  let catList: ReactNode;
+  if (enrichedCats.length === 0) {
+    catList = (
+      <div className="rounded-3xl border border-border/40 bg-background/50 p-10 text-center text-sm text-muted-foreground">
+        No cats in this tree yet.
+      </div>
+    );
+  } else if (groupByGeneration && catsByGeneration) {
+    catList = (
+      <div className="flex flex-col gap-8">
+        {catsByGeneration.map(({ generation, cats }) => (
+          <div key={generation} className="flex flex-col gap-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Generation {generation + 1}
+              <span className="ml-2 font-normal text-muted-foreground/60">
+                ({cats.length} cats)
+              </span>
+            </h3>
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {cats.map((cat) => (
+                <CatCard
+                  key={cat.id}
+                  cat={cat}
+                  onPreview={(label, url) => setFocusedPreview({ label, url })}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  } else {
+    catList = (
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {enrichedCats.map((cat) => (
+          <CatCard
+            key={cat.id}
+            cat={cat}
+            onPreview={(label, url) => setFocusedPreview({ label, url })}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-6 lg:px-8">
       <section className="rounded-3xl border border-green-500/30 bg-gradient-to-br from-green-500/15 via-slate-950 to-slate-950 p-8 text-balance shadow-[0_0_40px_rgba(34,197,94,0.15)]">
@@ -208,70 +259,17 @@ export function AncestryTreeViewClient({
           </button>
         </div>
 
-        {enrichedCats.length === 0 ? (
-          <div className="rounded-3xl border border-border/40 bg-background/50 p-10 text-center text-sm text-muted-foreground">
-            No cats in this tree yet.
-          </div>
-        ) : groupByGeneration && catsByGeneration ? (
-          <div className="flex flex-col gap-8">
-            {catsByGeneration.map(({ generation, cats }) => (
-              <div key={generation} className="flex flex-col gap-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Generation {generation + 1}
-                  <span className="ml-2 font-normal text-muted-foreground/60">
-                    ({cats.length} cats)
-                  </span>
-                </h3>
-                <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                  {cats.map((cat) => (
-                    <CatCard
-                      key={cat.id}
-                      cat={cat}
-                      onPreview={(label, url) =>
-                        setFocusedPreview({ label, url })
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {enrichedCats.map((cat) => (
-              <CatCard
-                key={cat.id}
-                cat={cat}
-                onPreview={(label, url) => setFocusedPreview({ label, url })}
-              />
-            ))}
-          </div>
-        )}
+        {catList}
       </section>
 
       {focusedPreview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-6 py-10"
-          role="button"
-          tabIndex={0}
-          onClick={(event) => {
-            if (event.target !== event.currentTarget) return;
-            closePreview();
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              closePreview();
-            }
-            if (
-              (event.key === "Enter" || event.key === " ") &&
-              event.target === event.currentTarget
-            ) {
-              event.preventDefault();
-              closePreview();
-            }
-          }}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6 py-10">
+          <button
+            type="button"
+            aria-label="Close preview"
+            onClick={closePreview}
+            className="absolute inset-0 cursor-default bg-black/80"
+          />
           <div className="relative w-full max-w-4xl rounded-3xl border border-border/40 bg-background/95 p-8 shadow-2xl">
             <button
               type="button"

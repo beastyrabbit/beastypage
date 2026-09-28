@@ -81,9 +81,9 @@ const LINK_FOCUS_CLASS =
 /** Hero quick-links (Twitch + Twitter pills) used on the home and personal pages */
 export function HeroSocialButtons({
   twitterLabel = "X",
-}: {
+}: Readonly<{
   twitterLabel?: string;
-}) {
+}>) {
   return (
     <>
       <Link

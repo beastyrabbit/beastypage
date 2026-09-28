@@ -99,6 +99,53 @@ const formatter = Intl.NumberFormat(undefined, {
 const DEFAULT_TOTAL = 60;
 const DEFAULT_CONCURRENCY = 6;
 
+function HealthPanel({ health }: Readonly<{ health: HealthSnapshot | null }>) {
+  if (!health) {
+    return (
+      <p>Use “Refresh renderer health” after a run to inspect queue metrics.</p>
+    );
+  }
+  if (!health.ok) {
+    return (
+      <div>
+        <p className="font-semibold text-red-300">Health check failed</p>
+        <p className="mt-1 text-xs">{health.error}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-foreground">Renderer health</span>
+        <span
+          className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+            health.status === "ok"
+              ? "bg-emerald-500/15 text-emerald-300"
+              : "bg-amber-500/15 text-amber-300"
+          }`}
+        >
+          {health.status}
+        </span>
+      </div>
+      <ul className="space-y-1 text-xs">
+        {Object.entries(health.metrics).map(([key, value]) => (
+          <li key={key} className="flex justify-between gap-4">
+            <span>{key}</span>
+            <span className="font-mono text-muted-foreground/80">
+              {typeof value === "number"
+                ? formatter.format(value)
+                : String(value)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
+        Last updated {new Date(health.fetchedAt).toLocaleTimeString()}
+      </p>
+    </div>
+  );
+}
+
 export default function RendererStressHarness() {
   const [totalRequests, setTotalRequests] = useState(DEFAULT_TOTAL);
   const [concurrency, setConcurrency] = useState(DEFAULT_CONCURRENCY);
@@ -159,7 +206,7 @@ export default function RendererStressHarness() {
     const workers = Math.max(1, Math.min(32, concurrency));
 
     const runStarted = performance.now();
-    const runToken = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+    const runToken = `${Date.now()}-${crypto.getRandomValues(new Uint32Array(1))[0]}`;
     runTokenRef.current = runToken;
     setEntries([]);
     setMetrics({
@@ -423,54 +470,7 @@ export default function RendererStressHarness() {
           )}
 
           <div className="mt-4 border-t border-border/40 pt-4 text-xs text-muted-foreground/70">
-            {health ? (
-              health.ok ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-foreground">
-                      Renderer health
-                    </span>
-                    <span
-                      className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                        health.status === "ok"
-                          ? "bg-emerald-500/15 text-emerald-300"
-                          : "bg-amber-500/15 text-amber-300"
-                      }`}
-                    >
-                      {health.status}
-                    </span>
-                  </div>
-                  <ul className="space-y-1 text-xs">
-                    {Object.entries(health.metrics).map(([key, value]) => (
-                      <li key={key} className="flex justify-between gap-4">
-                        <span>{key}</span>
-                        <span className="font-mono text-muted-foreground/80">
-                          {typeof value === "number"
-                            ? formatter.format(value)
-                            : String(value)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
-                    Last updated{" "}
-                    {new Date(health.fetchedAt).toLocaleTimeString()}
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <p className="font-semibold text-red-300">
-                    Health check failed
-                  </p>
-                  <p className="mt-1 text-xs">{health.error}</p>
-                </div>
-              )
-            ) : (
-              <p>
-                Use “Refresh renderer health” after a run to inspect queue
-                metrics.
-              </p>
-            )}
+            <HealthPanel health={health} />
           </div>
         </aside>
       </section>

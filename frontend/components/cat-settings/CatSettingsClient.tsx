@@ -163,6 +163,9 @@ export function CatSettingsClient({
     router.push(`/single-cat-plus?code=${encodeURIComponent(liveCode)}`);
   }, [router, liveCode]);
 
+  const guidedQuery = liveCode ? `?code=${encodeURIComponent(liveCode)}` : "";
+  const guidedHref = `/single-cat-plus/settings/guided${guidedQuery}`;
+
   return (
     <div className="flex flex-col gap-6">
       {/* ─── Guided Wizard CTA ─── */}
@@ -170,7 +173,7 @@ export function CatSettingsClient({
         <p className="text-sm text-muted-foreground">
           New here?{" "}
           <a
-            href={`/single-cat-plus/settings/guided${liveCode ? `?code=${encodeURIComponent(liveCode)}` : ""}`}
+            href={guidedHref}
             className="font-semibold text-primary underline underline-offset-4 transition hover:text-primary/80"
           >
             Try the guided wizard

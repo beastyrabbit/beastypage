@@ -15,19 +15,42 @@ import { encodePortableCodeFromSettings } from "./helpers";
 // BRB Preset — store a portable settings code used only for BRB mode
 // ---------------------------------------------------------------------------
 
+const PRESET_STATUS = {
+  ready: {
+    label: "Preset Ready",
+    className: "border-emerald-500/30 text-emerald-400",
+  },
+  invalid: {
+    label: "Invalid Preset",
+    className: "border-red-500/30 text-red-400",
+  },
+  live: {
+    label: "Uses Live Settings",
+    className: "border-border/40 text-muted-foreground",
+  },
+} as const;
+
+function getPresetStatus(
+  hasSavedPreset: boolean,
+  presetValid: boolean,
+): keyof typeof PRESET_STATUS {
+  if (!hasSavedPreset) return "live";
+  return presetValid ? "ready" : "invalid";
+}
+
 export function BrbPresetSection({
   settings,
   savedCode,
   draftCode,
   onDraftChange,
   onSave,
-}: {
+}: Readonly<{
   settings: SingleCatSettings;
   savedCode: string;
   draftCode: string;
   onDraftChange: (value: string) => void;
   onSave: (value: string) => Promise<boolean>;
-}) {
+}>) {
   const [saving, setSaving] = useState(false);
   const currentCode = useMemo(
     () => encodePortableCodeFromSettings(settings),
@@ -37,11 +60,8 @@ export function BrbPresetSection({
   const presetValid = hasSavedPreset
     ? Boolean(decodePortableSettings(savedCode))
     : true;
-  const presetStatus = hasSavedPreset
-    ? presetValid
-      ? "Preset Ready"
-      : "Invalid Preset"
-    : "Uses Live Settings";
+  const presetStatus =
+    PRESET_STATUS[getPresetStatus(hasSavedPreset, presetValid)];
 
   const runSave = async (value: string) => {
     setSaving(true);
@@ -74,14 +94,10 @@ export function BrbPresetSection({
         <span
           className={cn(
             "rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
-            hasSavedPreset && presetValid
-              ? "border-emerald-500/30 text-emerald-400"
-              : hasSavedPreset
-                ? "border-red-500/30 text-red-400"
-                : "border-border/40 text-muted-foreground",
+            presetStatus.className,
           )}
         >
-          {presetStatus}
+          {presetStatus.label}
         </span>
       </div>
 

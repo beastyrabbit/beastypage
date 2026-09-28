@@ -31,12 +31,16 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "This value is not valid.";
 }
 
-type TraitFieldProps = {
+type TraitFieldProps = Readonly<{
   definition: TraitEditorDefinition;
   value: unknown;
   onCommit: (value: unknown) => void;
-  onClear: () => void;
-};
+}>;
+
+type ClearableTraitFieldProps = TraitFieldProps &
+  Readonly<{
+    onClear: () => void;
+  }>;
 
 function ToggleEditor({ definition, value, onCommit }: TraitFieldProps) {
   const inputId = `generic-trait-${definition.traitId}`;
@@ -64,7 +68,7 @@ function SelectEditor({
   value,
   onCommit,
   onClear,
-}: TraitFieldProps) {
+}: ClearableTraitFieldProps) {
   const stringValue = typeof value === "string" ? value : "";
   const [draft, setDraft] = useState(stringValue);
   useEffect(() => setDraft(stringValue), [stringValue]);
@@ -299,11 +303,11 @@ function GenericTraitField({
   definition,
   params,
   onParamsChange,
-}: {
+}: Readonly<{
   definition: TraitEditorDefinition;
   params: CatParams;
   onParamsChange: GenericTraitEditorsProps["onParamsChange"];
-}) {
+}>) {
   const [validationError, setValidationError] = useState<string | null>(null);
   const value = getBuilderTraitValue(params, definition.traitId);
   const commit = (nextValue: unknown) => {
@@ -328,7 +332,6 @@ function GenericTraitField({
     definition,
     value,
     onCommit: commit,
-    onClear: clear,
   };
 
   return (
@@ -342,7 +345,9 @@ function GenericTraitField({
         </p>
       )}
       {definition.kind === "toggle" && <ToggleEditor {...editorProps} />}
-      {definition.kind === "select" && <SelectEditor {...editorProps} />}
+      {definition.kind === "select" && (
+        <SelectEditor {...editorProps} onClear={clear} />
+      )}
       {definition.kind === "list" && <ListEditor {...editorProps} />}
       {definition.kind === "compoundList" && (
         <CompoundListEditor {...editorProps} />
@@ -360,7 +365,7 @@ export function GenericTraitEditors({
   definitions,
   params,
   onParamsChange,
-}: GenericTraitEditorsProps) {
+}: Readonly<GenericTraitEditorsProps>) {
   if (definitions.length === 0) return null;
   return (
     <div className="grid gap-3 lg:grid-cols-2">

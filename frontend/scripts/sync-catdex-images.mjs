@@ -17,7 +17,9 @@ async function main() {
   console.log("Image sync complete.");
 }
 
-main().catch((error) => {
+try {
+  await main();
+} catch (error) {
   console.error("Failed to sync images", error);
   process.exit(1);
-});
+}

@@ -11,7 +11,7 @@ export class ProcessingError extends Error {
 /** Parse a data-URL into its MIME type and a raw Buffer. */
 export function parseDataUrl(dataUrl: string): { mime: string; buffer: Buffer } {
   const match = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(dataUrl);
-  if (!match || !match[1] || !match[2]) {
+  if (!match?.[1] || !match[2]) {
     throw new ProcessingError("Invalid data URL format");
   }
   const buffer = Buffer.from(match[2], "base64");

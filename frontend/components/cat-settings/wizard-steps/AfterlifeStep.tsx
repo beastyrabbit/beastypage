@@ -68,9 +68,9 @@ const VARIANTS = [
 
 function AfterlifeComparison({
   settings,
-}: {
+}: Readonly<{
   settings: WizardStepProps["settings"];
-}) {
+}>) {
   const { generator, ready } = useCatGenerator();
   const [cats, setCats] = useState<(ComparisonCat | null)[]>([
     null,

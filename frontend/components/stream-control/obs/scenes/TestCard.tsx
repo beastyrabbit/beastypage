@@ -9,7 +9,7 @@ import { SPREAD_CANVAS, SPREAD_REGIONS } from "../spreadLayout";
  * instead shows every separated element region with its exact crop
  * coordinates on the larger spread canvas.
  */
-export function TestCard({ spread = false }: { spread?: boolean }) {
+export function TestCard({ spread = false }: Readonly<{ spread?: boolean }>) {
   if (spread) {
     return <SpreadTestCard />;
   }

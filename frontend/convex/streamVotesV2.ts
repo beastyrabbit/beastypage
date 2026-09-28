@@ -31,6 +31,20 @@ function requireAvailableChoice(
   }
 }
 
+/** Call only after verifying host authority. */
+function hostOptionMeta(
+  requested: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const optionMeta: Record<string, unknown> = { streamer: true };
+  // Preserve presentation/provenance only after verifying host authority.
+  for (const key of ["label", "step"] as const) {
+    const value = requested?.[key];
+    if (typeof value === "string") optionMeta[key] = value.slice(0, 160);
+  }
+  if (requested?.via === "coinFlip") optionMeta.via = "coinFlip";
+  return optionMeta;
+}
+
 export const list = query({
   args: {
     session: v.id("stream_sessions"),
@@ -99,13 +113,7 @@ export const create = mutation({
       };
     } else {
       await requireHost(ctx, session);
-      optionMeta = { streamer: true };
-      // Preserve presentation/provenance only after verifying host authority.
-      for (const key of ["label", "step"] as const) {
-        if (typeof args.optionMeta?.[key] === "string")
-          optionMeta[key] = args.optionMeta[key].slice(0, 160);
-      }
-      if (args.optionMeta?.via === "coinFlip") optionMeta.via = "coinFlip";
+      optionMeta = hostOptionMeta(args.optionMeta);
     }
     const nowTs = Date.now();
     const insertDoc = {

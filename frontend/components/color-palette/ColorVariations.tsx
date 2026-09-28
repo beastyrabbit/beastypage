@@ -21,6 +21,12 @@ interface ColorVariationsProps {
 const BRIGHTNESS_STEPS = [-30, -15, 0, 15, 30];
 const HUE_STEPS = [-30, -20, -10, 0, 10, 20, 30];
 
+function formatStepLabel(step: number, unit: string): string {
+  if (step === 0) return "Original";
+  const sign = step > 0 ? "+" : "";
+  return `${sign}${step}${unit}`;
+}
+
 export function ColorVariations({ color }: Readonly<ColorVariationsProps>) {
   const brightnessVariations = useMemo(
     () =>
@@ -28,7 +34,7 @@ export function ColorVariations({ color }: Readonly<ColorVariationsProps>) {
         const adjusted = adjustBrightness(color.rgb, step);
         return {
           hex: rgbToHex(adjusted),
-          label: step === 0 ? "Original" : `${step > 0 ? "+" : ""}${step}%`,
+          label: formatStepLabel(step, "%"),
         };
       }),
     [color.rgb],
@@ -40,7 +46,7 @@ export function ColorVariations({ color }: Readonly<ColorVariationsProps>) {
         const adjusted = adjustHue(color.rgb, step);
         return {
           hex: rgbToHex(adjusted),
-          label: step === 0 ? "Original" : `${step > 0 ? "+" : ""}${step}°`,
+          label: formatStepLabel(step, "°"),
         };
       }),
     [color.rgb],

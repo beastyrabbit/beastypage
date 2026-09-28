@@ -762,7 +762,7 @@ function readStrategyManifest(): {
   }
   const manifest = readJson<StrategyManifest>(manifestPath);
   if (!Array.isArray(manifest.strategies)) {
-    throw new Error("Python strategy manifest has no strategies array");
+    throw new TypeError("Python strategy manifest has no strategies array");
   }
   const hash = createHash("sha256")
     .update(readFileSync(manifestPath))
@@ -954,10 +954,152 @@ function assertSpriteAsset(
   if (error) throw new Error(`${label} ${error}`);
 }
 
+type BooleanSpriteLayerOperation = Extract<
+  RenderOperationBinding,
+  { strategy: "booleanSpriteLayer" }
+>;
+type SpriteLayerOperation = Extract<
+  RenderOperationBinding,
+  { strategy: "spriteLayer" }
+>;
+type CatalogSpriteListOperation = Extract<
+  RenderOperationBinding,
+  { strategy: "catalogSpriteList" }
+>;
+type ReadonlyCatalogs = Readonly<
+  Record<string, readonly PublicCatalogElement[]>
+>;
+
+function validateBooleanSpriteLayerAssets(
+  operation: BooleanSpriteLayerOperation,
+  inventory: SpriteAssetInventory,
+): void {
+  if (operation.config.spriteKeys.length === 0) {
+    throw new Error(`${operation.operationId}.config.spriteKeys is empty`);
+  }
+  for (const spriteKey of operation.config.spriteKeys) {
+    assertSpriteAsset(
+      spriteKey,
+      `${operation.operationId}.config.spriteKeys`,
+      inventory,
+    );
+  }
+}
+
+function assertKnownCatalogValues(
+  values: readonly string[],
+  elementIds: ReadonlySet<string>,
+  label: string,
+): void {
+  for (const value of values) {
+    if (!elementIds.has(value)) {
+      throw new Error(`${label} maps unknown catalog value ${value}`);
+    }
+  }
+}
+
+function validateSpriteLayerAssets(
+  operation: SpriteLayerOperation,
+  traitById: ReadonlyMap<string, AnyCatTraitDefinition>,
+  catalogs: ReadonlyCatalogs,
+  inventory: SpriteAssetInventory,
+): void {
+  for (const [value, spriteKey] of Object.entries(
+    operation.config.spriteByValue ?? {},
+  )) {
+    assertSpriteAsset(
+      spriteKey,
+      `${operation.operationId}.config.spriteByValue.${value}`,
+      inventory,
+    );
+  }
+  const trait = traitById.get(operation.config.valueTrait);
+  const catalogId = trait?.value.catalog;
+  if (!catalogId) return;
+  const elements = catalogs[catalogId];
+  if (!elements) {
+    throw new Error(
+      `${operation.operationId} cannot resolve value catalog ${catalogId}`,
+    );
+  }
+  const elementIds = new Set(elements.map((element) => element.id));
+  assertKnownCatalogValues(
+    Object.keys(operation.config.spriteByValue ?? {}),
+    elementIds,
+    `${operation.operationId}.config.spriteByValue`,
+  );
+  for (const element of elements) {
+    if (isEmptyRenderableValue(element.id)) continue;
+    assertSpriteAsset(
+      spriteLayerKey(operation, element.id),
+      `${operation.operationId} value ${element.id}`,
+      inventory,
+    );
+  }
+}
+
+function catalogSpriteListKey(
+  operation: CatalogSpriteListOperation,
+  element: PublicCatalogElement,
+): string | undefined {
+  if (operation.config.resolver === "direct") return element.id;
+  if (operation.config.resolver === "mapping") {
+    return operation.config.sprites?.[element.id] ?? element.spriteKey;
+  }
+  return element.spriteKey;
+}
+
+function validateCatalogSpriteListAssets(
+  operation: CatalogSpriteListOperation,
+  catalogs: ReadonlyCatalogs,
+  inventory: SpriteAssetInventory,
+): void {
+  const elements = catalogs[operation.config.catalog];
+  if (!elements) {
+    throw new Error(
+      `${operation.operationId} cannot resolve catalog ${operation.config.catalog}`,
+    );
+  }
+  const elementIds = new Set(elements.map((element) => element.id));
+  for (const [value, spriteKey] of Object.entries(
+    operation.config.sprites ?? {},
+  )) {
+    if (!elementIds.has(value)) {
+      throw new Error(
+        `${operation.operationId}.config.sprites maps unknown catalog value ${value}`,
+      );
+    }
+    assertSpriteAsset(
+      spriteKey,
+      `${operation.operationId}.config.sprites.${value}`,
+      inventory,
+    );
+  }
+  assertKnownCatalogValues(
+    Object.keys(operation.config.availablePoses ?? {}),
+    elementIds,
+    `${operation.operationId}.config.availablePoses`,
+  );
+  for (const element of elements) {
+    if (isEmptyRenderableValue(element.id)) continue;
+    const spriteKey = catalogSpriteListKey(operation, element);
+    if (!spriteKey) {
+      throw new Error(
+        `${operation.operationId} has no ${operation.config.resolver} sprite mapping for ${element.id}`,
+      );
+    }
+    assertSpriteAsset(
+      spriteKey,
+      `${operation.operationId} value ${element.id}`,
+      inventory,
+    );
+  }
+}
+
 export function validateRenderStrategyAssets(
   system: CatSystemDefinition,
   operations: readonly RenderOperationBinding[],
-  catalogs: Readonly<Record<string, readonly PublicCatalogElement[]>>,
+  catalogs: ReadonlyCatalogs,
   inventory: SpriteAssetInventory,
 ): void {
   const traitById = new Map(
@@ -966,104 +1108,11 @@ export function validateRenderStrategyAssets(
 
   for (const operation of operations) {
     if (operation.strategy === "booleanSpriteLayer") {
-      if (operation.config.spriteKeys.length === 0) {
-        throw new Error(`${operation.operationId}.config.spriteKeys is empty`);
-      }
-      for (const spriteKey of operation.config.spriteKeys) {
-        assertSpriteAsset(
-          spriteKey,
-          `${operation.operationId}.config.spriteKeys`,
-          inventory,
-        );
-      }
-      continue;
-    }
-
-    if (operation.strategy === "spriteLayer") {
-      for (const [value, spriteKey] of Object.entries(
-        operation.config.spriteByValue ?? {},
-      )) {
-        assertSpriteAsset(
-          spriteKey,
-          `${operation.operationId}.config.spriteByValue.${value}`,
-          inventory,
-        );
-      }
-      const trait = traitById.get(operation.config.valueTrait);
-      const catalogId = trait?.value.catalog;
-      if (!catalogId) continue;
-      const elements = catalogs[catalogId];
-      if (!elements) {
-        throw new Error(
-          `${operation.operationId} cannot resolve value catalog ${catalogId}`,
-        );
-      }
-      const elementIds = new Set(elements.map((element) => element.id));
-      for (const value of Object.keys(operation.config.spriteByValue ?? {})) {
-        if (!elementIds.has(value)) {
-          throw new Error(
-            `${operation.operationId}.config.spriteByValue maps unknown catalog value ${value}`,
-          );
-        }
-      }
-      for (const element of elements) {
-        if (isEmptyRenderableValue(element.id)) continue;
-        assertSpriteAsset(
-          spriteLayerKey(operation, element.id),
-          `${operation.operationId} value ${element.id}`,
-          inventory,
-        );
-      }
-      continue;
-    }
-
-    if (operation.strategy !== "catalogSpriteList") continue;
-    const elements = catalogs[operation.config.catalog];
-    if (!elements) {
-      throw new Error(
-        `${operation.operationId} cannot resolve catalog ${operation.config.catalog}`,
-      );
-    }
-    const elementIds = new Set(elements.map((element) => element.id));
-    for (const [value, spriteKey] of Object.entries(
-      operation.config.sprites ?? {},
-    )) {
-      if (!elementIds.has(value)) {
-        throw new Error(
-          `${operation.operationId}.config.sprites maps unknown catalog value ${value}`,
-        );
-      }
-      assertSpriteAsset(
-        spriteKey,
-        `${operation.operationId}.config.sprites.${value}`,
-        inventory,
-      );
-    }
-    for (const value of Object.keys(operation.config.availablePoses ?? {})) {
-      if (!elementIds.has(value)) {
-        throw new Error(
-          `${operation.operationId}.config.availablePoses maps unknown catalog value ${value}`,
-        );
-      }
-    }
-    for (const element of elements) {
-      if (isEmptyRenderableValue(element.id)) continue;
-      const spriteKey =
-        operation.config.resolver === "direct"
-          ? element.id
-          : operation.config.resolver === "mapping"
-            ? (operation.config.sprites?.[element.id] ?? element.spriteKey)
-            : element.spriteKey;
-      if (!spriteKey) {
-        throw new Error(
-          `${operation.operationId} has no ${operation.config.resolver} sprite mapping for ${element.id}`,
-        );
-      }
-      assertSpriteAsset(
-        spriteKey,
-        `${operation.operationId} value ${element.id}`,
-        inventory,
-      );
+      validateBooleanSpriteLayerAssets(operation, inventory);
+    } else if (operation.strategy === "spriteLayer") {
+      validateSpriteLayerAssets(operation, traitById, catalogs, inventory);
+    } else if (operation.strategy === "catalogSpriteList") {
+      validateCatalogSpriteListAssets(operation, catalogs, inventory);
     }
   }
 }

@@ -43,6 +43,10 @@ export function formatValue(value: string) {
     .replace(/\b\w/g, (match) => match.toUpperCase());
 }
 
+function valueToText(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
 export function formatAddition(addition: EvolutionAddition) {
   if (addition.kind === "tortie") {
     return [addition.value.mask, addition.value.pattern, addition.value.colour]
@@ -55,7 +59,9 @@ export function formatAddition(addition: EvolutionAddition) {
   }
   if (typeof addition.value === "string") return formatValue(addition.value);
   if (Array.isArray(addition.value)) {
-    return addition.value.map((value) => formatValue(String(value))).join(", ");
+    return addition.value
+      .map((value) => formatValue(valueToText(value)))
+      .join(", ");
   }
   return JSON.stringify(addition.value);
 }
@@ -136,7 +142,7 @@ export function buildRollDisplayRows(
     return {
       id: `${idPrefix}-roll-${index}`,
       label: roll.label,
-      value: formatValue(String(roll.value)),
+      value: formatValue(valueToText(roll.value)),
     };
   });
 }

@@ -20,7 +20,7 @@ export function VariantBar<T>({
   applyConfig,
   isDirty,
   showToast,
-}: VariantBarProps<T>) {
+}: Readonly<VariantBarProps<T>>) {
   const { isAuthenticated } = useConvexAuth();
   const {
     store,
@@ -66,6 +66,16 @@ export function VariantBar<T>({
         confirmTimerRef.current = null;
       }
     }
+  }, [manageOpen]);
+
+  // Close manage popup on Escape
+  useEffect(() => {
+    if (!manageOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setManageOpen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [manageOpen]);
 
   useEffect(() => {
@@ -242,20 +252,17 @@ export function VariantBar<T>({
 
       {/* Manage popup */}
       {manageOpen && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70"
-          role="button"
-          tabIndex={0}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setManageOpen(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.preventDefault();
-              setManageOpen(false);
-            }
-          }}
+        <dialog
+          open
+          aria-modal="true"
+          className="fixed inset-0 z-[70] flex h-full max-h-none w-full max-w-none items-center justify-center bg-black/70 text-inherit"
         >
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => setManageOpen(false)}
+            className="absolute inset-0 cursor-default"
+          />
           <div className="relative mx-4 w-full max-w-md rounded-3xl border border-border/40 bg-background/95 p-6 shadow-2xl backdrop-blur">
             <button
               type="button"
@@ -359,7 +366,7 @@ export function VariantBar<T>({
               </p>
             )}
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );
