@@ -318,8 +318,7 @@ function WorkStatusPanel({
       </div>
       {work.kind === "error" &&
       files.length === 1 &&
-      activeUpload &&
-      files[0]?.size === activeUpload.size ? (
+      files[0]?.size === activeUpload?.size ? (
         <button
           type="button"
           className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-300/30 px-3 py-2 text-xs font-semibold hover:bg-red-500/10"
