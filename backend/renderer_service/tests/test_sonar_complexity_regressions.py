@@ -110,8 +110,9 @@ def test_schema_alternatives_and_reference_accept_valid_values(value):
 @pytest.mark.parametrize("value", [False, -1, "no", [], {}])
 def test_schema_alternatives_preserve_rejection(value):
     schema = _alternative_schema()
+    document = CatDocument(schemaVersion=1, traits={"choice": value})
     with pytest.raises(InvalidCatDocument, match="does not match any allowed schema"):
-        schema.validate(CatDocument(schemaVersion=1, traits={"choice": value}))
+        schema.validate(document)
 
 
 def _alternative_schema():
