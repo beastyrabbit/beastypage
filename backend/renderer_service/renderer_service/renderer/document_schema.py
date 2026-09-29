@@ -134,15 +134,8 @@ class CatDocumentSchema:
 
         alternatives = schema.get("anyOf")
         if isinstance(alternatives, list):
-            for alternative in alternatives:
-                if not isinstance(alternative, dict):
-                    continue
-                try:
-                    self._validate_node(value, alternative, path)
-                except InvalidCatDocument:
-                    continue
-                return
-            raise InvalidCatDocument(f"{path} does not match any allowed schema")
+            self._validate_alternatives(value, alternatives, path)
+            return
 
         if "const" in schema and value != schema["const"]:
             raise InvalidCatDocument(
@@ -151,7 +144,31 @@ class CatDocumentSchema:
         if "enum" in schema and value not in schema["enum"]:
             raise InvalidCatDocument(f"{path} contains an unsupported value {value!r}")
 
-        expected_type = schema.get("type")
+        self._validate_type(value, schema.get("type"), path)
+
+        if isinstance(value, dict):
+            self._validate_object(value, schema, path)
+        elif isinstance(value, list):
+            self._validate_array(value, schema, path)
+        elif isinstance(value, str):
+            self._validate_string(value, schema, path)
+        elif self._is_number(value):
+            self._validate_number(value, schema, path)
+
+    def _validate_alternatives(
+        self, value: Any, alternatives: list[Any], path: str
+    ) -> None:
+        for alternative in alternatives:
+            if not isinstance(alternative, dict):
+                continue
+            try:
+                self._validate_node(value, alternative, path)
+            except InvalidCatDocument:
+                continue
+            return
+        raise InvalidCatDocument(f"{path} does not match any allowed schema")
+
+    def _validate_type(self, value: Any, expected_type: Any, path: str) -> None:
         if isinstance(expected_type, list):
             if not any(
                 self._matches_type(value, candidate) for candidate in expected_type
@@ -165,15 +182,6 @@ class CatDocumentSchema:
             raise InvalidCatDocument(
                 f"{path} must be {expected_type}, received {type(value).__name__}"
             )
-
-        if isinstance(value, dict):
-            self._validate_object(value, schema, path)
-        elif isinstance(value, list):
-            self._validate_array(value, schema, path)
-        elif isinstance(value, str):
-            self._validate_string(value, schema, path)
-        elif self._is_number(value):
-            self._validate_number(value, schema, path)
 
     def _validate_object(
         self,

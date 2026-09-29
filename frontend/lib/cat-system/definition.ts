@@ -598,6 +598,494 @@ function assertAcyclic(
   for (const node of nodes) visit(node);
 }
 
+function validateTraitIdentity(
+  trait: AnyCatTraitDefinition,
+  ids: Set<string>,
+  catalogIds: ReadonlySet<string>,
+): void {
+  assertTraitContract(trait);
+  if (
+    !/^[a-z][A-Za-z0-9]*$/.test(trait.id) &&
+    !/^__probe_[a-z0-9]+$/.test(trait.id)
+  ) {
+    throw new Error(`Invalid trait id ${trait.id}`);
+  }
+  if (ids.has(trait.id)) throw new Error(`Duplicate trait id ${trait.id}`);
+  ids.add(trait.id);
+  if (trait.value.catalog && !catalogIds.has(trait.value.catalog)) {
+    throw new Error(`${trait.id} uses unknown catalog ${trait.value.catalog}`);
+  }
+}
+
+function validateEditCapability(trait: AnyCatTraitDefinition): void {
+  const edit = trait.capabilities.edit;
+  if (edit === "toggle" && trait.value.kind !== "boolean") {
+    throw new Error(`${trait.id}.edit toggle requires a boolean value`);
+  }
+  if (edit === "select" && trait.value.kind !== "string") {
+    throw new Error(`${trait.id}.edit select requires a string value`);
+  }
+  if (edit === "list" && trait.value.kind !== "stringList") {
+    throw new Error(`${trait.id}.edit list requires a stringList value`);
+  }
+  if (edit === "compoundList" && trait.value.kind !== "objectList") {
+    throw new Error(
+      `${trait.id}.edit compoundList requires an objectList value`,
+    );
+  }
+}
+
+function validateRevealCapability(
+  trait: AnyCatTraitDefinition,
+  catalogIds: ReadonlySet<string>,
+): void {
+  const reveal = trait.capabilities.reveal;
+  if (!reveal) return;
+  if (
+    reveal.spin !== false &&
+    reveal.spin?.order !== undefined &&
+    !Number.isFinite(reveal.spin.order)
+  ) {
+    throw new Error(`${trait.id}.reveal.spin.order must be finite`);
+  }
+  if (
+    reveal.spin !== false &&
+    reveal.spin?.label !== undefined &&
+    !reveal.spin.label.trim()
+  ) {
+    throw new Error(`${trait.id}.reveal.spin.label must not be empty`);
+  }
+  if (
+    reveal.strategy === "single" &&
+    trait.value.kind !== "boolean" &&
+    !hasCatalogBackedValue(trait, catalogIds, "string")
+  ) {
+    throw new Error(
+      `${trait.id}.reveal single requires a boolean or catalog-backed string value`,
+    );
+  }
+  if (
+    reveal.strategy === "slots" &&
+    !hasCatalogBackedValue(trait, catalogIds, "stringList")
+  ) {
+    throw new Error(
+      `${trait.id}.reveal slots requires a catalog-backed stringList value`,
+    );
+  }
+  if (
+    reveal.strategy === "compoundSlots" &&
+    trait.value.kind !== "objectList"
+  ) {
+    throw new Error(
+      `${trait.id}.reveal compoundSlots requires an objectList value`,
+    );
+  }
+}
+
+function validateInheritanceCapabilities(
+  trait: AnyCatTraitDefinition,
+  catalogIds: ReadonlySet<string>,
+): void {
+  if (
+    trait.capabilities.inherit === "mutate" &&
+    !hasCatalogBackedValue(trait, catalogIds, "string") &&
+    !hasCatalogBackedValue(trait, catalogIds, "stringList") &&
+    !hasTortieConsumerContract(trait)
+  ) {
+    throw new Error(
+      `${trait.id}.inherit mutate requires a catalog-backed string or stringList value, or the tortie objectList contract`,
+    );
+  }
+  if (
+    trait.capabilities.evolution === "accumulate" &&
+    trait.value.kind !== "stringList" &&
+    trait.value.kind !== "objectList"
+  ) {
+    throw new Error(`${trait.id}.evolution accumulate requires a list value`);
+  }
+}
+
+function validateGachaContract(
+  trait: AnyCatTraitDefinition,
+  gachaGateProbabilities: Map<string, number>,
+): void {
+  if (
+    ![
+      "none",
+      "catalogChoice",
+      "boolean",
+      "slotList",
+      "tortieList",
+      "derived",
+    ].includes(trait.gacha.strategy)
+  ) {
+    throw new Error(`${trait.id}.gacha has an unknown strategy`);
+  }
+  if (
+    trait.gacha.strategy !== "none" &&
+    trait.gacha.strategy !== "derived" &&
+    trait.gacha.gate
+  ) {
+    const gate = trait.gacha.gate;
+    if (!gate.group.trim()) {
+      throw new Error(`${trait.id}.gacha.gate.group must not be empty`);
+    }
+    assertProbability(gate.probability, `${trait.id}.gacha.gate.probability`);
+    const existingProbability = gachaGateProbabilities.get(gate.group);
+    if (
+      existingProbability !== undefined &&
+      existingProbability !== gate.probability
+    ) {
+      throw new Error(
+        `${trait.id}.gacha.gate ${gate.group} disagrees on probability`,
+      );
+    }
+    gachaGateProbabilities.set(gate.group, gate.probability);
+  }
+  if (
+    trait.capabilities.settings &&
+    trait.gacha.strategy !== "slotList" &&
+    trait.gacha.strategy !== "tortieList"
+  ) {
+    throw new Error(
+      `${trait.id}.settings is reserved for explicit slot-count controls`,
+    );
+  }
+}
+
+function registerRenderOperations(
+  trait: AnyCatTraitDefinition,
+  operations: Map<string, RenderOperationBinding>,
+  operationOwners: Map<string, string>,
+): void {
+  const renderBindings = Array.isArray(trait.render)
+    ? trait.render
+    : [trait.render];
+  for (const binding of renderBindings) {
+    if (binding.kind !== "operation") continue;
+    if (operations.has(binding.operationId)) {
+      throw new Error(`Duplicate render operation ${binding.operationId}`);
+    }
+    operations.set(binding.operationId, binding);
+    operationOwners.set(binding.operationId, trait.id);
+  }
+}
+
+function validateCatalogChoiceGacha(
+  trait: AnyCatTraitDefinition,
+  catalogIds: ReadonlySet<string>,
+): void {
+  if (trait.gacha.strategy !== "catalogChoice") return;
+  if (trait.value.kind !== "string") {
+    throw new Error(`${trait.id}.gacha catalogChoice requires a string value`);
+  }
+  if (!catalogIds.has(trait.gacha.catalog)) {
+    throw new Error(
+      `${trait.id}.gacha uses unknown catalog ${trait.gacha.catalog}`,
+    );
+  }
+  if (trait.gacha.includeUnsetChoice && trait.value.required) {
+    throw new Error(
+      `${trait.id}.gacha includeUnsetChoice requires an optional value`,
+    );
+  }
+  for (const conditional of trait.gacha.conditionalCatalogs ?? []) {
+    if (!catalogIds.has(conditional.catalog)) {
+      throw new Error(
+        `${trait.id}.gacha uses unknown conditional catalog ${conditional.catalog}`,
+      );
+    }
+  }
+  assertProbability(
+    trait.gacha.optionalProbability,
+    `${trait.id}.gacha.optionalProbability`,
+  );
+}
+
+function validateBooleanGacha(trait: AnyCatTraitDefinition): void {
+  if (trait.gacha.strategy !== "boolean") return;
+  if (trait.value.kind !== "boolean") {
+    throw new Error(`${trait.id}.gacha boolean requires a boolean value`);
+  }
+  assertProbability(trait.gacha.probability, `${trait.id}.gacha.probability`);
+}
+
+function validateSlotListGacha(
+  trait: AnyCatTraitDefinition,
+  catalogIds: ReadonlySet<string>,
+): void {
+  if (trait.gacha.strategy !== "slotList") return;
+  if (trait.value.kind !== "stringList") {
+    throw new Error(`${trait.id}.gacha slotList requires a stringList value`);
+  }
+  if (trait.value.unique === true && trait.gacha.unique !== true) {
+    throw new Error(
+      `${trait.id}.gacha must select unique values because its value contract is unique`,
+    );
+  }
+  if (!catalogIds.has(trait.gacha.catalog)) {
+    throw new Error(
+      `${trait.id}.gacha uses unknown catalog ${trait.gacha.catalog}`,
+    );
+  }
+  if (trait.value.catalog !== trait.gacha.catalog) {
+    throw new Error(
+      `${trait.id}.gacha slotList catalog ${trait.gacha.catalog} must match value catalog ${trait.value.catalog ?? "<missing>"}; use an explicit projection strategy for different catalogs`,
+    );
+  }
+  assertProbability(
+    trait.gacha.fillProbability,
+    `${trait.id}.gacha.fillProbability`,
+  );
+  validateCount(trait.gacha.count, `${trait.id}.gacha`, trait.value.maxItems);
+}
+
+function validateTortieListGacha(
+  trait: AnyCatTraitDefinition,
+  catalogIds: ReadonlySet<string>,
+): void {
+  if (trait.gacha.strategy !== "tortieList") return;
+  if (trait.value.kind !== "objectList") {
+    throw new Error(
+      `${trait.id}.gacha tortieList requires an objectList value`,
+    );
+  }
+  for (const catalogId of [
+    trait.gacha.maskCatalog,
+    trait.gacha.peltCatalog,
+    trait.gacha.colourCatalog,
+  ]) {
+    if (!catalogIds.has(catalogId)) {
+      throw new Error(`${trait.id}.gacha uses unknown catalog ${catalogId}`);
+    }
+  }
+  assertProbability(
+    trait.gacha.activationProbability,
+    `${trait.id}.gacha.activationProbability`,
+  );
+  assertProbability(
+    trait.gacha.fillProbability,
+    `${trait.id}.gacha.fillProbability`,
+  );
+  validateCount(trait.gacha.count, `${trait.id}.gacha`, trait.value.maxItems);
+}
+
+function validateDerivedGacha(trait: AnyCatTraitDefinition): void {
+  if (trait.gacha.strategy !== "derived") return;
+  if (trait.value.kind !== "string") {
+    throw new Error(`${trait.id}.gacha derived requires a string value`);
+  }
+  if (trait.gacha.resolver !== "coatChoiceProjection") {
+    throw new Error(`${trait.id}.gacha uses an unknown derived resolver`);
+  }
+  if (!trait.gacha.sourceTrait.trim()) {
+    throw new Error(`${trait.id}.gacha.sourceTrait must not be empty`);
+  }
+  if (!trait.gacha.dependsOn.includes(trait.gacha.sourceTrait)) {
+    throw new Error(
+      `${trait.id}.gacha must depend on source trait ${trait.gacha.sourceTrait}`,
+    );
+  }
+}
+
+function validateConditionalCatalogReferences(
+  trait: AnyCatTraitDefinition,
+  traitById: ReadonlyMap<string, AnyCatTraitDefinition>,
+): void {
+  if (trait.gacha.strategy !== "catalogChoice") return;
+  for (const conditional of trait.gacha.conditionalCatalogs ?? []) {
+    const conditionTrait = traitById.get(conditional.whenTrait);
+    if (!conditionTrait) {
+      throw new Error(
+        `${trait.id}.gacha conditional catalog references unknown trait ${conditional.whenTrait}`,
+      );
+    }
+    if (
+      conditional.condition === "nonEmptyList" &&
+      conditionTrait.value.kind !== "stringList" &&
+      conditionTrait.value.kind !== "objectList"
+    ) {
+      throw new Error(
+        `${trait.id}.gacha nonEmptyList condition requires a list trait`,
+      );
+    }
+    if (!(trait.gacha.dependsOn ?? []).includes(conditional.whenTrait)) {
+      throw new Error(
+        `${trait.id}.gacha must depend on conditional trait ${conditional.whenTrait}`,
+      );
+    }
+  }
+}
+
+function validateGachaReferences(
+  trait: AnyCatTraitDefinition,
+  traitById: ReadonlyMap<string, AnyCatTraitDefinition>,
+): void {
+  validateConditionalCatalogReferences(trait, traitById);
+  if (trait.gacha.strategy !== "derived") return;
+  const sourceTrait = traitById.get(trait.gacha.sourceTrait);
+  if (!sourceTrait) {
+    throw new Error(
+      `${trait.id}.gacha derives from unknown trait ${trait.gacha.sourceTrait}`,
+    );
+  }
+  if (sourceTrait.value.kind !== "string") {
+    throw new Error(
+      `${trait.id}.gacha resolver ${trait.gacha.resolver} requires a string source trait`,
+    );
+  }
+}
+
+function validateCompositeCatalog(
+  catalogId: string,
+  catalog: CatalogDefinition,
+  catalogIds: ReadonlySet<string>,
+): void {
+  if (catalog.source !== "composite") return;
+  for (const dependency of catalog.catalogs) {
+    if (!catalogIds.has(dependency)) {
+      throw new Error(`${catalogId} includes unknown catalog ${dependency}`);
+    }
+    if (dependency === catalogId) {
+      throw new Error(`${catalogId} cannot include itself`);
+    }
+  }
+  for (const selectable of catalog.selectableCatalogs ?? []) {
+    if (!catalog.catalogs.includes(selectable)) {
+      throw new Error(
+        `${catalogId}.selectableCatalogs includes non-member ${selectable}`,
+      );
+    }
+  }
+}
+
+function validateStaticCatalog(
+  catalogId: string,
+  catalog: CatalogDefinition,
+): void {
+  if (catalog.source !== "static") return;
+  const elementIds = new Set<string>();
+  for (const element of catalog.elements) {
+    if (!element.id.trim())
+      throw new Error(`${catalogId} has an empty element id`);
+    if (elementIds.has(element.id)) {
+      throw new Error(`${catalogId} has duplicate element ${element.id}`);
+    }
+    elementIds.add(element.id);
+    if (
+      element.weight !== undefined &&
+      (!Number.isFinite(element.weight) || element.weight <= 0)
+    ) {
+      throw new Error(`${catalogId}.${element.id} has an invalid weight`);
+    }
+  }
+}
+
+function validateRenderInputs(
+  trait: AnyCatTraitDefinition,
+  operations: ReadonlyMap<string, RenderOperationBinding>,
+): void {
+  const renderBindings = Array.isArray(trait.render)
+    ? trait.render
+    : [trait.render];
+  for (const binding of renderBindings) {
+    if (binding.kind !== "input") continue;
+    const operation = operations.get(binding.operationId);
+    if (!operation) {
+      throw new Error(
+        `${trait.id} references unknown render operation ${binding.operationId}`,
+      );
+    }
+    if (!(operation.reads ?? []).includes(trait.id)) {
+      throw new Error(
+        `${trait.id} render input ${binding.operationId} must declare ${trait.id} in reads`,
+      );
+    }
+  }
+}
+
+function validateOperationReferences(
+  id: string,
+  operation: RenderOperationBinding,
+  ids: ReadonlySet<string>,
+  catalogIds: ReadonlySet<string>,
+): void {
+  const config = operation.config as Record<string, unknown>;
+  for (const configKey of ["valueTrait", "tintTrait"] as const) {
+    const traitId = config[configKey];
+    if (typeof traitId !== "string") continue;
+    if (!ids.has(traitId)) {
+      throw new Error(
+        `${id}.config.${configKey} references unknown trait ${traitId}`,
+      );
+    }
+    if (!(operation.reads ?? []).includes(traitId)) {
+      throw new Error(`${id}.config.${configKey} must be declared in reads`);
+    }
+  }
+  if (
+    operation.strategy === "catalogSpriteList" &&
+    !catalogIds.has(operation.config.catalog)
+  ) {
+    throw new Error(
+      `${id}.config uses unknown catalog ${operation.config.catalog}`,
+    );
+  }
+  for (const traitId of operation.reads ?? []) {
+    if (!ids.has(traitId)) {
+      throw new Error(`${id} reads unknown trait ${traitId}`);
+    }
+  }
+}
+
+function validateOperationValueKinds(
+  id: string,
+  operation: RenderOperationBinding,
+  operationOwners: ReadonlyMap<string, string>,
+  traitById: ReadonlyMap<string, AnyCatTraitDefinition>,
+): void {
+  const config = operation.config as Record<string, unknown>;
+  const requireConfiguredTraitKind = (
+    configKey: "valueTrait" | "tintTrait",
+    expectedKind: TraitValueKind,
+  ): void => {
+    const traitId = config[configKey];
+    if (typeof traitId !== "string") {
+      throw new TypeError(`${id}.config.${configKey} must reference a trait`);
+    }
+    const configuredTrait = traitById.get(traitId);
+    if (!configuredTrait) return;
+    if (configuredTrait.value.kind !== expectedKind) {
+      throw new Error(
+        `${id}.${operation.strategy} requires ${configKey} ${traitId} to use a ${expectedKind} value`,
+      );
+    }
+  };
+
+  if (operation.strategy === "spriteLayer") {
+    requireConfiguredTraitKind("valueTrait", "string");
+    if (operation.config.tintTrait !== undefined) {
+      requireConfiguredTraitKind("tintTrait", "string");
+    }
+  } else if (operation.strategy === "catalogSpriteList") {
+    requireConfiguredTraitKind("valueTrait", "stringList");
+  } else if (
+    operation.strategy === "booleanSpriteLayer" ||
+    operation.strategy === "solidMultiply" ||
+    operation.strategy === "globalMirror"
+  ) {
+    requireConfiguredTraitKind("valueTrait", "boolean");
+  } else if (operation.strategy === "tintMultiply") {
+    const ownerId = operationOwners.get(id);
+    const owner = ownerId === undefined ? undefined : traitById.get(ownerId);
+    if (owner && owner.value.kind !== "string") {
+      throw new Error(
+        `${id}.tintMultiply requires owner trait ${owner.id} to use a string value`,
+      );
+    }
+  }
+}
+
 export function defineCatSystem<
   const TTraits extends readonly AnyCatTraitDefinition[],
   const TCatalogs extends Readonly<Record<string, CatalogDefinition>>,
@@ -617,432 +1105,40 @@ export function defineCatSystem<
   const operationOwners = new Map<string, string>();
   const gachaGateProbabilities = new Map<string, number>();
   for (const trait of definition.traits) {
-    assertTraitContract(trait);
-    if (
-      !/^[a-z][A-Za-z0-9]*$/.test(trait.id) &&
-      !/^__probe_[a-z0-9]+$/.test(trait.id)
-    ) {
-      throw new Error(`Invalid trait id ${trait.id}`);
-    }
-    if (ids.has(trait.id)) throw new Error(`Duplicate trait id ${trait.id}`);
-    ids.add(trait.id);
-    if (trait.value.catalog && !catalogIds.has(trait.value.catalog)) {
-      throw new Error(
-        `${trait.id} uses unknown catalog ${trait.value.catalog}`,
-      );
-    }
-    const edit = trait.capabilities.edit;
-    if (edit === "toggle" && trait.value.kind !== "boolean") {
-      throw new Error(`${trait.id}.edit toggle requires a boolean value`);
-    }
-    if (edit === "select" && trait.value.kind !== "string") {
-      throw new Error(`${trait.id}.edit select requires a string value`);
-    }
-    if (edit === "list" && trait.value.kind !== "stringList") {
-      throw new Error(`${trait.id}.edit list requires a stringList value`);
-    }
-    if (edit === "compoundList" && trait.value.kind !== "objectList") {
-      throw new Error(
-        `${trait.id}.edit compoundList requires an objectList value`,
-      );
-    }
-    const reveal = trait.capabilities.reveal;
-    if (reveal) {
-      if (
-        reveal.spin !== false &&
-        reveal.spin?.order !== undefined &&
-        !Number.isFinite(reveal.spin.order)
-      ) {
-        throw new Error(`${trait.id}.reveal.spin.order must be finite`);
-      }
-      if (
-        reveal.spin !== false &&
-        reveal.spin?.label !== undefined &&
-        !reveal.spin.label.trim()
-      ) {
-        throw new Error(`${trait.id}.reveal.spin.label must not be empty`);
-      }
-      if (
-        reveal.strategy === "single" &&
-        trait.value.kind !== "boolean" &&
-        !hasCatalogBackedValue(trait, catalogIds, "string")
-      ) {
-        throw new Error(
-          `${trait.id}.reveal single requires a boolean or catalog-backed string value`,
-        );
-      }
-      if (
-        reveal.strategy === "slots" &&
-        !hasCatalogBackedValue(trait, catalogIds, "stringList")
-      ) {
-        throw new Error(
-          `${trait.id}.reveal slots requires a catalog-backed stringList value`,
-        );
-      }
-      if (
-        reveal.strategy === "compoundSlots" &&
-        trait.value.kind !== "objectList"
-      ) {
-        throw new Error(
-          `${trait.id}.reveal compoundSlots requires an objectList value`,
-        );
-      }
-    }
-    if (
-      trait.capabilities.inherit === "mutate" &&
-      !hasCatalogBackedValue(trait, catalogIds, "string") &&
-      !hasCatalogBackedValue(trait, catalogIds, "stringList") &&
-      !hasTortieConsumerContract(trait)
-    ) {
-      throw new Error(
-        `${trait.id}.inherit mutate requires a catalog-backed string or stringList value, or the tortie objectList contract`,
-      );
-    }
-    if (
-      trait.capabilities.evolution === "accumulate" &&
-      trait.value.kind !== "stringList" &&
-      trait.value.kind !== "objectList"
-    ) {
-      throw new Error(`${trait.id}.evolution accumulate requires a list value`);
-    }
-    if (
-      ![
-        "none",
-        "catalogChoice",
-        "boolean",
-        "slotList",
-        "tortieList",
-        "derived",
-      ].includes(trait.gacha.strategy)
-    ) {
-      throw new Error(`${trait.id}.gacha has an unknown strategy`);
-    }
-    if (
-      trait.gacha.strategy !== "none" &&
-      trait.gacha.strategy !== "derived" &&
-      trait.gacha.gate
-    ) {
-      const gate = trait.gacha.gate;
-      if (!gate.group.trim()) {
-        throw new Error(`${trait.id}.gacha.gate.group must not be empty`);
-      }
-      assertProbability(gate.probability, `${trait.id}.gacha.gate.probability`);
-      const existingProbability = gachaGateProbabilities.get(gate.group);
-      if (
-        existingProbability !== undefined &&
-        existingProbability !== gate.probability
-      ) {
-        throw new Error(
-          `${trait.id}.gacha.gate ${gate.group} disagrees on probability`,
-        );
-      }
-      gachaGateProbabilities.set(gate.group, gate.probability);
-    }
-    if (
-      trait.capabilities.settings &&
-      trait.gacha.strategy !== "slotList" &&
-      trait.gacha.strategy !== "tortieList"
-    ) {
-      throw new Error(
-        `${trait.id}.settings is reserved for explicit slot-count controls`,
-      );
-    }
-    const renderBindings = Array.isArray(trait.render)
-      ? trait.render
-      : [trait.render];
-    for (const binding of renderBindings) {
-      if (binding.kind !== "operation") continue;
-      if (operations.has(binding.operationId)) {
-        throw new Error(`Duplicate render operation ${binding.operationId}`);
-      }
-      operations.set(binding.operationId, binding);
-      operationOwners.set(binding.operationId, trait.id);
-    }
-
-    if (trait.gacha.strategy === "catalogChoice") {
-      if (trait.value.kind !== "string") {
-        throw new Error(
-          `${trait.id}.gacha catalogChoice requires a string value`,
-        );
-      }
-      if (!catalogIds.has(trait.gacha.catalog)) {
-        throw new Error(
-          `${trait.id}.gacha uses unknown catalog ${trait.gacha.catalog}`,
-        );
-      }
-      if (trait.gacha.includeUnsetChoice && trait.value.required) {
-        throw new Error(
-          `${trait.id}.gacha includeUnsetChoice requires an optional value`,
-        );
-      }
-      for (const conditional of trait.gacha.conditionalCatalogs ?? []) {
-        if (!catalogIds.has(conditional.catalog)) {
-          throw new Error(
-            `${trait.id}.gacha uses unknown conditional catalog ${conditional.catalog}`,
-          );
-        }
-      }
-      assertProbability(
-        trait.gacha.optionalProbability,
-        `${trait.id}.gacha.optionalProbability`,
-      );
-    } else if (trait.gacha.strategy === "boolean") {
-      if (trait.value.kind !== "boolean") {
-        throw new Error(`${trait.id}.gacha boolean requires a boolean value`);
-      }
-      assertProbability(
-        trait.gacha.probability,
-        `${trait.id}.gacha.probability`,
-      );
-    } else if (trait.gacha.strategy === "slotList") {
-      if (trait.value.kind !== "stringList") {
-        throw new Error(
-          `${trait.id}.gacha slotList requires a stringList value`,
-        );
-      }
-      if (trait.value.unique === true && trait.gacha.unique !== true) {
-        throw new Error(
-          `${trait.id}.gacha must select unique values because its value contract is unique`,
-        );
-      }
-      if (!catalogIds.has(trait.gacha.catalog)) {
-        throw new Error(
-          `${trait.id}.gacha uses unknown catalog ${trait.gacha.catalog}`,
-        );
-      }
-      if (trait.value.catalog !== trait.gacha.catalog) {
-        throw new Error(
-          `${trait.id}.gacha slotList catalog ${trait.gacha.catalog} must match value catalog ${trait.value.catalog ?? "<missing>"}; use an explicit projection strategy for different catalogs`,
-        );
-      }
-      assertProbability(
-        trait.gacha.fillProbability,
-        `${trait.id}.gacha.fillProbability`,
-      );
-      validateCount(
-        trait.gacha.count,
-        `${trait.id}.gacha`,
-        trait.value.maxItems,
-      );
-    } else if (trait.gacha.strategy === "tortieList") {
-      if (trait.value.kind !== "objectList") {
-        throw new Error(
-          `${trait.id}.gacha tortieList requires an objectList value`,
-        );
-      }
-      for (const catalogId of [
-        trait.gacha.maskCatalog,
-        trait.gacha.peltCatalog,
-        trait.gacha.colourCatalog,
-      ]) {
-        if (!catalogIds.has(catalogId)) {
-          throw new Error(
-            `${trait.id}.gacha uses unknown catalog ${catalogId}`,
-          );
-        }
-      }
-      assertProbability(
-        trait.gacha.activationProbability,
-        `${trait.id}.gacha.activationProbability`,
-      );
-      assertProbability(
-        trait.gacha.fillProbability,
-        `${trait.id}.gacha.fillProbability`,
-      );
-      validateCount(
-        trait.gacha.count,
-        `${trait.id}.gacha`,
-        trait.value.maxItems,
-      );
-    } else if (trait.gacha.strategy === "derived") {
-      if (trait.value.kind !== "string") {
-        throw new Error(`${trait.id}.gacha derived requires a string value`);
-      }
-      if (trait.gacha.resolver !== "coatChoiceProjection") {
-        throw new Error(`${trait.id}.gacha uses an unknown derived resolver`);
-      }
-      if (!trait.gacha.sourceTrait.trim()) {
-        throw new Error(`${trait.id}.gacha.sourceTrait must not be empty`);
-      }
-      if (!trait.gacha.dependsOn.includes(trait.gacha.sourceTrait)) {
-        throw new Error(
-          `${trait.id}.gacha must depend on source trait ${trait.gacha.sourceTrait}`,
-        );
-      }
-    }
+    validateTraitIdentity(trait, ids, catalogIds);
+    validateEditCapability(trait);
+    validateRevealCapability(trait, catalogIds);
+    validateInheritanceCapabilities(trait, catalogIds);
+    validateGachaContract(trait, gachaGateProbabilities);
+    registerRenderOperations(trait, operations, operationOwners);
+    validateCatalogChoiceGacha(trait, catalogIds);
+    validateBooleanGacha(trait);
+    validateSlotListGacha(trait, catalogIds);
+    validateTortieListGacha(trait, catalogIds);
+    validateDerivedGacha(trait);
   }
 
   const traitById = new Map(
     definition.traits.map((trait) => [trait.id, trait] as const),
   );
   for (const trait of definition.traits) {
-    if (trait.gacha.strategy === "catalogChoice") {
-      for (const conditional of trait.gacha.conditionalCatalogs ?? []) {
-        const conditionTrait = traitById.get(conditional.whenTrait);
-        if (!conditionTrait) {
-          throw new Error(
-            `${trait.id}.gacha conditional catalog references unknown trait ${conditional.whenTrait}`,
-          );
-        }
-        if (
-          conditional.condition === "nonEmptyList" &&
-          conditionTrait.value.kind !== "stringList" &&
-          conditionTrait.value.kind !== "objectList"
-        ) {
-          throw new Error(
-            `${trait.id}.gacha nonEmptyList condition requires a list trait`,
-          );
-        }
-        if (!(trait.gacha.dependsOn ?? []).includes(conditional.whenTrait)) {
-          throw new Error(
-            `${trait.id}.gacha must depend on conditional trait ${conditional.whenTrait}`,
-          );
-        }
-      }
-    }
-    if (trait.gacha.strategy !== "derived") continue;
-    const sourceTrait = traitById.get(trait.gacha.sourceTrait);
-    if (!sourceTrait) {
-      throw new Error(
-        `${trait.id}.gacha derives from unknown trait ${trait.gacha.sourceTrait}`,
-      );
-    }
-    if (sourceTrait.value.kind !== "string") {
-      throw new Error(
-        `${trait.id}.gacha resolver ${trait.gacha.resolver} requires a string source trait`,
-      );
-    }
+    validateGachaReferences(trait, traitById);
   }
 
   for (const [catalogId, catalog] of Object.entries(definition.catalogs)) {
-    if (catalog.source === "composite") {
-      for (const dependency of catalog.catalogs) {
-        if (!catalogIds.has(dependency)) {
-          throw new Error(
-            `${catalogId} includes unknown catalog ${dependency}`,
-          );
-        }
-        if (dependency === catalogId) {
-          throw new Error(`${catalogId} cannot include itself`);
-        }
-      }
-      for (const selectable of catalog.selectableCatalogs ?? []) {
-        if (!catalog.catalogs.includes(selectable)) {
-          throw new Error(
-            `${catalogId}.selectableCatalogs includes non-member ${selectable}`,
-          );
-        }
-      }
-    } else if (catalog.source === "static") {
-      const elementIds = new Set<string>();
-      for (const element of catalog.elements) {
-        if (!element.id.trim())
-          throw new Error(`${catalogId} has an empty element id`);
-        if (elementIds.has(element.id)) {
-          throw new Error(`${catalogId} has duplicate element ${element.id}`);
-        }
-        elementIds.add(element.id);
-        if (
-          element.weight !== undefined &&
-          (!Number.isFinite(element.weight) || element.weight <= 0)
-        ) {
-          throw new Error(`${catalogId}.${element.id} has an invalid weight`);
-        }
-      }
-    }
+    validateCompositeCatalog(catalogId, catalog, catalogIds);
+    validateStaticCatalog(catalogId, catalog);
   }
 
   for (const trait of definition.traits) {
-    const renderBindings = Array.isArray(trait.render)
-      ? trait.render
-      : [trait.render];
-    for (const binding of renderBindings) {
-      if (binding.kind !== "input") continue;
-      const operation = operations.get(binding.operationId);
-      if (!operation) {
-        throw new Error(
-          `${trait.id} references unknown render operation ${binding.operationId}`,
-        );
-      }
-      if (!(operation.reads ?? []).includes(trait.id)) {
-        throw new Error(
-          `${trait.id} render input ${binding.operationId} must declare ${trait.id} in reads`,
-        );
-      }
-    }
+    validateRenderInputs(trait, operations);
   }
 
   const operationDependencies = new Map<string, readonly string[]>();
   for (const [id, operation] of operations) {
     operationDependencies.set(id, operation.after ?? []);
-    const config = operation.config as Record<string, unknown>;
-    for (const configKey of ["valueTrait", "tintTrait"] as const) {
-      const traitId = config[configKey];
-      if (typeof traitId !== "string") continue;
-      if (!ids.has(traitId)) {
-        throw new Error(
-          `${id}.config.${configKey} references unknown trait ${traitId}`,
-        );
-      }
-      if (!(operation.reads ?? []).includes(traitId)) {
-        throw new Error(`${id}.config.${configKey} must be declared in reads`);
-      }
-    }
-    if (
-      operation.strategy === "catalogSpriteList" &&
-      !catalogIds.has(operation.config.catalog)
-    ) {
-      throw new Error(
-        `${id}.config uses unknown catalog ${operation.config.catalog}`,
-      );
-    }
-    for (const traitId of operation.reads ?? []) {
-      if (!ids.has(traitId)) {
-        throw new Error(`${id} reads unknown trait ${traitId}`);
-      }
-    }
-
-    const requireConfiguredTraitKind = (
-      configKey: "valueTrait" | "tintTrait",
-      expectedKind: TraitValueKind,
-    ): void => {
-      const traitId = config[configKey];
-      if (typeof traitId !== "string") {
-        throw new TypeError(
-          `${id}.config.${configKey} must reference a trait`,
-        );
-      }
-      const configuredTrait = traitById.get(traitId);
-      if (!configuredTrait) return;
-      if (configuredTrait.value.kind !== expectedKind) {
-        throw new Error(
-          `${id}.${operation.strategy} requires ${configKey} ${traitId} to use a ${expectedKind} value`,
-        );
-      }
-    };
-
-    if (operation.strategy === "spriteLayer") {
-      requireConfiguredTraitKind("valueTrait", "string");
-      if (operation.config.tintTrait !== undefined) {
-        requireConfiguredTraitKind("tintTrait", "string");
-      }
-    } else if (operation.strategy === "catalogSpriteList") {
-      requireConfiguredTraitKind("valueTrait", "stringList");
-    } else if (
-      operation.strategy === "booleanSpriteLayer" ||
-      operation.strategy === "solidMultiply" ||
-      operation.strategy === "globalMirror"
-    ) {
-      requireConfiguredTraitKind("valueTrait", "boolean");
-    } else if (operation.strategy === "tintMultiply") {
-      const ownerId = operationOwners.get(id);
-      const owner = ownerId === undefined ? undefined : traitById.get(ownerId);
-      if (owner && owner.value.kind !== "string") {
-        throw new Error(
-          `${id}.tintMultiply requires owner trait ${owner.id} to use a string value`,
-        );
-      }
-    }
+    validateOperationReferences(id, operation, ids, catalogIds);
+    validateOperationValueKinds(id, operation, operationOwners, traitById);
   }
   assertAcyclic(
     [...operations.keys()],

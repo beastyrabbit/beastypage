@@ -236,23 +236,7 @@ class RenderPipeline:
         sources: list[tuple[str, Image.Image]] = []
 
         for frame_id, label, group, params in render_specs:
-            document = self._coerce_document(params)
-            render_params = self.adapter.to_renderer_params(
-                document,
-                self.repository.sprite_number_for_pose,
-            )
-            render_params = {**document.traits, **render_params}
-            render_params = self._normalize_params(render_params)
-            composed, stages = self.executor.execute(render_params)
-            if frame_mode == "layer" and layer_identifier is not None:
-                overlay = self._extract_layer_image(stages, layer_identifier)
-                if overlay is not None:
-                    image = overlay
-                else:
-                    image = self.repository.blank_canvas()
-            else:
-                image = composed
-
+            image = self._render_batch_frame(params, frame_mode, layer_identifier)
             images.append(image)
             frame_infos.append((frame_id, label, group))
             if include_sources:
@@ -299,6 +283,20 @@ class RenderPipeline:
             sheet=sheet, frames=frames, sources=sources, tile_size=sheet_tile
         )
 
+    def _render_batch_frame(
+        self, params: dict, frame_mode: str, layer_identifier: str | None
+    ) -> Image.Image:
+        document = self._coerce_document(params)
+        render_params = self.adapter.to_renderer_params(
+            document, self.repository.sprite_number_for_pose
+        )
+        render_params = self._normalize_params({**document.traits, **render_params})
+        composed, stages = self.executor.execute(render_params)
+        if frame_mode == "layer" and layer_identifier is not None:
+            overlay = self._extract_layer_image(stages, layer_identifier)
+            return overlay if overlay is not None else self.repository.blank_canvas()
+        return composed
+
     # ------------------------------------------------------------------
     def _normalize_params(self, params: dict) -> dict:
         normalized = deepcopy(params)
@@ -333,58 +331,9 @@ class RenderPipeline:
     # ------------------------------------------------------------------
     def _prepare_variant_params(self, base_params: dict, variant: BatchVariant) -> dict:
         params = deepcopy(base_params)
-
-        def clear_overridden_aliases(update: dict) -> None:
-            for trait in self.adapter.manifest.traits:
-                binding = trait.legacy
-                keys: list[str] = []
-                if isinstance(binding, ListBinding):
-                    keys = [binding.key] + (
-                        [binding.single_key] if binding.single_key else []
-                    )
-                elif isinstance(binding, BooleanAliasBinding):
-                    keys = [binding.key, *binding.aliases]
-                elif isinstance(binding, PoseBinding):
-                    keys = [
-                        binding.key,
-                        binding.sprite_key,
-                        "pose_name",
-                        "sprite_number",
-                        "sprite",
-                    ]
-                if any(key in update for key in keys):
-                    for key in keys:
-                        params.pop(key, None)
-
-        if variant.params:
-            clear_overridden_aliases(variant.params)
-            variant_params = deepcopy(variant.params)
-            legacy_coat_pattern = normalize_coat_pattern_name(
-                variant_params.get("peltName")
-            )
-            if "peltName" in variant_params and "coatPattern" not in variant_params:
-                if legacy_coat_pattern:
-                    variant_params["peltName"] = "SingleColour"
-                    variant_params["coatPattern"] = legacy_coat_pattern
-                else:
-                    variant_params["coatPattern"] = None
-            params.update(variant_params)
-        if variant.overrides:
-            clear_overridden_aliases(variant.overrides)
-            variant_overrides = deepcopy(variant.overrides)
-            legacy_coat_pattern = normalize_coat_pattern_name(
-                variant_overrides.get("peltName")
-            )
-            if (
-                "peltName" in variant_overrides
-                and "coatPattern" not in variant_overrides
-            ):
-                if legacy_coat_pattern:
-                    variant_overrides["peltName"] = "SingleColour"
-                    variant_overrides["coatPattern"] = legacy_coat_pattern
-                else:
-                    variant_overrides["coatPattern"] = None
-            params.update(variant_overrides)
+        for update in (variant.params, variant.overrides):
+            if update:
+                self._apply_variant_update(params, update)
         if variant.pose_name is not None:
             params["poseName"] = variant.pose_name
         if variant.sprite_number is not None:
@@ -393,6 +342,36 @@ class RenderPipeline:
                 params.pop("pose_name", None)
             params["spriteNumber"] = variant.sprite_number
         return self._normalize_params(params)
+
+    def _apply_variant_update(self, params: dict, update: dict) -> None:
+        for trait in self.adapter.manifest.traits:
+            keys = self._variant_alias_keys(trait.legacy)
+            if any(key in update for key in keys):
+                for key in keys:
+                    params.pop(key, None)
+        normalized_update = deepcopy(update)
+        legacy_coat_pattern = normalize_coat_pattern_name(update.get("peltName"))
+        if "peltName" in update and "coatPattern" not in update:
+            if legacy_coat_pattern:
+                normalized_update["peltName"] = "SingleColour"
+            normalized_update["coatPattern"] = legacy_coat_pattern or None
+        params.update(normalized_update)
+
+    @staticmethod
+    def _variant_alias_keys(binding: object) -> list[str]:
+        if isinstance(binding, ListBinding):
+            return [binding.key] + ([binding.single_key] if binding.single_key else [])
+        if isinstance(binding, BooleanAliasBinding):
+            return [binding.key, *binding.aliases]
+        if isinstance(binding, PoseBinding):
+            return [
+                binding.key,
+                binding.sprite_key,
+                "pose_name",
+                "sprite_number",
+                "sprite",
+            ]
+        return []
 
     # ------------------------------------------------------------------
     @staticmethod

@@ -223,14 +223,7 @@ def _assert_tree_matches(
     )
 
 
-def verify_bundle_integrity(
-    *,
-    integrity_path: Path = DEFAULT_INTEGRITY_PATH,
-    sprite_root: Path,
-    data_root: Path,
-    expected_catalog_hash: str | None = None,
-) -> BundleIntegrityMetadata:
-    manifest, _ = _read_json_object(integrity_path, "bundle integrity manifest")
+def _validate_manifest_fields(manifest: dict[str, Any]) -> None:
     required_keys = {
         "formatVersion",
         "hashAlgorithm",
@@ -247,11 +240,8 @@ def verify_bundle_integrity(
     if manifest["formatVersion"] != 1 or manifest["hashAlgorithm"] != "sha256":
         raise InvalidBundleIntegrity("Unsupported bundle integrity manifest format")
 
-    schema_version = _require_schema_version(
-        manifest["schemaVersion"], "Integrity schemaVersion"
-    )
-    catalog_hash = _require_hash(manifest["catalogHash"], "Integrity catalogHash")
 
+def _manifest_components(manifest: dict[str, Any]) -> dict[str, str]:
     raw_components = manifest["components"]
     if not isinstance(raw_components, dict) or set(raw_components) != _COMPONENT_NAMES:
         actual_names = (
@@ -261,11 +251,15 @@ def verify_bundle_integrity(
             "Bundle integrity components drifted "
             f"(expected={sorted(_COMPONENT_NAMES)}, actual={actual_names})"
         )
-    components = {
+    return {
         name: _require_hash(raw_components[name], f"Component {name}")
         for name in _COMPONENT_NAMES
     }
 
+
+def _manifest_asset_trees(
+    manifest: dict[str, Any], components: dict[str, str]
+) -> dict[str, dict[str, str]]:
     raw_asset_trees = manifest["assetTrees"]
     if (
         not isinstance(raw_asset_trees, dict)
@@ -284,7 +278,16 @@ def verify_bundle_integrity(
             raise InvalidBundleIntegrity(
                 f"assetTrees.{name} is not bound to component {name}"
             )
+    return asset_trees
 
+
+def _verify_catalog_anchor(
+    generated_dir: Path,
+    schema_version: int,
+    components: dict[str, str],
+    catalog_hash: str,
+    expected_catalog_hash: str | None,
+) -> None:
     computed_catalog_hash = _bundle_catalog_hash(schema_version, components)
     if computed_catalog_hash != catalog_hash:
         raise InvalidBundleIntegrity(
@@ -292,7 +295,6 @@ def verify_bundle_integrity(
             f"({computed_catalog_hash} != {catalog_hash})"
         )
 
-    generated_dir = integrity_path.parent
     catalog_hash_bytes = _read_bytes(
         generated_dir / "catalog-hash.txt", "catalog hash anchor"
     )
@@ -317,6 +319,13 @@ def verify_bundle_integrity(
             f"({configured_hash} != {catalog_hash})"
         )
 
+
+def _verify_artifacts(
+    generated_dir: Path,
+    schema_version: int,
+    catalog_hash: str,
+    components: dict[str, str],
+) -> None:
     parsed_artifacts: dict[str, dict[str, Any]] = {}
     artifact_contents: dict[str, bytes] = {}
     for component_name, (
@@ -331,6 +340,35 @@ def verify_bundle_integrity(
             raw = _read_bytes(path, component_name)
         artifact_contents[component_name] = raw
 
+    _verify_artifact_versions(parsed_artifacts, schema_version)
+
+    for name in ("publicCatCatalog", "renderPlan"):
+        artifact_hash = parsed_artifacts[name].get("catalogHash")
+        if artifact_hash != catalog_hash:
+            raise InvalidBundleIntegrity(
+                f"{name} catalogHash does not match bundle integrity catalogHash"
+            )
+
+    for component_name, (
+        filename,
+        normalizes_catalog_hash,
+    ) in _ARTIFACT_COMPONENTS.items():
+        raw = artifact_contents[component_name]
+        actual_digest = (
+            _hash_catalog_artifact(raw, catalog_hash, component_name)
+            if normalizes_catalog_hash
+            else _sha256(raw)
+        )
+        if actual_digest != components[component_name]:
+            raise InvalidBundleIntegrity(
+                f"{filename} drifted from the catalog hash "
+                f"({actual_digest} != {components[component_name]})"
+            )
+
+
+def _verify_artifact_versions(
+    parsed_artifacts: dict[str, dict[str, Any]], schema_version: int
+) -> None:
     document_schema = parsed_artifacts["catDocumentSchema"]
     try:
         document_version = document_schema["properties"]["schemaVersion"]["const"]
@@ -359,28 +397,27 @@ def verify_bundle_integrity(
     if len(set(versions.values())) != 1:
         raise InvalidBundleIntegrity(f"Bundle schemaVersion mismatch: {versions}")
 
-    for name in ("publicCatCatalog", "renderPlan"):
-        artifact_hash = parsed_artifacts[name].get("catalogHash")
-        if artifact_hash != catalog_hash:
-            raise InvalidBundleIntegrity(
-                f"{name} catalogHash does not match bundle integrity catalogHash"
-            )
 
-    for component_name, (
-        filename,
-        normalizes_catalog_hash,
-    ) in _ARTIFACT_COMPONENTS.items():
-        raw = artifact_contents[component_name]
-        actual_digest = (
-            _hash_catalog_artifact(raw, catalog_hash, component_name)
-            if normalizes_catalog_hash
-            else _sha256(raw)
-        )
-        if actual_digest != components[component_name]:
-            raise InvalidBundleIntegrity(
-                f"{filename} drifted from the catalog hash "
-                f"({actual_digest} != {components[component_name]})"
-            )
+def verify_bundle_integrity(
+    *,
+    integrity_path: Path = DEFAULT_INTEGRITY_PATH,
+    sprite_root: Path,
+    data_root: Path,
+    expected_catalog_hash: str | None = None,
+) -> BundleIntegrityMetadata:
+    manifest, _ = _read_json_object(integrity_path, "bundle integrity manifest")
+    _validate_manifest_fields(manifest)
+    schema_version = _require_schema_version(
+        manifest["schemaVersion"], "Integrity schemaVersion"
+    )
+    catalog_hash = _require_hash(manifest["catalogHash"], "Integrity catalogHash")
+    components = _manifest_components(manifest)
+    asset_trees = _manifest_asset_trees(manifest, components)
+    generated_dir = integrity_path.parent
+    _verify_catalog_anchor(
+        generated_dir, schema_version, components, catalog_hash, expected_catalog_hash
+    )
+    _verify_artifacts(generated_dir, schema_version, catalog_hash, components)
 
     _assert_tree_matches(
         "palettes",

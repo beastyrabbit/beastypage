@@ -64,6 +64,49 @@ describe("CatDocument", () => {
     expect(document.traits.whitePatchesTint).toBe("none");
   });
 
+  it("preserves envelope extras with nested params taking precedence", () => {
+    const outer = { value: ["outer"] };
+    const inner = { value: ["inner"] };
+    const document = decodeCatDocumentLegacy({
+      future: outer,
+      outerOnly: ["retained"],
+      params: { ...legacyCat, future: inner, ignored: () => "not JSON" },
+    });
+    expect(document.unknownTraits).toEqual({
+      future: inner,
+      outerOnly: ["retained"],
+    });
+    inner.value.push("changed");
+    expect(document.unknownTraits?.future).toEqual({ value: ["inner"] });
+  });
+
+  it("prefers explicit pose names and preserves aliases and cloned tortie layers", () => {
+    const layers = [{ mask: "ONE", pattern: "SingleColour", colour: "BLACK" }];
+    const document = decodeCatDocumentLegacy({
+      ...legacyCat,
+      poseName: " adult_long0 ",
+      darkForest: false,
+      darkMode: true,
+      tortie: layers,
+    });
+    const params = catDocumentToLegacyParams(document);
+    expect(params).toMatchObject({
+      poseName: "adult_long0",
+      spriteNumber: 9,
+      darkForest: true,
+      darkMode: true,
+      isTortie: true,
+      tortieMask: "ONE",
+      tortiePattern: "SingleColour",
+      tortieColour: "BLACK",
+      tortie: layers,
+    });
+    expect(params.tortie).not.toBe(document.traits.tortie);
+    expect((params.tortie as unknown[])[0]).not.toBe(
+      document.traits.tortie?.[0],
+    );
+  });
+
   it("rejects unsupported catalog values at TypeScript writer boundaries", () => {
     const document = decodeCatDocumentLegacy(legacyCat);
     expect(() =>

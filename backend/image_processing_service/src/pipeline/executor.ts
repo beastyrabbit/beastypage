@@ -11,6 +11,52 @@ interface ExecutionResult {
   height: number;
 }
 
+function inputSources(step: PipelineStep): string[] {
+  return [step.inputSource || "original", ...(step.blendWith ? [step.blendWith.stepId] : [])];
+}
+
+/** Validate the dependency order and count every use, including repeated blend inputs. */
+function countConsumers(steps: PipelineStep[]): Map<string, number> {
+  const remaining = new Map<string, number>();
+  const seen = new Set(["original"]);
+  for (const step of steps) {
+    if (!step.id || seen.has(step.id)) throw new ProcessingError("Step IDs must be unique and cannot be original");
+    for (const key of inputSources(step)) {
+      if (!seen.has(key)) throw new ProcessingError(`Step ${step.id} must reference an earlier enabled step`);
+      remaining.set(key, (remaining.get(key) ?? 0) + 1);
+    }
+    seen.add(step.id);
+  }
+  return remaining;
+}
+
+async function blendStep(output: Buffer, results: Map<string, Buffer>, step: PipelineStep): Promise<Buffer> {
+  if (!step.blendWith) return output;
+  const blendSource = results.get(step.blendWith.stepId);
+  if (!blendSource) {
+    throw new ProcessingError(
+      `Step "${step.id}" blend references unknown step "${step.blendWith.stepId}"`,
+    );
+  }
+
+  const outMeta = await sharp(output).metadata();
+  const blendMeta = await sharp(blendSource).metadata();
+  if (!outMeta.width || !outMeta.height || !blendMeta.width || !blendMeta.height) {
+    throw new ProcessingError(
+      `Step "${step.id}" blend: unable to read dimensions from output or blend source`,
+    );
+  }
+
+  let resizedBlendSource = blendSource;
+  if (outMeta.width !== blendMeta.width || outMeta.height !== blendMeta.height) {
+    resizedBlendSource = await sharp(blendSource)
+      .resize(outMeta.width, outMeta.height, { fit: "fill" })
+      .png()
+      .toBuffer();
+  }
+  return blendImages(resizedBlendSource, output, step.blendWith.mode, step.blendWith.opacity);
+}
+
 /**
  * Execute a pipeline of processing steps in order.
  * Each step can reference "original" or a previous step ID as its input source.
@@ -27,23 +73,12 @@ export async function executePipeline(
   const results = new Map<string, Buffer>();
   results.set("original", original);
   const enabled = steps.filter(step => step.enabled);
-  const remaining = new Map<string, number>();
-  const seen = new Set(["original"]);
-  for (const step of enabled) {
-    if (!step.id || seen.has(step.id)) throw new ProcessingError("Step IDs must be unique and cannot be original");
-    for (const key of [step.inputSource || "original", ...(step.blendWith ? [step.blendWith.stepId] : [])]) {
-      if (!seen.has(key)) throw new ProcessingError(`Step ${step.id} must reference an earlier enabled step`);
-      remaining.set(key, (remaining.get(key) ?? 0) + 1);
-    }
-    seen.add(step.id);
-  }
+  const remaining = countConsumers(enabled);
 
   let lastResult: Buffer = original;
   let stepsProcessed = 0;
 
-  for (const step of steps) {
-    if (!step.enabled) continue;
-
+  for (const step of enabled) {
     // Resolve input source
     const inputKey = step.inputSource || "original";
     const input = results.get(inputKey);
@@ -55,45 +90,10 @@ export async function executePipeline(
 
     // Execute algorithm
     const algorithmFn = getAlgorithm(step.algorithm);
-    let output = await algorithmFn(input, step.params);
-
-    // Apply blending if configured
-    if (step.blendWith) {
-      const blendSource = results.get(step.blendWith.stepId);
-      if (!blendSource) {
-        throw new ProcessingError(
-          `Step "${step.id}" blend references unknown step "${step.blendWith.stepId}"`,
-        );
-      }
-
-      // Ensure both images are the same dimensions
-      const outMeta = await sharp(output).metadata();
-      const blendMeta = await sharp(blendSource).metadata();
-
-      if (!outMeta.width || !outMeta.height || !blendMeta.width || !blendMeta.height) {
-        throw new ProcessingError(
-          `Step "${step.id}" blend: unable to read dimensions from output or blend source`,
-        );
-      }
-
-      let resizedBlendSource = blendSource;
-      if (outMeta.width !== blendMeta.width || outMeta.height !== blendMeta.height) {
-        resizedBlendSource = await sharp(blendSource)
-          .resize(outMeta.width, outMeta.height, { fit: "fill" })
-          .png()
-          .toBuffer();
-      }
-
-      output = await blendImages(
-        resizedBlendSource,
-        output,
-        step.blendWith.mode,
-        step.blendWith.opacity,
-      );
-    }
+    const output = await blendStep(await algorithmFn(input, step.params), results, step);
 
     results.set(step.id, output);
-    for (const key of [inputKey, ...(step.blendWith ? [step.blendWith.stepId] : [])]) {
+    for (const key of inputSources(step)) {
       const left = (remaining.get(key) ?? 1) - 1;
       remaining.set(key, left);
       if (left === 0) results.delete(key);

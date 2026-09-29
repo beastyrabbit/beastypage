@@ -275,56 +275,44 @@ function parseKnownCatDocument(input: unknown): CatDocument {
   return document;
 }
 
-export function legacyParamsToCatDocument(input: unknown): CatDocument {
-  if (!isRecord(input)) throw new Error("Cat payload must be an object");
-  const params = resolveLegacySource(input);
-  const traits: Record<string, unknown> = {};
-
-  for (const trait of catSystem.traits) {
-    const legacy = trait.legacy;
-    let value: unknown;
-    switch (legacy.strategy) {
-      case "direct":
-        value = normalizeDirectLegacyValue(trait, params[legacy.key]);
-        break;
-      case "list":
-        value = normalizeStringList(
-          params[legacy.key],
-          legacy.singleKey ? params[legacy.singleKey] : undefined,
+function readLegacyTraitValue(
+  trait: CatSystemTrait,
+  params: Record<string, unknown>,
+): unknown {
+  const legacy = trait.legacy;
+  switch (legacy.strategy) {
+    case "direct":
+      return normalizeDirectLegacyValue(trait, params[legacy.key]);
+    case "list":
+      return normalizeStringList(
+        params[legacy.key],
+        legacy.singleKey ? params[legacy.singleKey] : undefined,
+      );
+    case "pose": {
+      const rawPose = params[legacy.key] ?? params.pose_name;
+      if (typeof rawPose === "string" && rawPose.trim()) {
+        return rawPose.trim();
+      } else {
+        return (
+          poseNameForLegacySpriteNumber(
+            params[legacy.spriteKey] ?? params.sprite_number ?? params.sprite,
+          ) ?? undefined
         );
-        break;
-      case "pose": {
-        const rawPose = params[legacy.key] ?? params.pose_name;
-        if (typeof rawPose === "string" && rawPose.trim()) {
-          value = rawPose.trim();
-        } else {
-          value =
-            poseNameForLegacySpriteNumber(
-              params[legacy.spriteKey] ?? params.sprite_number ?? params.sprite,
-            ) ?? undefined;
-        }
-        break;
       }
-      case "tortie":
-        value = normalizeTortieLayers(params);
-        break;
-      case "booleanAlias":
-        value = [legacy.key, ...legacy.aliases].some((key) =>
-          Boolean(params[key]),
-        );
-        break;
     }
-    if (value !== undefined) traits[trait.id] = value;
+    case "tortie":
+      return normalizeTortieLayers(params);
+    case "booleanAlias":
+      return [legacy.key, ...legacy.aliases].some((key) =>
+        Boolean(params[key]),
+      );
   }
+}
 
-  if (isCoatPatternId(traits.pelt)) {
-    const resolved = resolveCoatChoice(traits.pelt);
-    traits.pelt = resolved.peltName;
-    if (resolved.coatPattern) traits.coatPattern = resolved.coatPattern;
-  }
-
-  applyRequiredDefaults(traits);
-
+function readUnknownLegacyTraits(
+  input: Record<string, unknown>,
+  params: Record<string, unknown>,
+): Record<string, JsonValue> {
   const unknownTraits: Record<string, JsonValue> = {};
   const sources = params === input ? [params] : [input, params];
   for (const source of sources) {
@@ -339,6 +327,29 @@ export function legacyParamsToCatDocument(input: unknown): CatDocument {
       unknownTraits[key] = cloneJson(value);
     }
   }
+
+  return unknownTraits;
+}
+
+export function legacyParamsToCatDocument(input: unknown): CatDocument {
+  if (!isRecord(input)) throw new Error("Cat payload must be an object");
+  const params = resolveLegacySource(input);
+  const traits: Record<string, unknown> = {};
+
+  for (const trait of catSystem.traits) {
+    const value = readLegacyTraitValue(trait, params);
+    if (value !== undefined) traits[trait.id] = value;
+  }
+
+  if (isCoatPatternId(traits.pelt)) {
+    const resolved = resolveCoatChoice(traits.pelt);
+    traits.pelt = resolved.peltName;
+    if (resolved.coatPattern) traits.coatPattern = resolved.coatPattern;
+  }
+
+  applyRequiredDefaults(traits);
+
+  const unknownTraits = readUnknownLegacyTraits(input, params);
 
   return parseKnownCatDocument({
     schemaVersion: catSystem.schemaVersion,
@@ -400,6 +411,54 @@ export function readCatDocument(
   }) as CatDocument;
 }
 
+function writeLegacyTortie(
+  value: unknown,
+  params: Record<string, unknown>,
+): void {
+  const layers = Array.isArray(value) ? cloneJson(value) : [];
+  params.tortie = layers;
+  params.isTortie = layers.length > 0;
+  const primary = isRecord(layers[0]) ? layers[0] : undefined;
+  if (primary) {
+    params.tortieMask = primary.mask;
+    params.tortiePattern = primary.pattern;
+    params.tortieColour = primary.colour;
+  }
+}
+
+function writeLegacyTraitValue(
+  trait: CatSystemTrait,
+  value: unknown,
+  params: Record<string, unknown>,
+): void {
+  const legacy = trait.legacy;
+  switch (legacy.strategy) {
+    case "direct":
+      params[legacy.key] = cloneJson(value);
+      break;
+    case "list": {
+      const list = Array.isArray(value) ? cloneJson(value) : [];
+      params[legacy.key] = list;
+      if (legacy.singleKey && list.length > 0)
+        params[legacy.singleKey] = list[0];
+      break;
+    }
+    case "pose": {
+      params[legacy.key] = value;
+      const spriteNumber = legacySpriteNumberForPoseName(String(value));
+      if (spriteNumber !== null) params[legacy.spriteKey] = spriteNumber;
+      break;
+    }
+    case "tortie":
+      writeLegacyTortie(value, params);
+      break;
+    case "booleanAlias":
+      params[legacy.key] = Boolean(value);
+      for (const alias of legacy.aliases) params[alias] = Boolean(value);
+      break;
+  }
+}
+
 export function catDocumentToLegacyParams(
   documentInput: unknown,
 ): Record<string, unknown> {
@@ -411,41 +470,7 @@ export function catDocumentToLegacyParams(
   for (const trait of catSystem.traits) {
     const value = (document.traits as Record<string, unknown>)[trait.id];
     if (value === undefined) continue;
-    const legacy = trait.legacy;
-    switch (legacy.strategy) {
-      case "direct":
-        params[legacy.key] = cloneJson(value);
-        break;
-      case "list": {
-        const list = Array.isArray(value) ? cloneJson(value) : [];
-        params[legacy.key] = list;
-        if (legacy.singleKey && list.length > 0)
-          params[legacy.singleKey] = list[0];
-        break;
-      }
-      case "pose": {
-        params[legacy.key] = value;
-        const spriteNumber = legacySpriteNumberForPoseName(String(value));
-        if (spriteNumber !== null) params[legacy.spriteKey] = spriteNumber;
-        break;
-      }
-      case "tortie": {
-        const layers = Array.isArray(value) ? cloneJson(value) : [];
-        params.tortie = layers;
-        params.isTortie = layers.length > 0;
-        const primary = isRecord(layers[0]) ? layers[0] : undefined;
-        if (primary) {
-          params.tortieMask = primary.mask;
-          params.tortiePattern = primary.pattern;
-          params.tortieColour = primary.colour;
-        }
-        break;
-      }
-      case "booleanAlias":
-        params[legacy.key] = Boolean(value);
-        for (const alias of legacy.aliases) params[alias] = Boolean(value);
-        break;
-    }
+    writeLegacyTraitValue(trait, value, params);
   }
   return params;
 }

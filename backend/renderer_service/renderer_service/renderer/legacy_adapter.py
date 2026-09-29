@@ -175,108 +175,10 @@ class LegacyCatAdapter:
         consumed: set[str] = set()
 
         for trait in self.manifest.traits:
-            binding = trait.legacy
-            value: JsonValue | None = None
-            present = False
-
-            if isinstance(binding, DirectBinding):
-                consumed.add(binding.key)
-                if binding.key in params:
-                    value = deepcopy(params[binding.key])
-                    present = True
-                    schema_allows_none = (
-                        self.document_schema is not None
-                        and self.document_schema.trait_explicitly_allows(
-                            trait.id, "none"
-                        )
-                    )
-                    if (
-                        not trait.required
-                        and trait.value_kind == "string"
-                        and not trait.has_default
-                        and not schema_allows_none
-                        and isinstance(value, str)
-                        and value.strip().lower() in {"", "none", "null"}
-                    ):
-                        value = None
-                        present = False
-            elif isinstance(binding, ListBinding):
-                consumed.add(binding.key)
-                if binding.single_key:
-                    consumed.add(binding.single_key)
-                present = binding.key in params or bool(
-                    binding.single_key and binding.single_key in params
-                )
-                if present:
-                    value = _normalise_string_list(
-                        params.get(binding.key),
-                        params.get(binding.single_key) if binding.single_key else None,
-                    )
-            elif isinstance(binding, PoseBinding):
-                consumed.update(
-                    {
-                        binding.key,
-                        binding.sprite_key,
-                        "pose_name",
-                        "sprite_number",
-                        "sprite",
-                    }
-                )
-                raw_pose = params.get(binding.key, params.get("pose_name"))
-                if isinstance(raw_pose, str) and raw_pose.strip():
-                    value = raw_pose.strip()
-                    present = True
-                else:
-                    raw_sprite = params.get(
-                        binding.sprite_key,
-                        params.get("sprite_number", params.get("sprite")),
-                    )
-                    try:
-                        sprite_number = (
-                            int(raw_sprite) if raw_sprite is not None else None
-                        )
-                    except (TypeError, ValueError):
-                        sprite_number = None
-                    pose_name = pose_for_sprite_number(sprite_number)
-                    if pose_name:
-                        value = pose_name
-                        present = True
-            elif isinstance(binding, TortieBinding):
-                tortie_keys = {
-                    "tortie",
-                    "isTortie",
-                    "tortieMask",
-                    "tortiePattern",
-                    "tortieColour",
-                }
-                consumed.update(tortie_keys)
-                present = any(key in params for key in tortie_keys)
-                if isinstance(params.get("tortie"), list):
-                    value = [
-                        deepcopy(entry)
-                        for entry in params["tortie"]
-                        if isinstance(entry, dict)
-                    ]
-                elif _truthy(params.get("isTortie")):
-                    value = [
-                        {
-                            "mask": str(params.get("tortieMask") or "ONE"),
-                            "pattern": str(
-                                params.get("tortiePattern") or "SingleColour"
-                            ),
-                            "colour": str(params.get("tortieColour") or "GINGER"),
-                        }
-                    ]
-                else:
-                    value = []
-            elif isinstance(binding, BooleanAliasBinding):
-                keys = [binding.key, *binding.aliases]
-                consumed.update(keys)
-                present = any(key in params for key in keys)
-                if present:
-                    value = any(_truthy(params.get(key)) for key in keys)
-
-            if present and value is not None:
+            value = self._read_legacy_binding(
+                trait, params, consumed, pose_for_sprite_number
+            )
+            if value is not None:
                 traits[trait.id] = value
 
         self._normalise_legacy_coat(params, traits)
@@ -293,6 +195,103 @@ class LegacyCatAdapter:
             self.document_schema.validate(document)
         return document
 
+    def _read_legacy_binding(
+        self,
+        trait: CompatibilityTrait,
+        params: dict[str, JsonValue],
+        consumed: set[str],
+        pose_for_sprite_number: Callable[[int | None], str | None],
+    ) -> JsonValue | None:
+        binding = trait.legacy
+        if isinstance(binding, DirectBinding):
+            consumed.add(binding.key)
+            value = deepcopy(params.get(binding.key))
+            if binding.key in params and self._is_absent_optional_string(trait, value):
+                return None
+            return value
+        if isinstance(binding, PoseBinding):
+            consumed.update(
+                {
+                    binding.key,
+                    binding.sprite_key,
+                    "pose_name",
+                    "sprite_number",
+                    "sprite",
+                }
+            )
+            return self._legacy_pose(params, binding, pose_for_sprite_number) or None
+        keys = self._legacy_binding_keys(binding)
+        consumed.update(keys)
+        if not any(key in params for key in keys):
+            return None
+        if isinstance(binding, ListBinding):
+            return _normalise_string_list(*(params.get(key) for key in keys))
+        if isinstance(binding, TortieBinding):
+            return self._legacy_tortie(params)
+        if isinstance(binding, BooleanAliasBinding):
+            return any(_truthy(params.get(key)) for key in keys)
+        return None
+
+    @staticmethod
+    def _legacy_binding_keys(binding: LegacyBinding) -> list[str]:
+        if isinstance(binding, ListBinding):
+            return [binding.key] + ([binding.single_key] if binding.single_key else [])
+        if isinstance(binding, TortieBinding):
+            return ["tortie", "isTortie", "tortieMask", "tortiePattern", "tortieColour"]
+        if isinstance(binding, BooleanAliasBinding):
+            return [binding.key, *binding.aliases]
+        return []
+
+    def _is_absent_optional_string(
+        self, trait: CompatibilityTrait, value: JsonValue | None
+    ) -> bool:
+        schema_allows_none = (
+            self.document_schema is not None
+            and self.document_schema.trait_explicitly_allows(trait.id, "none")
+        )
+        return (
+            not trait.required
+            and trait.value_kind == "string"
+            and not trait.has_default
+            and not schema_allows_none
+            and isinstance(value, str)
+            and value.strip().lower() in {"", "none", "null"}
+        )
+
+    @staticmethod
+    def _legacy_pose(
+        params: dict[str, JsonValue],
+        binding: PoseBinding,
+        pose_for_sprite_number: Callable[[int | None], str | None],
+    ) -> str | None:
+        raw_pose = params.get(binding.key, params.get("pose_name"))
+        if isinstance(raw_pose, str) and raw_pose.strip():
+            return raw_pose.strip()
+        raw_sprite = params.get(
+            binding.sprite_key, params.get("sprite_number", params.get("sprite"))
+        )
+        try:
+            sprite_number = int(raw_sprite) if raw_sprite is not None else None
+        except (TypeError, ValueError):
+            sprite_number = None
+        return pose_for_sprite_number(sprite_number)
+
+    @staticmethod
+    def _legacy_tortie(params: dict[str, JsonValue]) -> list[JsonValue]:
+        if isinstance(params.get("tortie"), list):
+            return [
+                deepcopy(entry) for entry in params["tortie"] if isinstance(entry, dict)
+            ]
+        if _truthy(params.get("isTortie")):
+            return [
+                {
+                    "mask": str(params.get("tortieMask") or "ONE"),
+                    "pattern": str(params.get("tortiePattern") or "SingleColour"),
+                    "colour": str(params.get("tortieColour") or "GINGER"),
+                }
+            ]
+        return []
+
     def to_renderer_params(
         self,
         document: CatDocument,
@@ -305,40 +304,61 @@ class LegacyCatAdapter:
             if trait.id not in normalized.traits:
                 continue
             value = deepcopy(normalized.traits[trait.id])
-            binding = trait.legacy
-            if isinstance(binding, DirectBinding):
-                params[binding.key] = value
-            elif isinstance(binding, ListBinding):
-                values = value if isinstance(value, list) else []
-                params[binding.key] = values
-                if binding.single_key and values:
-                    params[binding.single_key] = deepcopy(values[0])
-            elif isinstance(binding, PoseBinding):
-                pose_name = value if isinstance(value, str) else None
-                if pose_name:
-                    params[binding.key] = pose_name
-                    params[binding.sprite_key] = sprite_number_for_pose(pose_name, 0)
-            elif isinstance(binding, TortieBinding):
-                layers = value if isinstance(value, list) else []
-                params["tortie"] = layers
-                params["isTortie"] = bool(layers)
-                primary = layers[0] if layers and isinstance(layers[0], dict) else None
-                if primary:
-                    for legacy_key, layer_key in (
-                        ("tortieMask", "mask"),
-                        ("tortiePattern", "pattern"),
-                        ("tortieColour", "colour"),
-                    ):
-                        layer_value = primary.get(layer_key)
-                        if isinstance(layer_value, (str, int, float, bool)):
-                            params[legacy_key] = layer_value
-            elif isinstance(binding, BooleanAliasBinding):
-                enabled = _truthy(value)
-                params[binding.key] = enabled
-                for alias in binding.aliases:
-                    params[alias] = enabled
+            self._write_renderer_binding(
+                params, trait.legacy, value, sprite_number_for_pose
+            )
 
         return params
+
+    @staticmethod
+    def _write_renderer_binding(
+        params: dict[str, JsonValue],
+        binding: LegacyBinding,
+        value: JsonValue,
+        sprite_number_for_pose: Callable[[str | None, int | None], int],
+    ) -> None:
+        if isinstance(binding, DirectBinding):
+            params[binding.key] = value
+        elif isinstance(binding, ListBinding):
+            LegacyCatAdapter._write_list_params(params, binding, value)
+        elif isinstance(binding, PoseBinding):
+            pose_name = value if isinstance(value, str) else None
+            if pose_name:
+                params[binding.key] = pose_name
+                params[binding.sprite_key] = sprite_number_for_pose(pose_name, 0)
+        elif isinstance(binding, TortieBinding):
+            LegacyCatAdapter._write_tortie_params(params, value)
+        elif isinstance(binding, BooleanAliasBinding):
+            enabled = _truthy(value)
+            params[binding.key] = enabled
+            for alias in binding.aliases:
+                params[alias] = enabled
+
+    @staticmethod
+    def _write_list_params(
+        params: dict[str, JsonValue], binding: ListBinding, value: JsonValue
+    ) -> None:
+        values = value if isinstance(value, list) else []
+        params[binding.key] = values
+        if binding.single_key and values:
+            params[binding.single_key] = deepcopy(values[0])
+
+    @staticmethod
+    def _write_tortie_params(params: dict[str, JsonValue], value: JsonValue) -> None:
+        layers = value if isinstance(value, list) else []
+        params["tortie"] = layers
+        params["isTortie"] = bool(layers)
+        primary = layers[0] if layers and isinstance(layers[0], dict) else None
+        if not primary:
+            return
+        for legacy_key, layer_key in (
+            ("tortieMask", "mask"),
+            ("tortiePattern", "pattern"),
+            ("tortieColour", "colour"),
+        ):
+            layer_value = primary.get(layer_key)
+            if isinstance(layer_value, (str, int, float, bool)):
+                params[legacy_key] = layer_value
 
     def _apply_defaults(self, traits: dict[str, JsonValue]) -> None:
         for trait in self.manifest.traits:

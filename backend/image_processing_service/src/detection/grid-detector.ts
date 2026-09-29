@@ -95,6 +95,25 @@ function findPeriod(
 
   if (length < 6) return null;
 
+  const edgeRate = measureEdgeRates(px, w, ch, length, other, dir);
+  const edges = findEdges(edgeRate);
+  if (edges.length < 3) return null;
+
+  const gaps: number[] = [];
+  for (let i = 1; i < edges.length; i++) {
+    gaps.push(edges[i]! - edges[i - 1]!);
+  }
+  return estimatePeriod(gaps);
+}
+
+function measureEdgeRates(
+  px: Uint8Array,
+  w: number,
+  ch: number,
+  length: number,
+  other: number,
+  dir: "horizontal" | "vertical",
+): Float64Array {
   // Step 1: Compute edge rate for each position along the scanning axis.
   // For very large images, subsample the perpendicular axis (e.g., check
   // every Nth row instead of all rows) to keep compute bounded while
@@ -127,31 +146,30 @@ function findPeriod(
     }
     edgeRate[i] = changes / scanCount;
   }
+  return edgeRate;
+}
 
+function findEdges(edgeRate: Float64Array): number[] {
   // Step 2: Find edge positions using an adaptive threshold.
   // In pixel art, edge rates are bimodal: near 0 within blocks, near 1 at boundaries.
   // Use 25% of the max edge rate as the dividing line.
   let maxRate = 0;
-  for (let i = 1; i < length; i++) {
+  for (let i = 1; i < edgeRate.length; i++) {
     if (edgeRate[i]! > maxRate) maxRate = edgeRate[i]!;
   }
-  if (maxRate < 0.05) return null; // No significant edges
+  if (maxRate < 0.05) return []; // No significant edges
 
   const threshold = maxRate * 0.25;
 
   const edges: number[] = [];
-  for (let i = 1; i < length; i++) {
+  for (let i = 1; i < edgeRate.length; i++) {
     if (edgeRate[i]! > threshold) edges.push(i);
   }
 
-  if (edges.length < 3) return null;
+  return edges;
+}
 
-  // Step 3: Compute gaps between consecutive edge positions
-  const gaps: number[] = [];
-  for (let i = 1; i < edges.length; i++) {
-    gaps.push(edges[i]! - edges[i - 1]!);
-  }
-
+function estimatePeriod(gaps: number[]): PeriodResult | null {
   // Step 4: Find the dominant gap size.
   // Build histogram and find mode (minimum gap = 2 to exclude noise).
   const gapCounts = new Map<number, number>();
