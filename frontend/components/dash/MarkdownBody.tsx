@@ -57,9 +57,11 @@ function inlineMarkdown(text: string): string {
       return `<img src="${escapeHtml(safeSrc)}" alt="${alt}" class="max-w-full rounded" />`;
     },
   );
-  // Links — label is already HTML-escaped, escape href
+  // Links — label is already HTML-escaped, escape href. The label excludes
+  // "[" and the href allows one level of balanced parentheses, which keeps
+  // matching linear (no backtracking across link candidates).
   out = out.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
+    /\[([^[\]]+)\]\(((?:[^()]|\([^()]*\))+)\)/g,
     (_m, label: string, href: string) => {
       const safeHref = href.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
       return `<a href="${escapeHtml(safeHref)}" target="_blank" rel="noopener noreferrer" class="underline text-emerald-400 hover:text-emerald-300">${label}</a>`;
