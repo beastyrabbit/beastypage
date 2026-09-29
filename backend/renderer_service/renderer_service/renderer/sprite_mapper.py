@@ -142,6 +142,11 @@ class SpriteMapper:
                 "No accessories found in peltInfo.json. Check that peltInfo.json contains valid accessory data."
             )
 
+        self._load_markings()
+        self._build_accessory_lookup()
+        self._validate_accessory_sprites()
+
+    def _load_markings(self) -> None:
         collected_scars = self._collect_list("scars", ("scars1", "scars2", "scars3"))
         if collected_scars:
             self.scars = collected_scars
@@ -154,9 +159,6 @@ class SpriteMapper:
             self.white_patches = self._gather_white_patches()
         if not self.white_patches:
             raise ValueError("Could not derive white patches from sprite index data.")
-
-        self._build_accessory_lookup()
-        self._validate_accessory_sprites()
 
     # ------------------------------------------------------------------
     def _load_experimental_defs(self) -> dict[str, ExperimentalColourDefinition]:
@@ -237,32 +239,17 @@ class SpriteMapper:
                 "Masked": "masked",
             }
             prefix = mapping.get(name, name.lower())
-            return f"{prefix}{colour}" if colour else prefix
+            return f"{prefix}{colour}"
         if sprite_type == "eyes":
             return f"eyes{colour}"
         if sprite_type == "skin":
             return f"skin{colour}"
-        if sprite_type == "white":
-            if not name:
-                return None
-            return f"white{name}"
-        if sprite_type == "scar":
-            if not name:
-                return None
-            return f"scar{name}"
-        if sprite_type == "scars":
-            if not name:
-                return None
-            return f"scars{name}"
         if sprite_type == "accessory":
             return name
-        if sprite_type == "tortie":
-            if not name:
-                return None
-            return f"tortiemask{name}"
         if not name:
             return None
-        return f"{sprite_type}{name}"
+        prefix = "tortiemask" if sprite_type == "tortie" else sprite_type
+        return f"{prefix}{name}"
 
     # ------------------------------------------------------------------
     def get_experimental_definition(
@@ -306,63 +293,41 @@ class SpriteMapper:
         trimmed = raw.strip()
         upper = trimmed.upper()
 
-        if trimmed in self.accessory_sprite_names:
-            return trimmed
-        if upper in self.accessory_sprite_names:
-            return upper
+        for candidate in self._accessory_candidates(trimmed, upper):
+            if candidate in self.accessory_sprite_names:
+                return candidate
+        return self.accessory_lookup.get(upper) or None
 
-        accessory_alias = self.accessory_sprite_aliases.get(upper)
-        if accessory_alias and accessory_alias in self.accessory_sprite_names:
-            return accessory_alias
-
-        alias = self.collar_sprite_aliases.get(upper)
-        if alias and alias in self.accessory_sprite_names:
-            return alias
-
+    def _accessory_candidates(self, trimmed: str, upper: str) -> Iterable[str]:
+        yield trimmed
+        yield upper
+        for aliases in (self.accessory_sprite_aliases, self.collar_sprite_aliases):
+            alias = aliases.get(upper)
+            if alias:
+                yield alias
         if upper in self.collar_accessories:
-            candidate = f"collars{upper}"
-            if candidate in self.accessory_sprite_names:
-                return candidate
-            candidate = f"collars{trimmed}"
-            if candidate in self.accessory_sprite_names:
-                return candidate
+            yield f"collars{upper}"
+            yield f"collars{trimmed}"
 
         if upper in self.plant_accessories:
-            candidate = f"acc_plants{trimmed}"
-            if candidate in self.accessory_sprite_names:
-                return candidate
-            candidate = f"acc_plants{upper}"
-            if candidate in self.accessory_sprite_names:
-                return candidate
-            candidate = f"acc_herbs{trimmed}"
-            if candidate in self.accessory_sprite_names:
-                return candidate
+            yield f"acc_plants{trimmed}"
+            yield f"acc_plants{upper}"
+            yield f"acc_herbs{trimmed}"
 
         if upper in self.wild_accessories:
-            candidate = f"acc_wilds{trimmed}"
-            if candidate in self.accessory_sprite_names:
-                return candidate
-            candidate = f"acc_wilds{upper}"
-            if candidate in self.accessory_sprite_names:
-                return candidate
-            candidate = f"acc_wild{trimmed}"
-            if candidate in self.accessory_sprite_names:
-                return candidate
+            yield f"acc_wilds{trimmed}"
+            yield f"acc_wilds{upper}"
+            yield f"acc_wild{trimmed}"
 
         if upper in self.tail_accessories:
-            candidate = f"tail2_accessories{trimmed}"
-            if candidate in self.accessory_sprite_names:
-                return candidate
+            yield f"tail2_accessories{trimmed}"
 
-        fallback_options = [
+        yield from (
             trimmed,
             upper,
             trimmed.replace(" ", ""),
             upper.replace(" ", ""),
-        ]
-        for option in fallback_options:
-            if option in self.accessory_sprite_names:
-                return option
+        )
 
         for prefix in (
             "acc_herbs",
@@ -381,18 +346,8 @@ class SpriteMapper:
             "acc_deadInsect",
             "tail2_accessories",
         ):
-            candidate = f"{prefix}{trimmed}"
-            if candidate in self.accessory_sprite_names:
-                return candidate
-            candidate_upper = f"{prefix}{upper}"
-            if candidate_upper in self.accessory_sprite_names:
-                return candidate_upper
-
-        lookup_key = self.accessory_lookup.get(upper)
-        if lookup_key:
-            return lookup_key
-
-        return None
+            yield f"{prefix}{trimmed}"
+            yield f"{prefix}{upper}"
 
     def _collect_accessories(self) -> list[str]:
         combined: list[str] = []

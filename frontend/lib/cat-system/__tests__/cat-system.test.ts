@@ -193,6 +193,119 @@ describe("cat-system compiler guarantees", () => {
     ).toThrow(/gacha must be an explicit decision/);
   });
 
+  it.each([
+    [
+      { source: "static", elements: [{ id: "", label: "Empty" }] },
+      /empty element id/,
+    ],
+    [
+      {
+        source: "static",
+        elements: [
+          { id: "a", label: "A" },
+          { id: "a", label: "Again" },
+        ],
+      },
+      /duplicate element a/,
+    ],
+    [
+      { source: "static", elements: [{ id: "a", label: "A", weight: 0 }] },
+      /invalid weight/,
+    ],
+    [{ source: "composite", catalogs: ["missing"] }, /unknown catalog missing/],
+    [{ source: "composite", catalogs: ["probe"] }, /cannot include itself/],
+    [
+      { source: "composite", catalogs: [], selectableCatalogs: ["missing"] },
+      /non-member missing/,
+    ],
+  ] as const)("rejects invalid catalog definitions %#", (catalog, message) => {
+    expect(() => compileProbeTrait(baseTrait, { probe: catalog })).toThrow(
+      message,
+    );
+  });
+
+  it("checks shared gate probabilities across traits without changing the definition", () => {
+    const gatedTrait = {
+      ...baseTrait,
+      value: booleanValue({ required: false }),
+      gacha: {
+        strategy: "boolean",
+        probability: 0.5,
+        gate: { group: "shared", probability: 0.25 },
+      },
+    } as const;
+    const definition = {
+      schemaVersion: 1,
+      catalogs: {},
+      traits: [gatedTrait, { ...gatedTrait, id: "second" }],
+      aliases: {},
+      tombstones: {},
+    };
+    expect(defineCatSystem(definition)).toBe(definition);
+    expect(() =>
+      defineCatSystem({
+        ...definition,
+        traits: [
+          gatedTrait,
+          {
+            ...gatedTrait,
+            id: "second",
+            gacha: {
+              ...gatedTrait.gacha,
+              gate: { group: "shared", probability: 0.75 },
+            },
+          },
+        ],
+      }),
+    ).toThrow("second.gacha.gate shared disagrees on probability");
+  });
+
+  it("resolves forward gacha references and rejects cycles", () => {
+    const dependent = {
+      ...baseTrait,
+      value: booleanValue({ required: false }),
+      gacha: { strategy: "boolean", probability: 0.5, dependsOn: ["later"] },
+    } as const;
+    const later = {
+      ...dependent,
+      id: "later",
+      gacha: { strategy: "boolean", probability: 0.5 },
+    } as const;
+    const definition = {
+      schemaVersion: 1,
+      catalogs: {},
+      traits: [dependent, later],
+      aliases: {},
+      tombstones: {},
+    };
+    expect(defineCatSystem(definition)).toBe(definition);
+    expect(() =>
+      defineCatSystem({ ...definition, traits: [dependent] }),
+    ).toThrow(/depends on unknown later/);
+    expect(() =>
+      defineCatSystem({
+        ...definition,
+        traits: [
+          dependent,
+          { ...later, gacha: { ...later.gacha, dependsOn: [dependent.id] } },
+        ],
+      }),
+    ).toThrow(/contains a cycle/);
+  });
+
+  it("reports invalid trait identity before capability and catalog errors", () => {
+    expect(() =>
+      compileProbeTrait(
+        {
+          ...baseTrait,
+          id: "Invalid",
+          capabilities: { ...disabledCapabilities, edit: "toggle" },
+        },
+        { broken: { source: "composite", catalogs: ["missing"] } },
+      ),
+    ).toThrow("Invalid trait id Invalid");
+  });
+
   it("rejects a required trait without a valid default", () => {
     expect(() =>
       defineCatTrait({
@@ -261,15 +374,18 @@ describe("cat-system compiler guarantees", () => {
       { strategy: "booleanAlias", key: "enabled", aliases: ["active"] },
       /legacy booleanAlias requires value kind boolean/,
     ],
-  ] as const)("rejects an incompatible %s legacy binding", (_name, value, legacy, expected) => {
-    expect(() =>
-      defineCatTrait({
-        ...baseTrait,
-        value,
-        legacy: legacy as never,
-      }),
-    ).toThrow(expected);
-  });
+  ] as const)(
+    "rejects an incompatible %s legacy binding",
+    (_name, value, legacy, expected) => {
+      expect(() =>
+        defineCatTrait({
+          ...baseTrait,
+          value,
+          legacy: legacy as never,
+        }),
+      ).toThrow(expected);
+    },
+  );
 
   it("requires the legacy tortie item shape", () => {
     expect(() =>
@@ -366,33 +482,36 @@ describe("cat-system compiler guarantees", () => {
       { valueTrait: "__probe_render", affectsPreviousLayers: true },
       "boolean",
     ],
-  ] as const)("checks %s against the configured trait value kind", (strategy, value, config, expectedKind) => {
-    const trait = defineCatTrait({
-      ...baseTrait,
-      id: "__probe_render",
-      value,
-      render: {
-        kind: "operation",
-        operationId: "probeRender",
-        layerId: "probeRender",
-        strategy,
-        version: 1,
-        reads: ["__probe_render"],
-        config,
-      } as never,
-    });
-    expect(() =>
-      defineCatSystem({
-        schemaVersion: 1,
-        catalogs: {
-          values: { source: "static", elements: [{ id: "one" }] },
-        },
-        traits: [trait],
-        aliases: {},
-        tombstones: {},
-      }),
-    ).toThrow(new RegExp(`requires valueTrait .* ${expectedKind} value`));
-  });
+  ] as const)(
+    "checks %s against the configured trait value kind",
+    (strategy, value, config, expectedKind) => {
+      const trait = defineCatTrait({
+        ...baseTrait,
+        id: "__probe_render",
+        value,
+        render: {
+          kind: "operation",
+          operationId: "probeRender",
+          layerId: "probeRender",
+          strategy,
+          version: 1,
+          reads: ["__probe_render"],
+          config,
+        } as never,
+      });
+      expect(() =>
+        defineCatSystem({
+          schemaVersion: 1,
+          catalogs: {
+            values: { source: "static", elements: [{ id: "one" }] },
+          },
+          traits: [trait],
+          aliases: {},
+          tombstones: {},
+        }),
+      ).toThrow(new RegExp(`requires valueTrait .* ${expectedKind} value`));
+    },
+  );
 
   it("requires tintMultiply's owning trait to be a string", () => {
     const trait = defineCatTrait({

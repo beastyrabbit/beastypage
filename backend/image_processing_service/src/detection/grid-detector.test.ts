@@ -29,6 +29,46 @@ function actualGridSize(imageWidth: number, blockSize: number): number {
 }
 
 describe("grid-detector", () => {
+  it.each([
+    { width: 32, height: 32, xSize: 4, ySize: 4, gridSize: 4, confidence: 1 },
+    { width: 32, height: 32, xSize: 4, ySize: 32, gridSize: 4, confidence: 0.8 },
+    { width: 32, height: 32, xSize: 32, ySize: 4, gridSize: 4, confidence: 0.8 },
+    { width: 32, height: 32, xSize: 4, ySize: 8, gridSize: 4, confidence: 0.7 },
+    { width: 32, height: 5, xSize: 4, ySize: 5, gridSize: 4, confidence: 0.8 },
+    { width: 32, height: 4001, xSize: 4, ySize: 4001, gridSize: 4, confidence: 0.8 },
+  ])("combines deterministic axis periods $xSize/$ySize in $width x $height", async ({ width, height, xSize, ySize, gridSize, confidence }) => {
+    const pixels = Buffer.alloc(width * height * 3);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const offset = (y * width + x) * 3;
+        pixels[offset] = (Math.floor(x / xSize) % 2) * 255;
+        pixels[offset + 1] = (Math.floor(y / ySize) % 2) * 255;
+      }
+    }
+    const input = await sharp(pixels, { raw: { width, height, channels: 3 } }).png().toBuffer();
+    expect(await detectGrid(input)).toEqual({ detected: true, gridSize, confidence });
+  });
+
+  it.each([4, 32])("does not invent edges in a uniform %s-pixel image", async (size) => {
+    const input = await sharp({ create: { width: size, height: size, channels: 3, background: "red" } }).png().toBuffer();
+    expect(await detectGrid(input)).toEqual({ detected: false, gridSize: null, confidence: 0 });
+  });
+
+  it.each([
+    { boundaries: [0, 4, 8, 13, 17, 22, 26], expected: { detected: true, gridSize: 4, confidence: 0.8 } },
+    { boundaries: [0, 4, 6, 12, 22, 36, 54], expected: { detected: false, gridSize: null, confidence: 0 } },
+  ])("requires consistent gaps while tolerating rounding: $boundaries", async ({ boundaries, expected }) => {
+    const width = 60;
+    const pixels = Buffer.alloc(width * 8);
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < width; x++) {
+        pixels[y * width + x] = (boundaries.filter(boundary => boundary <= x).length % 2) * 255;
+      }
+    }
+    const input = await sharp(pixels, { raw: { width, height: 8, channels: 1 } }).png().toBuffer();
+    expect(await detectGrid(input)).toEqual(expected);
+  });
+
   // Test a range of block sizes with block-average pixelation
   const blockSizes = [4, 6, 8, 10, 12, 16, 20, 24, 32];
 

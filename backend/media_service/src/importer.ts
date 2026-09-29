@@ -80,6 +80,88 @@ function remoteName(url: URL) {
 	}
 }
 
+type RemoteResponse = Awaited<ReturnType<typeof request>>;
+
+async function redirectUrl(
+	response: RemoteResponse,
+	url: URL,
+	redirect: number,
+) {
+	if (
+		response.statusCode < 300 ||
+		response.statusCode >= 400 ||
+		!response.headers.location
+	)
+		return null;
+	await response.body.dump();
+	if (redirect === 5)
+		throw new RemoteImportError("Remote link redirected too many times", 400);
+	const location = Array.isArray(response.headers.location)
+		? response.headers.location[0]
+		: response.headers.location;
+	if (!location)
+		throw new RemoteImportError("Remote redirect had no destination");
+	return validateRemoteUrl(new URL(location, url).toString());
+}
+
+async function writeRemoteBody(
+	response: RemoteResponse,
+	destination: string,
+	maxBytes: number,
+) {
+	const file = await open(destination, "wx", 0o600);
+	let size = 0;
+	try {
+		for await (const chunk of response.body) {
+			size += chunk.byteLength;
+			if (size > maxBytes) {
+				throw new RemoteImportError(
+					"Remote file is larger than the current limit",
+					413,
+				);
+			}
+			await file.write(chunk);
+		}
+	} finally {
+		await file.close();
+	}
+	if (size === 0) throw new RemoteImportError("Remote file was empty");
+	return size;
+}
+
+async function saveRemoteResponse(
+	response: RemoteResponse,
+	url: URL,
+	destination: string,
+	maxBytes: number,
+): Promise<RemoteFile> {
+	if (response.statusCode < 200 || response.statusCode >= 300) {
+		await response.body.dump();
+		throw new RemoteImportError(
+			`Remote server returned HTTP ${response.statusCode}`,
+		);
+	}
+	const declaredLength = Number(response.headers["content-length"] ?? 0);
+	if (declaredLength > maxBytes) {
+		await response.body.dump();
+		throw new RemoteImportError(
+			"Remote file is larger than the current limit",
+			413,
+		);
+	}
+	const size = await writeRemoteBody(response, destination, maxBytes);
+	const contentType = response.headers["content-type"];
+	return {
+		path: destination,
+		name: remoteName(url),
+		mime:
+			typeof contentType === "string"
+				? contentType.split(";")[0]?.trim().slice(0, 150)
+				: undefined,
+		size,
+	};
+}
+
 export async function downloadRemote(
 	input: string,
 	destination: string,
@@ -101,68 +183,12 @@ export async function downloadRemote(
 				signal: AbortSignal.timeout(10 * 60 * 1000),
 			});
 
-			if (
-				response.statusCode >= 300 &&
-				response.statusCode < 400 &&
-				response.headers.location
-			) {
-				await response.body.dump();
-				if (redirect === 5)
-					throw new RemoteImportError(
-						"Remote link redirected too many times",
-						400,
-					);
-				const location = Array.isArray(response.headers.location)
-					? response.headers.location[0]
-					: response.headers.location;
-				if (!location)
-					throw new RemoteImportError("Remote redirect had no destination");
-				url = validateRemoteUrl(new URL(location, url).toString());
+			const nextUrl = await redirectUrl(response, url, redirect);
+			if (nextUrl) {
+				url = nextUrl;
 				continue;
 			}
-			if (response.statusCode < 200 || response.statusCode >= 300) {
-				await response.body.dump();
-				throw new RemoteImportError(
-					`Remote server returned HTTP ${response.statusCode}`,
-				);
-			}
-
-			const declaredLength = Number(response.headers["content-length"] ?? 0);
-			if (declaredLength > maxBytes) {
-				await response.body.dump();
-				throw new RemoteImportError(
-					"Remote file is larger than the current limit",
-					413,
-				);
-			}
-
-			const file = await open(destination, "wx", 0o600);
-			let size = 0;
-			try {
-				for await (const chunk of response.body) {
-					size += chunk.byteLength;
-					if (size > maxBytes) {
-						throw new RemoteImportError(
-							"Remote file is larger than the current limit",
-							413,
-						);
-					}
-					await file.write(chunk);
-				}
-			} finally {
-				await file.close();
-			}
-			if (size === 0) throw new RemoteImportError("Remote file was empty");
-			const contentType = response.headers["content-type"];
-			return {
-				path: destination,
-				name: remoteName(url),
-				mime:
-					typeof contentType === "string"
-						? contentType.split(";")[0]?.trim().slice(0, 150)
-						: undefined,
-				size,
-			};
+			return await saveRemoteResponse(response, url, destination, maxBytes);
 		} finally {
 			await dispatcher.close();
 		}

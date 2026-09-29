@@ -228,6 +228,40 @@ def _scar_secondary(
     return _stage_result(_renderer(renderer)._stage_scar_secondary(params, canvas))
 
 
+def _catalog_sprite_name(
+    cat_renderer: CatRendererV3,
+    config: CatalogSpriteListConfig,
+    value: str,
+    catalog_entry: dict,
+) -> str | None:
+    raw_sprite_key = catalog_entry.get("spriteKey")
+    if config.resolver == "accessory":
+        return (
+            raw_sprite_key
+            if isinstance(raw_sprite_key, str)
+            else cat_renderer._resolve_accessory(value)
+        )
+    if config.resolver == "mapping":
+        sprite_name = config.sprites.get(value)
+        if not sprite_name and isinstance(raw_sprite_key, str):
+            return raw_sprite_key
+        return sprite_name
+    return value
+
+
+def _catalog_sprite_available(
+    config: CatalogSpriteListConfig,
+    value: str,
+    catalog_entry: dict,
+    pose_name: str | None,
+) -> bool:
+    catalog_poses = catalog_entry.get("poses")
+    allowed_poses = config.available_poses.get(value)
+    if not allowed_poses and isinstance(catalog_poses, list):
+        allowed_poses = [str(item) for item in catalog_poses]
+    return not (allowed_poses and pose_name and pose_name not in allowed_poses)
+
+
 def _catalog_sprite_list(
     context: StrategyContext,
     operation: OperationBase,
@@ -245,26 +279,10 @@ def _catalog_sprite_list(
     catalog = context.catalogs.get(config.catalog, {})
     for value in _values(params.get(config.value_trait)):
         catalog_entry = catalog.get(value, {})
-        catalog_poses = catalog_entry.get("poses")
-        allowed_poses = config.available_poses.get(value)
-        if not allowed_poses and isinstance(catalog_poses, list):
-            allowed_poses = [str(item) for item in catalog_poses]
-        if allowed_poses and pose_name and pose_name not in allowed_poses:
+        if not _catalog_sprite_available(config, value, catalog_entry, pose_name):
             diagnostics.append(f"unavailable:{value}:{pose_name}")
             continue
-        if config.resolver == "accessory":
-            raw_sprite_key = catalog_entry.get("spriteKey")
-            sprite_name = (
-                str(raw_sprite_key)
-                if isinstance(raw_sprite_key, str)
-                else cat_renderer._resolve_accessory(value)
-            )
-        elif config.resolver == "mapping":
-            sprite_name = config.sprites.get(value)
-            if not sprite_name and isinstance(catalog_entry.get("spriteKey"), str):
-                sprite_name = str(catalog_entry["spriteKey"])
-        else:
-            sprite_name = value
+        sprite_name = _catalog_sprite_name(cat_renderer, config, value, catalog_entry)
         if not sprite_name or not cat_renderer.repo.has_sprite(sprite_name):
             diagnostics.append(f"missing:{value}")
             continue

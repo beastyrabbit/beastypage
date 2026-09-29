@@ -201,6 +201,16 @@ def _plan_sprite_references(
     return sprite_keys, fallback_groups
 
 
+def _blend_result(canvas: Image.Image, image: Image.Image, mode: str) -> Image.Image:
+    if mode == "replace":
+        return image
+    blenders = {"alpha": alpha_over, "multiply": multiply, "screen": screen, "add": add}
+    blend = blenders.get(mode)
+    if blend is None:  # pragma: no cover - Pydantic makes this unreachable
+        raise InvalidRenderPlan(f"Unsupported blend mode '{mode}'")
+    return blend(canvas, image)
+
+
 class RenderExecutor:
     def __init__(
         self,
@@ -315,18 +325,7 @@ class RenderExecutor:
             if result.image is None:
                 continue
 
-            if result.blend_mode == "alpha":
-                canvas = alpha_over(canvas, result.image)
-            elif result.blend_mode == "multiply":
-                canvas = multiply(canvas, result.image)
-            elif result.blend_mode == "screen":
-                canvas = screen(canvas, result.image)
-            elif result.blend_mode == "add":
-                canvas = add(canvas, result.image)
-            elif result.blend_mode == "replace":
-                canvas = result.image
-            else:  # pragma: no cover - Pydantic makes this unreachable
-                raise InvalidRenderPlan(f"Unsupported blend mode '{result.blend_mode}'")
+            canvas = _blend_result(canvas, result.image, result.blend_mode)
 
             if result.transform_previous_layers:
                 for stage in stages:
