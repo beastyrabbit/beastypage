@@ -3,6 +3,10 @@ on:
   pull_request:
 permissions:
   contents: read
+# Cancel runs superseded by a newer push to the same PR; push, tag and manual runs keep separate groups.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 jobs:
   applications:
     runs-on: arc-beastypage
