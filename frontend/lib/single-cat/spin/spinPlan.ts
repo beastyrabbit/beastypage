@@ -397,40 +397,56 @@ export function buildSpinPlan(input: SpinPlanInput): SpinPlan {
   return { spinny, slots, initial, phases, phase };
 }
 
+type PrefetchLoader = Pick<SpinFrameLoader, "prefetch" | "prefetchSingle">;
+
 /**
  * Queue every render of the spin in reveal order: frames for each flashy
  * phase and the single renders after each commit, ending with the final cat.
  * Calm plans queue only the single renders.
  */
-export function prefetchSpin(
-  loader: Pick<SpinFrameLoader, "prefetch" | "prefetchSingle">,
-  plan: SpinPlan,
-): void {
+export function prefetchSpin(loader: PrefetchLoader, plan: SpinPlan): void {
   for (const phase of plan.phases) {
-    switch (phase.kind) {
-      case "param":
-        if (phase.animate) loader.prefetch(phase.before, phase.descriptors);
-        else loader.prefetchSingle(phase.after);
-        break;
-      case "accessory":
-      case "scar":
-      case "registry":
-        if (plan.spinny) loader.prefetch(phase.before, phase.descriptors);
-        loader.prefetchSingle(phase.after);
-        break;
-      case "tortie":
-        if (!phase.spin) break;
-        if (plan.spinny) {
-          for (const stage of phase.spin.stages) {
-            loader.prefetch(phase.before, stage.descriptors);
-          }
-        }
-        loader.prefetchSingle(phase.after);
-        break;
-      case "empty":
-      case "final":
-        loader.prefetchSingle(phase.params);
-        break;
+    prefetchPhase(loader, phase, plan.spinny);
+  }
+}
+
+function prefetchPhase(
+  loader: PrefetchLoader,
+  phase: SpinPhase,
+  spinny: boolean,
+): void {
+  switch (phase.kind) {
+    case "param":
+      if (phase.animate) loader.prefetch(phase.before, phase.descriptors);
+      else loader.prefetchSingle(phase.after);
+      break;
+    case "accessory":
+    case "scar":
+    case "registry":
+      if (spinny) loader.prefetch(phase.before, phase.descriptors);
+      loader.prefetchSingle(phase.after);
+      break;
+    case "tortie":
+      prefetchTortiePhase(loader, phase, spinny);
+      break;
+    case "empty":
+    case "final":
+      loader.prefetchSingle(phase.params);
+      break;
+  }
+}
+
+/** A None layer renders nothing; otherwise stage frames, then the commit. */
+function prefetchTortiePhase(
+  loader: PrefetchLoader,
+  phase: TortieSlotPhase,
+  spinny: boolean,
+): void {
+  if (!phase.spin) return;
+  if (spinny) {
+    for (const stage of phase.spin.stages) {
+      loader.prefetch(phase.before, stage.descriptors);
     }
   }
+  loader.prefetchSingle(phase.after);
 }

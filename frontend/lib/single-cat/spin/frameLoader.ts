@@ -48,6 +48,12 @@ interface PendingFrame {
   descriptor: VariantDescriptor;
 }
 
+/** Default sort order (UTF-16 code units), independent of locale. */
+function compareCodeUnits(a: string, b: string): number {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
+}
+
 function normalize(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(normalize);
@@ -55,7 +61,7 @@ function normalize(value: unknown): unknown {
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
     const sorted: Record<string, unknown> = {};
-    for (const key of Object.keys(record).sort()) {
+    for (const key of Object.keys(record).sort(compareCodeUnits)) {
       sorted[key] = normalize(record[key]);
     }
     return sorted;
@@ -75,6 +81,15 @@ function defaultCreateCanvas(width: number, height: number) {
 }
 
 function noop() {}
+
+function getContext(canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Unable to acquire 2D context for spin frame");
+  }
+  ctx.imageSmoothingEnabled = false;
+  return ctx;
+}
 
 export function createSpinFrameLoader(
   generator: CatGeneratorApi,
@@ -162,15 +177,6 @@ export function createSpinFrameLoader(
       cache.delete(key);
     }
     entry.reject(error);
-  }
-
-  function getContext(canvas: HTMLCanvasElement) {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      throw new Error("Unable to acquire 2D context for spin frame");
-    }
-    ctx.imageSmoothingEnabled = false;
-    return ctx;
   }
 
   function cloneCanvas(source: HTMLCanvasElement | OffscreenCanvas) {

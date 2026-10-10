@@ -36,6 +36,7 @@ import {
 } from "@/lib/single-cat/spin/countReveal";
 import {
   readSpinPools,
+  type TortieSlotSpin,
   tortieStageCandidate,
 } from "@/lib/single-cat/spin/descriptors";
 import {
@@ -44,8 +45,11 @@ import {
 } from "@/lib/single-cat/spin/frameLoader";
 import {
   buildSpinPlan,
+  type ParamPhase,
   prefetchSpin,
   type SpinPlan,
+  type StringSlotPhase,
+  type TortieSlotPhase,
 } from "@/lib/single-cat/spin/spinPlan";
 import type { SpinFrameLoader } from "@/lib/single-cat/spin/types";
 import {
@@ -183,6 +187,231 @@ function collectSlotPhases<T>(lookup: (index: number) => T | undefined): T[] {
 
 function now(): number {
   return typeof performance === "undefined" ? Date.now() : performance.now();
+}
+
+type FlipStep = ReturnType<typeof buildFlipSequence>[number];
+
+/** A param row's index, assigned when setParamRows runs its updater. */
+interface ParamRowIndex {
+  current: number;
+}
+
+/** Spin inputs shared by every param reveal of one spin. */
+interface ParamRevealContext {
+  loader: SpinFrameLoader;
+  plan: SpinPlan;
+  hasRollerOptions: boolean;
+  token: number;
+}
+
+/** Tortie parts are revealed by the tortie toggle's slot spin instead. */
+const TORTIE_PART_IDS = new Set<ParamId>([
+  "tortieMask",
+  "tortiePattern",
+  "tortieColour",
+]);
+
+/** Duration of the step at `index`, recomputed so live timing edits apply. */
+function stepDurationAt(
+  sequence: FlipStep[],
+  index: number,
+  delay: number,
+  allowFastFlips: boolean,
+): number {
+  const durations = computeStepDurations(
+    sequence.slice(index),
+    delay,
+    allowFastFlips,
+  );
+  return durations[0] ?? delay;
+}
+
+function flipStepStatus(step: FlipStep): "active" | "revealed" {
+  return step.isFinal ? "revealed" : "active";
+}
+
+function formatSlotValue(value: string | null): string {
+  return value ? formatValue(value) : "None";
+}
+
+/** Marks a prefilled param row active and records its index in `row`. */
+function activateParamRow(
+  prev: ParamRow[],
+  definition: RegistryRevealDefinition,
+  row: ParamRowIndex,
+): ParamRow[] {
+  const idx = prev.findIndex((entry) => entry.id === definition.id);
+  if (idx !== -1) {
+    row.current = idx;
+    return prev.map((entry, i) =>
+      i === idx ? { ...entry, value: "---", status: "active" as const } : entry,
+    );
+  }
+  // Fallback: append if not found (shouldn't happen with prefill)
+  console.warn(
+    `[ObsOverlayClient] Param row for "${definition.id}" not found in prefilled board — appending as fallback`,
+  );
+  row.current = prev.length;
+  return [
+    ...prev,
+    {
+      id: definition.id,
+      label: definition.label,
+      value: "---",
+      status: "active" as const,
+    },
+  ];
+}
+
+function revealParamRow(
+  prev: ParamRow[],
+  id: ParamId,
+  value: string,
+): ParamRow[] {
+  return prev.map((row) =>
+    row.id === id ? { ...row, value, status: "revealed" as const } : row,
+  );
+}
+
+/** A param row during a flip: active, then revealed on the final frame. */
+function showParamStep(
+  prev: ParamRow[],
+  id: ParamId,
+  step: FlipStep,
+): ParamRow[] {
+  return prev.map((row) => {
+    if (row.id !== id) return row;
+    return {
+      ...row,
+      value: step.isFinal ? step.frame.option.display : row.value,
+      status: flipStepStatus(step),
+    };
+  });
+}
+
+/** Moves the rolled count's frame last; buildFlipSequence lands on it. */
+function moveRolledCountLast(frames: VariationFrame[], count: number): void {
+  const targetIdx = frames.findIndex((f) => f.option.raw === count);
+  if (targetIdx !== -1 && targetIdx !== frames.length - 1) {
+    const [target] = frames.splice(targetIdx, 1);
+    frames.push(target);
+  }
+}
+
+function firstRolledSlot(slots: readonly unknown[]): string | null {
+  return (
+    slots.find(
+      (entry): entry is string => typeof entry === "string" && entry !== "none",
+    ) ?? null
+  );
+}
+
+/** The finished spin's cat, before it is shared or persisted. */
+function buildFinishedCatState(
+  generator: CatGeneratorApi,
+  prepared: PreparedSpin,
+  counts: GenerationCounts,
+  previous: CatState | null,
+): CatState {
+  const { params } = prepared;
+  const { accessorySlots, scarSlots, tortieSlots } = prepared.plan.slots;
+  const tortieLayers = tortieSlots.filter(Boolean) as TortieSlot[];
+  const builderParams = sanitizeForBuilder(params, {
+    accessory: firstRolledSlot(accessorySlots),
+    scar: firstRolledSlot(scarSlots),
+    tortie: tortieLayers.length > 0 ? tortieLayers[0] : null,
+  });
+  builderParams.spriteNumber = DEFAULT_SPRITE_NUMBER;
+  builderParams.poseName = DEFAULT_POSE_NAME;
+
+  return {
+    params,
+    accessorySlots,
+    scarSlots,
+    tortieSlots,
+    counts,
+    catUrl: generator.buildCatURL?.(builderParams) ?? "",
+    builderParams,
+    shareUrl: null,
+    profileId: null,
+    mapperSlug: null,
+    legacyEncoded: previous?.legacyEncoded ?? null,
+    catShareSlug: previous?.catShareSlug ?? null,
+    catName: null,
+    creatorName: null,
+  };
+}
+
+/** Site URL for `path`; the bare path when there is no window. */
+function siteUrl(path: string): string {
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  return origin ? `${origin}${path}` : path;
+}
+
+/** The cat's legacy share encoding, encoding it now when missing. */
+function ensureLegacyEncoded(
+  existing: string | null | undefined,
+  payload: ReturnType<typeof buildSharePayload>,
+): string | null {
+  const current = existing ?? null;
+  if (current) return current;
+  try {
+    return encodeCatShare(payload);
+  } catch (err) {
+    console.warn("Failed to encode share payload", err);
+    return current;
+  }
+}
+
+/** Gold fireworks celebration for a finished spin. */
+async function celebrateSpin(): Promise<void> {
+  try {
+    const confetti = (await import("canvas-confetti")).default;
+    const gold = ["#f59e0b", "#fbbf24", "#d97706", "#eab308"];
+    const fireBurst = () => {
+      confetti({
+        particleCount: 60,
+        spread: 100,
+        origin: { x: 0.5, y: 0.5 },
+        colors: gold,
+        zIndex: 10000,
+        startVelocity: 30,
+      });
+      confetti({
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.6 },
+        particleCount: 40,
+        colors: gold,
+        zIndex: 10000,
+        startVelocity: 40,
+      });
+      confetti({
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.6 },
+        particleCount: 40,
+        colors: gold,
+        zIndex: 10000,
+        startVelocity: 40,
+      });
+      confetti({
+        spread: 360,
+        ticks: 60,
+        startVelocity: 25,
+        particleCount: 30,
+        origin: { x: 0.3 + Math.random() * 0.4, y: Math.random() * 0.4 },
+        colors: gold,
+        shapes: ["star"],
+        zIndex: 10000,
+      });
+    };
+    fireBurst();
+    setTimeout(fireBurst, 200);
+    setTimeout(fireBurst, 500);
+  } catch (err) {
+    console.warn("Confetti celebration failed", err);
+  }
 }
 
 function formatRevealedLayerValue(
@@ -1277,6 +1506,71 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     [],
   );
 
+  /**
+   * Flips through a sequence on the roller and canvas, re-reading the delay
+   * each step for live timing edits; calm mode stops after the current step.
+   * Resolves false once a newer spin cancelled this one.
+   */
+  const playRollerSequence = useCallback(
+    async (
+      sequence: FlipStep[],
+      readDelay: () => number,
+      showStep: (step: FlipStep) => void,
+      token: number,
+    ): Promise<boolean> => {
+      for (let idx = 0; idx < sequence.length; idx += 1) {
+        const step = sequence[idx];
+        if (generationIdRef.current !== token) return false;
+
+        // Recalculate delay on each step to get live updates
+        const delay = readDelay();
+        const stepDuration = stepDurationAt(
+          sequence,
+          idx,
+          delay,
+          timingConfigRef.current.allowFastFlips,
+        );
+
+        setRollerActiveValue(step.frame.option.display);
+        showStep(step);
+
+        const stepState = readSpinState();
+        await playFlip(() => drawCanvas(step.frame.canvas), stepDuration);
+        if (!stepState.spinny) break;
+      }
+      return true;
+    },
+    [drawCanvas, playFlip, readSpinState],
+  );
+
+  /** Flips one registry string slot's frames; false once cancelled. */
+  const flipRegistrySlot = useCallback(
+    async (
+      definition: RegistryRevealDefinition,
+      slot: StringSlotPhase,
+      loader: SpinFrameLoader,
+      token: number,
+    ): Promise<boolean> => {
+      const frames = await loader.frames(slot.before, slot.descriptors);
+      const sequence = buildFlipSequence(frames);
+      for (const step of sequence) {
+        if (generationIdRef.current !== token) return false;
+        const display = step.frame.option.display;
+        updateLayerRow(definition.layerKey, slot.index, {
+          value: display,
+          status: flipStepStatus(step),
+        });
+        setRollerActiveValue(display);
+        await playFlip(
+          () => drawCanvas(step.frame.canvas),
+          getDelayWithMultiplier(definition.timingKey),
+        );
+      }
+      return true;
+    },
+    [drawCanvas, getDelayWithMultiplier, playFlip, updateLayerRow],
+  );
+
   const spinRegistryStringSlots = useCallback(
     async (
       definition: RegistryRevealDefinition,
@@ -1310,24 +1604,16 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         await flashLayer(`${definition.layerKey}-${index}`);
 
         if (spinState.spinny) {
-          const frames = await loader.frames(slot.before, slot.descriptors);
-          const sequence = buildFlipSequence(frames);
-          for (const step of sequence) {
-            if (generationIdRef.current !== currentToken) return;
-            const display = step.frame.option.display;
-            updateLayerRow(definition.layerKey, index, {
-              value: display,
-              status: step.isFinal ? "revealed" : "active",
-            });
-            setRollerActiveValue(display);
-            await playFlip(
-              () => drawCanvas(step.frame.canvas),
-              getDelayWithMultiplier(definition.timingKey),
-            );
-          }
+          const played = await flipRegistrySlot(
+            definition,
+            slot,
+            loader,
+            currentToken,
+          );
+          if (!played) return;
         }
 
-        const display = slot.value ? formatValue(slot.value) : "None";
+        const display = formatSlotValue(slot.value);
         summary.push(display);
         updateLayerRow(definition.layerKey, index, {
           value: display,
@@ -1349,8 +1635,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       clearMirror,
       drawCanvas,
       flashLayer,
-      getDelayWithMultiplier,
-      playFlip,
+      flipRegistrySlot,
       readSpinState,
       updateLayerRow,
       updateParamRow,
@@ -1384,6 +1669,40 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       clearMirror();
     },
     [clearMirror, drawCanvas, playFlip, readSpinState, settleRoller],
+  );
+
+  /** Flips one accessory or scar slot's frames; false once cancelled. */
+  const flipStringLayerSlot = useCallback(
+    async (
+      kind: "accessory" | "scar",
+      slot: StringSlotPhase,
+      loader: SpinFrameLoader,
+      token: number,
+    ): Promise<boolean> => {
+      const { rows } = STRING_LAYER_UI[kind];
+      updateLayerRow(rows, slot.index, { status: "active", value: "---" });
+
+      // Every frame is a complete cat, so no base-layer compositing.
+      const frames = await loader.frames(slot.before, slot.descriptors);
+      const played = await playRollerSequence(
+        buildFlipSequence(frames),
+        () => getDelayWithMultiplier(kind),
+        (step) =>
+          updateLayerRow(rows, slot.index, {
+            value: step.frame.option.display,
+            status: flipStepStatus(step),
+          }),
+        token,
+      );
+      if (!played) return false;
+
+      const finalFrame = frames.at(-1);
+      if (finalFrame) {
+        drawCanvas(finalFrame.canvas);
+      }
+      return true;
+    },
+    [drawCanvas, getDelayWithMultiplier, playRollerSequence, updateLayerRow],
   );
 
   const spinStringLayerSlots = useCallback(
@@ -1423,47 +1742,15 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
 
         await flashLayer(`${ui.rows}-${i}`);
 
-        const display = slot.value ? formatValue(slot.value) : "None";
+        const display = formatSlotValue(slot.value);
         if (spinState.spinny) {
-          updateLayerRow(ui.rows, i, { status: "active", value: "---" });
-
-          // Every frame is a complete cat, so no base-layer compositing.
-          const frames = await loader.frames(slot.before, slot.descriptors);
-          const sequence = buildFlipSequence(frames);
-
-          for (let idx = 0; idx < sequence.length; idx += 1) {
-            const step = sequence[idx];
-            if (generationIdRef.current !== currentToken) return;
-
-            // Recalculate delay on each step to get live updates
-            const layerDelay = getDelayWithMultiplier(kind);
-            const currentConfig = timingConfigRef.current;
-            const stepDurations = computeStepDurations(
-              sequence.slice(idx),
-              layerDelay,
-              currentConfig.allowFastFlips,
-            );
-            const stepDuration = stepDurations[0] ?? layerDelay;
-
-            const frameDisplay = step.frame.option.display;
-            setRollerActiveValue(frameDisplay);
-            updateLayerRow(ui.rows, i, {
-              value: frameDisplay,
-              status: step.isFinal ? "revealed" : "active",
-            });
-
-            const drawStep = () => drawCanvas(step.frame.canvas);
-            const stepState = readSpinState();
-            await playFlip(drawStep, stepDuration);
-            if (!stepState.spinny) {
-              break;
-            }
-          }
-
-          const finalFrame = frames.at(-1);
-          if (finalFrame) {
-            drawCanvas(finalFrame.canvas);
-          }
+          const played = await flipStringLayerSlot(
+            kind,
+            slot,
+            loader,
+            currentToken,
+          );
+          if (!played) return;
         } else {
           updateLayerRow(ui.rows, i, { value: display, status: "revealed" });
           setRollerActiveValue(display);
@@ -1488,14 +1775,125 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       clearMirror,
       drawCanvas,
       flashLayer,
-      getDelayWithMultiplier,
-      playFlip,
+      flipStringLayerSlot,
       revealEmptySlotGroup,
       settleRoller,
       updateLayerRow,
       updateParamRow,
       readSpinState,
     ],
+  );
+
+  /** Spins a tortie layer's mask, pattern and colour stages; false once cancelled. */
+  const flipTortieStages = useCallback(
+    async (
+      slot: TortieSlotPhase,
+      spin: TortieSlotSpin,
+      loader: SpinFrameLoader,
+      pauseDuration: number,
+      token: number,
+    ): Promise<boolean> => {
+      const i = slot.index;
+      for (const stage of spin.stages) {
+        const stageStart = now();
+        setRollerLabel(`Tortie Layer ${i + 1} – ${stage.label}`);
+        const frames = await loader.frames(slot.before, stage.descriptors);
+        if (frames.length === 0) {
+          continue;
+        }
+
+        const sequence = buildFlipSequence(frames);
+
+        for (let idx = 0; idx < sequence.length; idx += 1) {
+          const step = sequence[idx];
+          if (generationIdRef.current !== token) return false;
+
+          // Recalculate delay on each step to get live updates
+          const stageDelay = getDelayWithMultiplier(stage.timingKey);
+          const stepDuration = stepDurationAt(
+            sequence,
+            idx,
+            stageDelay,
+            timingConfigRef.current.allowFastFlips,
+          );
+
+          const candidateLabel = formatTortieLayer(
+            tortieStageCandidate(
+              stage.kind,
+              step.frame.option.raw,
+              stage.working,
+              spin.maskPatternColour,
+            ),
+          );
+
+          const drawStep = () => drawCanvas(step.frame.canvas);
+          await playFlip(drawStep, stepDuration);
+          setRollerActiveValue(candidateLabel);
+          updateLayerRow("tortie", i, {
+            value: candidateLabel,
+            status: flipStepStatus(step),
+          });
+        }
+
+        await wait(pauseDuration);
+        addActualDuration(stage.timingKey, now() - stageStart);
+      }
+      return true;
+    },
+    [
+      addActualDuration,
+      drawCanvas,
+      getDelayWithMultiplier,
+      playFlip,
+      updateLayerRow,
+    ],
+  );
+
+  /** Reveals one tortie layer; resolves its summary text, or null once cancelled. */
+  const revealTortieSlot = useCallback(
+    async (
+      definition: RegistryRevealDefinition,
+      slot: TortieSlotPhase,
+      loader: SpinFrameLoader,
+      pauseDuration: number,
+      token: number,
+    ): Promise<string | null> => {
+      const i = slot.index;
+      const spin = slot.spin;
+      const spinState = readSpinState();
+
+      await flashLayer(`${definition.layerKey}-${i}`);
+
+      if (!spin || !slot.value) {
+        updateLayerRow("tortie", i, { value: "None", status: "revealed" });
+        if (!spinState.spinny) {
+          await wait(pauseDuration);
+        }
+        return "None";
+      }
+
+      const display = formatTortieLayer(slot.value);
+      if (spinState.spinny) {
+        updateLayerRow("tortie", i, { value: "—", status: "active" });
+        const played = await flipTortieStages(
+          slot,
+          spin,
+          loader,
+          pauseDuration,
+          token,
+        );
+        if (!played) return null;
+        setRollerLabel(`Tortie Layer ${i + 1}`);
+      } else {
+        updateLayerRow("tortie", i, { value: display, status: "revealed" });
+      }
+
+      setRollerActiveValue(display);
+      drawCanvas(await loader.single(slot.after));
+      await wait(pauseDuration);
+      return display;
+    },
+    [drawCanvas, flashLayer, flipTortieStages, readSpinState, updateLayerRow],
   );
 
   const spinTortieSlots = useCallback(
@@ -1527,80 +1925,15 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       const slots = collectSlotPhases((index) => plan.phase("tortie", index));
       for (const slot of slots) {
         if (generationIdRef.current !== currentToken) return;
-        const i = slot.index;
-        const spin = slot.spin;
-        const spinState = readSpinState();
-
-        await flashLayer(`${definition.layerKey}-${i}`);
-
-        if (!spin || !slot.value) {
-          updateLayerRow("tortie", i, { value: "None", status: "revealed" });
-          summary.push("None");
-          if (!spinState.spinny) {
-            await wait(pauseDuration);
-          }
-          continue;
-        }
-
-        const display = formatTortieLayer(slot.value);
-        if (spinState.spinny) {
-          updateLayerRow("tortie", i, { value: "—", status: "active" });
-
-          for (const stage of spin.stages) {
-            const stageStart = now();
-            setRollerLabel(`Tortie Layer ${i + 1} – ${stage.label}`);
-            const frames = await loader.frames(slot.before, stage.descriptors);
-            if (frames.length === 0) {
-              continue;
-            }
-
-            const sequence = buildFlipSequence(frames);
-
-            for (let idx = 0; idx < sequence.length; idx += 1) {
-              const step = sequence[idx];
-              if (generationIdRef.current !== currentToken) return;
-
-              // Recalculate delay on each step to get live updates
-              const stageDelay = getDelayWithMultiplier(stage.timingKey);
-              const currentConfig = timingConfigRef.current;
-              const stageDurations = computeStepDurations(
-                sequence.slice(idx),
-                stageDelay,
-                currentConfig.allowFastFlips,
-              );
-              const stepDuration = stageDurations[0] ?? stageDelay;
-
-              const candidateLabel = formatTortieLayer(
-                tortieStageCandidate(
-                  stage.kind,
-                  step.frame.option.raw,
-                  stage.working,
-                  spin.maskPatternColour,
-                ),
-              );
-
-              const drawStep = () => drawCanvas(step.frame.canvas);
-              await playFlip(drawStep, stepDuration);
-              setRollerActiveValue(candidateLabel);
-              updateLayerRow("tortie", i, {
-                value: candidateLabel,
-                status: step.isFinal ? "revealed" : "active",
-              });
-            }
-
-            await wait(pauseDuration);
-            addActualDuration(stage.timingKey, now() - stageStart);
-          }
-
-          setRollerLabel(`Tortie Layer ${i + 1}`);
-        } else {
-          updateLayerRow("tortie", i, { value: display, status: "revealed" });
-        }
-
+        const display = await revealTortieSlot(
+          definition,
+          slot,
+          loader,
+          pauseDuration,
+          currentToken,
+        );
+        if (display === null) return;
         summary.push(display);
-        setRollerActiveValue(display);
-        drawCanvas(await loader.single(slot.after));
-        await wait(pauseDuration);
       }
 
       const summaryText = summary.length ? summary.join(" • ") : "None";
@@ -1612,17 +1945,11 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       clearMirror();
     },
     [
-      addActualDuration,
       clearMirror,
-      drawCanvas,
-      flashLayer,
-      getDelayWithMultiplier,
-      playFlip,
       revealEmptySlotGroup,
+      revealTortieSlot,
       settleRoller,
-      updateLayerRow,
       updateParamRow,
-      readSpinState,
     ],
   );
 
@@ -1772,6 +2099,112 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   // Layer count spinner — reveals accessory/scar/tortie counts visually
   // -------------------------------------------------------------------
 
+  /**
+   * Renders a count group's frames in one batch, queued when the spin was
+   * prepared. Resolves null when rendering failed, so the group is skipped.
+   */
+  const renderCountFrames = useCallback(
+    async (
+      loader: SpinFrameLoader,
+      group: CountRevealGroup,
+      token: number,
+    ): Promise<VariationFrame[] | null> => {
+      try {
+        const rendered = await loader.frames(
+          group.baseParams,
+          group.descriptors,
+        );
+        return rendered.map((frame) => ({
+          option: frame.option,
+          canvas: compositeCountFrame(frame.canvas, frame.option.raw as number),
+        }));
+      } catch (err) {
+        if (err instanceof SpinLoaderDisposedError) throw err;
+        if (generationIdRef.current === token) {
+          console.warn(`Count reveal render failed for ${group.label}`, err);
+        }
+        return null;
+      }
+    },
+    [],
+  );
+
+  /** Flips through a count group's frames; false once cancelled. */
+  const flipCountSequence = useCallback(
+    async (
+      group: CountRevealGroup,
+      frames: VariationFrame[],
+      token: number,
+    ): Promise<boolean> => {
+      const sequence = buildFlipSequence(frames);
+
+      for (let idx = 0; idx < sequence.length; idx++) {
+        const step = sequence[idx];
+        if (generationIdRef.current !== token) return false;
+
+        const baseDelay = getDelayWithMultiplier(group.key) * 2; // slower for count reveal
+        // never fast-flip the count reveal
+        const stepDuration = stepDurationAt(sequence, idx, baseDelay, false);
+
+        setRollerActiveValue(step.frame.option.display);
+        drawCanvas(step.frame.canvas);
+        await playFlip(() => {}, stepDuration);
+        const stepState = readSpinState();
+        if (!stepState.spinny) break;
+      }
+      return true;
+    },
+    [drawCanvas, getDelayWithMultiplier, playFlip, readSpinState],
+  );
+
+  /** Rolls one layer count on the roller; false once cancelled. */
+  const revealCountGroup = useCallback(
+    async (
+      loader: SpinFrameLoader,
+      group: CountRevealGroup,
+      token: number,
+    ): Promise<boolean> => {
+      const { minCount, maxCount } = group;
+
+      // Show what we're about to roll
+      setRollerLabel(`Rolling: ${group.label}`);
+      setRollerActiveValue(`${minCount}–${maxCount}`);
+      setParamRows((prev) => [
+        ...prev,
+        {
+          id: group.key,
+          label: group.label,
+          value: "?",
+          status: "active" as const,
+        },
+      ]);
+      await wait(800); // let the viewer read what's being rolled
+      if (generationIdRef.current !== token) return false;
+
+      const frames = await renderCountFrames(loader, group, token);
+      if (generationIdRef.current !== token) return false;
+      if (!frames) return true;
+
+      // Reorder frames so the rolled count is last (buildFlipSequence targets the last frame)
+      moveRolledCountLast(frames, group.count);
+
+      const flipped = await flipCountSequence(group, frames, token);
+      if (!flipped) return false;
+
+      // Land on rolled count
+      const finalFrame = frames.find((f) => f.option.raw === group.count);
+      if (finalFrame) drawCanvas(finalFrame.canvas);
+      setRollerActiveValue(String(group.count));
+      setParamRows((prev) =>
+        revealParamRow(prev, group.key, String(group.count)),
+      );
+      await settleRoller(token);
+      await wait(600); // hold the result so viewer can see it
+      return generationIdRef.current === token;
+    },
+    [drawCanvas, flipCountSequence, renderCountFrames, settleRoller],
+  );
+
   const revealLayerCounts = useCallback(
     async (
       loader: SpinFrameLoader,
@@ -1780,91 +2213,8 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     ) => {
       for (const group of groups) {
         if (generationIdRef.current !== token) return;
-        const { minCount, maxCount } = group;
-
-        // Show what we're about to roll
-        setRollerLabel(`Rolling: ${group.label}`);
-        setRollerActiveValue(`${minCount}–${maxCount}`);
-        setParamRows((prev) => [
-          ...prev,
-          {
-            id: group.key,
-            label: group.label,
-            value: "?",
-            status: "active" as const,
-          },
-        ]);
-        await wait(800); // let the viewer read what's being rolled
-        if (generationIdRef.current !== token) return;
-
-        // One batch for every count; queued when the spin was prepared.
-        let frames: VariationFrame[];
-        try {
-          const rendered = await loader.frames(
-            group.baseParams,
-            group.descriptors,
-          );
-          frames = rendered.map((frame) => ({
-            option: frame.option,
-            canvas: compositeCountFrame(
-              frame.canvas,
-              frame.option.raw as number,
-            ),
-          }));
-        } catch (err) {
-          if (err instanceof SpinLoaderDisposedError) throw err;
-          if (generationIdRef.current !== token) return;
-          console.warn(`Count reveal render failed for ${group.label}`, err);
-          continue;
-        }
-        if (generationIdRef.current !== token) return;
-
-        // Reorder frames so the rolled count is last (buildFlipSequence targets the last frame)
-        const targetIdx = frames.findIndex((f) => f.option.raw === group.count);
-        if (targetIdx !== -1 && targetIdx !== frames.length - 1) {
-          const [target] = frames.splice(targetIdx, 1);
-          frames.push(target);
-        }
-
-        const sequence = buildFlipSequence(frames);
-
-        for (let idx = 0; idx < sequence.length; idx++) {
-          const step = sequence[idx];
-          if (generationIdRef.current !== token) return;
-
-          const baseDelay = getDelayWithMultiplier(group.key) * 2; // slower for count reveal
-          const stepDurations = computeStepDurations(
-            sequence.slice(idx),
-            baseDelay,
-            false, // never fast-flip the count reveal
-          );
-          const stepDuration = stepDurations[0] ?? baseDelay;
-
-          setRollerActiveValue(step.frame.option.display);
-          drawCanvas(step.frame.canvas);
-          await playFlip(() => {}, stepDuration);
-          const stepState = readSpinState();
-          if (!stepState.spinny) break;
-        }
-
-        // Land on rolled count
-        const finalFrame = frames.find((f) => f.option.raw === group.count);
-        if (finalFrame) drawCanvas(finalFrame.canvas);
-        setRollerActiveValue(String(group.count));
-        setParamRows((prev) =>
-          prev.map((row) =>
-            row.id === group.key
-              ? {
-                  ...row,
-                  value: String(group.count),
-                  status: "revealed" as const,
-                }
-              : row,
-          ),
-        );
-        await settleRoller(token);
-        await wait(600); // hold the result so viewer can see it
-        if (generationIdRef.current !== token) return;
+        const revealed = await revealCountGroup(loader, group, token);
+        if (!revealed) return;
       }
 
       setRollerLabel(null);
@@ -1875,14 +2225,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       );
       clearMirror();
     },
-    [
-      drawCanvas,
-      clearMirror,
-      playFlip,
-      settleRoller,
-      getDelayWithMultiplier,
-      readSpinState,
-    ],
+    [clearMirror, revealCountGroup],
   );
 
   /**
@@ -2020,6 +2363,446 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     ],
   );
 
+  /** Removes a slot group's param row once its slots are revealed. */
+  const dropParamRow = useCallback((row: ParamRowIndex) => {
+    if (row.current >= 0) {
+      setParamRows((prev) => prev.filter((_, idx) => idx !== row.current));
+    }
+  }, []);
+
+  /** Spins the accessory or scar slots, timing them under their own key. */
+  const revealStringLayerParam = useCallback(
+    async (
+      kind: "accessory" | "scar",
+      row: ParamRowIndex,
+      pauseDuration: number,
+      context: ParamRevealContext,
+    ) => {
+      const start = now();
+      await spinStringLayerSlots(
+        kind,
+        row.current,
+        context.plan,
+        context.loader,
+        pauseDuration,
+        context.token,
+      );
+      addActualDuration(kind, now() - start);
+      dropParamRow(row);
+      clearMirror();
+    },
+    [addActualDuration, clearMirror, dropParamRow, spinStringLayerSlots],
+  );
+
+  /** Flips a param through its options on the roller; false once cancelled. */
+  const revealAnimatedParam = useCallback(
+    async (
+      definition: RegistryRevealDefinition,
+      paramPhase: ParamPhase,
+      paramKey: ParamTimingKey | null,
+      speed: { baseFrameDuration: number },
+      context: ParamRevealContext,
+    ): Promise<boolean> => {
+      clearMirror();
+      setRollerLabel(definition.label);
+      setRollerActiveValue("—");
+      await wait(Math.max(getBaseFrameDuration(speed) * 0.25, PRE_SPIN_DELAY));
+
+      const frames = await context.loader.frames(
+        paramPhase.before,
+        paramPhase.descriptors,
+      );
+      const played = await playRollerSequence(
+        buildFlipSequence(frames),
+        () => (paramKey ? getDelayWithMultiplier(paramKey) : MIN_SAFE_STEP_MS),
+        (step) =>
+          setParamRows((prev) => showParamStep(prev, definition.id, step)),
+        context.token,
+      );
+      if (!played) return false;
+
+      const finalFrame = frames.at(-1);
+      if (finalFrame) {
+        drawCanvas(finalFrame.canvas);
+      }
+      const finalDisplay =
+        finalFrame?.option.display ?? paramPhase.targetDisplay;
+      setParamRows((prev) => revealParamRow(prev, definition.id, finalDisplay));
+      if (generationIdRef.current !== context.token) return false;
+      await settleRoller(context.token);
+      setRollerLabel(null);
+      setRollerActiveValue(null);
+      return true;
+    },
+    [
+      clearMirror,
+      drawCanvas,
+      getDelayWithMultiplier,
+      playRollerSequence,
+      settleRoller,
+    ],
+  );
+
+  /** Shows a param's value without flipping; false once cancelled. */
+  const revealSettledParam = useCallback(
+    async (
+      definition: RegistryRevealDefinition,
+      paramPhase: ParamPhase,
+      context: ParamRevealContext,
+    ): Promise<boolean> => {
+      const displayValue = paramPhase.targetDisplay;
+      clearMirror();
+      setParamRows((prev) => revealParamRow(prev, definition.id, displayValue));
+      drawCanvas(await context.loader.single(paramPhase.after));
+      if (generationIdRef.current !== context.token) return false;
+      setRollerLabel(null);
+      setRollerActiveValue(displayValue);
+      await settleRoller(context.token, {
+        keepLabel: false,
+        skipHighlight: true,
+      });
+      return true;
+    },
+    [clearMirror, drawCanvas, settleRoller],
+  );
+
+  /** Reveals one param of the spin; false once cancelled. */
+  const revealParam = useCallback(
+    async (
+      definition: RegistryRevealDefinition,
+      context: ParamRevealContext,
+    ): Promise<boolean> => {
+      const { id } = definition;
+      const paramKey = isParamTimingKey(id) ? id : null;
+      const paramStart = now();
+
+      setActiveParamId(id);
+
+      // Flash the row before activating it
+      setFlashParamId(id);
+      await wait(350);
+      setFlashParamId(null);
+
+      // Update existing pending row to active (instead of appending)
+      const row: ParamRowIndex = { current: -1 };
+      setParamRows((prev) => activateParamRow(prev, definition, row));
+
+      const spinState = readSpinState();
+      const basePause =
+        modeRef.current === "calm"
+          ? spinState.speed.calmParamPause
+          : spinState.speed.paramPause;
+      const pauseDuration = Math.max(
+        PARAM_REVEAL_PAUSE,
+        basePause / speedMultiplierRef.current,
+      );
+
+      if (id === "accessory" || id === "scar") {
+        await revealStringLayerParam(id, row, pauseDuration, context);
+        return true;
+      }
+
+      if (definition.strategy === "slots") {
+        await spinRegistryStringSlots(
+          definition,
+          row.current,
+          context.plan,
+          context.loader,
+          pauseDuration,
+          context.token,
+        );
+        dropParamRow(row);
+        return true;
+      }
+
+      const paramPhase = context.plan.phase("param", id);
+      if (!paramPhase) {
+        throw new Error(`Spin plan has no phase for ${id}`);
+      }
+      const isInstantParam = INSTANT_PARAMS.includes(id);
+      const isTortieToggle = definition.compoundMode === "tortieParts";
+      const shouldAnimate =
+        spinState.spinny &&
+        context.hasRollerOptions &&
+        !isInstantParam &&
+        !isTortieToggle;
+      const stillCurrent = shouldAnimate
+        ? await revealAnimatedParam(
+            definition,
+            paramPhase,
+            paramKey,
+            spinState.speed,
+            context,
+          )
+        : await revealSettledParam(definition, paramPhase, context);
+      if (!stillCurrent) return false;
+
+      if (isTortieToggle) {
+        await spinTortieSlots(
+          definition,
+          row.current,
+          context.plan,
+          context.loader,
+          pauseDuration,
+          context.token,
+        );
+      }
+
+      await wait(pauseDuration);
+      addActualDuration(paramKey, now() - paramStart);
+      return true;
+    },
+    [
+      addActualDuration,
+      dropParamRow,
+      readSpinState,
+      revealAnimatedParam,
+      revealSettledParam,
+      revealStringLayerParam,
+      spinRegistryStringSlots,
+      spinTortieSlots,
+    ],
+  );
+
+  /**
+   * Takes the spin the command queued, or prepares one now. Resolves null
+   * when it is unavailable or a newer spin cancelled this one.
+   */
+  const claimPreparedSpin = useCallback(
+    async (token: number): Promise<PreparedSpin | null> => {
+      // OBS: Use override params from the control page if available
+      const override = overrideParamsRef.current;
+      overrideParamsRef.current = null; // consume once
+      const preparing = preparedSpinRef.current;
+      preparedSpinRef.current = null;
+      const preloaded = await preparing?.catch(() => null);
+      if (generationIdRef.current !== token) return null;
+      return preloaded ?? (await prepareSpin(override));
+    },
+    [prepareSpin],
+  );
+
+  /** Plays the count reveal, then every param; false once cancelled. */
+  const runSpinReveal = useCallback(
+    async (
+      prepared: PreparedSpin,
+      hasRollerOptions: boolean,
+      token: number,
+    ): Promise<boolean> => {
+      const { loader, plan, params, slotSelections, countReveal } = prepared;
+
+      // Count reveal phase — spin the accessory/scar/tortie counts before params
+      if (countReveal.length > 0) {
+        await revealLayerCounts(loader, countReveal, token);
+        if (generationIdRef.current !== token) return false;
+      }
+
+      // Count reveal done — resize layer rows from max-prefill to actual slot counts
+      const { accessorySlots, scarSlots, tortieSlots } = plan.slots;
+      resetLayerRows(accessorySlots, scarSlots, tortieSlots, {
+        ...params.traits,
+        ...(slotSelections as Record<string, unknown> | undefined),
+      });
+
+      const context: ParamRevealContext = {
+        loader,
+        plan,
+        hasRollerOptions,
+        token,
+      };
+      for (const definition of PARAM_SEQUENCE) {
+        if (TORTIE_PART_IDS.has(definition.id)) continue;
+        if (generationIdRef.current !== token) return false;
+        const revealed = await revealParam(definition, context);
+        if (!revealed) return false;
+      }
+      return true;
+    },
+    [resetLayerRows, revealLayerCounts, revealParam],
+  );
+
+  /** Mapper persistence failed: fall back to a share or legacy view URL. */
+  const applyFallbackShareUrl = useCallback(
+    (shareSlug: string | null, legacyEncoded: string | null) => {
+      const current = catStateRef.current;
+      if (!current) return;
+      if (shareSlug) {
+        const fallbackUrl = siteUrl(`/visual-builder?share=${shareSlug}`);
+        catStateRef.current = {
+          ...current,
+          catShareSlug: shareSlug,
+          shareUrl: fallbackUrl,
+        };
+        setShareLink(fallbackUrl);
+      } else if (legacyEncoded) {
+        const fallbackUrl = siteUrl(`/view?cat=${legacyEncoded}`);
+        catStateRef.current = {
+          ...current,
+          legacyEncoded,
+          shareUrl: fallbackUrl,
+        };
+        setShareLink(fallbackUrl);
+      }
+    },
+    [],
+  );
+
+  /** Saves the mapper record and points the share link at its view page. */
+  const persistMapperRecord = useCallback(
+    async (
+      state: CatState,
+      payload: ReturnType<typeof buildSharePayload>,
+      shareSlug: string | null,
+      legacyEncoded: string | null,
+      token: number,
+    ) => {
+      const mapperPayload = shareSlug ? { ...payload, shareSlug } : payload;
+
+      try {
+        const result = await createMapper({
+          catData: catDataToLegacyPersistence(mapperPayload),
+          catName: state.catName ?? undefined,
+          creatorName: state.creatorName ?? undefined,
+        });
+        if (generationIdRef.current !== token) return;
+        if (result && catStateRef.current) {
+          const shareToken =
+            (result as { shareToken?: string }).shareToken ??
+            result.slug ??
+            result.id;
+          const url = siteUrl(`/view/${shareToken}`);
+          catStateRef.current = {
+            ...catStateRef.current,
+            profileId: result.id,
+            mapperSlug: shareToken,
+            legacyEncoded,
+            shareUrl: url,
+            catShareSlug: shareSlug ?? catStateRef.current.catShareSlug ?? null,
+          };
+          setShareLink(url);
+        }
+      } catch (err) {
+        console.warn("Failed to persist mapper record", err);
+        applyFallbackShareUrl(shareSlug, legacyEncoded);
+      }
+    },
+    [applyFallbackShareUrl, createMapper],
+  );
+
+  /** Shares and persists the finished cat in the background. */
+  const persistSpinShare = useCallback(
+    async (token: number) => {
+      if (generationIdRef.current !== token) return;
+      const state = catStateRef.current;
+      if (!state) return;
+      const payload = buildSharePayload(state);
+      const shareSeed = {
+        params: payload.params,
+        accessorySlots: payload.accessorySlots,
+        scarSlots: payload.scarSlots,
+        tortieSlots: payload.tortieSlots,
+        counts: payload.counts,
+      } as const;
+
+      let shareSlug: string | null = state.catShareSlug ?? null;
+      const shareRecord = await createCatShare(shareSeed);
+      if (generationIdRef.current !== token) return;
+      if (shareRecord?.slug) {
+        shareSlug = shareRecord.slug;
+      }
+      if (shareSlug && catStateRef.current) {
+        catStateRef.current = {
+          ...catStateRef.current,
+          catShareSlug: shareSlug,
+        };
+      }
+
+      const legacyEncoded = ensureLegacyEncoded(state.legacyEncoded, payload);
+      if (generationIdRef.current !== token) return;
+      if (legacyEncoded && catStateRef.current) {
+        catStateRef.current = { ...catStateRef.current, legacyEncoded };
+      }
+
+      await persistMapperRecord(
+        state,
+        payload,
+        shareSlug,
+        legacyEncoded,
+        token,
+      );
+    },
+    [persistMapperRecord],
+  );
+
+  /** Stores the finished cat, reports timing, celebrates and persists it. */
+  const finishSpin = useCallback(
+    (
+      generator: CatGeneratorApi,
+      prepared: PreparedSpin,
+      counts: GenerationCounts,
+      token: number,
+    ) => {
+      // Persist refs/state for actions
+      catStateRef.current = buildFinishedCatState(
+        generator,
+        prepared,
+        counts,
+        catStateRef.current,
+      );
+      resetMetaDrafts();
+      setShareLink(null);
+      setMetaSaving(false);
+
+      logTimingReport(
+        "post-roll",
+        activeTimingRef.current,
+        adjustedOptionCounts,
+        estimatedTotals,
+        actualDurationsRef.current,
+        totalActualRef.current,
+      );
+      setLastTimingSnapshot({
+        counts: { ...adjustedOptionCounts },
+        estimated: { ...estimatedTotals.perKey },
+        estimatedTotal: estimatedTotals.total,
+        actual: { ...actualDurationsRef.current },
+        actualTotal: totalActualRef.current,
+        timestamp: now(),
+      });
+      setIsGenerating(false);
+      setSpinDone(true);
+      scheduleAutoClear(token);
+
+      void celebrateSpin();
+
+      track("single_cat_generated", {
+        mode: modeRef.current,
+        accessories: counts.accessories > 0,
+        scars: counts.scars > 0,
+        torties: counts.tortie > 0,
+        afterlife: afterlifeMode !== "off",
+        speed: speedMultiplierRef.current,
+        layer_count_mode: exactLayerCounts ? "exact" : "chance",
+      });
+      window.setTimeout(() => {
+        if (generationIdRef.current === token) {
+          setRollerExpanded(false);
+        }
+      }, 500);
+
+      void persistSpinShare(token);
+    },
+    [
+      adjustedOptionCounts,
+      afterlifeMode,
+      estimatedTotals,
+      exactLayerCounts,
+      persistSpinShare,
+      resetMetaDrafts,
+      scheduleAutoClear,
+    ],
+  );
+
   const generateCatPlus = useCallback(async () => {
     const generator = generatorRef.current;
     if (!generator) return;
@@ -2051,28 +2834,19 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     setIsGenerating(true);
 
     try {
-      // OBS: Use override params from the control page if available
-      const override = overrideParamsRef.current;
-      overrideParamsRef.current = null; // consume once
-      const preparing = preparedSpinRef.current;
-      preparedSpinRef.current = null;
-      const preloaded = await preparing?.catch(() => null);
-      if (generationIdRef.current !== token) return;
-      const prepared = preloaded ?? (await prepareSpin(override));
+      const prepared = await claimPreparedSpin(token);
       if (generationIdRef.current !== token) return;
       if (!prepared) {
         setIsGenerating(false);
         setRollerExpanded(false);
         return;
       }
-      const { loader, plan, params, slotSelections, countReveal } = prepared;
-      const rollerOptions = parameterOptionsRef.current;
+      const { loader, plan, params } = prepared;
+      const hasRollerOptions = Boolean(parameterOptionsRef.current);
 
       initMaxLayerRows();
 
       const { accessorySlots, scarSlots, tortieSlots } = plan.slots;
-      const tortieLayers = tortieSlots.filter(Boolean) as TortieSlot[];
-
       const countsResult: GenerationCounts = {
         accessories: accessorySlots.length,
         scars: scarSlots.length,
@@ -2083,278 +2857,10 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         `Rolled → Accessories: ${countsResult.accessories} • Scars: ${countsResult.scars} • Tortie layers: ${countsResult.tortie}`,
       );
       setHasTint(Boolean(params.darkForest || params.dead));
-
-      const uniqueAccessories: string[] = Array.from(
-        new Set(
-          accessorySlots.filter(
-            (entry: unknown): entry is string =>
-              typeof entry === "string" && entry !== "none",
-          ),
-        ),
-      );
-      const uniqueScars: string[] = Array.from(
-        new Set(
-          scarSlots.filter(
-            (entry: unknown): entry is string =>
-              typeof entry === "string" && entry !== "none",
-          ),
-        ),
-      );
       initBoardRows();
 
-      // Count reveal phase — spin the accessory/scar/tortie counts before params
-      if (countReveal.length > 0) {
-        await revealLayerCounts(loader, countReveal, token);
-        if (generationIdRef.current !== token) return;
-      }
-
-      // Count reveal done — resize layer rows from max-prefill to actual slot counts
-      resetLayerRows(accessorySlots, scarSlots, tortieSlots, {
-        ...params.traits,
-        ...(slotSelections as Record<string, unknown> | undefined),
-      });
-
-      for (const definition of PARAM_SEQUENCE) {
-        if (
-          definition.id === "tortieMask" ||
-          definition.id === "tortiePattern" ||
-          definition.id === "tortieColour"
-        ) {
-          continue;
-        }
-        if (generationIdRef.current !== token) return;
-        const paramKeyCandidate = definition.id;
-        const paramKey = isParamTimingKey(paramKeyCandidate)
-          ? paramKeyCandidate
-          : null;
-        const paramStart =
-          typeof performance !== "undefined" ? performance.now() : Date.now();
-
-        setActiveParamId(definition.id);
-
-        // Flash the row before activating it
-        setFlashParamId(definition.id);
-        await wait(350);
-        setFlashParamId(null);
-
-        // Update existing pending row to active (instead of appending)
-        let rowIndex = -1;
-        setParamRows((prev) => {
-          const idx = prev.findIndex((row) => row.id === definition.id);
-          if (idx !== -1) {
-            rowIndex = idx;
-            return prev.map((row, i) =>
-              i === idx
-                ? { ...row, value: "---", status: "active" as const }
-                : row,
-            );
-          }
-          // Fallback: append if not found (shouldn't happen with prefill)
-          console.warn(
-            `[ObsOverlayClient] Param row for "${definition.id}" not found in prefilled board — appending as fallback`,
-          );
-          rowIndex = prev.length;
-          return [
-            ...prev,
-            {
-              id: definition.id,
-              label: definition.label,
-              value: "---",
-              status: "active" as const,
-            },
-          ];
-        });
-
-        const spinState = readSpinState();
-        const currentSpeedSetting = spinState.speed;
-        const basePause =
-          modeRef.current === "calm"
-            ? currentSpeedSetting.calmParamPause
-            : currentSpeedSetting.paramPause;
-        const pauseDuration = Math.max(
-          PARAM_REVEAL_PAUSE,
-          basePause / speedMultiplierRef.current,
-        );
-        const isInstantParam = INSTANT_PARAMS.includes(definition.id);
-        const isTortieToggle = definition.compoundMode === "tortieParts";
-        const shouldAnimate =
-          spinState.spinny &&
-          !!rollerOptions &&
-          !isInstantParam &&
-          !isTortieToggle;
-
-        if (definition.id === "accessory") {
-          const accessoryStart =
-            typeof performance !== "undefined" ? performance.now() : Date.now();
-          await spinStringLayerSlots(
-            "accessory",
-            rowIndex,
-            plan,
-            loader,
-            pauseDuration,
-            token,
-          );
-          const accessoryEnd =
-            typeof performance !== "undefined" ? performance.now() : Date.now();
-          addActualDuration("accessory", accessoryEnd - accessoryStart);
-          if (rowIndex >= 0) {
-            setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
-          }
-          clearMirror();
-          continue;
-        }
-
-        if (definition.id === "scar") {
-          const scarStart =
-            typeof performance !== "undefined" ? performance.now() : Date.now();
-          await spinStringLayerSlots(
-            "scar",
-            rowIndex,
-            plan,
-            loader,
-            pauseDuration,
-            token,
-          );
-          const scarEnd =
-            typeof performance !== "undefined" ? performance.now() : Date.now();
-          addActualDuration("scar", scarEnd - scarStart);
-          if (rowIndex >= 0) {
-            setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
-          }
-          clearMirror();
-          continue;
-        }
-
-        if (definition.strategy === "slots") {
-          await spinRegistryStringSlots(
-            definition,
-            rowIndex,
-            plan,
-            loader,
-            pauseDuration,
-            token,
-          );
-          if (rowIndex >= 0) {
-            setParamRows((prev) => prev.filter((_, idx) => idx !== rowIndex));
-          }
-          continue;
-        }
-
-        const paramPhase = plan.phase("param", definition.id);
-        if (!paramPhase) {
-          throw new Error(`Spin plan has no phase for ${definition.id}`);
-        }
-        const displayValue = paramPhase.targetDisplay;
-
-        if (shouldAnimate) {
-          clearMirror();
-          setRollerLabel(definition.label);
-          setRollerActiveValue("—");
-          await wait(
-            Math.max(
-              getBaseFrameDuration(currentSpeedSetting) * 0.25,
-              PRE_SPIN_DELAY,
-            ),
-          );
-
-          const frames = await loader.frames(
-            paramPhase.before,
-            paramPhase.descriptors,
-          );
-          const sequence = buildFlipSequence(frames);
-
-          for (let idx = 0; idx < sequence.length; idx += 1) {
-            const step = sequence[idx];
-            if (generationIdRef.current !== token) return;
-
-            // Recalculate delay on each step to get live updates
-            const currentConfig = timingConfigRef.current;
-            const configuredDelay = paramKey
-              ? getDelayWithMultiplier(paramKey)
-              : MIN_SAFE_STEP_MS;
-            const stepDurations = computeStepDurations(
-              sequence.slice(idx),
-              configuredDelay,
-              currentConfig.allowFastFlips,
-            );
-            const stepDuration = stepDurations[0] ?? configuredDelay;
-
-            const frameDisplay = step.frame.option.display;
-            setRollerActiveValue(frameDisplay);
-            setParamRows((prev) =>
-              prev.map((row) =>
-                row.id === definition.id
-                  ? {
-                      ...row,
-                      value: step.isFinal ? frameDisplay : row.value,
-                      status: step.isFinal ? "revealed" : "active",
-                    }
-                  : row,
-              ),
-            );
-            const drawStep = () => {
-              drawCanvas(step.frame.canvas);
-            };
-            const stepState = readSpinState();
-            await playFlip(drawStep, stepDuration);
-            if (!stepState.spinny) {
-              break;
-            }
-          }
-
-          const finalFrame = frames.at(-1);
-          if (finalFrame) {
-            drawCanvas(finalFrame.canvas);
-          }
-          const finalDisplay =
-            finalFrame?.option.display ?? paramPhase.targetDisplay;
-          setParamRows((prev) =>
-            prev.map((row) =>
-              row.id === definition.id
-                ? {
-                    ...row,
-                    value: finalDisplay,
-                    status: "revealed",
-                  }
-                : row,
-            ),
-          );
-          if (generationIdRef.current !== token) return;
-          await settleRoller(token);
-          setRollerLabel(null);
-          setRollerActiveValue(null);
-        } else {
-          clearMirror();
-          setParamRows((prev) =>
-            prev.map((row) =>
-              row.id === definition.id
-                ? { ...row, value: displayValue, status: "revealed" }
-                : row,
-            ),
-          );
-          drawCanvas(await loader.single(paramPhase.after));
-          if (generationIdRef.current !== token) return;
-          setRollerLabel(null);
-          setRollerActiveValue(displayValue);
-          await settleRoller(token, { keepLabel: false, skipHighlight: true });
-        }
-
-        if (definition.compoundMode === "tortieParts") {
-          await spinTortieSlots(
-            definition,
-            rowIndex,
-            plan,
-            loader,
-            pauseDuration,
-            token,
-          );
-        }
-
-        await wait(pauseDuration);
-        const paramEnd =
-          typeof performance !== "undefined" ? performance.now() : Date.now();
-        addActualDuration(paramKey, paramEnd - paramStart);
-      }
+      const revealed = await runSpinReveal(prepared, hasRollerOptions, token);
+      if (!revealed) return;
 
       setActiveParamId(null);
       setRollerActiveValue(null);
@@ -2365,229 +2871,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       // Every frame has been shown; release the spin's canvases.
       if (spinLoaderRef.current === loader) disposeSpinLoader();
 
-      const builderPrimaryAccessory = uniqueAccessories[0] ?? null;
-      const builderPrimaryScar = uniqueScars[0] ?? null;
-      const builderPrimaryTortie =
-        tortieLayers.length > 0 ? tortieLayers[0] : null;
-      const builderParams = sanitizeForBuilder(params, {
-        accessory: builderPrimaryAccessory,
-        scar: builderPrimaryScar,
-        tortie: builderPrimaryTortie,
-      });
-      builderParams.spriteNumber = DEFAULT_SPRITE_NUMBER;
-      builderParams.poseName = DEFAULT_POSE_NAME;
-
-      const catUrl = generator.buildCatURL?.(builderParams) ?? "";
-
-      // Persist refs/state for actions
-      const nextState: CatState = {
-        params,
-        accessorySlots,
-        scarSlots,
-        tortieSlots,
-        counts: countsResult,
-        catUrl,
-        builderParams,
-        shareUrl: null,
-        profileId: null,
-        mapperSlug: null,
-        legacyEncoded: catStateRef.current?.legacyEncoded ?? null,
-        catShareSlug: catStateRef.current?.catShareSlug ?? null,
-        catName: null,
-        creatorName: null,
-      };
-
-      catStateRef.current = nextState;
-      resetMetaDrafts();
-      setShareLink(null);
-      setMetaSaving(false);
-
-      logTimingReport(
-        "post-roll",
-        activeTimingRef.current,
-        adjustedOptionCounts,
-        estimatedTotals,
-        actualDurationsRef.current,
-        totalActualRef.current,
-      );
-      setLastTimingSnapshot({
-        counts: { ...adjustedOptionCounts },
-        estimated: { ...estimatedTotals.perKey },
-        estimatedTotal: estimatedTotals.total,
-        actual: { ...actualDurationsRef.current },
-        actualTotal: totalActualRef.current,
-        timestamp:
-          typeof performance !== "undefined" ? performance.now() : Date.now(),
-      });
-      setIsGenerating(false);
-      setSpinDone(true);
-      scheduleAutoClear(token);
-
-      // Gold fireworks celebration
-      (async () => {
-        try {
-          const confetti = (await import("canvas-confetti")).default;
-          const gold = ["#f59e0b", "#fbbf24", "#d97706", "#eab308"];
-          const fireBurst = () => {
-            confetti({
-              particleCount: 60,
-              spread: 100,
-              origin: { x: 0.5, y: 0.5 },
-              colors: gold,
-              zIndex: 10000,
-              startVelocity: 30,
-            });
-            confetti({
-              angle: 60,
-              spread: 55,
-              origin: { x: 0, y: 0.6 },
-              particleCount: 40,
-              colors: gold,
-              zIndex: 10000,
-              startVelocity: 40,
-            });
-            confetti({
-              angle: 120,
-              spread: 55,
-              origin: { x: 1, y: 0.6 },
-              particleCount: 40,
-              colors: gold,
-              zIndex: 10000,
-              startVelocity: 40,
-            });
-            confetti({
-              spread: 360,
-              ticks: 60,
-              startVelocity: 25,
-              particleCount: 30,
-              origin: { x: 0.3 + Math.random() * 0.4, y: Math.random() * 0.4 },
-              colors: gold,
-              shapes: ["star"],
-              zIndex: 10000,
-            });
-          };
-          fireBurst();
-          setTimeout(fireBurst, 200);
-          setTimeout(fireBurst, 500);
-        } catch (err) {
-          console.warn("Confetti celebration failed", err);
-        }
-      })();
-
-      track("single_cat_generated", {
-        mode: modeRef.current,
-        accessories: countsResult.accessories > 0,
-        scars: countsResult.scars > 0,
-        torties: countsResult.tortie > 0,
-        afterlife: afterlifeMode !== "off",
-        speed: speedMultiplierRef.current,
-        layer_count_mode: exactLayerCounts ? "exact" : "chance",
-      });
-      window.setTimeout(() => {
-        if (generationIdRef.current === token) {
-          setRollerExpanded(false);
-        }
-      }, 500);
-
-      const persistToken = token;
-      (async () => {
-        if (generationIdRef.current !== persistToken) return;
-        const state = catStateRef.current;
-        if (!state) return;
-        const payload = buildSharePayload(state);
-        const shareSeed = {
-          params: payload.params,
-          accessorySlots: payload.accessorySlots,
-          scarSlots: payload.scarSlots,
-          tortieSlots: payload.tortieSlots,
-          counts: payload.counts,
-        } as const;
-
-        let shareSlug: string | null = state.catShareSlug ?? null;
-        const shareRecord = await createCatShare(shareSeed);
-        if (generationIdRef.current !== persistToken) return;
-        if (shareRecord?.slug) {
-          shareSlug = shareRecord.slug;
-        }
-        if (shareSlug && catStateRef.current) {
-          catStateRef.current = {
-            ...catStateRef.current,
-            catShareSlug: shareSlug,
-          };
-        }
-
-        let legacyEncoded: string | null = state.legacyEncoded ?? null;
-        if (!legacyEncoded) {
-          try {
-            legacyEncoded = encodeCatShare(payload);
-          } catch (err) {
-            console.warn("Failed to encode share payload", err);
-          }
-        }
-        if (generationIdRef.current !== persistToken) return;
-        if (legacyEncoded && catStateRef.current) {
-          catStateRef.current = { ...catStateRef.current, legacyEncoded };
-        }
-
-        const mapperPayload = shareSlug ? { ...payload, shareSlug } : payload;
-
-        try {
-          const result = await createMapper({
-            catData: catDataToLegacyPersistence(mapperPayload),
-            catName: state.catName ?? undefined,
-            creatorName: state.creatorName ?? undefined,
-          });
-          if (generationIdRef.current !== persistToken) return;
-          if (result && catStateRef.current) {
-            const shareToken =
-              (result as { shareToken?: string }).shareToken ??
-              result.slug ??
-              result.id;
-            const origin =
-              typeof window !== "undefined" ? window.location.origin : "";
-            const url = origin
-              ? `${origin}/view/${shareToken}`
-              : `/view/${shareToken}`;
-            catStateRef.current = {
-              ...catStateRef.current,
-              profileId: result.id,
-              mapperSlug: shareToken,
-              legacyEncoded,
-              shareUrl: url,
-              catShareSlug:
-                shareSlug ?? catStateRef.current.catShareSlug ?? null,
-            };
-            setShareLink(url);
-          }
-        } catch (err) {
-          console.warn("Failed to persist mapper record", err);
-          const origin =
-            typeof window !== "undefined" ? window.location.origin : "";
-          if (catStateRef.current) {
-            if (shareSlug) {
-              const fallbackUrl = origin
-                ? `${origin}/visual-builder?share=${shareSlug}`
-                : `/visual-builder?share=${shareSlug}`;
-              catStateRef.current = {
-                ...catStateRef.current,
-                catShareSlug: shareSlug,
-                shareUrl: fallbackUrl,
-              };
-              setShareLink(fallbackUrl);
-            } else if (legacyEncoded) {
-              const fallbackUrl = origin
-                ? `${origin}/view?cat=${legacyEncoded}`
-                : `/view?cat=${legacyEncoded}`;
-              catStateRef.current = {
-                ...catStateRef.current,
-                legacyEncoded,
-                shareUrl: fallbackUrl,
-              };
-              setShareLink(fallbackUrl);
-            }
-          }
-        }
-      })();
+      finishSpin(generator, prepared, countsResult, token);
     } catch (err) {
       // A newer spin, clear, or unmount disposed this spin's loader.
       if (err instanceof SpinLoaderDisposedError) return;
@@ -2605,34 +2889,19 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       }, 300);
     }
   }, [
-    prepareSpin,
+    claimPreparedSpin,
     disposeSpinLoader,
-    afterlifeMode,
     drawCanvas,
-    resetLayerRows,
-    spinStringLayerSlots,
-    spinRegistryStringSlots,
-    spinTortieSlots,
-    revealLayerCounts,
+    runSpinReveal,
+    finishSpin,
     initBoardRows,
     initMaxLayerRows,
-    playFlip,
     clearMirror,
     drawPlaceholder,
-    settleRoller,
-    readSpinState,
-    createMapper,
-    resetMetaDrafts,
     resetWheelOverlay,
-    scheduleAutoClear,
-    getDelayWithMultiplier,
-    exactLayerCounts,
     timingConfig.allowFastFlips,
     timingConfig.delays,
     resetActualDurations,
-    addActualDuration,
-    estimatedTotals,
-    adjustedOptionCounts,
   ]);
 
   const _handleDownload = useCallback(() => {
