@@ -2056,8 +2056,9 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       overrideParamsRef.current = null; // consume once
       const preparing = preparedSpinRef.current;
       preparedSpinRef.current = null;
-      const prepared =
-        (await preparing?.catch(() => null)) ?? (await prepareSpin(override));
+      const preloaded = await preparing?.catch(() => null);
+      if (generationIdRef.current !== token) return;
+      const prepared = preloaded ?? (await prepareSpin(override));
       if (generationIdRef.current !== token) return;
       if (!prepared) {
         setIsGenerating(false);
