@@ -527,7 +527,15 @@ class CatRendererV3:
         if not self.repo.has_sprite(sprite_name, self._sprite_number(params)):
             return None, [f"missing:{sprite_name}"], "alpha", LayerIdentifier.lineart
         overlay = self._get_sprite(sprite_name, params)
-        return overlay, [sprite_name.lower()], "alpha", LayerIdentifier.lineart
+        diagnostics = [sprite_name.lower()]
+        # ClanGen keeps the StarClan sparkles in a separate sheet from the
+        # StarClan lineart.
+        if sprite_name == "lineartdead" and self.repo.has_sprite(
+            "line_sc_overlay", self._sprite_number(params)
+        ):
+            overlay = alpha_over(overlay, self._get_sprite("line_sc_overlay", params))
+            diagnostics.append("line_sc_overlay")
+        return overlay, diagnostics, "alpha", LayerIdentifier.lineart
 
     def _stage_skin(self, params: dict, _canvas: Image.Image):
         skin = params.get("skinColour") or params.get("skinColor")

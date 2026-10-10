@@ -22,6 +22,11 @@ import {
 } from "@/lib/cat-v3/poseOptions";
 import { getRandomAccessoryPool } from "@/lib/cat-v3/randomAccessories";
 import type { CatParams } from "@/lib/cat-v3/types";
+import type {
+  VariantDescriptor,
+  VariationFrame,
+  VariationOption,
+} from "@/lib/single-cat/spin/types";
 import {
   CLASSIC_WHEEL_PRIZES,
   type ClassicWheelSelection,
@@ -49,6 +54,12 @@ import {
   setRegistryRevealValue,
   type TimingPresetSet,
 } from "@/utils/spinTiming";
+
+export type {
+  VariantDescriptor,
+  VariationFrame,
+  VariationOption,
+} from "@/lib/single-cat/spin/types";
 
 // OBS stubs — functions referenced by the spin logic but not needed for overlay
 export const track = (..._args: unknown[]) => {};
@@ -92,27 +103,6 @@ export const LAYER_GROUPS = PARAM_SEQUENCE.filter(
   (definition) => definition.strategy !== "single",
 );
 
-export interface VariationOption {
-  raw: unknown;
-  display: string;
-}
-
-export interface VariationFrame {
-  option: VariationOption;
-  canvas: HTMLCanvasElement;
-}
-
-export interface VariantSheetRequest {
-  id: string;
-  params: Partial<CatParams>;
-  label?: string;
-  group?: string;
-}
-
-export interface VariantDescriptor extends VariantSheetRequest {
-  option: VariationOption;
-}
-
 export interface TimingSnapshot {
   counts: Record<ParamTimingKey, number>;
   estimated: Partial<Record<ParamTimingKey, number>>;
@@ -134,7 +124,6 @@ export const GLOBAL_PRESETS: Array<keyof TimingPresetSet> = [
   "normal",
   "fast",
 ];
-export const SUBSET_LIMIT = 20;
 
 export type LayerGroup = string;
 
@@ -746,8 +735,8 @@ export function compositeCountFrame(
   let numberColour = "rgba(200, 160, 80, 0.6)";
   if (srcCtx) {
     const px = srcCtx.getImageData(
-      Math.floor(DISPLAY_SIZE / 2),
-      Math.floor(DISPLAY_SIZE / 2),
+      Math.floor(catCanvas.width / 2),
+      Math.floor(catCanvas.height / 2),
       1,
       1,
     ).data;
@@ -775,7 +764,7 @@ export function buildLayerOptionStrings(
   allValuesInput: string[] | null | undefined,
   target: string | null | undefined,
   includeNone = true,
-  options?: { spinny?: boolean; limit?: number },
+  options?: { spinny?: boolean },
 ): VariationOption[] {
   const spinnyMode = options?.spinny ?? false;
   const allValues = Array.isArray(allValuesInput) ? allValuesInput : [];
@@ -783,10 +772,7 @@ export function buildLayerOptionStrings(
   const baseLimit = spinnyMode
     ? MAX_SPINNY_LAYER_VARIATIONS
     : MAX_LAYER_VARIATIONS;
-  const variationLimit = Math.max(
-    1,
-    Math.min(baseLimit, options?.limit ?? baseLimit),
-  );
+  const variationLimit = Math.max(1, baseLimit);
   const results: string[] = [];
 
   if (includeNone) {
