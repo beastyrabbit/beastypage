@@ -2302,7 +2302,6 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         pools: readSpinPools(mapper, rollerOptions),
         spinny: readSpinState().spinny,
       });
-      prefetchSpin(loader, plan);
 
       // The count reveal lands on the cat's real slot counts, which for a
       // control-page cat are not the overlay's own random counts.
@@ -2338,7 +2337,9 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
           )
         : [];
       if (spinLoaderRef.current !== loader) return null;
+      // Queue in play order: the count reveal, then every render of the spin.
       prefetchCountReveal(loader, countReveal);
+      prefetchSpin(loader, plan);
 
       return {
         loader,
