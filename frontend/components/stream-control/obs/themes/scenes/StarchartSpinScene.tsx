@@ -226,7 +226,7 @@ function chartRoute(stars: readonly Star[] | null) {
   const risenStars = all.filter((s) => s.state === "risen");
   const risingStar = all.find((s) => s.state === "rising") ?? null;
   const belowStars = all.filter((s) => s.state === "below");
-  const lastRisen = risenStars[risenStars.length - 1] ?? null;
+  const lastRisen = risenStars.at(-1) ?? null;
   const head = risingStar ?? lastRisen;
   const nextChain = [...(head ? [head] : []), ...belowStars];
   return { risenStars, risingStar, lastRisen, nextChain };

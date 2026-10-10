@@ -21,9 +21,7 @@ export function useOverlayTheme(
   rawSessionSettings: Record<string, unknown> | null,
   syncSessionSettings: (updates: Record<string, unknown>) => void,
 ) {
-  const [theme, setThemeState] = useState<OverlayThemeId>(
-    DEFAULT_OVERLAY_THEME,
-  );
+  const [theme, setTheme] = useState<OverlayThemeId>(DEFAULT_OVERLAY_THEME);
   const { touch, deferIfEditing, retryTick } = useFollowGuard();
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: retryTick re-runs the follow effect after a deferred edit
@@ -31,14 +29,14 @@ export function useOverlayTheme(
     if (!rawSessionSettings) return;
     const cancelRetry = deferIfEditing();
     if (cancelRetry) return cancelRetry;
-    setThemeState(resolveOverlayTheme(rawSessionSettings));
+    setTheme(resolveOverlayTheme(rawSessionSettings));
   }, [rawSessionSettings, deferIfEditing, retryTick]);
 
-  const setTheme = useCallback(
+  const pickTheme = useCallback(
     (id: OverlayThemeId) => {
       if (id === theme) return;
       touch();
-      setThemeState(id);
+      setTheme(id);
       syncSessionSettings({ [OVERLAY_THEME_SETTING_KEY]: id });
       // Shared id: quick arrow-key browsing updates one toast instead of stacking.
       toast.success(`Overlay theme: ${OVERLAY_THEME_META[id].label}`, {
@@ -48,5 +46,5 @@ export function useOverlayTheme(
     [theme, touch, syncSessionSettings],
   );
 
-  return { theme, setTheme };
+  return { theme, setTheme: pickTheme };
 }
