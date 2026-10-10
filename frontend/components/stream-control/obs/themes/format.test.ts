@@ -75,7 +75,7 @@ describe("truncateValue", () => {
   it("keeps short values and ellipsises long ones", () => {
     expect(truncateValue("Tabby", 10)).toBe("Tabby");
     expect(truncateValue("Adult Short Two", 8)).toBe("Adult S…");
-    expect(truncateValue("Adult Short Two", 8).length).toBe(8);
+    expect(truncateValue("Adult Short Two", 8)).toHaveLength(8);
   });
 });
 

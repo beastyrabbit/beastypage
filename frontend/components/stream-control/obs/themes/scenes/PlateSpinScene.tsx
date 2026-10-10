@@ -3,6 +3,7 @@
 import { QRCodeSVG } from "qrcode.react";
 import {
   type CSSProperties,
+  type ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -24,6 +25,7 @@ import {
 } from "../sceneShared";
 import {
   type AnchorId,
+  type SpriteAnchors,
   type SpritePoint,
   scaleAnchors,
 } from "../spriteAnchors";
@@ -111,6 +113,179 @@ interface Caption extends CaptionCandidate {
   priority: number;
 }
 
+type ScaledPoints = Record<AnchorId, SpritePoint>;
+
+/** What the caption builder needs to know about the current spin. */
+interface CaptionContext {
+  points: ScaledPoints | null;
+  activeParamId: SpinSceneProps["activeParamId"];
+  activeLayer: LayerSummaryGroup | null;
+  activeSlot: BoardSlot | null;
+  spinDone: boolean;
+}
+
+/** Label of whatever is rolling right now: param slot, layer group, or the roller's own label. */
+function rollingLabelFor(
+  activeSlot: BoardSlot | null,
+  activeLayer: LayerSummaryGroup | null,
+  rollerLabel: string | null,
+): string | null {
+  if (activeSlot) return sentenceCase(activeSlot.def.label);
+  if (activeLayer) return layerLabel(activeLayer);
+  return rollerLabel ? sentenceCase(rollerLabel) : null;
+}
+
+/** The anchors, but only when they belong to the pose currently on the canvas. */
+function freshAnchors(
+  anchors: SpriteAnchors | null,
+  poseName: string,
+  reverse: boolean,
+): SpriteAnchors | null {
+  return anchors?.pose === poseName && anchors.reverse === reverse
+    ? anchors
+    : null;
+}
+
+/** Revealed and not "None". */
+function shownTrait(slot: BoardSlot | undefined): slot is BoardSlot {
+  return slot?.status === "revealed" && !slot.isNone;
+}
+
+function coatSlots(slots: readonly BoardSlot[]) {
+  const bySlot = new Map(slots.map((s) => [s.def.id, s]));
+  return { colour: bySlot.get("colour"), pelt: bySlot.get("pelt") };
+}
+
+function captionTarget(
+  points: ScaledPoints | null,
+  paramId: string,
+): SpritePoint | null {
+  return points ? points[anchorForParam(paramId)] : null;
+}
+
+function captionFeature(paramId: string): string {
+  return FEATURE_NAME[anchorForParam(paramId)];
+}
+
+/** "Silver · Tabby" — colour and pelt merged into one caption. */
+function coatCaption(
+  colour: BoardSlot,
+  pelt: BoardSlot,
+  points: ScaledPoints | null,
+): Caption | null {
+  if (!colour.row || !pelt.row) return null;
+  return {
+    id: "coat",
+    target: captionTarget(points, "colour"),
+    feature: captionFeature("colour"),
+    label: "",
+    value: `${colour.row.value} · ${pelt.row.value}`,
+    rolling: false,
+    order: SEQ_INDEX.get("pelt") ?? 0,
+    priority: 0,
+  };
+}
+
+function slotCaption(slot: BoardSlot, ctx: CaptionContext): Caption | null {
+  const id = slot.def.id;
+  const rolling = slot.status === "active" || id === ctx.activeParamId;
+  if (!rolling && (slot.status !== "revealed" || slot.isNone)) return null;
+  return {
+    id,
+    target: captionTarget(ctx.points, id),
+    feature: captionFeature(id),
+    label: sentenceCase(slot.def.label),
+    value: rolling ? "rolling" : (slot.row?.value ?? ""),
+    rolling,
+    order: SEQ_INDEX.get(id) ?? 0,
+    priority: DONE_PRIORITY.indexOf(id),
+  };
+}
+
+/** First value plus a "+N" count of the rest. */
+function layerValueText(values: readonly string[]): string {
+  const extra = values.length - 1;
+  const more = extra > 0 ? ` +${extra}` : "";
+  return `${values[0]}${more}`;
+}
+
+function layerCaption(
+  group: LayerSummaryGroup,
+  ctx: CaptionContext,
+): Caption | null {
+  const def = LAYER_GROUPS.find((d) => d.layerKey === group.key);
+  if (!def) return null;
+  const rolling = group === ctx.activeLayer && !ctx.activeSlot && !ctx.spinDone;
+  if (!rolling && group.values.length === 0) return null;
+  return {
+    id: def.id,
+    target: captionTarget(ctx.points, def.id),
+    feature: captionFeature(def.id),
+    label: layerLabel(group),
+    value: rolling ? "rolling" : layerValueText(group.values),
+    rolling,
+    order: SEQ_INDEX.get(def.id) ?? 0,
+    priority: DONE_PRIORITY.indexOf(def.id),
+  };
+}
+
+/** Sort key: rolling first, then priority when done, else most recent reveal. */
+function captionRank(c: Caption, spinDone: boolean): number {
+  if (c.rolling) return -1;
+  if (!spinDone) return 1000 - c.order;
+  return c.priority < 0 ? 99 : c.priority;
+}
+
+/**
+ * Caption candidates: rolling trait + most recent (or, when done, most
+ * important) revealed traits that aren't "None".
+ */
+function buildCaptions(
+  slots: readonly BoardSlot[],
+  layers: readonly LayerSummaryGroup[],
+  ctx: CaptionContext,
+): Caption[] {
+  const all: Caption[] = [];
+  const { colour, pelt } = coatSlots(slots);
+  const mergeCoat = shownTrait(colour) && shownTrait(pelt);
+  const coat = mergeCoat ? coatCaption(colour, pelt, ctx.points) : null;
+  if (coat) all.push(coat);
+  for (const slot of slots) {
+    const id = slot.def.id;
+    if (mergeCoat && (id === "colour" || id === "pelt")) continue;
+    const caption = slotCaption(slot, ctx);
+    if (caption) all.push(caption);
+  }
+  for (const group of layers) {
+    const caption = layerCaption(group, ctx);
+    if (caption) all.push(caption);
+  }
+  all.sort(
+    (a, b) => captionRank(a, ctx.spinDone) - captionRank(b, ctx.spinDone),
+  );
+  return all.slice(0, PLATE_CAPTION_SLOTS.length);
+}
+
+function plateHeader(slots: readonly BoardSlot[], spinSeq: number | null) {
+  const { colour, pelt } = coatSlots(slots);
+  const parts: string[] = [];
+  if (shownTrait(colour) && colour.row) parts.push(colour.row.value);
+  if (shownTrait(pelt) && pelt.row) parts.push(pelt.row.value.toLowerCase());
+  const name = parts.length ? parts.join(" ") : "specimen pending";
+  const seq = spinSeq == null ? "" : ` ${spinSeq}`;
+  return `Plate${seq} · ${truncateValue(name, 34)}`;
+}
+
+function plateStatus(
+  spinDone: boolean,
+  rollingLabel: string | null,
+  revealed: number,
+): string {
+  if (spinDone) return "Plate complete";
+  if (rollingLabel) return `Rolling · ${rollingLabel}`;
+  return revealed > 0 ? "Rolling" : "Awaiting specimen";
+}
+
 export function PlateSpinScene(props: Readonly<SpinSceneProps>) {
   const {
     canvasRef,
@@ -144,21 +319,12 @@ export function PlateSpinScene(props: Readonly<SpinSceneProps>) {
     layers.find((g) => g.active) ??
     null;
 
-  const rollingLabel = activeSlot
-    ? sentenceCase(activeSlot.def.label)
-    : activeLayer
-      ? layerLabel(activeLayer)
-      : rollerLabel
-        ? sentenceCase(rollerLabel)
-        : null;
+  const rollingLabel = rollingLabelFor(activeSlot, activeLayer, rollerLabel);
 
   // Leader lines only when the anchors match the pose on the canvas and the
   // pose isn't flipping (sprite step) — otherwise they'd point at nothing.
   const spriteRolling = activeParamId === "sprite";
-  const anchorsFresh =
-    anchors && anchors.pose === poseName && anchors.reverse === reverse
-      ? anchors
-      : null;
+  const anchorsFresh = freshAnchors(anchors, poseName, reverse);
   const linesVisible = !spriteRolling && anchorsFresh !== null;
   const points = useMemo(
     () =>
@@ -171,81 +337,17 @@ export function PlateSpinScene(props: Readonly<SpinSceneProps>) {
     ? `${anchorsFresh.pose}-${anchorsFresh.reverse}`
     : "none";
 
-  // ── Caption candidates: rolling trait + most recent (or, when done, most
-  // important) revealed traits that aren't "None". ─────────────────────────
-  const captions = useMemo(() => {
-    const pointFor = (paramId: string): SpritePoint | null =>
-      points ? points[anchorForParam(paramId)] : null;
-    const featureFor = (paramId: string) =>
-      FEATURE_NAME[anchorForParam(paramId)];
-    const all: Caption[] = [];
-    const bySlot = new Map(slots.map((s) => [s.def.id, s]));
-    const colour = bySlot.get("colour");
-    const pelt = bySlot.get("pelt");
-    const mergeCoat =
-      colour?.status === "revealed" &&
-      pelt?.status === "revealed" &&
-      !colour.isNone &&
-      !pelt.isNone;
-    if (mergeCoat && colour?.row && pelt?.row) {
-      all.push({
-        id: "coat",
-        target: pointFor("colour"),
-        feature: featureFor("colour"),
-        label: "",
-        value: `${colour.row.value} · ${pelt.row.value}`,
-        rolling: false,
-        order: SEQ_INDEX.get("pelt") ?? 0,
-        priority: 0,
-      });
-    }
-    for (const slot of slots) {
-      const id = slot.def.id;
-      if (mergeCoat && (id === "colour" || id === "pelt")) continue;
-      const rolling = slot.status === "active" || id === activeParamId;
-      if (!rolling && (slot.status !== "revealed" || slot.isNone)) continue;
-      all.push({
-        id,
-        target: pointFor(id),
-        feature: featureFor(id),
-        label: sentenceCase(slot.def.label),
-        value: rolling ? "rolling" : (slot.row?.value ?? ""),
-        rolling,
-        order: SEQ_INDEX.get(id) ?? 0,
-        priority: DONE_PRIORITY.indexOf(id),
-      });
-    }
-    for (const group of layers) {
-      const def = LAYER_GROUPS.find((d) => d.layerKey === group.key);
-      if (!def) continue;
-      const rolling = group === activeLayer && !activeSlot && !spinDone;
-      if (!rolling && group.values.length === 0) continue;
-      const extra = group.values.length - 1;
-      all.push({
-        id: def.id,
-        target: pointFor(def.id),
-        feature: featureFor(def.id),
-        label: layerLabel(group),
-        value: rolling
-          ? "rolling"
-          : `${group.values[0]}${extra > 0 ? ` +${extra}` : ""}`,
-        rolling,
-        order: SEQ_INDEX.get(def.id) ?? 0,
-        priority: DONE_PRIORITY.indexOf(def.id),
-      });
-    }
-    const rank = (c: Caption) =>
-      c.rolling
-        ? -1
-        : spinDone
-          ? c.priority < 0
-            ? 99
-            : c.priority
-          : 1000 - c.order;
-    return all
-      .sort((a, b) => rank(a) - rank(b))
-      .slice(0, PLATE_CAPTION_SLOTS.length);
-  }, [slots, layers, points, activeParamId, activeLayer, activeSlot, spinDone]);
+  const captions = useMemo(
+    () =>
+      buildCaptions(slots, layers, {
+        points,
+        activeParamId,
+        activeLayer,
+        activeSlot,
+        spinDone,
+      }),
+    [slots, layers, points, activeParamId, activeLayer, activeSlot, spinDone],
+  );
 
   // Skip caption slots the drawn sprite reaches into (raised tails, lying
   // poses). The silhouette only changes with the pose, so re-check when the
@@ -283,26 +385,8 @@ export function PlateSpinScene(props: Readonly<SpinSceneProps>) {
     previousSlots.current = assignment;
   }, [assignment]);
 
-  const header = (() => {
-    const bySlot = new Map(slots.map((s) => [s.def.id, s]));
-    const colour = bySlot.get("colour");
-    const pelt = bySlot.get("pelt");
-    const parts: string[] = [];
-    if (colour?.status === "revealed" && colour.row && !colour.isNone)
-      parts.push(colour.row.value);
-    if (pelt?.status === "revealed" && pelt.row && !pelt.isNone)
-      parts.push(pelt.row.value.toLowerCase());
-    const name = parts.length ? parts.join(" ") : "specimen pending";
-    return `Plate${spinSeq != null ? ` ${spinSeq}` : ""} · ${truncateValue(name, 34)}`;
-  })();
-
-  const status = spinDone
-    ? "Plate complete"
-    : rollingLabel
-      ? `Rolling · ${rollingLabel}`
-      : revealed > 0
-        ? "Rolling"
-        : "Awaiting specimen";
+  const header = plateHeader(slots, spinSeq);
+  const status = plateStatus(spinDone, rollingLabel, revealed);
 
   const mono: CSSProperties = {
     fontFamily: "var(--obs-font-mono)",
@@ -532,7 +616,7 @@ export function PlateSpinScene(props: Readonly<SpinSceneProps>) {
               }}
             />
           </i>
-          50 px · 1 : 14.4
+          {"50 px · 1 : 14.4"}
         </div>
 
         {/* QR */}
@@ -704,6 +788,43 @@ function ExtrasColumn({
     lineHeight: 1.5,
     whiteSpace: "nowrap",
   };
+  let values: ReactNode;
+  if (rolling) {
+    values = (
+      <b style={{ ...valueStyle, color: "var(--obs-accent)" }}>rolling</b>
+    );
+  } else if (shown.length > 0) {
+    values = (
+      <>
+        {shown.map((v, i) => (
+          <b
+            // biome-ignore lint/suspicious/noArrayIndexKey: values can repeat
+            key={`${v}-${i}`}
+            style={valueStyle}
+          >
+            {truncateValue(v, 12)}
+          </b>
+        ))}
+        {more > 0 && (
+          <b
+            style={{
+              ...valueStyle,
+              fontWeight: 400,
+              color: "var(--obs-muted)",
+            }}
+          >
+            +{more} more
+          </b>
+        )}
+      </>
+    );
+  } else {
+    values = (
+      <b style={{ ...valueStyle, fontWeight: 400, color: "var(--obs-muted)" }}>
+        {anyRevealed ? "none" : "—"}
+      </b>
+    );
+  }
   return (
     <div style={{ maxWidth: 140 }}>
       <small
@@ -718,38 +839,7 @@ function ExtrasColumn({
       >
         {layerLabel(group)}
       </small>
-      {rolling ? (
-        <b style={{ ...valueStyle, color: "var(--obs-accent)" }}>rolling</b>
-      ) : shown.length > 0 ? (
-        <>
-          {shown.map((v, i) => (
-            <b
-              // biome-ignore lint/suspicious/noArrayIndexKey: values can repeat
-              key={`${v}-${i}`}
-              style={valueStyle}
-            >
-              {truncateValue(v, 12)}
-            </b>
-          ))}
-          {more > 0 && (
-            <b
-              style={{
-                ...valueStyle,
-                fontWeight: 400,
-                color: "var(--obs-muted)",
-              }}
-            >
-              +{more} more
-            </b>
-          )}
-        </>
-      ) : (
-        <b
-          style={{ ...valueStyle, fontWeight: 400, color: "var(--obs-muted)" }}
-        >
-          {anyRevealed ? "none" : "—"}
-        </b>
-      )}
+      {values}
     </div>
   );
 }

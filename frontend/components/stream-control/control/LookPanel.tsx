@@ -44,8 +44,8 @@ export function LookPanel() {
   const [bgColour, setBgColour] = useState("#00ff00");
   const [bgOpacity, setBgOpacity] = useState(100);
   const { touch: touchLocalEdit, deferIfEditing, retryTick } = useFollowGuard();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retryTick re-runs the follow effect after a deferred edit
   useEffect(() => {
-    void retryTick;
     const raw = rawSessionSettings;
     if (!raw) return;
     const cancelRetry = deferIfEditing();

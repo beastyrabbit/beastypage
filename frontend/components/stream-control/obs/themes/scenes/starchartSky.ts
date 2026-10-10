@@ -53,33 +53,48 @@ export function separateStars(
 ): SpritePoint[] {
   const out = points.map((p) => ({ x: p.x, y: p.y }));
   for (let it = 0; it < iterations; it++) {
-    let moved = false;
-    for (let i = 0; i < out.length; i++) {
-      for (let j = i + 1; j < out.length; j++) {
-        let dx = out[j].x - out[i].x;
-        let dy = out[j].y - out[i].y;
-        let d = Math.hypot(dx, dy);
-        if (d >= minDist) continue;
-        if (d < 0.01) {
-          // Coincident: split along a fixed, index-dependent direction.
-          const a = (j * 2.399) % (2 * Math.PI);
-          dx = Math.cos(a);
-          dy = Math.sin(a);
-          d = 1;
-        }
-        const push = (minDist - d) / 2;
-        const ux = dx / d;
-        const uy = dy / d;
-        out[i].x -= ux * push;
-        out[i].y -= uy * push;
-        out[j].x += ux * push;
-        out[j].y += uy * push;
-        moved = true;
-      }
-    }
-    if (!moved) break;
+    if (!relaxPass(out, minDist)) break;
   }
   return out;
+}
+
+/** One pass over every pair (in index order); true if any pair moved. */
+function relaxPass(out: SpritePoint[], minDist: number): boolean {
+  let moved = false;
+  for (let i = 0; i < out.length; i++) {
+    for (let j = i + 1; j < out.length; j++) {
+      if (pushPairApart(out, i, j, minDist)) moved = true;
+    }
+  }
+  return moved;
+}
+
+/** Push `out[i]` and `out[j]` apart symmetrically if closer than `minDist`. */
+function pushPairApart(
+  out: SpritePoint[],
+  i: number,
+  j: number,
+  minDist: number,
+): boolean {
+  let dx = out[j].x - out[i].x;
+  let dy = out[j].y - out[i].y;
+  let d = Math.hypot(dx, dy);
+  if (d >= minDist) return false;
+  if (d < 0.01) {
+    // Coincident: split along a fixed, index-dependent direction.
+    const a = (j * 2.399) % (2 * Math.PI);
+    dx = Math.cos(a);
+    dy = Math.sin(a);
+    d = 1;
+  }
+  const push = (minDist - d) / 2;
+  const ux = dx / d;
+  const uy = dy / d;
+  out[i].x -= ux * push;
+  out[i].y -= uy * push;
+  out[j].x += ux * push;
+  out[j].y += uy * push;
+  return true;
 }
 
 /** Celestial grid (stage px) from the approved mockup; stays left of the camera zone. */

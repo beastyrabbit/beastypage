@@ -125,119 +125,119 @@ interface Star {
   pos: SpritePoint;
   /** Unit vector away from the body centre — where the Greek letter goes. */
   out: SpritePoint;
-  state: "risen" | "rising" | "below";
+  state: StarState;
 }
 
-export function StarchartSpinScene(props: Readonly<SpinSceneProps>) {
-  const {
-    canvasRef,
-    wheelRef,
-    spinVisible,
-    initializing,
-    wheelReward,
-    wheelBannerVisible,
-    paramRows,
-    layerRows,
-    rollerLabel,
-    spinDone,
-    viewUrl,
-    spinSeq,
-    activeParamId,
-    poseName,
-    reverse,
-    anchors,
-    afterlife,
-  } = props;
+type StarState = "risen" | "rising" | "below";
 
-  const sky =
-    afterlife === "darkForce" || afterlife === "dark10"
-      ? DARK_FOREST
-      : STARCLAN;
+/** Constellation segments: thinner and softer once the chart is complete. */
+const LIVE_LINE = { lineWidth: 1.5, lineOpacity: 0.75 } as const;
+const DONE_LINE = { lineWidth: 1.1, lineOpacity: 0.45 } as const;
 
-  const slots = useBoardRows(paramRows);
-  const layers = useLayerSummary(layerRows);
-  const risen = revealedCount(slots);
+function skyFor(afterlife: SpinSceneProps["afterlife"]): SkyPalette {
+  if (afterlife === "darkForce" || afterlife === "dark10") return DARK_FOREST;
+  return STARCLAN;
+}
 
-  const activeSlot = slots.find((s) => s.def.id === activeParamId) ?? null;
+function findActiveLayer(
+  layers: readonly LayerSummaryGroup[],
+  activeParamId: SpinSceneProps["activeParamId"],
+): LayerSummaryGroup | null {
   const activeLayerKey = activeParamId
     ? (LAYER_DEF_BY_ID.get(activeParamId)?.layerKey ?? null)
     : null;
-  const activeLayer =
+  return (
     layers.find((g) => g.key === activeLayerKey) ??
     layers.find((g) => g.active) ??
-    null;
-  const rollingLabel = activeSlot
-    ? sentenceCase(activeSlot.def.label)
-    : activeLayer
-      ? layerLabel(activeLayer)
-      : rollerLabel
-        ? sentenceCase(rollerLabel)
-        : null;
+    null
+  );
+}
 
-  // Stars sit on the cat's features. While the pose is flipping (sprite step)
-  // or the new pose's anchors are still loading, keep the last settled sky.
-  const spriteRolling = activeParamId === "sprite";
+function rollingLabelFor(
+  activeSlot: BoardSlot | null,
+  activeLayer: LayerSummaryGroup | null,
+  rollerLabel: string | null,
+): string | null {
+  if (activeSlot) return sentenceCase(activeSlot.def.label);
+  if (activeLayer) return layerLabel(activeLayer);
+  if (rollerLabel) return sentenceCase(rollerLabel);
+  return null;
+}
+
+/**
+ * The anchors to draw stars on: the current pose's once they match it and the
+ * sprite isn't mid-flip, otherwise the last settled ones.
+ */
+function useShownAnchors(
+  anchors: SpriteAnchors | null,
+  poseName: string,
+  reverse: boolean,
+  spriteRolling: boolean,
+): SpriteAnchors | null {
   const fresh =
-    anchors && anchors.pose === poseName && anchors.reverse === reverse
-      ? anchors
-      : null;
+    anchors?.pose === poseName && anchors.reverse === reverse ? anchors : null;
   const [settled, setSettled] = useState<SpriteAnchors | null>(fresh);
   useEffect(() => {
     if (fresh && !spriteRolling) setSettled(fresh);
   }, [fresh, spriteRolling]);
-  const shown = !spriteRolling && fresh ? fresh : settled;
-  const poseKey = shown ? `${shown.pose}-${shown.reverse}` : "none";
+  return !spriteRolling && fresh ? fresh : settled;
+}
 
-  const stars = useMemo<Star[] | null>(() => {
-    if (!shown) return null;
-    const pts = scaleAnchors(shown, PX_PER_UNIT, { x: CAT.left, y: CAT.top });
-    const centre = pts.pelt;
-    const flip = shown.reverse ? -1 : 1;
-    const positions = separateStars(
-      slots.map((slot) => {
-        const id = slot.def.id;
-        const base = pts[anchorForParam(id)];
-        const j = starJitter(id);
-        return {
-          x: base.x + j.x * flip * PX_PER_UNIT,
-          y: base.y + j.y * PX_PER_UNIT,
-        };
-      }),
-    );
-    return slots.map((slot, index) => {
+function starState(slot: BoardSlot, activeParamId: string | null): StarState {
+  if (slot.status === "active" || slot.def.id === activeParamId)
+    return "rising";
+  if (slot.status === "revealed") return "risen";
+  return "below";
+}
+
+function buildStars(
+  shown: SpriteAnchors | null,
+  slots: readonly BoardSlot[],
+  activeParamId: string | null,
+): Star[] | null {
+  if (!shown) return null;
+  const pts = scaleAnchors(shown, PX_PER_UNIT, { x: CAT.left, y: CAT.top });
+  const centre = pts.pelt;
+  const flip = shown.reverse ? -1 : 1;
+  const positions = separateStars(
+    slots.map((slot) => {
       const id = slot.def.id;
-      const pos = positions[index];
-      const dx = pos.x - centre.x;
-      const dy = pos.y - centre.y;
-      const len = Math.hypot(dx, dy);
-      const out = len > 4 ? { x: dx / len, y: dy / len } : { x: 0.6, y: -0.8 };
-      const rising = slot.status === "active" || id === activeParamId;
+      const base = pts[anchorForParam(id)];
+      const j = starJitter(id);
       return {
-        slot,
-        index,
-        pos,
-        out,
-        state: rising
-          ? "rising"
-          : slot.status === "revealed"
-            ? "risen"
-            : "below",
+        x: base.x + j.x * flip * PX_PER_UNIT,
+        y: base.y + j.y * PX_PER_UNIT,
       };
-    });
-  }, [shown, slots, activeParamId]);
+    }),
+  );
+  return slots.map((slot, index) => {
+    const pos = positions[index];
+    const dx = pos.x - centre.x;
+    const dy = pos.y - centre.y;
+    const len = Math.hypot(dx, dy);
+    const out = len > 4 ? { x: dx / len, y: dy / len } : { x: 0.6, y: -0.8 };
+    return { slot, index, pos, out, state: starState(slot, activeParamId) };
+  });
+}
 
-  const risenStars = stars?.filter((s) => s.state === "risen") ?? [];
-  const risingStar = stars?.find((s) => s.state === "rising") ?? null;
-  const belowStars = stars?.filter((s) => s.state === "below") ?? [];
+/** Risen stars in order, the rising one, and the dotted route still to come. */
+function chartRoute(stars: readonly Star[] | null) {
+  const all = stars ?? [];
+  const risenStars = all.filter((s) => s.state === "risen");
+  const risingStar = all.find((s) => s.state === "rising") ?? null;
+  const belowStars = all.filter((s) => s.state === "below");
   const lastRisen = risenStars[risenStars.length - 1] ?? null;
-  const nextChain = [
-    ...(risingStar ? [risingStar] : lastRisen ? [lastRisen] : []),
-    ...belowStars,
-  ];
+  const head = risingStar ?? lastRisen;
+  const nextChain = [...(head ? [head] : []), ...belowStars];
+  return { risenStars, risingStar, lastRisen, nextChain };
+}
 
-  // Landings: a meteor streaks in and bursts when a trait rises. Stars that
-  // were already risen when the scene mounted (overlay reload) don't replay.
-  const risenKey = risenStars.map((s) => s.slot.def.id).join(",");
+/**
+ * Landings: a meteor streaks in and bursts when a trait rises. Stars that
+ * were already risen when the scene mounted (overlay reload) don't replay.
+ * Returns the landing timestamp per newly risen param id (cleared after 1.8s).
+ */
+function useLandings(risenKey: string): Record<string, number> {
   const seenRef = useRef<Set<string> | null>(null);
   const [landings, setLandings] = useState<Record<string, number>>({});
   useEffect(() => {
@@ -264,40 +264,107 @@ export function StarchartSpinScene(props: Readonly<SpinSceneProps>) {
       });
     }, 1800);
   }, [risenKey]);
+  return landings;
+}
 
-  // Finale: plays once each time the chart completes.
+/** Finale: plays once each time the chart completes. */
+function useFinale(spinDone: boolean): number | null {
   const [finaleAt, setFinaleAt] = useState<number | null>(null);
   useEffect(() => {
     setFinaleAt(spinDone ? Date.now() : null);
   }, [spinDone]);
+  return finaleAt;
+}
 
-  const header = (() => {
-    const bySlot = new Map(slots.map((s) => [s.def.id, s]));
-    const colour = bySlot.get("colour");
-    const pelt = bySlot.get("pelt");
-    const parts: string[] = [];
-    if (colour?.status === "revealed" && colour.row && !colour.isNone)
-      parts.push(colour.row.value);
-    if (pelt?.status === "revealed" && pelt.row && !pelt.isNone)
-      parts.push(pelt.row.value.toLowerCase());
-    const name = parts.length ? parts.join(" ") : "uncharted";
-    return `StarClan chart${spinSeq != null ? ` ${spinSeq}` : ""} · ${truncateValue(name, 30)}`;
-  })();
+function revealedValue(slot: BoardSlot | undefined): string | null {
+  if (slot?.status !== "revealed" || !slot.row || slot.isNone) return null;
+  return slot.row.value;
+}
 
-  const status = spinDone
-    ? "Chart complete"
-    : rollingLabel
-      ? `Rising · ${rollingLabel}`
-      : risen > 0
-        ? "Rising"
-        : "Awaiting moonrise";
+function chartHeader(
+  slots: readonly BoardSlot[],
+  spinSeq: number | null,
+): string {
+  const bySlot = new Map(slots.map((s) => [s.def.id, s]));
+  const colour = revealedValue(bySlot.get("colour"));
+  const pelt = revealedValue(bySlot.get("pelt"));
+  const parts: string[] = [];
+  if (colour !== null) parts.push(colour);
+  if (pelt !== null) parts.push(pelt.toLowerCase());
+  const name = parts.length ? parts.join(" ") : "uncharted";
+  const seq = spinSeq == null ? "" : ` ${spinSeq}`;
+  return `StarClan chart${seq} · ${truncateValue(name, 30)}`;
+}
+
+function describeStatus(
+  spinDone: boolean,
+  rollingLabel: string | null,
+  risen: number,
+): string {
+  if (spinDone) return "Chart complete";
+  if (rollingLabel) return `Rising · ${rollingLabel}`;
+  if (risen > 0) return "Rising";
+  return "Awaiting moonrise";
+}
+
+export function StarchartSpinScene(props: Readonly<SpinSceneProps>) {
+  const {
+    canvasRef,
+    wheelRef,
+    spinVisible,
+    initializing,
+    wheelReward,
+    wheelBannerVisible,
+    paramRows,
+    layerRows,
+    rollerLabel,
+    spinDone,
+    viewUrl,
+    spinSeq,
+    activeParamId,
+    poseName,
+    reverse,
+    anchors,
+    afterlife,
+  } = props;
+
+  const sky = skyFor(afterlife);
+
+  const slots = useBoardRows(paramRows);
+  const layers = useLayerSummary(layerRows);
+  const risen = revealedCount(slots);
+
+  const activeSlot = slots.find((s) => s.def.id === activeParamId) ?? null;
+  const activeLayer = findActiveLayer(layers, activeParamId);
+  const rollingLabel = rollingLabelFor(activeSlot, activeLayer, rollerLabel);
+
+  // Stars sit on the cat's features. While the pose is flipping (sprite step)
+  // or the new pose's anchors are still loading, keep the last settled sky.
+  const shown = useShownAnchors(
+    anchors,
+    poseName,
+    reverse,
+    activeParamId === "sprite",
+  );
+  const poseKey = shown ? `${shown.pose}-${shown.reverse}` : "none";
+
+  const stars = useMemo(
+    () => buildStars(shown, slots, activeParamId),
+    [shown, slots, activeParamId],
+  );
+  const { risenStars, risingStar, lastRisen, nextChain } = chartRoute(stars);
+
+  const landings = useLandings(risenStars.map((s) => s.slot.def.id).join(","));
+  const finaleAt = useFinale(spinDone);
+
+  const header = chartHeader(slots, spinSeq);
+  const status = describeStatus(spinDone, rollingLabel, risen);
 
   const mono: CSSProperties = {
     fontFamily: "var(--obs-font-mono)",
     textTransform: "uppercase",
   };
-  const lineWidth = spinDone ? 1.1 : 1.5;
-  const lineOpacity = spinDone ? 0.45 : 0.75;
+  const { lineWidth, lineOpacity } = spinDone ? DONE_LINE : LIVE_LINE;
 
   return (
     <SceneFade spinVisible={spinVisible}>
@@ -537,10 +604,9 @@ export function StarchartSpinScene(props: Readonly<SpinSceneProps>) {
             </g>
           </g>
           {/* Faint meteors drift through now and then. */}
-          {STARCHART_AMBIENT_METEORS.map(([x, y, dx, dy, period, delay], i) => (
+          {STARCHART_AMBIENT_METEORS.map(([x, y, dx, dy, period, delay]) => (
             <g
-              // biome-ignore lint/suspicious/noArrayIndexKey: static table
-              key={i}
+              key={`${x}-${y}-${dx}`}
               style={{ transform: `translate(${x}px, ${y}px)` }}
             >
               <g
@@ -839,6 +905,32 @@ export function StarchartSpinScene(props: Readonly<SpinSceneProps>) {
   );
 }
 
+/** Greek-letter / catalogue-letter colour for a star in `state`. */
+function stateColor(state: StarState, sky: SkyPalette): string {
+  if (state === "rising") return CYAN;
+  if (state === "below") return sky.dim;
+  return sky.gold;
+}
+
+function starFill(state: StarState, sky: SkyPalette): string {
+  if (state === "risen") return sky.gold;
+  if (state === "rising") return CYAN;
+  return "none";
+}
+
+function starAnimation(
+  state: StarState,
+  done: boolean,
+  index: number,
+): string | undefined {
+  if (state === "rising")
+    return "obs-starchart-pulse 1.4s ease-in-out infinite";
+  if (state !== "risen") return undefined;
+  if (done)
+    return `obs-starchart-twinkle 1.3s ease-in-out ${400 + index * 130}ms 1 both`;
+  return "obs-starchart-flare 700ms ease-out both";
+}
+
 function StarMark({
   star,
   sky,
@@ -846,16 +938,8 @@ function StarMark({
 }: Readonly<{ star: Star; sky: SkyPalette; done: boolean }>) {
   const { pos, out, state, slot, index } = star;
   const r = starRadius(slot.def.id) * (slot.isNone ? 0.7 : 1);
-  const letterColor =
-    state === "rising" ? CYAN : state === "below" ? sky.dim : sky.gold;
-  let animation: string | undefined;
-  if (state === "rising") {
-    animation = "obs-starchart-pulse 1.4s ease-in-out infinite";
-  } else if (state === "risen" && done) {
-    animation = `obs-starchart-twinkle 1.3s ease-in-out ${400 + index * 130}ms 1 both`;
-  } else if (state === "risen") {
-    animation = "obs-starchart-flare 700ms ease-out both";
-  }
+  const letterColor = stateColor(state, sky);
+  const animation = starAnimation(state, done, index);
   return (
     <g
       style={{
@@ -881,7 +965,7 @@ function StarMark({
       <circle
         key={`${state}-${done}`}
         r={state === "rising" ? 9 : r}
-        fill={state === "risen" ? sky.gold : state === "rising" ? CYAN : "none"}
+        fill={starFill(state, sky)}
         fillOpacity={state === "risen" && slot.isNone ? 0.55 : 1}
         stroke={state === "below" ? sky.dim : sky.qrInk}
         strokeOpacity={state === "below" ? 1 : 0.7}
@@ -1007,10 +1091,21 @@ function CatalogueRow({
 }>) {
   const below = !rising && slot.status !== "revealed";
   const soft = below || slot.isNone;
+  let state: StarState;
   let value: string;
-  if (rising) value = "rising";
-  else if (below) value = "below horizon";
-  else value = truncateValue(slot.row?.value ?? "", 20);
+  if (rising) {
+    state = "rising";
+    value = "rising";
+  } else if (below) {
+    state = "below";
+    value = "below horizon";
+  } else {
+    state = "risen";
+    value = truncateValue(slot.row?.value ?? "", 20);
+  }
+  let valueColor: string | undefined;
+  if (rising) valueColor = CYAN;
+  else if (soft) valueColor = sky.dim;
   return (
     <div
       className="grid items-baseline"
@@ -1029,7 +1124,7 @@ function CatalogueRow({
           fontFamily: "var(--obs-font-serif)",
           fontStyle: "italic",
           fontSize: 21,
-          color: rising ? CYAN : below ? sky.dim : sky.gold,
+          color: stateColor(state, sky),
         }}
       >
         {bayerLetter(index)}
@@ -1050,7 +1145,7 @@ function CatalogueRow({
           fontWeight: soft ? 400 : 600,
           fontFamily: below ? "var(--obs-font-serif)" : undefined,
           fontStyle: below ? "italic" : undefined,
-          color: rising ? CYAN : soft ? sky.dim : undefined,
+          color: valueColor,
           whiteSpace: "nowrap",
           animation:
             slot.status === "revealed"

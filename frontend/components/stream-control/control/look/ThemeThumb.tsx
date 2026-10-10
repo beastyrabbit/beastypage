@@ -18,7 +18,7 @@ import {
 const STAGE_TOP = "#1b1e25";
 const STAGE_BOTTOM = "#0c0e12";
 
-type SceneProps = { m: OverlayThemeMeta; p: string };
+type SceneProps = Readonly<{ m: OverlayThemeMeta; p: string }>;
 
 /** "#rrggbb" → "r g b" in 0–1, for the sRGB colour matrix. */
 function hexToUnitRgb(hex: string): [number, number, number] {
@@ -191,6 +191,13 @@ function Plate({ m, p }: SceneProps) {
   );
 }
 
+/** Sampler progress bar: four stitched cells, the live one in red, then empty. */
+function samplerBarFill(i: number, ink: string, red: string): string {
+  if (i < 4) return ink;
+  if (i === 4) return red;
+  return "none";
+}
+
 function Sampler({ m, p }: SceneProps) {
   const t = m.tokens;
   const [aida, wood, paper, red, pencil] = m.palette;
@@ -338,7 +345,7 @@ function Sampler({ m, p }: SceneProps) {
           y="104"
           width="3.6"
           height="2"
-          fill={i < 4 ? ink : i === 4 ? red : "none"}
+          fill={samplerBarFill(i, ink, red)}
           stroke={i > 4 ? pencil : undefined}
           strokeWidth="0.3"
         />
@@ -553,7 +560,7 @@ function Transit({ m, p }: SceneProps) {
         x1={x}
         x2={x}
         y1={stops[live]}
-        y2={stops[stops.length - 1]}
+        y2={stops.at(-1)}
         stroke={t.muted}
         strokeOpacity="0.55"
         strokeWidth="4"
@@ -562,6 +569,9 @@ function Transit({ m, p }: SceneProps) {
       />
       {stops.map((y, i) => {
         const next = i > live;
+        let stopStroke = STAGE_BOTTOM;
+        if (i === live) stopStroke = cyan;
+        else if (next) stopStroke = t.muted;
         return (
           <g key={y}>
             {i === live ? (
@@ -580,7 +590,7 @@ function Transit({ m, p }: SceneProps) {
               cy={y}
               r={i === 0 ? 4 : 3.2}
               fill={next ? STAGE_TOP : t.ink}
-              stroke={i === live ? cyan : next ? t.muted : STAGE_BOTTOM}
+              stroke={stopStroke}
               strokeWidth={i === live ? 1.8 : 1.3}
             />
             <rect

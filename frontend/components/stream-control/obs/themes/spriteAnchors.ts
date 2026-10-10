@@ -132,60 +132,62 @@ function centroid(
   return n ? { x: sx / n, y: sy / n } : null;
 }
 
-/**
- * Derive the anchor set from a solid silhouette mask and (optionally) an
- * eyes mask. Returns null when the silhouette is empty.
- */
-export function computeAnchorsFromMasks(
-  silhouette: SpriteMask,
-  eyes: SpriteMask | null,
-  opts: { pose: string; reverse: boolean },
-  width = SPRITE_SIZE,
-  height = SPRITE_SIZE,
-): SpriteAnchors | null {
-  const pelt = centroid(silhouette, width, height);
-  if (!pelt) return null;
-  const at = (x: number, y: number) =>
-    x >= 0 && y >= 0 && x < width && y < height && silhouette[y * width + x];
+/** A mask plus its dimensions, so the scan helpers take one argument. */
+interface MaskGrid {
+  mask: SpriteMask;
+  width: number;
+  height: number;
+}
 
-  const eyesPoint = (eyes && centroid(eyes, width, height)) ?? {
-    x: pelt.x,
-    y: pelt.y - height * 0.3,
-  };
+/** True when (x, y) is inside the grid and the mask pixel there is set. */
+function isSet(grid: MaskGrid, x: number, y: number): boolean {
+  const { mask, width, height } = grid;
+  return x >= 0 && y >= 0 && x < width && y < height && mask[y * width + x] > 0;
+}
 
-  // Head: topmost silhouette pixel within ±8 of the eye column.
-  let head: SpritePoint | null = null;
-  const ex = Math.round(eyesPoint.x);
-  for (let y = 0; y < height && !head; y++) {
-    for (let dx = 0; dx <= 8 && !head; dx++) {
-      if (at(ex + dx, y)) head = { x: ex + dx, y };
-      else if (at(ex - dx, y)) head = { x: ex - dx, y };
+/** Head: topmost silhouette pixel within ±8 of the eye column. */
+function findHead(grid: MaskGrid, eyes: SpritePoint): SpritePoint {
+  const ex = Math.round(eyes.x);
+  for (let y = 0; y < grid.height; y++) {
+    for (let dx = 0; dx <= 8; dx++) {
+      if (isSet(grid, ex + dx, y)) return { x: ex + dx, y };
+      if (isSet(grid, ex - dx, y)) return { x: ex - dx, y };
     }
   }
-  head ??= { x: eyesPoint.x, y: Math.max(0, eyesPoint.y - 6) };
+  return { x: eyes.x, y: Math.max(0, eyes.y - 6) };
+}
 
-  // Ear: the head point nudged toward the nearer silhouette edge.
-  const ear = { x: head.x + (head.x >= pelt.x ? 3 : -3), y: head.y + 1 };
-
-  // Back: topmost silhouette pixel at the centroid column.
-  let back: SpritePoint | null = null;
+/** Back: topmost silhouette pixel at the centroid column. */
+function findBack(grid: MaskGrid, pelt: SpritePoint): SpritePoint {
   const cx = Math.round(pelt.x);
-  for (let y = 0; y < height && !back; y++) {
-    if (at(cx, y)) back = { x: cx, y };
+  for (let y = 0; y < grid.height; y++) {
+    if (isSet(grid, cx, y)) return { x: cx, y };
   }
-  back ??= { x: pelt.x, y: Math.max(0, pelt.y - 8) };
+  return { x: pelt.x, y: Math.max(0, pelt.y - 8) };
+}
 
-  // Chest: between eyes and centroid, pushed down.
-  const chest = {
-    x: (eyesPoint.x + pelt.x) / 2,
-    y: (eyesPoint.y + pelt.y) / 2 + 6,
-  };
+function growBounds(bounds: SpriteBounds, x: number, y: number): void {
+  if (x < bounds.minX) bounds.minX = x;
+  if (x > bounds.maxX) bounds.maxX = x;
+  if (y < bounds.minY) bounds.minY = y;
+  if (y > bounds.maxY) bounds.maxY = y;
+}
 
-  // Tail: silhouette pixel farthest from the eyes, with pixels below the
-  // body centre penalised so hind paws don't win over a raised tail.
+/**
+ * One pass over the silhouette for the tail, the paw and the bounding box.
+ *
+ * Tail: silhouette pixel farthest from the eyes, with pixels below the body
+ * centre penalised so hind paws don't win over a raised tail.
+ * Paw: bottom-most pixel, ties broken by closeness to the centroid column.
+ */
+function scanTailPawBounds(
+  grid: MaskGrid,
+  eyes: SpritePoint,
+  pelt: SpritePoint,
+): { tail: SpritePoint; paw: SpritePoint; bounds: SpriteBounds } {
+  const { mask, width, height } = grid;
   let tail: SpritePoint = pelt;
   let best = -Infinity;
-  // Paw: bottom-most pixel, ties broken by closeness to the centroid column.
   let paw: SpritePoint = pelt;
   let pawScore = -Infinity;
   const bounds: SpriteBounds = {
@@ -196,12 +198,9 @@ export function computeAnchorsFromMasks(
   };
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      if (!silhouette[y * width + x]) continue;
-      if (x < bounds.minX) bounds.minX = x;
-      if (x > bounds.maxX) bounds.maxX = x;
-      if (y < bounds.minY) bounds.minY = y;
-      if (y > bounds.maxY) bounds.maxY = y;
-      const d = (x - eyesPoint.x) ** 2 + (y - eyesPoint.y) ** 2;
+      if (!mask[y * width + x]) continue;
+      growBounds(bounds, x, y);
+      const d = (x - eyes.x) ** 2 + (y - eyes.y) ** 2;
       const below = Math.max(0, y - pelt.y);
       const tailScore = d - 6 * below * below;
       if (tailScore > best) {
@@ -215,6 +214,57 @@ export function computeAnchorsFromMasks(
       }
     }
   }
+  return { tail, paw, bounds };
+}
+
+/** Mirror every anchor and the bounds horizontally (in place). */
+function mirrorAnchors(
+  points: Record<AnchorId, SpritePoint>,
+  bounds: SpriteBounds,
+  width: number,
+): void {
+  for (const id of ANCHOR_IDS) {
+    points[id] = { x: width - 1 - points[id].x, y: points[id].y };
+  }
+  const { minX, maxX } = bounds;
+  bounds.minX = width - 1 - maxX;
+  bounds.maxX = width - 1 - minX;
+}
+
+/**
+ * Derive the anchor set from a solid silhouette mask and (optionally) an
+ * eyes mask. Returns null when the silhouette is empty.
+ */
+export function computeAnchorsFromMasks(
+  silhouette: SpriteMask,
+  eyes: SpriteMask | null,
+  opts: { pose: string; reverse: boolean },
+  width = SPRITE_SIZE,
+  height = SPRITE_SIZE,
+): SpriteAnchors | null {
+  const pelt = centroid(silhouette, width, height);
+  if (!pelt) return null;
+  const grid: MaskGrid = { mask: silhouette, width, height };
+
+  const eyesPoint = (eyes && centroid(eyes, width, height)) ?? {
+    x: pelt.x,
+    y: pelt.y - height * 0.3,
+  };
+
+  const head = findHead(grid, eyesPoint);
+
+  // Ear: the head point nudged toward the nearer silhouette edge.
+  const ear = { x: head.x + (head.x >= pelt.x ? 3 : -3), y: head.y + 1 };
+
+  const back = findBack(grid, pelt);
+
+  // Chest: between eyes and centroid, pushed down.
+  const chest = {
+    x: (eyesPoint.x + pelt.x) / 2,
+    y: (eyesPoint.y + pelt.y) / 2 + 6,
+  };
+
+  const { tail, paw, bounds } = scanTailPawBounds(grid, eyesPoint, pelt);
 
   const points: Record<AnchorId, SpritePoint> = {
     eyes: eyesPoint,
@@ -226,16 +276,11 @@ export function computeAnchorsFromMasks(
     tail,
     paw,
   };
-  if (opts.reverse) {
-    for (const id of ANCHOR_IDS) {
-      points[id] = { x: width - 1 - points[id].x, y: points[id].y };
-    }
-    const { minX, maxX } = bounds;
-    bounds.minX = width - 1 - maxX;
-    bounds.maxX = width - 1 - minX;
-  }
+  if (opts.reverse) mirrorAnchors(points, bounds, width);
   return { pose: opts.pose, reverse: opts.reverse, points, bounds };
 }
+
+const ORIGIN: Readonly<SpritePoint> = Object.freeze({ x: 0, y: 0 });
 
 /**
  * Convert sprite-unit anchors to CSS pixels: `pxPerUnit` is the drawn cat
@@ -245,14 +290,15 @@ export function computeAnchorsFromMasks(
 export function scaleAnchors(
   anchors: SpriteAnchors,
   pxPerUnit: number,
-  offset: SpritePoint = { x: 0, y: 0 },
+  offset?: SpritePoint,
 ): Record<AnchorId, SpritePoint> {
+  const o = offset ?? ORIGIN;
   const out = {} as Record<AnchorId, SpritePoint>;
   for (const id of ANCHOR_IDS) {
     const p = anchors.points[id];
     out[id] = {
-      x: offset.x + (p.x + 0.5) * pxPerUnit,
-      y: offset.y + (p.y + 0.5) * pxPerUnit,
+      x: o.x + (p.x + 0.5) * pxPerUnit,
+      y: o.y + (p.y + 0.5) * pxPerUnit,
     };
   }
   return out;

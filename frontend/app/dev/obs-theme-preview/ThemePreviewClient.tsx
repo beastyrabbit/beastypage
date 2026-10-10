@@ -67,20 +67,35 @@ const DEMO_DURATIONS: Partial<Record<ParamTimingKey, number>> = {
 /** Rolling state: everything up to this board index is revealed, this one is active. */
 const ROLLING_INDEX = 8; // whitePatchesTint
 
+/** Board slots before `cursor` are revealed, the one at it is active. */
+function cursorStatus(boardIndex: number, cursor: number): ParamRow["status"] {
+  if (boardIndex < cursor) return "revealed";
+  if (boardIndex === cursor) return "active";
+  return "pending";
+}
+
+/** `boardIndex` is -1 for params that are not on the board (layer groups). */
+function slotStatus(
+  state: PreviewState,
+  step: number,
+  boardIndex: number,
+): ParamRow["status"] {
+  if (state === "done") return "revealed";
+  if (state === "rolling") {
+    return boardIndex < 0 ? "pending" : cursorStatus(boardIndex, ROLLING_INDEX);
+  }
+  if (state === "play") {
+    if (boardIndex >= 0) return cursorStatus(boardIndex, step);
+    return step >= 11 ? "revealed" : "pending";
+  }
+  return "pending";
+}
+
 function buildParamRows(state: PreviewState, step = 0): ParamRow[] {
   return PARAM_SEQUENCE.map((def) => {
     const demo = DEMO_VALUES[def.id] ?? { value: "???", raw: null };
     const boardIndex = BOARD_SLOTS.findIndex((s) => s.id === def.id);
-    let status: ParamRow["status"] = "pending";
-    if (state === "done") status = "revealed";
-    else if (state === "rolling" && boardIndex >= 0) {
-      if (boardIndex < ROLLING_INDEX) status = "revealed";
-      else if (boardIndex === ROLLING_INDEX) status = "active";
-    } else if (state === "play") {
-      if (boardIndex < 0) status = step >= 11 ? "revealed" : "pending";
-      else if (boardIndex < step) status = "revealed";
-      else if (boardIndex === step) status = "active";
-    }
+    const status = slotStatus(state, step, boardIndex);
     return {
       id: def.id,
       label: def.label,
@@ -176,26 +191,168 @@ function useDemoCat(
   }, [canvasRef, poseName, theme, state]);
 }
 
-export function ThemePreviewClient() {
-  const params = useSearchParams();
+type OverlayThemeId = SpinSceneProps["theme"];
+type Durations = Partial<Record<ParamTimingKey, number>>;
+
+interface PreviewQuery {
+  theme: OverlayThemeId;
+  state: PreviewState;
+  poseName: string;
+  reverse: boolean;
+  /** wheel=run<N> drives a real spin to prize N through the wheel handle. */
+  runIndex: number | null;
+  wheel: boolean;
+  wheelSpinning: boolean;
+  scale: number;
+}
+
+function resolveState(stateParam: string | null): PreviewState {
+  if (stateParam === "idle" || stateParam === "done" || stateParam === "play")
+    return stateParam;
+  return "rolling";
+}
+
+function parsePreviewQuery(params: Pick<URLSearchParams, "get">): PreviewQuery {
   const themeParam = params.get("theme");
-  const theme = isOverlayThemeId(themeParam) ? themeParam : "plate";
-  const stateParam = params.get("state");
-  const state: PreviewState =
-    stateParam === "idle" || stateParam === "done" || stateParam === "play"
-      ? stateParam
-      : "rolling";
-  const poseName = params.get("pose") ?? "adult_short2";
-  const reverse = params.get("reverse") === "1";
   const wheelParam = params.get("wheel");
-  // wheel=run<N> drives a real spin to prize N through the wheel handle.
   const runIndex = wheelParam?.startsWith("run")
     ? Number(wheelParam.slice(3) || "0")
     : null;
-  const wheel =
-    wheelParam === "1" || wheelParam === "spin" || runIndex !== null;
   const wheelSpinning = wheelParam === "spin" || runIndex !== null;
-  const scale = Number(params.get("scale") ?? "0.6");
+  return {
+    theme: isOverlayThemeId(themeParam) ? themeParam : "plate",
+    state: resolveState(params.get("state")),
+    poseName: params.get("pose") ?? "adult_short2",
+    reverse: params.get("reverse") === "1",
+    runIndex,
+    wheel: wheelParam === "1" || wheelSpinning,
+    wheelSpinning,
+    scale: Number(params.get("scale") ?? "0.6"),
+  };
+}
+
+/** Play-mode step after one tick; stops at 12 (done). */
+function nextPlayStep(step: number): number {
+  return step >= 12 ? step : step + 1;
+}
+
+/** Board slot that is rolling: the play cursor, or the fixed rolling slot. */
+function activeParam(state: PreviewState, step: number): string | null {
+  if (state === "play") return step < 11 ? BOARD_SLOTS[step].id : null;
+  if (state === "rolling") return BOARD_SLOTS[ROLLING_INDEX].id;
+  return null;
+}
+
+function demoDurations(
+  state: PreviewState,
+  step: number,
+): { durations: Durations; total: number } {
+  if (state === "play") {
+    const durations = Object.fromEntries(
+      BOARD_SLOTS.slice(0, Math.min(step, 11)).map((d, i) => [
+        d.timingKey,
+        1500 + ((i * 1370) % 4200),
+      ]),
+    ) as Durations;
+    const total = Object.values(durations).reduce<number>(
+      (a, b) => a + (b ?? 0),
+      0,
+    );
+    return { durations, total };
+  }
+  if (state === "done") {
+    return {
+      durations: {
+        ...DEMO_DURATIONS,
+        whitePatchesTint: 1500,
+        vitiligo: 2400,
+        sprite: 3900,
+      } as Durations,
+      total: 40400,
+    };
+  }
+  if (state === "rolling") return { durations: DEMO_DURATIONS, total: 32600 };
+  return { durations: {}, total: 0 };
+}
+
+function activeStartedAtFor(
+  state: PreviewState,
+  activeParamId: string | null,
+  timing: { startedAt: number; stepStartedAt: number },
+): number | null {
+  if (state === "play") return activeParamId ? timing.stepStartedAt : null;
+  if (state === "rolling") return timing.startedAt;
+  return null;
+}
+
+function wheelRewardFor(query: PreviewQuery): SpinSceneProps["wheelReward"] {
+  if (!query.wheel) return { status: "hidden", prize: null };
+  return {
+    status: query.wheelSpinning ? "spinning" : "settled",
+    prize: DEMO_PRIZE,
+  };
+}
+
+/** Mock scene props for the current query + play step. */
+function buildSceneProps(input: {
+  query: PreviewQuery;
+  step: number;
+  timing: { startedAt: number; stepStartedAt: number };
+  refs: Pick<SpinSceneProps, "canvasRef" | "wheelRef">;
+  rows: Pick<SpinSceneProps, "paramRows" | "layerRows">;
+  anchors: SpinSceneProps["anchors"];
+}): SpinSceneProps {
+  const { query, step } = input;
+  const { state } = query;
+  const isDone = state === "done" || (state === "play" && step >= 12);
+  const activeParamId = activeParam(state, step);
+  const { durations, total } = demoDurations(state, step);
+  const rolling = state === "rolling";
+  return {
+    ...input.refs,
+    spinVisible: true,
+    initializing: false,
+    wheelReward: wheelRewardFor(query),
+    wheelBannerVisible: query.wheel && !query.wheelSpinning,
+    ...input.rows,
+    flashParamId: null,
+    flashLayerKey: null,
+    rollerLabel: rolling ? "White Patch Tint" : null,
+    rollerActiveValue: rolling ? "Gold" : null,
+    spinDone: isDone,
+    viewUrl: isDone ? "https://beastyrabbit.com/view/demo427" : null,
+    spread: false,
+    theme: query.theme,
+    spinSeq: 427,
+    activeParamId,
+    activeParamStartedAt: activeStartedAtFor(
+      state,
+      activeParamId,
+      input.timing,
+    ),
+    paramDurations: durations,
+    totalDurationMs: total,
+    poseName: query.poseName,
+    reverse: query.reverse,
+    anchors: input.anchors,
+    mapper: null,
+    afterlife: "off",
+  };
+}
+
+function previewHref(
+  theme: string,
+  state: PreviewState,
+  poseName: string,
+  wheel: boolean,
+  scale: number,
+): string {
+  return `?theme=${theme}&state=${state}&pose=${poseName}${wheel ? "&wheel=1" : ""}&scale=${scale}`;
+}
+
+export function ThemePreviewClient() {
+  const query = parsePreviewQuery(useSearchParams());
+  const { theme, state, poseName, reverse, runIndex, wheel, scale } = query;
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wheelRef = useRef<OBSClassicWheelHandle | null>(null);
@@ -215,7 +372,7 @@ export function ThemePreviewClient() {
     if (state !== "play") return;
     setStep(0);
     const id = setInterval(() => {
-      setStep((s) => (s >= 12 ? s : s + 1));
+      setStep(nextPlayStep);
       setStepStartedAt(performance.now());
     }, PLAY_STEP_MS);
     return () => clearInterval(id);
@@ -225,69 +382,15 @@ export function ThemePreviewClient() {
 
   const paramRows = useMemo(() => buildParamRows(state, step), [state, step]);
   const layerRows = useMemo(() => buildLayerRows(state, step), [state, step]);
-  const playing = state === "play";
-  const playDone = playing && step >= 12;
-  const playActive = playing && step < 11 ? BOARD_SLOTS[step].id : null;
-  let activeParamId: string | null = null;
-  if (playing) activeParamId = playActive;
-  else if (state === "rolling") activeParamId = BOARD_SLOTS[ROLLING_INDEX].id;
-  const isDone = state === "done" || playDone;
-  const playDurations = Object.fromEntries(
-    BOARD_SLOTS.slice(0, Math.min(step, 11)).map((d, i) => [
-      d.timingKey,
-      1500 + ((i * 1370) % 4200),
-    ]),
-  ) as Partial<Record<ParamTimingKey, number>>;
-  let staticDurations: Partial<Record<ParamTimingKey, number>> = {};
-  if (state === "done") {
-    staticDurations = {
-      ...DEMO_DURATIONS,
-      whitePatchesTint: 1500,
-      vitiligo: 2400,
-      sprite: 3900,
-    } as Partial<Record<ParamTimingKey, number>>;
-  } else if (state === "rolling") {
-    staticDurations = DEMO_DURATIONS;
-  }
-  let staticTotal = 0;
-  if (state === "done") staticTotal = 40400;
-  else if (state === "rolling") staticTotal = 32600;
-  let activeStartedAt: number | null = null;
-  if (playing) activeStartedAt = playActive ? stepStartedAt : null;
-  else if (state === "rolling") activeStartedAt = startedAt;
 
-  const sceneProps: SpinSceneProps = {
-    canvasRef,
-    wheelRef,
-    spinVisible: true,
-    initializing: false,
-    wheelReward: wheel
-      ? { status: wheelSpinning ? "spinning" : "settled", prize: DEMO_PRIZE }
-      : { status: "hidden", prize: null },
-    wheelBannerVisible: wheel && !wheelSpinning,
-    paramRows,
-    layerRows,
-    flashParamId: null,
-    flashLayerKey: null,
-    rollerLabel: state === "rolling" ? "White Patch Tint" : null,
-    rollerActiveValue: state === "rolling" ? "Gold" : null,
-    spinDone: isDone,
-    viewUrl: isDone ? "https://beastyrabbit.com/view/demo427" : null,
-    spread: false,
-    theme,
-    spinSeq: 427,
-    activeParamId,
-    activeParamStartedAt: activeStartedAt,
-    paramDurations: playing ? playDurations : staticDurations,
-    totalDurationMs: playing
-      ? Object.values(playDurations).reduce<number>((a, b) => a + (b ?? 0), 0)
-      : staticTotal,
-    poseName,
-    reverse,
+  const sceneProps = buildSceneProps({
+    query,
+    step,
+    timing: { startedAt, stepStartedAt },
+    refs: { canvasRef, wheelRef },
+    rows: { paramRows, layerRows },
     anchors,
-    mapper: null,
-    afterlife: "off",
-  };
+  });
 
   const Scene = OVERLAY_THEMES[theme].SpinScene;
   const tokens = OVERLAY_THEME_META[theme].tokens;
@@ -299,7 +402,7 @@ export function ThemePreviewClient() {
         {OVERLAY_THEME_IDS.map((id) => (
           <a
             key={id}
-            href={`?theme=${id}&state=${state}&pose=${poseName}${wheel ? "&wheel=1" : ""}&scale=${scale}`}
+            href={previewHref(id, state, poseName, wheel, scale)}
             className={id === theme ? "underline" : "opacity-60"}
           >
             {id}
@@ -309,14 +412,14 @@ export function ThemePreviewClient() {
         {(["idle", "rolling", "done", "play"] as const).map((s) => (
           <a
             key={s}
-            href={`?theme=${theme}&state=${s}&pose=${poseName}${wheel ? "&wheel=1" : ""}&scale=${scale}`}
+            href={previewHref(theme, s, poseName, wheel, scale)}
             className={s === state ? "underline" : "opacity-60"}
           >
             {s}
           </a>
         ))}
         <a
-          href={`?theme=${theme}&state=${state}&pose=${poseName}${wheel ? "" : "&wheel=1"}&scale=${scale}`}
+          href={previewHref(theme, state, poseName, !wheel, scale)}
           className="ml-4 opacity-60"
         >
           wheel: {wheel ? "on" : "off"}

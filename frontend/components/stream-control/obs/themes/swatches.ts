@@ -165,13 +165,27 @@ export function swatchForParam(
   }
 }
 
+/** Text form of a raw param value: strings as-is, primitives via String, objects as JSON. */
+function rawText(raw: unknown): string {
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw;
+  if (
+    typeof raw === "number" ||
+    typeof raw === "boolean" ||
+    typeof raw === "bigint"
+  ) {
+    return String(raw);
+  }
+  return JSON.stringify(raw) ?? "";
+}
+
 /** Deterministic pseudo-DMC thread code for the sampler legend ("318", "B5200"). */
 export function dmcCode(paramId: ParamId, raw: unknown): string {
-  const text = `${paramId}:${String(raw ?? "")}`.toUpperCase();
+  const text = `${paramId}:${rawText(raw)}`.toUpperCase();
   if (text.endsWith(":WHITE")) return "B5200";
   let hash = 0;
   for (let i = 0; i < text.length; i++) {
-    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+    hash = (hash * 31 + (text.codePointAt(i) ?? 0)) >>> 0;
   }
   return String(100 + (hash % 3800));
 }

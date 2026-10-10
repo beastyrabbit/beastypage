@@ -116,6 +116,22 @@ function patternName(slots: BoardSlot[]): string | null {
   return pelt ? `${colour} ${pelt.toLowerCase()}` : colour;
 }
 
+/** Fill for one tick of the progress strip under the legend. */
+function progressTickStyle(status: BoardSlot["status"]): CSSProperties {
+  if (status === "revealed") return { background: INK, opacity: 0.9 };
+  if (status === "active") {
+    return {
+      background: RED,
+      animation: "obs-sampler-blink 1s steps(1) infinite",
+    };
+  }
+  return {
+    background: "transparent",
+    border: `1.2px solid ${PENCIL}`,
+    opacity: 0.5,
+  };
+}
+
 export function SamplerSpinScene(props: Readonly<SpinSceneProps>) {
   const {
     activeParamId,
@@ -140,8 +156,7 @@ export function SamplerSpinScene(props: Readonly<SpinSceneProps>) {
   // in their 50px cell). Falls back to the geometric centre while the pose is
   // flipping or the anchors are still loading.
   const bounds =
-    anchors &&
-    anchors.pose === poseName &&
+    anchors?.pose === poseName &&
     anchors.reverse === reverse &&
     activeParamId !== "sprite"
       ? anchors.bounds
@@ -179,7 +194,8 @@ export function SamplerSpinScene(props: Readonly<SpinSceneProps>) {
   const showThread = threadEnd !== null && !spinDone;
 
   const name = patternName(slots);
-  const title = `Pattern ${spinSeq ?? "—"}${name ? ` · ${name}` : ""}`;
+  const nameSuffix = name ? ` · ${name}` : "";
+  const title = `Pattern ${spinSeq ?? "—"}${nameSuffix}`;
 
   return (
     <SceneFade spinVisible={spinVisible} theme="sampler">
@@ -346,18 +362,7 @@ export function SamplerSpinScene(props: Readonly<SpinSceneProps>) {
                 flex: 1,
                 height: 12,
                 boxSizing: "border-box",
-                ...(slot.status === "revealed"
-                  ? { background: INK, opacity: 0.9 }
-                  : slot.status === "active"
-                    ? {
-                        background: RED,
-                        animation: "obs-sampler-blink 1s steps(1) infinite",
-                      }
-                    : {
-                        background: "transparent",
-                        border: `1.2px solid ${PENCIL}`,
-                        opacity: 0.5,
-                      }),
+                ...progressTickStyle(slot.status),
               }}
             />
           ))}

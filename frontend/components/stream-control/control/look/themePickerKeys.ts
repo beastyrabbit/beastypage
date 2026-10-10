@@ -20,7 +20,7 @@ export function nextThemeOnKey<T>(
     case "Home":
       return ids[0];
     case "End":
-      return ids[ids.length - 1];
+      return ids.at(-1) ?? null;
     default:
       return null;
   }

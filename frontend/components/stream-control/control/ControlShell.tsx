@@ -11,7 +11,7 @@ import { useClerk } from "@clerk/nextjs";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { Cat, Dna, Loader2, Palette, Play, Settings2 } from "lucide-react";
 import { MotionConfig, motion, type Variants } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { api } from "@/convex/_generated/api";
@@ -208,6 +208,27 @@ export function ControlShell() {
   const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const sessionRef = useRef(session);
   sessionRef.current = session;
+  // Per-field syncs not yet echoed by Convex. Race: a theme pick merges
+  // `overlayTheme` asynchronously; a scene command fired before the echo
+  // writes the full settings from the stale session snapshot and would
+  // overwrite the pick. buildSessionSettings re-applies these until they land.
+  const pendingSyncRef = useRef<Record<string, unknown>>({});
+  // Writes whose mutation resolved: Convex resolves only once the local query
+  // results include the write, so this render's session already reflects them
+  // (covers object values, which never compare equal to their echo).
+  const landedSyncRef = useRef<Map<string, unknown>>(new Map());
+  const storedSettings = session?.settings as
+    | Record<string, unknown>
+    | undefined;
+  for (const [key, value] of Object.entries(pendingSyncRef.current)) {
+    const landed =
+      landedSyncRef.current.has(key) &&
+      Object.is(landedSyncRef.current.get(key), value);
+    if (landed || Object.is(storedSettings?.[key], value)) {
+      delete pendingSyncRef.current[key];
+    }
+  }
+  landedSyncRef.current.clear();
   const lobbyModeRef = useRef(lobbyMode);
   lobbyModeRef.current = lobbyMode;
   const lobbyCatCountRef = useRef(lobbyCatCount);
@@ -243,6 +264,7 @@ export function ControlShell() {
       // (lobbyInfoMode, evolutionInfo, batchInfo, obs appearance, …) survive
       // writes that don't know about them.
       ...(sessionRef.current?.settings as Record<string, unknown> | undefined),
+      ...pendingSyncRef.current,
       ...baseSettings,
       lobbyMode: lobbyModeRef.current,
       lobbyCatCount: lobbyCatCountRef.current,
@@ -276,23 +298,44 @@ export function ControlShell() {
   const syncSessionSettings = useCallback(
     (updates: Record<string, unknown>) => {
       touchLocalEdit();
+      pendingSyncRef.current = { ...pendingSyncRef.current, ...updates };
+      // Landed writes are dropped on the next render; failed writes never
+      // echo, so drop them now rather than let later full writes resurrect them.
+      const settle = (ok: boolean) => {
+        for (const [key, value] of Object.entries(updates)) {
+          if (!Object.is(pendingSyncRef.current[key], value)) continue;
+          if (ok) landedSyncRef.current.set(key, value);
+          else delete pendingSyncRef.current[key];
+        }
+      };
       // Server-side merge: concurrent per-field syncs (lobby sliders, mode
       // info, overlay appearance) must not clobber each other.
       if (!sessionRef.current) {
         const merged = buildSessionSettings(settingsRef.current, updates);
-        void saveSessionSettings(merged).catch((err) => {
+        void saveSessionSettings(merged).then(
+          () => settle(true),
+          (err) => {
+            settle(false);
+            console.error(
+              "[StreamControl] Failed to sync settings to Convex",
+              err,
+            );
+            toast.error("Failed to save stream settings");
+          },
+        );
+        return;
+      }
+      void mergeSettingsMut({ settings: updates }).then(
+        () => settle(true),
+        (err) => {
+          settle(false);
           console.error(
             "[StreamControl] Failed to sync settings to Convex",
             err,
           );
           toast.error("Failed to save stream settings");
-        });
-        return;
-      }
-      void mergeSettingsMut({ settings: updates }).catch((err) => {
-        console.error("[StreamControl] Failed to sync settings to Convex", err);
-        toast.error("Failed to save stream settings");
-      });
+        },
+      );
     },
     [
       buildSessionSettings,
@@ -795,6 +838,163 @@ export function ControlShell() {
     syncSessionSettings({ lobbyInfoMode: activeTab });
   }, [activeTab, initialized, syncSessionSettings]);
 
+  const apiKey = viewer?.apiKey;
+  const controlApi = useMemo<StreamControlApi>(() => {
+    const pageOrigin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    const obsUrl = apiKey
+      ? `${pageOrigin}/single-cat-stream/obs?key=${apiKey}`
+      : null;
+    const fallbackCommand =
+      (session?.currentCommand as
+        | {
+            type?: string;
+            params?: unknown;
+          }
+        | undefined) ?? undefined;
+    const hasWheelSource = Boolean(
+      fallbackCommand?.type === "spin" && fallbackCommand.params !== undefined,
+    );
+    const commandBusy =
+      spinning || wheelSpinning || sceneCommandPending !== null;
+    const activeScene = getActiveStreamScene(session);
+    const sessionCommand = session?.currentCommand;
+    const currentBatchCommand =
+      sessionCommand?.type === "batch" && sessionCommand.batch
+        ? {
+            ...(sessionCommand.batch as BatchStreamCommand),
+            seq: sessionCommand.seq,
+          }
+        : null;
+    const batchLiveState = session?.batchState ?? null;
+
+    return {
+      testMode: Boolean(session?.testMode),
+      obsUrl,
+      activeScene,
+      onAirLabel: describeOnAir(session),
+      commandBusy,
+      hasWheelSource,
+      generatorReady,
+      settings,
+      updateSettings,
+      syncSessionSettings,
+      variants,
+      handleVariantSelect,
+      paletteDisplayMode,
+      setPaletteDisplayMode,
+      spinning,
+      wheelSpinning,
+      countdownSeconds,
+      setCountdownSeconds,
+      handleSpin,
+      handleWheelSpin,
+      resultAutoClearEnabled,
+      setResultAutoClearEnabled,
+      resultAutoClearSeconds,
+      setResultAutoClearSeconds,
+      runLobbyScene: () => void runSceneCommand("Lobby", () => showLobbyMut()),
+      runBrbScene: () => void runSceneCommand("BRB", () => showBrbMut()),
+      runTestScene: () =>
+        void runSceneCommand("Test", () => toggleTestModeMut()),
+      runClearScene: () =>
+        void runSceneCommand("Clear", () => clearOverlayMut()),
+      lobbyMode,
+      setLobbyMode,
+      lobbyCatCount,
+      setLobbyCatCount,
+      lobbyMoveSpeed,
+      setLobbyMoveSpeed,
+      lobbySwapSpeed,
+      setLobbySwapSpeed,
+      lobbyCatMinSize,
+      setLobbyCatMinSize,
+      lobbyCatMaxSize,
+      setLobbyCatMaxSize,
+      lobbyAutoClearSeconds,
+      setLobbyAutoClearSeconds,
+      clearLobbyCats: () =>
+        syncSessionSettings({ lobbyClearSeq: ++clearSeqRef.current }),
+      brbSettingsCode,
+      brbSettingsDraft,
+      setBrbSettingsDraft,
+      saveBrbSettingsCode,
+      shareLink,
+      currentSlug,
+      currentProfileId,
+      hasTint,
+      lastResultRef,
+      handleDownload,
+      exportCat,
+      catNameDraft,
+      setCatNameDraft,
+      creatorNameDraft,
+      setCreatorNameDraft,
+      metaDirty,
+      setMetaDirty,
+      handleSaveMeta,
+      historySaving,
+      metaSaving,
+      currentBatchCommand,
+      batchLiveState,
+      rawSessionSettings,
+      overlayTheme,
+      setOverlayTheme,
+      activeTab,
+      setActiveTab,
+      previewContainerRef,
+    };
+  }, [
+    apiKey,
+    session,
+    spinning,
+    wheelSpinning,
+    sceneCommandPending,
+    generatorReady,
+    settings,
+    updateSettings,
+    syncSessionSettings,
+    variants,
+    handleVariantSelect,
+    paletteDisplayMode,
+    countdownSeconds,
+    handleSpin,
+    handleWheelSpin,
+    resultAutoClearEnabled,
+    resultAutoClearSeconds,
+    runSceneCommand,
+    showLobbyMut,
+    showBrbMut,
+    toggleTestModeMut,
+    clearOverlayMut,
+    lobbyMode,
+    lobbyCatCount,
+    lobbyMoveSpeed,
+    lobbySwapSpeed,
+    lobbyCatMinSize,
+    lobbyCatMaxSize,
+    lobbyAutoClearSeconds,
+    brbSettingsCode,
+    brbSettingsDraft,
+    saveBrbSettingsCode,
+    shareLink,
+    currentSlug,
+    currentProfileId,
+    hasTint,
+    handleDownload,
+    exportCat,
+    catNameDraft,
+    creatorNameDraft,
+    metaDirty,
+    handleSaveMeta,
+    historySaving,
+    metaSaving,
+    rawSessionSettings,
+    overlayTheme,
+    setOverlayTheme,
+    activeTab,
+  ]);
+
   // Auth gate
   if (authLoading) {
     return (
@@ -824,109 +1024,6 @@ export function ControlShell() {
       </div>
     );
   }
-
-  const apiKey = viewer?.apiKey;
-  const pageOrigin =
-    typeof window !== "undefined" ? window.location.origin : "";
-  const obsUrl = apiKey
-    ? `${pageOrigin}/single-cat-stream/obs?key=${apiKey}`
-    : null;
-  const fallbackCommand =
-    (session?.currentCommand as
-      | {
-          type?: string;
-          params?: unknown;
-        }
-      | undefined) ?? undefined;
-  const hasWheelSource = Boolean(
-    fallbackCommand?.type === "spin" && fallbackCommand.params !== undefined,
-  );
-  const commandBusy = spinning || wheelSpinning || sceneCommandPending !== null;
-  const activeScene = getActiveStreamScene(session);
-  const sessionCommand = session?.currentCommand;
-  const currentBatchCommand =
-    sessionCommand?.type === "batch" && sessionCommand.batch
-      ? {
-          ...(sessionCommand.batch as BatchStreamCommand),
-          seq: sessionCommand.seq,
-        }
-      : null;
-  const batchLiveState = session?.batchState ?? null;
-
-  const controlApi: StreamControlApi = {
-    testMode: Boolean(session?.testMode),
-    obsUrl,
-    activeScene,
-    onAirLabel: describeOnAir(session),
-    commandBusy,
-    hasWheelSource,
-    generatorReady,
-    settings,
-    updateSettings,
-    syncSessionSettings,
-    variants,
-    handleVariantSelect,
-    paletteDisplayMode,
-    setPaletteDisplayMode,
-    spinning,
-    wheelSpinning,
-    countdownSeconds,
-    setCountdownSeconds,
-    handleSpin,
-    handleWheelSpin,
-    resultAutoClearEnabled,
-    setResultAutoClearEnabled,
-    resultAutoClearSeconds,
-    setResultAutoClearSeconds,
-    runLobbyScene: () => void runSceneCommand("Lobby", () => showLobbyMut()),
-    runBrbScene: () => void runSceneCommand("BRB", () => showBrbMut()),
-    runTestScene: () => void runSceneCommand("Test", () => toggleTestModeMut()),
-    runClearScene: () => void runSceneCommand("Clear", () => clearOverlayMut()),
-    lobbyMode,
-    setLobbyMode,
-    lobbyCatCount,
-    setLobbyCatCount,
-    lobbyMoveSpeed,
-    setLobbyMoveSpeed,
-    lobbySwapSpeed,
-    setLobbySwapSpeed,
-    lobbyCatMinSize,
-    setLobbyCatMinSize,
-    lobbyCatMaxSize,
-    setLobbyCatMaxSize,
-    lobbyAutoClearSeconds,
-    setLobbyAutoClearSeconds,
-    clearLobbyCats: () =>
-      syncSessionSettings({ lobbyClearSeq: ++clearSeqRef.current }),
-    brbSettingsCode,
-    brbSettingsDraft,
-    setBrbSettingsDraft,
-    saveBrbSettingsCode,
-    shareLink,
-    currentSlug,
-    currentProfileId,
-    hasTint,
-    lastResultRef,
-    handleDownload,
-    exportCat,
-    catNameDraft,
-    setCatNameDraft,
-    creatorNameDraft,
-    setCreatorNameDraft,
-    metaDirty,
-    setMetaDirty,
-    handleSaveMeta,
-    historySaving,
-    metaSaving,
-    currentBatchCommand,
-    batchLiveState,
-    rawSessionSettings,
-    overlayTheme,
-    setOverlayTheme,
-    activeTab,
-    setActiveTab,
-    previewContainerRef,
-  };
 
   return (
     <StreamControlContext.Provider value={controlApi}>

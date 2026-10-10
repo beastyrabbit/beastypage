@@ -138,7 +138,7 @@ export function computeStopPoints(
       y += G.pitch + (gapAnchors.has(i) ? G.branchGap : 0);
     } else {
       const b = i - G.verticalCount;
-      const last = G.bottomStopXs[G.bottomStopXs.length - 1];
+      const last = G.bottomStopXs.at(-1) ?? 0;
       const x =
         G.bottomStopXs[b] ?? last - 200 * (b - G.bottomStopXs.length + 1);
       points.push({ x, y: G.bottomY });
@@ -265,45 +265,169 @@ function branchItems(branch: TransitBranchInput): BranchItem[] {
   return items.length > 0 ? items : [closed];
 }
 
-function trunkLabels(
+function trunkNameTone(kind: StationKind): LabelTone {
+  if (kind === "live") return "live";
+  if (kind === "next") return "dim";
+  return "ink";
+}
+
+function trunkNameLabel(
   slot: TransitSlotInput,
   kind: StationKind,
   at: Point,
   onBottom: boolean,
-): TransitLabel[] {
-  const nameTone: LabelTone =
-    kind === "live" ? "live" : kind === "next" ? "dim" : "ink";
-  const out: TransitLabel[] = [];
-  out.push({
+): TransitLabel {
+  return {
     key: `name-${slot.id}`,
     text: slot.name,
     full: slot.name,
     x: onBottom ? at.x : at.x - NAME_GAP,
     y: onBottom ? at.y - 28 : at.y + 9,
     anchor: onBottom ? "middle" : "end",
-    tone: nameTone,
+    tone: trunkNameTone(kind),
     size: "name",
-  });
-  if (kind === "next") return out;
-  let text = ROLLING_TEXT;
-  let full = ROLLING_TEXT;
-  let tone: LabelTone = "live";
-  if (kind !== "live") {
-    full = slot.value ?? "None";
-    text = truncateValue(full, onBottom ? BOTTOM_VALUE_MAX : TRUNK_VALUE_MAX);
-    tone = kind === "closed" ? "dim" : slot.family;
+  };
+}
+
+/** Value text + tone for a started trunk stop ("live", "served" or "closed"). */
+function trunkValue(
+  slot: TransitSlotInput,
+  kind: StationKind,
+  onBottom: boolean,
+): { text: string; full: string; tone: LabelTone } {
+  if (kind === "live") {
+    return { text: ROLLING_TEXT, full: ROLLING_TEXT, tone: "live" };
   }
-  out.push({
+  const full = slot.value ?? "None";
+  return {
+    text: truncateValue(full, onBottom ? BOTTOM_VALUE_MAX : TRUNK_VALUE_MAX),
+    full,
+    tone: kind === "closed" ? "dim" : slot.family,
+  };
+}
+
+function trunkValueLabel(
+  slot: TransitSlotInput,
+  kind: StationKind,
+  at: Point,
+  onBottom: boolean,
+): TransitLabel {
+  const { text, full, tone } = trunkValue(slot, kind, onBottom);
+  const liveNudge = kind === "live" ? 10 : 0;
+  return {
     key: `value-${slot.id}`,
     text,
     full,
-    x: onBottom ? at.x : at.x + NAME_GAP + (kind === "live" ? 10 : 0),
+    x: onBottom ? at.x : at.x + NAME_GAP + liveNudge,
     y: onBottom ? at.y + 44 : at.y + 9,
     anchor: onBottom ? "middle" : "start",
     tone,
     size: "value",
+  };
+}
+
+function trunkLabels(
+  slot: TransitSlotInput,
+  kind: StationKind,
+  at: Point,
+  onBottom: boolean,
+): TransitLabel[] {
+  const name = trunkNameLabel(slot, kind, at, onBottom);
+  if (kind === "next") return [name];
+  return [name, trunkValueLabel(slot, kind, at, onBottom)];
+}
+
+function terminusSegmentState(
+  spinDone: boolean,
+  allServed: boolean,
+): SegmentState {
+  if (spinDone) return "served";
+  if (allServed) return "live";
+  return "next";
+}
+
+function branchSegmentState(state: TransitBranchState): SegmentState {
+  if (state === "live") return "live";
+  if (state === "served") return "served";
+  return "next";
+}
+
+interface PlacedBranchItem {
+  item: BranchItem;
+  x: number;
+  more: boolean;
+}
+
+/** Lays items left to right from `startX`; overflow collapses into a "+N" tag. */
+function placeBranchItems(
+  items: BranchItem[],
+  startX: number,
+): PlacedBranchItem[] {
+  const placed: PlacedBranchItem[] = [];
+  let x = startX;
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+    const width = Math.max(
+      BRANCH_STOP_R * 2,
+      estimateBranchLabelWidth(item.text) - 7,
+    );
+    const reserve = i < items.length - 1 ? 48 : 0;
+    if (placed.length > 0 && x + width + reserve > G.maxX) {
+      const more = `+${items.length - i}`;
+      placed.push({
+        item: { text: more, full: more, kind: "next", tone: "dim" },
+        x,
+        more: true,
+      });
+      break;
+    }
+    placed.push({ item, x, more: false });
+    x += width + 30;
+  }
+  return placed;
+}
+
+/** Appends one branch's stub segment, stops and labels to the layout. */
+function layoutBranch(
+  branch: TransitBranchInput,
+  row: BranchRow,
+  out: Pick<TransitLayout, "segments" | "stations" | "labels">,
+): void {
+  const startX = row.rowStart.x + 26;
+  const placed = placeBranchItems(branchItems(branch), startX);
+  const lastStopX = placed.findLast((p) => !p.more)?.x ?? startX;
+  const branchState = branchSegmentState(branch.state);
+  out.segments.push({
+    key: `branch-${branch.key}`,
+    d: `M${row.junction.x},${row.junction.y} L${row.rowStart.x},${row.rowStart.y} L${lastStopX},${row.rowStart.y}`,
+    state: branchState,
+    color:
+      branchState === "live"
+        ? TRANSIT_LIVE
+        : TRANSIT_FAMILY_COLOR[branch.family],
+    branch: true,
   });
-  return out;
+  placed.forEach(({ item, x: stopX, more }, i) => {
+    if (!more) {
+      out.stations.push({
+        key: `bst-${branch.key}-${i}`,
+        x: stopX,
+        y: row.rowStart.y,
+        r: item.kind === "live" ? 10 : BRANCH_STOP_R,
+        kind: item.kind,
+      });
+    }
+    out.labels.push({
+      key: `blabel-${branch.key}-${i}`,
+      text: item.text,
+      full: item.full,
+      x: more ? stopX : stopX - 7,
+      y: more ? row.rowStart.y + 6 : row.rowStart.y - 18,
+      anchor: "start",
+      tone: item.tone,
+      size: "tiny",
+    });
+  });
 }
 
 export function computeTransitLayout(
@@ -352,13 +476,11 @@ export function computeTransitLayout(
   const terminus = { x: G.terminusX, y: G.bottomY };
   const allServed =
     slots.length > 0 && slots.every((s) => s.status === "revealed");
-  let terminusState: SegmentState = "next";
-  if (spinDone) terminusState = "served";
-  else if (allServed) terminusState = "live";
+  const terminusState = terminusSegmentState(spinDone, allServed);
   segments.push({
     key: "seg-terminus",
     d: trunkPath(
-      points[points.length - 1] ?? lineStart,
+      points.at(-1) ?? lineStart,
       terminus,
       slots.length <= G.verticalCount,
       bendY,
@@ -382,65 +504,7 @@ export function computeTransitLayout(
   const rows = branchRows(branches, points, bendY);
   for (const branch of branches) {
     const row = rows.get(branch.key);
-    if (!row) continue;
-    const items = branchItems(branch);
-    const placed: { item: BranchItem; x: number; more: boolean }[] = [];
-    let x = row.rowStart.x + 26;
-    for (let i = 0; i < items.length; i += 1) {
-      const item = items[i];
-      const width = Math.max(
-        BRANCH_STOP_R * 2,
-        estimateBranchLabelWidth(item.text) - 7,
-      );
-      const reserve = i < items.length - 1 ? 48 : 0;
-      if (placed.length > 0 && x + width + reserve > G.maxX) {
-        const more = `+${items.length - i}`;
-        placed.push({
-          item: { text: more, full: more, kind: "next", tone: "dim" },
-          x,
-          more: true,
-        });
-        break;
-      }
-      placed.push({ item, x, more: false });
-      x += width + 30;
-    }
-    const lastStopX =
-      placed.filter((p) => !p.more).pop()?.x ?? row.rowStart.x + 26;
-    let branchState: SegmentState = "next";
-    if (branch.state === "live") branchState = "live";
-    else if (branch.state === "served") branchState = "served";
-    segments.push({
-      key: `branch-${branch.key}`,
-      d: `M${row.junction.x},${row.junction.y} L${row.rowStart.x},${row.rowStart.y} L${lastStopX},${row.rowStart.y}`,
-      state: branchState,
-      color:
-        branchState === "live"
-          ? TRANSIT_LIVE
-          : TRANSIT_FAMILY_COLOR[branch.family],
-      branch: true,
-    });
-    placed.forEach(({ item, x: stopX, more }, i) => {
-      if (!more) {
-        stations.push({
-          key: `bst-${branch.key}-${i}`,
-          x: stopX,
-          y: row.rowStart.y,
-          r: item.kind === "live" ? 10 : BRANCH_STOP_R,
-          kind: item.kind,
-        });
-      }
-      labels.push({
-        key: `blabel-${branch.key}-${i}`,
-        text: item.text,
-        full: item.full,
-        x: more ? stopX : stopX - 7,
-        y: more ? row.rowStart.y + 6 : row.rowStart.y - 18,
-        anchor: "start",
-        tone: item.tone,
-        size: "tiny",
-      });
-    });
+    if (row) layoutBranch(branch, row, { segments, stations, labels });
   }
 
   return {
