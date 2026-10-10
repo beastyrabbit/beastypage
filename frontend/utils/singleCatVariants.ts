@@ -212,26 +212,11 @@ function sanitizeDelays(
   return delays;
 }
 
-function sanitizeSubsetLimits(
-  raw: SpinTimingConfig["subsetLimits"],
-): Partial<Record<ParamTimingKey, boolean>> {
-  const subsetLimits: Partial<Record<ParamTimingKey, boolean>> = {};
-  if (raw && typeof raw === "object") {
-    for (const [key, value] of Object.entries(raw)) {
-      if (isParamTimingKey(key) && Boolean(value)) {
-        subsetLimits[key] = true;
-      }
-    }
-  }
-  return subsetLimits;
-}
-
 function sanitizeTiming(raw: unknown): SpinTimingConfig {
   if (!raw || typeof raw !== "object") return DEFAULT_TIMING_CONFIG;
   const t = raw as Partial<SpinTimingConfig>;
 
   const delays = sanitizeDelays(t.delays);
-  const subsetLimits = sanitizeSubsetLimits(t.subsetLimits);
 
   const defaultFlashy = DEFAULT_TIMING_CONFIG.pauseDelays?.flashyMs ?? 1000;
   const defaultCalm = DEFAULT_TIMING_CONFIG.pauseDelays?.calmMs ?? 1000;
@@ -251,7 +236,6 @@ function sanitizeTiming(raw: unknown): SpinTimingConfig {
   return {
     allowFastFlips: Boolean(t.allowFastFlips),
     delays: { ...DEFAULT_TIMING_CONFIG.delays, ...delays },
-    subsetLimits,
     pauseDelays,
   };
 }

@@ -20,7 +20,6 @@ export type ParamTimingKey = string;
 export interface SpinTimingConfig {
   allowFastFlips: boolean;
   delays: Partial<Record<ParamTimingKey, number>>;
-  subsetLimits?: Partial<Record<ParamTimingKey, boolean>>;
   pauseDelays?: {
     flashyMs: number;
     calmMs: number;
@@ -350,7 +349,6 @@ export const DEFAULT_TIMING_CONFIG: SpinTimingConfig = {
       PARAM_TIMING_PRESETS[key]?.normal ?? 180,
     ]),
   ),
-  subsetLimits: {},
   pauseDelays: {
     flashyMs: 1000,
     calmMs: 1000,

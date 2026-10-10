@@ -94,7 +94,6 @@ export function useObsSession(apiKey: string) {
         timing: {
           ...DEFAULT_TIMING_CONFIG,
           delays: { ...DEFAULT_TIMING_CONFIG.delays },
-          subsetLimits: { ...DEFAULT_TIMING_CONFIG.subsetLimits },
           pauseDelays: DEFAULT_TIMING_CONFIG.pauseDelays
             ? {
                 flashyMs: DEFAULT_TIMING_CONFIG.pauseDelays.flashyMs,
