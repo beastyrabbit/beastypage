@@ -90,6 +90,28 @@ def test_pipeline_smoke():
     assert LayerIdentifier.accessories in ids
 
 
+def test_starclan_lineart_includes_sparkle_overlay():
+    repo = SpriteRepository()
+    pipeline = RenderPipeline(repository=repo)
+    params = {
+        "spriteNumber": 8,
+        "peltName": "SingleColour",
+        "colour": "GINGER",
+        "dead": True,
+    }
+
+    ids, diag = render_layer_ids(pipeline, params)
+    lineart = diag[ids.index(LayerIdentifier.lineart)]
+    assert lineart == ["lineartdead", "line_sc_overlay"]
+
+    alive = pipeline.render({**params, "dead": False}).composed
+    starclan = pipeline.render(params).composed
+    # The sparkles sit around the cat, so fewer pixels stay fully transparent.
+    alive_transparent = alive.getchannel("A").histogram()[0]
+    starclan_transparent = starclan.getchannel("A").histogram()[0]
+    assert starclan_transparent < alive_transparent
+
+
 def test_named_pose_render_smoke():
     repo = SpriteRepository()
     pipeline = RenderPipeline(repository=repo)
