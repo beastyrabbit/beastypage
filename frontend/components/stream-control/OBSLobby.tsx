@@ -21,6 +21,7 @@ import type {
   ExtendedMode,
   LayerRange,
 } from "@/utils/singleCatVariants";
+import { OBS_PANEL_STYLE } from "./obs/themes/panelStyle";
 
 /** Build CSS style for a palette swatch — uses pattern rendering for pattern palettes. */
 function swatchStyle(def: PaletteColorDef, size: number): React.CSSProperties {
@@ -466,12 +467,7 @@ export function OBSLobby({
             top: "40px",
             width: "900px",
             // Same card treatment as the spin board and reveal scenes.
-            background:
-              "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
-            borderRadius: "20px",
-            border: "2px solid rgba(245, 158, 11, 0.2)",
-            boxShadow:
-              "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+            ...OBS_PANEL_STYLE,
             padding: "28px 32px",
           }}
         >
@@ -557,7 +553,9 @@ export function OBSLobby({
                             width: i === paletteIdx ? "16px" : "6px",
                             height: "6px",
                             background:
-                              i === paletteIdx ? "#f59e0b" : "#3f3f46",
+                              i === paletteIdx
+                                ? "var(--obs-accent)"
+                                : "#3f3f46",
                           }}
                         />
                       ))}
