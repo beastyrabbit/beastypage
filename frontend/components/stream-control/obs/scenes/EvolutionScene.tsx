@@ -30,6 +30,7 @@ import type {
 } from "@/lib/evolution/streamEvolution";
 import { cn } from "@/lib/utils";
 import { QrBadge } from "../QrBadge";
+import { OBS_PANEL_STYLE } from "../themes/panelStyle";
 
 interface EvolutionSceneProps {
   command: EvolutionStreamCommand;
@@ -309,13 +310,11 @@ function LineageBoard({
       <div className="flex min-h-0 flex-1 gap-6">
         {/* Lineage board */}
         <div
-          className="flex min-w-0 flex-1 flex-col gap-3 rounded-3xl border-2 p-6"
+          className="flex min-w-0 flex-1 flex-col gap-3 p-6"
           style={{
-            background:
-              "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
-            borderColor: "rgba(245, 158, 11, 0.2)",
-            boxShadow:
-              "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+            ...OBS_PANEL_STYLE,
+            // Classic: 24px (rounded-3xl); square themes stay square.
+            borderRadius: "calc(var(--obs-panel-radius) * 1.2)",
           }}
         >
           {/* Starter */}

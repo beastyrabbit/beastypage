@@ -1,4 +1,4 @@
-import { Cloud, Layers, PawPrint, Twitch } from "lucide-react";
+import { Chrome, Cloud, Layers, PawPrint, Twitch } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType } from "react";
 import CoffeeIcon from "@/components/ui/coffee-icon";
@@ -61,6 +61,11 @@ const SECONDARY_LINKS: LinkCard[] = [
     href: "https://ko-fi.com/beastyrabbit",
     label: "Ko-fi",
     icon: CoffeeIcon,
+  },
+  {
+    href: "https://chromewebstore.google.com/detail/Tab%20Organizer/nnoleclnibghacjbilmdfalllpnongpn?hl=de&authuser=0",
+    label: "Tab Organizer",
+    icon: Chrome,
   },
 ];
 

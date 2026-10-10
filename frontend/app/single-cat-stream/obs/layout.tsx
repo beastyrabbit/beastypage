@@ -17,7 +17,6 @@ export default function OBSOverlayLayout({
           height: "1080px",
           "--cam-zone-width": "640px",
           "--content-width": "1280px",
-          "--accent-color": "#f59e0b",
         } as React.CSSProperties
       }
     >

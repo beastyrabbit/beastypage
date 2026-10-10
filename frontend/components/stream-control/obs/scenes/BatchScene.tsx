@@ -18,6 +18,7 @@ import {
 } from "@/lib/adoption/streamBatch";
 import { cn } from "@/lib/utils";
 import { QrBadge } from "../QrBadge";
+import { OBS_PANEL_STYLE } from "../themes/panelStyle";
 
 interface BatchSceneProps {
   command: BatchStreamCommand & { seq: number };
@@ -367,14 +368,12 @@ export function BatchScene({
       <div className="flex min-h-0 flex-1 gap-5">
         {/* Cat grid */}
         <div
-          className="grid min-w-0 flex-1 content-evenly justify-items-center gap-2 overflow-hidden rounded-3xl border-2 p-4"
+          className="grid min-w-0 flex-1 content-evenly justify-items-center gap-2 overflow-hidden p-4"
           style={{
             gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-            background:
-              "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
-            borderColor: "rgba(245, 158, 11, 0.2)",
-            boxShadow:
-              "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+            ...OBS_PANEL_STYLE,
+            // Classic: 24px (rounded-3xl); square themes stay square.
+            borderRadius: "calc(var(--obs-panel-radius) * 1.2)",
           }}
         >
           {survivors.map((cat) => {

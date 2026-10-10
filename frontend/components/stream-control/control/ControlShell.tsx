@@ -9,8 +9,9 @@
 
 import { useClerk } from "@clerk/nextjs";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { Cat, Dna, Loader2, Play, Settings2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Cat, Dna, Loader2, Palette, Play, Settings2 } from "lucide-react";
+import { MotionConfig, motion, type Variants } from "motion/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { api } from "@/convex/_generated/api";
@@ -34,12 +35,17 @@ import { useVariants } from "@/utils/variants";
 import { getActiveStreamScene } from "../sceneState";
 import { BatchCullBoard } from "./BatchCullBoard";
 import { BatchPanel } from "./BatchPanel";
-import { type StreamControlApi, StreamControlContext } from "./context";
+import {
+  type ControlTabId,
+  type StreamControlApi,
+  StreamControlContext,
+} from "./context";
 import { EvolutionPanel } from "./EvolutionPanel";
 import {
   buildStreamGeneratorOptions,
   type CanvasExportSource,
   canvasToPngBlob,
+  describeOnAir,
   FULL_EXPORT_SIZE,
   isLobbyMode,
   isNonNegativeFiniteNumber,
@@ -47,13 +53,13 @@ import {
   isPositiveFiniteNumber,
   type LobbyMode,
 } from "./helpers";
+import { LookPanel } from "./LookPanel";
+import { useOverlayTheme } from "./look/useOverlayTheme";
 import { PreviewCard } from "./PreviewCard";
 import { SettingsPanel } from "./SettingsPanel";
 import { SpinPanel } from "./SpinPanel";
 import { StatusBar } from "./StatusBar";
 import { useFollowGuard } from "./useFollowGuard";
-
-type ControlTabId = "spin" | "evolution" | "batch" | "settings";
 
 /** Saved result auto-clear seconds, falling back to the legacy field, then 30. */
 function resolveResultAutoClearSeconds(s: Record<string, unknown>): number {
@@ -89,8 +95,31 @@ const TABS: Array<{
   { id: "spin", label: "Spin", icon: Play },
   { id: "evolution", label: "Evolution", icon: Dna },
   { id: "batch", label: "Batch", icon: Cat },
+  { id: "look", label: "Look", icon: Palette },
   { id: "settings", label: "Settings", icon: Settings2 },
 ];
+
+/**
+ * Panels stay mounted (drafts and sliders keep their state); the active one
+ * fades/slides in, inactive ones are display:none once hidden.
+ */
+const PANEL_VARIANTS: Variants = {
+  show: {
+    opacity: 1,
+    y: 0,
+    display: "block",
+    transition: { duration: 0.22, ease: "easeOut" },
+  },
+  hide: {
+    opacity: 0,
+    y: 6,
+    transition: { duration: 0 },
+    transitionEnd: { display: "none" },
+  },
+};
+
+/** Tabs that are not a stream mode, so they must not change the lobby info card. */
+const NON_MODE_TABS: ReadonlySet<ControlTabId> = new Set(["look", "settings"]);
 
 export function ControlShell() {
   const clerk = useClerk();
@@ -179,6 +208,27 @@ export function ControlShell() {
   const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const sessionRef = useRef(session);
   sessionRef.current = session;
+  // Per-field syncs not yet echoed by Convex. Race: a theme pick merges
+  // `overlayTheme` asynchronously; a scene command fired before the echo
+  // writes the full settings from the stale session snapshot and would
+  // overwrite the pick. buildSessionSettings re-applies these until they land.
+  const pendingSyncRef = useRef<Record<string, unknown>>({});
+  // Writes whose mutation resolved: Convex resolves only once the local query
+  // results include the write, so this render's session already reflects them
+  // (covers object values, which never compare equal to their echo).
+  const landedSyncRef = useRef<Map<string, unknown>>(new Map());
+  const storedSettings = session?.settings as
+    | Record<string, unknown>
+    | undefined;
+  for (const [key, value] of Object.entries(pendingSyncRef.current)) {
+    const landed =
+      landedSyncRef.current.has(key) &&
+      Object.is(landedSyncRef.current.get(key), value);
+    if (landed || Object.is(storedSettings?.[key], value)) {
+      delete pendingSyncRef.current[key];
+    }
+  }
+  landedSyncRef.current.clear();
   const lobbyModeRef = useRef(lobbyMode);
   lobbyModeRef.current = lobbyMode;
   const lobbyCatCountRef = useRef(lobbyCatCount);
@@ -214,6 +264,7 @@ export function ControlShell() {
       // (lobbyInfoMode, evolutionInfo, batchInfo, obs appearance, …) survive
       // writes that don't know about them.
       ...(sessionRef.current?.settings as Record<string, unknown> | undefined),
+      ...pendingSyncRef.current,
       ...baseSettings,
       lobbyMode: lobbyModeRef.current,
       lobbyCatCount: lobbyCatCountRef.current,
@@ -247,23 +298,44 @@ export function ControlShell() {
   const syncSessionSettings = useCallback(
     (updates: Record<string, unknown>) => {
       touchLocalEdit();
+      pendingSyncRef.current = { ...pendingSyncRef.current, ...updates };
+      // Landed writes are dropped on the next render; failed writes never
+      // echo, so drop them now rather than let later full writes resurrect them.
+      const settle = (ok: boolean) => {
+        for (const [key, value] of Object.entries(updates)) {
+          if (!Object.is(pendingSyncRef.current[key], value)) continue;
+          if (ok) landedSyncRef.current.set(key, value);
+          else delete pendingSyncRef.current[key];
+        }
+      };
       // Server-side merge: concurrent per-field syncs (lobby sliders, mode
       // info, overlay appearance) must not clobber each other.
       if (!sessionRef.current) {
         const merged = buildSessionSettings(settingsRef.current, updates);
-        void saveSessionSettings(merged).catch((err) => {
+        void saveSessionSettings(merged).then(
+          () => settle(true),
+          (err) => {
+            settle(false);
+            console.error(
+              "[StreamControl] Failed to sync settings to Convex",
+              err,
+            );
+            toast.error("Failed to save stream settings");
+          },
+        );
+        return;
+      }
+      void mergeSettingsMut({ settings: updates }).then(
+        () => settle(true),
+        (err) => {
+          settle(false);
           console.error(
             "[StreamControl] Failed to sync settings to Convex",
             err,
           );
           toast.error("Failed to save stream settings");
-        });
-        return;
-      }
-      void mergeSettingsMut({ settings: updates }).catch((err) => {
-        console.error("[StreamControl] Failed to sync settings to Convex", err);
-        toast.error("Failed to save stream settings");
-      });
+        },
+      );
     },
     [
       buildSessionSettings,
@@ -753,11 +825,175 @@ export function ControlShell() {
 
   const [activeTab, setActiveTab] = useState<ControlTabId>("spin");
 
-  // Tell the lobby which mode's info to show (Scenes is not a mode).
+  const rawSessionSettings =
+    (session?.settings as Record<string, unknown> | undefined) ?? null;
+  const { theme: overlayTheme, setTheme: setOverlayTheme } = useOverlayTheme(
+    rawSessionSettings,
+    syncSessionSettings,
+  );
+
+  // Tell the lobby which mode's info to show (Look/Settings are not modes).
   useEffect(() => {
-    if (activeTab === "settings" || !initialized) return;
+    if (NON_MODE_TABS.has(activeTab) || !initialized) return;
     syncSessionSettings({ lobbyInfoMode: activeTab });
   }, [activeTab, initialized, syncSessionSettings]);
+
+  const apiKey = viewer?.apiKey;
+  const controlApi = useMemo<StreamControlApi>(() => {
+    const pageOrigin =
+      typeof window !== "undefined" ? window.location.origin : "";
+    const obsUrl = apiKey
+      ? `${pageOrigin}/single-cat-stream/obs?key=${apiKey}`
+      : null;
+    const fallbackCommand =
+      (session?.currentCommand as
+        | {
+            type?: string;
+            params?: unknown;
+          }
+        | undefined) ?? undefined;
+    const hasWheelSource = Boolean(
+      fallbackCommand?.type === "spin" && fallbackCommand.params !== undefined,
+    );
+    const commandBusy =
+      spinning || wheelSpinning || sceneCommandPending !== null;
+    const activeScene = getActiveStreamScene(session);
+    const sessionCommand = session?.currentCommand;
+    const currentBatchCommand =
+      sessionCommand?.type === "batch" && sessionCommand.batch
+        ? {
+            ...(sessionCommand.batch as BatchStreamCommand),
+            seq: sessionCommand.seq,
+          }
+        : null;
+    const batchLiveState = session?.batchState ?? null;
+
+    return {
+      testMode: Boolean(session?.testMode),
+      obsUrl,
+      activeScene,
+      onAirLabel: describeOnAir(session),
+      commandBusy,
+      hasWheelSource,
+      generatorReady,
+      settings,
+      updateSettings,
+      syncSessionSettings,
+      variants,
+      handleVariantSelect,
+      paletteDisplayMode,
+      setPaletteDisplayMode,
+      spinning,
+      wheelSpinning,
+      countdownSeconds,
+      setCountdownSeconds,
+      handleSpin,
+      handleWheelSpin,
+      resultAutoClearEnabled,
+      setResultAutoClearEnabled,
+      resultAutoClearSeconds,
+      setResultAutoClearSeconds,
+      runLobbyScene: () => void runSceneCommand("Lobby", () => showLobbyMut()),
+      runBrbScene: () => void runSceneCommand("BRB", () => showBrbMut()),
+      runTestScene: () =>
+        void runSceneCommand("Test", () => toggleTestModeMut()),
+      runClearScene: () =>
+        void runSceneCommand("Clear", () => clearOverlayMut()),
+      lobbyMode,
+      setLobbyMode,
+      lobbyCatCount,
+      setLobbyCatCount,
+      lobbyMoveSpeed,
+      setLobbyMoveSpeed,
+      lobbySwapSpeed,
+      setLobbySwapSpeed,
+      lobbyCatMinSize,
+      setLobbyCatMinSize,
+      lobbyCatMaxSize,
+      setLobbyCatMaxSize,
+      lobbyAutoClearSeconds,
+      setLobbyAutoClearSeconds,
+      clearLobbyCats: () =>
+        syncSessionSettings({ lobbyClearSeq: ++clearSeqRef.current }),
+      brbSettingsCode,
+      brbSettingsDraft,
+      setBrbSettingsDraft,
+      saveBrbSettingsCode,
+      shareLink,
+      currentSlug,
+      currentProfileId,
+      hasTint,
+      lastResultRef,
+      handleDownload,
+      exportCat,
+      catNameDraft,
+      setCatNameDraft,
+      creatorNameDraft,
+      setCreatorNameDraft,
+      metaDirty,
+      setMetaDirty,
+      handleSaveMeta,
+      historySaving,
+      metaSaving,
+      currentBatchCommand,
+      batchLiveState,
+      rawSessionSettings,
+      overlayTheme,
+      setOverlayTheme,
+      activeTab,
+      setActiveTab,
+      previewContainerRef,
+    };
+  }, [
+    apiKey,
+    session,
+    spinning,
+    wheelSpinning,
+    sceneCommandPending,
+    generatorReady,
+    settings,
+    updateSettings,
+    syncSessionSettings,
+    variants,
+    handleVariantSelect,
+    paletteDisplayMode,
+    countdownSeconds,
+    handleSpin,
+    handleWheelSpin,
+    resultAutoClearEnabled,
+    resultAutoClearSeconds,
+    runSceneCommand,
+    showLobbyMut,
+    showBrbMut,
+    toggleTestModeMut,
+    clearOverlayMut,
+    lobbyMode,
+    lobbyCatCount,
+    lobbyMoveSpeed,
+    lobbySwapSpeed,
+    lobbyCatMinSize,
+    lobbyCatMaxSize,
+    lobbyAutoClearSeconds,
+    brbSettingsCode,
+    brbSettingsDraft,
+    saveBrbSettingsCode,
+    shareLink,
+    currentSlug,
+    currentProfileId,
+    hasTint,
+    handleDownload,
+    exportCat,
+    catNameDraft,
+    creatorNameDraft,
+    metaDirty,
+    handleSaveMeta,
+    historySaving,
+    metaSaving,
+    rawSessionSettings,
+    overlayTheme,
+    setOverlayTheme,
+    activeTab,
+  ]);
 
   // Auth gate
   if (authLoading) {
@@ -789,158 +1025,90 @@ export function ControlShell() {
     );
   }
 
-  const apiKey = viewer?.apiKey;
-  const pageOrigin =
-    typeof window !== "undefined" ? window.location.origin : "";
-  const obsUrl = apiKey
-    ? `${pageOrigin}/single-cat-stream/obs?key=${apiKey}`
-    : null;
-  const fallbackCommand =
-    (session?.currentCommand as
-      | {
-          type?: string;
-          params?: unknown;
-        }
-      | undefined) ?? undefined;
-  const hasWheelSource = Boolean(
-    fallbackCommand?.type === "spin" && fallbackCommand.params !== undefined,
-  );
-  const commandBusy = spinning || wheelSpinning || sceneCommandPending !== null;
-  const activeScene = getActiveStreamScene(session);
-  const sessionCommand = session?.currentCommand;
-  const currentBatchCommand =
-    sessionCommand?.type === "batch" && sessionCommand.batch
-      ? {
-          ...(sessionCommand.batch as BatchStreamCommand),
-          seq: sessionCommand.seq,
-        }
-      : null;
-  const batchLiveState = session?.batchState ?? null;
-
-  const controlApi: StreamControlApi = {
-    testMode: Boolean(session?.testMode),
-    obsUrl,
-    activeScene,
-    commandBusy,
-    hasWheelSource,
-    generatorReady,
-    settings,
-    updateSettings,
-    syncSessionSettings,
-    variants,
-    handleVariantSelect,
-    paletteDisplayMode,
-    setPaletteDisplayMode,
-    spinning,
-    wheelSpinning,
-    countdownSeconds,
-    setCountdownSeconds,
-    handleSpin,
-    handleWheelSpin,
-    resultAutoClearEnabled,
-    setResultAutoClearEnabled,
-    resultAutoClearSeconds,
-    setResultAutoClearSeconds,
-    runLobbyScene: () => void runSceneCommand("Lobby", () => showLobbyMut()),
-    runBrbScene: () => void runSceneCommand("BRB", () => showBrbMut()),
-    runTestScene: () => void runSceneCommand("Test", () => toggleTestModeMut()),
-    runClearScene: () => void runSceneCommand("Clear", () => clearOverlayMut()),
-    lobbyMode,
-    setLobbyMode,
-    lobbyCatCount,
-    setLobbyCatCount,
-    lobbyMoveSpeed,
-    setLobbyMoveSpeed,
-    lobbySwapSpeed,
-    setLobbySwapSpeed,
-    lobbyCatMinSize,
-    setLobbyCatMinSize,
-    lobbyCatMaxSize,
-    setLobbyCatMaxSize,
-    lobbyAutoClearSeconds,
-    setLobbyAutoClearSeconds,
-    clearLobbyCats: () =>
-      syncSessionSettings({ lobbyClearSeq: ++clearSeqRef.current }),
-    brbSettingsCode,
-    brbSettingsDraft,
-    setBrbSettingsDraft,
-    saveBrbSettingsCode,
-    shareLink,
-    currentSlug,
-    currentProfileId,
-    hasTint,
-    lastResultRef,
-    handleDownload,
-    exportCat,
-    catNameDraft,
-    setCatNameDraft,
-    creatorNameDraft,
-    setCreatorNameDraft,
-    metaDirty,
-    setMetaDirty,
-    handleSaveMeta,
-    historySaving,
-    metaSaving,
-    currentBatchCommand,
-    batchLiveState,
-    rawSessionSettings:
-      (session?.settings as Record<string, unknown> | undefined) ?? null,
-    previewContainerRef,
-  };
-
   return (
     <StreamControlContext.Provider value={controlApi}>
-      <div className="space-y-6">
-        <StatusBar />
-        <div className="grid items-start gap-6 lg:grid-cols-2">
-          <div className="min-w-0">
-            {/* Tab strip */}
-            <div
-              role="tablist"
-              aria-label="Stream control sections"
-              className="mb-4 inline-flex items-center gap-1 rounded-xl border border-border/40 bg-background/60 p-1"
-            >
-              {TABS.map((tab) => (
-                <button
-                  type="button"
-                  role="tab"
-                  key={tab.id}
-                  aria-selected={activeTab === tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition",
-                    activeTab === tab.id
-                      ? "bg-amber-600 text-white shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
+      <MotionConfig reducedMotion="user">
+        <div className="space-y-6">
+          <StatusBar />
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
+            <div className="min-w-0">
+              <p className="section-eyebrow mb-2.5">Controls</p>
+              {/* Tab strip */}
+              <div
+                role="tablist"
+                aria-label="Stream control sections"
+                className="mb-4 flex max-w-full flex-wrap items-center gap-1 rounded-xl border border-border/40 bg-background/60 p-1 sm:inline-flex"
+              >
+                {TABS.map((tab) => {
+                  const selected = activeTab === tab.id;
+                  return (
+                    <motion.button
+                      type="button"
+                      role="tab"
+                      key={tab.id}
+                      id={`control-tab-${tab.id}`}
+                      aria-selected={selected}
+                      aria-controls={`control-panel-${tab.id}`}
+                      onClick={() => setActiveTab(tab.id)}
+                      whileTap={{ scale: 0.97 }}
+                      className={cn(
+                        "relative inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-colors",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70",
+                        selected
+                          ? "text-white"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {selected ? (
+                        <motion.span
+                          layoutId="control-tab-pill"
+                          aria-hidden="true"
+                          className="absolute inset-0 rounded-lg bg-amber-600 shadow-sm shadow-amber-900/30"
+                          transition={{
+                            type: "spring",
+                            bounce: 0.18,
+                            duration: 0.38,
+                          }}
+                        />
+                      ) : null}
+                      <tab.icon className="relative size-3.5" />
+                      <span className="relative">{tab.label}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              {/* Panels stay mounted so drafts and sliders keep their state */}
+              {(
+                [
+                  ["spin", <SpinPanel key="spin" />],
+                  ["evolution", <EvolutionPanel key="evolution" />],
+                  ["batch", <BatchPanel key="batch" />],
+                  ["look", <LookPanel key="look" />],
+                  ["settings", <SettingsPanel key="settings" />],
+                ] as const
+              ).map(([id, panel]) => (
+                <motion.div
+                  key={id}
+                  id={`control-panel-${id}`}
+                  role="tabpanel"
+                  aria-labelledby={`control-tab-${id}`}
+                  initial={false}
+                  animate={activeTab === id ? "show" : "hide"}
+                  variants={PANEL_VARIANTS}
                 >
-                  <tab.icon className="size-3.5" />
-                  {tab.label}
-                </button>
+                  {panel}
+                </motion.div>
               ))}
             </div>
 
-            {/* Panels stay mounted so drafts and sliders keep their state */}
-            <div className={cn(activeTab !== "spin" && "hidden")}>
-              <SpinPanel />
-            </div>
-            <div className={cn(activeTab !== "evolution" && "hidden")}>
-              <EvolutionPanel />
-            </div>
-            <div className={cn(activeTab !== "batch" && "hidden")}>
-              <BatchPanel />
-            </div>
-            <div className={cn(activeTab !== "settings" && "hidden")}>
-              <SettingsPanel />
-            </div>
+            <PreviewCard />
           </div>
 
-          <PreviewCard />
+          {/* Full-width live elimination board — visible on every tab */}
+          <BatchCullBoard />
         </div>
-
-        {/* Full-width live elimination board — visible on every tab */}
-        <BatchCullBoard />
-      </div>
+      </MotionConfig>
     </StreamControlContext.Provider>
   );
 }

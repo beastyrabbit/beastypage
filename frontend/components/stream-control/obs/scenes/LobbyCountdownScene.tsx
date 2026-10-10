@@ -2,6 +2,7 @@
 
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import { type LobbySettings, OBSLobby } from "../../OBSLobby";
+import { OBS_PANEL_STYLE, obsAccentAlpha } from "../themes/panelStyle";
 
 interface LobbyCountdownSceneProps {
   lobbySettings: LobbySettings;
@@ -10,6 +11,8 @@ interface LobbyCountdownSceneProps {
   countdownPreview: string | null;
   countdownValue: number;
   spinBoardVisible: boolean;
+  /** Classic shows its board/layer-bar previews behind the countdown; other themes have no such panels. */
+  showBoardPreview?: boolean;
 }
 
 /**
@@ -23,6 +26,7 @@ export function LobbyCountdownScene({
   countdownPreview,
   countdownValue,
   spinBoardVisible,
+  showBoardPreview = true,
 }: Readonly<LobbyCountdownSceneProps>) {
   return (
     <div className="relative" style={{ width: "1920px", height: "1080px" }}>
@@ -110,17 +114,17 @@ export function LobbyCountdownScene({
                 style={{
                   fontSize: countdownValue === 0 ? "220px" : "300px",
                   fontWeight: 900,
-                  color: countdownValue === 0 ? "#22c55e" : "#fbbf24",
+                  color: countdownValue === 0 ? "#22c55e" : "var(--obs-accent)",
                   textShadow:
                     countdownValue === 0
                       ? "0 0 100px rgba(34,197,94,0.6), 0 4px 30px rgba(0,0,0,0.7)"
-                      : "0 0 80px rgba(251,191,36,0.5), 0 4px 30px rgba(0,0,0,0.7)",
+                      : `0 0 80px ${obsAccentAlpha(0.5)}, 0 4px 30px rgba(0,0,0,0.7)`,
                   lineHeight: 1,
                   animation:
                     countdownValue === 0
                       ? "countdown-go 0.6s ease-out"
                       : "countdown-pop 0.8s ease-out",
-                  fontFamily: "'Geist Mono', ui-monospace, monospace",
+                  fontFamily: "var(--obs-font-mono)",
                 }}
               >
                 {countdownValue === 0 ? "GO!" : countdownValue}
@@ -135,13 +139,8 @@ export function LobbyCountdownScene({
                 top: "20px",
                 width: "510px",
                 bottom: "220px",
-                background:
-                  "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
-                borderRadius: "20px",
-                border: "2px solid rgba(245, 158, 11, 0.2)",
-                boxShadow:
-                  "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
-                opacity: spinBoardVisible ? 1 : 0,
+                ...OBS_PANEL_STYLE,
+                opacity: showBoardPreview && spinBoardVisible ? 1 : 0,
                 transition: "opacity 3s ease-in-out",
               }}
             >
@@ -149,7 +148,7 @@ export function LobbyCountdownScene({
                 className="flex items-center justify-center"
                 style={{
                   height: "100px",
-                  borderBottom: "1px solid rgba(245, 158, 11, 0.1)",
+                  borderBottom: `1px solid ${obsAccentAlpha(0.1)}`,
                   padding: "20px 28px",
                 }}
               >
@@ -166,14 +165,11 @@ export function LobbyCountdownScene({
                 left: "20px",
                 bottom: "20px",
                 right: "20px",
-                background:
-                  "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 50%, rgba(10,10,10,0.92) 100%)",
-                borderRadius: "16px",
-                border: "2px solid rgba(245, 158, 11, 0.2)",
-                boxShadow:
-                  "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+                ...OBS_PANEL_STYLE,
+                // Classic: 16px (20px × 0.8); square themes stay square.
+                borderRadius: "calc(var(--obs-panel-radius) * 0.8)",
                 padding: "14px 32px",
-                opacity: spinBoardVisible ? 1 : 0,
+                opacity: showBoardPreview && spinBoardVisible ? 1 : 0,
                 transition: "opacity 3s ease-in-out",
               }}
             >

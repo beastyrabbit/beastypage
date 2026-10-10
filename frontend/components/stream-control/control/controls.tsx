@@ -39,7 +39,12 @@ export function SliderControl({
         >
           {label}
         </label>
-        <span className="tabular-nums text-sm font-semibold text-foreground">
+        <span
+          className={cn(
+            "tabular-nums text-sm font-semibold transition-colors duration-150",
+            disabled ? "text-muted-foreground/50" : "text-foreground",
+          )}
+        >
           {format(value)}
         </span>
       </div>
@@ -91,6 +96,7 @@ export function ToggleControl({
         onClick={() => onChange(!checked)}
         className={cn(
           "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70",
           checked
             ? "border-amber-500/60 bg-amber-500/20"
             : "border-border/50 bg-muted/40",
