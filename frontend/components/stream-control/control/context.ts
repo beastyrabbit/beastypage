@@ -7,10 +7,13 @@ import type {
 } from "@/lib/adoption/streamBatch";
 import type { SingleCatSettings } from "@/utils/singleCatVariants";
 import type { useVariants } from "@/utils/variants";
+import type { OverlayThemeId } from "../obs/themes/themeMeta";
 import type { StreamSceneButtonId } from "../sceneState";
 import type { LobbyMode } from "./helpers";
 
 type VariantsApi = ReturnType<typeof useVariants<SingleCatSettings>>;
+
+export type ControlTabId = "spin" | "evolution" | "batch" | "look" | "settings";
 
 export interface StreamControlLastResult {
   canvas: HTMLCanvasElement | OffscreenCanvas;
@@ -32,6 +35,8 @@ export interface StreamControlApi {
   testMode: boolean;
   obsUrl: string | null;
   activeScene: StreamSceneButtonId | null;
+  /** What the overlay is showing right now ("Lobby", "Spin", …), or null when idle. */
+  onAirLabel: string | null;
   commandBusy: boolean;
   hasWheelSource: boolean;
   generatorReady: boolean;
@@ -110,6 +115,14 @@ export interface StreamControlApi {
 
   // Raw session settings snapshot — for panels with their own synced fields
   rawSessionSettings: Record<string, unknown> | null;
+
+  // Overlay look (session setting `overlayTheme`)
+  overlayTheme: OverlayThemeId;
+  setOverlayTheme: (id: OverlayThemeId) => void;
+
+  // Tabs — so the status bar can jump to a panel
+  activeTab: ControlTabId;
+  setActiveTab: (tab: ControlTabId) => void;
 
   // Preview
   previewContainerRef: RefObject<HTMLDivElement | null>;

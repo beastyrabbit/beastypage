@@ -11,7 +11,6 @@ import {
 } from "../../OBSClassicWheel";
 import { QrBadge } from "../QrBadge";
 import {
-  DISPLAY_SIZE,
   LAYER_GROUPS,
   LAYER_PARAM_IDS,
   type LayerGroup,
@@ -22,6 +21,8 @@ import {
   type WheelRewardState,
 } from "../spinSupport";
 import { SPREAD_CANVAS, SPREAD_REGIONS } from "../spreadLayout";
+import { CatCanvas } from "../themes/CatCanvas";
+import { OBS_PANEL_STYLE, obsAccentAlpha } from "../themes/panelStyle";
 
 interface SpinBoardProps {
   spinVisible: boolean;
@@ -53,7 +54,7 @@ const flapChars = `${Presets.ALPHANUM} .-()_/•–:`;
 const boardSlots = PARAM_SEQUENCE.filter((def) => !LAYER_PARAM_IDS.has(def.id));
 
 const LAYER_ROW_BORDER_COLOR: Record<LayerRowState["status"], string> = {
-  active: "#f59e0b",
+  active: "var(--obs-accent)",
   revealed: "#3f3f46",
   idle: "rgba(113,113,122,0.3)",
 };
@@ -71,7 +72,7 @@ const LAYER_ROW_VALUE_CLASS: Record<LayerRowState["status"], string> = {
 };
 
 function boardRowBorderLeft(isActive: boolean, isPending: boolean): string {
-  if (isActive) return "3px solid #f59e0b";
+  if (isActive) return "3px solid var(--obs-accent)";
   if (isPending) return "3px solid rgba(113,113,122,0.3)";
   return "3px solid transparent";
 }
@@ -96,8 +97,11 @@ function RollerStatus({
       <>
         <div className="flex items-center gap-2.5">
           <div
-            className="size-2 rounded-full bg-amber-500"
-            style={{ animation: "obs-dot-pulse 1s ease-in-out infinite" }}
+            className="size-2 rounded-full"
+            style={{
+              background: "var(--obs-accent)",
+              animation: "obs-dot-pulse 1s ease-in-out infinite",
+            }}
           />
           <span className="text-xs font-bold uppercase tracking-[0.3em] text-amber-500/60">
             {rollerLabel}
@@ -117,9 +121,8 @@ function RollerStatus({
         <span
           className="text-lg font-black uppercase tracking-[0.3em]"
           style={{
-            color: "#f59e0b",
-            textShadow:
-              "0 0 12px rgba(245,158,11,0.5), 0 0 24px rgba(245,158,11,0.25)",
+            color: "var(--obs-accent)",
+            textShadow: `0 0 12px ${obsAccentAlpha(0.5)}, 0 0 24px ${obsAccentAlpha(0.25)}`,
             animation: "obs-done-pulse 2s ease-in-out infinite",
           }}
         >
@@ -175,7 +178,7 @@ export function SpinBoard({
     wheelReward.status === "spinning"
       ? "???"
       : (wheelReward.prize?.prizeName ?? "");
-  const wheelPrizeColor = wheelReward.prize?.color ?? "#f59e0b";
+  const wheelPrizeColor = wheelReward.prize?.color ?? "var(--obs-accent)";
 
   // Spread mode gives every element its own separated region (50px gutters,
   // canvas larger than full HD) so each one can be cropped in OBS — see
@@ -229,6 +232,9 @@ export function SpinBoard({
         transition: "opacity 1.5s ease-in-out",
       }}
     >
+      {/* Keyframe colours stay literal amber: SpinBoard only renders under
+          the classic theme, and var() inside keyframe text-shadows is not
+          resolved consistently across browser-source engines. */}
       <style>{`
         @keyframes obs-dot-pulse {
           0%, 100% { opacity: 0.4; transform: scale(0.8); }
@@ -246,7 +252,7 @@ export function SpinBoard({
           border: 1px solid #27272a !important;
           border-radius: 4px !important;
           margin-right: 2px !important;
-          font-family: 'Geist Mono', ui-monospace, monospace !important;
+          font-family: var(--obs-font-mono) !important;
           font-weight: 700 !important;
           box-shadow: 0 1px 3px rgba(0,0,0,0.4) !important;
           text-shadow: 0 1px 2px rgba(0,0,0,0.8), 0 0 4px rgba(0,0,0,0.5) !important;
@@ -300,16 +306,7 @@ export function SpinBoard({
           transition: "opacity 360ms ease",
         }}
       >
-        <canvas
-          ref={canvasRef}
-          width={DISPLAY_SIZE}
-          height={DISPLAY_SIZE}
-          style={{
-            width: "720px",
-            height: "720px",
-            imageRendering: "pixelated",
-          }}
-        />
+        <CatCanvas canvasRef={canvasRef} cssSize={720} />
       </div>
 
       {/* Share QR — bottom-left of the cat zone once the result is saved */}
@@ -336,9 +333,8 @@ export function SpinBoard({
             className="flex min-w-[320px] items-center justify-center gap-3 rounded-2xl border px-5 py-3"
             style={{
               background: "rgba(12, 10, 6, 0.92)",
-              borderColor: "rgba(245, 158, 11, 0.28)",
-              boxShadow:
-                "0 14px 40px rgba(0,0,0,0.45), 0 0 30px rgba(245,158,11,0.08)",
+              borderColor: obsAccentAlpha(0.28),
+              boxShadow: `0 14px 40px rgba(0,0,0,0.45), 0 0 30px ${obsAccentAlpha(0.08)}`,
             }}
           >
             <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-zinc-400">
@@ -362,12 +358,11 @@ export function SpinBoard({
         className="absolute z-10 overflow-hidden"
         style={{
           ...layerBarPosition,
+          ...OBS_PANEL_STYLE,
+          // The bar is wide, so classic shades it horizontally.
           background:
             "linear-gradient(90deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 50%, rgba(10,10,10,0.92) 100%)",
           borderRadius: "16px",
-          border: "2px solid rgba(245, 158, 11, 0.2)",
-          boxShadow:
-            "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
           padding: "14px 0",
         }}
       >
@@ -433,19 +428,14 @@ export function SpinBoard({
         className="absolute flex flex-col overflow-hidden"
         style={{
           ...boardPosition,
-          background:
-            "linear-gradient(180deg, rgba(10,10,10,0.92) 0%, rgba(15,12,5,0.90) 100%)",
-          borderRadius: "20px",
-          border: "2px solid rgba(245, 158, 11, 0.2)",
-          boxShadow:
-            "0 0 60px rgba(245, 158, 11, 0.06), inset 0 1px 0 rgba(245, 158, 11, 0.08)",
+          ...OBS_PANEL_STYLE,
         }}
       >
         {/* Roller — current spinning param */}
         <div
           style={{
             height: "100px",
-            borderBottom: "1px solid rgba(245, 158, 11, 0.1)",
+            borderBottom: `1px solid ${obsAccentAlpha(0.1)}`,
             padding: "20px 28px",
           }}
         >
@@ -503,9 +493,7 @@ export function SpinBoard({
                 style={{
                   padding: "8px 24px",
                   borderLeft: boardRowBorderLeft(isActive, isPending),
-                  background: isActive
-                    ? "rgba(245,158,11,0.05)"
-                    : "transparent",
+                  background: isActive ? obsAccentAlpha(0.05) : "transparent",
                 }}
               >
                 <span
@@ -536,7 +524,7 @@ export function SpinBoard({
               style={{
                 marginInline: "24px",
                 paddingInline: "0px",
-                borderColor: "rgba(245, 158, 11, 0.12)",
+                borderColor: obsAccentAlpha(0.12),
               }}
             >
               <span

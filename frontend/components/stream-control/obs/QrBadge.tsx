@@ -1,6 +1,7 @@
 "use client";
 
 import { QRCodeSVG } from "qrcode.react";
+import { obsAccentAlpha } from "./themes/panelStyle";
 
 interface QrBadgeProps {
   url: string;
@@ -32,9 +33,8 @@ export function QrBadge({
         className="flex flex-col items-center gap-2 rounded-2xl border px-4 pb-3 pt-4"
         style={{
           background: "rgba(250, 250, 249, 0.97)",
-          borderColor: "rgba(245, 158, 11, 0.45)",
-          boxShadow:
-            "0 14px 40px rgba(0,0,0,0.45), 0 0 30px rgba(245,158,11,0.10)",
+          borderColor: obsAccentAlpha(0.45),
+          boxShadow: `0 14px 40px rgba(0,0,0,0.45), 0 0 30px ${obsAccentAlpha(0.1)}`,
         }}
       >
         <QRCodeSVG

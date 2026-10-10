@@ -11,8 +11,18 @@
  * pure helpers live in ./spinSupport, dispatch decisions in ./commandPolicy.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CatGeneratorApi } from "@/components/cat-builder/types";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type {
+  SpriteMapperApi as CatBuilderSpriteMapperApi,
+  CatGeneratorApi,
+} from "@/components/cat-builder/types";
 import {
   type BatchStreamCommand,
   parseBatchStreamCommand,
@@ -21,7 +31,11 @@ import {
   catDataToLegacyPersistence,
   syncChangedRegistryTraitsFromLegacy,
 } from "@/lib/cat-system";
-import { DEFAULT_POSE_NAME, formatPoseName } from "@/lib/cat-v3/poseOptions";
+import {
+  DEFAULT_POSE_NAME,
+  formatPoseName,
+  poseNameForLegacySpriteNumber,
+} from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
   type EvolutionStreamCommand,
@@ -73,7 +87,6 @@ import { BatchScene } from "./scenes/BatchScene";
 import { BrbScene } from "./scenes/BrbScene";
 import { EvolutionScene } from "./scenes/EvolutionScene";
 import { LobbyCountdownScene } from "./scenes/LobbyCountdownScene";
-import { SpinBoard } from "./scenes/SpinBoard";
 import { TestCard } from "./scenes/TestCard";
 import {
   applyParamValue,
@@ -135,6 +148,14 @@ import {
   type WheelRewardState,
   wait,
 } from "./spinSupport";
+import { OVERLAY_THEMES } from "./themes/registry";
+import {
+  OVERLAY_THEME_META,
+  resolveOverlaySpread,
+  resolveOverlayTheme,
+  themeTokensToCssVars,
+} from "./themes/themeMeta";
+import { useSpriteAnchors } from "./themes/useSpriteAnchors";
 import { useObsSession } from "./useObsSession";
 
 type TortieStageKind = "mask" | "pattern" | "colour";
@@ -368,20 +389,30 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     return Math.max(MIN_SAFE_STEP_MS, baseDelay / speedMultiplierRef.current);
   }, []);
 
+  // Rendered mirrors of the timing refs, for themed scenes (track times).
+  const [paramDurations, setParamDurations] = useState<
+    Partial<Record<ParamTimingKey, number>>
+  >({});
+  const [totalDurationMs, setTotalDurationMs] = useState(0);
+
   const resetActualDurations = useCallback(() => {
     actualDurationsRef.current = {};
     totalActualRef.current = 0;
+    setParamDurations({});
+    setTotalDurationMs(0);
   }, []);
 
   const addActualDuration = useCallback(
     (key: ParamTimingKey | null, deltaMs: number) => {
       if (!Number.isFinite(deltaMs) || deltaMs <= 0) return;
       totalActualRef.current += deltaMs;
+      setTotalDurationMs(totalActualRef.current);
       if (!key) return;
       actualDurationsRef.current = {
         ...actualDurationsRef.current,
         [key]: (actualDurationsRef.current[key] ?? 0) + deltaMs,
       };
+      setParamDurations(actualDurationsRef.current);
     },
     [],
   );
@@ -451,7 +482,19 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   );
   const [_rollerHighlight, setRollerHighlight] = useState(false);
   const [paramRows, setParamRows] = useState<ParamRow[]>([]);
-  const [_activeParamId, setActiveParamId] = useState<ParamId | null>(null);
+  const [activeParamId, setActiveParamId] = useState<ParamId | null>(null);
+  const [activeParamStartedAt, setActiveParamStartedAt] = useState<
+    number | null
+  >(null);
+  // Pose/mirroring of the cat currently on the canvas (feeds sprite anchors).
+  const [drawnPoseName, setDrawnPoseName] = useState(DEFAULT_POSE_NAME);
+  const [drawnReverse, setDrawnReverse] = useState(false);
+  const anchors = useSpriteAnchors(drawnPoseName, drawnReverse);
+  // Last image drawn into the engine canvas, replayed when a theme swap
+  // mounts a different scene's <canvas>.
+  const lastSourceRef = useRef<HTMLCanvasElement | OffscreenCanvas | null>(
+    null,
+  );
   const [wheelReward, setWheelReward] = useState<WheelRewardState>({
     status: "hidden",
     prize: null,
@@ -984,6 +1027,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   }, []);
 
   const drawPlaceholder = useCallback(() => {
+    lastSourceRef.current = null;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -1001,6 +1045,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   const drawCanvas = useCallback(
     (source?: HTMLCanvasElement | OffscreenCanvas) => {
       if (!source) return;
+      lastSourceRef.current = source;
       const target = canvasRef.current;
       if (!target) return;
       const ctx = target.getContext("2d");
@@ -1067,14 +1112,24 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     [],
   );
 
+  const syncDrawnPose = useCallback((params: Partial<CatParams>) => {
+    setDrawnPoseName(
+      params.poseName ??
+        poseNameForLegacySpriteNumber(params.spriteNumber) ??
+        DEFAULT_POSE_NAME,
+    );
+    setDrawnReverse(Boolean(params.reverse));
+  }, []);
+
   const renderCat = useCallback(
     async (params: Partial<CatParams>) => {
       const generator = generatorRef.current;
       if (!generator) return;
       const result = await generator.generateCat(params);
       drawCanvas(result.canvas as HTMLCanvasElement);
+      syncDrawnPose(params);
     },
-    [drawCanvas],
+    [drawCanvas, syncDrawnPose],
   );
 
   const resetWheelOverlay = useCallback(() => {
@@ -1128,6 +1183,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
             id: def.id,
             label: def.label,
             value: getParameterValueForDisplay(def.id, params),
+            raw: getParameterRawValue(def.id, params),
             status: "revealed" as const,
           }),
         ),
@@ -1161,6 +1217,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       setFlashParamId(null);
       setFlashLayerKey(null);
       setActiveParamId(null);
+      setActiveParamStartedAt(null);
       setHasTint(Boolean(params.darkForest || params.darkMode || params.dead));
 
       catStateRef.current = {
@@ -2506,6 +2563,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     setRollerHighlight(false);
     setRollSummary(null);
     setActiveParamId(null);
+    setActiveParamStartedAt(null);
     setHasTint(false);
     setSpinDone(false);
     resetWheelOverlay();
@@ -2707,6 +2765,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         const rawTargetValue = getParameterRawValue(definition.id, params);
         const displayValue = getParameterValueForDisplay(definition.id, params);
         setActiveParamId(definition.id);
+        setActiveParamStartedAt(paramStart);
 
         // Flash the row before activating it
         setFlashParamId(definition.id);
@@ -2873,6 +2932,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
                   ? {
                       ...row,
                       value: step.isFinal ? frameDisplay : row.value,
+                      raw: step.isFinal ? step.frame.option.raw : row.raw,
                       status: step.isFinal ? "revealed" : "active",
                     }
                   : row,
@@ -2897,12 +2957,14 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
             definition.id,
             finalFrame.option.raw,
           );
+          syncDrawnPose(progressiveParams);
           setParamRows((prev) =>
             prev.map((row) =>
               row.id === definition.id
                 ? {
                     ...row,
                     value: finalFrame.option.display,
+                    raw: finalFrame.option.raw,
                     status: "revealed",
                   }
                 : row,
@@ -2917,7 +2979,12 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
           setParamRows((prev) =>
             prev.map((row) =>
               row.id === definition.id
-                ? { ...row, value: displayValue, status: "revealed" }
+                ? {
+                    ...row,
+                    value: displayValue,
+                    raw: rawTargetValue,
+                    status: "revealed",
+                  }
                 : row,
             ),
           );
@@ -2946,9 +3013,12 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         const paramEnd =
           typeof performance !== "undefined" ? performance.now() : Date.now();
         addActualDuration(paramKey, paramEnd - paramStart);
+        setActiveParamId(null);
+        setActiveParamStartedAt(null);
       }
 
       setActiveParamId(null);
+      setActiveParamStartedAt(null);
       setRollerActiveValue(null);
       setRollerLabel(null);
 
@@ -3201,6 +3271,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     afterlifeMode,
     drawCanvas,
     renderCat,
+    syncDrawnPose,
     scarRange,
     tortieRange,
     resetLayerRows,
@@ -3510,7 +3581,11 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   const { obsBgMode, obsBgColour, obsBgOpacity } = resolveObsBackgroundSettings(
     sessionSettingsRecord,
   );
-  const obsLayoutSpread = sessionSettingsRecord?.obsLayoutMode === "spread";
+  const overlayTheme = resolveOverlayTheme(sessionSettingsRecord);
+  const obsLayoutSpread = resolveOverlaySpread(
+    sessionSettingsRecord,
+    overlayTheme,
+  );
   useEffect(() => {
     const isOBS = typeof window !== "undefined" && "obsstudio" in window;
     let background: string;
@@ -3561,6 +3636,22 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     | "evolution"
     | "batch"
   >("idle");
+  const obsPhaseRef = useRef(obsPhase);
+  useEffect(() => {
+    obsPhaseRef.current = obsPhase;
+  }, [obsPhase]);
+
+  // A theme swap mounts a different scene (and a fresh <canvas>); replay the
+  // last drawn frame into it so the cat survives the switch.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: overlayTheme is the trigger (the remounted canvas), not a value read here.
+  useEffect(() => {
+    const source = lastSourceRef.current;
+    if (source) {
+      drawCanvas(source);
+    } else if (obsPhaseRef.current === "active") {
+      drawPlaceholder();
+    }
+  }, [overlayTheme, drawCanvas, drawPlaceholder]);
   const [countdownValue, setCountdownValue] = useState(0);
   const [countdownPreview, setCountdownPreview] = useState<string | null>(null);
   const [spinDone, setSpinDone] = useState(false);
@@ -3643,6 +3734,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       setFlashParamId(null);
       setFlashLayerKey(null);
       setActiveParamId(null);
+      setActiveParamStartedAt(null);
       setCountdownPreview(null);
       setCountdownValue(0);
       setSpinBoardVisible(false);
@@ -3789,6 +3881,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
           };
           setRollerHighlight(false);
           setActiveParamId(null);
+          setActiveParamStartedAt(null);
 
           const cdSeconds = (cmd as Record<string, unknown>).countdownSeconds as
             | number
@@ -4122,9 +4215,27 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   const commandViewSlug = session?.currentCommand?.viewSlug;
   const viewUrl = buildViewUrl(commandViewSlug);
 
+  // Every scene renders inside the theme root, which carries the --obs-*
+  // tokens. Spread layouts are larger than 1920×1080, so the root never clips.
+  const themed = (scene: ReactNode) => (
+    <div
+      data-overlay-theme={overlayTheme}
+      data-obs-phase={obsPhase}
+      data-spin-done={spinDone}
+      className="relative"
+      style={{
+        ...themeTokensToCssVars(OVERLAY_THEME_META[overlayTheme].tokens),
+        width: 1920,
+        height: 1080,
+      }}
+    >
+      {scene}
+    </div>
+  );
+
   // Test mode — layout guide for OBS positioning
   if (session?.testMode) {
-    return <TestCard spread={obsLayoutSpread} />;
+    return themed(<TestCard spread={obsLayoutSpread} />);
   }
 
   // When idle (after clear), show nothing — fully transparent
@@ -4134,36 +4245,36 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
 
   // BRB mode — lobby cats without the settings panel
   if (obsPhase === "brb") {
-    return (
-      <BrbScene settings={brbLobbySettings} generator={generatorRef.current} />
+    return themed(
+      <BrbScene settings={brbLobbySettings} generator={generatorRef.current} />,
     );
   }
 
   // Evolution ceremony → lineage + QR
   if (obsPhase === "evolution" && evolutionCommand) {
-    return (
+    return themed(
       <EvolutionScene
         key={`evolution-${evolutionCommand.seq}`}
         command={evolutionCommand}
         initialPhase={evolutionInitialPhase}
-      />
+      />,
     );
   }
 
   // Batch elimination show → final grid + QR
   if (obsPhase === "batch" && batchCommand) {
-    return (
+    return themed(
       <BatchScene
         key={`batch-${batchCommand.seq}`}
         command={withLiveBatchSlug(batchCommand, session?.currentCommand)}
         liveState={session?.batchState ?? null}
         apiKey={apiKey}
-      />
+      />,
     );
   }
 
   if (obsPhase === "lobby" || obsPhase === "countdown") {
-    return (
+    return themed(
       <LobbyCountdownScene
         lobbySettings={lobbySettings}
         generator={generatorRef.current}
@@ -4171,12 +4282,14 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         countdownPreview={countdownPreview}
         countdownValue={countdownValue}
         spinBoardVisible={spinBoardVisible}
-      />
+        showBoardPreview={overlayTheme === "classic"}
+      />,
     );
   }
 
-  return (
-    <SpinBoard
+  const SpinScene = OVERLAY_THEMES[overlayTheme].SpinScene;
+  return themed(
+    <SpinScene
       canvasRef={canvasRef}
       wheelRef={wheelRef}
       spinVisible={spinVisible}
@@ -4192,6 +4305,19 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       spinDone={spinDone}
       viewUrl={viewUrl}
       spread={obsLayoutSpread}
-    />
+      theme={overlayTheme}
+      spinSeq={session?.currentCommand?.seq ?? null}
+      activeParamId={activeParamId}
+      activeParamStartedAt={activeParamStartedAt}
+      paramDurations={paramDurations}
+      totalDurationMs={totalDurationMs}
+      poseName={drawnPoseName}
+      reverse={drawnReverse}
+      anchors={anchors}
+      // mapperRef holds the full spriteMapper singleton, typed with
+      // spinSupport's narrower interface.
+      mapper={mapperRef.current as CatBuilderSpriteMapperApi | null}
+      afterlife={afterlifeMode}
+    />,
   );
 }

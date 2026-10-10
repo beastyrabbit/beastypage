@@ -79,6 +79,8 @@ export interface ParamRow {
   label: string;
   value: string;
   status: "pending" | "active" | "revealed";
+  /** Raw trait value once revealed (for colour swatches); undefined otherwise. */
+  raw?: unknown;
 }
 
 /** Param IDs that map to layer-panel rows rather than the main param board. */
