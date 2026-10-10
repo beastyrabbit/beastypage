@@ -1894,8 +1894,10 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     async (override: SpinOverride | null): Promise<PreparedSpin | null> => {
       const generator = generatorRef.current;
       if (!generator) return null;
+      const generation = generationIdRef.current;
       const mapper = await ensureMapperReady();
-      if (!mapper) return null;
+      // A clear, new command, or unmount while waiting cancels this spin.
+      if (!mapper || generationIdRef.current !== generation) return null;
 
       disposeSpinLoader();
       const loader = createSpinFrameLoader(generator);
@@ -2359,6 +2361,8 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
 
       drawCanvas(await loader.single(plan.phase("final").params));
       if (generationIdRef.current !== token) return;
+      // Every frame has been shown; release the spin's canvases.
+      if (spinLoaderRef.current === loader) disposeSpinLoader();
 
       const builderPrimaryAccessory = uniqueAccessories[0] ?? null;
       const builderPrimaryScar = uniqueScars[0] ?? null;
@@ -2601,6 +2605,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     }
   }, [
     prepareSpin,
+    disposeSpinLoader,
     afterlifeMode,
     drawCanvas,
     resetLayerRows,
@@ -3189,7 +3194,8 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
           overrideParamsRef.current = override;
           // Roll the plan and start loading every frame now, so the
           // countdown doubles as preload time.
-          preparedSpinRef.current = prepareSpin(override);
+          // A failed preparation is retried by generateCatPlus.
+          preparedSpinRef.current = prepareSpin(override).catch(() => null);
           setRollerHighlight(false);
           setActiveParamId(null);
 

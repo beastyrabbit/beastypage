@@ -90,11 +90,13 @@ export async function prepareCountReveal(
   if (!generator.generateRandomCat) return [];
   const generateRandomCat = generator.generateRandomCat.bind(generator);
 
+  // The range always covers the count it lands on, even when the cat came
+  // from settings the local range no longer matches.
   const groups = inputs
     .map((input) => ({
       ...input,
-      minCount: Math.min(input.range.min, input.range.max),
-      maxCount: Math.max(input.range.min, input.range.max),
+      minCount: Math.min(input.range.min, input.range.max, input.count),
+      maxCount: Math.max(input.range.min, input.range.max, input.count),
     }))
     .filter((group) => group.minCount !== group.maxCount);
 
