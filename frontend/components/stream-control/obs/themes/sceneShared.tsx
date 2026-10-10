@@ -100,16 +100,20 @@ export function SceneFade({
   width = 1920,
   height = 1080,
   style,
+  theme,
   children,
 }: Readonly<{
   spinVisible: boolean;
   width?: number;
   height?: number;
   style?: CSSProperties;
+  /** Lets a scene scope its `prefers-reduced-motion` rule to `[data-obs-scene="<theme>"]`. */
+  theme?: string;
   children: ReactNode;
 }>) {
   return (
     <div
+      data-obs-scene={theme}
       className="relative"
       style={{
         width: `${width}px`,

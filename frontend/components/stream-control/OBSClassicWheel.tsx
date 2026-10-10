@@ -42,6 +42,11 @@ export const OBSClassicWheel = forwardRef<
   const wheelRef = useRef<Wheel | null>(null);
   const resolveSpinRef = useRef<(() => void) | null>(null);
   const labelRingRef = useRef<SVGGElement | null>(null);
+  /** Resolve a pending spinTo promise so callers never hang when the wheel goes away. */
+  const settlePendingSpin = useCallback(() => {
+    resolveSpinRef.current?.();
+    resolveSpinRef.current = null;
+  }, []);
   const rafRef = useRef<number | null>(null);
   const clipId = useId();
 
@@ -70,6 +75,8 @@ export const OBSClassicWheel = forwardRef<
 
   const createWheel = useCallback(() => {
     if (!containerRef.current) return;
+    stopLabelLoop();
+    settlePendingSpin();
     wheelRef.current?.remove();
 
     try {
@@ -119,17 +126,19 @@ export const OBSClassicWheel = forwardRef<
       console.error("[OBSClassicWheel] Failed to create wheel instance", err);
       wheelRef.current = null;
     }
-  }, [size, skin, stopLabelLoop, syncLabels]);
+  }, [size, skin, stopLabelLoop, syncLabels, settlePendingSpin]);
 
   useEffect(() => {
     createWheel();
     return () => {
+      // A theme switch remounts the wheel mid-spin: settle the awaiting
+      // caller (the reveal continues with the banner) instead of hanging it.
       stopLabelLoop();
-      resolveSpinRef.current = null;
+      settlePendingSpin();
       wheelRef.current?.remove();
       wheelRef.current = null;
     };
-  }, [createWheel, stopLabelLoop]);
+  }, [createWheel, stopLabelLoop, settlePendingSpin]);
 
   // Static label geometry: segment centres from the prize weights, 0° at the
   // top, clockwise — the same convention spin-wheel uses for its items.
@@ -200,9 +209,7 @@ export const OBSClassicWheel = forwardRef<
         });
       },
       reset() {
-        // Resolve any pending spinTo promise before recreating
-        resolveSpinRef.current?.();
-        resolveSpinRef.current = null;
+        // createWheel settles any pending spin and stops the label loop.
         createWheel();
       },
     }),

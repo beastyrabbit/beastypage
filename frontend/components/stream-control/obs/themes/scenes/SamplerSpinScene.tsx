@@ -76,6 +76,10 @@ const TITLE_MAX = 40;
 const VALUE_MAX = 16;
 
 const KEYFRAMES = `
+@media (prefers-reduced-motion: reduce) {
+  [data-obs-scene="sampler"] * { animation: none !important; }
+}
+
 @keyframes obs-sampler-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.15; } }
 @keyframes obs-sampler-run { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -34; } }
 @keyframes obs-sampler-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -178,7 +182,7 @@ export function SamplerSpinScene(props: Readonly<SpinSceneProps>) {
   const title = `Pattern ${spinSeq ?? "—"}${name ? ` · ${name}` : ""}`;
 
   return (
-    <SceneFade spinVisible={spinVisible}>
+    <SceneFade spinVisible={spinVisible} theme="sampler">
       <style>{KEYFRAMES}</style>
 
       {/* Hoop with aida cloth; the grid origin is the cat's top-left pixel. */}

@@ -46,6 +46,10 @@ const TITLE_MAX = 30;
 const TRACK_TEXT_MAX = 30;
 
 const KEYFRAMES = `
+@media (prefers-reduced-motion: reduce) {
+  [data-obs-scene="mixtape"] * { animation: none !important; }
+}
+
 @keyframes obs-mixtape-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 @keyframes obs-mixtape-spin { to { transform: rotate(360deg); } }
 @keyframes obs-mixtape-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -103,7 +107,7 @@ export function MixtapeSpinScene(props: Readonly<SpinSceneProps>) {
   const runningTime = formatTrackTime(totalDurationMs);
 
   return (
-    <SceneFade spinVisible={spinVisible}>
+    <SceneFade spinVisible={spinVisible} theme="mixtape">
       <style>{KEYFRAMES}</style>
 
       {/* Cover */}

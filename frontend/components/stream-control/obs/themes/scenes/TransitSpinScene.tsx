@@ -38,6 +38,10 @@ const TONE_FILL: Record<LabelTone, string> = {
 };
 
 const STYLES = `
+@media (prefers-reduced-motion: reduce) {
+  [data-obs-scene="transit"] * { animation: none !important; }
+}
+
 @keyframes obs-transit-dash { to { stroke-dashoffset: -32; } }
 @keyframes obs-transit-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
@@ -205,7 +209,7 @@ export function TransitSpinScene(props: Readonly<SpinSceneProps>) {
   }, [slots, groups, activeParamId, spinDone]);
 
   return (
-    <SceneFade spinVisible={props.spinVisible}>
+    <SceneFade spinVisible={props.spinVisible} theme="transit">
       <style>{STYLES}</style>
 
       {/* Route badge */}
