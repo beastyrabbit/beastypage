@@ -51,6 +51,35 @@ export function canvasToPngBlob(canvas: CanvasExportSource): Promise<Blob> {
   });
 }
 
+const ON_AIR_LABELS: Record<string, string> = {
+  lobby: "Lobby",
+  brb: "BRB",
+  test: "Test",
+  spin: "Spin",
+  wheel: "Wheel",
+  countdown: "Countdown",
+  evolution: "Evolution",
+  batch: "Batch",
+};
+
+/** Short label for what the overlay is showing right now, or null when idle/cleared. */
+export function describeOnAir(
+  session:
+    | {
+        status?: string | null;
+        testMode?: boolean | null;
+        currentCommand?: { type?: string | null } | null;
+      }
+    | null
+    | undefined,
+): string | null {
+  if (!session) return null;
+  if (session.testMode) return "Test";
+  if (session.status !== "active") return null;
+  const type = session.currentCommand?.type;
+  return type ? (ON_AIR_LABELS[type] ?? null) : null;
+}
+
 /** Format a multiplier value like 1 -> "1x", 0.25 -> "0.25x", 2.50 -> "2.5x" */
 export function formatMultiplier(v: number): string {
   const text = v.toFixed(2);

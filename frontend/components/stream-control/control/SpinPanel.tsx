@@ -9,6 +9,7 @@ import {
   SendHorizontal,
   Sparkles,
 } from "lucide-react";
+import { motion } from "motion/react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { LayerCountModeSelector } from "@/components/common/LayerCountModeSelector";
@@ -71,25 +72,34 @@ export function SpinPanel() {
     <div className="space-y-6">
       {/* Controls */}
       <section className="rounded-2xl border border-border/40 bg-background/80 p-4 backdrop-blur">
+        <p className="section-eyebrow mb-3">Trigger</p>
         {/* Spin + sliders row */}
         <div className="mb-4 flex items-center gap-3">
-          <button
+          <motion.button
             type="button"
             onClick={handleSpin}
             disabled={commandBusy || !generatorReady}
+            whileTap={{ scale: 0.97 }}
             className={cn(
-              "inline-flex items-center gap-2 rounded-xl bg-amber-600 px-6 py-3",
-              "text-sm font-bold text-white shadow-lg shadow-amber-900/20 transition",
+              "relative inline-flex items-center gap-2 rounded-xl bg-amber-600 px-6 py-3",
+              "text-sm font-bold text-white shadow-lg shadow-amber-900/20 transition-colors",
               "hover:bg-amber-500 active:bg-amber-700 disabled:opacity-50",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             )}
           >
+            {spinning ? (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -inset-1 rounded-[14px] ring-2 ring-amber-400/60 motion-safe:animate-pulse"
+              />
+            ) : null}
             {spinning ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <Play className="size-4" />
             )}
             {spinning ? "Spinning…" : "Spin!"}
-          </button>
+          </motion.button>
           <button
             type="button"
             onClick={handleWheelSpin}
@@ -158,9 +168,7 @@ export function SpinPanel() {
 
       {/* Settings Panel */}
       <section className="rounded-2xl border border-border/40 bg-background/80 p-5 backdrop-blur">
-        <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Settings
-        </h3>
+        <h3 className="section-eyebrow mb-4">Generator</h3>
         <div className="space-y-4">
           {/* Timing Variant */}
           <div className="flex items-center gap-2">
@@ -329,9 +337,7 @@ export function SpinPanel() {
 
       {/* Links & Actions */}
       <section className="rounded-2xl border border-border/40 bg-background/80 p-5 backdrop-blur">
-        <h3 className="text-sm font-semibold text-foreground">
-          Links & Actions
-        </h3>
+        <h3 className="section-eyebrow">Share</h3>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"

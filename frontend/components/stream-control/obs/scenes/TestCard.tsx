@@ -1,6 +1,9 @@
 "use client";
 
 import { SPREAD_CANVAS, SPREAD_REGIONS } from "../spreadLayout";
+import { obsAccentAlpha } from "../themes/panelStyle";
+
+const CORNER_BORDER = `3px solid ${obsAccentAlpha(0.5)}`;
 
 /**
  * Test mode — static layout guide for positioning the browser source in OBS.
@@ -21,7 +24,7 @@ export function TestCard({ spread = false }: Readonly<{ spread?: boolean }>) {
         height: "1080px",
         background:
           "repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 0 0 / 40px 40px",
-        border: "3px solid rgba(245, 158, 11, 0.6)",
+        border: `3px solid ${obsAccentAlpha(0.6)}`,
         overflow: "hidden",
       }}
     >
@@ -40,7 +43,7 @@ export function TestCard({ spread = false }: Readonly<{ spread?: boolean }>) {
           style={{
             fontSize: "80px",
             fontWeight: 900,
-            color: "rgba(245, 158, 11, 0.08)",
+            color: obsAccentAlpha(0.08),
             letterSpacing: "0.05em",
             fontFamily: "monospace",
           }}
@@ -66,10 +69,10 @@ export function TestCard({ spread = false }: Readonly<{ spread?: boolean }>) {
             bottom: y ? 0 : undefined,
             width: "30px",
             height: "30px",
-            borderLeft: !x ? "3px solid rgba(245,158,11,0.5)" : undefined,
-            borderRight: x ? "3px solid rgba(245,158,11,0.5)" : undefined,
-            borderTop: !y ? "3px solid rgba(245,158,11,0.5)" : undefined,
-            borderBottom: y ? "3px solid rgba(245,158,11,0.5)" : undefined,
+            borderLeft: x ? undefined : CORNER_BORDER,
+            borderRight: x ? CORNER_BORDER : undefined,
+            borderTop: y ? undefined : CORNER_BORDER,
+            borderBottom: y ? CORNER_BORDER : undefined,
           }}
         />
       ))}
@@ -244,8 +247,8 @@ export function TestCard({ spread = false }: Readonly<{ spread?: boolean }>) {
           left: "50%",
           bottom: "30px",
           transform: "translateX(-50%)",
-          background: "rgba(245, 158, 11, 0.15)",
-          border: "1px solid rgba(245, 158, 11, 0.3)",
+          background: obsAccentAlpha(0.15),
+          border: `1px solid ${obsAccentAlpha(0.3)}`,
           borderRadius: "8px",
           padding: "8px 20px",
         }}
@@ -255,7 +258,7 @@ export function TestCard({ spread = false }: Readonly<{ spread?: boolean }>) {
             width: "8px",
             height: "8px",
             borderRadius: "50%",
-            background: "#f59e0b",
+            background: "var(--obs-accent)",
             animation: "obs-dot-pulse 1s ease-in-out infinite",
           }}
         />
@@ -263,7 +266,7 @@ export function TestCard({ spread = false }: Readonly<{ spread?: boolean }>) {
           style={{
             fontSize: "13px",
             fontWeight: 700,
-            color: "#f59e0b",
+            color: "var(--obs-accent)",
             fontFamily: "monospace",
             letterSpacing: "0.1em",
           }}
@@ -289,7 +292,7 @@ function SpreadTestCard() {
         height: `${SPREAD_CANVAS.height}px`,
         background:
           "repeating-conic-gradient(rgba(255,255,255,0.03) 0% 25%, transparent 0% 50%) 0 0 / 40px 40px",
-        border: "3px solid rgba(245, 158, 11, 0.6)",
+        border: `3px solid ${obsAccentAlpha(0.6)}`,
         overflow: "hidden",
       }}
     >
@@ -344,8 +347,8 @@ function SpreadTestCard() {
           left: "50%",
           bottom: "16px",
           transform: "translateX(-50%)",
-          background: "rgba(245, 158, 11, 0.15)",
-          border: "1px solid rgba(245, 158, 11, 0.3)",
+          background: obsAccentAlpha(0.15),
+          border: `1px solid ${obsAccentAlpha(0.3)}`,
           borderRadius: "8px",
           padding: "8px 20px",
           whiteSpace: "nowrap",
@@ -356,7 +359,7 @@ function SpreadTestCard() {
             width: "8px",
             height: "8px",
             borderRadius: "50%",
-            background: "#f59e0b",
+            background: "var(--obs-accent)",
             animation: "obs-dot-pulse 1s ease-in-out infinite",
           }}
         />
@@ -364,7 +367,7 @@ function SpreadTestCard() {
           style={{
             fontSize: "13px",
             fontWeight: 700,
-            color: "#f59e0b",
+            color: "var(--obs-accent)",
             fontFamily: "monospace",
             letterSpacing: "0.1em",
           }}
