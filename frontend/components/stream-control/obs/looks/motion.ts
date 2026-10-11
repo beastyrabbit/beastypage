@@ -1,5 +1,6 @@
 "use client";
 
+import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 /**
@@ -35,15 +36,21 @@ export const LOOK_MOTION_KEYFRAMES = `
 }
 `;
 
-/** Types `text` out one character at a time; returns the visible prefix. */
+/**
+ * Types `text` out one character at a time; returns the visible prefix.
+ * Shows the whole text at once when disabled or under reduced motion.
+ */
 export function useTypewriter(
   text: string,
   speedMs = 34,
   enabled = true,
 ): string {
+  // The reduced-motion preference is only known on the client, so it must
+  // not shape the first render (hydration); the effect applies it.
+  const instant = !enabled || Boolean(useReducedMotion());
   const [length, setLength] = useState(enabled ? 0 : text.length);
   useEffect(() => {
-    if (!enabled) {
+    if (instant) {
       setLength(text.length);
       return;
     }
@@ -55,7 +62,7 @@ export function useTypewriter(
       if (i >= text.length) window.clearInterval(id);
     }, speedMs);
     return () => window.clearInterval(id);
-  }, [text, speedMs, enabled]);
+  }, [text, speedMs, instant]);
   return text.slice(0, length);
 }
 
