@@ -13,6 +13,14 @@ import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 
 const MAX_SLUG_LENGTH = 40;
 const COPY_SUFFIX = "-copy";
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function saveFailureMessage(error: string | undefined): string {
+  if (error === "password_required")
+    return "Password required to overwrite this tree";
+  if (error === "invalid_password") return "Incorrect password";
+  return error ?? "Failed to save tree";
+}
 
 interface SaveTreeDialogProps {
   currentName: string;
@@ -103,6 +111,23 @@ export function SaveTreeDialog({
   const slugExists = slugCheck?.exists ?? false;
   const treeHasPassword = initialHasPassword ?? slugCheck?.hasPassword ?? false;
 
+  const handleSaveFailure = (saveError: string | undefined) => {
+    if (saveError === "edit_token_required" && onSaveAsNew) {
+      setSaveAsNew(true);
+      setError(
+        "This tree is read-only in this browser. Save a copy under a new slug to continue editing.",
+      );
+      return;
+    }
+    if (saveError === "edit_token_required") {
+      setError(
+        "This tree can only be edited from the browser where it was created, or with its password.",
+      );
+      return;
+    }
+    setError(saveFailureMessage(saveError));
+  };
+
   const handleSave = async () => {
     if (!name.trim()) {
       setError("Please enter a tree name");
@@ -129,24 +154,7 @@ export function SaveTreeDialog({
       );
 
       if (!result.success) {
-        if (result.error === "password_required") {
-          setError("Password required to overwrite this tree");
-        } else if (result.error === "invalid_password") {
-          setError("Incorrect password");
-        } else if (result.error === "edit_token_required") {
-          if (onSaveAsNew) {
-            setSaveAsNew(true);
-            setError(
-              "This legacy tree is read-only. Save a copy under a new slug to continue editing.",
-            );
-          } else {
-            setError(
-              "This tree can only be edited from the browser where it was created, or with its password.",
-            );
-          }
-        } else {
-          setError(result.error ?? "Failed to save tree");
-        }
+        handleSaveFailure(result.error);
         return;
       }
 
@@ -168,6 +176,12 @@ export function SaveTreeDialog({
     }
     if (!newSlug.trim()) {
       setError("Please enter a new tree slug");
+      return;
+    }
+    if (!SLUG_PATTERN.test(newSlug.trim())) {
+      setError(
+        "Use lowercase letters, numbers, and single hyphens in the slug",
+      );
       return;
     }
 
@@ -223,6 +237,12 @@ export function SaveTreeDialog({
     window.open(getTreeUrl(), "_blank", "noopener,noreferrer");
   }, [getTreeUrl]);
 
+  const saveButtonLabel = saveAsNew
+    ? "Save as New Tree"
+    : slugExists
+      ? "Update Tree"
+      : "Save Tree";
+
   // Success state
   if (saveSuccess) {
     let copyIcon = <CopyIcon size={16} />;
@@ -240,11 +260,7 @@ export function SaveTreeDialog({
           className="absolute inset-0 cursor-default"
           onClick={onClose}
         />
-        <div
-          className="glass-card relative z-10 w-full max-w-md p-6"
-          role="dialog"
-          aria-modal="true"
-        >
+        <dialog open className="glass-card relative z-10 w-full max-w-md p-6">
           <button
             type="button"
             onClick={onClose}
@@ -300,7 +316,7 @@ export function SaveTreeDialog({
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       </div>
     );
   }
@@ -313,11 +329,7 @@ export function SaveTreeDialog({
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <div
-        className="glass-card relative z-10 w-full max-w-md p-6"
-        role="dialog"
-        aria-modal="true"
-      >
+      <dialog open className="glass-card relative z-10 w-full max-w-md p-6">
         <button
           type="button"
           onClick={onClose}
@@ -459,15 +471,11 @@ export function SaveTreeDialog({
               ) : (
                 <Save className="size-4" />
               )}
-              {saveAsNew
-                ? "Save as New Tree"
-                : slugExists
-                  ? "Update Tree"
-                  : "Save Tree"}
+              {saveButtonLabel}
             </button>
           </div>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

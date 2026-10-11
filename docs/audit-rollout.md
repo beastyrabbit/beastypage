@@ -27,16 +27,18 @@ Convex environment before removing the optional validator in a later cleanup.
 
 Perfect Cat matchup requests keep `clientId` optional for existing clients.
 Current browser pages use an in-memory page identity, so two tabs do not
-replace each other's pending matchup. Requests with an ID receive a stored,
-expiring matchup capability. Votes may omit the new token during the bridge,
+replace each other's pending matchup. Requests receive a stored,
+expiring matchup capability and return the generated client ID when none was
+provided. Votes may omit the new token during the bridge,
 but the server still requires the stored client ID, exact current pair, expiry,
-and unused state. New clients send the token. Anonymous requests do not create
-unreachable stored matchups. Active persisted capabilities are capped at 600;
+and unused state. New clients send the token. Successful votes delete their
+capability immediately. Active persisted capabilities are capped at 600;
 expired rows are removed by the hourly bounded cleanup.
 
 The matchup capability table still depends on the configured Convex mutation
 boundary for request admission. The active-row cap prevents unbounded storage
-growth from fresh IDs, while an edge/IP rate limit or signed stateless
+growth from fresh IDs, but 600 concurrently pending matchups exhausts new-client
+capacity until some vote or expire. An edge/IP rate limit or signed stateless
 capability rollout would provide stronger abuse control before higher-volume
 anonymous traffic is enabled. Do not add a first-caller ownership rule,
 because it would let an attacker claim another client's identifier. Monitor
@@ -78,3 +80,14 @@ reservations. Authenticated users are keyed by their Convex identity. Each key
 has a bounded hourly reservation budget. Legacy callers and clients that cannot
 persist a key share a separate 60/hour fallback bucket, and all callers remain
 behind a 600/hour global backstop.
+Reservations now last one hour. Completed submissions leave a consumed row
+through that window, so finishing an upload does not replenish the quota.
+Cleanup deletes expired unattached blobs and leaves consumed card blobs intact.
+
+# Pixelator input limits
+
+The proxy accepts approximately 14 MB of JSON, matching the service's hard
+10 MiB decoded-image limit plus base64 and JSON overhead. The former 60 MB
+route declaration was not an effective end-to-end contract once service input
+limits were enforced. Oversized requests now fail before the proxy buffers and
+forwards a body the service would reject. The 4 million-pixel limit also applies.

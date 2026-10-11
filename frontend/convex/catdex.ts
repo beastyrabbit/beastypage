@@ -18,7 +18,9 @@ type RarityDoc = Doc<"rarity">;
 const MAX_CARD_UPLOAD_BYTES = 10 * 1024 * 1024;
 const CARD_UPLOAD_CONTENT_TYPES = new Set(["image/png", "image/jpeg"]);
 const THUMBNAIL_RETRY_AFTER_MS = 30 * 60 * 1000;
-const CATDEX_UPLOAD_TTL_MS = 30 * 60 * 1000;
+// Keep upload reservations for the full rate-limit window. Consumed rows are
+// retained as lightweight submission events so completed uploads count too.
+const CATDEX_UPLOAD_TTL_MS = 60 * 60 * 1000;
 const MAX_UPLOAD_CLEANUP_BATCH = 100;
 const MAX_UPLOADS_PER_CLIENT_PER_HOUR = 12;
 // Legacy callers do not provide a stable client key, so keep their shared
@@ -413,7 +415,10 @@ async function consumeCardUpload(
   ) {
     throw new Error("Card upload was not issued for this submission.");
   }
-  await ctx.db.delete(upload._id);
+  await ctx.db.patch(upload._id, {
+    status: "consumed",
+    updatedAt: Date.now(),
+  });
 }
 
 export const getUploadReservation = internalQuery({
@@ -471,7 +476,9 @@ export const cleanupExpiredUploads = internalMutation({
       .withIndex("byExpiresAt", (q) => q.lt("expiresAt", Date.now()))
       .take(limit);
     for (const upload of expired) {
-      if (upload.storageId) await ctx.storage.delete(upload.storageId);
+      if (upload.status === "attached" && upload.storageId) {
+        await ctx.storage.delete(upload.storageId);
+      }
       await ctx.db.delete(upload._id);
     }
     if (expired.length === limit) {

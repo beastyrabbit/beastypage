@@ -19,14 +19,28 @@ async function seedCats(t: ReturnType<typeof convexTest>) {
 }
 
 describe("perfect cat matchups", () => {
-  it("does not persist a matchup for an anonymous request", async () => {
+  it("returns a redeemable capability for an anonymous request", async () => {
     const t = convexTest(schema, modules);
     await seedCats(t);
 
     const response = await t.mutation(api.perfectCats.requestMatchup, {});
 
     expect(response.cats).toHaveLength(2);
-    expect(response.matchupToken).toBeUndefined();
+    expect(response.clientId).toEqual(expect.any(String));
+    expect(response.matchupToken).toEqual(expect.any(String));
+    const winner = response.cats[0];
+    const loser = response.cats[1];
+    if (!winner || !loser || !response.clientId || !response.matchupToken) {
+      throw new Error("Expected a complete anonymous matchup");
+    }
+    await expect(
+      t.mutation(api.perfectCats.submitVote, {
+        clientId: response.clientId,
+        winnerId: winner.id,
+        loserId: loser.id,
+        matchupToken: response.matchupToken,
+      }),
+    ).resolves.toMatchObject({ winner: { id: winner.id } });
     await expect(
       t.run((ctx) => ctx.db.query("perfect_matchups").collect()),
     ).resolves.toHaveLength(0);

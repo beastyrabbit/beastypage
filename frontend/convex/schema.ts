@@ -150,7 +150,11 @@ export default defineSchema({
     token: v.string(),
     rateKey: v.optional(v.string()),
     storageId: v.optional(v.id("_storage")),
-    status: v.union(v.literal("pending"), v.literal("attached")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("attached"),
+      v.literal("consumed"),
+    ),
     expiresAt: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),

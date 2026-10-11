@@ -78,12 +78,6 @@ const nextConfig = {
   turbopack: {
     root: projectRoot,
   },
-  experimental: {
-    // Pixelator accepts the historical 60 MB JSON body limit. The route and
-    // image-processing service apply stricter decoded-image limits after the
-    // request has been read.
-    proxyClientMaxBodySize: "64mb",
-  },
   async rewrites() {
     // Proxy PostHog requests through /bubu to avoid ad-blockers
     return [

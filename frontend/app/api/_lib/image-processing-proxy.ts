@@ -7,7 +7,9 @@ import {
 const BACKEND_BASE = (
   process.env.IMAGE_PROCESSING_INTERNAL_URL ?? "http://127.0.0.1:8002"
 ).replace(/\/$/, "");
-const DEFAULT_MAX_BODY_BYTES = 16 * 1024 * 1024;
+// Keep the proxy cap aligned with the image-processing service's 10 MiB
+// decoded-image limit plus base64 and JSON overhead.
+const DEFAULT_MAX_BODY_BYTES = 14_100_000;
 
 interface ImageProcessingProxyOptions {
   endpoint: string;

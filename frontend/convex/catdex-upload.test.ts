@@ -15,8 +15,12 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 
-async function issueUpload(t: ReturnType<typeof convexTest>, content = "card") {
-  const url = await t.mutation(api.catdex.generateUploadUrl, {});
+async function issueUpload(
+  t: ReturnType<typeof convexTest>,
+  content = "card",
+  clientKey?: string,
+) {
+  const url = await t.mutation(api.catdex.generateUploadUrl, { clientKey });
   const token = new URL(url, "https://fixture.invalid").searchParams.get(
     "token",
   );
@@ -56,6 +60,46 @@ describe("Catdex uploads", () => {
         clientKey: "legacy-client-key",
       }),
     ).resolves.toContain("/catdex/upload?token=");
+  });
+
+  it("counts completed submissions in the hourly reservation budget", async () => {
+    const t = convexTest(schema, modules);
+    for (let index = 0; index < 12; index += 1) {
+      const upload = await issueUpload(
+        t,
+        `card-${index}`,
+        "completed-client-key",
+      );
+      const { seasonId, rarityId } = await t.run(async (ctx) => ({
+        seasonId: await ctx.db.insert("card_season", {
+          seasonName: `Fixture ${index}`,
+          createdAt: 1,
+          updatedAt: 1,
+        }),
+        rarityId: await ctx.db.insert("rarity", {
+          rarityName: `Common ${index}`,
+          createdAt: 1,
+          updatedAt: 1,
+        }),
+      }));
+      await t.mutation(api.catdex.create, {
+        twitchUserName: "fixture",
+        catName: `cat-${index}`,
+        seasonId,
+        rarityId,
+        defaultCard: {
+          storageId: upload.storageId,
+          fileName: "card.png",
+          uploadToken: upload.token,
+        },
+      });
+    }
+
+    await expect(
+      t.mutation(api.catdex.generateUploadUrl, {
+        clientKey: "completed-client-key",
+      }),
+    ).rejects.toThrow("Too many pending uploads");
   });
 
   it("serves a CORS preflight and rejects unsupported media", async () => {

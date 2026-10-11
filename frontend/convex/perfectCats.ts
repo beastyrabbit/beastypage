@@ -1,7 +1,12 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api.js";
 import type { Doc, Id } from "./_generated/dataModel.js";
-import { internalMutation, mutation, query } from "./_generated/server.js";
+import {
+  internalMutation,
+  type MutationCtx,
+  mutation,
+  query,
+} from "./_generated/server.js";
 
 const INITIAL_RATING = 1500;
 const K_FACTOR = 24;
@@ -179,106 +184,126 @@ type MatchupResponse = {
   needsSeed: number;
   totalCats: number;
   totalCatsCapped?: boolean;
+  clientId?: string;
   matchupToken?: string;
 };
+
+type Database = MutationCtx["db"];
+
+async function findMatchupPool(db: Database) {
+  const allCats = await db.query("perfect_cats").take(COUNT_SAMPLE_LIMIT + 1);
+  const totalCats = Math.min(allCats.length, COUNT_SAMPLE_LIMIT);
+  const candidateMap = new Map<string, Doc<"perfect_cats">>();
+  const topRated = await db
+    .query("perfect_cats")
+    .withIndex("byRating", (q) => q)
+    .order("desc")
+    .take(24);
+  addCandidates(candidateMap, topRated);
+  const recentlyUpdated = await db
+    .query("perfect_cats")
+    .withIndex("byUpdated", (q) => q)
+    .order("desc")
+    .take(24);
+  addCandidates(candidateMap, recentlyUpdated);
+  addCandidates(candidateMap, allCats.slice(0, 40));
+  return {
+    allCats,
+    pool: Array.from(candidateMap.values()),
+    totalCats,
+    needsSeed: Math.max(0, MINIMUM_POOL_SIZE - totalCats),
+  };
+}
+
+async function findSeenPairs(db: Database, clientId: string) {
+  const seenPairs = new Set<string>();
+  const recentVotes = await db
+    .query("perfect_votes")
+    .withIndex("byClient", (q) => q.eq("clientId", clientId))
+    .order("desc")
+    .take(RECENT_VOTE_SAMPLE);
+  for (const vote of recentVotes) {
+    seenPairs.add(pairKey(vote.catAId, vote.catBId));
+  }
+  return seenPairs;
+}
+
+async function persistMatchup(
+  db: Database,
+  clientId: string,
+  first: Doc<"perfect_cats">,
+  second: Doc<"perfect_cats">,
+  now: number,
+) {
+  const matchupToken = crypto.randomUUID();
+  const previous = await db
+    .query("perfect_matchups")
+    .withIndex("byClient", (q) => q.eq("clientId", clientId))
+    .first();
+  if (!previous) {
+    const activeMatchups = await db
+      .query("perfect_matchups")
+      .withIndex("byExpiresAt", (q) => q.gt("expiresAt", now))
+      .take(MAX_ACTIVE_MATCHUPS + 1);
+    const pendingCount = activeMatchups.filter(
+      (matchup) => !matchup.consumed,
+    ).length;
+    if (pendingCount >= MAX_ACTIVE_MATCHUPS) {
+      throw new Error("Perfect Cat matchups are temporarily full");
+    }
+  }
+  const pendingMatchup = {
+    clientId,
+    catAId: first._id,
+    catBId: second._id,
+    token: matchupToken,
+    createdAt: now,
+    expiresAt: now + MATCHUP_TTL_MS,
+    consumed: false,
+  };
+  if (previous) await db.replace(previous._id, pendingMatchup);
+  else await db.insert("perfect_matchups", pendingMatchup);
+  return matchupToken;
+}
 
 export const requestMatchup = mutation({
   args: {
     clientId: v.optional(v.string()),
   },
   handler: async ({ db }, args): Promise<MatchupResponse> => {
-    // Matchups require a stable client ID so that submitVote can redeem them.
-    // Anonymous callers can still receive a pair, but we do not create an
-    // unreachable pending row for a generated ID that is never returned.
     const clientId = args.clientId?.trim()
       ? validClientId(args.clientId)
-      : undefined;
-    const allCats = await db.query("perfect_cats").take(COUNT_SAMPLE_LIMIT + 1);
-    const totalCats = Math.min(allCats.length, COUNT_SAMPLE_LIMIT);
-    const needsSeed = Math.max(0, MINIMUM_POOL_SIZE - totalCats);
+      : validClientId(undefined);
+    const { allCats, pool, totalCats, needsSeed } = await findMatchupPool(db);
 
     if (totalCats < 2) {
-      return { cats: [], needsSeed, totalCats };
+      return { cats: [], needsSeed, totalCats, clientId };
     }
-
-    const candidateMap = new Map<string, Doc<"perfect_cats">>();
-    const topRated = await db
-      .query("perfect_cats")
-      .withIndex("byRating", (q) => q)
-      .order("desc")
-      .take(24);
-    addCandidates(candidateMap, topRated);
-
-    const recentlyUpdated = await db
-      .query("perfect_cats")
-      .withIndex("byUpdated", (q) => q)
-      .order("desc")
-      .take(24);
-    addCandidates(candidateMap, recentlyUpdated);
-
-    addCandidates(candidateMap, allCats.slice(0, 40));
-
-    const pool = Array.from(candidateMap.values());
     if (pool.length < 2) {
-      return { cats: [], needsSeed, totalCats };
+      return { cats: [], needsSeed, totalCats, clientId };
     }
 
-    const seenPairs = new Set<string>();
-    if (clientId) {
-      const recentVotes = await db
-        .query("perfect_votes")
-        .withIndex("byClient", (q) => q.eq("clientId", clientId))
-        .order("desc")
-        .take(RECENT_VOTE_SAMPLE);
-      for (const vote of recentVotes) {
-        seenPairs.add(pairKey(vote.catAId, vote.catBId));
-      }
-    }
+    const seenPairs = await findSeenPairs(db, clientId);
 
     const first = pickRandom(pool);
     if (!first) {
-      return { cats: [], needsSeed, totalCats };
+      return { cats: [], needsSeed, totalCats, clientId };
     }
 
     const second = chooseSecondCat(pool, first, seenPairs);
 
     if (!second) {
-      return { cats: [], needsSeed, totalCats };
+      return { cats: [], needsSeed, totalCats, clientId };
     }
 
     const now = Date.now();
-    const matchupToken = clientId ? crypto.randomUUID() : undefined;
-    if (clientId && matchupToken) {
-      const previous = await db
-        .query("perfect_matchups")
-        .withIndex("byClient", (q) => q.eq("clientId", clientId))
-        .first();
-      if (!previous) {
-        const activeMatchups = await db
-          .query("perfect_matchups")
-          .withIndex("byExpiresAt", (q) => q.gt("expiresAt", now))
-          .take(MAX_ACTIVE_MATCHUPS + 1);
-        if (activeMatchups.length >= MAX_ACTIVE_MATCHUPS) {
-          throw new Error("Perfect Cat matchups are temporarily full");
-        }
-      }
-      const pendingMatchup = {
-        clientId,
-        catAId: first._id,
-        catBId: second._id,
-        token: matchupToken,
-        createdAt: now,
-        expiresAt: now + MATCHUP_TTL_MS,
-        consumed: false,
-      };
-      if (previous) await db.replace(previous._id, pendingMatchup);
-      else await db.insert("perfect_matchups", pendingMatchup);
-    }
+    const matchupToken = await persistMatchup(db, clientId, first, second, now);
     return {
       cats: [sanitizeCat(first), sanitizeCat(second)],
       needsSeed,
       totalCats,
       totalCatsCapped: allCats.length > COUNT_SAMPLE_LIMIT,
+      clientId,
       matchupToken,
     };
   },
@@ -336,9 +361,6 @@ export const submitVote = mutation({
     ) {
       throw new Error("Vote requires the current unused matchup");
     }
-    // Consuming the served pair and updating ratings share one transaction.
-    await db.patch(matchup._id, { consumed: true });
-
     const [winner, loser] = await Promise.all([
       db.get(args.winnerId),
       db.get(args.loserId),
@@ -346,6 +368,10 @@ export const submitVote = mutation({
     if (!winner || !loser) {
       throw new Error("One of the cats no longer exists");
     }
+
+    // Delete the capability after validation so completed votes do not count
+    // against the active cap or occupy the client's next matchup slot.
+    await db.delete(matchup._id);
 
     const expectedWinner =
       1 / (1 + 10 ** ((loser.rating - winner.rating) / 400));

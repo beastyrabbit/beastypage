@@ -684,6 +684,62 @@ export function AncestryTreeClient({
     [tree, isSpriteMapperReady],
   );
 
+  const handleAddChildWithoutPartner = useCallback(
+    async (parentCat: AncestryTreeCat, forcedGender: "M" | "F") => {
+      if (!tree || !isSpriteMapperReady) return;
+
+      setIsGenerating(true);
+      try {
+        const newPartnerParams = await generateRandomParamsV3();
+        const manager = AncestryTreeManager.deserialize(
+          tree,
+          mutationPoolRef.current,
+        );
+        manager.assignPartner(parentCat.id, newPartnerParams, undefined, false);
+
+        const currentCat = manager.getCat(parentCat.id);
+        const newPartnerId = currentCat?.partnerIds.at(-1);
+        if (!currentCat || !newPartnerId) return;
+
+        const motherId =
+          currentCat.gender === "F" ? currentCat.id : newPartnerId;
+        const fatherId =
+          currentCat.gender === "M" ? currentCat.id : newPartnerId;
+        const originalConfig = { ...manager.getTree().config };
+        manager.setConfig({ minChildren: 1, maxChildren: 1 });
+        manager.generateOffspring(
+          motherId,
+          fatherId,
+          currentCat.generation + 1,
+          forcedGender,
+        );
+        manager.setConfig(originalConfig);
+
+        const serialized = manager.serialize();
+        setTree(serialized);
+        const updatedCat = serialized.cats.find(
+          (cat) => cat.id === parentCat.id,
+        );
+        if (updatedCat) setSelectedCat(updatedCat);
+      } catch (error) {
+        console.error("Failed to add spouse and child:", error);
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [isSpriteMapperReady, tree],
+  );
+
+  const getExistingPartnerId = useCallback(
+    (candidateId: string | undefined) => {
+      if (!candidateId || !tree) return undefined;
+      return tree.cats.some((cat) => cat.id === candidateId)
+        ? candidateId
+        : undefined;
+    },
+    [tree],
+  );
+
   // Handle add relative from graph placeholder click
   const handleAddRelativeFromGraph = useCallback(
     async (
@@ -695,99 +751,32 @@ export function AncestryTreeClient({
       setIsEditingRelations(false);
 
       if (type === "spouse") {
-        // Add new spouse (supports multiple spouses)
         await handleAssignRandomPartner(parentCat);
-      } else if (type === "father" || type === "mother") {
-        // Add a parent to the cat
-        await handleAddParent(parentCat, type);
-      } else {
-        // Add child - respect the son/daughter choice
-        const forcedGender: "M" | "F" = type === "son" ? "M" : "F";
-
-        // Check if otherParentId references a valid existing spouse
-        let validPartnerId: string | undefined;
-
-        if (otherParentId && tree) {
-          // Check if otherParentId exists in the tree
-          const partnerExists = tree.cats.some((c) => c.id === otherParentId);
-          if (partnerExists) {
-            validPartnerId = otherParentId;
-          }
-        }
-
-        if (validPartnerId) {
-          // Specific spouse indicated - add child with that spouse
-          await handleAddChildWithPartner(
-            parentCat,
-            validPartnerId,
-            forcedGender,
-          );
-        } else {
-          // No specific spouse - create new spouse first, then add child
-          if (!tree || !isSpriteMapperReady) return;
-
-          setIsGenerating(true);
-          try {
-            const newPartnerParams = await generateRandomParamsV3();
-            const manager = AncestryTreeManager.deserialize(
-              tree,
-              mutationPoolRef.current,
-            );
-
-            // First, assign a partner (without generating offspring)
-            manager.assignPartner(
-              parentCat.id,
-              newPartnerParams,
-              undefined,
-              false,
-            );
-
-            // Then generate a child with the correct gender
-            const currentCat = manager.getCat(parentCat.id);
-            if (currentCat && currentCat.partnerIds.length > 0) {
-              const newPartnerId = currentCat.partnerIds.at(-1);
-              if (!newPartnerId) return;
-              const motherId =
-                currentCat.gender === "F" ? currentCat.id : newPartnerId;
-              const fatherId =
-                currentCat.gender === "M" ? currentCat.id : newPartnerId;
-
-              // Temporarily set config to generate exactly 1 child
-              const originalConfig = { ...manager.getTree().config };
-              manager.setConfig({ minChildren: 1, maxChildren: 1 });
-              manager.generateOffspring(
-                motherId,
-                fatherId,
-                currentCat.generation + 1,
-                forcedGender,
-              );
-              manager.setConfig(originalConfig);
-            }
-
-            const serialized = manager.serialize();
-            setTree(serialized);
-
-            // Update selectedCat with fresh data
-            const updatedCat = serialized.cats.find(
-              (c) => c.id === parentCat.id,
-            );
-            if (updatedCat) {
-              setSelectedCat(updatedCat);
-            }
-          } catch (error) {
-            console.error("Failed to add spouse and child:", error);
-          } finally {
-            setIsGenerating(false);
-          }
-        }
+        return;
       }
+      if (type === "father" || type === "mother") {
+        await handleAddParent(parentCat, type);
+        return;
+      }
+
+      const forcedGender: "M" | "F" = type === "son" ? "M" : "F";
+      const validPartnerId = getExistingPartnerId(otherParentId);
+      if (validPartnerId) {
+        await handleAddChildWithPartner(
+          parentCat,
+          validPartnerId,
+          forcedGender,
+        );
+        return;
+      }
+      await handleAddChildWithoutPartner(parentCat, forcedGender);
     },
     [
       handleAssignRandomPartner,
       handleAddChildWithPartner,
+      handleAddChildWithoutPartner,
       handleAddParent,
-      tree,
-      isSpriteMapperReady,
+      getExistingPartnerId,
     ],
   );
 

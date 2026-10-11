@@ -7,6 +7,15 @@ const MAX_TREE_BYTES = 900 * 1024;
 const MAX_SLUG_LENGTH = 40;
 const MAX_NAME_LENGTH = 120;
 
+function assertSlugFormat(slug: string) {
+  if (
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ||
+    slug.length > MAX_SLUG_LENGTH
+  ) {
+    throw new Error("Invalid tree slug");
+  }
+}
+
 function assertTreeSize(args: {
   slug: string;
   name: string;
@@ -392,6 +401,7 @@ export const saveAsNew = mutation({
   args: treeSaveFields,
   handler: async (ctx, args) => {
     assertTreeSize(args);
+    assertSlugFormat(args.slug);
 
     const existing = await ctx.db
       .query("ancestry_tree")
