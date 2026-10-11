@@ -16,8 +16,8 @@ import {
   getCoatPatternName,
 } from "@/lib/cat-v3/coatPatterns";
 import type { CatParams } from "@/lib/cat-v3/types";
-import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { readMapperEditToken } from "@/lib/mapperEditToken";
+import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { cn } from "@/lib/utils";
 
 type StepId =
