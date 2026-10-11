@@ -71,13 +71,6 @@ export const create = mutation({
       throw new Error("Signups are closed");
     if (!args.viewerSession || args.viewerSession.length < 32)
       throw new Error("A private participant token is required");
-    const participantCount = await ctx.db
-      .query("stream_participants")
-      .withIndex("bySession", (q) => q.eq("sessionId", args.sessionId))
-      .take(MAX_PARTICIPANTS_PER_SESSION);
-    if (participantCount.length >= MAX_PARTICIPANTS_PER_SESSION) {
-      throw new Error("This session has reached its participant limit");
-    }
     const existing = await ctx.db
       .query("stream_participants")
       .withIndex("by_sessionId_and_viewerSession", (q) =>
@@ -87,6 +80,13 @@ export const create = mutation({
       )
       .first();
     if (existing) return streamParticipantToClient(existing);
+    const participantCount = await ctx.db
+      .query("stream_participants")
+      .withIndex("bySession", (q) => q.eq("sessionId", args.sessionId))
+      .take(MAX_PARTICIPANTS_PER_SESSION);
+    if (participantCount.length >= MAX_PARTICIPANTS_PER_SESSION) {
+      throw new Error("This session has reached its participant limit");
+    }
     if (!session.allowRepeatIps && args.fingerprint) {
       const duplicate = await ctx.db
         .query("stream_participants")

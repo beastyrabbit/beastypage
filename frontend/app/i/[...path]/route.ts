@@ -21,12 +21,13 @@ function upstreamUrl(request: Request) {
 }
 
 function isInternalPath(request: Request) {
-  let pathname = new URL(request.url).pathname;
-  // The catch-all route must not expose the media service's internal control
-  // endpoints through percent-encoded path segments. Decode a small bounded
-  // number of times because clients can encode an already encoded slash.
+  const rawPathname = new URL(request.url).pathname;
+  let pathname = rawPathname;
+  // The canonical worker endpoint is authenticated by the media service and
+  // must remain reachable through this public base URL. Reject encoded forms
+  // that could bypass an upstream path policy by decoding a bounded number of
+  // times and only blocking when decoding changes an internal path.
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (pathname.includes("/api/internal/")) return true;
     let decoded: string;
     try {
       decoded = decodeURIComponent(pathname);
@@ -34,10 +35,12 @@ function isInternalPath(request: Request) {
       // Malformed paths are not public media paths; fail closed.
       return true;
     }
-    if (decoded === pathname) return false;
+    if (decoded === pathname) {
+      return rawPathname !== decoded && decoded.includes("/api/internal/");
+    }
     pathname = decoded;
   }
-  return pathname.includes("/api/internal/");
+  return rawPathname !== pathname && pathname.includes("/api/internal/");
 }
 
 async function proxy(request: Request) {

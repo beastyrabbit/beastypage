@@ -281,6 +281,14 @@ describe("legacy voting transactions", () => {
     await expect(
       t.mutation(api.streamParticipantsV2.create, {
         sessionId,
+        viewerSession: `participant-token-${"0".padStart(30, "0")}`,
+        displayName: "Viewer 0",
+        status: "active",
+      }),
+    ).resolves.toMatchObject({ display_name: "Viewer 0" });
+    await expect(
+      t.mutation(api.streamParticipantsV2.create, {
+        sessionId,
         viewerSession: "participant-token-overflow-000000000000000000",
         displayName: "Overflow",
         status: "active",
