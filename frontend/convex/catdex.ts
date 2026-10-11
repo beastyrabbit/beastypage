@@ -230,11 +230,13 @@ export const generateUploadUrl = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     const identity = await ctx.auth.getUserIdentity();
-    const rateKey = identity?.tokenIdentifier
-      ? `identity:${identity.tokenIdentifier}`
-      : args.clientKey && /^[A-Za-z0-9_-]{16,80}$/.test(args.clientKey)
+    const anonymousRateKey =
+      args.clientKey && /^[A-Za-z0-9_-]{16,80}$/.test(args.clientKey)
         ? `client:${args.clientKey}`
         : undefined;
+    const rateKey = identity?.tokenIdentifier
+      ? `identity:${identity.tokenIdentifier}`
+      : anonymousRateKey;
     if (rateKey) {
       const recentClientUploads = await ctx.db
         .query("catdex_uploads")
