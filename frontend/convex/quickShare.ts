@@ -306,6 +306,7 @@ function isCollectionOwner(
     candidate.receiptHash === args.collectionReceiptHash &&
     candidate.rateIdentity === args.rateIdentity &&
     candidate.ipHash === args.ipHash &&
+    candidate.active &&
     candidate.state !== "removed" &&
     candidate.retainedUntil > args.now
   );

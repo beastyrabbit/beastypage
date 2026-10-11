@@ -210,7 +210,7 @@ describe("Quick Share Convex policy", () => {
     ).rejects.toThrow("ACTIVE_LIMIT");
   });
 
-  it("keeps a collection receipt usable after its first item fails", async () => {
+  it("does not let an inactive item authorize collection appends", async () => {
     const t = convexTest(schema, modules);
     const now = Date.now();
     const first = await t.mutation(
@@ -231,7 +231,7 @@ describe("Quick Share Convex policy", () => {
         ...createArgs("Collect1", { now: now + 2 }),
         collectionReceiptHash: "receipt-Collect1",
       }),
-    ).resolves.toMatchObject({ slug: "Collect1" });
+    ).rejects.toThrow("SLUG_COLLISION");
 
     await expect(
       t.mutation(internal.quickShare.createUpload, {
