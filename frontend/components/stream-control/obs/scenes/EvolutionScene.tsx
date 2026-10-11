@@ -154,13 +154,15 @@ export function EvolutionShowFrame({
   const activeIndex =
     step.kind === "summon" ? 0 : "index" in step ? step.index : -1;
   const activeCat = activeIndex >= 0 ? (cats[activeIndex] ?? null) : null;
-  // Re-measure at the land phase too: the live loop stops with `charging`,
-  // and the landed cat's entrance transform may still be in flight then.
+  // Measure per frame only while something lands or enters (land phase,
+  // reveal): that is when the leader line and the confetti origin need the
+  // moving rect. A whole-lineage measurement on every frame of a roll is
+  // layout work the strobe does not need.
   const rects = useElementRects(
     localRef,
     "data-lineage-key",
     [step.kind, reveal.activeKey, roll?.phase ?? null],
-    reveal.charging,
+    roll?.phase === "land" || step.kind === "reveal",
   );
   const [plaqueRect, setPlaqueRect] = useState<Rect | null>(null);
   // The leader line mounts at canvas level, outside the look's plaque slot,
@@ -484,6 +486,8 @@ export function EvolutionScene({
       branchLabel: cat.branchLabel,
       archetype: cat.archetype,
       previewUrl: renderedCats[i]?.previewUrl ?? null,
+      // Same parent rule as rollParentFor: level ≤ 1 evolves from the starter.
+      parentUrl: renderedCats[cat.level <= 1 ? 0 : i - 1]?.previewUrl ?? null,
       additions: cat.additions,
     })),
     totalCount: command.totalCount,

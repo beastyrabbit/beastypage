@@ -19,6 +19,7 @@ function reveal(overrides: Partial<LineageReveal>): LineageReveal {
     charging: false,
     revealing: true,
     teaserUrl: null,
+    baseUrl: null,
     progress: 0.2,
     chargeMs: 5000,
     done: false,
@@ -103,17 +104,61 @@ describe("lineageBranchOpen / lineageSpriteUrl", () => {
     expect(lineageBranchOpen(reveal({}), "A")).toBe(false);
   });
 
-  it("draws the teaser while charging and falls back to the preview", () => {
+  it("draws the teaser while charging and never the finished preview", () => {
     const rolling = reveal({ teaserUrl: "data:candidate" });
     expect(lineageSpriteUrl("charging", rolling, "data:preview")).toBe(
       "data:candidate",
     );
-    expect(lineageSpriteUrl("charging", reveal({}), "data:preview")).toBe(
-      "data:preview",
-    );
+    // No candidate frame yet: the roll's base (parent) or nothing, never
+    // the finished cat (that would spoil the result).
+    expect(lineageSpriteUrl("charging", reveal({}), "data:preview")).toBeNull();
+    expect(
+      lineageSpriteUrl(
+        "charging",
+        reveal({ baseUrl: "data:parent" }),
+        "data:preview",
+      ),
+    ).toBe("data:parent");
     expect(lineageSpriteUrl("hidden", rolling, "data:preview")).toBeNull();
     expect(lineageSpriteUrl("revealing", rolling, "data:preview")).toBe(
       "data:preview",
     );
+  });
+});
+
+describe("lineageSpriteUrl", () => {
+  const reveal = (teaserUrl: string | null, baseUrl: string | null) =>
+    ({ teaserUrl, baseUrl }) as unknown as Parameters<
+      typeof lineageSpriteUrl
+    >[1];
+  it("never shows the finished cat while charging", () => {
+    expect(lineageSpriteUrl("charging", reveal(null, null), "final.png")).toBe(
+      null,
+    );
+    expect(
+      lineageSpriteUrl("charging", reveal(null, "parent.png"), "final.png"),
+    ).toBe("parent.png");
+    expect(
+      lineageSpriteUrl(
+        "charging",
+        reveal("candidate.png", "parent.png"),
+        "final.png",
+      ),
+    ).toBe("candidate.png");
+  });
+  it("draws the finished cat once shown or revealing", () => {
+    expect(
+      lineageSpriteUrl("shown", reveal(null, "parent.png"), "final.png"),
+    ).toBe("final.png");
+    expect(lineageSpriteUrl("revealing", reveal(null, null), "final.png")).toBe(
+      "final.png",
+    );
+    expect(
+      lineageSpriteUrl(
+        "hidden",
+        reveal("candidate.png", "parent.png"),
+        "final.png",
+      ),
+    ).toBe(null);
   });
 });

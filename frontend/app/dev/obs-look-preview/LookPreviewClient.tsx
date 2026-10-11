@@ -806,6 +806,7 @@ export function LookPreviewClient() {
       branchLabel: cat.branchLabel,
       archetype: cat.archetype,
       previewUrl: sprites[i] ?? null,
+      parentUrl: sprites[cat.level <= 1 ? 0 : i - 1] ?? null,
       additions: cat.additions,
     })),
     totalCount: evolutionCommand.totalCount,

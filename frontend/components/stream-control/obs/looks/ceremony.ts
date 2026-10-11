@@ -63,6 +63,8 @@ export interface CeremonyCatInput {
   archetype: string | null;
   previewUrl: string | null;
   additions?: readonly EvolutionAddition[];
+  /** The parent's finished sprite: what this cat looked like before its first roll. */
+  parentUrl?: string | null;
 }
 
 export interface LineageRoll {
@@ -95,6 +97,13 @@ export interface LineageReveal {
   revealing: boolean;
   /** Frame to draw on the active cat: the strobe candidate while rolling, the landed frame from the land phase on and through reveal(i), null otherwise. */
   teaserUrl: string | null;
+  /**
+   * What the active cat looked like before the current roll: the previous
+   * addition's landed frame, else the parent's sprite. Drawn while rolling
+   * whenever no candidate frame is ready yet, so the finished cat never
+   * shows before its land.
+   */
+  baseUrl: string | null;
   /** 0..1 progress through the whole ceremony. */
   progress: number;
   /** Budget of the CURRENT roll, or rollBudgetMs(chargeMs, 1) outside a roll (look timers never see undefined). */
@@ -144,7 +153,7 @@ export function lineageSpriteUrl(
   reveal: LineageReveal | undefined,
   previewUrl: string | null,
 ): string | null {
-  if (state === "charging") return reveal?.teaserUrl ?? previewUrl;
+  if (state === "charging") return reveal?.teaserUrl ?? reveal?.baseUrl ?? null;
   if (state === "hidden") return null;
   return previewUrl;
 }
@@ -375,6 +384,7 @@ export function useLineageCeremony({
 
   let roll: LineageRoll | null = null;
   let teaserUrl: string | null = null;
+  let baseUrl: string | null = null;
   let landedValues: string[] = [];
   let landing: LineageReveal["landing"] = null;
   let chargeMs = rollBudgetMs(chargeDurationMs, 1);
@@ -392,6 +402,11 @@ export function useLineageCeremony({
       rollKeyOf(activeCat.key, step.addition),
     );
     const candidateCount = frames?.candidates.length ?? 0;
+    const previousFrames =
+      step.addition > 0
+        ? framesRef.current.get(rollKeyOf(activeCat.key, step.addition - 1))
+        : undefined;
+    baseUrl = previousFrames?.landed ?? activeCat.parentUrl ?? null;
     if (phase.phase === "land") {
       teaserUrl = frames?.landed ?? null;
     } else if (phase.frameIndex >= 0 && frames && candidateCount > 0) {
@@ -520,6 +535,7 @@ export function useLineageCeremony({
     charging: step.kind === "roll",
     revealing: step.kind === "reveal" || step.kind === "summon",
     teaserUrl,
+    baseUrl,
     progress: Math.min(1, through / Math.max(1, totalCount)),
     chargeMs,
     done,
