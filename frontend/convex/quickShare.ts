@@ -81,7 +81,6 @@ async function reserveUsage(
   tier: QuickShareTier,
   bytes: number,
   now: number,
-  collectionItem = false,
 ) {
   const policy = policyForTier(tier);
   const active = await ctx.db
@@ -89,9 +88,12 @@ async function reserveUsage(
     .withIndex("by_rateIdentity_and_active", (q) =>
       q.eq("rateIdentity", identity).eq("active", true),
     )
-    .collect();
-  const activeShares = new Set(active.map((upload) => upload.slug));
-  if (!collectionItem && activeShares.size >= policy.active) {
+    // The active limit applies to every stored media item. Collection items
+    // share a public slug, but each still occupies storage and processing
+    // capacity. Keep this query bounded so an abusive account cannot make
+    // limit checks scan its entire history.
+    .take(policy.active);
+  if (active.length >= policy.active) {
     throw new Error("ACTIVE_LIMIT");
   }
 
@@ -122,7 +124,7 @@ async function reserveUsage(
           .eq("windowStart", window.start),
       )
       .unique();
-    const nextStarts = (row?.starts ?? 0) + (collectionItem ? 0 : 1);
+    const nextStarts = (row?.starts ?? 0) + 1;
     const nextBytes = (row?.bytes ?? 0) + bytes;
     if (nextStarts > window.startsLimit) throw new Error("HOURLY_LIMIT");
     if (nextBytes > window.bytesLimit) throw new Error("DAILY_BYTES_LIMIT");
@@ -185,7 +187,7 @@ export const createUpload = internalMutation({
     const existingSlugs = await ctx.db
       .query("quick_share_uploads")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .collect();
+      .take(policy.active + 1);
     if (existingSlugs.length > 0) {
       const collectionOwner = existingSlugs[0];
       if (
@@ -212,7 +214,6 @@ export const createUpload = internalMutation({
       args.tier,
       args.originalSize,
       args.now,
-      existingSlugs.length > 0,
     );
 
     const publicExpiresAt =
@@ -961,8 +962,8 @@ export const maintenance = internalMutation({
     const now = Date.now();
     const abandoned = await ctx.db
       .query("quick_share_uploads")
-      .withIndex("by_state_and_createdAt", (q) =>
-        q.eq("state", "uploading").lte("createdAt", now - 60 * 60 * 1000),
+      .withIndex("by_state_and_updatedAt", (q) =>
+        q.eq("state", "uploading").lte("updatedAt", now - 60 * 60 * 1000),
       )
       .take(50);
     for (const upload of abandoned) {

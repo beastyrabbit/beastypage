@@ -5,7 +5,20 @@ import { httpAction, internalAction } from "./_generated/server.js";
 
 type JsonObject = Record<string, unknown>;
 
-const RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 60_000, 5 * 60_000];
+// A worker serializes media processing and can legitimately hold a lease for
+// up to 25 minutes. Keep retrying busy/unreachable dispatches long enough to
+// cover that lease before the hourly maintenance sweep becomes the fallback.
+// This remains bounded so an outage cannot turn into an unbounded scheduler
+// loop.
+const RETRY_DELAYS_MS = [
+  1_000,
+  5_000,
+  15_000,
+  60_000,
+  5 * 60_000,
+  15 * 60_000,
+  30 * 60_000,
+];
 
 function retryDelay(attempt: number) {
   return RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];

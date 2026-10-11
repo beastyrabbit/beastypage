@@ -5,7 +5,7 @@ import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { DAY_MS, MIB, startOfDay } from "./quickSharePolicy";
+import { DAY_MS, MIB, startOfDay, startOfHour } from "./quickSharePolicy";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -161,6 +161,47 @@ describe("Quick Share Convex policy", () => {
         createArgs("ShrA010x", { rateIdentity: "ip:hourly" }),
       ),
     ).rejects.toThrow("HOURLY_LIMIT");
+  });
+
+  it("charges collection items against active and hourly limits", async () => {
+    const t = convexTest(schema, modules);
+    const now = 1_800_000_000_000;
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Collect1", { rateIdentity: "ip:collection", now }),
+    );
+
+    const second = await t.mutation(internal.quickShare.createUpload, {
+      ...createArgs("Collect1", {
+        rateIdentity: "ip:collection",
+        now: now + 1,
+      }),
+      collectionReceiptHash: "receipt-Collect1",
+    });
+    expect(second.slug).toBe(first.slug);
+
+    const usage = await t.run(async (ctx) =>
+      ctx.db
+        .query("quick_share_usage")
+        .withIndex("by_identity_and_kind_and_windowStart", (q) =>
+          q
+            .eq("identity", "ip:collection")
+            .eq("kind", "hour")
+            .eq("windowStart", startOfHour(now)),
+        )
+        .unique(),
+    );
+    expect(usage?.starts).toBe(2);
+
+    await expect(
+      t.mutation(internal.quickShare.createUpload, {
+        ...createArgs("Collect1", {
+          rateIdentity: "ip:collection",
+          now: now + 2,
+        }),
+        collectionReceiptHash: "receipt-Collect1",
+      }),
+    ).rejects.toThrow("ACTIVE_LIMIT");
   });
 
   it("revokes every active link for a banned exact IP", async () => {
@@ -346,6 +387,22 @@ describe("Quick Share Convex policy", () => {
       false,
       "UPLOAD_TIMED_OUT",
     ]);
+  });
+
+  it("does not abandon an old upload that received a recent part", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const created = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Recent01", { now: now - 2 * 60 * 60 * 1000 }),
+    );
+    await t.run(async (ctx) => {
+      await ctx.db.patch(created.id, { updatedAt: now });
+    });
+
+    await t.mutation(internal.quickShare.maintenance, {});
+    const upload = await t.run(async (ctx) => ctx.db.get(created.id));
+    expect([upload?.state, upload?.active]).toEqual(["uploading", true]);
   });
 
   it("reserves URL import capacity before download and refunds unused bytes", async () => {

@@ -578,6 +578,7 @@ export default defineSchema({
     .index("by_ipHash_and_active", ["ipHash", "active"])
     .index("by_ipHash_and_createdAt", ["ipHash", "createdAt"])
     .index("by_state_and_createdAt", ["state", "createdAt"])
+    .index("by_state_and_updatedAt", ["state", "updatedAt"])
     .index("by_active_and_publicExpiresAt", ["active", "publicExpiresAt"])
     .index("by_retainedUntil", ["retainedUntil"]),
 
