@@ -94,7 +94,7 @@ export type BatchLiveState = {
   eliminatedIds: string[];
   /** Cat marked as the removal candidate — highlighted for viewers. */
   markedId?: string | null;
-  /** "Maybe leaves next" picks — shown yellow; reset after every cull. */
+  /** "Maybe leaves next" picks — shown yellow; kept across culls (minus the culled cat) until cleared. */
   potentialIds?: string[];
   /** Crowd favourites — persist across culls. */
   favoriteIds?: string[];

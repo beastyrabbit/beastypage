@@ -786,7 +786,7 @@ function CullCard({
       </button>
       <button
         type="button"
-        title="Mark as potential (resets each cull)"
+        title="Mark as potential (stays until you clear it)"
         onClick={() => actions.highlight(cat.id, "potential")}
         className={cn(
           "absolute -right-1.5 -top-1.5 flex size-7 items-center justify-center rounded-full border shadow-sm transition",

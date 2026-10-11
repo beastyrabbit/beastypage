@@ -71,7 +71,7 @@ export const batchStateValidator = v.object({
   eliminatedIds: v.array(v.string()),
   /** Cat the streamer has marked as the removal candidate (shown to viewers). */
   markedId: v.optional(v.string()),
-  /** "Maybe leaves next" picks — shown yellow; reset after every cull. */
+  /** "Maybe leaves next" picks — shown yellow; kept across culls (minus the culled cat) until cleared. */
   potentialIds: v.optional(v.array(v.string())),
   /** Crowd favourites — persist across culls. */
   favoriteIds: v.optional(v.array(v.string())),

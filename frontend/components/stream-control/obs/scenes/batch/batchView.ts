@@ -25,7 +25,7 @@ export interface BatchViewCat {
   params: CatParams;
   /** Streamer's removal candidate — only meaningful while awaiting a cull. */
   marked: boolean;
-  /** "Maybe leaves next" (resets each cull). */
+  /** "Maybe leaves next" (kept across culls until cleared). */
   potential: boolean;
   /** Crowd favourite (persists). */
   favorite: boolean;

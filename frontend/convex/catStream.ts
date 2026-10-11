@@ -409,7 +409,7 @@ export const markBatchCat = mutation({
 
 /**
  * Control page → session: toggle a highlight on a batch cat. "potential"
- * (maybe leaves next, shown yellow) resets after every cull, "favorite"
+ * (maybe leaves next, shown yellow) is kept across culls, minus the culled cat, "favorite"
  * persists across culls, "spotlight" shows the cat enlarged on the overlay
  * and the control board (only one at a time — toggling another cat moves it).
  */
