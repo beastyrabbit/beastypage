@@ -105,11 +105,12 @@ function getSpriteVariantsSubtitle(
   count: number,
   isOpen: boolean,
   rendererReady: boolean,
+  attempted: boolean,
 ): string {
   if (loading) return "Rendering preview sprites…";
   if (count > 0) return `${pluralize(count, "sprite")} available`;
   if (!isOpen) return "Expand to render poses";
-  if (!rendererReady) return "Preparing renderer…";
+  if (!rendererReady || !attempted) return "Preparing renderer…";
   return "Sprite previews unavailable";
 }
 
@@ -153,6 +154,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
     [],
   );
   const [spriteVariantsLoading, setSpriteVariantsLoading] = useState(false);
+  const [spriteVariantsAttempted, setSpriteVariantsAttempted] = useState(false);
   const [spriteVariantsOpen, setSpriteVariantsOpen] = useState(false);
 
   const [builderBaseUrl, setBuilderBaseUrl] = useState<string | null>(null);
@@ -397,12 +399,14 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
     if (!catPayload) {
       setSpriteVariants([]);
       setSpriteVariantsLoading(false);
+      setSpriteVariantsAttempted(false);
       setSpriteVariantsOpen(false);
       return;
     }
 
     setSpriteVariants([]);
     setSpriteVariantsLoading(false);
+    setSpriteVariantsAttempted(false);
     setSpriteVariantsOpen(false);
   }, [catPayload]);
 
@@ -414,6 +418,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
 
     let cancelled = false;
     setSpriteVariantsLoading(true);
+    setSpriteVariantsAttempted(false);
     setSpriteVariants([]);
 
     (async () => {
@@ -507,6 +512,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
       } finally {
         if (!cancelled) {
           setSpriteVariantsLoading(false);
+          setSpriteVariantsAttempted(true);
         }
       }
     })();
@@ -527,6 +533,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
     spriteVariants.length,
     spriteVariantsOpen,
     rendererReady,
+    spriteVariantsAttempted,
   );
 
   const showLoader = !!loadingMessage || (slug && mapperRecord === undefined);
@@ -547,6 +554,15 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
     const target = url ?? builderBaseUrl;
     if (!target) return;
     router.push(target);
+  };
+
+  const handleToggleSpriteVariants = () => {
+    const next = !spriteVariantsOpen;
+    if (next) {
+      setSpriteVariantsAttempted(false);
+      setSpriteVariantsLoading(rendererReady);
+    }
+    setSpriteVariantsOpen(next);
   };
 
   const downloadDataUrl = useCallback((dataUrl: string, filename: string) => {
@@ -864,7 +880,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
             <div className="glass-card px-6 py-6">
               <button
                 type="button"
-                onClick={() => setSpriteVariantsOpen((prev) => !prev)}
+                onClick={handleToggleSpriteVariants}
                 className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/70 px-4 py-3 text-left transition hover:bg-background"
               >
                 <div>
@@ -893,12 +909,15 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
               >
                 {spriteVariantsOpen &&
                   spriteVariants.length === 0 &&
-                  spriteVariantsLoading && (
+                  (!spriteVariantsAttempted || spriteVariantsLoading) && (
                     <p className="col-span-full text-sm text-muted-foreground">
-                      Rendering preview sprites…
+                      {spriteVariantsLoading
+                        ? "Rendering preview sprites…"
+                        : "Preparing renderer…"}
                     </p>
                   )}
                 {spriteVariantsOpen &&
+                  spriteVariantsAttempted &&
                   !spriteVariantsLoading &&
                   spriteVariants.length === 0 && (
                     <p className="col-span-full text-sm text-muted-foreground">
