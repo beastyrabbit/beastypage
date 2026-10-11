@@ -388,6 +388,42 @@ describe("legacy voting transactions", () => {
     }
   });
 
+  it("keeps viewer links unique and immutable", async () => {
+    const t = convexTest(schema, modules);
+    const host = t.withIdentity({
+      subject: "host",
+      issuer: "https://identity.example",
+    });
+    const other = t.withIdentity({
+      subject: "other",
+      issuer: "https://identity.example",
+    });
+    const session = await host.mutation(api.streamSessionsV2.create, {
+      viewerKey: "stable-viewer-key",
+      status: "live",
+    });
+
+    await expect(
+      other.mutation(api.streamSessionsV2.create, {
+        viewerKey: "stable-viewer-key",
+        status: "live",
+      }),
+    ).rejects.toThrow("Viewer key already in use");
+    await expect(
+      host.mutation(api.streamSessionsV2.update, {
+        id: session!.id as Id<"stream_sessions">,
+        viewerKey: "attacker-selected-key",
+      }),
+    ).rejects.toThrow("Viewer key cannot be changed");
+
+    expect(
+      await t.query(api.streamSessionsV2.list, {
+        viewerKey: "stable-viewer-key",
+        limit: 1,
+      }),
+    ).toMatchObject([{ id: session!.id, viewer_key: "stable-viewer-key" }]);
+  });
+
   it("enforces host, membership, choice, round, and one participant vote", async () => {
     const t = convexTest(schema, modules);
     const host = t.withIdentity({
