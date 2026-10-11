@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 import {
   CLASSIC_WHEEL_ITEMS,
   CLASSIC_WHEEL_PRIZES,
-  pickClassicWheelPrize,
   type ClassicWheelPrize,
+  pickClassicWheelPrize,
 } from "@/lib/wheel/classicWheel";
 
 export function ClassicWheelClient() {
@@ -382,6 +382,13 @@ export function ClassicWheelClient() {
           <h2 className="text-lg font-semibold text-foreground">
             Wheel summary
           </h2>
+          {stats?.truncated && (
+            <p className="mt-2 text-xs text-amber-200/80">
+              Showing statistics from the latest{" "}
+              {stats.sampleSize.toLocaleString()} logged spins. Older spins are
+              omitted from these totals.
+            </p>
+          )}
           <div className="mt-4 overflow-hidden rounded-2xl border border-border/30 bg-background/80">
             <table className="w-full text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted-foreground/70">

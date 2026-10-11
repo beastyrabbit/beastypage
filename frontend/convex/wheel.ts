@@ -42,11 +42,12 @@ export const stats = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const limit = Math.max(1, Math.min(args.limit ?? 10_000, 10_000));
-    const records = await ctx.db
+    const recordsWithNext = await ctx.db
       .query("wheel_spins")
       .withIndex("byCreated")
       .order("desc")
-      .take(limit);
+      .take(limit + 1);
+    const records = recordsWithNext.slice(0, limit);
 
     const totals = new Map<
       string,
@@ -95,7 +96,8 @@ export const stats = query({
       totalForced,
       lastSpinAt: mostRecent,
       prizes: prizeStats,
-      truncated: records.length >= limit,
+      sampleSize: records.length,
+      truncated: recordsWithNext.length > limit,
     };
   },
 });

@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internalQuery, mutation, query } from "./_generated/server.js";
 
@@ -20,6 +21,37 @@ type CollectionDoc = Doc<"collection">;
 
 export type CollectionEntry = Awaited<ReturnType<typeof collectionDocToClient>>;
 
+const PAGE_SIZE = 36;
+
+/** Paginated collection archive used by the public gallery. */
+export const page = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("collection")
+      .withIndex("byCreated", (q) => q)
+      .order("desc")
+      .paginate({
+        ...args.paginationOpts,
+        numItems: Math.min(
+          PAGE_SIZE,
+          Math.max(1, args.paginationOpts.numItems),
+        ),
+      });
+
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map((doc) => collectionDocToClient(ctx, doc)),
+      ),
+    };
+  },
+});
+
+/**
+ * Legacy bounded collection query. New clients should use page so older
+ * artwork remains reachable as the archive grows.
+ */
 export const list = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
