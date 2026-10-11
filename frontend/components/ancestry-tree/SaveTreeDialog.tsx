@@ -11,6 +11,9 @@ import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 
+const MAX_SLUG_LENGTH = 40;
+const COPY_SUFFIX = "-copy";
+
 interface SaveTreeDialogProps {
   currentName: string;
   currentCreator?: string;
@@ -62,7 +65,9 @@ export function SaveTreeDialog({
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [saveAsNew, setSaveAsNew] = useState(false);
-  const [newSlug, setNewSlug] = useState(`${currentSlug}-copy`);
+  const [newSlug, setNewSlug] = useState(
+    `${currentSlug.slice(0, MAX_SLUG_LENGTH - COPY_SUFFIX.length)}${COPY_SUFFIX}`,
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -344,6 +349,7 @@ export function SaveTreeDialog({
               <input
                 type="text"
                 id="newTreeSlug"
+                maxLength={MAX_SLUG_LENGTH}
                 value={newSlug}
                 onChange={(e) => setNewSlug(e.target.value)}
                 placeholder="e.g., thunderclan-copy"
