@@ -34,6 +34,8 @@ type VariantOutcome =
 
 type VariantFailure = { failure: ThumbnailFailure };
 
+type VariantFailureResult = { variant: Variant; failure: ThumbnailFailure };
+
 const MAX_SOURCE_BYTES = 16 * 1024 * 1024;
 
 async function readResponseBody(response: Response): Promise<Buffer | null> {
@@ -113,55 +115,15 @@ export const generateForCat = internalAction({
     if (!cat) {
       return { success: false, reason: "cat_not_found" } as const;
     }
-    if (
-      (args.attempt === undefined &&
-        (cat.thumbnailAttemptCount !== undefined ||
-          cat.thumbnailStatus === "complete" ||
-          cat.thumbnailStatus === "failed")) ||
-      (args.attempt !== undefined &&
-        (cat.thumbnailAttemptCount !== args.attempt ||
-          cat.thumbnailStatus !== "processing"))
-    ) {
+    if (isStaleThumbnailAttempt(cat, args.attempt)) {
       return { success: false, reason: "stale_attempt" } as const;
     }
 
-    const results: VariantResult[] = [];
-
-    const tasks: Array<Promise<VariantOutcome>> = [];
-    if (cat.defaultCardStorageId && !cat.defaultCardThumbStorageId) {
-      tasks.push(
-        generateThumbnail(
-          ctx,
-          args.id,
-          "default",
-          cat.defaultCardStorageId,
-          cat.defaultCardName,
-        ),
-      );
-    }
-    if (cat.customCardStorageId && !cat.customCardThumbStorageId) {
-      tasks.push(
-        generateThumbnail(
-          ctx,
-          args.id,
-          "custom",
-          cat.customCardStorageId,
-          cat.customCardName,
-        ),
-      );
-    }
-
-    const resolved = await Promise.all(tasks);
-    for (const item of resolved) {
-      if ("payload" in item) results.push(item);
-    }
-    const failures = resolved.filter(
-      (item): item is { variant: Variant; failure: ThumbnailFailure } =>
-        "failure" in item,
+    const { results, retryableFailure } = await generateThumbnailVariants(
+      ctx,
+      args.id,
+      cat,
     );
-    const retryableFailure =
-      failures.length > 0 &&
-      failures.every((item) => item.failure === "temporary");
 
     if (!results.length) {
       await ctx.runMutation(internal.catdex.markThumbnailFailed, {
@@ -199,6 +161,68 @@ export const generateForCat = internalAction({
     } as const;
   },
 });
+
+function isStaleThumbnailAttempt(
+  cat: Doc<"catdex">,
+  attempt: number | undefined,
+): boolean {
+  if (attempt === undefined) {
+    return (
+      cat.thumbnailAttemptCount !== undefined ||
+      cat.thumbnailStatus === "complete" ||
+      cat.thumbnailStatus === "failed"
+    );
+  }
+  return (
+    cat.thumbnailAttemptCount !== attempt ||
+    cat.thumbnailStatus !== "processing"
+  );
+}
+
+async function generateThumbnailVariants(
+  ctx: ActionCtx,
+  catId: Id<"catdex">,
+  cat: Doc<"catdex">,
+): Promise<{ results: VariantResult[]; retryableFailure: boolean }> {
+  const tasks = [
+    cat.defaultCardStorageId && !cat.defaultCardThumbStorageId
+      ? generateThumbnail(
+          ctx,
+          catId,
+          "default",
+          cat.defaultCardStorageId,
+          cat.defaultCardName,
+        )
+      : null,
+    cat.customCardStorageId && !cat.customCardThumbStorageId
+      ? generateThumbnail(
+          ctx,
+          catId,
+          "custom",
+          cat.customCardStorageId,
+          cat.customCardName,
+        )
+      : null,
+  ].filter((task): task is Promise<VariantOutcome> => task !== null);
+
+  const resolved = await Promise.all(tasks);
+  const results = resolved.filter(isVariantResult);
+  const failures = resolved.filter(isVariantFailure);
+  return {
+    results,
+    retryableFailure:
+      failures.length > 0 &&
+      failures.every((item) => item.failure === "temporary"),
+  };
+}
+
+function isVariantResult(item: VariantOutcome): item is VariantResult {
+  return "payload" in item;
+}
+
+function isVariantFailure(item: VariantOutcome): item is VariantFailureResult {
+  return "failure" in item;
+}
 
 async function deleteGeneratedThumbnails(
   ctx: ActionCtx,

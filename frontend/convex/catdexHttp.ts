@@ -1,5 +1,6 @@
 import { internal } from "./_generated/api.js";
 import type { Id } from "./_generated/dataModel.js";
+import type { ActionCtx } from "./_generated/server.js";
 import { httpAction } from "./_generated/server.js";
 
 const MAX_CARD_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -99,11 +100,22 @@ export const upload = httpAction(async (ctx, request) => {
   } catch {
     return json({ error: "UPLOAD_FAILED" }, 500);
   }
+  return (
+    (await attachStoredUpload(ctx, token, storageId)) ?? json({ storageId })
+  );
+});
+
+async function attachStoredUpload(
+  ctx: ActionCtx,
+  token: string,
+  storageId: Id<"_storage">,
+): Promise<Response | null> {
   try {
     await ctx.runMutation(internal.catdex.attachUpload, {
       token,
       storageId,
     });
+    return null;
   } catch (error) {
     try {
       await ctx.storage.delete(storageId);
@@ -113,6 +125,4 @@ export const upload = httpAction(async (ctx, request) => {
     const message = error instanceof Error ? error.message : "UPLOAD_FAILED";
     return json({ error: message }, message.includes("expired") ? 410 : 400);
   }
-
-  return json({ storageId });
-});
+}
