@@ -193,6 +193,15 @@ export async function POST(request: NextRequest) {
     if (request.signal.aborted) {
       return NextResponse.json({ error: "Request aborted" }, { status: 499 });
     }
+    if (
+      error instanceof DOMException &&
+      (error.name === "TimeoutError" || error.name === "AbortError")
+    ) {
+      return NextResponse.json(
+        { error: "Renderer request timed out" },
+        { status: 504 },
+      );
+    }
     return NextResponse.json(
       { error: "Renderer service unavailable" },
       { status: 502 },

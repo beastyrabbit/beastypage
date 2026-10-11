@@ -231,6 +231,7 @@ export function prepareCatShare(data: EncodePayload): CatShareStoredPayload {
 export type CreateCatShareResult = {
   slug: string;
   id?: string | null;
+  editToken?: string | null;
   payload: CatShareStoredPayload;
 };
 
@@ -258,9 +259,15 @@ export async function createCatShare(
     const json = (await response.json()) as {
       slug?: string;
       id?: string | null;
+      editToken?: string | null;
     };
     if (!json.slug) throw new Error("createCatShare: response missing slug");
-    return { slug: json.slug, id: json.id ?? null, payload };
+    return {
+      slug: json.slug,
+      id: json.id ?? null,
+      editToken: json.editToken ?? null,
+      payload,
+    };
   } catch (error) {
     console.error("Failed to create cat share", error);
     return null;

@@ -36,7 +36,7 @@ vi.mock("@/lib/convexUrl", () => ({
 
 import { POST } from "./route";
 
-function request() {
+function request(signal?: AbortSignal) {
   return new NextRequest("http://localhost/api/discord/random-cat", {
     method: "POST",
     headers: {
@@ -44,6 +44,7 @@ function request() {
       "content-type": "application/json",
     },
     body: JSON.stringify({}),
+    signal,
   });
 }
 
@@ -123,6 +124,22 @@ describe("Discord random-cat renderer catalog guard", () => {
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toEqual({
       error: "Renderer catalog mismatch",
+    });
+  });
+
+  it("reports renderer timeouts separately from service failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(
+        new DOMException("The operation timed out", "TimeoutError"),
+      ),
+    );
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(504);
+    await expect(response.json()).resolves.toEqual({
+      error: "Renderer request timed out",
     });
   });
 });
