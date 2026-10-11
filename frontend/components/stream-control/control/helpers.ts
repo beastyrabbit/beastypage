@@ -22,9 +22,9 @@ import {
 } from "@/lib/evolution/rollSchedule";
 import {
   ceremonyElapsedMs,
+  ceremonyPhaseForReload,
   type EvolutionLiveState,
   type EvolutionStreamCommand,
-  estimateEvolutionCommandMs,
 } from "@/lib/evolution/streamEvolution";
 import {
   encodePortableSettings,
@@ -341,12 +341,14 @@ export function isShowLive(
     const evolution = command.evolution as EvolutionStreamCommand;
     const state = session?.evolutionState;
     const live = state?.seq === command.seq ? state : null;
-    if (live?.skipToBoard) return false;
     const timestamp =
       typeof command.timestamp === "number" ? command.timestamp : now;
+    // The effective clock already carries the offset and any hold, so it is
+    // measured against the schedule itself (a forward "Reveal now" jump must
+    // not shorten the bound a second time); a skip ends the show.
     return (
-      ceremonyElapsedMs(now, timestamp, command.seq, live) <
-      estimateEvolutionCommandMs(evolution, live)
+      ceremonyPhaseForReload(evolution, command.seq, timestamp, live, now) ===
+      "ceremony"
     );
   }
   return false;

@@ -302,6 +302,20 @@ describe("isShowLive", () => {
         T0 + TOTAL_MS + 1000,
       ),
     ).toBe(true);
+    // A forward "Reveal now" jump (negative offset) moves the effective clock
+    // ahead; the show stays live until that clock reaches the schedule total.
+    expect(
+      isShowLive(
+        evolutionSession({ seq: 7, offsetMs: -5000 }),
+        T0 + TOTAL_MS - 6000,
+      ),
+    ).toBe(true);
+    expect(
+      isShowLive(
+        evolutionSession({ seq: 7, offsetMs: -5000 }),
+        T0 + TOTAL_MS - 5000,
+      ),
+    ).toBe(false);
   });
   it("other commands and no session are not live", () => {
     expect(isShowLive(null, NOW)).toBe(false);

@@ -537,9 +537,7 @@ function NumberConsoleForm({
         disabled={!typedUsable || !awaiting}
         className="rounded-lg border border-red-500/60 bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {markedCat && typedCat && markedCat.id === typedCat.id
-          ? "Remove"
-          : "Mark"}
+        {markedCat && markedCat.id === typedCat?.id ? "Remove" : "Mark"}
       </button>
       <button
         type="button"

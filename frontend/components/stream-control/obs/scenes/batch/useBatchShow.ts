@@ -263,8 +263,7 @@ function stagingWindup(
 ): BatchBeat {
   ctx.stageFrames(stage);
   const { current } = ctx;
-  const stamp =
-    current && current.stageIndex === stage ? current.stageStartedAt : 0;
+  const stamp = current?.stageIndex === stage ? current.stageStartedAt : 0;
   return windupBeat(stageId, stamp ?? 0);
 }
 
@@ -272,9 +271,7 @@ function stagingWindup(
 function resolveAnchor(ctx: TickContext, stage: number): StageAnchor | null {
   const { current, refs } = ctx;
   const serverAnchor =
-    current &&
-    current.stageIndex === stage &&
-    typeof current.stageStartedAt === "number"
+    current?.stageIndex === stage && typeof current.stageStartedAt === "number"
       ? current.stageStartedAt
       : null;
   const localAnchor = refs.localAnchor.current;
@@ -412,10 +409,10 @@ function cullBeat(
   const departMs = cull.reduced ? BATCH_BEAT_MS.departReduced : BATCH_DEPART_MS;
   const repackMs = cull.reduced ? BATCH_BEAT_MS.repackReduced : BATCH_REPACK_MS;
   const since = now - cullAt;
-  const last = eliminated[eliminated.length - 1];
+  const last = eliminated.at(-1);
   const { stageId, timeline, landed } = play;
   if (since < departMs) {
-    cursor.fading = last;
+    cursor.fading = last ?? null;
     return beatOf({
       kind: "depart",
       stageId,

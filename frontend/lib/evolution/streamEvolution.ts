@@ -151,7 +151,12 @@ export function ceremonyPhaseForReload(
   return elapsed >= scheduleFor(command).totalMs ? "tree" : "ceremony";
 }
 
-/** Upper bound (ms) for the whole show incl. offset and an open hold; kept for callers that want one number. */
+/**
+ * Wall-clock upper bound (ms) for the whole show: compare it with
+ * `now − command.timestamp` only. It already folds in the offset and an open
+ * hold, so never measure `ceremonyElapsedMs` (the effective clock) against
+ * it; that clock belongs with the schedule total (`ceremonyPhaseForReload`).
+ */
 export function estimateEvolutionCommandMs(
   command: EvolutionStreamCommand,
   state?: EvolutionLiveState | null,
