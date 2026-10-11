@@ -71,11 +71,20 @@ const catdexCard = {
   rarity: "Common",
   updated: 1,
 };
-export const usePaginatedQuery = () => ({
-  results: new URL(location.href).searchParams.has("catdexCard")
-    ? [catdexCard]
-    : [],
-  status: "CanLoadMore",
-  loadMore: () => {},
-});
+export const usePaginatedQuery = (
+  reference: Parameters<typeof getFunctionName>[0],
+) => {
+  const functionName = getFunctionName(reference);
+  return {
+    results:
+      functionName === "collection:page" ||
+      new URL(location.href).searchParams.has("catdexCard")
+        ? functionName === "collection:page"
+          ? [artwork]
+          : [catdexCard]
+        : [],
+    status: "CanLoadMore" as const,
+    loadMore: () => {},
+  };
+};
 export class ConvexReactClient {}
