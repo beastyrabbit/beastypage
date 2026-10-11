@@ -18,6 +18,10 @@ type RarityDoc = Doc<"rarity">;
 const MAX_CARD_UPLOAD_BYTES = 10 * 1024 * 1024;
 const CARD_UPLOAD_CONTENT_TYPES = new Set(["image/png", "image/jpeg"]);
 const THUMBNAIL_RETRY_AFTER_MS = 30 * 60 * 1000;
+const CATDEX_UPLOAD_TTL_MS = 30 * 60 * 1000;
+const MAX_UPLOAD_CLEANUP_BATCH = 100;
+const MAX_UPLOADS_PER_HOUR = 60;
+const MAX_THUMBNAIL_ATTEMPTS = 3;
 
 export type CatdexPayload = Awaited<ReturnType<typeof catdexRecordToClient>>;
 
@@ -71,10 +75,52 @@ function shouldSkipThumbnail(cat: CatdexDoc, now: number): boolean {
   if (cat.thumbnailStatus === "failed" || cat.thumbnailStatus === "complete") {
     return true;
   }
-  return Boolean(
+  if (cat.thumbnailAttemptedAt === undefined) return false;
+  if (cat.thumbnailStatus === "pending") {
+    return cat.thumbnailAttemptedAt > now;
+  }
+  return (
     cat.thumbnailStatus === "processing" &&
-      (cat.thumbnailAttemptedAt ?? now) > now - THUMBNAIL_RETRY_AFTER_MS,
+    cat.thumbnailAttemptedAt > now - THUMBNAIL_RETRY_AFTER_MS
   );
+}
+
+function isCurrentThumbnailAttempt(cat: CatdexDoc, attempt?: number) {
+  if (attempt === undefined) {
+    return (
+      cat.thumbnailAttemptCount === undefined &&
+      cat.thumbnailStatus !== "complete" &&
+      cat.thumbnailStatus !== "failed"
+    );
+  }
+  return (
+    cat.thumbnailStatus === "processing" &&
+    cat.thumbnailAttemptCount === attempt
+  );
+}
+
+function thumbnailOutcomeUpdates(
+  cat: CatdexDoc,
+  updates: Partial<CatdexDoc>,
+  retryableFailure = false,
+): Partial<CatdexDoc> {
+  const needs = thumbnailNeeds({ ...cat, ...updates });
+  if (!needs.default && !needs.custom) {
+    return { ...updates, thumbnailStatus: "complete" };
+  }
+  const canRetry =
+    retryableFailure &&
+    (cat.thumbnailAttemptCount ?? 1) < MAX_THUMBNAIL_ATTEMPTS;
+  const attemptedAt = Date.now();
+  // A pending row stores its next eligible retry in this field; processing
+  // rows store the start time used by stale-job recovery.
+  return {
+    ...updates,
+    thumbnailStatus: canRetry ? "pending" : "failed",
+    thumbnailAttemptedAt: canRetry
+      ? attemptedAt + THUMBNAIL_RETRY_AFTER_MS
+      : attemptedAt,
+  };
 }
 
 export const page = query({
@@ -172,15 +218,43 @@ export const getDoc = internalQuery({
 });
 
 /**
- * Generate a short-lived Convex storage URL for a Catdex submission.
+ * Generate a short-lived managed upload URL for a Catdex submission.
  *
  * This is intentionally public because submissions are available to visitors
- * without an account. The create mutation validates the resulting storage
- * object before attaching it to a Catdex record.
+ * without an account. The HTTP upload action validates and records the stored
+ * object before the create mutation attaches it to a Catdex record.
  */
 export const generateUploadUrl = mutation({
   args: {},
-  handler: async (ctx) => ctx.storage.generateUploadUrl(),
+  handler: async (ctx) => {
+    const now = Date.now();
+    const recentUploads = await ctx.db
+      .query("catdex_uploads")
+      .withIndex("byCreatedAt", (q) => q.gt("createdAt", now - 60 * 60 * 1000))
+      .take(MAX_UPLOADS_PER_HOUR + 1);
+    if (recentUploads.length >= MAX_UPLOADS_PER_HOUR) {
+      throw new Error("Too many pending uploads; try again later");
+    }
+    const token = crypto.randomUUID();
+    await ctx.db.insert("catdex_uploads", {
+      token,
+      status: "pending",
+      expiresAt: now + CATDEX_UPLOAD_TTL_MS,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // HTTP actions are served from the Convex site origin. Refuse to return a
+    // relative URL: browsers would resolve it against the frontend origin,
+    // bypassing the upload action on self-hosted deployments.
+    const configuredOrigin =
+      process.env.CONVEX_SITE_URL ?? process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
+    const origin = configuredOrigin?.replace(/\/$/, "");
+    if (!origin) {
+      throw new Error("CONVEX_SITE_URL is not configured");
+    }
+    return `${origin}/catdex/upload?token=${encodeURIComponent(token)}`;
+  },
 });
 
 export const create = mutation({
@@ -193,15 +267,29 @@ export const create = mutation({
     defaultCard: v.object({
       storageId: v.id("_storage"),
       fileName: v.string(),
+      uploadToken: v.optional(v.string()),
     }),
     customCard: v.optional(
       v.object({
         storageId: v.id("_storage"),
         fileName: v.string(),
+        uploadToken: v.optional(v.string()),
       }),
     ),
   },
   handler: async (ctx, args) => {
+    await consumeCardUpload(
+      ctx,
+      args.defaultCard.uploadToken,
+      args.defaultCard.storageId,
+    );
+    if (args.customCard) {
+      await consumeCardUpload(
+        ctx,
+        args.customCard.uploadToken,
+        args.customCard.storageId,
+      );
+    }
     await validateCardUpload(ctx, args.defaultCard.storageId);
     if (args.customCard) {
       await validateCardUpload(ctx, args.customCard.storageId);
@@ -218,7 +306,9 @@ export const create = mutation({
       defaultCardName: args.defaultCard.fileName,
       createdAt: nowTs,
       updatedAt: nowTs,
-      thumbnailStatus: "pending" as const,
+      thumbnailStatus: "processing" as const,
+      thumbnailAttemptedAt: nowTs,
+      thumbnailAttemptCount: 1,
       ...(args.cardNumber !== undefined ? { cardNumber: args.cardNumber } : {}),
       ...(args.customCard
         ? {
@@ -235,6 +325,7 @@ export const create = mutation({
     }
     await ctx.scheduler.runAfter(0, internal.imageService.generateForCat, {
       id: docId,
+      attempt: 1,
     });
     return catdexRecordToClient(ctx, doc);
   },
@@ -251,13 +342,111 @@ async function validateCardUpload(
   if (metadata.size > MAX_CARD_UPLOAD_BYTES) {
     throw new Error("Card uploads must be 10 MiB or smaller.");
   }
+  // The managed HTTP endpoint validates the request header before storing.
+  // Some Convex test/storage backends omit contentType from system metadata,
+  // so only reject an explicitly unsupported type here.
   if (
-    !metadata.contentType ||
+    metadata.contentType !== undefined &&
     !CARD_UPLOAD_CONTENT_TYPES.has(metadata.contentType)
   ) {
     throw new Error("Card uploads must be PNG or JPEG images.");
   }
 }
+
+async function consumeCardUpload(
+  ctx: Pick<MutationCtx, "db">,
+  token: string | undefined,
+  storageId: Id<"_storage">,
+) {
+  const upload = token
+    ? await ctx.db
+        .query("catdex_uploads")
+        .withIndex("byToken", (q) => q.eq("token", token))
+        .unique()
+    : await ctx.db
+        .query("catdex_uploads")
+        .withIndex("byStorageId", (q) => q.eq("storageId", storageId))
+        .unique();
+  if (!token && !upload) return;
+  if (!upload) {
+    throw new Error("Card upload was not issued for this submission.");
+  }
+  if (
+    upload.status !== "attached" ||
+    upload.storageId !== storageId ||
+    upload.expiresAt <= Date.now()
+  ) {
+    throw new Error("Card upload was not issued for this submission.");
+  }
+  await ctx.db.delete(upload._id);
+}
+
+export const getUploadReservation = internalQuery({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    const upload = await ctx.db
+      .query("catdex_uploads")
+      .withIndex("byToken", (q) => q.eq("token", args.token))
+      .unique();
+    if (!upload) return null;
+    if (upload.status !== "pending" || upload.expiresAt <= Date.now()) {
+      return null;
+    }
+    return upload;
+  },
+});
+
+export const attachUpload = internalMutation({
+  args: {
+    token: v.string(),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const upload = await ctx.db
+      .query("catdex_uploads")
+      .withIndex("byToken", (q) => q.eq("token", args.token))
+      .unique();
+    if (!upload) {
+      throw new Error("Card upload URL has expired.");
+    }
+    if (upload.status !== "pending" || upload.expiresAt <= Date.now()) {
+      throw new Error("Card upload URL has expired.");
+    }
+    await validateCardUpload(ctx, args.storageId);
+    await ctx.db.patch(upload._id, {
+      storageId: args.storageId,
+      status: "attached",
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const cleanupExpiredUploads = internalMutation({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = Math.max(
+      1,
+      Math.min(
+        args.limit ?? MAX_UPLOAD_CLEANUP_BATCH,
+        MAX_UPLOAD_CLEANUP_BATCH,
+      ),
+    );
+    const expired = await ctx.db
+      .query("catdex_uploads")
+      .withIndex("byExpiresAt", (q) => q.lt("expiresAt", Date.now()))
+      .take(limit);
+    for (const upload of expired) {
+      if (upload.storageId) await ctx.storage.delete(upload.storageId);
+      await ctx.db.delete(upload._id);
+    }
+    if (expired.length === limit) {
+      await ctx.scheduler.runAfter(0, internal.catdex.cleanupExpiredUploads, {
+        limit,
+      });
+    }
+    return { deleted: expired.length };
+  },
+});
 
 async function catdexRecordToClient(
   ctx: QueryCtx,
@@ -431,8 +620,14 @@ export const applyThumbnailUpdates = internalMutation({
         height: v.optional(v.number()),
       }),
     ),
+    attempt: v.optional(v.number()),
+    retryableFailure: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const current = await ctx.db.get(args.id);
+    if (!current || !isCurrentThumbnailAttempt(current, args.attempt)) {
+      return { success: false, reason: "stale_attempt" } as const;
+    }
     const updates: Partial<CatdexDoc> = {
       updatedAt: Date.now(),
     };
@@ -445,41 +640,31 @@ export const applyThumbnailUpdates = internalMutation({
       applyCustomCardThumbnail(updates, args.customCard);
     }
 
-    const current = await ctx.db.get(args.id);
-    if (current) {
-      const hasDefault = Boolean(
-        !current.defaultCardStorageId ||
-          args.defaultCard?.thumbStorageId ||
-          current.defaultCardThumbStorageId,
-      );
-      const hasCustom = Boolean(
-        !current.customCardStorageId ||
-          args.customCard?.thumbStorageId ||
-          current.customCardThumbStorageId,
-      );
-      updates.thumbnailStatus = hasDefault && hasCustom ? "complete" : "failed";
-    }
-
-    await ctx.db.patch(args.id, updates);
+    await ctx.db.patch(
+      args.id,
+      thumbnailOutcomeUpdates(current, updates, args.retryableFailure),
+    );
     return { success: true };
   },
 });
 
 export const markThumbnailFailed = internalMutation({
-  args: { id: v.id("catdex") },
+  args: {
+    id: v.id("catdex"),
+    attempt: v.optional(v.number()),
+    retryableFailure: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
     const current = await ctx.db.get(args.id);
-    if (!current) return;
-    const hasDefault =
-      !current.defaultCardStorageId ||
-      Boolean(current.defaultCardThumbStorageId);
-    const hasCustom =
-      !current.customCardStorageId || Boolean(current.customCardThumbStorageId);
-    await ctx.db.patch(args.id, {
-      thumbnailStatus: hasDefault && hasCustom ? "complete" : "failed",
-      thumbnailAttemptedAt: Date.now(),
-      updatedAt: Date.now(),
-    });
+    if (!current || !isCurrentThumbnailAttempt(current, args.attempt)) return;
+    await ctx.db.patch(
+      args.id,
+      thumbnailOutcomeUpdates(
+        current,
+        { updatedAt: Date.now() },
+        args.retryableFailure,
+      ),
+    );
   },
 });
 
@@ -497,18 +682,23 @@ export const enqueueMissingThumbnails = internalMutation({
       if (shouldSkipThumbnail(cat, now)) continue;
       const needs = thumbnailNeeds(cat);
       if (!needs.default && !needs.custom) {
-        if (cat.thumbnailStatus === undefined) {
-          await ctx.db.patch(cat._id, { thumbnailStatus: "complete" });
-        }
+        await ctx.db.patch(cat._id, { thumbnailStatus: "complete" });
+        continue;
+      }
+
+      if ((cat.thumbnailAttemptCount ?? 0) >= MAX_THUMBNAIL_ATTEMPTS) {
+        await ctx.db.patch(cat._id, { thumbnailStatus: "failed" });
         continue;
       }
 
       await ctx.db.patch(cat._id, {
         thumbnailStatus: "processing",
         thumbnailAttemptedAt: now,
+        thumbnailAttemptCount: (cat.thumbnailAttemptCount ?? 0) + 1,
       });
       await ctx.scheduler.runAfter(0, internal.imageService.generateForCat, {
         id: cat._id,
+        attempt: (cat.thumbnailAttemptCount ?? 0) + 1,
       });
       enqueued += 1;
       if (enqueued >= max) break;

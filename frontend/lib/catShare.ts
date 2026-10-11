@@ -235,7 +235,10 @@ export type CreateCatShareResult = {
   payload: CatShareStoredPayload;
 };
 
-type CreateCatShareOptions = { slug?: string };
+type CreateCatShareOptions = {
+  slug?: string;
+  editToken?: string | null;
+};
 
 export async function createCatShare(
   data: EncodePayload,
@@ -251,7 +254,11 @@ export async function createCatShare(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
-      body: JSON.stringify({ slug: options?.slug, data: payload }),
+      body: JSON.stringify({
+        slug: options?.slug,
+        editToken: options?.editToken ?? undefined,
+        data: payload,
+      }),
     });
     if (!response.ok) {
       throw new Error(`createCatShare: unexpected status ${response.status}`);

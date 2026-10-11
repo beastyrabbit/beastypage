@@ -185,10 +185,6 @@ class RendererSupervisor:
         }
 
 
-class RequestBodyTooLargeError(Exception):
-    """Raised when a streamed request exceeds the renderer body budget."""
-
-
 class RequestBodyLimitMiddleware:
     def __init__(self, app: Callable, max_bytes: int) -> None:
         self.app = app
@@ -204,21 +200,41 @@ class RequestBodyLimitMiddleware:
             await self._send_too_large(send)
             return
 
-        received_bytes = 0
-
-        async def limited_receive() -> Message:
-            nonlocal received_bytes
+        # Read the request before handing control to FastAPI.  Raising from a
+        # wrapped ``receive`` function is too late: Starlette's request parser
+        # can turn that exception into a generic 400 response.  Keeping the
+        # bounded body in memory also means downstream code sees one normal,
+        # complete ASGI request and cannot consume bytes beyond the cap.
+        body_buffer = bytearray()
+        terminal_message: Message | None = None
+        while True:
             message = await receive()
-            if message["type"] == HTTP_REQUEST:
-                received_bytes += len(message.get("body", b""))
-                if received_bytes > self.max_bytes:
-                    raise RequestBodyTooLargeError
-            return message
+            if message["type"] != HTTP_REQUEST:
+                terminal_message = message
+                break
 
-        try:
-            await self.app(scope, limited_receive, send)
-        except RequestBodyTooLargeError:
-            await self._send_too_large(send)
+            chunk = message.get("body", b"")
+            if len(body_buffer) + len(chunk) > self.max_bytes:
+                await self._send_too_large(send)
+                return
+            body_buffer.extend(chunk)
+            if not message.get("more_body", False):
+                break
+
+        body = bytes(body_buffer)
+        del body_buffer
+        replayed = False
+
+        async def replay_receive() -> Message:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                if terminal_message is not None:
+                    return terminal_message
+                return {"type": HTTP_REQUEST, "body": body, "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay_receive, send)
 
     @staticmethod
     def _content_length(scope: Scope) -> int | None:
@@ -239,7 +255,7 @@ class RequestBodyLimitMiddleware:
         await send(
             {
                 "type": HTTP_RESPONSE_START,
-                "status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                "status": status.HTTP_413_CONTENT_TOO_LARGE,
                 "headers": [
                     (b"content-type", b"application/json"),
                     (b"content-length", str(len(body)).encode("ascii")),

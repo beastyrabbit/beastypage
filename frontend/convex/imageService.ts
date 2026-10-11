@@ -7,11 +7,12 @@ import {
   MAX_SOURCE_PIXELS,
 } from "../lib/image-source-limits.js";
 import { internal } from "./_generated/api.js";
-import type { Id } from "./_generated/dataModel.js";
+import type { Doc, Id } from "./_generated/dataModel.js";
 import type { ActionCtx } from "./_generated/server.js";
 import { internalAction } from "./_generated/server.js";
 
 type Variant = "default" | "custom";
+type ThumbnailFailure = "temporary" | "permanent";
 
 type ThumbnailPayload = {
   thumbStorageId: Id<"_storage">;
@@ -26,6 +27,12 @@ type VariantResult = {
   variant: Variant;
   payload: ThumbnailPayload;
 };
+
+type VariantOutcome =
+  | VariantResult
+  | { variant: Variant; failure: ThumbnailFailure };
+
+type VariantFailure = { failure: ThumbnailFailure };
 
 const MAX_SOURCE_BYTES = 16 * 1024 * 1024;
 
@@ -96,16 +103,31 @@ function resizeThumbnail(image: ResizableImage) {
 export const generateForCat = internalAction({
   args: {
     id: v.id("catdex"),
+    attempt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const cat = await ctx.runQuery(internal.catdex.getDoc, { id: args.id });
+    const cat: Doc<"catdex"> | null = await ctx.runQuery(
+      internal.catdex.getDoc,
+      { id: args.id },
+    );
     if (!cat) {
       return { success: false, reason: "cat_not_found" } as const;
+    }
+    if (
+      (args.attempt === undefined &&
+        (cat.thumbnailAttemptCount !== undefined ||
+          cat.thumbnailStatus === "complete" ||
+          cat.thumbnailStatus === "failed")) ||
+      (args.attempt !== undefined &&
+        (cat.thumbnailAttemptCount !== args.attempt ||
+          cat.thumbnailStatus !== "processing"))
+    ) {
+      return { success: false, reason: "stale_attempt" } as const;
     }
 
     const results: VariantResult[] = [];
 
-    const tasks: Array<Promise<VariantResult | null>> = [];
+    const tasks: Array<Promise<VariantOutcome>> = [];
     if (cat.defaultCardStorageId && !cat.defaultCardThumbStorageId) {
       tasks.push(
         generateThumbnail(
@@ -131,12 +153,21 @@ export const generateForCat = internalAction({
 
     const resolved = await Promise.all(tasks);
     for (const item of resolved) {
-      if (item) results.push(item);
+      if ("payload" in item) results.push(item);
     }
+    const failures = resolved.filter(
+      (item): item is { variant: Variant; failure: ThumbnailFailure } =>
+        "failure" in item,
+    );
+    const retryableFailure =
+      failures.length > 0 &&
+      failures.every((item) => item.failure === "temporary");
 
     if (!results.length) {
       await ctx.runMutation(internal.catdex.markThumbnailFailed, {
         id: args.id,
+        attempt: args.attempt,
+        retryableFailure,
       });
       return { success: false, reason: "nothing_to_generate" } as const;
     }
@@ -148,11 +179,19 @@ export const generateForCat = internalAction({
       (entry) => entry.variant === "custom",
     )?.payload;
 
-    await ctx.runMutation(internal.catdex.applyThumbnailUpdates, {
-      id: args.id,
-      ...(defaultCard ? { defaultCard } : {}),
-      ...(customCard ? { customCard } : {}),
-    });
+    const applied: { success: boolean; reason?: string } =
+      await ctx.runMutation(internal.catdex.applyThumbnailUpdates, {
+        id: args.id,
+        attempt: args.attempt,
+        retryableFailure,
+        ...(defaultCard ? { defaultCard } : {}),
+        ...(customCard ? { customCard } : {}),
+      });
+
+    if ("reason" in applied && applied.reason === "stale_attempt") {
+      await deleteGeneratedThumbnails(ctx, [defaultCard, customCard]);
+      return applied;
+    }
 
     return {
       success: true,
@@ -161,42 +200,148 @@ export const generateForCat = internalAction({
   },
 });
 
+async function deleteGeneratedThumbnails(
+  ctx: ActionCtx,
+  cards: Array<ThumbnailPayload | undefined>,
+) {
+  await Promise.all(
+    cards.flatMap((card) => {
+      if (!card) return [];
+      return [
+        ctx.storage.delete(card.thumbStorageId).catch((error) => {
+          console.warn("Failed to clean up stale Catdex thumbnail", error);
+        }),
+      ];
+    }),
+  );
+}
+
 async function generateThumbnail(
   ctx: ActionCtx,
   catId: Id<"catdex">,
   variant: Variant,
   storageId: string,
   name: string | null | undefined,
-): Promise<VariantResult | null> {
-  const downloadUrl = await ctx.storage.getUrl(storageId);
-  if (!downloadUrl) {
+): Promise<VariantOutcome> {
+  const downloadUrl = await resolveDownloadUrl(ctx, storageId, catId, variant);
+  if (typeof downloadUrl !== "string") {
+    return { variant, ...downloadUrl };
+  }
+
+  const source = await fetchThumbnailSource(downloadUrl, catId, variant);
+  if ("failure" in source) return { variant, ...source };
+
+  const processed = await processThumbnail(source.buffer, catId, variant);
+  if ("failure" in processed) return { variant, ...processed };
+
+  const thumbStorageId = await storeThumbnail(
+    ctx,
+    processed.buffer,
+    catId,
+    variant,
+  );
+  if ("failure" in thumbStorageId) return { variant, ...thumbStorageId };
+
+  const thumbName = `${name ?? variant}-card-thumb.jpg`;
+
+  return {
+    variant,
+    payload: {
+      thumbStorageId,
+      thumbName,
+      thumbWidth: processed.image.width,
+      thumbHeight: processed.image.height,
+      width: processed.dimensions.width,
+      height: processed.dimensions.height,
+    },
+  };
+}
+
+async function resolveDownloadUrl(
+  ctx: ActionCtx,
+  storageId: string,
+  catId: Id<"catdex">,
+  variant: Variant,
+): Promise<string | VariantFailure> {
+  try {
+    const downloadUrl = await ctx.storage.getUrl(storageId);
+    if (downloadUrl) return downloadUrl;
+  } catch (error) {
     console.warn("Unable to resolve storage URL for thumbnail variant", {
       catId,
       variant,
+      error,
     });
-    return null;
+    return { failure: "temporary" };
+  }
+  console.warn("Unable to resolve storage URL for thumbnail variant", {
+    catId,
+    variant,
+  });
+  return { failure: "permanent" };
+}
+
+async function fetchThumbnailSource(
+  downloadUrl: string,
+  catId: Id<"catdex">,
+  variant: Variant,
+): Promise<{ buffer: Buffer } | VariantFailure> {
+  let response: Response;
+  try {
+    response = await fetch(downloadUrl);
+  } catch (error) {
+    console.warn("Failed to fetch image for thumbnail", {
+      catId,
+      variant,
+      error,
+    });
+    return { failure: "temporary" };
+  }
+
+  if (!response.ok) {
+    console.warn("Failed to fetch image for thumbnail", {
+      catId,
+      variant,
+      status: response.status,
+    });
+    return { failure: classifyHttpFailure(response.status) };
   }
 
   try {
-    // Fetch the original image
-    const response = await fetch(downloadUrl);
-    if (!response.ok) {
-      console.warn("Failed to fetch image for thumbnail", {
-        catId,
-        variant,
-        status: response.status,
-      });
-      return null;
-    }
-
     const buffer = await readResponseBody(response);
-    if (!buffer) return null;
+    return buffer ? { buffer } : { failure: "permanent" };
+  } catch (error) {
+    console.warn("Failed to read image for thumbnail", {
+      catId,
+      variant,
+      error,
+    });
+    return { failure: "temporary" };
+  }
+}
 
+function classifyHttpFailure(status: number): ThumbnailFailure {
+  return status === 408 || status === 429 || status >= 500
+    ? "temporary"
+    : "permanent";
+}
+
+async function processThumbnail(
+  buffer: Buffer,
+  catId: Id<"catdex">,
+  variant: Variant,
+): Promise<
+  | {
+      image: Awaited<ReturnType<typeof Jimp.read>>;
+      dimensions: { width: number; height: number };
+      buffer: Buffer;
+    }
+  | VariantFailure
+> {
+  try {
     // Reject oversized or unsupported raster headers before Jimp allocates a
-    // decoded pixel buffer.
+    // decoded pixel buffer. These are source problems and should not retry.
     assertImageSourceWithinLimits(buffer);
-
-    // Read the original image with Jimp
     const image = await Jimp.read(buffer);
     const dimensions = resizeThumbnail(image);
     if (!dimensions) {
@@ -204,36 +349,36 @@ async function generateThumbnail(
         catId,
         variant,
       });
-      return null;
+      return { failure: "permanent" };
     }
-
-    // Convert to JPEG with 85% quality
     const processed = await image.getBuffer("image/jpeg", { quality: 85 });
-
-    // Store the thumbnail
-    const thumbStorageId = await ctx.storage.store(
-      new Blob([new Uint8Array(processed)], { type: "image/jpeg" }),
-    );
-
-    const thumbName = `${name ?? variant}-card-thumb.jpg`;
-
-    return {
-      variant,
-      payload: {
-        thumbStorageId,
-        thumbName,
-        thumbWidth: image.width,
-        thumbHeight: image.height,
-        width: dimensions.width,
-        height: dimensions.height,
-      },
-    };
+    return { image, dimensions, buffer: processed };
   } catch (error) {
-    console.warn("Error generating thumbnail with jimp", {
+    console.warn("Error decoding thumbnail source", {
       catId,
       variant,
       error,
     });
-    return null;
+    return { failure: "permanent" };
+  }
+}
+
+async function storeThumbnail(
+  ctx: ActionCtx,
+  buffer: Buffer,
+  catId: Id<"catdex">,
+  variant: Variant,
+): Promise<Id<"_storage"> | VariantFailure> {
+  try {
+    return await ctx.storage.store(
+      new Blob([new Uint8Array(buffer)], { type: "image/jpeg" }),
+    );
+  } catch (error) {
+    console.warn("Error storing generated thumbnail", {
+      catId,
+      variant,
+      error,
+    });
+    return { failure: "temporary" };
   }
 }

@@ -141,6 +141,70 @@ describe("Catdex thumbnail backfill", () => {
     );
   });
 
+  it("retries temporary failures twice, then suppresses further work", async () => {
+    const t = convexTest(schema, modules);
+    const { seasonId, rarityId } = await insertBaseRows(t);
+    const storageId = await t.run((ctx) =>
+      ctx.storage.store(new Blob(["fixture"], { type: "image/png" })),
+    );
+    const catId = await t.run((ctx) =>
+      ctx.db.insert("catdex", {
+        catName: "Retry",
+        twitchUserName: "fixture",
+        seasonId,
+        rarityId,
+        approved: true,
+        defaultCardStorageId: storageId,
+        defaultCardName: "retry.png",
+        thumbnailStatus: "processing",
+        thumbnailAttemptedAt: Date.now(),
+        thumbnailAttemptCount: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+
+    await t.mutation(internal.catdex.markThumbnailFailed, {
+      id: catId,
+      attempt: 1,
+      retryableFailure: true,
+    });
+    await expect(t.run((ctx) => ctx.db.get(catId))).resolves.toMatchObject({
+      thumbnailStatus: "pending",
+      thumbnailAttemptCount: 1,
+    });
+
+    // A late duplicate from attempt 1 must not overwrite the pending retry.
+    await t.mutation(internal.catdex.markThumbnailFailed, {
+      id: catId,
+      attempt: 1,
+      retryableFailure: false,
+    });
+    await expect(t.run((ctx) => ctx.db.get(catId))).resolves.toMatchObject({
+      thumbnailStatus: "pending",
+    });
+    await expect(
+      t.mutation(internal.catdex.enqueueMissingThumbnails, { limit: 1 }),
+    ).resolves.toEqual({ enqueued: 0 });
+
+    await t.run((ctx) =>
+      ctx.db.patch(catId, {
+        thumbnailStatus: "processing",
+        thumbnailAttemptedAt: Date.now() - 31 * 60 * 1000,
+        thumbnailAttemptCount: 3,
+      }),
+    );
+    await t.mutation(internal.catdex.markThumbnailFailed, {
+      id: catId,
+      attempt: 3,
+      retryableFailure: true,
+    });
+    await expect(t.run((ctx) => ctx.db.get(catId))).resolves.toMatchObject({
+      thumbnailStatus: "failed",
+      thumbnailAttemptCount: 3,
+    });
+  });
+
   it("does not regress a completed row when a duplicate job has no work", async () => {
     const t = convexTest(schema, modules);
     const { seasonId, rarityId } = await insertBaseRows(t);

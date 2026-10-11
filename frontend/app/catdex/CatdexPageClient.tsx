@@ -230,12 +230,14 @@ export default function CatdexPage() {
         defaultCard: {
           storageId: defaultUpload.storageId as Id<"_storage">,
           fileName: defaultUpload.fileName,
+          uploadToken: defaultUpload.uploadToken,
         },
         ...(customUpload
           ? {
               customCard: {
                 storageId: customUpload.storageId as Id<"_storage">,
                 fileName: customUpload.fileName,
+                uploadToken: customUpload.uploadToken,
               },
             }
           : {}),
@@ -830,10 +832,19 @@ function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
 async function uploadToStorage(
   file: File,
   generateUploadUrl: () => Promise<string>,
-): Promise<{ storageId: string; fileName: string }> {
+): Promise<{ storageId: string; fileName: string; uploadToken: string }> {
   const uploadUrl = await generateUploadUrl();
+  const configuredSiteOrigin = process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
+  const uploadTarget = new URL(
+    uploadUrl,
+    configuredSiteOrigin || window.location.origin,
+  ).toString();
+  const uploadToken = new URL(uploadTarget).searchParams.get("token");
+  if (!uploadToken) {
+    throw new Error("Upload URL did not include an upload token.");
+  }
 
-  const uploadResponse = await fetch(uploadUrl, {
+  const uploadResponse = await fetch(uploadTarget, {
     method: "POST",
     headers: {
       "Content-Type": file.type || "application/octet-stream",
@@ -848,7 +859,7 @@ async function uploadToStorage(
   if (!storageId) {
     throw new Error("Upload completed but storageId was missing.");
   }
-  return { storageId, fileName: file.name };
+  return { storageId, fileName: file.name, uploadToken };
 }
 
 function inferEntryDefaults(fileName: string): {

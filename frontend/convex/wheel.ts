@@ -21,16 +21,25 @@ export const logSpin = mutation({
     prizeName: v.string(),
     forced: v.boolean(),
     randomBucket: v.optional(v.number()),
+    clientKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    const actorKey = identity?.tokenIdentifier ?? "anonymous";
-    const rateLimit = identity
-      ? AUTHENTICATED_SPINS_PER_MINUTE
-      : ANONYMOUS_SPINS_PER_MINUTE;
     if (args.forced) {
       throw new Error("Forced wheel spins are internal-only");
     }
+    const identity = await ctx.auth.getUserIdentity();
+    const anonymousClientKey =
+      !identity &&
+      args.clientKey &&
+      /^[A-Za-z0-9_-]{16,80}$/.test(args.clientKey)
+        ? args.clientKey
+        : null;
+    const actorKey =
+      identity?.tokenIdentifier ??
+      (anonymousClientKey ? `anonymous:${anonymousClientKey}` : "anonymous");
+    const rateLimit = identity
+      ? AUTHENTICATED_SPINS_PER_MINUTE
+      : ANONYMOUS_SPINS_PER_MINUTE;
     if (args.randomBucket === undefined) {
       throw new Error("A random bucket is required");
     }

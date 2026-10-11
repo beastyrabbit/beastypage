@@ -1,9 +1,15 @@
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from pydantic import ValidationError
 
-from renderer_service.app import create_app
+from renderer_service.app import (
+    MAX_REQUEST_BODY_BYTES,
+    RequestBodyLimitMiddleware,
+    create_app,
+)
 from renderer_service.models import BatchRenderRequest, BatchVariant, RenderOptions
 from renderer_service.renderer.pipeline import RenderPipeline
 
@@ -130,6 +136,128 @@ def test_request_body_limit_rejects_chunked_payload_without_content_length():
         )
 
     assert response.status_code == 413
+
+
+def test_request_body_limit_accepts_exact_budget_and_replays_complete_body():
+    received: dict[str, bytes] = {}
+    responses: list[dict] = []
+
+    async def downstream(scope, receive, send):
+        message = await receive()
+        received["body"] = message["body"]
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    body = b"x" * MAX_REQUEST_BODY_BYTES
+    source = iter(
+        [
+            {
+                "type": "http.request",
+                "body": body[:-1],
+                "more_body": True,
+            },
+            {"type": "http.request", "body": body[-1:], "more_body": False},
+        ]
+    )
+
+    async def receive():
+        return next(source)
+
+    async def send(message):
+        responses.append(message)
+
+    async def invoke():
+        await RequestBodyLimitMiddleware(downstream, MAX_REQUEST_BODY_BYTES)(
+            {"type": "http", "headers": []}, receive, send
+        )
+
+    asyncio.run(invoke())
+
+    assert received["body"] == body
+    assert responses[0]["status"] == 200
+
+
+def test_request_body_limit_uses_actual_bytes_when_content_length_underreports():
+    downstream_called = False
+    responses: list[dict] = []
+
+    async def downstream(scope, receive, send):
+        nonlocal downstream_called
+        downstream_called = True
+
+    body = b"x" * (MAX_REQUEST_BODY_BYTES + 1)
+    source = iter(
+        [
+            {
+                "type": "http.request",
+                "body": body[: MAX_REQUEST_BODY_BYTES // 2],
+                "more_body": True,
+            },
+            {
+                "type": "http.request",
+                "body": body[MAX_REQUEST_BODY_BYTES // 2 :],
+                "more_body": False,
+            },
+        ]
+    )
+
+    async def receive():
+        return next(source)
+
+    async def send(message):
+        responses.append(message)
+
+    async def invoke():
+        await RequestBodyLimitMiddleware(downstream, MAX_REQUEST_BODY_BYTES)(
+            {
+                "type": "http",
+                "headers": [(b"content-length", b"1")],
+            },
+            receive,
+            send,
+        )
+
+    asyncio.run(invoke())
+
+    assert downstream_called is False
+    assert responses[0]["status"] == 413
+
+
+def test_request_body_limit_stops_reading_at_overflow_and_sends_only_one_response():
+    receive_calls = 0
+    responses: list[dict] = []
+
+    async def downstream(scope, receive, send):
+        pytest.fail("Oversized input must not reach request parsing")
+
+    async def receive():
+        nonlocal receive_calls
+        receive_calls += 1
+        if receive_calls > 1:
+            pytest.fail("The rejected request body must not be drained")
+        return {
+            "type": "http.request",
+            "body": b"x" * (MAX_REQUEST_BODY_BYTES + 1),
+            "more_body": True,
+        }
+
+    async def send(message):
+        responses.append(message)
+
+    async def invoke():
+        await RequestBodyLimitMiddleware(downstream, MAX_REQUEST_BODY_BYTES)(
+            {"type": "http", "headers": []}, receive, send
+        )
+
+    asyncio.run(invoke())
+
+    assert receive_calls == 1
+    assert [message["type"] for message in responses] == [
+        "http.response.start",
+        "http.response.body",
+    ]
+    assert responses[0]["status"] == 413
+    assert responses[1]["more_body"] is False
 
 
 @pytest.fixture(scope="module")

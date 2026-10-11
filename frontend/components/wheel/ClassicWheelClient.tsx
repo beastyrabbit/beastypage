@@ -35,6 +35,23 @@ export function ClassicWheelClient() {
   );
   const [wasForced, setWasForced] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [clientKey] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const storageKey = "classic-wheel:client-key";
+      const existing = window.localStorage.getItem(storageKey);
+      if (existing && /^[A-Za-z0-9_-]{16,80}$/.test(existing)) {
+        return existing;
+      }
+      const generated =
+        window.crypto?.randomUUID?.() ??
+        `${Date.now()}-${window.crypto.getRandomValues(new Uint32Array(1))[0]}`;
+      window.localStorage.setItem(storageKey, generated);
+      return generated;
+    } catch {
+      return null;
+    }
+  });
 
   const logSpin = useMutation(api.wheel.logSpin);
   const stats = useQuery(api.wheel.stats, {});
@@ -306,6 +323,7 @@ export function ClassicWheelClient() {
             prizeName: stored.prize.name,
             forced: false,
             randomBucket: stored.randomBucket,
+            clientKey: clientKey ?? undefined,
           }).catch((error) => {
             console.error("Failed to log wheel spin", error);
           });
@@ -328,7 +346,7 @@ export function ClassicWheelClient() {
         1,
       );
     },
-    [isSpinning, logSpin, triggerCelebration],
+    [clientKey, isSpinning, logSpin, triggerCelebration],
   );
 
   const closeModal = useCallback(() => {

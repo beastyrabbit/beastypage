@@ -11,6 +11,13 @@ crons.interval(
 );
 
 crons.interval(
+  "catdex-upload-retention",
+  { hours: 1 },
+  internal.catdex.cleanupExpiredUploads,
+  { limit: 100 },
+);
+
+crons.interval(
   "quick-share-retention",
   { hours: 1 },
   internal.quickShare.maintenance,

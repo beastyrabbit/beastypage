@@ -67,6 +67,36 @@ describe("bounded archive queries", () => {
     ).resolves.toBeNull();
   });
 
+  it("keeps valid anonymous device keys on separate rate-limit buckets", async () => {
+    const t = convexTest(schema, modules);
+    const first = "device-key-aaaaaaaa";
+    const second = "device-key-bbbbbbbb";
+    for (let i = 0; i < 30; i += 1) {
+      await t.mutation(api.wheel.logSpin, {
+        prizeName: "Moondust",
+        forced: false,
+        randomBucket: 0,
+        clientKey: first,
+      });
+    }
+    await expect(
+      t.mutation(api.wheel.logSpin, {
+        prizeName: "Moondust",
+        forced: false,
+        randomBucket: 0,
+        clientKey: first,
+      }),
+    ).rejects.toThrow("rate limit");
+    await expect(
+      t.mutation(api.wheel.logSpin, {
+        prizeName: "Moondust",
+        forced: false,
+        randomBucket: 0,
+        clientKey: second,
+      }),
+    ).resolves.toBeNull();
+  });
+
   it("makes artwork past the legacy collection cap reachable through pages", async () => {
     const t = convexTest(schema, modules);
     await t.run(async (ctx) => {
