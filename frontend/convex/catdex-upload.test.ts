@@ -42,6 +42,22 @@ describe("Catdex uploads", () => {
     );
   });
 
+  it("bounds legacy reservations without consuming keyed capacity", async () => {
+    const t = convexTest(schema, modules);
+    for (let index = 0; index < 60; index += 1) {
+      await t.mutation(api.catdex.generateUploadUrl, {});
+    }
+
+    await expect(t.mutation(api.catdex.generateUploadUrl, {})).rejects.toThrow(
+      "Too many pending uploads",
+    );
+    await expect(
+      t.mutation(api.catdex.generateUploadUrl, {
+        clientKey: "legacy-client-key",
+      }),
+    ).resolves.toContain("/catdex/upload?token=");
+  });
+
   it("serves a CORS preflight and rejects unsupported media", async () => {
     const t = convexTest(schema, modules);
     const url = await t.mutation(api.catdex.generateUploadUrl, {});

@@ -21,6 +21,10 @@ const THUMBNAIL_RETRY_AFTER_MS = 30 * 60 * 1000;
 const CATDEX_UPLOAD_TTL_MS = 30 * 60 * 1000;
 const MAX_UPLOAD_CLEANUP_BATCH = 100;
 const MAX_UPLOADS_PER_CLIENT_PER_HOUR = 12;
+// Legacy callers do not provide a stable client key, so keep their shared
+// fallback bucket from consuming the entire hourly capacity reserved for
+// keyed browser and authenticated callers.
+const MAX_UNKEYED_UPLOADS_PER_HOUR = 60;
 const MAX_GLOBAL_UPLOADS_PER_HOUR = 600;
 const MAX_THUMBNAIL_ATTEMPTS = 3;
 
@@ -229,6 +233,7 @@ export const generateUploadUrl = mutation({
   args: { clientKey: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const windowStart = now - 60 * 60 * 1000;
     const identity = await ctx.auth.getUserIdentity();
     const anonymousRateKey =
       args.clientKey && /^[A-Za-z0-9_-]{16,80}$/.test(args.clientKey)
@@ -241,16 +246,26 @@ export const generateUploadUrl = mutation({
       const recentClientUploads = await ctx.db
         .query("catdex_uploads")
         .withIndex("byRateKeyAndCreatedAt", (q) =>
-          q.eq("rateKey", rateKey).gt("createdAt", now - 60 * 60 * 1000),
+          q.eq("rateKey", rateKey).gt("createdAt", windowStart),
         )
         .take(MAX_UPLOADS_PER_CLIENT_PER_HOUR + 1);
       if (recentClientUploads.length >= MAX_UPLOADS_PER_CLIENT_PER_HOUR) {
         throw new Error("Too many pending uploads; try again later");
       }
+    } else {
+      const recentUnkeyedUploads = await ctx.db
+        .query("catdex_uploads")
+        .withIndex("byRateKeyAndCreatedAt", (q) =>
+          q.eq("rateKey", undefined).gt("createdAt", windowStart),
+        )
+        .take(MAX_UNKEYED_UPLOADS_PER_HOUR + 1);
+      if (recentUnkeyedUploads.length >= MAX_UNKEYED_UPLOADS_PER_HOUR) {
+        throw new Error("Too many pending uploads; try again later");
+      }
     }
     const recentUploads = await ctx.db
       .query("catdex_uploads")
-      .withIndex("byCreatedAt", (q) => q.gt("createdAt", now - 60 * 60 * 1000))
+      .withIndex("byCreatedAt", (q) => q.gt("createdAt", windowStart))
       .take(MAX_GLOBAL_UPLOADS_PER_HOUR + 1);
     if (recentUploads.length >= MAX_GLOBAL_UPLOADS_PER_HOUR) {
       throw new Error("Too many pending uploads; try again later");
