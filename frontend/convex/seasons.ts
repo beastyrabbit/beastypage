@@ -21,6 +21,11 @@ export const list = query({
       .withIndex("byCreatedAt", (q) => q)
       .order("desc")
       .take(200);
+    seasons.sort(
+      (a, b) =>
+        (b.createdAt ?? 0) - (a.createdAt ?? 0) ||
+        a._creationTime - b._creationTime,
+    );
     return Promise.all(seasons.map((doc) => seasonRecordToClient(ctx, doc)));
   },
 });

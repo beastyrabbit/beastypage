@@ -30,4 +30,24 @@ describe("season listing", () => {
       false,
     );
   });
+
+  it("keeps insertion order for seasons with the same creation timestamp", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      for (let index = 0; index < 2; index += 1) {
+        await ctx.db.insert("card_season", {
+          seasonName: `Tie ${index}`,
+          createdAt: 1,
+          updatedAt: 1,
+        });
+      }
+    });
+
+    const seasons = await t.query(api.seasons.list, {});
+
+    expect(seasons.map((season) => season.season_name)).toEqual([
+      "Tie 0",
+      "Tie 1",
+    ]);
+  });
 });
