@@ -85,6 +85,34 @@ describe("anonymous capability ownership", () => {
       await expect(entry.update()).rejects.toThrow(/Not authorized/);
     }
   });
+
+  it("requires the mapper edit token for anonymous metadata updates", async () => {
+    const t = convexTest(schema, modules);
+    const profile = await t.mutation(api.mapper.create, {
+      catData: { mode: "wizard-timeline", params: {} },
+    });
+    const id = profile.id as Id<"cat_profile">;
+
+    await expect(
+      t.mutation(api.mapper.updateMeta, {
+        id,
+        catName: "Blocked",
+      }),
+    ).rejects.toThrow("Not authorized");
+
+    const updated = await t.mutation(api.mapper.updateMeta, {
+      id,
+      catName: "Named",
+      creatorName: "Creator",
+      editToken: profile.editToken,
+    });
+    expect(updated).toMatchObject({
+      id: profile.id,
+      catName: "Named",
+      creatorName: "Creator",
+    });
+    expect(JSON.stringify(updated)).not.toContain(profile.editToken);
+  });
 });
 
 describe("adoption authority", () => {

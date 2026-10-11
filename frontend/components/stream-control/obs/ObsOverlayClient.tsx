@@ -359,6 +359,7 @@ function buildFinishedCatState(
     shareUrl: null,
     profileId: null,
     mapperSlug: null,
+    editToken: null,
     legacyEncoded: previous?.legacyEncoded ?? null,
     catShareSlug: previous?.catShareSlug ?? null,
     catName: null,
@@ -802,6 +803,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       catName?: string;
       creatorName?: string;
       shareToken?: string;
+      editToken?: string;
     } | null> => null,
     [],
   );
@@ -814,6 +816,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
       catName?: string;
       creatorName?: string;
       shareToken?: string;
+      editToken?: string;
     } | null> => null,
     [],
   );
@@ -2757,6 +2760,8 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
             ...catStateRef.current,
             profileId: result.id,
             mapperSlug: shareToken,
+            editToken:
+              result.editToken ?? catStateRef.current.editToken ?? null,
             legacyEncoded,
             shareUrl: url,
             catShareSlug: shareSlug ?? catStateRef.current.catShareSlug ?? null,
@@ -3094,6 +3099,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
           ...state,
           profileId: result.id,
           mapperSlug: shareToken,
+          editToken: result.editToken ?? state.editToken ?? null,
           legacyEncoded,
           shareUrl: url,
           catShareSlug: shareSlug ?? state.catShareSlug ?? null,
@@ -3190,6 +3196,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         id: state.profileId as Id<"cat_profile">,
         catName: trimmedCat || undefined,
         creatorName: trimmedCreator || undefined,
+        editToken: state.editToken ?? undefined,
       });
       if (result && catStateRef.current) {
         catStateRef.current = {

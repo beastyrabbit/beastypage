@@ -146,6 +146,8 @@ export interface CatState {
   builderParams?: Partial<CatParams>;
   profileId?: string | null;
   mapperSlug?: string | null;
+  /** Capability returned when an anonymous mapper profile is created. */
+  editToken?: string | null;
   legacyEncoded?: string | null;
   catName?: string | null;
   creatorName?: string | null;

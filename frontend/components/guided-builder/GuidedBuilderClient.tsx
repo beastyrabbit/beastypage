@@ -51,6 +51,7 @@ import {
 } from "@/lib/cat-v3/coatPatterns";
 import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
+import { storeMapperEditToken } from "@/lib/mapperEditToken";
 import type { PaletteMode } from "@/lib/palettes";
 import { getPaletteMetadata } from "@/lib/palettes";
 import { cn } from "@/lib/utils";
@@ -1245,6 +1246,9 @@ export function GuidedBuilderClient() {
           throw new Error("Share API did not return a slug.");
         }
         const slug = record.slug ?? record.id;
+        if (record.editToken) {
+          storeMapperEditToken(slug, record.editToken);
+        }
         const url = `${window.location.origin}/guided-builder/view/${slug}`;
         setShareInfo({ slug, url });
         await ensureCopied(url);
