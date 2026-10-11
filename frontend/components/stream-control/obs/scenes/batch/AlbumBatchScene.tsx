@@ -88,9 +88,10 @@ export function AlbumBatchScene({ view }: Readonly<BatchSceneViewProps>) {
   const cellH = 840 / rows;
   const sticker = Math.max(60, Math.floor(Math.min(cellW, cellH) - 34));
   const sprite = sticker - 8;
+  // Half a stage of foil comes off while the current stage is still rolling.
+  const stageStep = view.phase === "revealing" ? 0.5 : 1;
   const progress = view.stages.length
-    ? (view.stageIndex + (view.phase === "revealing" ? 0.5 : 1)) /
-      view.stages.length
+    ? (view.stageIndex + stageStep) / view.stages.length
     : 1;
   const foil = foilClip(progress);
   const spot = view.spotlight;

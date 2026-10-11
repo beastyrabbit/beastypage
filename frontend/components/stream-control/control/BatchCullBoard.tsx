@@ -37,6 +37,12 @@ function cullCardStateClass(
   return favorite ? "border-pink-400/50 bg-pink-400/5" : "border-border/30";
 }
 
+function numberBadgeClass(marked: boolean, potential: boolean): string {
+  if (marked) return "bg-red-500 text-white";
+  if (potential) return "bg-yellow-400 text-yellow-950";
+  return "bg-foreground/90 text-background";
+}
+
 function cullLabelClass(marked: boolean, potential: boolean): string {
   if (marked) return "text-red-300";
   return potential ? "text-yellow-300" : "text-foreground";
@@ -402,11 +408,7 @@ export function BatchCullBoard() {
                   <span
                     className={cn(
                       "rounded-md px-1.5 font-mono text-base tabular-nums",
-                      marked
-                        ? "bg-red-500 text-white"
-                        : potential
-                          ? "bg-yellow-400 text-yellow-950"
-                          : "bg-foreground/90 text-background",
+                      numberBadgeClass(marked, potential),
                     )}
                   >
                     {numberLabel}
