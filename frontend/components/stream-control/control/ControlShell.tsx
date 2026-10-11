@@ -56,6 +56,7 @@ import {
 import { LookPanel } from "./LookPanel";
 import { useBatchTheme } from "./look/useBatchTheme";
 import { useOverlayTheme } from "./look/useOverlayTheme";
+import { useShowLook } from "./look/useShowLook";
 import { PreviewCard } from "./PreviewCard";
 import { SettingsPanel } from "./SettingsPanel";
 import { SpinPanel } from "./SpinPanel";
@@ -832,6 +833,10 @@ export function ControlShell() {
     rawSessionSettings,
     syncSessionSettings,
   );
+  const { look: showLook, setLook: setShowLook } = useShowLook(
+    rawSessionSettings,
+    syncSessionSettings,
+  );
   const { theme: batchTheme, setTheme: setBatchTheme } = useBatchTheme(
     rawSessionSettings,
     syncSessionSettings,
@@ -947,6 +952,8 @@ export function ControlShell() {
       setOverlayTheme,
       batchTheme,
       setBatchTheme,
+      showLook,
+      setShowLook,
       activeTab,
       setActiveTab,
       previewContainerRef,
@@ -1001,6 +1008,8 @@ export function ControlShell() {
     setOverlayTheme,
     batchTheme,
     setBatchTheme,
+    showLook,
+    setShowLook,
     activeTab,
   ]);
 

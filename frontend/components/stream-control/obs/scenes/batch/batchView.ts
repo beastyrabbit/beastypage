@@ -1,4 +1,5 @@
 import type { BatchStage } from "@/lib/adoption/streamBatch";
+import type { CatParams } from "@/lib/cat-v3/types";
 
 /** Where the elimination show is right now. */
 export type BatchScenePhase = "loading" | "revealing" | "awaitingCull" | "done";
@@ -14,6 +15,8 @@ export interface BatchViewCat {
   label: string;
   /** Rendered sprite at the current reveal stage, null until the first render lands. */
   previewUrl: string | null;
+  /** The cat's full params — looks that describe the cat in prose read these. */
+  params: CatParams;
   /** Streamer's removal candidate — only meaningful while awaiting a cull. */
   marked: boolean;
   /** "Maybe leaves next" (resets each cull). */

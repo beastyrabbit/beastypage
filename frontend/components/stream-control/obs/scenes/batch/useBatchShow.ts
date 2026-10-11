@@ -269,6 +269,7 @@ export function useBatchShow({
       numberLabel: formatBatchNumber(index + 1),
       label: cat.label,
       previewUrl: previews[cat.id]?.url ?? null,
+      params: cat.catData.params,
       marked: awaiting && cat.id === markedId,
       potential: cat.id !== markedId && potentialSet.has(cat.id),
       favorite: favoriteSet.has(cat.id),
