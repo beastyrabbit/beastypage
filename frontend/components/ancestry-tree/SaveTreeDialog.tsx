@@ -237,11 +237,9 @@ export function SaveTreeDialog({
     window.open(getTreeUrl(), "_blank", "noopener,noreferrer");
   }, [getTreeUrl]);
 
-  const saveButtonLabel = saveAsNew
-    ? "Save as New Tree"
-    : slugExists
-      ? "Update Tree"
-      : "Save Tree";
+  let saveButtonLabel = "Save Tree";
+  if (slugExists) saveButtonLabel = "Update Tree";
+  if (saveAsNew) saveButtonLabel = "Save as New Tree";
 
   // Success state
   if (saveSuccess) {
