@@ -2,7 +2,7 @@ import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api.js";
 import type { Doc, Id } from "./_generated/dataModel.js";
-import type { QueryCtx } from "./_generated/server.js";
+import type { MutationCtx, QueryCtx } from "./_generated/server.js";
 import {
   internalMutation,
   internalQuery,
@@ -14,6 +14,9 @@ import { docIdToString } from "./utils.js";
 type CatdexDoc = Doc<"catdex">;
 type SeasonDoc = Doc<"card_season">;
 type RarityDoc = Doc<"rarity">;
+
+const MAX_CARD_UPLOAD_BYTES = 10 * 1024 * 1024;
+const CARD_UPLOAD_CONTENT_TYPES = new Set(["image/png", "image/jpeg"]);
 
 export type CatdexPayload = Awaited<ReturnType<typeof catdexRecordToClient>>;
 
@@ -111,6 +114,18 @@ export const getDoc = internalQuery({
   },
 });
 
+/**
+ * Generate a short-lived Convex storage URL for a Catdex submission.
+ *
+ * This is intentionally public because submissions are available to visitors
+ * without an account. The create mutation validates the resulting storage
+ * object before attaching it to a Catdex record.
+ */
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => ctx.storage.generateUploadUrl(),
+});
+
 export const create = mutation({
   args: {
     twitchUserName: v.string(),
@@ -130,6 +145,11 @@ export const create = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    await validateCardUpload(ctx, args.defaultCard.storageId);
+    if (args.customCard) {
+      await validateCardUpload(ctx, args.customCard.storageId);
+    }
+
     const nowTs = Date.now();
     const insertDoc = {
       twitchUserName: args.twitchUserName,
@@ -161,6 +181,25 @@ export const create = mutation({
     return catdexRecordToClient(ctx, doc);
   },
 });
+
+async function validateCardUpload(
+  ctx: Pick<MutationCtx, "db">,
+  storageId: Id<"_storage">,
+) {
+  const metadata = await ctx.db.system.get("_storage", storageId);
+  if (!metadata) {
+    throw new Error("Card upload was not found or has expired.");
+  }
+  if (metadata.size > MAX_CARD_UPLOAD_BYTES) {
+    throw new Error("Card uploads must be 10 MiB or smaller.");
+  }
+  if (
+    !metadata.contentType ||
+    !CARD_UPLOAD_CONTENT_TYPES.has(metadata.contentType)
+  ) {
+    throw new Error("Card uploads must be PNG or JPEG images.");
+  }
+}
 
 async function catdexRecordToClient(
   ctx: QueryCtx,

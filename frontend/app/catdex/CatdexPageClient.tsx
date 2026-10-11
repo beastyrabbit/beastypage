@@ -80,6 +80,7 @@ export default function CatdexPage() {
   const seasons = useQuery(api.seasons.list, {});
   const rarities = useQuery(api.rarities.list, {});
   const hasPending = useQuery(api.catdex.hasPending, {});
+  const generateUploadUrlMutation = useMutation(api.catdex.generateUploadUrl);
   const createCatMutation = useMutation(api.catdex.create);
 
   const [search, setSearch] = useState("");
@@ -208,9 +209,12 @@ export default function CatdexPage() {
       if (!rarityId) throw new Error("Rarity is required.");
       if (!defaultFile) throw new Error("Default card art is required.");
 
-      const defaultUpload = await uploadToStorage(defaultFile);
+      const defaultUpload = await uploadToStorage(
+        defaultFile,
+        generateUploadUrlMutation,
+      );
       const customUpload = customFile
-        ? await uploadToStorage(customFile)
+        ? await uploadToStorage(customFile, generateUploadUrlMutation)
         : null;
 
       await createCatMutation({
@@ -237,7 +241,7 @@ export default function CatdexPage() {
           : {}),
       });
     },
-    [createCatMutation],
+    [createCatMutation, generateUploadUrlMutation],
   );
 
   useEffect(() => {
@@ -825,23 +829,9 @@ function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
 
 async function uploadToStorage(
   file: File,
+  generateUploadUrl: () => Promise<string>,
 ): Promise<{ storageId: string; fileName: string }> {
-  const getUrlResponse = await fetch(
-    `${CONVEX_HTTP_URL}/api/storage/getUploadUrl`,
-    {
-      method: "POST",
-    },
-  );
-  if (!getUrlResponse.ok) {
-    const text = await getUrlResponse.text();
-    throw new Error(
-      `Unable to request upload URL (${getUrlResponse.status}): ${text}`,
-    );
-  }
-  const { uploadUrl } = await getUrlResponse.json();
-  if (!uploadUrl) {
-    throw new Error("Convex did not return an upload URL.");
-  }
+  const uploadUrl = await generateUploadUrl();
 
   const uploadResponse = await fetch(uploadUrl, {
     method: "POST",
