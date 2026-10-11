@@ -25,10 +25,12 @@ export const storeDiscordImage = action({
   args: {
     dataUrl: v.string(),
     colors: v.any(),
-    serviceToken: v.string(),
+    // Optional during the bridge rollout so older Next route replicas fail
+    // with an authorization error instead of an argument-validation error.
+    serviceToken: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ slug: string; storageId: string }> => {
-    if (!hasValidServiceToken(args.serviceToken)) {
+    if (!args.serviceToken || !hasValidServiceToken(args.serviceToken)) {
       throw new Error("Unauthorized service request");
     }
     const match = DATA_URL_REGEX.exec(args.dataUrl.trim());

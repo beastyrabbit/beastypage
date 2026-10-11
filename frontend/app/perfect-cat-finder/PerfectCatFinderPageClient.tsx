@@ -393,7 +393,7 @@ export default function PerfectCatFinderPage() {
 
   const handleVote = useCallback(
     async (winner: MatchupCat) => {
-      if (!clientId || !matchupToken || matchup.length < 2) return;
+      if (!clientId || matchup.length < 2) return;
       const loser = matchup.find((cat) => cat.id !== winner.id);
       if (!loser) return;
       setVoteBusy(true);
@@ -403,7 +403,7 @@ export default function PerfectCatFinderPage() {
           clientId,
           winnerId: winner.id,
           loserId: loser.id,
-          matchupToken,
+          ...(matchupToken ? { matchupToken } : {}),
         });
       } catch (err) {
         console.error("Failed to submit vote", err);
