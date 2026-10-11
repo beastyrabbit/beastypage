@@ -594,6 +594,13 @@ it("paginates approved cards without including pending records", async () => {
   expect(await t.query(api.catdex.hasPending, {})).toBe(true);
 });
 
+it("generates a Convex storage upload URL for Catdex submissions", async () => {
+  const t = convexTest(schema, modules);
+  await expect(t.mutation(api.catdex.generateUploadUrl, {})).resolves.toMatch(
+    /^https:\/\/some-deployment\.convex\.cloud\/api\/storage\/upload\?token=/,
+  );
+});
+
 it("resets only the authenticated user's variants and preserves the account", async () => {
   const t = convexTest(schema, modules);
   const user = t.withIdentity({

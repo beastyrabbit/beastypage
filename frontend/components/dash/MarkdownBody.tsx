@@ -23,8 +23,8 @@ function sanitize(html: string): string {
     .replace(/\bon\w+\s*=\s*"[^"]*"/gi, "")
     .replace(/\bon\w+\s*=\s*'[^']*'/gi, "")
     .replace(/\bon\w+\s*=\s*[^\s>]*/gi, "")
-    .replace(/href\s*=\s*"javascript:[^"]*"/gi, 'href="#"')
-    .replace(/href\s*=\s*'javascript:[^']*'/gi, "href='#'")
+    .replace(/href\s*=\s*"\s*javascript:[^"]*"/gi, 'href="#"')
+    .replace(/href\s*=\s*'\s*javascript:[^']*'/gi, "href='#'")
     .replace(/(?:src|href)\s*=\s*"data:[^"]*"/gi, 'src=""')
     .replace(/(?:src|href)\s*=\s*'data:[^']*'/gi, "src=''");
 }

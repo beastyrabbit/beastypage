@@ -20,7 +20,12 @@ function upstreamUrl(request: Request) {
   return base;
 }
 
+function isInternalPath(request: Request) {
+  return new URL(request.url).pathname.includes("/api/internal/");
+}
+
 async function proxy(request: Request) {
+  if (isInternalPath(request)) return new Response("Not found", { status: 404 });
   const headers = new Headers(request.headers);
   headers.delete("host");
   headers.delete("connection");

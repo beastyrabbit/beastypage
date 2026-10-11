@@ -4,7 +4,7 @@ FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b533
 ARG CAT_SYSTEM_CATALOG_HASH
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY tsconfig.json ./
 COPY src/ src/
 RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \

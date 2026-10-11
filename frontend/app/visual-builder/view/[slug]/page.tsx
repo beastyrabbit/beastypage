@@ -9,11 +9,13 @@ export const metadata: Metadata = {
 };
 
 type PageProps = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
-export default function VisualBuilderViewPage({ params }: Readonly<PageProps>) {
-  const slug = params.slug;
+export default async function VisualBuilderViewPage({
+  params,
+}: Readonly<PageProps>) {
+  const { slug } = await params;
   if (!slug) {
     notFound();
   }

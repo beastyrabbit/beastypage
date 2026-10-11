@@ -220,10 +220,11 @@ jobs:
           pnpm exec convex deploy
 
   build-frontend:
-    needs: [changes, cat-system-contract]
+    needs: [changes, cat-system-contract, deploy-convex]
     if: |
       always() &&
       (needs.cat-system-contract.result == 'success' || needs.cat-system-contract.result == 'skipped') &&
+      (needs.deploy-convex.result == 'success' || needs.deploy-convex.result == 'skipped') &&
       ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
        (github.event_name == 'push' && needs.changes.outputs.frontend == 'true') ||
        (github.event_name == 'workflow_dispatch' && inputs.build_frontend))
