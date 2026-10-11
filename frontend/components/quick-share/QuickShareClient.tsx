@@ -41,6 +41,7 @@ type Policy = {
   smallLifetimeMs: number;
   largeLifetimeMs: number;
   chunkBytes: number;
+  collectionMaxItems: number;
 };
 
 type ShareStatus = {
@@ -136,6 +137,12 @@ function errorMessage(error: unknown) {
   }
   if (raw.includes("DAILY_BYTES_LIMIT")) {
     return "The daily transfer limit has been reached. Try again tomorrow.";
+  }
+  if (raw.includes("COLLECTION_LIMIT")) {
+    return "This shared collection is full. Start a new share for more files.";
+  }
+  if (raw.includes("SLUG_COLLISION")) {
+    return "This shared collection is no longer accepting files. Start a new share.";
   }
   if (raw.includes("IP_BANNED"))
     return "Sharing is unavailable from this network.";
@@ -688,6 +695,32 @@ export function QuickShareClient() {
   async function startFileUpload(event: FormEvent, selectedFiles: File[]) {
     event.preventDefault();
     if (selectedFiles.length === 0 || !policy) return;
+    const maxSelection = Math.min(
+      policy.active,
+      policy.collectionMaxItems ?? policy.active,
+    );
+    if (selectedFiles.length > maxSelection) {
+      setWork({
+        kind: "error",
+        label: `Select at most ${maxSelection} files per share.`,
+      });
+      return;
+    }
+    const activeHistoryCount = history.filter(
+      (item) =>
+        item.publicExpiresAt > Date.now() &&
+        (item.state === "uploading" ||
+          item.state === "processing" ||
+          item.state === "ready"),
+    ).length;
+    if (activeHistoryCount + selectedFiles.length > policy.active) {
+      setWork({
+        kind: "error",
+        label:
+          "Too many shares are active. Wait for one to expire before creating another.",
+      });
+      return;
+    }
     const oversized = selectedFiles.find((item) => item.size > policy.maxBytes);
     if (oversized) {
       setWork({

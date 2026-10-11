@@ -63,6 +63,29 @@ describe("raw media delivery", () => {
 		expect(head).toHaveBeenCalledWith("derivatives/later-item.png");
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
+	it("falls back to the legacy public operation only for unknown-operation 400s", async () => {
+		const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
+			const request = JSON.parse(String(init?.body));
+			if (request.op === "publicCollection") {
+				return controlResponse({ error: "Unknown operation" }, 400);
+			}
+			return controlResponse({
+				key: "derivatives/legacy.png",
+				mime: "image/png",
+				size: 4,
+				name: "legacy.png",
+				expiresAt: Date.now() + 60_000,
+			});
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const get = vi.fn(async () => ({
+			body: new Blob(["safe"]).stream(),
+			contentLength: 4,
+		}));
+		const { app } = createApp(config, { get } as unknown as ObjectStore);
+		expect((await app.request("/i/Abcdefg1")).status).toBe(200);
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
 	it("returns media bytes directly with range and crawler headers", async () => {
 		vi.stubGlobal(
 			"fetch",

@@ -5,7 +5,13 @@ import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { DAY_MS, MIB, startOfDay, startOfHour } from "./quickSharePolicy";
+import {
+  DAY_MS,
+  MIB,
+  QUICK_SHARE_POLICY,
+  startOfDay,
+  startOfHour,
+} from "./quickSharePolicy";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -204,6 +210,105 @@ describe("Quick Share Convex policy", () => {
     ).rejects.toThrow("ACTIVE_LIMIT");
   });
 
+  it("keeps a collection receipt usable after its first item fails", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Collect1", { now }),
+    );
+    await t.run((ctx) =>
+      ctx.db.patch(first.id, { state: "unsupported", active: false }),
+    );
+    await expect(
+      t.mutation(internal.quickShare.createUpload, {
+        ...createArgs("Collect1", { now: now + 1 }),
+        collectionReceiptHash: "receipt-Collect1",
+      }),
+    ).resolves.toMatchObject({ slug: "Collect1" });
+
+    await expect(
+      t.mutation(internal.quickShare.createUpload, {
+        ...createArgs("Collect1", { now: now + 2 }),
+        collectionReceiptHash: "wrong-receipt",
+      }),
+    ).rejects.toThrow("SLUG_COLLISION");
+  });
+
+  it("caps total collection rows even when failed items free active slots", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Collect1", { now }),
+    );
+    await t.run(async (ctx) => {
+      const original = await ctx.db.get(first.id);
+      if (!original) throw new Error("Expected a collection upload");
+      const { _id: _uploadId, _creationTime, ...row } = original;
+      for (
+        let index = 1;
+        index < QUICK_SHARE_POLICY.collectionMaxItems;
+        index += 1
+      ) {
+        await ctx.db.insert("quick_share_uploads", {
+          ...row,
+          state: "failed",
+          active: false,
+          receiptHash: `failed-${index}`,
+        });
+      }
+    });
+    await expect(
+      t.mutation(internal.quickShare.createUpload, {
+        ...createArgs("Collect1", { now: now + 1 }),
+        collectionReceiptHash: "receipt-Collect1",
+      }),
+    ).rejects.toThrow("COLLECTION_LIMIT");
+  });
+
+  it("bounds public collection and slug moderation reads for legacy collections", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Collect1", { now }),
+    );
+    await t.run(async (ctx) => {
+      const original = await ctx.db.get(first.id);
+      if (!original) throw new Error("Expected a collection upload");
+      const { _id: _uploadId, _creationTime, ...row } = original;
+      await ctx.db.patch(first.id, {
+        state: "ready",
+        publicKey: "derivatives/first",
+        publicMime: "image/png",
+        publicSize: 1,
+      });
+      for (
+        let index = 1;
+        index < QUICK_SHARE_POLICY.collectionMaxItems + 1;
+        index += 1
+      ) {
+        await ctx.db.insert("quick_share_uploads", {
+          ...row,
+          state: "ready",
+          publicKey: `derivatives/${index}`,
+          publicMime: "image/png",
+          publicSize: 1,
+        });
+      }
+    });
+    expect(
+      await t.query(internal.quickShare.getPublicCollection, {
+        slug: "Collect1",
+        now,
+      }),
+    ).toHaveLength(QUICK_SHARE_POLICY.collectionMaxItems);
+    expect(
+      await t.query(internal.quickShare.adminList, { slug: "Collect1" }),
+    ).toHaveLength(QUICK_SHARE_POLICY.collectionMaxItems);
+  });
+
   it("revokes every active link for a banned exact IP", async () => {
     const t = convexTest(schema, modules);
     const first = await t.mutation(
@@ -325,6 +430,54 @@ describe("Quick Share Convex policy", () => {
     expect(recovered?.status).toBe("pending");
     expect(recovered?.leaseId).toBeUndefined();
     expect(recovered?.leaseExpiresAt).toBeUndefined();
+  });
+
+  it("wakes the oldest pending job when processing finishes", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("WakeJob1", { now }),
+    );
+    const second = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("WakeJob2", { now: now + 1 }),
+    );
+    for (const upload of [first, second]) {
+      await t.mutation(internal.quickShare.markComplete, {
+        uploadId: upload.id,
+        receiptHash: `receipt-${upload.slug}`,
+        now: now + 2,
+      });
+    }
+    const jobs = await t.run((ctx) => ctx.db.query("quick_share_jobs").take(2));
+    const firstJob = jobs.find((job) => job.uploadId === first.id);
+    const secondJob = jobs.find((job) => job.uploadId === second.id);
+    if (!firstJob || !secondJob)
+      throw new Error("Expected both processing jobs");
+    await t.mutation(internal.quickShare.claimJob, {
+      jobId: firstJob._id,
+      leaseId: "test-lease",
+      now: now + 3,
+    });
+    await t.mutation(internal.quickShare.finishProcessJob, {
+      jobId: firstJob._id,
+      leaseId: "test-lease",
+      state: "ready",
+      publicKey: "derivatives/first",
+      publicMime: "image/png",
+      publicSize: 1,
+      now: now + 4,
+    });
+    const scheduled = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").take(20),
+    );
+    const secondDispatches = scheduled.filter(
+      (row) =>
+        row.name.endsWith(":dispatchJob") &&
+        (row.args[0] as { jobId: string }).jobId === secondJob._id,
+    );
+    expect(secondDispatches).toHaveLength(2);
   });
 
   it("does not resurrect a share removed while processing", async () => {

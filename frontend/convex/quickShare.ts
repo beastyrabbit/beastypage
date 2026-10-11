@@ -51,6 +51,21 @@ async function enqueueJob(
   return jobId;
 }
 
+async function dispatchNextPendingJob(ctx: MutationCtx) {
+  const next = await ctx.db
+    .query("quick_share_jobs")
+    .withIndex("by_status_and_createdAt", (q) => q.eq("status", "pending"))
+    .first();
+  if (next) {
+    // Let the finishing worker return its response and release local capacity.
+    // An atomic lease makes duplicate wake-ups from other replicas harmless.
+    await ctx.scheduler.runAfter(1_000, internal.quickShareHttp.dispatchJob, {
+      jobId: next._id,
+      attempt: 0,
+    });
+  }
+}
+
 function publicUpload(doc: Doc<"quick_share_uploads">) {
   return {
     id: doc._id,
@@ -187,17 +202,21 @@ export const createUpload = internalMutation({
     const existingSlugs = await ctx.db
       .query("quick_share_uploads")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .take(policy.active + 1);
+      .take(QUICK_SHARE_POLICY.collectionMaxItems + 1);
     if (existingSlugs.length > 0) {
-      const collectionOwner = existingSlugs[0];
-      if (
-        !args.collectionReceiptHash ||
-        collectionOwner.receiptHash !== args.collectionReceiptHash ||
-        collectionOwner.rateIdentity !== args.rateIdentity ||
-        collectionOwner.ipHash !== args.ipHash ||
-        !collectionOwner.active
-      ) {
+      const collectionOwner = existingSlugs.find(
+        (candidate) =>
+          candidate.receiptHash === args.collectionReceiptHash &&
+          candidate.rateIdentity === args.rateIdentity &&
+          candidate.ipHash === args.ipHash &&
+          candidate.state !== "removed" &&
+          candidate.retainedUntil > args.now,
+      );
+      if (!collectionOwner) {
         throw new Error("SLUG_COLLISION");
+      }
+      if (existingSlugs.length >= QUICK_SHARE_POLICY.collectionMaxItems) {
+        throw new Error("COLLECTION_LIMIT");
       }
     }
     const ban = await ctx.db
@@ -502,7 +521,8 @@ export const getPublicCollection = internalQuery({
     const uploads = await ctx.db
       .query("quick_share_uploads")
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .collect();
+      .order("desc")
+      .take(QUICK_SHARE_POLICY.collectionMaxItems);
     return uploads
       .filter(
         (upload) =>
@@ -718,6 +738,7 @@ export const finishProcessJob = internalMutation({
       leaseExpiresAt: undefined,
       updatedAt: args.now,
     });
+    await dispatchNextPendingJob(ctx);
     return { accepted: upload?.state === "processing" && upload.active };
   },
 });
@@ -733,7 +754,7 @@ export const adminList = internalQuery({
       uploads = await ctx.db
         .query("quick_share_uploads")
         .withIndex("by_slug", (q) => q.eq("slug", args.slug as string))
-        .collect();
+        .take(QUICK_SHARE_POLICY.collectionMaxItems);
     } else if (args.ipHash) {
       uploads = await ctx.db
         .query("quick_share_uploads")
@@ -1059,6 +1080,7 @@ export const finishDeleteJob = internalMutation({
     await ctx.db.delete(job._id);
     const upload = await ctx.db.get("quick_share_uploads", uploadId);
     if (upload) await ctx.db.delete(upload._id);
+    await dispatchNextPendingJob(ctx);
     return null;
   },
 });
@@ -1077,6 +1099,7 @@ export const policy = internalQuery({
       smallLifetimeMs: selected.smallLifetimeMs,
       largeLifetimeMs: selected.largeLifetimeMs,
       chunkBytes: QUICK_SHARE_POLICY.chunkBytes,
+      collectionMaxItems: QUICK_SHARE_POLICY.collectionMaxItems,
     };
   },
 });

@@ -128,7 +128,8 @@ function errorStatus(message: string) {
   if (
     message.includes("ACTIVE_LIMIT") ||
     message.includes("HOURLY_LIMIT") ||
-    message.includes("DAILY_BYTES_LIMIT")
+    message.includes("DAILY_BYTES_LIMIT") ||
+    message.includes("COLLECTION_LIMIT")
   ) {
     return 429;
   }

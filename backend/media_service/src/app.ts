@@ -313,6 +313,7 @@ export function createApp(
 					.abortMultipart(originalKey, multipartUploadId)
 					.catch(() => {});
 				if (
+					!input.collectionSlug &&
 					error instanceof Error &&
 					error.message.includes("SLUG_COLLISION")
 				) {
@@ -780,8 +781,14 @@ export function createApp(
 		try {
 			result = await control.call<PublicUpload[]>("publicCollection", { slug });
 		} catch (error) {
-			// Allows the media service to roll out before the new Convex operation.
-			if (statusCode(error) < 500) throw error;
+			// Older Convex deployments reject the new operation explicitly. Only
+			// that compatibility response may fall back; auth and data errors must
+			// remain visible to the caller.
+			const isUnknownOperation =
+				statusCode(error) === 400 &&
+				error instanceof Error &&
+				/unknown operation/i.test(error.message);
+			if (!isUnknownOperation) throw error;
 			result = await control.call<PublicUpload>("public", { slug });
 		}
 		const items = Array.isArray(result) ? result : [result];
