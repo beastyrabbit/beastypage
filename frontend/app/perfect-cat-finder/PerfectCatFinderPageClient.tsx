@@ -546,20 +546,38 @@ export default function PerfectCatFinderPage() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         {isReady ? (
-          matchup.map((cat) => (
-            <CatCard
-              key={String(cat.id)}
-              cat={cat}
-              preview={getPreview(cat)}
-              disabled={voteBusy}
-              onVote={handleVote}
-              onInspect={(entry) => {
-                setSelectedCat(entry);
-                void ensurePreview(entry);
-                track("perfect_cat_inspected", { from: "matchup" });
-              }}
-            />
-          ))
+          <>
+            {error && (
+              <div
+                role="alert"
+                className="col-span-full flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+              >
+                <p>{error}</p>
+                <button
+                  type="button"
+                  disabled={voteBusy}
+                  onClick={() => void loadMatchup()}
+                  className="rounded-full border border-red-300/40 px-3 py-1.5 font-medium transition hover:bg-red-300/10 disabled:opacity-50"
+                >
+                  Load a new matchup
+                </button>
+              </div>
+            )}
+            {matchup.map((cat) => (
+              <CatCard
+                key={String(cat.id)}
+                cat={cat}
+                preview={getPreview(cat)}
+                disabled={voteBusy}
+                onVote={handleVote}
+                onInspect={(entry) => {
+                  setSelectedCat(entry);
+                  void ensurePreview(entry);
+                  track("perfect_cat_inspected", { from: "matchup" });
+                }}
+              />
+            ))}
+          </>
         ) : (
           <div className="col-span-full flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/60 bg-background/60 py-16 text-sm text-muted-foreground">
             <Loader2 className="size-6 animate-spin text-primary" />

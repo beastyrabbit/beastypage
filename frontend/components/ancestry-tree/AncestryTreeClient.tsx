@@ -831,6 +831,12 @@ export function AncestryTreeClient({
       editToken?: string;
     }> => {
       if (!tree) return { success: false, error: "No tree to save" };
+      if (tree.cats.length > MAX_CATS) {
+        return {
+          success: false,
+          error: `Tree exceeds the ${MAX_CATS}-cat limit. Remove cats before saving.`,
+        };
+      }
 
       const updatedTree = { ...tree, name, creatorName };
       try {

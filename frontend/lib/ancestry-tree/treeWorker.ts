@@ -12,6 +12,8 @@ import type {
   TreeGenerationConfig,
 } from "./types";
 
+const MAX_CATS = 500;
+
 export interface TreeWorkerRequest {
   config: TreeGenerationConfig;
   foundingCouple: FoundingCoupleInput;
@@ -87,12 +89,19 @@ self.onmessage = (event: MessageEvent<TreeWorkerMessage>) => {
 
       manager.generateGeneration(gen);
 
+      const catCount = manager.getAllCats().length;
+      if (catCount > MAX_CATS) {
+        throw new Error(
+          `Generated tree exceeds the ${MAX_CATS}-cat limit. Reduce the depth or children settings and try again.`,
+        );
+      }
+
       // Report progress
       const progressMessage: TreeProgressMessage = {
         type: "progress",
         generation: gen,
         total: config.depth,
-        catCount: manager.getAllCats().length,
+        catCount,
       };
       self.postMessage(progressMessage);
     }
