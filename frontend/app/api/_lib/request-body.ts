@@ -12,36 +12,51 @@ export class RequestBodyTooLargeError extends Error {
   }
 }
 
-export async function readRequestBody(
-  request: Request,
-  maxBytes: number,
-): Promise<string> {
+function validateDeclaredLength(request: Request, maxBytes: number): void {
   const contentLength = request.headers.get("content-length");
-  if (contentLength) {
-    const declaredLength = Number(contentLength);
-    if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
-      throw new RequestBodyTooLargeError();
-    }
-  }
+  if (!contentLength) return;
 
+  const declaredLength = Number(contentLength);
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new RequestBodyTooLargeError();
+  }
+}
+
+function throwIfAborted(request: Request): void {
   if (request.signal.aborted) {
     throw new DOMException("Request aborted", "AbortError");
   }
-  if (!request.body) return "";
+}
 
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  let onAbort: (() => void) | undefined;
-  const abortPromise = new Promise<never>((_, reject) => {
+function createAbortPromise(
+  request: Request,
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): { promise: Promise<never>; onAbort: () => void } {
+  let onAbort!: () => void;
+  const promise = new Promise<never>((_, reject) => {
     onAbort = () => {
       reject(new DOMException("Request aborted", "AbortError"));
       void reader.cancel().catch(() => undefined);
     };
     request.signal.addEventListener("abort", onAbort, { once: true });
   });
+  return { promise, onAbort };
+}
+
+async function readChunks(
+  request: Request,
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  maxBytes: number,
+): Promise<Uint8Array[]> {
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  const { promise: abortPromise, onAbort } = createAbortPromise(
+    request,
+    reader,
+  );
+
   try {
-    if (request.signal.aborted) onAbort?.();
+    if (request.signal.aborted) onAbort();
     while (true) {
       const { done, value } = await Promise.race([reader.read(), abortPromise]);
       if (done) break;
@@ -54,11 +69,19 @@ export async function readRequestBody(
       chunks.push(value);
     }
   } finally {
-    if (onAbort) request.signal.removeEventListener("abort", onAbort);
+    request.signal.removeEventListener("abort", onAbort);
     abortPromise.catch(() => undefined);
     reader.releaseLock();
   }
 
+  return chunks;
+}
+
+function decodeChunks(chunks: Uint8Array[]): string {
+  const totalBytes = chunks.reduce(
+    (total, chunk) => total + chunk.byteLength,
+    0,
+  );
   const bytes = new Uint8Array(totalBytes);
   let offset = 0;
   for (const chunk of chunks) {
@@ -66,4 +89,16 @@ export async function readRequestBody(
     offset += chunk.byteLength;
   }
   return new TextDecoder().decode(bytes);
+}
+
+export async function readRequestBody(
+  request: Request,
+  maxBytes: number,
+): Promise<string> {
+  validateDeclaredLength(request, maxBytes);
+  throwIfAborted(request);
+  if (!request.body) return "";
+
+  const chunks = await readChunks(request, request.body.getReader(), maxBytes);
+  return decodeChunks(chunks);
 }
