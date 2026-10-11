@@ -77,17 +77,18 @@ function resizeThumbnail(image: ResizableImage) {
   }
 
   const maxDim = 256;
-  let newWidth = originalWidth;
-  let newHeight = originalHeight;
   if (originalWidth > maxDim || originalHeight > maxDim) {
-    if (originalWidth > originalHeight) {
-      newWidth = maxDim;
-      newHeight = Math.round((originalHeight / originalWidth) * maxDim);
-    } else {
-      newHeight = maxDim;
-      newWidth = Math.round((originalWidth / originalHeight) * maxDim);
-    }
-    image.resize({ w: newWidth, h: newHeight });
+    const dimensions =
+      originalWidth > originalHeight
+        ? {
+            w: maxDim,
+            h: Math.round((originalHeight / originalWidth) * maxDim),
+          }
+        : {
+            w: Math.round((originalWidth / originalHeight) * maxDim),
+            h: maxDim,
+          };
+    image.resize(dimensions);
   }
   return { width: originalWidth, height: originalHeight };
 }

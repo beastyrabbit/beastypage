@@ -229,6 +229,16 @@ async def reject_oversized_requests(
     return _request_body_too_large() if exceeded else response
 
 
+def _create_renderer_supervisor(pipeline: RenderPipeline) -> RendererSupervisor:
+    return RendererSupervisor(
+        pipeline,
+        max_queue_size=getattr(settings, "max_queue_size", 120),
+        worker_count=getattr(settings, "worker_count", 4),
+        circuit_failure_threshold=getattr(settings, "circuit_failure_threshold", 8),
+        circuit_reset_seconds=getattr(settings, "circuit_reset_seconds", 12),
+    )
+
+
 def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -266,19 +276,7 @@ def create_app() -> FastAPI:
         canvas_size=settings.default_canvas_size,
         expected_catalog_hash=os.getenv("CAT_SYSTEM_CATALOG_HASH", "unknown"),
     )
-    supervisor = RendererSupervisor(
-        pipeline,
-        max_queue_size=settings.max_queue_size
-        if hasattr(settings, "max_queue_size")
-        else 120,
-        worker_count=settings.worker_count if hasattr(settings, "worker_count") else 4,
-        circuit_failure_threshold=settings.circuit_failure_threshold
-        if hasattr(settings, "circuit_failure_threshold")
-        else 8,
-        circuit_reset_seconds=settings.circuit_reset_seconds
-        if hasattr(settings, "circuit_reset_seconds")
-        else 12,
-    )
+    supervisor = _create_renderer_supervisor(pipeline)
 
     app.add_middleware(
         CORSMiddleware,
