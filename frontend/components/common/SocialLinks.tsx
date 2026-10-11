@@ -117,12 +117,12 @@ const ALL_LINKS: LinkCard[] = [
 const LINK_FOCUS_CLASS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-const HERO_BUTTON_CLASS = `group inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-[translate,scale,background-color,border-color,box-shadow,color] duration-200 hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)] motion-safe:hover:-translate-y-px active:scale-[0.96] ${LINK_FOCUS_CLASS}`;
+const HERO_BUTTON_CLASS = `group inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-[translate,scale,background-color,border-color,box-shadow,color] duration-200 hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)] motion-safe:hover:-translate-y-px motion-safe:active:scale-[0.96] ${LINK_FOCUS_CLASS}`;
 
 const CARD_CLASS = `glass-card group flex items-center gap-4 transition-[translate,border-color,box-shadow,background-color] duration-300 ease-out-soft motion-safe:hover:-translate-y-[5px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-8 motion-reduce:opacity-100 fill-mode-backwards ${LINK_FOCUS_CLASS}`;
 
 const CARD_ICON_BOX_CLASS =
-  "rounded-xl bg-white/5 p-3 transition-[rotate,scale,background-color] duration-300 ease-spring group-hover:rotate-[5deg] group-hover:scale-[1.08] group-hover:bg-white/10";
+  "rounded-xl bg-white/5 p-3 transition-[rotate,scale,background-color] duration-300 ease-spring motion-safe:group-hover:rotate-[5deg] motion-safe:group-hover:scale-[1.08] group-hover:bg-white/10";
 
 /** Lets the whole link drive an itshover icon, not just its small svg. */
 function useIconHover() {
@@ -175,7 +175,7 @@ export function HeroSocialButtons({
       >
         <Twitch
           size={12}
-          className="transition-[rotate,scale] duration-300 ease-spring group-hover:-rotate-[10deg] group-hover:scale-[1.2]"
+          className="transition-[rotate,scale] duration-300 ease-spring motion-safe:group-hover:-rotate-[10deg] motion-safe:group-hover:scale-[1.2]"
         />{" "}
         Twitch
       </Link>
@@ -237,7 +237,7 @@ function SocialPill({ card }: { card: LinkCard }) {
       rel="noopener noreferrer"
       {...handlers}
       data-verb={card.verb}
-      className={`icon-verb group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-muted-foreground transition-[scale,background-color,border-color,color] duration-200 hover:border-white/20 hover:bg-white/10 hover:text-foreground active:scale-[0.96] ${LINK_FOCUS_CLASS}`}
+      className={`icon-verb group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-muted-foreground transition-[scale,background-color,border-color,color] duration-200 hover:border-white/20 hover:bg-white/10 hover:text-foreground motion-safe:active:scale-[0.96] ${LINK_FOCUS_CLASS}`}
     >
       <CardIcon card={card} iconRef={ref} size={16} />
       <span>{card.label}</span>

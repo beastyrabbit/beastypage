@@ -1112,4 +1112,27 @@
   .caret-hover::after {
     animation: none !important;
   }
+
+  /* Hover and press transforms hold still too; colour changes stay. */
+  .hover-tilt,
+  .hover-tag,
+  .peek,
+  .icon-verb svg,
+  .brand-mark,
+  .nav-pill,
+  .link-underline {
+    transition: none !important;
+  }
+  .hover-tilt:hover,
+  .hover-tilt:active,
+  .hover-tag:hover,
+  .icon-verb:hover svg,
+  .nav-pill:active {
+    translate: none !important;
+    rotate: none !important;
+    scale: none !important;
+  }
+  .peek-host:hover .peek {
+    translate: 0 100% !important;
+  }
 }

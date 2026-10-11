@@ -70,11 +70,11 @@ export function UserAuthButton() {
         className={cn(
           "group inline-flex items-center gap-1.5 rounded-lg border border-border/50",
           "px-3 py-1.5 text-xs font-semibold text-muted-foreground",
-          "transition hover:bg-foreground hover:text-background active:scale-[0.96]",
+          "transition hover:bg-foreground hover:text-background motion-safe:active:scale-[0.96]",
           "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200",
         )}
       >
-        <LogIn className="size-3.5 transition-[translate] duration-200 group-hover:translate-x-0.5" />
+        <LogIn className="size-3.5 transition-[translate] duration-200 motion-safe:group-hover:translate-x-0.5" />
         Sign in
       </button>
     );
@@ -90,7 +90,7 @@ export function UserAuthButton() {
         className={cn(
           "flex size-8 items-center justify-center rounded-full",
           "border border-border/50 overflow-hidden",
-          "transition hover:ring-2 hover:ring-primary/30 active:scale-[0.96]",
+          "transition hover:ring-2 hover:ring-primary/30 motion-safe:active:scale-[0.96]",
           "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-200",
         )}
         aria-label="User menu"

@@ -172,7 +172,7 @@ export function SiteHeader() {
                     data-accent={item.key}
                     style={{ animationDelay: `${index * 30}ms` }}
                     className={cn(
-                      "rounded-lg border border-border/50 px-3 py-2.5 text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-[0.985]",
+                      "rounded-lg border border-border/50 px-3 py-2.5 text-muted-foreground transition hover:bg-muted hover:text-foreground motion-safe:active:scale-[0.985]",
                       "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 fill-mode-backwards",
                       isActive(item) &&
                         "border-primary/40 bg-primary/10 text-foreground",

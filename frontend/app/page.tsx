@@ -73,14 +73,14 @@ export default function HomePage() {
             Hey there, I&apos;m{" "}
             <span className="group/name text-gradient-personal animate-shimmer bg-[length:200%_auto]">
               Beasty
-              <span className="inline-block transition-[rotate,translate] duration-400 ease-spring group-hover/name:rotate-[10deg] group-hover/name:-translate-y-1">
+              <span className="inline-block transition-[rotate,translate] duration-400 ease-spring motion-safe:group-hover/name:rotate-[10deg] motion-safe:group-hover/name:-translate-y-1">
                 .
               </span>
             </span>
           </h1>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <HeroSocialButtons />
-            <DiscordInviteButton className="cta-ring inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)] active:scale-[0.96]" />
+            <DiscordInviteButton className="cta-ring inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-slate-950/70 px-4 py-2 text-xs font-bold text-amber-100 transition-all hover:border-amber-300/60 hover:text-white hover:bg-slate-900 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)] motion-safe:active:scale-[0.96]" />
           </div>
         </div>
       </section>

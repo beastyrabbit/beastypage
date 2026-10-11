@@ -581,7 +581,7 @@ export function DiscordInviteButton({
         type="button"
         onClick={handleOpen}
         className={cn(
-          "rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background transition hover:opacity-90 active:scale-[0.96]",
+          "rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background transition hover:opacity-90 motion-safe:active:scale-[0.96]",
           className,
         )}
       >

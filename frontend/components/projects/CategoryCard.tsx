@@ -83,7 +83,7 @@ export function CategoryCard({
       {/* Content */}
       <div className="relative z-10 flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-white/10 p-3 transition-[rotate,scale,background-color] duration-300 ease-spring group-hover:rotate-[5deg] group-hover:scale-[1.08] group-hover:bg-white/15">
+          <div className="rounded-xl bg-white/10 p-3 transition-[rotate,scale,background-color] duration-300 ease-spring motion-safe:group-hover:rotate-[5deg] motion-safe:group-hover:scale-[1.08] group-hover:bg-white/15">
             {entry.kind === "animated" ? (
               <entry.icon
                 ref={iconRef}
