@@ -7,7 +7,10 @@ const INITIAL_RATING = 1500;
 const K_FACTOR = 24;
 const MINIMUM_POOL_SIZE = 16;
 const RECENT_VOTE_SAMPLE = 40;
-const COUNT_SAMPLE_LIMIT = 1_000;
+// The UI only needs a bounded pool-size estimate. Keeping this window small
+// avoids reading a thousand documents and expanding the mutation conflict set
+// on every anonymous matchup request.
+const COUNT_SAMPLE_LIMIT = 256;
 const MAX_REGISTERED_CATS = 32;
 const MAX_PARAMS_BYTES = 32 * 1024;
 const MATCHUP_TTL_MS = 15 * 60 * 1000;

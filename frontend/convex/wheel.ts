@@ -41,7 +41,9 @@ export const logSpin = mutation({
 export const stats = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const limit = Math.max(1, Math.min(args.limit ?? 10_000, 10_000));
+    // The wheel UI displays a recent-window disclosure; keep its reactive
+    // query small so each spin does not re-read the entire archive.
+    const limit = Math.max(1, Math.min(args.limit ?? 2_000, 10_000));
     const recordsWithNext = await ctx.db
       .query("wheel_spins")
       .withIndex("byCreated")

@@ -113,6 +113,15 @@ function isAdmin(tokenIdentifier: string | undefined) {
   return allowlist.includes(tokenIdentifier);
 }
 
+function constantTimeEqual(left: string, right: string) {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
 function errorStatus(message: string) {
   if (message.includes("IP_BANNED")) return 403;
   if (message.includes("FILE_TOO_LARGE")) return 413;
@@ -137,7 +146,7 @@ function errorStatus(message: string) {
 export const quickShareInternal = httpAction(async (ctx, request) => {
   const expected = process.env.QUICK_SHARE_INTERNAL_TOKEN;
   const received = request.headers.get("x-quick-share-internal-token");
-  if (!expected || !received || expected !== received) {
+  if (!expected || !received || !constantTimeEqual(expected, received)) {
     return json({ error: "Unauthorized" }, 401);
   }
 

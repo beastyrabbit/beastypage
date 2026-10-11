@@ -68,6 +68,7 @@ type MatchupResponse = {
   cats: MatchupCat[];
   needsSeed: number;
   totalCats: number;
+  totalCatsCapped?: boolean;
   matchupToken?: string;
 };
 
@@ -287,6 +288,7 @@ export default function PerfectCatFinderPage() {
   const [matchup, setMatchup] = useState<MatchupCat[]>([]);
   const [matchupToken, setMatchupToken] = useState<string | null>(null);
   const [poolSize, setPoolSize] = useState(0);
+  const [poolSizeCapped, setPoolSizeCapped] = useState(false);
   const [loading, setLoading] = useState(true);
   const [voteBusy, setVoteBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -366,12 +368,14 @@ export default function PerfectCatFinderPage() {
         setMatchup(normalized);
         setMatchupToken(response.matchupToken ?? null);
         setPoolSize(response.totalCats);
+        setPoolSizeCapped(Boolean(response.totalCatsCapped));
         normalized.forEach((cat) => void ensurePreview(cat));
         track("perfect_cat_matchup_loaded", {});
       } else {
         setMatchup([]);
         setMatchupToken(null);
         setPoolSize(response.totalCats);
+        setPoolSizeCapped(Boolean(response.totalCatsCapped));
       }
     } catch (err) {
       console.error("Failed to load matchup", err);
@@ -596,6 +600,7 @@ export default function PerfectCatFinderPage() {
           </div>
           <span className="inline-flex items-center gap-2 rounded-full border border-border/40 px-3 py-1 text-xs font-semibold text-muted-foreground">
             Pool size {poolSize}
+            {poolSizeCapped ? "+" : ""}
           </span>
         </div>
         <div className="overflow-hidden rounded-2xl border border-border/40">
