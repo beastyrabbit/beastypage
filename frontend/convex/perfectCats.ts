@@ -243,12 +243,11 @@ async function persistMatchup(
   if (!previous) {
     const activeMatchups = await db
       .query("perfect_matchups")
-      .withIndex("byExpiresAt", (q) => q.gt("expiresAt", now))
+      .withIndex("byConsumedAndExpiresAt", (q) =>
+        q.eq("consumed", false).gt("expiresAt", now),
+      )
       .take(MAX_ACTIVE_MATCHUPS + 1);
-    const pendingCount = activeMatchups.filter(
-      (matchup) => !matchup.consumed,
-    ).length;
-    if (pendingCount >= MAX_ACTIVE_MATCHUPS) {
+    if (activeMatchups.length >= MAX_ACTIVE_MATCHUPS) {
       throw new Error("Perfect Cat matchups are temporarily full");
     }
   }

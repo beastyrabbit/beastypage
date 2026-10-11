@@ -391,7 +391,8 @@ export default defineSchema({
     consumed: v.boolean(),
   })
     .index("byClient", ["clientId"])
-    .index("byExpiresAt", ["expiresAt"]),
+    .index("byExpiresAt", ["expiresAt"])
+    .index("byConsumedAndExpiresAt", ["consumed", "expiresAt"]),
 
   palette_generator_settings: defineTable({
     slug: v.string(),
