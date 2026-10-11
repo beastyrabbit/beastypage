@@ -71,6 +71,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     clearTimeout(timeout);
+    if (request.signal.aborted) {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
     if (error instanceof DOMException && error.name === "AbortError") {
       return NextResponse.json(
         { error: "Processing timed out" },
