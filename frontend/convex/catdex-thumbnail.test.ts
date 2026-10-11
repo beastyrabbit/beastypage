@@ -140,4 +140,35 @@ describe("Catdex thumbnail backfill", () => {
       ]),
     );
   });
+
+  it("does not regress a completed row when a duplicate job has no work", async () => {
+    const t = convexTest(schema, modules);
+    const { seasonId, rarityId } = await insertBaseRows(t);
+    const storageId = await t.run((ctx) =>
+      ctx.storage.store(new Blob(["fixture"], { type: "image/png" })),
+    );
+    const thumbStorageId = await t.run((ctx) =>
+      ctx.storage.store(new Blob(["thumbnail"], { type: "image/jpeg" })),
+    );
+    const catId = await t.run((ctx) =>
+      ctx.db.insert("catdex", {
+        catName: "Complete",
+        twitchUserName: "fixture",
+        seasonId,
+        rarityId,
+        approved: true,
+        defaultCardStorageId: storageId,
+        defaultCardThumbStorageId: thumbStorageId,
+        defaultCardName: "complete.png",
+        thumbnailStatus: "complete",
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    );
+
+    await t.mutation(internal.catdex.markThumbnailFailed, { id: catId });
+    await expect(t.run((ctx) => ctx.db.get(catId))).resolves.toMatchObject({
+      thumbnailStatus: "complete",
+    });
+  });
 });

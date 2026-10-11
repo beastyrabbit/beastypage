@@ -1,5 +1,6 @@
 import { createCanvas } from "@napi-rs/canvas";
 import { describe, expect, it } from "vitest";
+import { assertImageSourceWithinLimits } from "../../image-source-limits";
 import {
   extractColorsServer,
   generatePaletteImage,
@@ -45,6 +46,36 @@ function makePngHeader(width: number, height: number): Buffer {
   return header;
 }
 
+/** Create a JPEG header with metadata before its start-of-frame marker. */
+function makeJpegHeader(
+  width: number,
+  height: number,
+  metadataBytes = 0,
+): Buffer {
+  const chunks = [Buffer.from([0xff, 0xd8])];
+  let remaining = metadataBytes;
+  while (remaining > 0) {
+    const payloadLength = Math.min(remaining, 65_533);
+    const app = Buffer.alloc(payloadLength + 4);
+    app[0] = 0xff;
+    app[1] = 0xe1;
+    app.writeUInt16BE(payloadLength + 2, 2);
+    chunks.push(app);
+    remaining -= payloadLength;
+  }
+
+  const frame = Buffer.alloc(21);
+  frame[0] = 0xff;
+  frame[1] = 0xc0;
+  frame.writeUInt16BE(17, 2);
+  frame[4] = 8;
+  frame.writeUInt16BE(height, 5);
+  frame.writeUInt16BE(width, 7);
+  frame[9] = 3;
+  chunks.push(frame);
+  return Buffer.concat(chunks);
+}
+
 describe("getImagePixelsServer", () => {
   it("returns data, width, and height for a valid PNG", async () => {
     const buf = makeSolidPng(128, 64, 32);
@@ -64,6 +95,29 @@ describe("getImagePixelsServer", () => {
     await expect(getImagePixelsServer(oversized)).rejects.toThrow(
       "Image dimensions exceed processing limits",
     );
+  });
+
+  it("rejects oversized JPEG dimensions after large metadata", async () => {
+    const oversized = makeJpegHeader(5_001, 5_000, 70_000);
+    await expect(getImagePixelsServer(oversized)).rejects.toThrow(
+      "Image dimensions exceed processing limits",
+    );
+  });
+
+  it("accepts a normal JPEG", async () => {
+    const canvas = createCanvas(20, 20);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "rgb(128, 64, 32)";
+    ctx.fillRect(0, 0, 20, 20);
+    const result = await getImagePixelsServer(canvas.toBuffer("image/jpeg"));
+    expect(result.width).toBe(20);
+    expect(result.height).toBe(20);
+  });
+
+  it("rejects unknown image headers before decoding", () => {
+    expect(() =>
+      assertImageSourceWithinLimits(Buffer.from("not an image")),
+    ).toThrow("Unsupported or unreadable raster image header");
   });
 
   it("keeps resizing normal high-resolution images", async () => {

@@ -391,9 +391,9 @@ export const applyThumbnailUpdates = internalMutation({
     const current = await ctx.db.get(args.id);
     if (current) {
       const hasDefault = Boolean(
-        current.defaultCardStorageId &&
-          (args.defaultCard?.thumbStorageId ||
-            current.defaultCardThumbStorageId),
+        !current.defaultCardStorageId ||
+          args.defaultCard?.thumbStorageId ||
+          current.defaultCardThumbStorageId,
       );
       const hasCustom = Boolean(
         !current.customCardStorageId ||
@@ -411,8 +411,15 @@ export const applyThumbnailUpdates = internalMutation({
 export const markThumbnailFailed = internalMutation({
   args: { id: v.id("catdex") },
   handler: async (ctx, args) => {
+    const current = await ctx.db.get(args.id);
+    if (!current) return;
+    const hasDefault =
+      !current.defaultCardStorageId ||
+      Boolean(current.defaultCardThumbStorageId);
+    const hasCustom =
+      !current.customCardStorageId || Boolean(current.customCardThumbStorageId);
     await ctx.db.patch(args.id, {
-      thumbnailStatus: "failed",
+      thumbnailStatus: hasDefault && hasCustom ? "complete" : "failed",
       thumbnailAttemptedAt: Date.now(),
       updatedAt: Date.now(),
     });

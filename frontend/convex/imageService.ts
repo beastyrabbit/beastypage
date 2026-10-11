@@ -1,6 +1,11 @@
 "use node";
 import { v } from "convex/values";
 import { Jimp } from "jimp";
+import {
+  assertImageSourceWithinLimits,
+  MAX_SOURCE_DIMENSION,
+  MAX_SOURCE_PIXELS,
+} from "../lib/image-source-limits.js";
 import { internal } from "./_generated/api.js";
 import type { Id } from "./_generated/dataModel.js";
 import type { ActionCtx } from "./_generated/server.js";
@@ -21,6 +26,8 @@ type VariantResult = {
   variant: Variant;
   payload: ThumbnailPayload;
 };
+
+const MAX_SOURCE_BYTES = 16 * 1024 * 1024;
 
 export const generateForCat = internalAction({
   args: {
@@ -118,12 +125,60 @@ async function generateThumbnail(
       return null;
     }
 
-    const buffer = await response.arrayBuffer();
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (Number.isFinite(contentLength) && contentLength > MAX_SOURCE_BYTES) {
+      console.warn("Source image exceeds thumbnail size limit", {
+        catId,
+        variant,
+      });
+      return null;
+    }
+    if (!response.body) return null;
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let byteLength = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        byteLength += value.byteLength;
+        if (byteLength > MAX_SOURCE_BYTES) {
+          await reader.cancel();
+          console.warn("Source image exceeds thumbnail size limit", {
+            catId,
+            variant,
+          });
+          return null;
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    if (!byteLength) return null;
+    const buffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+
+    // Reject oversized or unsupported raster headers before Jimp allocates a
+    // decoded pixel buffer.
+    assertImageSourceWithinLimits(buffer);
 
     // Read the original image with Jimp
     const image = await Jimp.read(Buffer.from(buffer));
     const originalWidth = image.width;
     const originalHeight = image.height;
+    if (
+      originalWidth < 1 ||
+      originalHeight < 1 ||
+      originalWidth > MAX_SOURCE_DIMENSION ||
+      originalHeight > MAX_SOURCE_DIMENSION ||
+      originalWidth * originalHeight > MAX_SOURCE_PIXELS
+    ) {
+      console.warn("Source image dimensions exceed thumbnail limits", {
+        catId,
+        variant,
+      });
+      return null;
+    }
 
     // Resize with Jimp (256px max dimension, maintain aspect ratio)
     const maxDim = 256;

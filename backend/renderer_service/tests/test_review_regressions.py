@@ -36,7 +36,11 @@ def test_small_batch_and_png_options():
     "params",
     [
         {"blob": "x" * 50_000},
-        {"tree": [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]},
+        {
+            "tree": [
+                [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+            ]
+        },
     ],
 )
 def test_render_json_input_budget_rejects_large_or_deep_values(params):
@@ -48,8 +52,7 @@ def test_render_json_input_budget_rejects_large_or_deep_values(params):
 
 def test_batch_json_budget_rejects_cumulative_variant_payloads():
     variants = [
-        {"id": str(index), "params": {"blob": "x" * 10_000}}
-        for index in range(20)
+        {"id": str(index), "params": {"blob": "x" * 10_000}} for index in range(20)
     ]
     with pytest.raises(ValidationError, match="Batch input JSON"):
         BatchRenderRequest.model_validate(
