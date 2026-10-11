@@ -402,6 +402,8 @@ describe("legacy voting transactions", () => {
       viewerKey: "stable-viewer-key",
       status: "live",
     });
+    if (!session) throw new Error("Session was not created");
+    const sessionId = session.id as Id<"stream_sessions">;
 
     await expect(
       other.mutation(api.streamSessionsV2.create, {
@@ -411,7 +413,7 @@ describe("legacy voting transactions", () => {
     ).rejects.toThrow("Viewer key already in use");
     await expect(
       host.mutation(api.streamSessionsV2.update, {
-        id: session!.id as Id<"stream_sessions">,
+        id: sessionId,
         viewerKey: "attacker-selected-key",
       }),
     ).rejects.toThrow("Viewer key cannot be changed");
@@ -421,7 +423,7 @@ describe("legacy voting transactions", () => {
         viewerKey: "stable-viewer-key",
         limit: 1,
       }),
-    ).toMatchObject([{ id: session!.id, viewer_key: "stable-viewer-key" }]);
+    ).toMatchObject([{ id: sessionId, viewer_key: "stable-viewer-key" }]);
   });
 
   it("enforces host, membership, choice, round, and one participant vote", async () => {
