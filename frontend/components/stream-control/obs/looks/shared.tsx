@@ -4,7 +4,11 @@ import Image from "next/image";
 import { QRCodeSVG } from "qrcode.react";
 import type { CSSProperties } from "react";
 
-/** A rendered cat sprite at `size` px, pixel-crisp; a quiet dot while it renders. */
+/**
+ * A rendered cat sprite at `size` px, pixel-crisp; a quiet dot while it renders.
+ * `catId` marks the root `[data-batch-cat]` for the batch wrapper (numeral,
+ * leader lines, FLIP); `landed` plays the 300 ms `look-land` flash while true.
+ */
 export function LookSprite({
   url,
   alt,
@@ -12,6 +16,8 @@ export function LookSprite({
   style,
   className,
   placeholderColor = "currentColor",
+  catId,
+  landed,
 }: Readonly<{
   url: string | null;
   alt: string;
@@ -19,12 +25,16 @@ export function LookSprite({
   style?: CSSProperties;
   className?: string;
   placeholderColor?: string;
+  catId?: string;
+  landed?: boolean;
 }>) {
+  const landClass = landed ? "look-land" : "";
   if (!url) {
     return (
       <div
         aria-hidden="true"
-        className={className}
+        data-batch-cat={catId}
+        className={`${className ?? ""} ${landClass}`.trim() || undefined}
         style={{
           width: size,
           height: size,
@@ -49,7 +59,8 @@ export function LookSprite({
       width={size}
       height={size}
       unoptimized
-      className={`image-render-pixel object-contain ${className ?? ""}`}
+      data-batch-cat={catId}
+      className={`image-render-pixel object-contain ${className ?? ""} ${landClass}`.trim()}
       style={{ width: size, height: size, ...style }}
     />
   );

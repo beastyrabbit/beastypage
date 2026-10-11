@@ -7,13 +7,13 @@
  */
 
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
-import { estimateCeremonySecondsFromCounts } from "./ceremonyEstimate";
 import type {
   EvolutionAddition,
   EvolutionArchetype,
   EvolutionCatData,
   EvolutionGeneratedCat,
 } from "./evolutionGenerator";
+import { buildCeremonySchedule, scheduleCatsFromCommand } from "./rollSchedule";
 
 export type EvolutionStreamCat = {
   key: string;
@@ -34,6 +34,23 @@ export type EvolutionStreamCommand = {
   chargeDurationMs?: number;
   /** Ordered cats, starter first — params only, no rendered previews. */
   cats: EvolutionStreamCat[];
+};
+
+/** Charge used when the command carries none (the generator page default). */
+const DEFAULT_CHARGE_MS = 8400;
+
+/** Hold auto-releases after this; convex/catStream.ts keeps HOLD_MAX_MS = 90000 in sync. */
+export const EVOLUTION_HOLD_MAX_MS = 90_000;
+
+/** cat_stream_sessions.evolutionState as the overlay and control page read it. */
+export type EvolutionLiveState = {
+  seq: number;
+  /** Signed ms subtracted from the wall clock. Set ABSOLUTELY by the server (hold-with-park, reveal-at); released holds fold in (+). */
+  offsetMs: number;
+  /** Server ms the current hold began; absent when not held. `| null` only because the control page spreads partial objects; the server never writes null. */
+  holdStartedAt?: number | null;
+  /** The streamer skipped the rest of the ceremony. */
+  skipToBoard?: boolean;
 };
 
 /** Strip generated cats down to what the overlay needs (drops `rolls`). */
@@ -71,23 +88,77 @@ export function parseEvolutionStreamCommand(
 }
 
 /**
- * Generous upper bound (ms) for how long the ceremony for this command
- * takes on the overlay — used to decide, after an overlay reload, whether
- * to replay the ceremony or jump straight to the lineage + QR finale.
+ * Reads `session.evolutionState` off any session-shaped object. The overlay
+ * receives the session document untyped for this field until the schema
+ * carries it; a malformed value reads as "absent".
  */
+export function readEvolutionLiveState(
+  session: unknown,
+): EvolutionLiveState | null {
+  if (!session || typeof session !== "object") return null;
+  const raw = (session as { evolutionState?: unknown }).evolutionState;
+  if (!raw || typeof raw !== "object") return null;
+  const state = raw as Partial<EvolutionLiveState>;
+  if (typeof state.seq !== "number") return null;
+  return {
+    seq: state.seq,
+    offsetMs: typeof state.offsetMs === "number" ? state.offsetMs : 0,
+    ...(typeof state.holdStartedAt === "number"
+      ? { holdStartedAt: state.holdStartedAt }
+      : {}),
+    ...(state.skipToBoard ? { skipToBoard: true } : {}),
+  };
+}
+
+/**
+ * Ceremony clock both overlay instances and the control page agree on:
+ * now − commandTimestamp − offsetMs − (held ? min(now − holdStartedAt, EVOLUTION_HOLD_MAX_MS) : 0).
+ * Clamped at 0. When state.seq !== seq the state is ignored.
+ */
+export function ceremonyElapsedMs(
+  now: number,
+  commandTimestamp: number,
+  seq: number,
+  state: EvolutionLiveState | null | undefined,
+): number {
+  const live = state && state.seq === seq ? state : null;
+  const offset = live?.offsetMs ?? 0;
+  const held =
+    typeof live?.holdStartedAt === "number"
+      ? Math.min(Math.max(0, now - live.holdStartedAt), EVOLUTION_HOLD_MAX_MS)
+      : 0;
+  return Math.max(0, now - commandTimestamp - offset - held);
+}
+
+function scheduleFor(command: EvolutionStreamCommand) {
+  return buildCeremonySchedule(
+    scheduleCatsFromCommand(command),
+    command.totalCount,
+    command.chargeDurationMs ?? DEFAULT_CHARGE_MS,
+  );
+}
+
+/** Reload policy: "tree" once the clock is past the schedule or the streamer skipped, else "ceremony". */
+export function ceremonyPhaseForReload(
+  command: EvolutionStreamCommand,
+  seq: number,
+  commandTimestamp: number,
+  state: EvolutionLiveState | null | undefined,
+  now: number,
+): "ceremony" | "tree" {
+  if (state && state.seq === seq && state.skipToBoard) return "tree";
+  const elapsed = ceremonyElapsedMs(now, commandTimestamp, seq, state);
+  return elapsed >= scheduleFor(command).totalMs ? "tree" : "ceremony";
+}
+
+/** Upper bound (ms) for the whole show incl. offset and an open hold; kept for callers that want one number. */
 export function estimateEvolutionCommandMs(
   command: EvolutionStreamCommand,
+  state?: EvolutionLiveState | null,
 ): number {
-  const evolutions = command.cats.filter((cat) => cat.level > 0).length;
-  const branches = new Set(
-    command.cats.map((cat) => cat.branchLabel).filter(Boolean),
-  ).size;
-  const spinSeconds = (command.chargeDurationMs ?? 8400) / 1000;
-  const estimateSeconds = estimateCeremonySecondsFromCounts(
-    Math.max(branches, 1),
-    evolutions,
-    spinSeconds,
+  return (
+    scheduleFor(command).totalMs +
+    (state?.offsetMs ?? 0) +
+    (state?.holdStartedAt ? EVOLUTION_HOLD_MAX_MS : 0)
   );
-  // 25% slack + 15s for module loading and sprite rendering.
-  return estimateSeconds * 1250 + 15_000;
 }

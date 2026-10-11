@@ -31,6 +31,8 @@ export const LOOK_MOTION_KEYFRAMES = `
 @keyframes look-dust { 0% { opacity: 0.9; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(var(--dx, 20px), var(--dy, -30px)) scale(0.3); } }
 @keyframes look-ink { 0% { width: 0; } 100% { width: 100%; } }
 @keyframes look-shimmer { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+@keyframes look-land { 0% { filter: brightness(1.6); } 100% { filter: brightness(1); } }
+.look-land { animation: look-land 300ms ease-out; }
 @media (prefers-reduced-motion: reduce) {
   [data-look], [data-look] * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
 }

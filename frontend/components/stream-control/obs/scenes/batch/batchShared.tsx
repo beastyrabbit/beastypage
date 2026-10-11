@@ -9,9 +9,13 @@ import type { BatchViewCat } from "./batchView";
 export const BATCH_CANVAS = { width: 1280, height: 1080 } as const;
 
 /**
- * A cat sprite at the current reveal stage. Keyed by the preview url so the
- * previous stage's image stays until the next render lands. Renders a
- * transparent box until the first render exists so layouts never jump.
+ * A cat sprite at the current reveal stage. The `src` swaps in place when
+ * the next stage's frame is published (no remount, so the wrapper's rect
+ * measurements and FLIP keep the same element). Renders a transparent box
+ * until the first render exists so layouts never jump. The root carries
+ * `data-batch-cat` for the wrapper and `obs-batch-landed` while the cat's
+ * changed frame has just landed (the class drops at the next windup, so the
+ * flash replays once per stage per cat).
  */
 export function BatchSprite({
   cat,
@@ -32,18 +36,29 @@ export function BatchSprite({
     transform: flip ? "scaleX(-1)" : undefined,
     ...style,
   };
+  const landed = cat.landed ? "1" : "0";
+  const landedClass = cat.landed && cat.changed ? " obs-batch-landed" : "";
   if (!cat.previewUrl) {
-    return <div className={className} style={base} aria-hidden="true" />;
+    return (
+      <div
+        data-batch-cat={cat.id}
+        data-landed={landed}
+        className={`${className ?? ""}${landedClass}`}
+        style={base}
+        aria-hidden="true"
+      />
+    );
   }
   return (
     <Image
-      key={cat.previewUrl}
+      data-batch-cat={cat.id}
+      data-landed={landed}
       src={cat.previewUrl}
       alt={cat.label}
       width={size}
       height={size}
       unoptimized
-      className={`image-render-pixel object-contain ${className ?? ""}`}
+      className={`image-render-pixel object-contain ${className ?? ""}${landedClass}`}
       style={base}
     />
   );

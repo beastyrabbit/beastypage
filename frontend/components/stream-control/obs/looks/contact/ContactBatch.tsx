@@ -1,11 +1,16 @@
 "use client";
 
-import { type BatchBoardCat, stageStripWindow } from "../batchModel";
+import {
+  type BatchBoardCat,
+  type BatchBoardModel,
+  stageStripWindow,
+} from "../batchModel";
+import { LOOK_FONT_HAND } from "../fonts";
 import type { BatchBoardProps } from "../LookBoardProps";
-import { useChangeTick } from "../motion";
 import { LookSprite, poolNumber } from "../shared";
 import {
   ContactSheet,
+  CS_AMBER,
   CS_GREASE,
   FilmStrip,
   Frame,
@@ -37,6 +42,32 @@ function exposureCaption(
   const lead = `${poolNumber(index)} ${cat.label}`;
   if (out) return `${lead} · st.${cat.eliminatedAtStage}`;
   return cat.favorite ? `${lead} ♥` : lead;
+}
+
+/** The darkroom's pencil note for a beat; the trait stays written through the verdict. Empty once done. */
+function pencilNote(model: BatchBoardModel): string {
+  const trait = model.traitLabel;
+  const leavingIndex = model.cats.findIndex((cat) => cat.fading);
+  const leaving = leavingIndex >= 0 ? poolNumber(leavingIndex) : "??";
+  switch (model.beat) {
+    case "loading":
+      return "loading the film…";
+    case "windup":
+    case "deal":
+      return `exposing ${trait}…`;
+    case "hold":
+      return `${trait} — developed`;
+    case "awaiting":
+      return `${trait} — X one? say a number`;
+    case "verdict":
+      return `${trait} — X ${model.verdictNumber ?? "??"}…`;
+    case "depart":
+      return `${leaving} out`;
+    case "repack":
+      return "next frame…";
+    case "done":
+      return "";
+  }
 }
 
 /**
@@ -75,48 +106,70 @@ export function ContactBatch({ model }: Readonly<BatchBoardProps>) {
     ? model.cats.findIndex((cat) => cat.id === model.spotlight?.id)
     : -1;
   const loupe = Math.min(330, stripHeight * 1.5);
+  const note = pencilNote(model);
   let circleOrder = 0;
 
   return (
     <ContactSheet>
-      <SheetHead
-        title={`Adopt run — ${n} exposures, keep ${model.finalCount}`}
-        caption={
-          <>
-            STAGE {Math.min(model.stageIndex + 1, model.stages.length)}/
-            {model.stages.length} ·{" "}
-            {stageStripWindow(model.stages, 6)
-              .filter((stage) => stage.revealed)
-              .map((stage) => stage.label.toUpperCase())
-              .join(" · ") || "NOTHING YET"}{" "}
-            · <i style={{ fontStyle: "normal", color: CS_GREASE }}>X</i> WENT
-            HOME · <i style={{ fontStyle: "normal", color: CS_GREASE }}>○</i>{" "}
-            {done ? "PRINT" : "STILL IN"}
-          </>
-        }
-      />
+      {/* Once saved the proof sticker is slapped over the head; the plaque at the right keeps the show's text. */}
       {model.qrUrl ? (
         <ProofSticker
           url={model.qrUrl}
           title="PROOF SET"
           lines={`${model.remaining} prints, saved — scan for the litter`}
-          style={{ right: 60, top: 22, width: 290 }}
+          style={{ left: 64, top: 20, width: 300 }}
         />
       ) : (
+        <SheetHead
+          title={`Adopt run — ${n} exposures`}
+          captionMaxWidth={580}
+          caption={
+            <>
+              KEEP {model.finalCount} · STAGE{" "}
+              {Math.min(model.stageIndex + 1, model.stages.length)}/
+              {model.stages.length} ·{" "}
+              {stageStripWindow(model.stages, 6)
+                .filter((stage) => stage.revealed)
+                .map((stage) => stage.label.toUpperCase())
+                .join(" · ") || "NOTHING YET"}{" "}
+              · <i style={{ fontStyle: "normal", color: CS_GREASE }}>X</i> WENT
+              HOME · <i style={{ fontStyle: "normal", color: CS_GREASE }}>○</i>{" "}
+              {done ? "PRINT" : "STILL IN"}
+            </>
+          }
+        />
+      )}
+      {note ? (
         <Pencil
-          key={model.statusLabel}
+          key={note}
           style={{
-            right: 80,
-            top: 60,
+            left: 64,
+            top: 108,
             fontSize: 30,
-            transform: "rotate(3deg)",
+            transform: "rotate(-1deg)",
             animation: "look-pop 400ms ease both",
           }}
           white
         >
-          {model.statusLabel}
+          {note}
         </Pencil>
-      )}
+      ) : null}
+      {/* The wrapper's plaque writes the roll in the sheet's top-right corner; always mounted. */}
+      <div
+        data-plaque-slot=""
+        style={{
+          position: "absolute",
+          right: 60,
+          top: 26,
+          width: 560,
+          height: 120,
+          ["--obs-plaque-ink" as string]: "#d9d2c2",
+          ["--obs-plaque-muted" as string]: "#9a948a",
+          ["--obs-plaque-accent" as string]: CS_AMBER,
+          ["--obs-plaque-shadow" as string]: "none",
+          ["--obs-plaque-font-serif" as string]: LOOK_FONT_HAND,
+        }}
+      />
 
       {Array.from({ length: strips }, (_, stripIndex) => (
         <FilmStrip
@@ -342,7 +395,6 @@ function ExposureFrame({
   sprite: number;
 }>) {
   const out = cat.eliminated && !cat.fading;
-  const tick = useChangeTick(cat.previewUrl);
   return (
     <Frame
       left={left}
@@ -354,10 +406,12 @@ function ExposureFrame({
       alt={cat.label}
       sprite={sprite}
       dim={out}
-      developing={tick > 0 && !out && !cat.fading}
+      catId={cat.id}
+      developing={cat.landed && cat.changed && !out && !cat.fading}
       style={
+        // Flickers through the 1600 ms depart; the grease X draws at repack.
         cat.fading
-          ? { animation: "look-flicker 1000ms steps(6) both" }
+          ? { animation: "look-flicker 1500ms steps(6) both" }
           : undefined
       }
     />

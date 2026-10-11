@@ -1257,6 +1257,52 @@ function additionsToTraitChanges(
   }));
 }
 
+/**
+ * Applies `additions` to `parent` exactly as generateEvolutionBatch does for
+ * a generated cat: a "coat" addition pre-applies LONG_HAIR_POSE to the parent
+ * document and params (pose evolves as "preserve", so the trait change alone
+ * would be skipped), then createCatData with additionsToTraitChanges.
+ * `meta` = the parent's meta re-rolled as a branch carrying `additions`.
+ */
+export function applyEvolutionAdditions(
+  parent: EvolutionCatData,
+  additions: readonly EvolutionAddition[],
+  system: CatSystemDefinition = catSystem,
+): EvolutionCatData {
+  const coatGrew = additions.some((addition) => addition.kind === "coat");
+  const meta: EvolutionCatMeta = {
+    ...parent.evolution,
+    role: "branch",
+    additions: [...additions],
+    rolls: [],
+  };
+  const evolutionParent = coatGrew
+    ? {
+        ...parent,
+        document: parseEvolutionDocumentForSystem(
+          {
+            ...parent.document,
+            traits: {
+              ...parent.document.traits,
+              pose: LONG_HAIR_POSE,
+            },
+          },
+          system,
+        ),
+        params: applyEvolutionStarterHairToParams(
+          clone(parent.params),
+          EVOLUTION_STARTER_HAIR_STYLES.long,
+        ),
+      }
+    : parent;
+  return createCatData(
+    evolutionParent,
+    additionsToTraitChanges(additions),
+    meta,
+    system,
+  );
+}
+
 function splitSlots(catData: EvolutionCatData) {
   return {
     accessories: uniqueClean(catData.accessorySlots),

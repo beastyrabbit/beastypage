@@ -26,10 +26,12 @@ const CSS = `
 .ab .slot.full .stk{position:absolute;left:3px;top:3px}
 .ab .slot.full .nb{position:absolute;left:-6px;top:-6px}
 .ab .slot.full .nm{position:absolute;bottom:6px;left:0;right:0;text-align:center;font:900 13px ${SANS};color:#1b2a4a}
-.ab .foot{position:absolute;bottom:18px;left:24px;right:24px;font:700 15px ${SANS};color:#8c6a2a}
+.ab .foot{position:absolute;bottom:60px;right:24px;white-space:nowrap;font:700 20px ${SANS};color:#8c6a2a}
+.ab .plq{position:absolute;left:60px;bottom:24px;width:560px;height:120px;--obs-plaque-ink:#1b2a4a;--obs-plaque-muted:#8c6a2a;--obs-plaque-accent:#e0322b;--obs-plaque-shadow:none}
+.ab .page.l.wide .plq{left:28px;width:540px}
 .ab .foot b{color:#e0322b}
-.ab .sheet{position:absolute;left:24px;top:110px;width:790px;height:840px;background:#fff;border-radius:6px;box-shadow:inset 0 0 0 1px #e6e0d4}
-.ab .cell{position:absolute;transition:opacity .9s ease,transform .9s ease}
+.ab .sheet{position:absolute;left:24px;top:110px;width:790px;height:760px;background:#fff;border-radius:6px;box-shadow:inset 0 0 0 1px #e6e0d4}
+.ab .cell{position:absolute;transition:opacity 1.5s ease,transform 1.5s ease}
 .ab .stk{position:relative;border-radius:50% 50% 46% 46%/44% 44% 56% 56%;background:#ffe8b0;box-shadow:0 2px 0 #fff,0 3px 6px rgba(0,0,0,.25);overflow:hidden;border:3px solid #fff;margin:0 auto}
 .ab .stk .sprite{position:absolute;left:0;top:0}
 .ab .nb{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;font:800 16px var(--obs-font-mono,ui-monospace,monospace);background:#ffb84a;color:#1b2a4a;box-shadow:0 2px 0 #c98a2a;flex:none}
@@ -60,7 +62,7 @@ const CSS = `
 .ab .lift span{position:absolute;left:0;right:0;bottom:22px;text-align:center;font:900 18px ${SANS};color:#1b2a4a}
 .ab .lift.empty{background:rgba(255,255,255,.5);border:4px dashed #c8c0b0;box-shadow:none}
 .ab .lift.empty span{font:italic 14px Georgia,serif;color:#8c6a2a;bottom:100px}
-.ab .done{position:absolute;left:0;right:0;bottom:40px;text-align:center;font:900 54px ${SANS};color:#ffb84a;-webkit-text-stroke:2px #1b2a4a;letter-spacing:.06em;transform:rotate(-4deg)}
+.ab .done{position:absolute;left:420px;right:28px;bottom:50px;text-align:right;font:900 54px ${SANS};color:#ffb84a;-webkit-text-stroke:2px #1b2a4a;letter-spacing:.06em;transform:rotate(-4deg)}
 .ab .ttl{position:absolute;left:0;right:0;bottom:8px;text-align:center;font:700 11px ${SANS};color:#8a7fa8;letter-spacing:.3em;text-transform:uppercase}
 @keyframes ab-pulse{50%{transform:rotate(12deg) scale(1.12)}}
 `;
@@ -85,7 +87,7 @@ export function AlbumBatchScene({ view }: Readonly<BatchSceneViewProps>) {
   const columns = fixedGridColumns(view.poolSize);
   const rows = Math.ceil(view.poolSize / columns);
   const cellW = 790 / columns;
-  const cellH = 840 / rows;
+  const cellH = 760 / rows;
   const sticker = Math.max(60, Math.floor(Math.min(cellW, cellH) - 34));
   const sprite = sticker - 8;
   // Half a stage of foil comes off while the current stage is still rolling.
@@ -130,6 +132,7 @@ export function AlbumBatchScene({ view }: Readonly<BatchSceneViewProps>) {
             ))}
           </div>
           <div className="done">COMPLETE!</div>
+          <div data-plaque-slot="" className="plq" />
         </div>
         <div className="page r order">
           <div className="hdr">
@@ -224,7 +227,7 @@ export function AlbumBatchScene({ view }: Readonly<BatchSceneViewProps>) {
                 className={cn(
                   "cell",
                   gone && "peeled",
-                  cat.marked && "swap",
+                  cat.marked && !gone && "swap",
                   cat.potential && "maybe",
                   cat.fading && "lifting",
                 )}
@@ -252,7 +255,11 @@ export function AlbumBatchScene({ view }: Readonly<BatchSceneViewProps>) {
                   </div>
                 )}
                 <b className="nb">{cat.numberLabel}</b>
-                {cat.marked ? <i className="tab red">SWAP?</i> : null}
+                {cat.marked && !gone ? (
+                  <i className="tab red">
+                    {cat.id === view.beat.pendingCullId ? "SWAP!" : "SWAP?"}
+                  </i>
+                ) : null}
                 {cat.potential ? <i className="tab yel">?</i> : null}
                 {cat.favorite && !gone ? <i className="holostar">★</i> : null}
                 <span className="nm" style={{ top: sticker + 6 }}>
@@ -267,12 +274,12 @@ export function AlbumBatchScene({ view }: Readonly<BatchSceneViewProps>) {
             <>
               {"pick one to "}
               <b>SWAP</b>
-              {` away — ${view.cullNumber} of ${view.maxEliminations} · say its number`}
+              {` away — ${view.cullNumber} of ${view.maxEliminations}`}
             </>
-          ) : (
-            view.statusLabel
-          )}
+          ) : null}
         </div>
+        {/* The wrapper's plaque lives in the sheet's bottom margin. */}
+        <div data-plaque-slot="" className="plq" />
       </div>
       <div className="ttl">{view.title}</div>
     </div>

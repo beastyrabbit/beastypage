@@ -13,8 +13,9 @@ import {
 import { cn } from "@/lib/utils";
 import { QrBadge } from "../../QrBadge";
 import { OBS_PANEL_STYLE } from "../../themes/panelStyle";
+import { LOOK_FONT_PIXEL } from "../fonts";
 import type { LineageBoardProps } from "../LookBoardProps";
-import type { LineageCat } from "../lineageModel";
+import { additionTags, type LineageCat } from "../lineageModel";
 
 /** Usable board area inside the 1280×1080 scene (padding, QR column, header). */
 const BOARD_WIDTH = 1280 - 72 - 24 - 260 - 48;
@@ -62,7 +63,13 @@ export function ClassicLineage({ model }: Readonly<LineageBoardProps>) {
   return (
     <div
       className="relative flex flex-col"
-      style={{ width: "1280px", height: "1080px", padding: "28px 36px" }}
+      style={{
+        width: "1280px",
+        height: "1080px",
+        padding: "28px 36px",
+        // The overlay page has no --font-pixel; share the chamber's pixel font.
+        ["--font-pixel" as string]: LOOK_FONT_PIXEL,
+      }}
     >
       <style>{`
         @keyframes obs-lineage-pop {
@@ -149,6 +156,7 @@ export function ClassicLineage({ model }: Readonly<LineageBoardProps>) {
                     <span className="max-w-full truncate px-1 text-sm font-bold text-white/90">
                       {cat.label}
                     </span>
+                    <TraitText cat={cat} size={10} />
                   </div>
                 );
               })}
@@ -202,6 +210,7 @@ export function ClassicLineage({ model }: Readonly<LineageBoardProps>) {
                           >
                             {stageRank(cat.level)}
                           </span>
+                          <TraitText cat={cat} size={9} />
                         </div>
                       ))}
                     </div>
@@ -221,29 +230,44 @@ export function ClassicLineage({ model }: Readonly<LineageBoardProps>) {
   );
 }
 
+/** What the cat gained at this stop, full words in the board's pixel type. */
+function TraitText({ cat, size }: Readonly<{ cat: LineageCat; size: number }>) {
+  const tags = additionTags(cat.additions);
+  if (tags.length === 0) return null;
+  return (
+    <span
+      className={cn(
+        pixelFontClass,
+        "max-w-full px-1 text-center text-amber-100/80",
+      )}
+      style={{ fontSize: size, lineHeight: 1.6 }}
+    >
+      {tags.join(" · ")}
+    </span>
+  );
+}
+
 function LineageSprite({
   cat,
   size,
 }: Readonly<{ cat: LineageCat; size: number }>) {
-  if (!cat.previewUrl) {
-    return (
-      <div
-        className="flex items-center justify-center text-[10px] text-white/40"
-        style={{ width: size, height: size }}
-      >
-        …
-      </div>
-    );
-  }
   return (
-    <Image
-      src={cat.previewUrl}
-      alt={cat.label}
-      width={size}
-      height={size}
-      unoptimized
-      className="image-render-pixel object-contain drop-shadow-[0_8px_20px_rgba(0,0,0,0.55)]"
-      style={{ width: size, height: size }}
-    />
+    <div data-lineage-key={cat.key} style={{ width: size, height: size }}>
+      {cat.previewUrl ? (
+        <Image
+          src={cat.previewUrl}
+          alt={cat.label}
+          width={size}
+          height={size}
+          unoptimized
+          className="image-render-pixel object-contain drop-shadow-[0_8px_20px_rgba(0,0,0,0.55)]"
+          style={{ width: size, height: size }}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-[10px] text-white/40">
+          …
+        </div>
+      )}
+    </div>
   );
 }

@@ -30,11 +30,12 @@ export function ContactSheet({ children }: Readonly<{ children: ReactNode }>) {
   );
 }
 
-/** Handwritten heading + mono caption. */
+/** Handwritten heading + mono caption; `captionMaxWidth` clips a long caption with an ellipsis. */
 export function SheetHead({
   title,
   caption,
-}: Readonly<{ title: string; caption: ReactNode }>) {
+  captionMaxWidth,
+}: Readonly<{ title: string; caption: ReactNode; captionMaxWidth?: number }>) {
   return (
     <div style={{ position: "absolute", left: 64, top: 26 }}>
       <div
@@ -57,6 +58,9 @@ export function SheetHead({
           color: "#9a9385",
           marginTop: 8,
           whiteSpace: "nowrap",
+          maxWidth: captionMaxWidth,
+          overflow: captionMaxWidth ? "hidden" : undefined,
+          textOverflow: captionMaxWidth ? "ellipsis" : undefined,
         }}
       >
         {caption}
@@ -251,6 +255,7 @@ function FrameSprite({
 /**
  * A frame on a strip. `dim` for repeated/unexposed negatives, `exposing`
  * strobes the sprite like a lightbox, `developing` plays the develop wash.
+ * `catId` marks the frame `[data-batch-cat]` for the batch wrapper.
  */
 export function Frame({
   left,
@@ -267,6 +272,7 @@ export function Frame({
   exposing,
   developing,
   style,
+  catId,
 }: Readonly<{
   left: number;
   width: number;
@@ -282,9 +288,11 @@ export function Frame({
   exposing?: boolean;
   developing?: boolean;
   style?: CSSProperties;
+  catId?: string;
 }>) {
   return (
     <div
+      data-batch-cat={catId}
       style={{
         position: "absolute",
         top: 33,

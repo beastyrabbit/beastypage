@@ -23,6 +23,7 @@ import {
 } from "@/lib/cat-system";
 import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import type { SlotSelections } from "@/lib/cat-v3/types";
+import type { EvolutionStreamCommand } from "@/lib/evolution/streamEvolution";
 import { normalizePortableSettingsCode } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
 import { withResolvedAfterlifeParams } from "@/utils/catSettingsHelpers";
@@ -51,6 +52,7 @@ import {
   isNonNegativeFiniteNumber,
   isPaletteDisplayMode,
   isPositiveFiniteNumber,
+  isShowLive,
   type LobbyMode,
 } from "./helpers";
 import { LookPanel } from "./LookPanel";
@@ -848,6 +850,19 @@ export function ControlShell() {
     syncSessionSettings({ lobbyInfoMode: activeTab });
   }, [activeTab, initialized, syncSessionSettings]);
 
+  // Wall clock for the live-show readouts (isShowLive, ledgers); ticks only
+  // while a batch or evolution command is current.
+  const liveCommandType = session?.currentCommand?.type;
+  const showTicking =
+    liveCommandType === "batch" || liveCommandType === "evolution";
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!showTicking) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [showTicking]);
+
   const apiKey = viewer?.apiKey;
   const controlApi = useMemo<StreamControlApi>(() => {
     const pageOrigin =
@@ -874,9 +889,24 @@ export function ControlShell() {
         ? {
             ...(sessionCommand.batch as BatchStreamCommand),
             seq: sessionCommand.seq,
+            timestamp: sessionCommand.timestamp,
           }
         : null;
     const batchLiveState = session?.batchState ?? null;
+    const currentEvolutionCommand =
+      sessionCommand?.type === "evolution" && sessionCommand.evolution
+        ? {
+            ...(sessionCommand.evolution as EvolutionStreamCommand),
+            seq: sessionCommand.seq,
+            timestamp: sessionCommand.timestamp,
+          }
+        : null;
+    const evolutionLiveState = session?.evolutionState ?? null;
+    const showLive = isShowLive(session, now);
+    const endShow = async () => {
+      if (!window.confirm("End the show and return to the lobby?")) return;
+      await runSceneCommand("Lobby", () => showLobbyMut());
+    };
 
     return {
       testMode: Boolean(session?.testMode),
@@ -947,6 +977,10 @@ export function ControlShell() {
       metaSaving,
       currentBatchCommand,
       batchLiveState,
+      currentEvolutionCommand,
+      evolutionLiveState,
+      showLive,
+      endShow,
       rawSessionSettings,
       overlayTheme,
       setOverlayTheme,
@@ -961,6 +995,7 @@ export function ControlShell() {
   }, [
     apiKey,
     session,
+    now,
     spinning,
     wheelSpinning,
     sceneCommandPending,

@@ -85,7 +85,7 @@ describe("buildBatchBoardModel", () => {
     const model = buildBatchBoardModel(base);
     expect(model.stages.map((s) => s.revealed)).toEqual([true, true, false]);
     expect(model.stages.map((s) => s.current)).toEqual([false, true, false]);
-    expect(model.statusLabel).toBe("Choosing who leaves…");
+    expect(model.statusLabel).toBe("Eyes rolled. Who leaves? Say a number");
     expect(model.title).toBe("Adoption Elimination");
     expect(model.spotlight?.id).toBe("a");
     expect(model.cats.find((c) => c.id === "a")?.favorite).toBe(true);
@@ -104,6 +104,59 @@ describe("buildBatchBoardModel", () => {
   it("drops a spotlight without a rendered preview", () => {
     const model = buildBatchBoardModel({ ...base, spotlightId: "d" });
     expect(model.spotlight).toBeNull();
+  });
+
+  it("derives the beat from the phase when none is given", () => {
+    expect(buildBatchBoardModel({ ...base, phase: "loading" }).beat).toBe(
+      "loading",
+    );
+    expect(buildBatchBoardModel({ ...base, phase: "revealing" }).beat).toBe(
+      "deal",
+    );
+    expect(buildBatchBoardModel(base).beat).toBe("awaiting");
+    expect(buildBatchBoardModel({ ...base, phase: "done" }).beat).toBe("done");
+    const model = buildBatchBoardModel(base);
+    expect(model.traitLabel).toBe("Eyes");
+    expect(model.verdictNumber).toBeNull();
+    expect(model.verdictEndsAt).toBeNull();
+    expect(model.reducedMotion).toBe(false);
+    expect(model.cats.every((c) => !c.changed && !c.landed)).toBe(true);
+    expect(model.cats.every((c) => c.valueLabel === null)).toBe(true);
+  });
+
+  it("carries the verdict, landing and value facts when given", () => {
+    const model = buildBatchBoardModel({
+      ...base,
+      beat: "verdict",
+      pendingCullId: "c",
+      verdictAt: 1_700_000_000_000,
+      changedIds: ["a", "c"],
+      landedIds: ["a"],
+      valueLabels: { a: "Little", c: "Tuxedo" },
+      reducedMotion: true,
+    });
+    expect(model.beat).toBe("verdict");
+    expect(model.verdictNumber).toBe("03");
+    expect(model.verdictEndsAt).toBe(1_700_000_000_000);
+    expect(model.statusLabel).toBe("#03 leaves in…");
+    expect(model.reducedMotion).toBe(true);
+    const a = model.cats.find((c) => c.id === "a");
+    expect(a?.changed).toBe(true);
+    expect(a?.landed).toBe(true);
+    expect(a?.valueLabel).toBe("Little");
+    const c = model.cats.find((x) => x.id === "c");
+    expect(c?.marked).toBe(true);
+    expect(c?.landed).toBe(false);
+    // Verdict and awaiting both count as "awaiting a cull" for marking.
+    const departing = buildBatchBoardModel({
+      ...base,
+      beat: "depart",
+      fadingId: "d",
+    });
+    expect(departing.statusLabel).toBe("#04 leaves");
+    expect(departing.verdictNumber).toBeNull();
+    expect(departing.cats.find((x) => x.id === "d")?.departing).toBe(true);
+    expect(departing.cats.find((x) => x.id === "c")?.marked).toBe(false);
   });
 });
 

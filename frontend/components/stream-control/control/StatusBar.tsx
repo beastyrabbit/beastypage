@@ -2,14 +2,79 @@
 
 import { Copy, Eye, Radio, Square, Timer } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  buildBatchStagePlan,
+  formatBatchNumber,
+} from "@/lib/adoption/streamBatch";
+import { formatDuration } from "@/lib/evolution/ceremonyEstimate";
 import { cn } from "@/lib/utils";
 import { OVERLAY_THEME_META } from "../obs/themes/themeMeta";
 import { useStreamControl } from "./context";
+import { describeBatchBeat, evolutionLedger } from "./helpers";
 import { PaletteDots } from "./look/ThemeTile";
 
 const FOCUS_RING =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70";
+
+/**
+ * Where the live show is, for the on-air pill: "Stage 7/23 · WHITE PATCHES ·
+ * awaiting" or "Roll · ACCESSORY · 1/2 · 1m 12s left". Ticks once a second
+ * while a show is live; null otherwise.
+ */
+function useShowReadout(): string | null {
+  const {
+    showLive,
+    currentBatchCommand,
+    batchLiveState,
+    currentEvolutionCommand,
+    evolutionLiveState,
+  } = useStreamControl();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!showLive) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [showLive]);
+  const stages = useMemo(
+    () =>
+      currentBatchCommand
+        ? buildBatchStagePlan(
+            currentBatchCommand.config,
+            currentBatchCommand.cats,
+          )
+        : [],
+    [currentBatchCommand],
+  );
+  if (!showLive) return null;
+  if (currentBatchCommand) {
+    const cats = currentBatchCommand.cats;
+    const readout = describeBatchBeat(
+      batchLiveState,
+      stages,
+      null,
+      (id) => formatBatchNumber(cats.findIndex((cat) => cat.id === id) + 1),
+      now,
+    );
+    return readout
+      ? `${readout.stage} · ${readout.trait} · ${readout.beat}`
+      : null;
+  }
+  if (currentEvolutionCommand) {
+    const ledger = evolutionLedger(
+      currentEvolutionCommand,
+      evolutionLiveState,
+      now,
+    );
+    const eta = ledger.held
+      ? "held"
+      : `${formatDuration(ledger.etaMs / 1000)} left`;
+    return `${ledger.stepLabel} · ${eta}`;
+  }
+  return null;
+}
 
 /**
  * Persistent bar above the tab panels. Left: the scene switcher (Lobby /
@@ -31,6 +96,7 @@ export function StatusBar() {
     setActiveTab,
   } = useStreamControl();
   const themeMeta = OVERLAY_THEME_META[overlayTheme];
+  const showReadout = useShowReadout();
 
   const scenes = [
     {
@@ -150,6 +216,12 @@ export function StatusBar() {
                 <span className="sr-only">nothing</span>
               </>
             )}
+            {showReadout ? (
+              <span className="font-mono tabular-nums text-red-100/80">
+                {" · "}
+                {showReadout}
+              </span>
+            ) : null}
           </span>
         </output>
       </div>

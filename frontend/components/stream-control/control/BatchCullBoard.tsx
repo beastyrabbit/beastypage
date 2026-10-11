@@ -2,13 +2,21 @@
 
 import { useMutation } from "convex/react";
 import { Expand, Heart, Star } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import type { SpriteMapperApi } from "@/components/cat-builder/types";
 import { api } from "@/convex/_generated/api";
 import {
   BATCH_TORTIE_PLACEHOLDER_FALLBACK,
+  BATCH_VERDICT_MS,
   type BatchTortiePlaceholders,
   buildBatchStagePlan,
   buildPartialBatchParams,
@@ -16,11 +24,32 @@ import {
   parseBatchNumberInput,
 } from "@/lib/adoption/streamBatch";
 import { cn } from "@/lib/utils";
+import { stageInputs, summarizeStage } from "../obs/scenes/batch/batchBeats";
 import { useStreamControl } from "./context";
+import { verdictSecondsLeft } from "./helpers";
 
-function cullStatusLabel(awaiting: boolean, cullsLeft: number): string {
-  if (awaiting) return `Pick one (${cullsLeft} culls left)`;
-  return cullsLeft > 0 ? "Revealing…" : "Finalists locked";
+/** A verdict whose finalize never ran reads "stuck" this long after verdictAt. */
+const VERDICT_STUCK_MS = 10_000;
+
+type Highlight = "potential" | "favorite" | "spotlight";
+const HIGHLIGHT_KEYS: Record<string, Highlight> = {
+  f: "favorite",
+  p: "potential",
+  s: "spotlight",
+};
+
+function cullStatusLabel(args: {
+  pending: boolean;
+  stuck: boolean;
+  awaiting: boolean;
+  dealing: boolean;
+  label: string;
+  cullsLeft: number;
+}): string {
+  if (args.pending) return args.stuck ? "Verdict stuck" : "Verdict…";
+  if (args.awaiting) return `Pick one (${args.cullsLeft} culls left)`;
+  if (args.dealing) return `Dealing ${args.label}…`;
+  return "Finalists locked";
 }
 
 function cullCardStateClass(
@@ -51,18 +80,19 @@ function cullLabelClass(marked: boolean, potential: boolean): string {
 /**
  * Full-width live mirror of the elimination show, rendered below the
  * preview so the streamer can actually see the cats. Survivors render at
- * the overlay's current reveal stage; while the overlay waits for a cull,
- * a single click marks a cat (viewers see the mark on stream) and a
- * double-click removes it. Each card also has round corner buttons:
- * top-left shows the sprite big (overlay + here), top-right marks a
- * yellow "potential" (resets each cull), bottom-right a favourite
- * (persists for the whole show).
+ * the overlay's current reveal stage. The number field is the console:
+ * chat says a number, the streamer types it — Enter marks it, Enter again
+ * arms the verdict (a 3 s countdown at the cat on stream, then the cull),
+ * Esc cancels the verdict or clears the mark, F / P / S toggle favourite /
+ * potential / spotlight. Clicking a card marks it, a double-click arms it.
+ * While a verdict runs the marks are frozen; only Cancel and F/P/S stay live.
  */
 export function BatchCullBoard() {
   const { currentBatchCommand: command, batchLiveState: liveState } =
     useStreamControl();
   const markBatchCat = useMutation(api.catStream.markBatchCat);
   const cullBatchCat = useMutation(api.catStream.cullBatchCat);
+  const cancelBatchCull = useMutation(api.catStream.cancelBatchCull);
   const setBatchHighlight = useMutation(api.catStream.setBatchHighlight);
   const { generator } = useCatGenerator();
   const placeholdersRef = useRef<BatchTortiePlaceholders>(
@@ -70,9 +100,10 @@ export function BatchCullBoard() {
   );
   const [placeholdersReady, setPlaceholdersReady] = useState(false);
   const renderTokenRef = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<Record<string, string>>({});
-  const [culling, setCulling] = useState(false);
   const [numberInput, setNumberInput] = useState("");
+  const [now, setNow] = useState(() => Date.now());
 
   const active = Boolean(command && liveState?.seq === command.seq);
   const stages = useMemo(
@@ -82,6 +113,24 @@ export function BatchCullBoard() {
   const eliminated = useMemo(
     () => new Set(liveState?.eliminatedIds ?? []),
     [liveState?.eliminatedIds],
+  );
+  const survivors = useMemo(
+    () =>
+      command ? command.cats.filter((cat) => !eliminated.has(cat.id)) : [],
+    [command, eliminated],
+  );
+  const stageIndex = liveState?.stageIndex ?? 0;
+  const stage = stages[Math.min(stageIndex, stages.length - 1)] ?? null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: placeholdersReady flips once the ref is filled; the ref itself is stable
+  const summary = useMemo(
+    () =>
+      stage
+        ? summarizeStage(
+            stageInputs(survivors, stages, stageIndex, placeholdersRef.current),
+            stage,
+          )
+        : null,
+    [stage, stages, stageIndex, survivors, placeholdersReady],
   );
 
   useEffect(() => {
@@ -158,50 +207,76 @@ export function BatchCullBoard() {
     command?.cats,
   ]);
 
-  // Re-arm for the next removal round.
+  // Verdict numeral + ring: tick while a cull is armed.
+  const pendingCullId = liveState?.pendingCullId ?? null;
   useEffect(() => {
-    if (liveState?.awaitingCull) {
-      setCulling(false);
-    }
-  }, [liveState?.awaitingCull]);
+    if (!pendingCullId) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [pendingCullId]);
 
   if (!active || !command || !liveState) return null;
 
-  const survivors = command.cats.filter((cat) => !eliminated.has(cat.id));
   const maxEliminations = command.cats.length - command.finalCount;
   const cullsLeft = maxEliminations - liveState.eliminatedIds.length;
-  const awaiting = liveState.awaitingCull && !culling;
+  const verdictAt =
+    typeof liveState.verdictAt === "number" ? liveState.verdictAt : null;
+  const pending = Boolean(pendingCullId && verdictAt !== null);
+  const stuck =
+    pending && verdictAt !== null && verdictAt + VERDICT_STUCK_MS < now;
+  const secondsLeft = pending ? verdictSecondsLeft(verdictAt, now) : null;
+  const ringFraction =
+    pending && verdictAt !== null
+      ? Math.min(1, Math.max(0, (verdictAt - now) / BATCH_VERDICT_MS))
+      : 0;
+  // Marks and culls only while the overlay waits and no verdict is armed.
+  const awaiting = liveState.awaitingCull && !pending;
+  const dealing = !liveState.awaitingCull && stageIndex < stages.length;
   const potentials = new Set(liveState.potentialIds ?? []);
   const favorites = new Set(liveState.favoriteIds ?? []);
   const spotlightId = liveState.spotlightId ?? null;
   const spotlightCat = spotlightId
     ? (survivors.find((cat) => cat.id === spotlightId) ?? null)
     : null;
+  const numberOf = (catId: string) =>
+    formatBatchNumber(command.cats.findIndex((cat) => cat.id === catId) + 1);
+  const stageLabel = (summary?.label ?? stage?.label ?? "").toUpperCase();
+  const pendingNumber = pendingCullId ? numberOf(pendingCullId) : null;
+
+  const report = (error: unknown, fallback: string) =>
+    toast.error(error instanceof Error ? error.message : fallback);
+  const clearAndRefocus = () => {
+    setNumberInput("");
+    inputRef.current?.focus();
+  };
 
   const handleMark = (catId: string) => {
     if (!awaiting) return;
     markBatchCat({
       seq: command.seq,
       catId: liveState.markedId === catId ? null : catId,
-    }).catch(() => {});
+    }).catch((error) => report(error, "Failed to mark the cat"));
   };
 
-  const handleCull = (catId: string) => {
-    if (!awaiting) return;
-    setCulling(true);
-    cullBatchCat({ seq: command.seq, catId }).catch((error) => {
-      setCulling(false);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to remove the cat",
-      );
-    });
+  /** Arm the verdict (or, on a stuck verdict for the same cat, apply it). */
+  const handleArm = (catId: string) => {
+    if (!liveState.awaitingCull) return;
+    cullBatchCat({ seq: command.seq, catId }).catch((error) =>
+      report(error, "Failed to remove the cat"),
+    );
   };
 
-  const handleHighlight = (
-    catId: string,
-    kind: "potential" | "favorite" | "spotlight",
-  ) => {
-    setBatchHighlight({ seq: command.seq, catId, kind }).catch(() => {});
+  const handleCancel = () => {
+    cancelBatchCull({ seq: command.seq }).catch((error) =>
+      report(error, "Failed to cancel the verdict"),
+    );
+  };
+
+  const handleHighlight = (catId: string, kind: Highlight) => {
+    setBatchHighlight({ seq: command.seq, catId, kind }).catch((error) =>
+      report(error, "Failed to update the highlight"),
+    );
   };
 
   // Pick by number: chat says "number 13", the streamer types 13 and acts.
@@ -220,20 +295,46 @@ export function BatchCullBoard() {
     if (typedGone) return `${formatBatchNumber(typedNumber ?? 0)} already left`;
     return null;
   })();
-  const actOnTyped = (
-    kind: "mark" | "potential" | "favorite" | "spotlight",
-  ) => {
+  const actOnTyped = (kind: Highlight) => {
     if (!typedCat || !typedUsable) return;
-    if (kind === "mark") handleMark(typedCat.id);
-    else handleHighlight(typedCat.id, kind);
+    handleHighlight(typedCat.id, kind);
+    clearAndRefocus();
   };
+  // Enter: mark the typed cat; Enter on the marked cat's number arms the
+  // verdict. During a stuck verdict Enter re-applies it (the server applies
+  // an expired arm inline).
   const handleNumberSubmit = (event: FormEvent) => {
     event.preventDefault();
-    actOnTyped("mark");
+    if (pending) {
+      if (stuck && pendingCullId) {
+        handleArm(pendingCullId);
+        clearAndRefocus();
+      }
+      return;
+    }
+    if (!typedCat || !typedUsable || !awaiting) return;
+    if (markedCat && markedCat.id === typedCat.id) handleArm(typedCat.id);
+    else handleMark(typedCat.id);
+    clearAndRefocus();
+  };
+  const handleNumberKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      if (pending) handleCancel();
+      else if (liveState.markedId) handleMark(liveState.markedId);
+      clearAndRefocus();
+      return;
+    }
+    const highlight = HIGHLIGHT_KEYS[event.key.toLowerCase()];
+    if (highlight && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      actOnTyped(highlight);
+    }
   };
   const handleRemoveMarked = () => {
-    if (!markedCat) return;
-    handleCull(markedCat.id);
+    if (!markedCat || !awaiting) return;
+    handleArm(markedCat.id);
+    clearAndRefocus();
   };
 
   return (
@@ -241,21 +342,38 @@ export function BatchCullBoard() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-base font-semibold text-foreground">
           Live Elimination — {survivors.length} cats
+          {stage ? (
+            <span className="ml-3 font-mono text-sm font-medium tabular-nums text-muted-foreground">
+              Stage {Math.min(stageIndex + 1, stages.length)}/{stages.length} ·{" "}
+              {stageLabel}
+              {summary ? ` · ${summary.changedCount} changed` : ""}
+              {summary && summary.rareIds.length > 0
+                ? ` · rare ${summary.rareIds.map((id) => `#${numberOf(id)}`).join(" ")}`
+                : ""}
+            </span>
+          ) : null}
         </h3>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">
-            Type the number chat says, or click a card to mark it · double-click
-            removes
+            Type the number chat says · Enter marks · same number + Enter
+            removes · Esc cancels · F / P / S
           </span>
           <span
             className={cn(
               "rounded-full border px-3 py-1 text-sm font-semibold",
-              awaiting
+              pending || awaiting
                 ? "border-red-500/50 bg-red-500/10 text-red-300"
                 : "border-border/40 text-muted-foreground",
             )}
           >
-            {cullStatusLabel(awaiting, cullsLeft)}
+            {cullStatusLabel({
+              pending,
+              stuck,
+              awaiting,
+              dealing,
+              label: stageLabel,
+              cullsLeft,
+            })}
           </span>
         </div>
       </div>
@@ -268,11 +386,15 @@ export function BatchCullBoard() {
         <label className="flex items-center gap-2 text-sm font-medium text-foreground">
           <span>Number</span>
           <input
+            ref={inputRef}
             type="text"
             inputMode="numeric"
             autoComplete="off"
+            // biome-ignore lint/a11y/noAutofocus: the board is a keyboard console; the number field is its one input
+            autoFocus
             value={numberInput}
             onChange={(event) => setNumberInput(event.target.value)}
+            onKeyDown={handleNumberKey}
             placeholder="13"
             aria-label="Cat number"
             className="w-20 rounded-lg border border-border/50 bg-background px-3 py-1.5 font-mono text-lg font-bold tabular-nums text-foreground outline-none focus:border-amber-400"
@@ -288,7 +410,9 @@ export function BatchCullBoard() {
           disabled={!typedUsable || !awaiting}
           className="rounded-lg border border-red-500/60 bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Mark
+          {markedCat && typedCat && markedCat.id === typedCat.id
+            ? "Remove"
+            : "Mark"}
         </button>
         <button
           type="button"
@@ -321,11 +445,40 @@ export function BatchCullBoard() {
           onClick={handleRemoveMarked}
           className="rounded-lg border border-red-500 bg-red-600 px-3 py-1.5 text-sm font-bold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {markedCat
-            ? `Remove ${formatBatchNumber(command.cats.indexOf(markedCat) + 1)}`
-            : "Remove marked"}
+          {markedCat ? `Remove ${numberOf(markedCat.id)}` : "Remove marked"}
         </button>
       </form>
+
+      {/* Verdict — the countdown running on stream */}
+      {pending && pendingNumber ? (
+        <output
+          aria-live="polite"
+          className="mb-4 flex flex-wrap items-center gap-4 rounded-2xl border border-red-500/50 bg-red-500/10 px-4 py-3"
+        >
+          {stuck ? (
+            <span className="text-sm font-semibold text-red-200">
+              Verdict stuck — Enter applies it, Esc clears it
+            </span>
+          ) : (
+            <span className="text-sm font-semibold text-red-200">
+              #{pendingNumber} leaves in{" "}
+              <span className="ml-1 inline-block min-w-[1.5ch] font-mono text-2xl font-bold tabular-nums text-white">
+                {secondsLeft ?? 0}
+              </span>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              handleCancel();
+              clearAndRefocus();
+            }}
+            className="rounded-lg border border-border/50 bg-background px-3 py-1.5 text-sm font-semibold text-foreground transition hover:bg-foreground hover:text-background"
+          >
+            Cancel
+          </button>
+        </output>
+      ) : null}
 
       {/* Spotlight — the cat currently shown big on stream */}
       {spotlightCat && (
@@ -345,7 +498,7 @@ export function BatchCullBoard() {
           <div className="flex flex-col gap-2">
             <span className="text-2xl font-bold text-foreground">
               <span className="mr-2 rounded-md bg-sky-500 px-2 py-0.5 font-mono text-white">
-                {formatBatchNumber(command.cats.indexOf(spotlightCat) + 1)}
+                {numberOf(spotlightCat.id)}
               </span>
               {spotlightCat.label}
             </span>
@@ -366,17 +519,34 @@ export function BatchCullBoard() {
       <div className="grid grid-cols-4 gap-3 sm:grid-cols-6 xl:grid-cols-8">
         {survivors.map((cat) => {
           const url = previews[cat.id];
-          const marked = liveState.markedId === cat.id;
+          const isPending = pendingCullId === cat.id;
+          const marked = liveState.markedId === cat.id || isPending;
           const potential = potentials.has(cat.id);
           const favorite = favorites.has(cat.id);
           const spotlighted = spotlightId === cat.id;
-          const numberLabel = formatBatchNumber(command.cats.indexOf(cat) + 1);
           return (
             <div key={cat.id} className="relative">
+              {isPending ? (
+                // Countdown ring: a conic sweep masked to a 2 px border.
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -inset-1 rounded-[14px]"
+                  style={{
+                    padding: 2,
+                    background: `conic-gradient(rgb(248 113 113) ${Math.round(ringFraction * 360)}deg, transparent 0)`,
+                    WebkitMask:
+                      "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+                    WebkitMaskComposite: "xor",
+                    maskComposite: "exclude",
+                  }}
+                />
+              ) : null}
               <button
                 type="button"
                 onClick={() => handleMark(cat.id)}
-                onDoubleClick={() => handleCull(cat.id)}
+                onDoubleClick={() => {
+                  if (awaiting) handleArm(cat.id);
+                }}
                 disabled={!awaiting}
                 className={cn(
                   "flex w-full flex-col items-center rounded-xl border p-2 transition",
@@ -411,7 +581,7 @@ export function BatchCullBoard() {
                       numberBadgeClass(marked, potential),
                     )}
                   >
-                    {numberLabel}
+                    {numberOf(cat.id)}
                   </span>
                   {cat.label}
                 </span>

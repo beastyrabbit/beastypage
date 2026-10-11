@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CatParams } from "@/lib/cat-v3/types";
+import type { BatchBeat } from "../scenes/batch/batchBeats";
 import type { BatchShowView, BatchViewCat } from "../scenes/batch/batchView";
 import { batchBoardFromView } from "./batchFromView";
 
@@ -28,6 +29,27 @@ function cat(id: string, extra: Partial<BatchViewCat> = {}): BatchViewCat {
     spotlight: false,
     eliminated: false,
     fading: false,
+    departing: false,
+    changed: false,
+    landed: false,
+    valueLabel: null,
+    ...extra,
+  };
+}
+
+function beat(extra: Partial<BatchBeat> = {}): BatchBeat {
+  return {
+    kind: "awaiting",
+    stageId: "s2",
+    startedAt: 0,
+    durationMs: 0,
+    anchor: "server",
+    order: [],
+    landedIds: [],
+    changedIds: [],
+    unchangedIds: [],
+    rareIds: [],
+    groups: [],
     ...extra,
   };
 }
@@ -41,6 +63,7 @@ describe("batchBoardFromView", () => {
     const view: BatchShowView = {
       title: "Litter",
       phase: "awaitingCull",
+      beat: beat(),
       stages: [
         { id: "s1", label: "Pelt", type: "simple", param: "colour" },
         { id: "s2", label: "Eyes", type: "simple", param: "eyeColour" },
@@ -49,6 +72,7 @@ describe("batchBoardFromView", () => {
       stageIndex: 1,
       stageNumber: 2,
       stageLabel: "Eyes",
+      traitLabel: "Eyes",
       cats: [a, b, c, d],
       survivors: [a, c, d],
       eliminated: [b, d],
@@ -59,7 +83,8 @@ describe("batchBoardFromView", () => {
       cullNumber: 3,
       spotlight: a,
       qrUrl: null,
-      statusLabel: "Choosing who leaves…",
+      statusLabel: "Eyes rolled. Who leaves? Say a number",
+      reducedMotion: false,
     };
     const model = batchBoardFromView(view);
     expect(model.cats.map((x) => [x.id, x.eliminatedAtStage])).toEqual([
@@ -76,6 +101,56 @@ describe("batchBoardFromView", () => {
     expect(model.poolCount).toBe(4);
     expect(model.saved).toBe(false);
     expect(model.cats[0].params).toBe(params);
+    expect(model.beat).toBe("awaiting");
+    expect(model.traitLabel).toBe("Eyes");
+    expect(model.verdictNumber).toBeNull();
+    expect(model.verdictEndsAt).toBeNull();
+    expect(model.reducedMotion).toBe(false);
+  });
+
+  it("maps the beat facts and per-cat landing state", () => {
+    const a = cat("a", { changed: true, landed: true, valueLabel: "Little" });
+    const c = cat("c", { marked: true, numberLabel: "03", number: 3 });
+    const d = cat("d", { eliminated: true, fading: true, departing: true });
+    const view: BatchShowView = {
+      title: "Litter",
+      phase: "awaitingCull",
+      beat: beat({
+        kind: "verdict",
+        pendingCullId: "c",
+        verdictEndsAt: 1_700_000_000_000,
+        landedIds: ["a"],
+        changedIds: ["a"],
+      }),
+      stages: [{ id: "s1", label: "Pelt", type: "simple", param: "colour" }],
+      stageIndex: 0,
+      stageNumber: 1,
+      stageLabel: "Pelt",
+      traitLabel: "Pelt",
+      cats: [a, c, d],
+      survivors: [a, c, d],
+      eliminated: [d],
+      poolSize: 3,
+      remaining: 2,
+      finalCount: 2,
+      maxEliminations: 1,
+      cullNumber: 2,
+      spotlight: null,
+      qrUrl: null,
+      statusLabel: "#03 leaves in…",
+      reducedMotion: true,
+    };
+    const model = batchBoardFromView(view);
+    expect(model.beat).toBe("verdict");
+    expect(model.verdictNumber).toBe("03");
+    expect(model.verdictEndsAt).toBe(1_700_000_000_000);
+    expect(model.reducedMotion).toBe(true);
+    expect(model.statusLabel).toBe("#03 leaves in…");
+    const boardA = model.cats.find((x) => x.id === "a");
+    expect(boardA?.changed).toBe(true);
+    expect(boardA?.landed).toBe(true);
+    expect(boardA?.valueLabel).toBe("Little");
+    expect(model.cats.find((x) => x.id === "d")?.departing).toBe(true);
   });
 
   it("drops a spotlight without a sprite and marks saved from the QR", () => {
@@ -83,10 +158,12 @@ describe("batchBoardFromView", () => {
     const view: BatchShowView = {
       title: "Litter",
       phase: "done",
+      beat: beat({ kind: "done", stageId: "done" }),
       stages: [],
       stageIndex: 0,
       stageNumber: 0,
       stageLabel: "",
+      traitLabel: "",
       cats: [a],
       survivors: [a],
       eliminated: [],
@@ -98,6 +175,7 @@ describe("batchBoardFromView", () => {
       spotlight: a,
       qrUrl: "https://x/adoption/s",
       statusLabel: "Complete",
+      reducedMotion: false,
     };
     const model = batchBoardFromView(view);
     expect(model.spotlight).toBeNull();

@@ -24,11 +24,12 @@ const CSS = `
 .cs .bunting{position:absolute;left:0;right:0;top:0;height:30px;display:flex;justify-content:space-between;padding:0 20px}
 .cs .bunting i{width:36px;height:30px;clip-path:polygon(0 0,100% 0,50% 100%);background:#e05a7a}
 .cs .bunting i:nth-child(2n){background:#ffb84a}.cs .bunting i:nth-child(3n){background:#2f6fde}
-.cs .banner{position:absolute;left:60px;top:48px;width:520px;background:#fff;border:3px solid #2a2622;padding:12px 18px;box-shadow:6px 6px 0 #2a2622}
-.cs .banner b{display:block;font:900 30px ${SANS};letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cs .banner span{display:block;font:700 15px ${SANS};color:#e05a7a;letter-spacing:.14em;text-transform:uppercase;margin-top:2px}
-.cs .banner em{display:block;font:italic 14px ${SERIF};color:#6b6459;margin-top:4px}
-.cs .ped{position:absolute;text-align:center;transition:opacity 1s ease,transform 1s ease}
+.cs .banner{position:absolute;left:60px;top:48px;width:620px;background:#fff;border:3px solid #2a2622;padding:12px 18px;box-shadow:6px 6px 0 #2a2622}
+.cs .banner > b{display:block;font:900 30px ${SANS};letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs .banner > span{display:block;font:700 15px ${SANS};color:#e05a7a;letter-spacing:.14em;text-transform:uppercase;margin-top:2px}
+.cs .banner > em{display:block;font:italic 14px ${SERIF};color:#6b6459;margin-top:4px}
+.cs .banner .plq{width:100%;height:120px;margin-top:6px;--obs-plaque-ink:#2a2622;--obs-plaque-muted:#6b6459;--obs-plaque-accent:#e0322b;--obs-plaque-shadow:none;--obs-plaque-font-serif:var(--obs-font-serif,Georgia,serif)}
+.cs .ped{position:absolute;text-align:center;transition:opacity 1.5s ease,transform 1.5s ease}
 .cs .ped .sprite{margin:0 auto;position:relative;z-index:2}
 .cs .base{height:22px;margin:-6px 10px 0;background:#f6f1e4;border:2px solid #2a2622;border-radius:4px;box-shadow:0 6px 0 #a89a7c}
 .cs .tent{margin:8px 16px 0;background:#fff;border:2px solid #2a2622;border-radius:4px;padding:2px 4px 4px}
@@ -37,6 +38,9 @@ const CSS = `
 .cs .ped.judge .tent{border-color:#e0322b;box-shadow:0 0 0 3px #e0322b;animation:cs-pulse 1.1s ease-in-out infinite}
 .cs .ped.judge .tent b{color:#e0322b}
 .cs .ped.maybe .tent{background:#fff4c2;border-color:#d9a400}
+.cs .ped.verdict .tent{background:#e0322b;border-color:#e0322b;box-shadow:0 0 0 3px #e0322b;animation:none}
+.cs .ped.verdict .tent b{color:#fff}
+.cs .ped.verdict .tent span{color:#ffd1cc}
 .cs .ros{position:absolute;right:10px;top:-6px;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle,#ffd23f 0 30%,#e05a7a 32%);box-shadow:0 0 0 3px #fff;z-index:3}
 .cs .ped.excusing{opacity:0;transform:translateY(40px)}
 .cs .table{position:absolute;left:920px;top:250px;width:320px;height:420px}
@@ -50,7 +54,7 @@ const CSS = `
 .cs .excused i{display:block;font:italic 12px ${SERIF};color:#6b6459}
 .cs .excused b{font:700 20px ${MONO};letter-spacing:.2em;color:#6b6459;text-decoration:line-through;word-break:break-word}
 .cs .ring{position:absolute;left:60px;right:60px;bottom:22px;text-align:center;font:italic 15px ${SERIF};color:#6b6459}
-.cs .bigros{position:absolute;left:520px;top:640px;width:240px;text-align:center}
+.cs .bigros{position:absolute;left:520px;top:730px;width:240px;text-align:center}
 .cs .rosc{width:200px;height:200px;margin:0 auto;border-radius:50%;background:radial-gradient(circle,#fff 0 46%,#e05a7a 47% 60%,#ffd23f 61%);display:flex;align-items:center;justify-content:center}
 .cs .rosc .qr{border-radius:50%;overflow:hidden;width:150px;height:150px;display:flex;align-items:center;justify-content:center;background:#fff}
 .cs .bigros span{display:block;margin-top:8px;font:900 15px ${SANS}}
@@ -65,21 +69,29 @@ function Pedestals({
   cell,
   columns,
   done,
+  verdictId,
+  beat,
 }: Readonly<{
   cats: readonly BatchViewCat[];
   area: Area;
   cell: number;
   columns: number;
   done: boolean;
+  /** Cat under the judge's verdict (verdict + depart beats). */
+  verdictId: string | null;
+  beat: BatchShowView["beat"]["kind"];
 }>) {
-  const sprite = Math.max(44, Math.round(cell * 0.58));
+  // Finalists stand taller: the pedestal holds the sprite, base and tent.
+  const sprite = Math.max(44, Math.round(cell * (done ? 0.75 : 0.58)));
+  const pitch = done ? cell + 50 : cell + 10;
   const placed = centredRows(cats.length, columns, area.w, cell);
   return (
     <>
       {cats.map((cat, i) => {
         const pos = placed[i];
         if (!pos) return null;
-        const stagger = done && i % 2 ? 60 : 0;
+        const stagger = done && i % 2 ? 40 : 0;
+        const verdict = cat.id === verdictId;
         return (
           <div
             key={cat.id}
@@ -87,11 +99,12 @@ function Pedestals({
               "ped",
               cat.marked && "judge",
               cat.potential && "maybe",
+              verdict && "verdict",
               cat.fading && "excusing",
             )}
             style={{
               left: area.x + pos.x,
-              top: area.y + pos.row * (cell + 10) + stagger,
+              top: area.y + pos.row * pitch + stagger,
               width: cell,
             }}
           >
@@ -99,7 +112,13 @@ function Pedestals({
             <div className="base" />
             <div className="tent">
               <b>{cat.numberLabel}</b>
-              <span>{cat.label}</span>
+              <span>
+                {verdict
+                  ? beat === "depart"
+                    ? "excused"
+                    : "excused in…"
+                  : cat.label}
+              </span>
             </div>
             {cat.favorite || done ? <i className="ros" /> : null}
           </div>
@@ -146,7 +165,7 @@ function RingSide({ view }: Readonly<{ view: BatchShowView }>) {
       <div className="ring">
         {view.phase === "awaitingCull"
           ? "the judge excuses one after this class — call a number"
-          : view.statusLabel}
+          : null}
       </div>
     </>
   );
@@ -179,15 +198,18 @@ export function CatShowBatchScene({ view }: Readonly<BatchSceneViewProps>) {
   const floor = done
     ? [...view.survivors]
     : floorCats(view.survivors, view.spotlight);
+  // The benches start under the banner (title + plaque); Best in Show packs
+  // the finalists into two rows at most so ten of them still get ≥ 95 px.
   const area: Area = done
-    ? { x: 60, y: 300, w: 1160, h: 300 }
-    : { x: 40, y: 220, w: 860, h: 800 };
+    ? { x: 60, y: 290, w: 1160, h: 280 }
+    : { x: 40, y: 290, w: 860, h: 730 };
   const grid = done
-    ? {
-        columns: Math.max(1, floor.length),
-        cell: Math.min(150, 1160 / Math.max(1, floor.length)),
-      }
+    ? packSquares(floor.length, area.w, area.h, 10, 240)
     : packSquares(floor.length, area.w, area.h, 10, 200);
+  const verdictId =
+    view.beat.kind === "verdict" || view.beat.kind === "depart"
+      ? (view.beat.pendingCullId ?? null)
+      : null;
 
   return (
     <div className="cs" style={{ width: 1280, height: 1080 }}>
@@ -209,6 +231,8 @@ export function CatShowBatchScene({ view }: Readonly<BatchSceneViewProps>) {
         {done ? null : (
           <em>{`${view.remaining} benched · ${view.finalCount} go to Best in Show`}</em>
         )}
+        {/* The wrapper's plaque: the class card under the title. */}
+        <div data-plaque-slot="" className="plq" />
       </div>
       <Pedestals
         cats={floor}
@@ -216,6 +240,8 @@ export function CatShowBatchScene({ view }: Readonly<BatchSceneViewProps>) {
         cell={grid.cell}
         columns={grid.columns}
         done={done}
+        verdictId={verdictId}
+        beat={view.beat.kind}
       />
       {done ? <BestInShowRosette view={view} /> : <RingSide view={view} />}
     </div>

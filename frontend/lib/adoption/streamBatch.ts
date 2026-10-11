@@ -20,8 +20,14 @@ import { readCatDocument } from "@/lib/cat-system/document";
 import { catSystem } from "@/lib/cat-system/registry";
 import { getSystemRevealTraits } from "@/lib/cat-system/runtime";
 import { applyCoatChoice, getCoatChoiceValue } from "@/lib/cat-v3/coatPatterns";
-import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
+import { DEFAULT_POSE_NAME, formatPoseName } from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
+
+/** Verdict window armed by cullBatchCat; convex/catStream.ts keeps its own VERDICT_MS = 3000 in sync. */
+export const BATCH_VERDICT_MS = 3000;
+/** Depart + repack after a finalised cull; the next stage is reported at lastCullAt + this. convex has no copy. */
+export const BATCH_DEPART_MS = 1600;
+export const BATCH_REPACK_MS = 400;
 
 export type BatchLayerConfig = {
   accessoryCount: number;
@@ -94,6 +100,14 @@ export type BatchLiveState = {
   favoriteIds?: string[];
   /** Cat shown enlarged on the overlay and control board. */
   spotlightId?: string | null;
+  /** Cat whose cull is armed; cleared by cancel or finalize. `| null` matches markedId/spotlightId's existing convention; the server never writes null (clearing = omitting the key). */
+  pendingCullId?: string | null;
+  /** Server ms when finalizeBatchCull fires (= arm time + BATCH_VERDICT_MS). */
+  verdictAt?: number | null;
+  /** Server ms the current `stageIndex` was entered (stamped by reportBatchStage); every deal timeline is anchored here. */
+  stageStartedAt?: number;
+  /** Server ms the most recent cull was finalised; depart/repack are anchored here. */
+  lastCullAt?: number;
 };
 
 export const BATCH_FINAL_COUNT = 10;
@@ -538,6 +552,179 @@ function normalizePartialTraitValue(
   return current;
 }
 
+/** The bare-kit value each simple param starts from (what `buildPartialBatchParams` reveals over). */
+export const BATCH_STAGE_PLACEHOLDERS: Readonly<
+  Record<string, string | boolean>
+> = {
+  poseName: DEFAULT_POSE_NAME,
+  peltName: "SingleColour",
+  colour: "GINGER",
+  tint: "none",
+  skinColour: "PINK",
+  eyeColour: "BLUE",
+  eyeColour2: "none",
+  whitePatches: "none",
+  whitePatchesTint: "none",
+  points: "none",
+  vitiligo: "none",
+  shading: false,
+  reverse: false,
+};
+
+export interface BatchStageValue {
+  /** Raw token as the renderer sees it ("LITTLE", "Tabby", "adult_long0", "true"). */
+  value: string;
+  /** Human label ("Little", "Tabby", "Adult Long 0", "Shaded"). */
+  label: string;
+}
+
+/**
+ * Title Case of a raw token: "RED_COLLAR" → "Red Collar". Mixed-case words
+ * ("SingleColour", "Marbled") are kept as they are. Pose names go through
+ * formatPoseName instead.
+ */
+export function formatBatchValue(value: string): string {
+  return value
+    .split(/[_\s-]+/)
+    .filter((word) => word.length > 0)
+    .map((word) => {
+      const mixed = word !== word.toUpperCase() && word !== word.toLowerCase();
+      if (mixed) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
+function stringifyTraitValue(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function isAbsentToken(value: unknown): boolean {
+  return (
+    value === undefined ||
+    value === null ||
+    value === false ||
+    value === "" ||
+    value === "none"
+  );
+}
+
+/**
+ * The value `stage` reveals on `cat`, or null when the stage leaves the cat
+ * as it was ("none", missing slot, false boolean, missing tortie layer).
+ * Pure; mirrors the branch of buildPartialBatchParams for that one stage.
+ */
+export function stageValueFor(
+  cat: BatchStreamCat,
+  stage: BatchStage,
+): BatchStageValue | null {
+  const finalParams = cat.catData.params as unknown as Record<string, unknown>;
+  if (stage.type === "simple") {
+    if (stage.param === "peltName") {
+      const value = getCoatChoiceValue({
+        peltName:
+          typeof finalParams.peltName === "string"
+            ? finalParams.peltName
+            : undefined,
+        coatPattern:
+          typeof finalParams.coatPattern === "string"
+            ? finalParams.coatPattern
+            : undefined,
+      });
+      return { value, label: formatBatchValue(value) };
+    }
+    if (stage.param === "poseName") {
+      const pose = finalParams.poseName;
+      if (typeof pose !== "string" || pose === "") return null;
+      return { value: pose, label: formatPoseName(pose) };
+    }
+    if (stage.param === "shading" || stage.param === "reverse") {
+      if (finalParams[stage.param] !== true) return null;
+      return {
+        value: "true",
+        label: stage.param === "shading" ? "Shaded" : "Mirrored",
+      };
+    }
+    const raw = finalParams[stage.param];
+    if (isAbsentToken(raw)) return null;
+    const value = stringifyTraitValue(raw);
+    return { value, label: formatBatchValue(value) };
+  }
+  if (stage.type === "accessory" || stage.type === "scar") {
+    const slots =
+      stage.type === "accessory"
+        ? cat.catData.accessorySlots
+        : cat.catData.scarSlots;
+    const slot = slots[stage.slotIndex];
+    if (!slot || slot === "none") return null;
+    return { value: slot, label: formatBatchValue(slot) };
+  }
+  if (stage.type === "tortie-sub") {
+    const layer = cat.catData.tortieSlots[stage.layerIndex];
+    if (!layer) return null;
+    const value = layer[stage.subElement];
+    if (!value) return null;
+    return { value, label: formatBatchValue(value) };
+  }
+  const finalValue = canonicalTraits(cat, catSystem)?.[stage.traitId];
+  if (stage.strategy === "single") {
+    if (isAbsentToken(finalValue)) return null;
+    const value = stringifyTraitValue(finalValue);
+    return { value, label: formatBatchValue(value) };
+  }
+  const list = Array.isArray(finalValue) ? finalValue : [];
+  const item: unknown = list[stage.slotIndex ?? 0];
+  if (item === undefined) return null;
+  const value = stringifyTraitValue(item);
+  return { value, label: formatBatchValue(value) };
+}
+
+/**
+ * True when rendering stage k changes the cat's pixels versus stage k-1.
+ * Not a deep-equal of buildPartialBatchParams (that returns the final
+ * params untouched on the last stage, so every cat would read "changed"
+ * on Pose): each stage type compares its own value against the bare-kit
+ * placeholder it replaces.
+ */
+export function stageChanged(
+  cat: BatchStreamCat,
+  stages: BatchStage[],
+  k: number,
+  placeholders: BatchTortiePlaceholders = BATCH_TORTIE_PLACEHOLDER_FALLBACK,
+): boolean {
+  const stage = stages[k];
+  if (!stage) return false;
+  if (stage.type === "simple") {
+    const value = stageValueFor(cat, stage);
+    if (value === null) return false;
+    const placeholder = BATCH_STAGE_PLACEHOLDERS[stage.param];
+    return placeholder === undefined || value.value !== String(placeholder);
+  }
+  if (stage.type === "accessory" || stage.type === "scar") {
+    return stageValueFor(cat, stage) !== null;
+  }
+  if (stage.type === "tortie-sub") {
+    const layer = cat.catData.tortieSlots[stage.layerIndex];
+    if (!layer) return false;
+    const firstForLayer = stages.findIndex(
+      (candidate) =>
+        candidate.type === "tortie-sub" &&
+        candidate.layerIndex === stage.layerIndex,
+    );
+    // The layer appears with this stage, placeholders and all.
+    if (firstForLayer === k) return true;
+    return layer[stage.subElement] !== placeholders[stage.subElement];
+  }
+  const finalValue = canonicalTraits(cat, catSystem)?.[stage.traitId];
+  if (stage.strategy === "single") {
+    return (
+      finalValue !== undefined && finalValue !== "none" && finalValue !== false
+    );
+  }
+  const list = Array.isArray(finalValue) ? finalValue : [];
+  return list[stage.slotIndex ?? 0] !== undefined;
+}
+
 /**
  * Render params for a cat with stages 0..revealedThrough applied
  * (revealedThrough = -1 renders the unrevealed base kit). Mirrors the
@@ -561,21 +748,7 @@ export function buildPartialBatchParams(
   const simple: Record<string, unknown> & {
     peltName: string;
     coatPattern?: string;
-  } = {
-    poseName: DEFAULT_POSE_NAME,
-    peltName: "SingleColour",
-    colour: "GINGER",
-    tint: "none",
-    skinColour: "PINK",
-    eyeColour: "BLUE",
-    eyeColour2: "none",
-    whitePatches: "none",
-    whitePatchesTint: "none",
-    points: "none",
-    vitiligo: "none",
-    shading: false,
-    reverse: false,
-  };
+  } = { ...BATCH_STAGE_PLACEHOLDERS, peltName: "SingleColour" };
   const accessorySlots: string[] = [];
   const scarSlots: string[] = [];
   const genericValues = new Map<
