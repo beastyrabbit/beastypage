@@ -1,6 +1,7 @@
 "use client";
 
 import { useConvexAuth } from "convex/react";
+import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -62,12 +63,12 @@ export function SiteHeader() {
   return (
     <header
       ref={headerRef}
-      className="sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+      className="header-scroll-shadow sticky top-0 z-50 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
         <Link
           href="/"
-          className="flex items-center gap-2 text-sm font-semibold tracking-wide"
+          className="brand flex items-center gap-2 text-sm font-semibold tracking-wide"
         >
           <span className="inline-flex size-8 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-primary">
             <Image
@@ -75,23 +76,38 @@ export function SiteHeader() {
               alt="BeastyRabbit"
               width={32}
               height={32}
-              className="h-6 w-6 rounded-full"
+              className="brand-mark h-6 w-6 rounded-full"
               priority
             />
           </span>
-          <span className="hidden sm:inline">BeastyRabbit</span>
+          <span className="brand-word hidden sm:inline">BeastyRabbit</span>
         </Link>
         <nav className="hidden items-center gap-2 text-sm font-medium lg:flex">
-          {visibleItems.map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              data-accent={item.key}
-              className={cn("nav-pill", isActive(item) && "nav-pill--active")}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {visibleItems.map((item) => {
+            const active = isActive(item);
+            return (
+              <Link
+                key={item.key}
+                href={item.href}
+                data-accent={item.key}
+                className={cn("nav-pill", active && "nav-pill--active")}
+              >
+                {active && (
+                  <motion.span
+                    layoutId="site-nav-ink"
+                    className="nav-ink"
+                    data-accent={item.key}
+                    transition={{
+                      type: "spring",
+                      bounce: 0.18,
+                      duration: 0.42,
+                    }}
+                  />
+                )}
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
         <div className="flex items-center gap-3">
           <UserAuthButton />
@@ -112,19 +128,19 @@ export function SiteHeader() {
             <span className="flex w-4 flex-col gap-1" aria-hidden>
               <span
                 className={cn(
-                  "h-px w-full bg-current transition",
+                  "h-px w-full bg-current transition duration-300 ease-out",
                   mobileOpen && "translate-y-[5px] rotate-45",
                 )}
               />
               <span
                 className={cn(
-                  "h-px w-full bg-current transition",
-                  mobileOpen && "opacity-0",
+                  "h-px w-full bg-current transition duration-300 ease-out",
+                  mobileOpen && "scale-x-0 opacity-0",
                 )}
               />
               <span
                 className={cn(
-                  "h-px w-full bg-current transition",
+                  "h-px w-full bg-current transition duration-300 ease-out",
                   mobileOpen && "-translate-y-[5px] -rotate-45",
                 )}
               />
@@ -132,36 +148,47 @@ export function SiteHeader() {
           </button>
         </div>
       </div>
-      {mobileOpen ? (
-        <div
-          id="mobile-site-navigation"
-          className="border-t border-border/60 bg-background px-4 py-4 lg:hidden"
-        >
-          <nav
-            className="mx-auto grid max-w-6xl grid-cols-2 gap-2 text-sm font-medium sm:grid-cols-3"
-            aria-label="Mobile navigation"
+      <AnimatePresence initial={false}>
+        {mobileOpen ? (
+          <motion.div
+            key="mobile-site-navigation"
+            id="mobile-site-navigation"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden border-t border-border/60 bg-background lg:hidden"
           >
-            {visibleItems.map((item) => (
-              <Link
-                key={item.key}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                data-accent={item.key}
-                className={cn(
-                  "rounded-lg border border-border/50 px-3 py-2.5 text-muted-foreground transition hover:bg-muted hover:text-foreground",
-                  isActive(item) &&
-                    "border-primary/40 bg-primary/10 text-foreground",
-                )}
+            <div className="px-4 py-4">
+              <nav
+                className="mx-auto grid max-w-6xl grid-cols-2 gap-2 text-sm font-medium sm:grid-cols-3"
+                aria-label="Mobile navigation"
               >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="mx-auto mt-3 max-w-6xl border-t border-border/50 pt-3">
-            <DiscordInviteButton className="w-full rounded-lg py-2" />
-          </div>
-        </div>
-      ) : null}
+                {visibleItems.map((item, index) => (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    data-accent={item.key}
+                    style={{ animationDelay: `${index * 30}ms` }}
+                    className={cn(
+                      "rounded-lg border border-border/50 px-3 py-2.5 text-muted-foreground transition hover:bg-muted hover:text-foreground motion-safe:active:scale-[0.985]",
+                      "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 fill-mode-backwards",
+                      isActive(item) &&
+                        "border-primary/40 bg-primary/10 text-foreground",
+                    )}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </nav>
+              <div className="mx-auto mt-3 max-w-6xl border-t border-border/50 pt-3">
+                <DiscordInviteButton className="w-full rounded-lg py-2" />
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </header>
   );
 }
