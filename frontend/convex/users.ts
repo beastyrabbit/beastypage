@@ -273,6 +273,10 @@ export const backfillUsernameSearch = internalMutation({
       .query("user_search_migrations")
       .withIndex("byName", (q) => q.eq("name", USERNAME_SEARCH_MIGRATION))
       .unique();
+    // New and edited users populate usernameSearch themselves. Once the
+    // legacy rows are complete, avoid rescanning the users index on every
+    // periodic recovery invocation.
+    if (state?.complete) return { processed: 0, complete: true };
     const cursor = state?.cursor;
     const usersQuery = cursor
       ? ctx.db

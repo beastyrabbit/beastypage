@@ -2,7 +2,10 @@
 
 The `users.usernameSearch` field and `byUsernameSearch` index are written for
 all new and edited users. Existing user documents need a one-time bounded
-backfill before username prefix search is enabled:
+backfill before username prefix search is enabled. A six-hour Convex cron
+automatically starts or resumes that backfill after rollout, so no manual
+operator action is required. Operators can run the mutation below to start it
+immediately or accelerate the first pass:
 
 ```sh
 npx convex run users:backfillUsernameSearch '{"batchSize":100}'

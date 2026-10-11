@@ -58,6 +58,9 @@ describe("indexed user lookups", () => {
       batchSize: 100,
     });
     await expect(
+      t.mutation(internal.users.backfillUsernameSearch, { batchSize: 100 }),
+    ).resolves.toEqual({ processed: 0, complete: true });
+    await expect(
       user.query(api.users.searchByUsername, { prefix: "LEG" }),
     ).resolves.toEqual([{ userId: "legacy", username: "Legacy_Name" }]);
   });
