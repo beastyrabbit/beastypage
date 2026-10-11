@@ -362,3 +362,23 @@ describe("evolution ceremony clock", () => {
     });
   });
 });
+
+describe("reportBatchStage bounds", () => {
+  it("ignores a report beyond the stage plan or one that skips a stage", async () => {
+    const { host, session, report } = await setup();
+    const seq = await host.mutation(api.catStream.triggerBatch, {
+      batch: BATCH,
+    });
+    // Three cats, one finalist: stages 0 and 1, then the done report at 2.
+    await report(seq, 0, false);
+    await report(seq, 3, false);
+    expect((await session()).batchState?.stageIndex).toBe(0);
+    await report(seq, 2, false);
+    expect((await session()).batchState?.stageIndex).toBe(0);
+    await report(seq, -1, false);
+    expect((await session()).batchState?.stageIndex).toBe(0);
+    await report(seq, 1, false);
+    await report(seq, 2, false);
+    expect((await session()).batchState?.stageIndex).toBe(2);
+  });
+});
