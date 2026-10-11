@@ -9,7 +9,10 @@ const BACKEND_BASE = (
 ).replace(/\/$/, "");
 // Keep the proxy cap aligned with the image-processing service's 10 MiB
 // decoded-image limit plus base64 and JSON overhead.
-const DEFAULT_MAX_BODY_BYTES = 14_100_000;
+const MAX_DECODED_IMAGE_BYTES = 10 * 1024 * 1024;
+const JSON_BODY_OVERHEAD_BYTES = 65_536;
+const DEFAULT_MAX_BODY_BYTES =
+  Math.ceil((MAX_DECODED_IMAGE_BYTES * 4) / 3) + JSON_BODY_OVERHEAD_BYTES;
 
 interface ImageProcessingProxyOptions {
   endpoint: string;

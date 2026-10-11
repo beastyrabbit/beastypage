@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api.js";
 import type { Doc, Id } from "./_generated/dataModel.js";
 import {
@@ -248,7 +248,10 @@ async function persistMatchup(
       )
       .take(MAX_ACTIVE_MATCHUPS + 1);
     if (activeMatchups.length >= MAX_ACTIVE_MATCHUPS) {
-      throw new Error("Perfect Cat matchups are temporarily full");
+      throw new ConvexError({
+        code: "matchups_full",
+        message: "Perfect Cat matchups are temporarily full",
+      });
     }
   }
   const pendingMatchup = {

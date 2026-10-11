@@ -73,6 +73,21 @@ type MatchupResponse = {
   matchupToken?: string;
 };
 
+function matchupLoadErrorMessage(error: unknown): string {
+  if (error && typeof error === "object" && "data" in error) {
+    const data = (error as { data?: unknown }).data;
+    if (
+      data &&
+      typeof data === "object" &&
+      "code" in data &&
+      data.code === "matchups_full"
+    ) {
+      return "Matchup capacity is temporarily full. Please try again shortly.";
+    }
+  }
+  return error instanceof Error ? error.message : "Failed to load matchup";
+}
+
 type SeedResult = {
   requested: number;
   generated: number;
@@ -372,8 +387,7 @@ export default function PerfectCatFinderPage() {
       }
     } catch (err) {
       console.error("Failed to load matchup", err);
-      const message =
-        err instanceof Error ? err.message : "Failed to load matchup";
+      const message = matchupLoadErrorMessage(err);
       setError(message);
       track("perfect_cat_matchup_load_failed", { message });
     } finally {

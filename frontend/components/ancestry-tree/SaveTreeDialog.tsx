@@ -258,7 +258,10 @@ export function SaveTreeDialog({
           className="absolute inset-0 cursor-default"
           onClick={onClose}
         />
-        <dialog open className="glass-card relative z-10 w-full max-w-md p-6">
+        <dialog
+          open
+          className="glass-card relative z-10 w-full max-w-md p-6 text-inherit"
+        >
           <button
             type="button"
             onClick={onClose}
@@ -327,7 +330,10 @@ export function SaveTreeDialog({
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <dialog open className="glass-card relative z-10 w-full max-w-md p-6">
+      <dialog
+        open
+        className="glass-card relative z-10 w-full max-w-md p-6 text-inherit"
+      >
         <button
           type="button"
           onClick={onClose}
