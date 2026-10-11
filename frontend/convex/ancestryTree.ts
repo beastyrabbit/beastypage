@@ -1,5 +1,51 @@
-import { v } from "convex/values";
-import { mutation, query } from "./_generated/server.js";
+import { type Infer, v } from "convex/values";
+import type { Doc } from "./_generated/dataModel.js";
+import { type MutationCtx, mutation, query } from "./_generated/server.js";
+
+const MAX_CATS = 500;
+const MAX_TREE_BYTES = 900 * 1024;
+const MAX_SLUG_LENGTH = 40;
+const MAX_NAME_LENGTH = 120;
+
+function assertSlugFormat(slug: string) {
+  if (
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ||
+    slug.length > MAX_SLUG_LENGTH
+  ) {
+    throw new Error("Invalid tree slug");
+  }
+}
+
+function assertTreeSize(args: {
+  slug: string;
+  name: string;
+  cats: unknown[];
+  config: unknown;
+}) {
+  if (args.slug.length === 0 || args.slug.length > MAX_SLUG_LENGTH) {
+    throw new Error("Invalid tree slug");
+  }
+  if (args.name.trim().length === 0 || args.name.length > MAX_NAME_LENGTH) {
+    throw new Error("Invalid tree name");
+  }
+  if (args.cats.length > MAX_CATS) {
+    throw new Error(`Tree exceeds the ${MAX_CATS} cat limit`);
+  }
+  let encoded: string;
+  try {
+    encoded = JSON.stringify({
+      slug: args.slug,
+      name: args.name,
+      cats: args.cats,
+      config: args.config,
+    });
+  } catch {
+    throw new Error("Invalid tree payload");
+  }
+  if (new TextEncoder().encode(encoded).byteLength > MAX_TREE_BYTES) {
+    throw new Error("Tree payload is too large");
+  }
+}
 
 /**
  * Password hashing utilities using Web Crypto PBKDF2
@@ -185,6 +231,24 @@ async function existingTreePasswordError(
     : "invalid_password";
 }
 
+async function treeEditError(
+  ctx: MutationCtx,
+  existing: Doc<"ancestry_tree">,
+  args: { editToken?: string; password?: string },
+): Promise<
+  "password_required" | "invalid_password" | "edit_token_required" | null
+> {
+  const identity = await ctx.auth.getUserIdentity();
+  const owner =
+    existing.ownerTokenIdentifier &&
+    identity?.tokenIdentifier === existing.ownerTokenIdentifier;
+  const tokenMatch =
+    existing.editToken && args.editToken === existing.editToken;
+  if (owner || tokenMatch) return null;
+  if (!existing.passwordHash) return "edit_token_required";
+  return existingTreePasswordError(existing.passwordHash, args.password);
+}
+
 const catValidator = v.object({
   id: v.string(),
   name: v.object({
@@ -222,20 +286,50 @@ const configValidator = v.object({
   ),
 });
 
-export const save = mutation({
-  args: {
-    slug: v.string(),
-    name: v.string(),
-    foundingMotherId: v.string(),
-    foundingFatherId: v.string(),
-    cats: v.array(catValidator),
-    config: configValidator,
-    creatorName: v.optional(v.string()),
-    password: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const now = Date.now();
+const treeSaveFields = {
+  slug: v.string(),
+  name: v.string(),
+  foundingMotherId: v.string(),
+  foundingFatherId: v.string(),
+  cats: v.array(catValidator),
+  config: configValidator,
+  creatorName: v.optional(v.string()),
+  password: v.optional(v.string()),
+  editToken: v.optional(v.string()),
+};
+const treeSaveValidator = v.object(treeSaveFields);
 
+type TreeSaveArgs = Infer<typeof treeSaveValidator>;
+
+async function insertNewTree(ctx: MutationCtx, args: TreeSaveArgs) {
+  const now = Date.now();
+  const editToken = crypto.randomUUID();
+  const identity = await ctx.auth.getUserIdentity();
+  const insertData = {
+    slug: args.slug,
+    name: args.name,
+    foundingMotherId: args.foundingMotherId,
+    foundingFatherId: args.foundingFatherId,
+    cats: args.cats,
+    config: args.config,
+    createdAt: now,
+    updatedAt: now,
+    editToken,
+    ...(args.creatorName !== undefined && { creatorName: args.creatorName }),
+    ...(args.password && { passwordHash: await hashPassword(args.password) }),
+    ...(identity?.tokenIdentifier && {
+      ownerTokenIdentifier: identity.tokenIdentifier,
+    }),
+  };
+  const id = await ctx.db.insert("ancestry_tree", insertData);
+  return { id, editToken };
+}
+
+export const save = mutation({
+  args: treeSaveFields,
+  handler: async (ctx, args) => {
+    assertTreeSize(args);
+    const now = Date.now();
     // Check if tree with this slug already exists
     const existing = await ctx.db
       .query("ancestry_tree")
@@ -243,12 +337,9 @@ export const save = mutation({
       .first();
 
     if (existing) {
-      const passwordError = await existingTreePasswordError(
-        existing.passwordHash,
-        args.password,
-      );
-      if (passwordError) {
-        return { success: false, error: passwordError } as const;
+      const editError = await treeEditError(ctx, existing, args);
+      if (editError) {
+        return { success: false, error: editError } as const;
       }
 
       // Update existing tree
@@ -285,43 +376,48 @@ export const save = mutation({
         id: existing._id,
         slug: args.slug,
         isNew: false,
+        editToken: existing.editToken,
       } as const;
     }
 
     // Create new tree
-    const insertData: {
-      slug: string;
-      name: string;
-      foundingMotherId: string;
-      foundingFatherId: string;
-      cats: typeof args.cats;
-      config: typeof args.config;
-      createdAt: number;
-      updatedAt: number;
-      creatorName?: string;
-      passwordHash?: string;
-    } = {
+    assertSlugFormat(args.slug);
+    const { id, editToken } = await insertNewTree(ctx, args);
+
+    return {
+      success: true,
+      id,
       slug: args.slug,
-      name: args.name,
-      foundingMotherId: args.foundingMotherId,
-      foundingFatherId: args.foundingFatherId,
-      cats: args.cats,
-      config: args.config,
-      createdAt: now,
-      updatedAt: now,
-    };
+      isNew: true,
+      editToken,
+    } as const;
+  },
+});
 
-    if (args.creatorName !== undefined) {
-      insertData.creatorName = args.creatorName;
-    }
+/**
+ * Save a copy under a new slug without ever attempting to edit the source.
+ * This is the migration-safe path for legacy trees that predate edit tokens.
+ */
+export const saveAsNew = mutation({
+  args: treeSaveFields,
+  handler: async (ctx, args) => {
+    assertTreeSize(args);
+    assertSlugFormat(args.slug);
 
-    if (args.password) {
-      insertData.passwordHash = await hashPassword(args.password);
-    }
+    const existing = await ctx.db
+      .query("ancestry_tree")
+      .withIndex("bySlug", (q) => q.eq("slug", args.slug))
+      .first();
+    if (existing) return { success: false, error: "slug_taken" } as const;
 
-    const id = await ctx.db.insert("ancestry_tree", insertData);
-
-    return { success: true, id, slug: args.slug, isNew: true } as const;
+    const { id, editToken } = await insertNewTree(ctx, args);
+    return {
+      success: true,
+      id,
+      slug: args.slug,
+      isNew: true,
+      editToken,
+    } as const;
   },
 });
 
@@ -353,7 +449,7 @@ export const getBySlug = query({
     if (!tree) return null;
 
     // Return tree data with hasPassword flag, but not the actual hash
-    const { passwordHash, ...treeData } = tree;
+    const { passwordHash, editToken, ownerTokenIdentifier, ...treeData } = tree;
     return { ...treeData, hasPassword: !!passwordHash };
   },
 });
@@ -363,7 +459,7 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 20;
+    const limit = Math.max(1, Math.min(args.limit ?? 20, 100));
 
     const trees = await ctx.db
       .query("ancestry_tree")
@@ -399,6 +495,7 @@ export const update = mutation({
     config: v.optional(configValidator),
     creatorName: v.optional(v.string()),
     password: v.optional(v.string()),
+    editToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -410,18 +507,18 @@ export const update = mutation({
       return { success: false, error: "not_found" } as const;
     }
 
-    // Check password if tree has one
-    if (existing.passwordHash) {
-      if (!args.password) {
-        return { success: false, error: "password_required" } as const;
-      }
-      const isValid = await verifyPassword(
-        args.password,
-        existing.passwordHash,
-      );
-      if (!isValid) {
-        return { success: false, error: "invalid_password" } as const;
-      }
+    const editError = await treeEditError(ctx, existing, args);
+    if (editError) {
+      return { success: false, error: editError } as const;
+    }
+
+    if (args.cats || args.config || args.name) {
+      assertTreeSize({
+        slug: args.slug,
+        name: args.name ?? existing.name,
+        cats: args.cats ?? existing.cats,
+        config: args.config ?? existing.config,
+      });
     }
 
     const updates: Record<string, unknown> = {
@@ -434,7 +531,12 @@ export const update = mutation({
     if (args.creatorName !== undefined) updates.creatorName = args.creatorName;
 
     await ctx.db.patch(existing._id, updates);
-    return { success: true, id: existing._id, slug: args.slug } as const;
+    return {
+      success: true,
+      id: existing._id,
+      slug: args.slug,
+      editToken: existing.editToken,
+    } as const;
   },
 });
 
@@ -442,6 +544,7 @@ export const remove = mutation({
   args: {
     slug: v.string(),
     password: v.optional(v.string()),
+    editToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -453,17 +556,26 @@ export const remove = mutation({
       return { success: false, error: "not_found" } as const;
     }
 
-    // Check password if tree is protected
-    if (existing.passwordHash) {
-      if (!args.password) {
-        return { success: false, error: "password_required" } as const;
-      }
-      const isValid = await verifyPassword(
-        args.password,
-        existing.passwordHash,
-      );
-      if (!isValid) {
-        return { success: false, error: "invalid_password" } as const;
+    const identity = await ctx.auth.getUserIdentity();
+    const owner =
+      existing.ownerTokenIdentifier &&
+      identity?.tokenIdentifier === existing.ownerTokenIdentifier;
+    const tokenMatch =
+      existing.editToken && args.editToken === existing.editToken;
+    if (!owner && !tokenMatch) {
+      if (existing.passwordHash) {
+        if (!args.password) {
+          return { success: false, error: "password_required" } as const;
+        }
+        const isValid = await verifyPassword(
+          args.password,
+          existing.passwordHash,
+        );
+        if (!isValid) {
+          return { success: false, error: "invalid_password" } as const;
+        }
+      } else {
+        return { success: false, error: "edit_token_required" } as const;
       }
     }
 

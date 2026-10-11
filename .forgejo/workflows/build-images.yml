@@ -60,7 +60,7 @@ jobs:
       discord_bot: ${{ steps.filter.outputs.discord_bot }}
       cat_system: ${{ steps.filter.outputs.cat_system }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: Detect changed paths
@@ -112,19 +112,19 @@ jobs:
        needs.changes.outputs.cat_system == 'true')
     runs-on: personal
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           version: 10.33.0
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
 
       - name: Install contract build dependencies
         run: |
@@ -135,63 +135,27 @@ jobs:
       - name: Verify the closed cat-system contract
         run: pnpm cat-system:build
 
-  # Tags don't have path-filter outputs, so compute whether Convex changed
-  # since the previous release tag before deciding to deploy.
-  tag-convex-changes:
-    runs-on: personal
-    if: startsWith(github.ref, 'refs/tags/v')
-    outputs:
-      convex: ${{ steps.diff.outputs.convex }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - id: diff
-        env:
-          CURRENT_TAG: ${{ github.ref_name }}
-          CURRENT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-
-          previous_tag=$(
-            git tag --sort=-version:refname \
-              | grep -Fxv "$CURRENT_TAG" \
-              | head -n 1
-          )
-
-          if [ -z "$previous_tag" ]; then
-            echo "No previous release tag found; deploying Convex by default."
-            echo "convex=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "Comparing frontend/convex changes from $previous_tag to $CURRENT_SHA"
-
-          if git diff --quiet "$previous_tag..$CURRENT_SHA" -- frontend/convex; then
-            echo "convex=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "convex=true" >> "$GITHUB_OUTPUT"
-          fi
-
   deploy-convex:
-    needs: [changes, tag-convex-changes, cat-system-contract]
+    # Every release tag deploys Convex. A previous deployment may have failed
+    # even when this release contains no Convex diff, and skipping here would
+    # leave production permanently behind until a future backend change.
+    needs: [changes, cat-system-contract]
     if: |
       always() && needs.cat-system-contract.result == 'success' &&
-      ((startsWith(github.ref, 'refs/tags/v') && needs.tag-convex-changes.outputs.convex == 'true') ||
+      ((startsWith(github.ref, 'refs/tags/v')) ||
        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.deploy_convex == 'true'))
     runs-on: personal
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
-          version: 11
+          version: 10.33.0
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           cache: 'pnpm'
@@ -256,20 +220,22 @@ jobs:
           CONVEX_DEPLOY_KEY: ${{ steps.ci-secrets.outputs.CONVEX_DEPLOY_KEY }}
 
   build-frontend:
-    needs: [changes, cat-system-contract]
+    needs: [changes, cat-system-contract, deploy-convex]
     # Build if: tag push, frontend files changed on main, or manual trigger
     if: |
       always() &&
       (needs.cat-system-contract.result == 'success' || needs.cat-system-contract.result == 'skipped') &&
+      (needs.deploy-convex.result == 'success' || needs.deploy-convex.result == 'skipped') &&
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.frontend == 'true' ||
        github.event.inputs.build_frontend == 'true')
     runs-on: personal
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Read cat-system catalog hash
         id: cat-system
@@ -282,22 +248,24 @@ jobs:
           apt-get install -y --no-install-recommends ca-certificates docker.io
           docker --version
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
         with:
           driver: remote
           endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+      # The private registry-login action is hosted behind Pangolin auth; keep
+      # it pinned to the reviewed immutable Forgejo commit.
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@c1285eb4d761c067bc09565c079b9f3ba355f137
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-frontend
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
+            type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Fetch frontend CI secrets from Infisical
@@ -354,7 +322,7 @@ jobs:
 
       # Note: NEXT_PUBLIC_CONVEX_URL uses a placeholder at build time
       # and is injected at runtime via docker-entrypoint.sh
-      - uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
@@ -381,11 +349,12 @@ jobs:
        needs.changes.outputs.renderer == 'true' ||
        github.event.inputs.build_renderer == 'true')
     runs-on: personal
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Read cat-system catalog hash
         id: cat-system
@@ -398,25 +367,25 @@ jobs:
           apt-get install -y --no-install-recommends ca-certificates docker.io
           docker --version
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
         with:
           driver: remote
           endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@c1285eb4d761c067bc09565c079b9f3ba355f137
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-renderer
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
+            type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           file: ./backend/renderer_service/Dockerfile
@@ -436,9 +405,10 @@ jobs:
        needs.changes.outputs.image_processing == 'true' ||
        github.event.inputs.build_image_processing == 'true')
     runs-on: personal
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
       - name: Enable pnpm
@@ -454,11 +424,12 @@ jobs:
        needs.changes.outputs.image_processing == 'true' ||
        github.event.inputs.build_image_processing == 'true')
     runs-on: personal
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Docker CLI
         run: |
@@ -467,25 +438,25 @@ jobs:
           apt-get install -y --no-install-recommends ca-certificates docker.io
           docker --version
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
         with:
           driver: remote
           endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@c1285eb4d761c067bc09565c079b9f3ba355f137
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-image-processing
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
+            type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: ./backend/image_processing_service
           file: ./backend/image_processing_service/Dockerfile
@@ -501,11 +472,12 @@ jobs:
        needs.changes.outputs.discord_bot == 'true' ||
        github.event.inputs.build_discord_bot == 'true')
     runs-on: personal
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Read cat-system catalog hash
         id: cat-system
@@ -518,25 +490,25 @@ jobs:
           apt-get install -y --no-install-recommends ca-certificates docker.io
           docker --version
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
         with:
           driver: remote
           endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@c1285eb4d761c067bc09565c079b9f3ba355f137
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-discord-bot
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
+            type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: ./backend/discord-bot
           file: ./backend/discord-bot/Dockerfile
@@ -556,9 +528,10 @@ jobs:
        needs.changes.outputs.media == 'true' ||
        github.event.inputs.build_media == 'true')
     runs-on: personal
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
       - name: Enable pnpm
@@ -574,11 +547,12 @@ jobs:
        needs.changes.outputs.media == 'true' ||
        github.event.inputs.build_media == 'true')
     runs-on: personal
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install Docker CLI
         run: |
@@ -587,25 +561,25 @@ jobs:
           apt-get install -y --no-install-recommends ca-certificates docker.io
           docker --version
 
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
         with:
           driver: remote
           endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@c1285eb4d761c067bc09565c079b9f3ba355f137
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.OWNER }}/beastypage-media
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
+            type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - uses: docker/build-push-action@v7
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: ./backend/media_service
           file: ./backend/media_service/Dockerfile

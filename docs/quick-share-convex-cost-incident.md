@@ -65,6 +65,19 @@ Best practice: make reliability explicit:
 - check job state before every retry so completed work is not repeated;
 - use an infrequent, paginated safety sweep for migration and outage recovery.
 
+Dispatch retries use a 51-minute bounded horizon (1 second, 5 seconds, 15
+seconds, 1 minute, 5 minutes, 15 minutes, and 30 minutes). That covers the
+25-minute worker lease and normal single-worker queues, so a busy replica does
+not leave a job pending until the next hourly sweep. The hourly sweep remains
+the fallback for a longer outage or a worker that never returns.
+
+Collections have two separate bounds: each item consumes the tier's active
+and hourly allowance, and a short link accepts at most 100 retained rows.
+Public collection and moderation reads take at most those 100 rows. A failed
+or unsupported first item still authorizes continuation with its upload
+receipt while its retention record remains available; removed or expired
+collections require a new link.
+
 The steady-state Quick Share safety work is now one hourly maintenance mutation
 plus two bounded child mutations, normally about 72 executions per day. The
 Catdex thumbnail backfill runs once every six hours. Additional work only occurs

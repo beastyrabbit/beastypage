@@ -23,6 +23,9 @@ export const QUICK_SHARE_POLICY = {
   retentionMs: 30 * DAY_MS,
   chunkBytes: 16 * MIB,
   publicIdLength: 8,
+  // Bound legacy and failed rows for a single short link. Active uploads
+  // remain constrained by each tier's active limit.
+  collectionMaxItems: 100,
 } as const;
 
 export type QuickShareTier = "anonymous" | "signedIn";

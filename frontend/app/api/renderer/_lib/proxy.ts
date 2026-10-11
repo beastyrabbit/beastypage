@@ -1,4 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
+import {
+  RequestBodyTooLargeError,
+  readRequestBody,
+} from "@/app/api/_lib/request-body";
 
 function normalizeRendererBase(url: string) {
   const trimmed = url.replace(/\/$/, "");
@@ -13,6 +17,7 @@ export const RENDERER_BASE = normalizeRendererBase(
 );
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const MAX_RENDER_BODY_BYTES = 16 * 1024 * 1024;
 
 type Validator = (body: unknown) => string | null;
 
@@ -57,7 +62,13 @@ function selectResponseHeaders(upstream: Response): Headers {
   return headers;
 }
 
-function classifyError(error: unknown): { status: number; message: string } {
+function classifyError(
+  error: unknown,
+  requestSignal: AbortSignal,
+): { status: number; message: string } {
+  if (requestSignal.aborted) {
+    return { status: 499, message: "Request aborted" };
+  }
   if (error instanceof DOMException && error.name === "AbortError") {
     return { status: 504, message: "Renderer request timed out" };
   }
@@ -118,6 +129,116 @@ function streamWithFinalizer(
   });
 }
 
+async function readJsonRequestBody(
+  request: NextRequest,
+  validate: Validator | undefined,
+): Promise<{ body: string } | { response: NextResponse }> {
+  let rawBody: string;
+  try {
+    rawBody = await readRequestBody(request, MAX_RENDER_BODY_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return {
+        response: NextResponse.json(
+          { error: "Request body is too large" },
+          { status: 413 },
+        ),
+      };
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return {
+        response: NextResponse.json(
+          { error: "Request aborted" },
+          { status: 499 },
+        ),
+      };
+    }
+    throw error;
+  }
+
+  if (!rawBody) {
+    return {
+      response: NextResponse.json(
+        { error: "Request body must not be empty" },
+        { status: 400 },
+      ),
+    };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch (_error) {
+    return {
+      response: NextResponse.json(
+        { error: "Request body is not valid JSON" },
+        { status: 400 },
+      ),
+    };
+  }
+
+  const validationError = validate?.(parsed);
+  if (validationError) {
+    return {
+      response: NextResponse.json({ error: validationError }, { status: 400 }),
+    };
+  }
+
+  return { body: rawBody };
+}
+
+function responseForUpstreamWithoutBody(
+  upstream: Response,
+): Promise<NextResponse> {
+  return upstream
+    .text()
+    .then((text) =>
+      NextResponse.json(
+        { error: text || "Renderer returned no data" },
+        { status: upstream.status || 500 },
+      ),
+    );
+}
+
+function responseForRedirect(
+  targetUrl: string,
+  upstream: Response,
+): NextResponse {
+  const location = upstream.headers.get("location");
+  console.error(
+    "[renderer-proxy] upstream redirect for %s %s returned %d%s",
+    "POST",
+    targetUrl,
+    upstream.status,
+    location ? " with location header" : "",
+  );
+  return NextResponse.json(
+    { error: "Renderer request was redirected" },
+    { status: 502 },
+  );
+}
+
+function proxyUpstreamResponse(
+  targetUrl: string,
+  upstream: Response,
+  clearTimeout: () => void,
+): Promise<NextResponse> | NextResponse {
+  if (isManualRedirect(upstream)) {
+    clearTimeout();
+    return responseForRedirect(targetUrl, upstream);
+  }
+
+  if (!upstream.body) {
+    clearTimeout();
+    return responseForUpstreamWithoutBody(upstream);
+  }
+
+  return new NextResponse(streamWithFinalizer(upstream.body, clearTimeout), {
+    status: upstream.status,
+    headers: selectResponseHeaders(upstream),
+  });
+}
+
 export async function proxyRendererJson(
   request: NextRequest,
   { timeoutMs = DEFAULT_TIMEOUT_MS, validate, path }: ProxyOptions,
@@ -127,30 +248,9 @@ export async function proxyRendererJson(
     return NextResponse.json({ error: contentTypeError }, { status: 415 });
   }
 
-  const clone = request.clone();
-  const rawBody = await clone.text();
-  if (!rawBody) {
-    return NextResponse.json(
-      { error: "Request body must not be empty" },
-      { status: 400 },
-    );
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawBody);
-  } catch (_error) {
-    return NextResponse.json(
-      { error: "Request body is not valid JSON" },
-      { status: 400 },
-    );
-  }
-
-  if (validate) {
-    const validationError = validate(parsed);
-    if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
-    }
+  const bodyResult = await readJsonRequestBody(request, validate);
+  if ("response" in bodyResult) {
+    return bodyResult.response;
   }
 
   const controller = new AbortController();
@@ -162,8 +262,8 @@ export async function proxyRendererJson(
     const upstream = await fetch(targetUrl, {
       method: "POST",
       headers: selectHeaders(request),
-      body: rawBody,
-      signal: controller.signal,
+      body: bodyResult.body,
+      signal: AbortSignal.any([controller.signal, request.signal]),
       redirect: "manual",
     });
 
@@ -176,46 +276,14 @@ export async function proxyRendererJson(
       );
     }
 
-    if (isManualRedirect(upstream)) {
-      clear();
-      const location = upstream.headers.get("location");
-      console.error(
-        "[renderer-proxy] upstream redirect for %s %s returned %d%s",
-        "POST",
-        targetUrl,
-        upstream.status,
-        location ? " with location header" : "",
-      );
-      return NextResponse.json(
-        { error: "Renderer request was redirected" },
-        { status: 502 },
-      );
-    }
-
-    if (!upstream.body) {
-      clear();
-      const text = await upstream.text();
-      return NextResponse.json(
-        { error: text || "Renderer returned no data" },
-        { status: upstream.status || 500 },
-      );
-    }
-
-    const headers = selectResponseHeaders(upstream);
-
-    const proxiedBody = streamWithFinalizer(upstream.body, clear);
-
-    return new NextResponse(proxiedBody, {
-      status: upstream.status,
-      headers,
-    });
+    return await proxyUpstreamResponse(targetUrl, upstream, clear);
   } catch (error) {
     clear();
     console.error(
       `[renderer-proxy] upstream request failed for ${path}`,
       error,
     );
-    const { status, message } = classifyError(error);
+    const { status, message } = classifyError(error, request.signal);
     return NextResponse.json({ error: message }, { status });
   }
 }

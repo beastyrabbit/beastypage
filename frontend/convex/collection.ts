@@ -1,7 +1,8 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internalQuery, mutation, query } from "./_generated/server.js";
 
-export const totalCount = query({
+export const totalCount = internalQuery({
   args: {},
   handler: async (ctx) => {
     let count = 0;
@@ -20,11 +21,46 @@ type CollectionDoc = Doc<"collection">;
 
 export type CollectionEntry = Awaited<ReturnType<typeof collectionDocToClient>>;
 
+const PAGE_SIZE = 36;
+
+/** Paginated collection archive used by the public gallery. */
+export const page = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("collection")
+      .withIndex("byCreated", (q) => q)
+      .order("desc")
+      .paginate({
+        ...args.paginationOpts,
+        numItems: Math.min(
+          PAGE_SIZE,
+          Math.max(1, args.paginationOpts.numItems),
+        ),
+      });
+
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map((doc) => collectionDocToClient(ctx, doc)),
+      ),
+    };
+  },
+});
+
+/**
+ * Legacy bounded collection query. New clients should use page so older
+ * artwork remains reachable as the archive grows.
+ */
 export const list = query({
-  args: {},
-  handler: async (ctx) => {
-    const entries = await ctx.db.query("collection").collect();
-    entries.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = Math.max(1, Math.min(args.limit ?? 200, 200));
+    const entries = await ctx.db
+      .query("collection")
+      .withIndex("byCreated", (q) => q)
+      .order("desc")
+      .take(limit);
     return Promise.all(entries.map((doc) => collectionDocToClient(ctx, doc)));
   },
 });
@@ -36,6 +72,17 @@ export const setFocus = mutation({
     focusY: v.number(),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    const admins = (process.env.QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    if (!admins.includes(identity.tokenIdentifier)) {
+      throw new Error("Not authorized to edit collection focus");
+    }
     const doc = await ctx.db.get(args.id);
     if (!doc) {
       throw new Error("Collection entry not found.");

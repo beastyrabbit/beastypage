@@ -15,6 +15,7 @@ import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import { api } from "@/convex/_generated/api";
 import {
   type CanonicalCatViewPayload,
+  type CatTraitDisplayRow,
   catViewPayloadToShareSeed,
   getCatViewDisplayRows,
   normalizeCatViewPayload,
@@ -100,10 +101,258 @@ function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
-function getSpriteVariantsSubtitle(loading: boolean, count: number): string {
+function getSpriteVariantsSubtitle(
+  loading: boolean,
+  count: number,
+  isOpen: boolean,
+  rendererReady: boolean,
+  attempted: boolean,
+): string {
   if (loading) return "Rendering preview sprites…";
   if (count > 0) return `${pluralize(count, "sprite")} available`;
+  if (!isOpen) return "Expand to render poses";
+  if (!rendererReady || !attempted) return "Preparing renderer…";
   return "Sprite previews unavailable";
+}
+
+type TraitBreakdownProps = Readonly<{
+  traitRows: CatTraitDisplayRow[];
+  traitsOpen: boolean;
+  showDarkForestTint: boolean;
+  onToggle: () => void;
+  onToggleDarkForestTint: () => void;
+}>;
+
+function TraitRow({
+  row,
+  showDarkForestTint,
+  onToggleDarkForestTint,
+}: Readonly<{
+  row: CatTraitDisplayRow;
+  showDarkForestTint: boolean;
+  onToggleDarkForestTint: () => void;
+}>) {
+  if (row.traitId === "darkForest") {
+    return (
+      <div
+        key={row.key}
+        className="flex flex-col gap-1 rounded-xl border border-border/30 bg-background/60 px-3 py-2"
+      >
+        <dt className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
+          {row.label}
+        </dt>
+        <dd className="flex items-center justify-between font-mono text-xs text-foreground sm:text-sm">
+          <span>Enabled</span>
+          <button
+            type="button"
+            aria-pressed={showDarkForestTint}
+            aria-label="Toggle dark forest tint"
+            onClick={onToggleDarkForestTint}
+            className={cn(
+              "relative inline-flex h-6 w-11 items-center rounded-full border border-border/40 bg-background/70 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40",
+              showDarkForestTint && "border-primary/60 bg-primary/80",
+            )}
+          >
+            <span
+              className={cn(
+                "inline-block h-4 w-4 transform rounded-full bg-background shadow-sm transition-transform",
+                showDarkForestTint ? "translate-x-5" : "translate-x-1",
+              )}
+            />
+          </button>
+        </dd>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      key={row.key}
+      className="flex flex-col gap-1 rounded-xl border border-border/30 bg-background/60 px-3 py-2"
+    >
+      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
+        {row.label}
+      </dt>
+      <dd className="break-words font-mono text-xs text-foreground sm:text-sm">
+        {row.value}
+      </dd>
+    </div>
+  );
+}
+
+function TraitBreakdown({
+  traitRows,
+  traitsOpen,
+  showDarkForestTint,
+  onToggle,
+  onToggleDarkForestTint,
+}: TraitBreakdownProps) {
+  return (
+    <div className="rounded-3xl border border-border/40 bg-background/70 p-5">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/70 px-4 py-3 text-left transition hover:bg-background"
+      >
+        <div className="flex items-center gap-2">
+          <SparklesIcon size={16} className="text-primary" />
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">
+              Trait Breakdown
+            </h2>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+              {traitRows.length > 0
+                ? pluralize(traitRows.length, "trait")
+                : "No traits available"}
+            </p>
+          </div>
+        </div>
+        <DownChevron
+          size={16}
+          className={cn(
+            "text-muted-foreground transition-transform",
+            traitsOpen ? "rotate-180" : "rotate-0",
+          )}
+        />
+      </button>
+      <div
+        className={cn(
+          "grid overflow-hidden transition-all duration-300",
+          traitsOpen ? "mt-4 max-h-[9999px] gap-2" : "max-h-0 gap-0",
+        )}
+      >
+        {traitsOpen &&
+          traitRows.map((row) => (
+            <TraitRow
+              key={row.key}
+              row={row}
+              showDarkForestTint={showDarkForestTint}
+              onToggleDarkForestTint={onToggleDarkForestTint}
+            />
+          ))}
+        {traitsOpen && traitRows.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            No trait information available.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function getSpriteVariantsStatus(
+  open: boolean,
+  attempted: boolean,
+  loading: boolean,
+  count: number,
+): string | null {
+  if (!open || count > 0) return null;
+  if (!attempted || loading) {
+    return loading ? "Rendering preview sprites…" : "Preparing renderer…";
+  }
+  return "Sprite previews unavailable for this cat.";
+}
+
+type SpriteVariantsProps = Readonly<{
+  open: boolean;
+  subtitle: string;
+  variants: SpriteVariantPreview[];
+  attempted: boolean;
+  loading: boolean;
+  onToggle: () => void;
+  onCopy: (dataUrl: string, filename: string) => Promise<void>;
+}>;
+
+function SpriteVariants({
+  open,
+  subtitle,
+  variants,
+  attempted,
+  loading,
+  onToggle,
+  onCopy,
+}: SpriteVariantsProps) {
+  const status = getSpriteVariantsStatus(
+    open,
+    attempted,
+    loading,
+    variants.length,
+  );
+
+  return (
+    <div className="glass-card px-6 py-6">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/70 px-4 py-3 text-left transition hover:bg-background"
+      >
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">
+            Sprite Variations
+          </h3>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+            {subtitle}
+          </p>
+        </div>
+        <DownChevron
+          size={16}
+          className={cn(
+            "text-muted-foreground transition-transform",
+            open ? "rotate-180" : "rotate-0",
+          )}
+        />
+      </button>
+      <div
+        className={cn(
+          "grid overflow-hidden transition-all duration-300",
+          open
+            ? "mt-4 max-h-[9999px] gap-4 md:grid-cols-2 xl:grid-cols-3"
+            : "max-h-0 gap-0",
+        )}
+      >
+        {status && (
+          <p className="col-span-full text-sm text-muted-foreground">
+            {status}
+          </p>
+        )}
+        {open &&
+          variants.map((variant) => (
+            <div
+              key={variant.id}
+              className="rounded-2xl border border-border/40 bg-background/70 p-4"
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-foreground">
+                  {variant.name}
+                </p>
+                <span className="text-xs text-muted-foreground">
+                  Named pose
+                </span>
+              </div>
+              <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
+                <Image
+                  src={variant.dataUrl}
+                  alt={variant.name}
+                  width={PREVIEW_CANVAS_SIZE}
+                  height={PREVIEW_CANVAS_SIZE}
+                  unoptimized
+                  className="mx-auto block h-72 w-72 image-render-pixel"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  onCopy(variant.dataUrl, `${variant.name || "sprite"}.png`)
+                }
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary"
+              >
+                <CopyIcon size={12} /> Copy sprite
+              </button>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
 }
 
 export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
@@ -146,6 +395,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
     [],
   );
   const [spriteVariantsLoading, setSpriteVariantsLoading] = useState(false);
+  const [spriteVariantsAttempted, setSpriteVariantsAttempted] = useState(false);
   const [spriteVariantsOpen, setSpriteVariantsOpen] = useState(false);
 
   const [builderBaseUrl, setBuilderBaseUrl] = useState<string | null>(null);
@@ -390,101 +640,129 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
     if (!catPayload) {
       setSpriteVariants([]);
       setSpriteVariantsLoading(false);
+      setSpriteVariantsAttempted(false);
       setSpriteVariantsOpen(false);
       return;
     }
 
     setSpriteVariants([]);
     setSpriteVariantsLoading(false);
+    setSpriteVariantsAttempted(false);
     setSpriteVariantsOpen(false);
   }, [catPayload]);
 
   useEffect(() => {
-    if (!rendererReady || !catPayload?.params) return;
+    if (!rendererReady || !catPayload?.params || !spriteVariantsOpen) return;
+    if (spriteVariants.length > 0) return;
     const generator = generatorRef.current;
     if (!generator) return;
 
     let cancelled = false;
     setSpriteVariantsLoading(true);
+    setSpriteVariantsAttempted(false);
     setSpriteVariants([]);
 
     (async () => {
       const previews: SpriteVariantPreview[] = [];
-      const { default: spriteMapper } = await import(
-        "@/lib/single-cat/spriteMapper"
-      );
-      if (!spriteMapper.loaded) {
-        await spriteMapper.init();
-      }
-      const fallbackSpriteNumber =
-        typeof catPayload.params.spriteNumber === "number"
-          ? catPayload.params.spriteNumber
-          : 0;
-      const poseChoices = getAvailablePoseNames(spriteMapper).map(
-        (poseName: string) => ({
-          id: `pose-${poseName}`,
-          poseName,
-          spriteNumber: fallbackSpriteNumber,
-          name: formatPoseName(poseName),
-        }),
-      );
+      try {
+        const { default: spriteMapper } = await import(
+          "@/lib/single-cat/spriteMapper"
+        );
+        if (cancelled) return;
+        if (!spriteMapper.loaded) {
+          await spriteMapper.init();
+        }
+        if (cancelled) return;
 
-      previews.push(
-        ...(
-          await Promise.all(
-            poseChoices.map(
-              async (poseChoice): Promise<SpriteVariantPreview | null> => {
-                if (cancelled) return null;
-                try {
-                  const variantPayload = setCanonicalViewTrait(
-                    catPayload,
-                    "pose",
-                    poseChoice.poseName,
-                  );
-                  const result = await generator.generateCat(
-                    variantPayload.params,
-                  );
-                  const previewCanvas = document.createElement("canvas");
-                  previewCanvas.width = PREVIEW_CANVAS_SIZE;
-                  previewCanvas.height = PREVIEW_CANVAS_SIZE;
-                  const ctx = previewCanvas.getContext("2d");
-                  if (!ctx) return null;
-                  ctx.imageSmoothingEnabled = false;
-                  ctx.drawImage(
-                    result.canvas as HTMLCanvasElement,
-                    0,
-                    0,
-                    PREVIEW_CANVAS_SIZE,
-                    PREVIEW_CANVAS_SIZE,
-                  );
-                  return {
-                    id: poseChoice.id,
-                    spriteNumber: poseChoice.spriteNumber,
-                    poseName: poseChoice.poseName,
-                    name: poseChoice.name,
-                    dataUrl: previewCanvas.toDataURL("image/png"),
-                  };
-                } catch (err) {
-                  console.warn("Failed to render sprite variant", err);
-                  return null;
-                }
-              },
-            ),
-          )
-        ).filter(
-          (preview): preview is SpriteVariantPreview => preview !== null,
-        ),
-      );
-      if (!cancelled) {
-        setSpriteVariants(previews);
-        setSpriteVariantsLoading(false);
+        const fallbackSpriteNumber =
+          typeof catPayload.params.spriteNumber === "number"
+            ? catPayload.params.spriteNumber
+            : 0;
+        const poseChoices = getAvailablePoseNames(spriteMapper).map(
+          (poseName: string) => ({
+            id: `pose-${poseName}`,
+            poseName,
+            spriteNumber: fallbackSpriteNumber,
+            name: formatPoseName(poseName),
+          }),
+        );
+
+        let nextIndex = 0;
+        const renderPose = async (poseChoice: (typeof poseChoices)[number]) => {
+          if (cancelled) return null;
+          try {
+            const variantPayload = setCanonicalViewTrait(
+              catPayload,
+              "pose",
+              poseChoice.poseName,
+            );
+            const result = await generator.generateCat(variantPayload.params);
+            if (cancelled) return null;
+            const previewCanvas = document.createElement("canvas");
+            previewCanvas.width = PREVIEW_CANVAS_SIZE;
+            previewCanvas.height = PREVIEW_CANVAS_SIZE;
+            const ctx = previewCanvas.getContext("2d");
+            if (!ctx) return null;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(
+              result.canvas as HTMLCanvasElement,
+              0,
+              0,
+              PREVIEW_CANVAS_SIZE,
+              PREVIEW_CANVAS_SIZE,
+            );
+            return {
+              id: poseChoice.id,
+              spriteNumber: poseChoice.spriteNumber,
+              poseName: poseChoice.poseName,
+              name: poseChoice.name,
+              dataUrl: previewCanvas.toDataURL("image/png"),
+            };
+          } catch (err) {
+            console.warn("Failed to render sprite variant", err);
+            return null;
+          }
+        };
+        const worker = async () => {
+          while (!cancelled) {
+            const index = nextIndex++;
+            const poseChoice = poseChoices[index];
+            if (!poseChoice) return;
+            const preview = await renderPose(poseChoice);
+            if (preview) previews.push(preview);
+          }
+        };
+        const workerCount = Math.min(3, poseChoices.length);
+        await Promise.all(Array.from({ length: workerCount }, () => worker()));
+        if (!cancelled) {
+          const ordered = poseChoices
+            .map((poseChoice) =>
+              previews.find((preview) => preview.id === poseChoice.id),
+            )
+            .filter(
+              (preview): preview is SpriteVariantPreview =>
+                preview !== undefined,
+            );
+          setSpriteVariants(ordered);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn("Failed to load sprite variants", err);
+          setSpriteVariants([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setSpriteVariantsLoading(false);
+          setSpriteVariantsAttempted(true);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
+      setSpriteVariantsLoading(false);
     };
-  }, [rendererReady, catPayload]);
+  }, [rendererReady, catPayload, spriteVariants.length, spriteVariantsOpen]);
 
   const traitRows = useMemo(() => {
     if (!catPayload) return [];
@@ -494,6 +772,9 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
   const spriteVariantsSubtitle = getSpriteVariantsSubtitle(
     spriteVariantsLoading,
     spriteVariants.length,
+    spriteVariantsOpen,
+    rendererReady,
+    spriteVariantsAttempted,
   );
 
   const showLoader = !!loadingMessage || (slug && mapperRecord === undefined);
@@ -514,6 +795,15 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
     const target = url ?? builderBaseUrl;
     if (!target) return;
     router.push(target);
+  };
+
+  const handleToggleSpriteVariants = () => {
+    const next = !spriteVariantsOpen;
+    if (next && spriteVariants.length === 0) {
+      setSpriteVariantsAttempted(false);
+      setSpriteVariantsLoading(rendererReady);
+    }
+    setSpriteVariantsOpen(next);
   };
 
   const downloadDataUrl = useCallback((dataUrl: string, filename: string) => {
@@ -617,12 +907,12 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
   const catDisplayName = useMemo(() => {
     const metaName = meta?.catName?.trim();
     if (metaName) return metaName;
+    const payloadParams = catPayload?.params as
+      | Record<string, unknown>
+      | undefined;
     const payloadName =
-      typeof (catPayload?.params as Record<string, unknown> | undefined)
-        ?.catName === "string"
-        ? (
-            (catPayload?.params as Record<string, unknown>).catName as string
-          ).trim()
+      typeof payloadParams?.catName === "string"
+        ? payloadParams.catName.trim()
         : "";
     return payloadName || "Shared Cat";
   }, [catPayload, meta]);
@@ -630,13 +920,12 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
   const creatorDisplayName = useMemo(() => {
     const metaCreator = meta?.creatorName?.trim();
     if (metaCreator) return metaCreator;
+    const payloadParams = catPayload?.params as
+      | Record<string, unknown>
+      | undefined;
     const payloadCreator =
-      typeof (catPayload?.params as Record<string, unknown> | undefined)
-        ?.creatorName === "string"
-        ? (
-            (catPayload?.params as Record<string, unknown>)
-              .creatorName as string
-          ).trim()
+      typeof payloadParams?.creatorName === "string"
+        ? payloadParams.creatorName.trim()
         : "";
     return payloadCreator || null;
   }, [catPayload, meta]);
@@ -731,188 +1020,28 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
             </div>
 
             <div className="flex flex-col gap-6">
-              <div className="rounded-3xl border border-border/40 bg-background/70 p-5">
-                <button
-                  type="button"
-                  onClick={() => setTraitsOpen((prev) => !prev)}
-                  className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/70 px-4 py-3 text-left transition hover:bg-background"
-                >
-                  <div className="flex items-center gap-2">
-                    <SparklesIcon size={16} className="text-primary" />
-                    <div>
-                      <h2 className="text-sm font-semibold text-foreground">
-                        Trait Breakdown
-                      </h2>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-                        {traitRows.length > 0
-                          ? pluralize(traitRows.length, "trait")
-                          : "No traits available"}
-                      </p>
-                    </div>
-                  </div>
-                  <DownChevron
-                    size={16}
-                    className={cn(
-                      "text-muted-foreground transition-transform",
-                      traitsOpen ? "rotate-180" : "rotate-0",
-                    )}
-                  />
-                </button>
-                <div
-                  className={cn(
-                    "grid overflow-hidden transition-all duration-300",
-                    traitsOpen ? "mt-4 max-h-[9999px] gap-2" : "max-h-0 gap-0",
-                  )}
-                >
-                  {traitsOpen &&
-                    traitRows.map((row) => {
-                      if (row.traitId === "darkForest") {
-                        return (
-                          <div
-                            key={row.key}
-                            className="flex flex-col gap-1 rounded-xl border border-border/30 bg-background/60 px-3 py-2"
-                          >
-                            <dt className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                              {row.label}
-                            </dt>
-                            <dd className="flex items-center justify-between font-mono text-xs text-foreground sm:text-sm">
-                              <span>Enabled</span>
-                              <button
-                                type="button"
-                                aria-pressed={showDarkForestTint}
-                                aria-label="Toggle dark forest tint"
-                                onClick={() =>
-                                  setShowDarkForestTint((prev) => !prev)
-                                }
-                                className={cn(
-                                  "relative inline-flex h-6 w-11 items-center rounded-full border border-border/40 bg-background/70 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40",
-                                  showDarkForestTint &&
-                                    "border-primary/60 bg-primary/80",
-                                )}
-                              >
-                                <span
-                                  className={cn(
-                                    "inline-block h-4 w-4 transform rounded-full bg-background shadow-sm transition-transform",
-                                    showDarkForestTint
-                                      ? "translate-x-5"
-                                      : "translate-x-1",
-                                  )}
-                                />
-                              </button>
-                            </dd>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div
-                          key={row.key}
-                          className="flex flex-col gap-1 rounded-xl border border-border/30 bg-background/60 px-3 py-2"
-                        >
-                          <dt className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                            {row.label}
-                          </dt>
-                          <dd className="font-mono text-xs text-foreground sm:text-sm break-words">
-                            {row.value}
-                          </dd>
-                        </div>
-                      );
-                    })}
-                  {traitsOpen && traitRows.length === 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      No trait information available.
-                    </p>
-                  )}
-                </div>
-              </div>
+              <TraitBreakdown
+                traitRows={traitRows}
+                traitsOpen={traitsOpen}
+                showDarkForestTint={showDarkForestTint}
+                onToggle={() => setTraitsOpen((prev) => !prev)}
+                onToggleDarkForestTint={() =>
+                  setShowDarkForestTint((prev) => !prev)
+                }
+              />
             </div>
           </div>
 
           <div className="space-y-6">
-            <div className="glass-card px-6 py-6">
-              <button
-                type="button"
-                onClick={() => setSpriteVariantsOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-background/70 px-4 py-3 text-left transition hover:bg-background"
-              >
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">
-                    Sprite Variations
-                  </h3>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-                    {spriteVariantsSubtitle}
-                  </p>
-                </div>
-                <DownChevron
-                  size={16}
-                  className={cn(
-                    "text-muted-foreground transition-transform",
-                    spriteVariantsOpen ? "rotate-180" : "rotate-0",
-                  )}
-                />
-              </button>
-              <div
-                className={cn(
-                  "grid overflow-hidden transition-all duration-300",
-                  spriteVariantsOpen
-                    ? "mt-4 max-h-[9999px] gap-4 md:grid-cols-2 xl:grid-cols-3"
-                    : "max-h-0 gap-0",
-                )}
-              >
-                {spriteVariantsOpen &&
-                  spriteVariants.length === 0 &&
-                  spriteVariantsLoading && (
-                    <p className="col-span-full text-sm text-muted-foreground">
-                      Rendering preview sprites…
-                    </p>
-                  )}
-                {spriteVariantsOpen &&
-                  !spriteVariantsLoading &&
-                  spriteVariants.length === 0 && (
-                    <p className="col-span-full text-sm text-muted-foreground">
-                      Sprite previews unavailable for this cat.
-                    </p>
-                  )}
-                {spriteVariantsOpen &&
-                  spriteVariants.map((variant) => (
-                    <div
-                      key={variant.id}
-                      className="rounded-2xl border border-border/40 bg-background/70 p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-foreground">
-                          {variant.name}
-                        </p>
-                        <span className="text-xs text-muted-foreground">
-                          Named pose
-                        </span>
-                      </div>
-                      <div className="mt-3 overflow-hidden rounded-xl border border-border/30 bg-background/80">
-                        <Image
-                          src={variant.dataUrl}
-                          alt={variant.name}
-                          width={PREVIEW_CANVAS_SIZE}
-                          height={PREVIEW_CANVAS_SIZE}
-                          unoptimized
-                          className="mx-auto block h-72 w-72 image-render-pixel"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleCopyVariantSprite(
-                            variant.dataUrl,
-                            `${variant.name || "sprite"}.png`,
-                          )
-                        }
-                        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-primary"
-                      >
-                        <CopyIcon size={12} /> Copy sprite
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            </div>
+            <SpriteVariants
+              open={spriteVariantsOpen}
+              subtitle={spriteVariantsSubtitle}
+              variants={spriteVariants}
+              attempted={spriteVariantsAttempted}
+              loading={spriteVariantsLoading}
+              onToggle={handleToggleSpriteVariants}
+              onCopy={handleCopyVariantSprite}
+            />
           </div>
         </div>
       )}

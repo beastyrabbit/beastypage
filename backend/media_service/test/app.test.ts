@@ -33,6 +33,44 @@ afterEach(() => {
 });
 
 describe("raw media delivery", () => {
+	it.each([
+		["/i/api/uploads", undefined],
+		["/i/api/imports", undefined],
+		["/i/api/admin/bans", { authorization: "Bearer admin-token" }],
+	])("rejects oversized JSON bodies on %s", async (path, extraHeaders) => {
+		const { app } = createApp(config, {} as ObjectStore);
+		const response = await app.request(`https://beastyrabbit.com${path}`, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"content-length": String(64 * 1024 + 1),
+				...extraHeaders,
+			},
+			body: "{}",
+		});
+		expect(response.status).toBe(413);
+		expect(await response.json()).toEqual({
+			error: "Request body is too large",
+		});
+	});
+
+	it("rejects malformed JSON before calling the control plane", async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal("fetch", fetchMock);
+		const { app } = createApp(config, {} as ObjectStore);
+		const response = await app.request(
+			"https://beastyrabbit.com/i/api/imports",
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: "{",
+			},
+		);
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({ error: "Invalid JSON body" });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
 	it("serves the selected later survivor consistently for GET and HEAD", async () => {
 		const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
 			const request = JSON.parse(String(init?.body));
@@ -61,6 +99,29 @@ describe("raw media delivery", () => {
 		);
 		expect(get).toHaveBeenCalledWith("derivatives/later-item.png", undefined);
 		expect(head).toHaveBeenCalledWith("derivatives/later-item.png");
+		expect(fetchMock).toHaveBeenCalledTimes(2);
+	});
+	it("falls back to the legacy public operation only for unknown-operation 400s", async () => {
+		const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
+			const request = JSON.parse(String(init?.body));
+			if (request.op === "publicCollection") {
+				return controlResponse({ error: "Unknown operation" }, 400);
+			}
+			return controlResponse({
+				key: "derivatives/legacy.png",
+				mime: "image/png",
+				size: 4,
+				name: "legacy.png",
+				expiresAt: Date.now() + 60_000,
+			});
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const get = vi.fn(async () => ({
+			body: new Blob(["safe"]).stream(),
+			contentLength: 4,
+		}));
+		const { app } = createApp(config, { get } as unknown as ObjectStore);
+		expect((await app.request("/i/Abcdefg1")).status).toBe(200);
 		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 	it("returns media bytes directly with range and crawler headers", async () => {

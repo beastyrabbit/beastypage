@@ -73,3 +73,13 @@ it("accepts a bounded image stream and rejects a stream exceeding its byte budge
     downloadPublicImage("https://images.example/image.png"),
   ).rejects.toThrow("10 MB");
 });
+
+it("propagates an already-aborted request signal before DNS work", async () => {
+  const controller = new AbortController();
+  controller.abort();
+
+  await expect(
+    downloadPublicImage("https://images.example/image.png", controller.signal),
+  ).rejects.toMatchObject({ name: "AbortError" });
+  expect(mocks.lookup).not.toHaveBeenCalled();
+});

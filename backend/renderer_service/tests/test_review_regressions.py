@@ -1,7 +1,15 @@
+import asyncio
+
 import pytest
+from fastapi.testclient import TestClient
 from PIL import Image
 from pydantic import ValidationError
 
+from renderer_service.app import (
+    MAX_REQUEST_BODY_BYTES,
+    RequestBodyLimitMiddleware,
+    create_app,
+)
 from renderer_service.models import BatchRenderRequest, BatchVariant, RenderOptions
 from renderer_service.renderer.pipeline import RenderPipeline
 
@@ -28,6 +36,228 @@ def test_small_batch_and_png_options():
     )
     with pytest.raises(ValidationError):
         RenderOptions(outputFormat="array")
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"blob": "x" * 50_000},
+        {
+            "tree": [
+                [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+            ]
+        },
+    ],
+)
+def test_render_json_input_budget_rejects_large_or_deep_values(params):
+    with pytest.raises(ValidationError):
+        BatchRenderRequest.model_validate(
+            {"payload": {"params": params}, "variants": []}
+        )
+
+
+def test_batch_json_budget_rejects_cumulative_variant_payloads():
+    variants = [
+        {"id": str(index), "params": {"blob": "x" * 10_000}} for index in range(20)
+    ]
+    with pytest.raises(ValidationError, match="Batch input JSON"):
+        BatchRenderRequest.model_validate(
+            {"payload": {"params": {}}, "variants": variants}
+        )
+
+
+def test_render_json_input_budget_rejects_too_many_nodes():
+    with pytest.raises(ValidationError, match="too many JSON values"):
+        BatchRenderRequest.model_validate(
+            {"payload": {"params": {"items": [None] * 20_000}}}
+        )
+
+
+def test_invalid_layer_does_not_open_renderer_circuit():
+    app = create_app()
+    payload = {
+        "payload": {"params": {}},
+        "options": {"frameMode": "layer", "layerId": "does-not-exist"},
+    }
+    with TestClient(app) as client:
+        responses = [client.post("/render/batch", json=payload) for _ in range(10)]
+        health = client.get("/health").json()
+
+    assert all(response.status_code == 422 for response in responses)
+    assert health["metrics"]["total_failed"] == 0
+    assert health["metrics"]["circuit_open"] is False
+
+
+def test_invalid_document_is_a_client_error_without_failure_counter():
+    app = create_app()
+    payload = {
+        "payload": {
+            "document": {
+                "schemaVersion": 1,
+                "traits": {"colour": 123},
+            }
+        }
+    }
+    with TestClient(app) as client:
+        response = client.post("/render", json=payload)
+        health = client.get("/health").json()
+
+    assert response.status_code == 422
+    assert health["metrics"]["total_failed"] == 0
+    assert health["metrics"]["circuit_open"] is False
+
+
+def test_request_body_limit_rejects_large_payload_before_json_validation():
+    app = create_app()
+    body = '{"payload":{"params":{"ignored":"' + ("x" * 2_100_000) + '"}}}'
+    with TestClient(app) as client:
+        response = client.post(
+            "/render",
+            content=body,
+            headers={"content-type": "application/json"},
+        )
+
+    assert response.status_code == 413
+
+
+def test_request_body_limit_rejects_chunked_payload_without_content_length():
+    app = create_app()
+
+    def chunks():
+        yield b'{"payload":{"params":{"ignored":"'
+        yield b"x" * 2_100_000
+        yield b'"}}}'
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/render",
+            content=chunks(),
+            headers={"content-type": "application/json"},
+        )
+
+    assert response.status_code == 413
+
+
+def test_request_body_limit_accepts_exact_budget_and_replays_complete_body():
+    received: dict[str, bytes] = {}
+    responses: list[dict] = []
+
+    async def downstream(scope, receive, send):
+        message = await receive()
+        received["body"] = message["body"]
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    body = b"x" * MAX_REQUEST_BODY_BYTES
+    source = iter(
+        [
+            {
+                "type": "http.request",
+                "body": body[:-1],
+                "more_body": True,
+            },
+            {"type": "http.request", "body": body[-1:], "more_body": False},
+        ]
+    )
+
+    async def receive():
+        return next(source)
+
+    async def send(message):
+        responses.append(message)
+
+    async def invoke():
+        await RequestBodyLimitMiddleware(downstream, MAX_REQUEST_BODY_BYTES)(
+            {"type": "http", "headers": []}, receive, send
+        )
+
+    asyncio.run(invoke())
+
+    assert received["body"] == body
+    assert responses[0]["status"] == 200
+
+
+def test_request_body_limit_uses_actual_bytes_when_content_length_underreports():
+    downstream_called = False
+    responses: list[dict] = []
+
+    async def downstream(scope, receive, send):
+        nonlocal downstream_called
+        downstream_called = True
+
+    body = b"x" * (MAX_REQUEST_BODY_BYTES + 1)
+    source = iter(
+        [
+            {
+                "type": "http.request",
+                "body": body[: MAX_REQUEST_BODY_BYTES // 2],
+                "more_body": True,
+            },
+            {
+                "type": "http.request",
+                "body": body[MAX_REQUEST_BODY_BYTES // 2 :],
+                "more_body": False,
+            },
+        ]
+    )
+
+    async def receive():
+        return next(source)
+
+    async def send(message):
+        responses.append(message)
+
+    async def invoke():
+        await RequestBodyLimitMiddleware(downstream, MAX_REQUEST_BODY_BYTES)(
+            {
+                "type": "http",
+                "headers": [(b"content-length", b"1")],
+            },
+            receive,
+            send,
+        )
+
+    asyncio.run(invoke())
+
+    assert downstream_called is False
+    assert responses[0]["status"] == 413
+
+
+def test_request_body_limit_stops_reading_at_overflow_and_sends_only_one_response():
+    receive_calls = 0
+    responses: list[dict] = []
+
+    async def downstream(scope, receive, send):
+        pytest.fail("Oversized input must not reach request parsing")
+
+    async def receive():
+        nonlocal receive_calls
+        receive_calls += 1
+        if receive_calls > 1:
+            pytest.fail("The rejected request body must not be drained")
+        return {
+            "type": "http.request",
+            "body": b"x" * (MAX_REQUEST_BODY_BYTES + 1),
+            "more_body": True,
+        }
+
+    async def send(message):
+        responses.append(message)
+
+    async def invoke():
+        await RequestBodyLimitMiddleware(downstream, MAX_REQUEST_BODY_BYTES)(
+            {"type": "http", "headers": []}, receive, send
+        )
+
+    asyncio.run(invoke())
+
+    assert receive_calls == 1
+    assert [message["type"] for message in responses] == [
+        "http.response.start",
+        "http.response.body",
+    ]
+    assert responses[0]["status"] == 413
+    assert responses[1]["more_body"] is False
 
 
 @pytest.fixture(scope="module")

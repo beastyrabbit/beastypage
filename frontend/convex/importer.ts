@@ -1,7 +1,10 @@
 import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel.js";
-import type { ActionCtx, MutationCtx } from "./_generated/server.js";
-import { action, mutation } from "./_generated/server.js";
+import {
+  internalAction,
+  internalMutation,
+  type MutationCtx,
+} from "./_generated/server.js";
 
 const imageReference = v.object({
   fileName: v.string(),
@@ -56,26 +59,11 @@ type RarityPayload = Infer<typeof rarityPayload>;
 type CatdexRecordPayload = Infer<typeof catdexRecordPayload>;
 type CollectionRecordPayload = Infer<typeof collectionRecordPayload>;
 
-async function requireAdmin(ctx: ActionCtx | MutationCtx) {
-  const getAdminIdentity = (
-    ctx.auth as { getAdminIdentity?: () => Promise<unknown> }
-  ).getAdminIdentity;
-  if (!getAdminIdentity) {
-    return null;
-  }
-  try {
-    const identity = await getAdminIdentity();
-    if (!identity) {
-      return null;
-    }
-    return identity;
-  } catch {
-    // Missing admin identity is treated as an unauthenticated request.
-    return null;
-  }
-}
-
-export const prepareUploadUrls = action({
+// Bundle import is an administrative operation. Keep both functions internal so
+// they cannot be invoked by an arbitrary Convex client. The deployment bridge
+// (or a one-off admin action) must call these through an internal function
+// reference after authenticating the operator out of band.
+export const prepareUploadUrls = internalAction({
   args: {
     assets: v.array(
       v.object({
@@ -85,7 +73,6 @@ export const prepareUploadUrls = action({
     ),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
     const uploads = await Promise.all(
       args.assets.map(async (asset) => ({
         key: asset.key,
@@ -96,7 +83,7 @@ export const prepareUploadUrls = action({
   },
 });
 
-export const ingestBundle = mutation({
+export const ingestBundle = internalMutation({
   args: {
     bundle: v.object({
       seasons: v.array(seasonPayload),
@@ -106,8 +93,6 @@ export const ingestBundle = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
-
     const existingCat = await ctx.db.query("catdex").first();
     const existingCollection = await ctx.db.query("collection").first();
 
@@ -298,6 +283,11 @@ async function insertCatdexRecords(
       approved: record.approved,
       createdAt,
       updatedAt,
+      thumbnailStatus:
+        record.defaultCardThumb &&
+        (!record.customCard || record.customCardThumb)
+          ? "complete"
+          : "pending",
       defaultCardStorageId: storageId(record.defaultCard.storageId),
       defaultCardName: record.defaultCard.fileName,
     };

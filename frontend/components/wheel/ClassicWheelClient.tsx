@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 import {
   CLASSIC_WHEEL_ITEMS,
   CLASSIC_WHEEL_PRIZES,
-  pickClassicWheelPrize,
   type ClassicWheelPrize,
+  pickClassicWheelPrize,
 } from "@/lib/wheel/classicWheel";
 
 export function ClassicWheelClient() {
@@ -35,9 +35,26 @@ export function ClassicWheelClient() {
   );
   const [wasForced, setWasForced] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [clientKey] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const storageKey = "classic-wheel:client-key";
+      const existing = window.localStorage.getItem(storageKey);
+      if (existing && /^[A-Za-z0-9_-]{16,80}$/.test(existing)) {
+        return existing;
+      }
+      const generated =
+        window.crypto?.randomUUID?.() ??
+        `${Date.now()}-${window.crypto.getRandomValues(new Uint32Array(1))[0]}`;
+      window.localStorage.setItem(storageKey, generated);
+      return generated;
+    } catch {
+      return null;
+    }
+  });
 
   const logSpin = useMutation(api.wheel.logSpin);
-  const stats = useQuery(api.wheel.stats);
+  const stats = useQuery(api.wheel.stats, {});
 
   const prizeStats = useMemo(() => {
     const map = new Map<string, { count: number }>();
@@ -306,6 +323,7 @@ export function ClassicWheelClient() {
             prizeName: stored.prize.name,
             forced: false,
             randomBucket: stored.randomBucket,
+            clientKey: clientKey ?? undefined,
           }).catch((error) => {
             console.error("Failed to log wheel spin", error);
           });
@@ -328,7 +346,7 @@ export function ClassicWheelClient() {
         1,
       );
     },
-    [isSpinning, logSpin, triggerCelebration],
+    [clientKey, isSpinning, logSpin, triggerCelebration],
   );
 
   const closeModal = useCallback(() => {
@@ -382,13 +400,22 @@ export function ClassicWheelClient() {
           <h2 className="text-lg font-semibold text-foreground">
             Wheel summary
           </h2>
+          {stats?.truncated && (
+            <p className="mt-2 text-xs text-amber-200/80">
+              Showing statistics from the latest{" "}
+              {stats.sampleSize.toLocaleString()} logged spins. Older spins are
+              omitted from these totals.
+            </p>
+          )}
           <div className="mt-4 overflow-hidden rounded-2xl border border-border/30 bg-background/80">
             <table className="w-full text-sm">
               <thead className="text-xs uppercase tracking-wide text-muted-foreground/70">
                 <tr className="border-b border-border/20">
                   <th className="px-4 py-2 text-left">Prize</th>
                   <th className="px-4 py-2 text-right">Chance</th>
-                  <th className="px-4 py-2 text-right">Spins</th>
+                  <th className="px-4 py-2 text-right">
+                    {stats?.truncated ? "Spins in sample" : "Spins"}
+                  </th>
                 </tr>
               </thead>
               <tbody>

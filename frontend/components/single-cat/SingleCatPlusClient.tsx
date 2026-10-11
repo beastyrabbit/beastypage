@@ -2451,6 +2451,8 @@ export function SingleCatPlusClient({
             ...catStateRef.current,
             profileId: result.id,
             mapperSlug: shareToken,
+            editToken:
+              result.editToken ?? catStateRef.current.editToken ?? null,
             legacyEncoded,
             shareUrl: url,
             catShareSlug: shareSlug ?? catStateRef.current.catShareSlug ?? null,
@@ -2538,6 +2540,7 @@ export function SingleCatPlusClient({
         shareUrl: null,
         profileId: null,
         mapperSlug: null,
+        editToken: null,
         legacyEncoded: catStateRef.current?.legacyEncoded ?? null,
         catShareSlug: catStateRef.current?.catShareSlug ?? null,
         catName: null,
@@ -3049,6 +3052,7 @@ export function SingleCatPlusClient({
           ...state,
           profileId: result.id,
           mapperSlug: shareToken,
+          editToken: result.editToken ?? state.editToken ?? null,
           legacyEncoded,
           shareUrl: url,
           catShareSlug: shareSlug ?? state.catShareSlug ?? null,
@@ -3145,6 +3149,7 @@ export function SingleCatPlusClient({
         id: state.profileId as Id<"cat_profile">,
         catName: trimmedCat || undefined,
         creatorName: trimmedCreator || undefined,
+        editToken: state.editToken ?? undefined,
       });
       if (result && catStateRef.current) {
         catStateRef.current = {

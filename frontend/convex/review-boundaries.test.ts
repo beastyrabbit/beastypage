@@ -9,6 +9,116 @@ import schema from "./schema";
 const modules = import.meta.glob("./**/*.ts");
 afterEach(() => vi.unstubAllEnvs());
 
+describe("anonymous capability ownership", () => {
+  it("does not treat two missing identities as the same owner", async () => {
+    const t = convexTest(schema, modules);
+    const cases = [
+      {
+        slug: "sharefixture",
+        create: () =>
+          t.mutation(api.catShares.create, {
+            slug: "sharefixture",
+            data: { params: {} },
+          }),
+        update: () =>
+          t.mutation(api.catShares.create, {
+            slug: "sharefixture",
+            data: { params: { changed: true } },
+          }),
+      },
+      {
+        slug: "dashfixture",
+        create: () =>
+          t.mutation(api.dashSettings.save, {
+            slug: "dashfixture",
+            config: { value: 1 },
+          }),
+        update: () =>
+          t.mutation(api.dashSettings.save, {
+            slug: "dashfixture",
+            config: { value: 2 },
+          }),
+      },
+      {
+        slug: "palettefixture",
+        create: () =>
+          t.mutation(api.paletteGeneratorSettings.save, {
+            slug: "palettefixture",
+            config: { value: 1 },
+          }),
+        update: () =>
+          t.mutation(api.paletteGeneratorSettings.save, {
+            slug: "palettefixture",
+            config: { value: 2 },
+          }),
+      },
+      {
+        slug: "pixelatorfixture",
+        create: () =>
+          t.mutation(api.pixelatorSettings.save, {
+            slug: "pixelatorfixture",
+            config: { value: 1 },
+          }),
+        update: () =>
+          t.mutation(api.pixelatorSettings.save, {
+            slug: "pixelatorfixture",
+            config: { value: 2 },
+          }),
+      },
+      {
+        slug: "singlecatfixture",
+        create: () =>
+          t.mutation(api.singleCatSettings.save, {
+            slug: "singlecatfixture",
+            config: { value: 1 },
+          }),
+        update: () =>
+          t.mutation(api.singleCatSettings.save, {
+            slug: "singlecatfixture",
+            config: { value: 2 },
+          }),
+      },
+    ];
+
+    for (const entry of cases) {
+      await entry.create();
+      await expect(entry.update()).rejects.toThrow(/Not authorized/);
+    }
+  });
+
+  it("requires the mapper edit token for anonymous metadata updates", async () => {
+    const t = convexTest(schema, modules);
+    const profile = await t.mutation(api.mapper.create, {
+      catData: { mode: "wizard-timeline", params: {} },
+    });
+    const id = profile.id as Id<"cat_profile">;
+    const publicProfile = await t.query(api.mapper.getBySlug, {
+      slugOrId: profile.slug,
+    });
+    expect(JSON.stringify(publicProfile)).not.toContain(profile.editToken);
+
+    await expect(
+      t.mutation(api.mapper.updateMeta, {
+        id,
+        catName: "Blocked",
+      }),
+    ).rejects.toThrow("Not authorized");
+
+    const updated = await t.mutation(api.mapper.updateMeta, {
+      id,
+      catName: "Named",
+      creatorName: "Creator",
+      editToken: profile.editToken,
+    });
+    expect(updated).toMatchObject({
+      id: profile.id,
+      catName: "Named",
+      creatorName: "Creator",
+    });
+    expect(JSON.stringify(updated)).not.toContain(profile.editToken);
+  });
+});
+
 describe("adoption authority", () => {
   it("keeps editor capabilities private and requires them to attach profiles and edit batches", async () => {
     const t = convexTest(schema, modules);
@@ -147,6 +257,45 @@ describe("legacy voting transactions", () => {
     });
   });
 
+  it("bounds anonymous participant creation per session", async () => {
+    const t = convexTest(schema, modules);
+    const host = t.withIdentity({
+      subject: "participant-limit-host",
+      issuer: "https://identity.example",
+    });
+    const session = await host.mutation(api.streamSessionsV2.create, {
+      viewerKey: "participant-limit",
+      status: "live",
+      currentStep: "colour",
+      allowedOptions: ["WHITE"],
+    });
+    const sessionId = session!.id as Id<"stream_sessions">;
+    for (let index = 0; index < 500; index += 1) {
+      await t.mutation(api.streamParticipantsV2.create, {
+        sessionId,
+        viewerSession: `participant-token-${index.toString().padStart(30, "0")}`,
+        displayName: `Viewer ${index}`,
+        status: "active",
+      });
+    }
+    await expect(
+      t.mutation(api.streamParticipantsV2.create, {
+        sessionId,
+        viewerSession: `participant-token-${"0".padStart(30, "0")}`,
+        displayName: "Viewer 0",
+        status: "active",
+      }),
+    ).resolves.toMatchObject({ display_name: "Viewer 0" });
+    await expect(
+      t.mutation(api.streamParticipantsV2.create, {
+        sessionId,
+        viewerSession: "participant-token-overflow-000000000000000000",
+        displayName: "Overflow",
+        status: "active",
+      }),
+    ).rejects.toThrow("participant limit");
+  });
+
   it("admits host choices before opening viewer voting on creation and advancement", async () => {
     const t = convexTest(schema, modules);
     const host = t.withIdentity({
@@ -276,6 +425,44 @@ describe("legacy voting transactions", () => {
         ).map((session) => session.id),
       ).toEqual([active!.id]);
     }
+  });
+
+  it("keeps viewer links unique and immutable", async () => {
+    const t = convexTest(schema, modules);
+    const host = t.withIdentity({
+      subject: "host",
+      issuer: "https://identity.example",
+    });
+    const other = t.withIdentity({
+      subject: "other",
+      issuer: "https://identity.example",
+    });
+    const session = await host.mutation(api.streamSessionsV2.create, {
+      viewerKey: "stable-viewer-key",
+      status: "live",
+    });
+    if (!session) throw new Error("Session was not created");
+    const sessionId = session.id as Id<"stream_sessions">;
+
+    await expect(
+      other.mutation(api.streamSessionsV2.create, {
+        viewerKey: "stable-viewer-key",
+        status: "live",
+      }),
+    ).rejects.toThrow("Viewer key already in use");
+    await expect(
+      host.mutation(api.streamSessionsV2.update, {
+        id: sessionId,
+        viewerKey: "attacker-selected-key",
+      }),
+    ).rejects.toThrow("Viewer key cannot be changed");
+
+    expect(
+      await t.query(api.streamSessionsV2.list, {
+        viewerKey: "stable-viewer-key",
+        limit: 1,
+      }),
+    ).toMatchObject([{ id: sessionId, viewer_key: "stable-viewer-key" }]);
   });
 
   it("enforces host, membership, choice, round, and one participant vote", async () => {
@@ -444,6 +631,30 @@ it("paginates approved cards without including pending records", async () => {
   );
   expect(next.isDone).toBe(true);
   expect(await t.query(api.catdex.hasPending, {})).toBe(true);
+});
+
+it("generates bounded managed upload reservations for Catdex submissions", async () => {
+  vi.stubEnv("CONVEX_SITE_URL", "https://fixture.convex.site");
+  const t = convexTest(schema, modules);
+  const clientKey = "fixture-client-key";
+  await expect(
+    t.mutation(api.catdex.generateUploadUrl, { clientKey }),
+  ).resolves.toMatch(/\/catdex\/upload\?token=/);
+  await expect(
+    t.run((ctx) => ctx.db.query("catdex_uploads").take(100)),
+  ).resolves.toHaveLength(1);
+
+  for (let i = 0; i < 11; i += 1) {
+    await t.mutation(api.catdex.generateUploadUrl, { clientKey });
+  }
+  await expect(
+    t.mutation(api.catdex.generateUploadUrl, { clientKey }),
+  ).rejects.toThrow("Too many pending uploads");
+  await expect(
+    t.mutation(api.catdex.generateUploadUrl, {
+      clientKey: "another-client-key",
+    }),
+  ).resolves.toMatch(/\/catdex\/upload\?token=/);
 });
 
 it("resets only the authenticated user's variants and preserves the account", async () => {

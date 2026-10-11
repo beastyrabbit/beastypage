@@ -16,6 +16,7 @@ import {
   getCoatPatternName,
 } from "@/lib/cat-v3/coatPatterns";
 import type { CatParams } from "@/lib/cat-v3/types";
+import { readMapperEditToken } from "@/lib/mapperEditToken";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { cn } from "@/lib/utils";
 
@@ -348,6 +349,7 @@ export function GuidedTimelineViewer({
         id: recordId as Id<"cat_profile">,
         catName: trimmedCat || undefined,
         creatorName: trimmedCreator || undefined,
+        editToken: (slug ? readMapperEditToken(slug) : null) ?? undefined,
       });
       const resolvedName = result?.catName ?? (trimmedCat || null);
       const resolvedCreator = result?.creatorName ?? (trimmedCreator || null);

@@ -51,6 +51,21 @@ async function enqueueJob(
   return jobId;
 }
 
+async function dispatchNextPendingJob(ctx: MutationCtx) {
+  const next = await ctx.db
+    .query("quick_share_jobs")
+    .withIndex("by_status_and_createdAt", (q) => q.eq("status", "pending"))
+    .first();
+  if (next) {
+    // Let the finishing worker return its response and release local capacity.
+    // An atomic lease makes duplicate wake-ups from other replicas harmless.
+    await ctx.scheduler.runAfter(1_000, internal.quickShareHttp.dispatchJob, {
+      jobId: next._id,
+      attempt: 0,
+    });
+  }
+}
+
 function publicUpload(doc: Doc<"quick_share_uploads">) {
   return {
     id: doc._id,
@@ -81,7 +96,6 @@ async function reserveUsage(
   tier: QuickShareTier,
   bytes: number,
   now: number,
-  collectionItem = false,
 ) {
   const policy = policyForTier(tier);
   const active = await ctx.db
@@ -89,9 +103,12 @@ async function reserveUsage(
     .withIndex("by_rateIdentity_and_active", (q) =>
       q.eq("rateIdentity", identity).eq("active", true),
     )
-    .collect();
-  const activeShares = new Set(active.map((upload) => upload.slug));
-  if (!collectionItem && activeShares.size >= policy.active) {
+    // The active limit applies to every stored media item. Collection items
+    // share a public slug, but each still occupies storage and processing
+    // capacity. Keep this query bounded so an abusive account cannot make
+    // limit checks scan its entire history.
+    .take(policy.active);
+  if (active.length >= policy.active) {
     throw new Error("ACTIVE_LIMIT");
   }
 
@@ -122,7 +139,7 @@ async function reserveUsage(
           .eq("windowStart", window.start),
       )
       .unique();
-    const nextStarts = (row?.starts ?? 0) + (collectionItem ? 0 : 1);
+    const nextStarts = (row?.starts ?? 0) + 1;
     const nextBytes = (row?.bytes ?? 0) + bytes;
     if (nextStarts > window.startsLimit) throw new Error("HOURLY_LIMIT");
     if (nextBytes > window.bytesLimit) throw new Error("DAILY_BYTES_LIMIT");
@@ -182,22 +199,7 @@ export const createUpload = internalMutation({
     if (args.slug.length !== QUICK_SHARE_POLICY.publicIdLength) {
       throw new Error("INVALID_SLUG");
     }
-    const existingSlugs = await ctx.db
-      .query("quick_share_uploads")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .collect();
-    if (existingSlugs.length > 0) {
-      const collectionOwner = existingSlugs[0];
-      if (
-        !args.collectionReceiptHash ||
-        collectionOwner.receiptHash !== args.collectionReceiptHash ||
-        collectionOwner.rateIdentity !== args.rateIdentity ||
-        collectionOwner.ipHash !== args.ipHash ||
-        !collectionOwner.active
-      ) {
-        throw new Error("SLUG_COLLISION");
-      }
-    }
+    await assertCollectionAdmission(ctx, args);
     const ban = await ctx.db
       .query("quick_share_bans")
       .withIndex("by_ipHash_and_active", (q) =>
@@ -212,7 +214,6 @@ export const createUpload = internalMutation({
       args.tier,
       args.originalSize,
       args.now,
-      existingSlugs.length > 0,
     );
 
     const publicExpiresAt =
@@ -250,6 +251,66 @@ export const createUpload = internalMutation({
     return { id, slug: args.slug, publicExpiresAt, retainedUntil };
   },
 });
+
+async function assertCollectionAdmission(
+  ctx: MutationCtx,
+  args: {
+    slug: string;
+    collectionReceiptHash?: string;
+    rateIdentity: string;
+    ipHash: string;
+    now: number;
+  },
+) {
+  const slugExists = await ctx.db
+    .query("quick_share_uploads")
+    .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+    .first();
+  if (!slugExists) return;
+
+  const receiptRows = args.collectionReceiptHash
+    ? await ctx.db
+        .query("quick_share_uploads")
+        .withIndex("by_receiptHash", (q) =>
+          q.eq("receiptHash", args.collectionReceiptHash as string),
+        )
+        .take(QUICK_SHARE_POLICY.collectionMaxItems + 1)
+    : [];
+  if (!receiptRows.some((candidate) => isCollectionOwner(candidate, args))) {
+    throw new Error("SLUG_COLLISION");
+  }
+
+  const activeSlugs = await ctx.db
+    .query("quick_share_uploads")
+    .withIndex("by_slug_and_active_and_retainedUntil", (q) =>
+      q.eq("slug", args.slug).eq("active", true).gt("retainedUntil", args.now),
+    )
+    .take(QUICK_SHARE_POLICY.collectionMaxItems + 1);
+  if (activeSlugs.length >= QUICK_SHARE_POLICY.collectionMaxItems) {
+    throw new Error("COLLECTION_LIMIT");
+  }
+}
+
+function isCollectionOwner(
+  candidate: Doc<"quick_share_uploads">,
+  args: {
+    slug: string;
+    collectionReceiptHash?: string;
+    rateIdentity: string;
+    ipHash: string;
+    now: number;
+  },
+) {
+  return (
+    candidate.slug === args.slug &&
+    candidate.receiptHash === args.collectionReceiptHash &&
+    candidate.rateIdentity === args.rateIdentity &&
+    candidate.ipHash === args.ipHash &&
+    candidate.active &&
+    candidate.state !== "removed" &&
+    candidate.retainedUntil > args.now
+  );
+}
 
 export const getUpload = internalQuery({
   args: {
@@ -500,8 +561,15 @@ export const getPublicCollection = internalQuery({
   handler: async (ctx, args) => {
     const uploads = await ctx.db
       .query("quick_share_uploads")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .collect();
+      .withIndex("by_slug_and_active_and_state_and_publicExpiresAt", (q) =>
+        q
+          .eq("slug", args.slug)
+          .eq("active", true)
+          .eq("state", "ready")
+          .gt("publicExpiresAt", args.now),
+      )
+      .order("desc")
+      .take(QUICK_SHARE_POLICY.collectionMaxItems);
     return uploads
       .filter(
         (upload) =>
@@ -631,7 +699,7 @@ export const retryDispatchJob = internalMutation({
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get("quick_share_jobs", args.jobId);
-    if (!job || job.status !== "pending") return null;
+    if (job?.status !== "pending") return null;
     await ctx.scheduler.runAfter(0, internal.quickShareHttp.dispatchJob, {
       jobId: job._id,
       attempt: args.attempt,
@@ -717,6 +785,7 @@ export const finishProcessJob = internalMutation({
       leaseExpiresAt: undefined,
       updatedAt: args.now,
     });
+    await dispatchNextPendingJob(ctx);
     return { accepted: upload?.state === "processing" && upload.active };
   },
 });
@@ -729,10 +798,24 @@ export const adminList = internalQuery({
   handler: async (ctx, args) => {
     let uploads: Array<Doc<"quick_share_uploads">>;
     if (args.slug) {
-      uploads = await ctx.db
+      const activeUploads = await ctx.db
+        .query("quick_share_uploads")
+        .withIndex("by_slug_and_active_and_retainedUntil", (q) =>
+          q
+            .eq("slug", args.slug as string)
+            .eq("active", true)
+            .gt("retainedUntil", Date.now()),
+        )
+        .take(QUICK_SHARE_POLICY.collectionMaxItems);
+      const seen = new Set(activeUploads.map((upload) => upload._id));
+      const historicalUploads = await ctx.db
         .query("quick_share_uploads")
         .withIndex("by_slug", (q) => q.eq("slug", args.slug as string))
-        .collect();
+        .take(QUICK_SHARE_POLICY.collectionMaxItems);
+      uploads = [
+        ...activeUploads,
+        ...historicalUploads.filter((upload) => !seen.has(upload._id)),
+      ].slice(0, QUICK_SHARE_POLICY.collectionMaxItems);
     } else if (args.ipHash) {
       uploads = await ctx.db
         .query("quick_share_uploads")
@@ -961,8 +1044,8 @@ export const maintenance = internalMutation({
     const now = Date.now();
     const abandoned = await ctx.db
       .query("quick_share_uploads")
-      .withIndex("by_state_and_createdAt", (q) =>
-        q.eq("state", "uploading").lte("createdAt", now - 60 * 60 * 1000),
+      .withIndex("by_state_and_updatedAt", (q) =>
+        q.eq("state", "uploading").lte("updatedAt", now - 60 * 60 * 1000),
       )
       .take(50);
     for (const upload of abandoned) {
@@ -1058,6 +1141,7 @@ export const finishDeleteJob = internalMutation({
     await ctx.db.delete(job._id);
     const upload = await ctx.db.get("quick_share_uploads", uploadId);
     if (upload) await ctx.db.delete(upload._id);
+    await dispatchNextPendingJob(ctx);
     return null;
   },
 });
@@ -1076,6 +1160,7 @@ export const policy = internalQuery({
       smallLifetimeMs: selected.smallLifetimeMs,
       largeLifetimeMs: selected.largeLifetimeMs,
       chunkBytes: QUICK_SHARE_POLICY.chunkBytes,
+      collectionMaxItems: QUICK_SHARE_POLICY.collectionMaxItems,
     };
   },
 });

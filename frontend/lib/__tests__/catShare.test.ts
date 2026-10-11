@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  createCatShare,
   decodeCatShare,
   encodeCatShare,
   prepareCatShare,
@@ -18,6 +19,28 @@ function decodeStoredPayload(encoded: string): Record<string, unknown> {
 
 describe("cat share codec", () => {
   afterEach(() => vi.unstubAllGlobals());
+
+  it("forwards the edit capability for slug updates", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ slug: "saved", id: "share-id" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createCatShare(
+      { params: { colour: "WHITE" } },
+      { slug: "saved", editToken: "capability-token" },
+    );
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toMatchObject(
+      {
+        slug: "saved",
+        editToken: "capability-token",
+      },
+    );
+  });
 
   it("round-trips JSON shares without structuredClone", async () => {
     vi.stubGlobal("structuredClone", undefined);

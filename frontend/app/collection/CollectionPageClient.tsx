@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
@@ -13,7 +13,11 @@ import type { CollectionEntry } from "@/convex/collection";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
 
 export default function CollectionPage() {
-  const entries = useQuery(api.collection.list, {});
+  const {
+    results: entries,
+    status: pageStatus,
+    loadMore,
+  } = usePaginatedQuery(api.collection.page, {}, { initialNumItems: 36 });
   const [search, setSearch] = useState("");
   const [activeEntry, setActiveEntry] = useState<CollectionEntry | null>(null);
 
@@ -58,7 +62,7 @@ export default function CollectionPage() {
     };
   }, [activeEntry]);
 
-  const isLoading = !entries;
+  const isLoading = pageStatus === "LoadingFirstPage";
 
   const filteredEntries = useMemo(() => {
     if (!entries) return [] as CollectionEntry[];
@@ -114,7 +118,7 @@ export default function CollectionPage() {
           </p>
           <div className="flex flex-wrap items-center gap-3 text-xs mt-2">
             <span className="rounded-full bg-sky-500/10 px-3 py-1 font-bold text-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.2)]">
-              {safeEntries.length} items
+              {safeEntries.length} items loaded
             </span>
             <span className="rounded-full bg-white/5 px-3 py-1 text-muted-foreground border border-white/5">
               {filteredEntries.length} showing
@@ -133,6 +137,12 @@ export default function CollectionPage() {
             onChange={(event) => setSearch(event.target.value)}
           />
         </label>
+        {pageStatus !== "Exhausted" && (
+          <p className="text-xs text-muted-foreground">
+            Search applies to the artwork loaded so far. Load more artwork to
+            include older pieces.
+          </p>
+        )}
       </section>
 
       {filteredEntries.length === 0 ? (
@@ -194,6 +204,19 @@ export default function CollectionPage() {
             );
           })}
         </section>
+      )}
+
+      {pageStatus !== "Exhausted" && safeEntries.length > 0 && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            disabled={pageStatus !== "CanLoadMore"}
+            onClick={() => loadMore(36)}
+            className="rounded-full border border-sky-400/50 bg-sky-500/15 px-5 py-2.5 text-sm font-semibold text-sky-200 transition hover:bg-sky-500/25 disabled:cursor-wait disabled:opacity-50"
+          >
+            {pageStatus === "LoadingMore" ? "Loading…" : "Load more artwork"}
+          </button>
+        </div>
       )}
 
       <footer className="rounded-2xl border border-white/5 bg-white/5 p-6 text-xs text-muted-foreground text-center">

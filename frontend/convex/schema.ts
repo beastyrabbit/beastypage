@@ -114,7 +114,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("byName", ["seasonName"])
-    .index("byShort", ["shortName"]),
+    .index("byShort", ["shortName"])
+    .index("byCreatedAt", ["createdAt"]),
 
   rarity: defineTable({
     rarityName: v.string(),
@@ -147,13 +148,46 @@ export default defineSchema({
     customCardThumbStorageId: v.optional(v.id("_storage")),
     customCardThumbWidth: v.optional(v.number()),
     customCardThumbHeight: v.optional(v.number()),
+    thumbnailStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("processing"),
+        v.literal("complete"),
+        v.literal("failed"),
+      ),
+    ),
+    thumbnailAttemptedAt: v.optional(v.number()),
+    thumbnailAttemptCount: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("bySeason", ["seasonId"])
     .index("byRarity", ["rarityId"])
     .index("byApproval", ["approved"])
-    .index("byOwner", ["twitchUserName"]),
+    .index("byOwner", ["twitchUserName"])
+    .index("byThumbnailStatusAndAttemptedAt", [
+      "thumbnailStatus",
+      "thumbnailAttemptedAt",
+    ]),
+
+  catdex_uploads: defineTable({
+    token: v.string(),
+    rateKey: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("attached"),
+      v.literal("consumed"),
+    ),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("byToken", ["token"])
+    .index("byStorageId", ["storageId"])
+    .index("byCreatedAt", ["createdAt"])
+    .index("byRateKeyAndCreatedAt", ["rateKey", "createdAt"])
+    .index("byExpiresAt", ["expiresAt"]),
 
   collection: defineTable({
     artistName: v.string(),
@@ -173,7 +207,9 @@ export default defineSchema({
     focusY: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("byArtist", ["artistName"]),
+  })
+    .index("byArtist", ["artistName"])
+    .index("byCreated", ["createdAt"]),
 
   coinflipper_scores: defineTable({
     playerName: v.string(),
@@ -220,6 +256,8 @@ export default defineSchema({
   cat_shares: defineTable({
     slug: v.string(),
     data: v.any(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("bySlug", ["slug"])
@@ -228,6 +266,8 @@ export default defineSchema({
   single_cat_settings: defineTable({
     slug: v.string(),
     config: v.any(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -322,10 +362,12 @@ export default defineSchema({
     prizeName: v.string(),
     forced: v.boolean(),
     randomBucket: v.optional(v.number()),
+    actorKey: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("byPrize", ["prizeName"])
-    .index("byCreated", ["createdAt"]),
+    .index("byCreated", ["createdAt"])
+    .index("byActorKeyAndCreatedAt", ["actorKey", "createdAt"]),
 
   discord_challenge: defineTable({
     token: v.string(),
@@ -363,9 +405,24 @@ export default defineSchema({
     .index("byClient", ["clientId", "createdAt"])
     .index("byCats", ["catAId", "catBId", "createdAt"]),
 
+  perfect_matchups: defineTable({
+    clientId: v.string(),
+    catAId: v.id("perfect_cats"),
+    catBId: v.id("perfect_cats"),
+    token: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    consumed: v.boolean(),
+  })
+    .index("byClient", ["clientId"])
+    .index("byExpiresAt", ["expiresAt"])
+    .index("byConsumedAndExpiresAt", ["consumed", "expiresAt"]),
+
   palette_generator_settings: defineTable({
     slug: v.string(),
     config: v.any(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -375,6 +432,8 @@ export default defineSchema({
   pixelator_settings: defineTable({
     slug: v.string(),
     config: v.any(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -384,6 +443,8 @@ export default defineSchema({
   dash_settings: defineTable({
     slug: v.string(),
     config: v.any(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -407,6 +468,8 @@ export default defineSchema({
 
   ancestry_tree: defineTable({
     slug: v.string(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     name: v.string(),
     foundingMotherId: v.string(),
     foundingFatherId: v.string(),
@@ -458,6 +521,9 @@ export default defineSchema({
   users: defineTable({
     tokenIdentifier: v.string(),
     username: v.optional(v.string()),
+    // Lower-case username used by case-insensitive prefix search. Optional
+    // during the online backfill of legacy user documents.
+    usernameSearch: v.optional(v.string()),
     showProfilePic: v.boolean(),
     apiKey: v.optional(v.string()),
     createdAt: v.number(),
@@ -465,7 +531,15 @@ export default defineSchema({
   })
     .index("byTokenIdentifier", ["tokenIdentifier"])
     .index("byUsername", ["username"])
+    .index("byUsernameSearch", ["usernameSearch"])
     .index("byApiKey", ["apiKey"]),
+
+  user_search_migrations: defineTable({
+    name: v.string(),
+    cursor: v.optional(v.string()),
+    complete: v.boolean(),
+    updatedAt: v.number(),
+  }).index("byName", ["name"]),
 
   cat_stream_sessions: defineTable({
     userId: v.id("users"),
@@ -556,6 +630,17 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_slug", ["slug"])
+    .index("by_slug_and_active_and_retainedUntil", [
+      "slug",
+      "active",
+      "retainedUntil",
+    ])
+    .index("by_slug_and_active_and_state_and_publicExpiresAt", [
+      "slug",
+      "active",
+      "state",
+      "publicExpiresAt",
+    ])
     .index("by_receiptHash", ["receiptHash"])
     .index("by_ownerTokenIdentifier_and_publicExpiresAt", [
       "ownerTokenIdentifier",
@@ -565,6 +650,7 @@ export default defineSchema({
     .index("by_ipHash_and_active", ["ipHash", "active"])
     .index("by_ipHash_and_createdAt", ["ipHash", "createdAt"])
     .index("by_state_and_createdAt", ["state", "createdAt"])
+    .index("by_state_and_updatedAt", ["state", "updatedAt"])
     .index("by_active_and_publicExpiresAt", ["active", "publicExpiresAt"])
     .index("by_retainedUntil", ["retainedUntil"]),
 

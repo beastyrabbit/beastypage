@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1.25
 
 # Stage 1: Install dependencies
-FROM node:24-alpine AS deps
+FROM node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS deps
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Build application
-FROM node:24-alpine AS builder
+FROM node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS builder
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
@@ -44,7 +44,7 @@ RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
 RUN pnpm run build
 
 # Stage 3: Production image (Node-based for standalone compatibility)
-FROM node:24-alpine AS runner
+FROM node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runner
 WORKDIR /app
 
 ARG CAT_SYSTEM_CATALOG_HASH=unknown

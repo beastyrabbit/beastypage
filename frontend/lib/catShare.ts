@@ -231,10 +231,14 @@ export function prepareCatShare(data: EncodePayload): CatShareStoredPayload {
 export type CreateCatShareResult = {
   slug: string;
   id?: string | null;
+  editToken?: string | null;
   payload: CatShareStoredPayload;
 };
 
-type CreateCatShareOptions = { slug?: string };
+type CreateCatShareOptions = {
+  slug?: string;
+  editToken?: string | null;
+};
 
 export async function createCatShare(
   data: EncodePayload,
@@ -250,7 +254,11 @@ export async function createCatShare(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
-      body: JSON.stringify({ slug: options?.slug, data: payload }),
+      body: JSON.stringify({
+        slug: options?.slug,
+        editToken: options?.editToken ?? undefined,
+        data: payload,
+      }),
     });
     if (!response.ok) {
       throw new Error(`createCatShare: unexpected status ${response.status}`);
@@ -258,9 +266,15 @@ export async function createCatShare(
     const json = (await response.json()) as {
       slug?: string;
       id?: string | null;
+      editToken?: string | null;
     };
     if (!json.slug) throw new Error("createCatShare: response missing slug");
-    return { slug: json.slug, id: json.id ?? null, payload };
+    return {
+      slug: json.slug,
+      id: json.id ?? null,
+      editToken: json.editToken ?? null,
+      payload,
+    };
   } catch (error) {
     console.error("Failed to create cat share", error);
     return null;

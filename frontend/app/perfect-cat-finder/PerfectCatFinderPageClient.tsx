@@ -27,6 +27,7 @@ import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { renderCatV3 } from "@/lib/cat-v3/api";
 import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { createCatShare, encodeCatShare } from "@/lib/catShare";
+import { createPerfectCatClientId } from "./client-token";
 
 const PALETTE_MODES = [
   "off",
@@ -68,7 +69,24 @@ type MatchupResponse = {
   cats: MatchupCat[];
   needsSeed: number;
   totalCats: number;
+  totalCatsCapped?: boolean;
+  matchupToken?: string;
 };
+
+function matchupLoadErrorMessage(error: unknown): string {
+  if (error && typeof error === "object" && "data" in error) {
+    const data = (error as { data?: unknown }).data;
+    if (
+      data &&
+      typeof data === "object" &&
+      "code" in data &&
+      data.code === "matchups_full"
+    ) {
+      return "Matchup capacity is temporarily full. Please try again shortly.";
+    }
+  }
+  return error instanceof Error ? error.message : "Failed to load matchup";
+}
 
 type SeedResult = {
   requested: number;
@@ -112,18 +130,10 @@ async function seedForMatchup(
   return false;
 }
 
-function useClientToken(key: string): string | null {
+function useClientToken(): string | null {
   const [token] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
-    const storageKey = `pcf:${key}`;
-    let existing = window.localStorage.getItem(storageKey);
-    if (!existing) {
-      existing =
-        window.crypto?.randomUUID?.() ??
-        `${Date.now()}-${window.crypto.getRandomValues(new Uint32Array(1))[0]}`;
-      window.localStorage.setItem(storageKey, existing);
-    }
-    return existing;
+    return createPerfectCatClientId();
   });
 
   return token;
@@ -273,7 +283,7 @@ function CatCard({
 }
 
 export default function PerfectCatFinderPage() {
-  const clientId = useClientToken("device");
+  const clientId = useClientToken();
   const requestMatchup = useMutation(api.perfectCats.requestMatchup);
   const registerCats = useMutation(api.perfectCats.registerCats);
   const submitVote = useMutation(api.perfectCats.submitVote);
@@ -284,7 +294,9 @@ export default function PerfectCatFinderPage() {
   const [message, setMessage] = useState<string | null>(null);
   const messageTimeoutRef = useRef<number | null>(null);
   const [matchup, setMatchup] = useState<MatchupCat[]>([]);
+  const [matchupToken, setMatchupToken] = useState<string | null>(null);
   const [poolSize, setPoolSize] = useState(0);
+  const [poolSizeCapped, setPoolSizeCapped] = useState(false);
   const [loading, setLoading] = useState(true);
   const [voteBusy, setVoteBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -362,17 +374,20 @@ export default function PerfectCatFinderPage() {
           params: toCanonicalRenderPayload(cat.params),
         }));
         setMatchup(normalized);
+        setMatchupToken(response.matchupToken ?? null);
         setPoolSize(response.totalCats);
+        setPoolSizeCapped(Boolean(response.totalCatsCapped));
         normalized.forEach((cat) => void ensurePreview(cat));
         track("perfect_cat_matchup_loaded", {});
       } else {
         setMatchup([]);
+        setMatchupToken(null);
         setPoolSize(response.totalCats);
+        setPoolSizeCapped(Boolean(response.totalCatsCapped));
       }
     } catch (err) {
       console.error("Failed to load matchup", err);
-      const message =
-        err instanceof Error ? err.message : "Failed to load matchup";
+      const message = matchupLoadErrorMessage(err);
       setError(message);
       track("perfect_cat_matchup_load_failed", { message });
     } finally {
@@ -394,21 +409,26 @@ export default function PerfectCatFinderPage() {
       if (!loser) return;
       setVoteBusy(true);
       track("perfect_cat_vote", {});
+      let voteSucceeded = false;
       try {
         await submitVote({
           clientId,
           winnerId: winner.id,
           loserId: loser.id,
+          ...(matchupToken ? { matchupToken } : {}),
         });
+        voteSucceeded = true;
       } catch (err) {
         console.error("Failed to submit vote", err);
         setError(err instanceof Error ? err.message : "Failed to submit vote");
       } finally {
         setVoteBusy(false);
       }
-      await loadMatchup();
+      if (voteSucceeded) {
+        await loadMatchup();
+      }
     },
-    [clientId, loadMatchup, matchup, submitVote],
+    [clientId, loadMatchup, matchup, matchupToken, submitVote],
   );
 
   const handleCopySprite = useCallback(
@@ -537,20 +557,38 @@ export default function PerfectCatFinderPage() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         {isReady ? (
-          matchup.map((cat) => (
-            <CatCard
-              key={String(cat.id)}
-              cat={cat}
-              preview={getPreview(cat)}
-              disabled={voteBusy}
-              onVote={handleVote}
-              onInspect={(entry) => {
-                setSelectedCat(entry);
-                void ensurePreview(entry);
-                track("perfect_cat_inspected", { from: "matchup" });
-              }}
-            />
-          ))
+          <>
+            {error && (
+              <div
+                role="alert"
+                className="col-span-full flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+              >
+                <p>{error}</p>
+                <button
+                  type="button"
+                  disabled={voteBusy}
+                  onClick={() => void loadMatchup()}
+                  className="rounded-full border border-red-300/40 px-3 py-1.5 font-medium transition hover:bg-red-300/10 disabled:opacity-50"
+                >
+                  Load a new matchup
+                </button>
+              </div>
+            )}
+            {matchup.map((cat) => (
+              <CatCard
+                key={String(cat.id)}
+                cat={cat}
+                preview={getPreview(cat)}
+                disabled={voteBusy}
+                onVote={handleVote}
+                onInspect={(entry) => {
+                  setSelectedCat(entry);
+                  void ensurePreview(entry);
+                  track("perfect_cat_inspected", { from: "matchup" });
+                }}
+              />
+            ))}
+          </>
         ) : (
           <div className="col-span-full flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border/60 bg-background/60 py-16 text-sm text-muted-foreground">
             <Loader2 className="size-6 animate-spin text-primary" />
@@ -569,6 +607,7 @@ export default function PerfectCatFinderPage() {
           </div>
           <span className="inline-flex items-center gap-2 rounded-full border border-border/40 px-3 py-1 text-xs font-semibold text-muted-foreground">
             Pool size {poolSize}
+            {poolSizeCapped ? "+" : ""}
           </span>
         </div>
         <div className="overflow-hidden rounded-2xl border border-border/40">
