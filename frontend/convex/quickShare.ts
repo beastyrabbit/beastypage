@@ -199,38 +199,7 @@ export const createUpload = internalMutation({
     if (args.slug.length !== QUICK_SHARE_POLICY.publicIdLength) {
       throw new Error("INVALID_SLUG");
     }
-    const slugExists = await ctx.db
-      .query("quick_share_uploads")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
-      .first();
-    const activeSlugs = await ctx.db
-      .query("quick_share_uploads")
-      .withIndex("by_slug_and_active_and_retainedUntil", (q) =>
-        q
-          .eq("slug", args.slug)
-          .eq("active", true)
-          .gt("retainedUntil", args.now),
-      )
-      .take(QUICK_SHARE_POLICY.collectionMaxItems + 1);
-    if (slugExists) {
-      const receiptRows = args.collectionReceiptHash
-        ? await ctx.db
-            .query("quick_share_uploads")
-            .withIndex("by_receiptHash", (q) =>
-              q.eq("receiptHash", args.collectionReceiptHash as string),
-            )
-            .take(QUICK_SHARE_POLICY.collectionMaxItems + 1)
-        : [];
-      const collectionOwnerExists = receiptRows.some((candidate) =>
-        isCollectionOwner(candidate, args),
-      );
-      if (!collectionOwnerExists) {
-        throw new Error("SLUG_COLLISION");
-      }
-      if (activeSlugs.length >= QUICK_SHARE_POLICY.collectionMaxItems) {
-        throw new Error("COLLECTION_LIMIT");
-      }
-    }
+    await assertCollectionAdmission(ctx, args);
     const ban = await ctx.db
       .query("quick_share_bans")
       .withIndex("by_ipHash_and_active", (q) =>
@@ -282,6 +251,45 @@ export const createUpload = internalMutation({
     return { id, slug: args.slug, publicExpiresAt, retainedUntil };
   },
 });
+
+async function assertCollectionAdmission(
+  ctx: MutationCtx,
+  args: {
+    slug: string;
+    collectionReceiptHash?: string;
+    rateIdentity: string;
+    ipHash: string;
+    now: number;
+  },
+) {
+  const slugExists = await ctx.db
+    .query("quick_share_uploads")
+    .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+    .first();
+  if (!slugExists) return;
+
+  const receiptRows = args.collectionReceiptHash
+    ? await ctx.db
+        .query("quick_share_uploads")
+        .withIndex("by_receiptHash", (q) =>
+          q.eq("receiptHash", args.collectionReceiptHash as string),
+        )
+        .take(QUICK_SHARE_POLICY.collectionMaxItems + 1)
+    : [];
+  if (!receiptRows.some((candidate) => isCollectionOwner(candidate, args))) {
+    throw new Error("SLUG_COLLISION");
+  }
+
+  const activeSlugs = await ctx.db
+    .query("quick_share_uploads")
+    .withIndex("by_slug_and_active_and_retainedUntil", (q) =>
+      q.eq("slug", args.slug).eq("active", true).gt("retainedUntil", args.now),
+    )
+    .take(QUICK_SHARE_POLICY.collectionMaxItems + 1);
+  if (activeSlugs.length >= QUICK_SHARE_POLICY.collectionMaxItems) {
+    throw new Error("COLLECTION_LIMIT");
+  }
+}
 
 function isCollectionOwner(
   candidate: Doc<"quick_share_uploads">,
