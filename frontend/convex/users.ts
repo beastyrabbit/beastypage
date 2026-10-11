@@ -380,7 +380,7 @@ export const resolveUsernames = query({
             q.eq("tokenIdentifier", `${issuer}|${userId}`),
           )
           .unique();
-        return [userId, user?.username ?? "unknown"] as const;
+        return [userId, user?.username ?? userId] as const;
       }),
     );
     const byClerkId = new Map(resolvedUsers);

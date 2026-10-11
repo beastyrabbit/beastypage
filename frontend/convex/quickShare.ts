@@ -199,7 +199,11 @@ export const createUpload = internalMutation({
     if (args.slug.length !== QUICK_SHARE_POLICY.publicIdLength) {
       throw new Error("INVALID_SLUG");
     }
-    const existingSlugs = await ctx.db
+    const slugExists = await ctx.db
+      .query("quick_share_uploads")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .first();
+    const activeSlugs = await ctx.db
       .query("quick_share_uploads")
       .withIndex("by_slug_and_active_and_retainedUntil", (q) =>
         q
@@ -208,9 +212,18 @@ export const createUpload = internalMutation({
           .gt("retainedUntil", args.now),
       )
       .take(QUICK_SHARE_POLICY.collectionMaxItems + 1);
-    if (existingSlugs.length > 0) {
-      const collectionOwnerExists = existingSlugs.some(
+    if (slugExists) {
+      const receiptRows = args.collectionReceiptHash
+        ? await ctx.db
+            .query("quick_share_uploads")
+            .withIndex("by_receiptHash", (q) =>
+              q.eq("receiptHash", args.collectionReceiptHash as string),
+            )
+            .take(QUICK_SHARE_POLICY.collectionMaxItems + 1)
+        : [];
+      const collectionOwnerExists = receiptRows.some(
         (candidate) =>
+          candidate.slug === args.slug &&
           candidate.receiptHash === args.collectionReceiptHash &&
           candidate.rateIdentity === args.rateIdentity &&
           candidate.ipHash === args.ipHash &&
@@ -220,7 +233,7 @@ export const createUpload = internalMutation({
       if (!collectionOwnerExists) {
         throw new Error("SLUG_COLLISION");
       }
-      if (existingSlugs.length >= QUICK_SHARE_POLICY.collectionMaxItems) {
+      if (activeSlugs.length >= QUICK_SHARE_POLICY.collectionMaxItems) {
         throw new Error("COLLECTION_LIMIT");
       }
     }
@@ -762,10 +775,24 @@ export const adminList = internalQuery({
   handler: async (ctx, args) => {
     let uploads: Array<Doc<"quick_share_uploads">>;
     if (args.slug) {
-      uploads = await ctx.db
+      const activeUploads = await ctx.db
+        .query("quick_share_uploads")
+        .withIndex("by_slug_and_active_and_retainedUntil", (q) =>
+          q
+            .eq("slug", args.slug as string)
+            .eq("active", true)
+            .gt("retainedUntil", Date.now()),
+        )
+        .take(QUICK_SHARE_POLICY.collectionMaxItems);
+      const seen = new Set(activeUploads.map((upload) => upload._id));
+      const historicalUploads = await ctx.db
         .query("quick_share_uploads")
         .withIndex("by_slug", (q) => q.eq("slug", args.slug as string))
         .take(QUICK_SHARE_POLICY.collectionMaxItems);
+      uploads = [
+        ...activeUploads,
+        ...historicalUploads.filter((upload) => !seen.has(upload._id)),
+      ].slice(0, QUICK_SHARE_POLICY.collectionMaxItems);
     } else if (args.ipHash) {
       uploads = await ctx.db
         .query("quick_share_uploads")

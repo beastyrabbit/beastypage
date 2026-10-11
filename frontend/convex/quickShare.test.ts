@@ -223,13 +223,19 @@ describe("Quick Share Convex policy", () => {
     await expect(
       t.mutation(internal.quickShare.createUpload, {
         ...createArgs("Collect1", { now: now + 1 }),
+        collectionReceiptHash: "wrong-receipt",
+      }),
+    ).rejects.toThrow("SLUG_COLLISION");
+    await expect(
+      t.mutation(internal.quickShare.createUpload, {
+        ...createArgs("Collect1", { now: now + 2 }),
         collectionReceiptHash: "receipt-Collect1",
       }),
     ).resolves.toMatchObject({ slug: "Collect1" });
 
     await expect(
       t.mutation(internal.quickShare.createUpload, {
-        ...createArgs("Collect1", { now: now + 2 }),
+        ...createArgs("Collect1", { now: now + 3 }),
         collectionReceiptHash: "wrong-receipt",
       }),
     ).rejects.toThrow("SLUG_COLLISION");
@@ -308,6 +314,47 @@ describe("Quick Share Convex policy", () => {
     ).resolves.toMatchObject([
       { key: "derivatives/older", mime: "image/png", size: 1 },
     ]);
+  });
+
+  it("keeps live uploads visible in admin slug searches past stale rows", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const live = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("AdmLive1", { now }),
+    );
+    await t.run(async (ctx) => {
+      await ctx.db.patch(live.id, {
+        state: "ready",
+        publicKey: "derivatives/live",
+        publicMime: "image/png",
+        publicSize: 1,
+      });
+      const original = await ctx.db.get(live.id);
+      if (!original) throw new Error("Expected a live upload");
+      const { _id: _uploadId, _creationTime, ...row } = original;
+      for (
+        let index = 0;
+        index < QUICK_SHARE_POLICY.collectionMaxItems;
+        index += 1
+      ) {
+        await ctx.db.insert("quick_share_uploads", {
+          ...row,
+          state: "failed",
+          active: false,
+          receiptHash: `admin-stale-${index}`,
+          createdAt: now + index + 1,
+        });
+      }
+    });
+
+    await expect(
+      t.query(internal.quickShare.adminList, { slug: "AdmLive1" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ originalKey: "originals/AdmLive1" }),
+      ]),
+    );
   });
 
   it("bounds public collection and slug moderation reads for legacy collections", async () => {

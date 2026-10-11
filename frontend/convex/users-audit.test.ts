@@ -107,4 +107,15 @@ describe("indexed user lookups", () => {
       }),
     ).rejects.toThrow("at most 100");
   });
+
+  it("falls back to the Clerk ID for an unknown user", async () => {
+    const t = convexTest(schema, modules).withIdentity({
+      subject: "viewer",
+      issuer: "https://identity.example",
+    });
+
+    await expect(
+      t.query(api.users.resolveUsernames, { userIds: ["missing-user"] }),
+    ).resolves.toEqual([{ userId: "missing-user", username: "missing-user" }]);
+  });
 });
