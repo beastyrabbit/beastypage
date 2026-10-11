@@ -157,6 +157,12 @@ function nextStep(
   }
 }
 
+/** Index of the cat the step is about; the summon is about the starter. */
+function activeIndexOf(step: CeremonyStep): number | null {
+  if (step.kind === "summon") return 0;
+  return "index" in step ? step.index : null;
+}
+
 function revealedThrough(step: CeremonyStep, totalCount: number): number {
   if (step.kind === "finale") return totalCount;
   if (step.kind === "summon") return 1;
@@ -288,8 +294,7 @@ export function useLineageCeremony({
 
   const through = revealedThrough(step, totalCount);
   const revealedKeys = new Set(cats.slice(0, through).map((cat) => cat.key));
-  const activeIndex =
-    step.kind === "summon" ? 0 : "index" in step ? step.index : null;
+  const activeIndex = activeIndexOf(step);
   const activeCat = activeIndex === null ? null : (cats[activeIndex] ?? null);
   const openBranches = new Set<string>();
   for (const cat of cats.slice(0, through)) {

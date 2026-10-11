@@ -22,6 +22,23 @@ const FIRST_TOP = 180;
 const STRIP_GAP = 20;
 const BOTTOM_LIMIT = 1060;
 
+/** Frames per strip: wider frames for small pools, six across for big ones. */
+function framesPerStrip(poolSize: number): number {
+  if (poolSize <= 16) return 4;
+  return poolSize <= 25 ? 5 : 6;
+}
+
+/** "07 Fernkit ♥" or "07 Fernkit · st.3" for a frame's corner caption. */
+function exposureCaption(
+  cat: BatchBoardCat,
+  index: number,
+  out: boolean,
+): string {
+  const lead = `${poolNumber(index)} ${cat.label}`;
+  if (out) return `${lead} · st.${cat.eliminatedAtStage}`;
+  return cat.favorite ? `${lead} ♥` : lead;
+}
+
 /**
  * The adoption pool as one contact sheet: every kit is an exposure with its
  * number. Grease pencil: X = went home, circle = print for adoption (every
@@ -35,7 +52,7 @@ const BOTTOM_LIMIT = 1060;
  */
 export function ContactBatch({ model }: Readonly<BatchBoardProps>) {
   const n = model.cats.length;
-  const perStrip = n <= 16 ? 4 : n <= 25 ? 5 : 6;
+  const perStrip = framesPerStrip(n);
   const strips = Math.max(1, Math.ceil(n / perStrip));
   const stripHeight = Math.min(
     215,
@@ -331,7 +348,7 @@ function ExposureFrame({
       left={left}
       width={width}
       height={height}
-      cap={`${poolNumber(index)} ${cat.label}${out ? ` · st.${cat.eliminatedAtStage}` : cat.favorite ? " ♥" : ""}`}
+      cap={exposureCaption(cat, index, out)}
       number={String(index + 1)}
       url={cat.previewUrl}
       alt={cat.label}

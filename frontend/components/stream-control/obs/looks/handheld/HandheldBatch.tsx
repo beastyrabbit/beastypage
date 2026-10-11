@@ -1,6 +1,10 @@
 "use client";
 
-import { type BatchBoardCat, stageStripWindow } from "../batchModel";
+import {
+  type BatchBoardCat,
+  type BatchBoardStage,
+  stageStripWindow,
+} from "../batchModel";
 import type { BatchBoardProps } from "../LookBoardProps";
 import { chunkBySizes, splitColumns } from "../layout";
 import { useChangeTick, useTypewriter } from "../motion";
@@ -122,11 +126,7 @@ export function HandheldBatch({ model }: Readonly<BatchBoardProps>) {
               <span
                 key={s.id}
                 style={{
-                  color: s.current
-                    ? GB_INK
-                    : s.revealed
-                      ? GB_DIM
-                      : "rgba(48,98,48,.35)",
+                  color: stageColour(s),
                   animation:
                     s.current && model.phase === "revealing"
                       ? "gb-blink 0.6s steps(1) infinite"
@@ -277,6 +277,23 @@ export function HandheldBatch({ model }: Readonly<BatchBoardProps>) {
   );
 }
 
+function stageColour(stage: BatchBoardStage): string {
+  if (stage.current) return GB_INK;
+  return stage.revealed ? GB_DIM : "rgba(48,98,48,.35)";
+}
+
+function rowAnimation(cat: BatchBoardCat): string | undefined {
+  if (cat.fading) return "look-leave 900ms steps(5) forwards";
+  return cat.marked ? "gb-blink 1.2s steps(1) infinite" : undefined;
+}
+
+/** "▶07 FERNKIT ♥ ?" — the row's name line with its state marks. */
+function rowName(cat: BatchBoardCat, number: string): string {
+  const lead = cat.spotlight ? "▶" : "";
+  const marks = `${cat.favorite ? " ♥" : ""}${cat.potential ? " ?" : ""}`;
+  return `${lead}${number} ${cat.label.toUpperCase()}${marks}`;
+}
+
 function PartyRow({
   cat,
   number,
@@ -293,6 +310,7 @@ function PartyRow({
   const inverted = cat.marked;
   const small = height < 36;
   const tick = useChangeTick(cat.previewUrl);
+  const ink = inverted ? GB_SCREEN : GB_INK;
   return (
     <div
       style={{
@@ -304,12 +322,8 @@ function PartyRow({
         alignItems: "center",
         height,
         background: inverted ? GB_INK : undefined,
-        color: inverted ? GB_SCREEN : GB_INK,
-        animation: cat.fading
-          ? "look-leave 900ms steps(5) forwards"
-          : inverted
-            ? "gb-blink 1.2s steps(1) infinite"
-            : undefined,
+        color: ink,
+        animation: rowAnimation(cat),
         padding: inverted ? "0 4px" : undefined,
       }}
     >
@@ -329,10 +343,7 @@ function PartyRow({
           textOverflow: "ellipsis",
         }}
       >
-        {cat.spotlight ? "▶" : ""}
-        {number} {cat.label.toUpperCase()}
-        {cat.favorite ? " ♥" : ""}
-        {cat.potential ? " ?" : ""}
+        {rowName(cat, number)}
         {small ? null : (
           <small
             style={{
@@ -347,34 +358,38 @@ function PartyRow({
           </small>
         )}
       </div>
-      {showBar ? (
-        <div style={{ fontSize: 9, textAlign: "right" }}>
-          REV{" "}
-          <span
-            style={{
-              display: "inline-block",
-              width: 120,
-              height: 8,
-              border: `2px solid ${inverted ? GB_SCREEN : GB_INK}`,
-              position: "relative",
-              verticalAlign: "middle",
-              marginLeft: 4,
-            }}
-          >
-            <i
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: `${Math.round(revealRatio * 100)}%`,
-                background: inverted ? GB_SCREEN : GB_INK,
-                transition: "width 600ms steps(6)",
-              }}
-            />
-          </span>
-        </div>
-      ) : null}
+      {showBar ? <RevealBar ratio={revealRatio} ink={ink} /> : null}
+    </div>
+  );
+}
+
+function RevealBar({ ratio, ink }: Readonly<{ ratio: number; ink: string }>) {
+  return (
+    <div style={{ fontSize: 9, textAlign: "right" }}>
+      REV{" "}
+      <span
+        style={{
+          display: "inline-block",
+          width: 120,
+          height: 8,
+          border: `2px solid ${ink}`,
+          position: "relative",
+          verticalAlign: "middle",
+          marginLeft: 4,
+        }}
+      >
+        <i
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: `${Math.round(ratio * 100)}%`,
+            background: ink,
+            transition: "width 600ms steps(6)",
+          }}
+        />
+      </span>
     </div>
   );
 }

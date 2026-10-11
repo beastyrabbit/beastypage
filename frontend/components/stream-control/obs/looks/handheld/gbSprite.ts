@@ -15,6 +15,14 @@ const SHADE_RGB: [number, number, number][] = [
   [155, 188, 15],
 ];
 
+/** Luminance thresholds between the four shades, darkest first. */
+const SHADE_STEPS = [64, 128, 200];
+
+function shadeFor(luminance: number): number {
+  const index = SHADE_STEPS.findIndex((step) => luminance < step);
+  return index === -1 ? SHADE_STEPS.length : index;
+}
+
 const cache = new Map<string, Promise<string>>();
 
 /**
@@ -45,8 +53,7 @@ export function toGbSprite(url: string): Promise<string> {
           continue;
         }
         const lum = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-        const shade = lum < 64 ? 0 : lum < 128 ? 1 : lum < 200 ? 2 : 3;
-        const [r, g, b] = SHADE_RGB[shade];
+        const [r, g, b] = SHADE_RGB[shadeFor(lum)];
         px[i] = r;
         px[i + 1] = g;
         px[i + 2] = b;

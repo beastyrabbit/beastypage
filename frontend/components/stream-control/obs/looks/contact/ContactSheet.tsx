@@ -176,6 +176,78 @@ export function FrameMarker({
   );
 }
 
+function spriteAnimation(
+  exposing: boolean,
+  developing: boolean,
+): string | undefined {
+  if (exposing) return "look-flicker 0.4s steps(3) infinite";
+  return developing ? "look-develop 1600ms ease both" : undefined;
+}
+
+function FrameCaption({
+  text,
+  color,
+  maxWidth,
+  blinking,
+}: Readonly<{
+  text: string;
+  color: string;
+  maxWidth: number;
+  blinking: boolean;
+}>) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 6,
+        top: 4,
+        fontSize: 9,
+        color,
+        letterSpacing: ".1em",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+        maxWidth,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        animation: blinking ? "look-blink 0.7s steps(1) infinite" : undefined,
+        zIndex: 2,
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+function FrameSprite({
+  url,
+  alt,
+  size,
+  dim,
+  animation,
+}: Readonly<{
+  url: string | null;
+  alt: string;
+  size: number;
+  dim: boolean;
+  animation: string | undefined;
+}>) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%,-50%)",
+        opacity: dim ? 0.35 : 1,
+        filter: dim ? "grayscale(.7)" : undefined,
+        animation,
+      }}
+    >
+      <LookSprite url={url} alt={alt} size={size} placeholderColor="#777" />
+    </div>
+  );
+}
+
 /**
  * A frame on a strip. `dim` for repeated/unexposed negatives, `exposing`
  * strobes the sprite like a lightbox, `developing` plays the develop wash.
@@ -226,51 +298,21 @@ export function Frame({
       }}
     >
       {cap ? (
-        <div
-          style={{
-            position: "absolute",
-            left: 6,
-            top: 4,
-            fontSize: 9,
-            color: capColor ?? (dim ? "#6a6a6a" : "#b5b5b5"),
-            letterSpacing: ".1em",
-            textTransform: "uppercase",
-            whiteSpace: "nowrap",
-            maxWidth: width - 12,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            animation: exposing
-              ? "look-blink 0.7s steps(1) infinite"
-              : undefined,
-            zIndex: 2,
-          }}
-        >
-          {cap}
-        </div>
+        <FrameCaption
+          text={cap}
+          color={capColor ?? (dim ? "#6a6a6a" : "#b5b5b5")}
+          maxWidth={width - 12}
+          blinking={Boolean(exposing)}
+        />
       ) : null}
       {!blank && sprite ? (
-        <div
-          style={{
-            position: "absolute",
-            left: "50%",
-            top: "50%",
-            transform: "translate(-50%,-50%)",
-            opacity: dim ? 0.35 : 1,
-            filter: dim ? "grayscale(.7)" : undefined,
-            animation: exposing
-              ? "look-flicker 0.4s steps(3) infinite"
-              : developing
-                ? "look-develop 1600ms ease both"
-                : undefined,
-          }}
-        >
-          <LookSprite
-            url={url ?? null}
-            alt={alt ?? ""}
-            size={sprite}
-            placeholderColor="#777"
-          />
-        </div>
+        <FrameSprite
+          url={url ?? null}
+          alt={alt ?? ""}
+          size={sprite}
+          dim={Boolean(dim)}
+          animation={spriteAnimation(Boolean(exposing), Boolean(developing))}
+        />
       ) : null}
       {exposing ? (
         <div
@@ -416,6 +458,10 @@ export function GreaseEllipse({
   draw?: boolean;
   delayMs?: number;
 }>) {
+  const drawing = Boolean(draw) && !dashed;
+  let strokeDasharray: string | number | undefined;
+  if (dashed) strokeDasharray = "0.06 0.04";
+  else if (draw) strokeDasharray = 1;
   return (
     <ellipse
       cx={cx}
@@ -424,12 +470,8 @@ export function GreaseEllipse({
       ry={ry}
       transform={`rotate(${tilt} ${cx} ${cy})`}
       pathLength={1}
-      strokeDasharray={dashed ? "0.06 0.04" : draw ? 1 : undefined}
-      style={
-        draw && !dashed
-          ? { ...DRAW, animationDelay: `${delayMs}ms` }
-          : undefined
-      }
+      strokeDasharray={strokeDasharray}
+      style={drawing ? { ...DRAW, animationDelay: `${delayMs}ms` } : undefined}
     />
   );
 }

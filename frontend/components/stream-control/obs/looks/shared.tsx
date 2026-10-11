@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { QRCodeSVG } from "qrcode.react";
 import type { CSSProperties } from "react";
-import { LOOK_MOTION_KEYFRAMES } from "./motion";
 
 /** A rendered cat sprite at `size` px, pixel-crisp; a quiet dot while it renders. */
 export function LookSprite({
@@ -86,4 +85,4 @@ export function poolNumber(index: number): string {
 }
 
 /** Shared keyframes (pulses, leaves, pops, wipes, stamps, draws …). */
-export const LOOK_KEYFRAMES = LOOK_MOTION_KEYFRAMES;
+export { LOOK_MOTION_KEYFRAMES as LOOK_KEYFRAMES } from "./motion";

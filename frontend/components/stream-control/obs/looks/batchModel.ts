@@ -87,10 +87,10 @@ export function stageStripWindow(
   max = 8,
 ): BatchBoardStage[] {
   if (stages.length <= max) return [...stages];
-  const current = Math.max(
-    0,
-    stages.findIndex((stage) => stage.current),
-  );
+  // Once the show is done no stage is current: anchor on the last one so
+  // the strip shows what just finished, not the opening stages.
+  const currentIndex = stages.findIndex((stage) => stage.current);
+  const current = currentIndex === -1 ? stages.length - 1 : currentIndex;
   const before = Math.min(current, Math.floor((max - 1) * 0.6));
   const start = Math.max(0, Math.min(current - before, stages.length - max));
   const end = Math.min(stages.length, start + max);

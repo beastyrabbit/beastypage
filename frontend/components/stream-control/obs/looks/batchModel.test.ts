@@ -136,6 +136,13 @@ describe("stageStripWindow", () => {
     expect(labels.indexOf("S12")).toBeGreaterThan(labels.indexOf("S9"));
   });
 
+  it("anchors on the final stages once the show is done", () => {
+    const done = plan(23, 22).map((s) => ({ ...s, current: false }));
+    const labels = stageStripWindow(done, 8).map((s) => s.label);
+    expect(labels[0]).toBe("…");
+    expect(labels.at(-1)).toBe("S22");
+  });
+
   it("pins the window to the ends of the plan", () => {
     const start = stageStripWindow(plan(23, 0), 8).map((s) => s.label);
     expect(start[0]).toBe("S0");

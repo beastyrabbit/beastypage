@@ -63,7 +63,7 @@ export function AllegiancesPage({
             background: "#8d7a63",
           }}
         />
-        Allegiances
+        {"Allegiances"}
         <span
           style={{
             position: "absolute",

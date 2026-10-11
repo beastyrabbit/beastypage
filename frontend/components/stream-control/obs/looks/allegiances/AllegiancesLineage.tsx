@@ -11,7 +11,12 @@ import {
 import { describeCat } from "../describeCat";
 import type { LineageBoardProps } from "../LookBoardProps";
 import { chunkBySizes, splitColumns } from "../layout";
-import { additionTags, type LineageCat, lineageRank } from "../lineageModel";
+import {
+  additionTags,
+  type LineageCat,
+  type LineageModel,
+  lineageRank,
+} from "../lineageModel";
 import { LookSprite } from "../shared";
 import {
   AL_FAINT,
@@ -32,6 +37,106 @@ type Row =
     }
   | { kind: "cat"; key: string; cat: LineageCat; newest: boolean };
 
+interface Layout {
+  twoColumns: boolean;
+  columnWidth: number;
+  spriteSize: number;
+  fontSize: number;
+  plateLeft: number;
+  plateWidth: number;
+  plateSprite: number;
+  bookplateWidth: number;
+  bookplateRight: number;
+}
+
+const WIDE: Layout = {
+  twoColumns: false,
+  columnWidth: 650,
+  spriteSize: 76,
+  fontSize: 20,
+  plateLeft: 840,
+  plateWidth: 340,
+  plateSprite: 300,
+  bookplateWidth: 320,
+  bookplateRight: 96,
+};
+
+const NARROW: Layout = {
+  twoColumns: true,
+  columnWidth: 380,
+  spriteSize: 60,
+  fontSize: 17,
+  plateLeft: 950,
+  plateWidth: 260,
+  plateSprite: 220,
+  bookplateWidth: 260,
+  bookplateRight: 70,
+};
+
+/** Origin section + starter, then one section per branch with its cats. */
+function buildRows(model: LineageModel, newestKey: string | null): Row[] {
+  const rows: Row[] = [];
+  if (model.starter) {
+    rows.push(
+      {
+        kind: "section",
+        key: "origin",
+        heading: "Origin",
+        note: "kit · where every line begins",
+        branch: null,
+      },
+      {
+        kind: "cat",
+        key: model.starter.key,
+        cat: model.starter,
+        newest: false,
+      },
+    );
+  }
+  for (const branch of model.branches) {
+    rows.push({
+      kind: "section",
+      key: `branch-${branch.label}`,
+      heading: `❧ ${branch.label} line`,
+      note: branch.theme.blurb,
+      branch: branch.label,
+    });
+    for (const cat of branch.cats) {
+      rows.push({
+        kind: "cat",
+        key: cat.key,
+        cat,
+        newest: cat.key === newestKey,
+      });
+    }
+  }
+  return rows;
+}
+
+/** A section rules itself in once its branch has opened (origin: once any cat is written). */
+function sectionOpen(
+  row: Extract<Row, { kind: "section" }>,
+  reveal: LineageReveal | undefined,
+): boolean {
+  if (row.branch === null) return !reveal || reveal.revealedKeys.size > 0;
+  return lineageBranchOpen(reveal, row.branch);
+}
+
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+function subtitleFor(
+  model: LineageModel,
+  reveal: LineageReveal | undefined,
+): string {
+  if (!reveal || reveal.done) {
+    return `${plural(model.branches.length, "line")} · ${plural(model.totalCount, "cat")}, as the lineage stood when the ceremony ended`;
+  }
+  const choosing = reveal.charging ? " · StarClan is choosing" : "";
+  return `being written · ${reveal.revealedKeys.size} of ${model.totalCount} cats named${choosing}`;
+}
+
 /**
  * The lineage typeset like the front matter of a Warriors book: Origin,
  * then one section per branch, every cat described in prose with a marginal
@@ -47,77 +152,27 @@ export function AllegiancesLineage({
   reveal,
 }: Readonly<LineageBoardProps>) {
   const done = !reveal || reveal.done;
-  const newest = model.cats[model.cats.length - 1] ?? null;
-  const rows: Row[] = [];
-  if (model.starter) {
-    rows.push({
-      kind: "section",
-      key: "origin",
-      heading: "Origin",
-      note: "kit · where every line begins",
-      branch: null,
-    });
-    rows.push({
-      kind: "cat",
-      key: model.starter.key,
-      cat: model.starter,
-      newest: false,
-    });
-  }
-  for (const branch of model.branches) {
-    rows.push({
-      kind: "section",
-      key: `branch-${branch.label}`,
-      heading: `❧ ${branch.label} line`,
-      note: branch.theme.blurb,
-      branch: branch.label,
-    });
-    for (const cat of branch.cats) {
-      rows.push({
-        kind: "cat",
-        key: cat.key,
-        cat,
-        newest: cat.key === newest?.key,
-      });
-    }
-  }
+  const newest = model.cats.at(-1) ?? null;
+  const rows = buildRows(model, newest?.key ?? null);
   // Layout is decided on the finished lineage so lines never jump columns
   // mid-ceremony; hidden rows simply are not drawn yet.
   const catRows = rows.filter((row) => row.kind === "cat").length;
-  const twoColumns = catRows > 8;
-  const columns = twoColumns
+  const layout = catRows > 8 ? NARROW : WIDE;
+  const columns = layout.twoColumns
     ? chunkBySizes(rows, splitColumns(rows.length, Math.ceil(rows.length / 2)))
     : [rows];
-  const columnWidth = twoColumns ? 380 : 650;
-  const columnLeft = (index: number) => 120 + index * (columnWidth + 30);
-  const spriteSize = twoColumns ? 60 : 76;
-  const fontSize = twoColumns ? 17 : 20;
-  const plateLeft = twoColumns ? 950 : 840;
-  const plateWidth = twoColumns ? 260 : 340;
-  const plateSprite = twoColumns ? 220 : 300;
 
   // The plate shows the cat being written, else the newest.
   const activeCat = reveal?.activeKey
     ? (model.cats.find((cat) => cat.key === reveal.activeKey) ?? null)
     : null;
-  const plateCat = reveal && !reveal.done ? activeCat : newest;
-  const plateState = plateCat
-    ? lineageCatState(reveal, plateCat.key)
-    : "hidden";
-  const plateUrl = plateCat
-    ? lineageSpriteUrl(plateState, reveal, plateCat.previewUrl)
-    : null;
-
+  const plateCat = done ? newest : activeCat;
   const lineLabel = model.starter?.label ?? "the line";
-  const written = reveal ? reveal.revealedKeys.size : model.totalCount;
-  const subtitle = done
-    ? `${model.branches.length} line${model.branches.length === 1 ? "" : "s"} · ${model.totalCount} cat${model.totalCount === 1 ? "" : "s"}, as the lineage stood when the ceremony ended`
-    : `being written · ${written} of ${model.totalCount} cats named${reveal?.charging ? " · StarClan is choosing" : ""}`;
 
   return (
     <AllegiancesPage
       title={`${lineLabel}'s Line`}
-      subtitle={subtitle}
+      subtitle={subtitleFor(model, reveal)}
       marginNote="BEASTYPAGE · EVOLUTION · LINEAGE"
       folio="117"
     >
@@ -127,112 +182,40 @@ export function AllegiancesLineage({
           style={{
             position: "absolute",
             top: 222,
-            left: columnLeft(columnIndex),
-            width: columnWidth,
+            left: 120 + columnIndex * (layout.columnWidth + 30),
+            width: layout.columnWidth,
           }}
         >
-          {columnRows.map((row) => {
-            if (row.kind === "section") {
-              const open =
-                row.branch === null
-                  ? !reveal || reveal.revealedKeys.size > 0
-                  : lineageBranchOpen(reveal, row.branch);
-              if (!open) return null;
-              return (
-                <div
-                  key={row.key}
-                  style={{ animation: "look-wipe 700ms ease both" }}
-                >
-                  <AllegiancesSection
-                    heading={row.heading}
-                    note={row.note}
-                    size={twoColumns ? 0.92 : 1}
-                  />
-                </div>
-              );
-            }
-            const state = lineageCatState(reveal, row.cat.key);
-            if (state === "hidden") return null;
-            return (
-              <Entry
-                key={row.key}
-                cat={row.cat}
-                state={state}
-                reveal={reveal}
-                newest={row.newest && done}
-                spriteSize={spriteSize}
-                fontSize={fontSize}
-              />
-            );
-          })}
+          {columnRows.map((row) => (
+            <RowView
+              key={row.key}
+              row={row}
+              reveal={reveal}
+              done={done}
+              layout={layout}
+            />
+          ))}
         </div>
       ))}
 
-      {plateCat && plateUrl ? (
-        <AllegiancesPlate
-          key={`${plateCat.key}-${plateState}`}
-          width={plateWidth}
-          style={{
-            top: 214,
-            left: plateLeft,
-            animation:
-              plateState === "revealing"
-                ? "look-stamp-flat 700ms cubic-bezier(.2,1.3,.4,1) both"
-                : "look-pop 500ms ease both",
-          }}
-          caption={
-            plateState === "charging" ? (
-              <>
-                <b style={{ fontStyle: "normal", fontVariant: "small-caps" }}>
-                  Plate.
-                </b>{" "}
-                the next {lineageRank(plateCat).toLowerCase()} of the{" "}
-                {plateCat.branchLabel ?? "origin"} line, still being drawn…
-              </>
-            ) : (
-              <>
-                <b style={{ fontStyle: "normal", fontVariant: "small-caps" }}>
-                  Plate {romanNumeral(model.cats.indexOf(plateCat) + 1)}.
-                </b>{" "}
-                {plateCat.label}, {lineageRank(plateCat).toLowerCase()}
-                {plateCat.branchLabel
-                  ? ` of the ${plateCat.branchLabel} line`
-                  : ""}
-                {done && plateCat.key === newest?.key
-                  ? ", newest of them all."
-                  : "."}
-              </>
-            )
-          }
-        >
-          <div
-            style={{
-              animation:
-                plateState === "charging"
-                  ? "look-flicker 0.5s steps(3) infinite"
-                  : undefined,
-              filter:
-                plateState === "charging"
-                  ? "sepia(.6) contrast(.8)"
-                  : undefined,
-            }}
-          >
-            <LookSprite
-              url={plateUrl}
-              alt={plateCat.label}
-              size={plateSprite}
-            />
-          </div>
-        </AllegiancesPlate>
+      {plateCat ? (
+        <Plate
+          cat={plateCat}
+          model={model}
+          reveal={reveal}
+          done={done}
+          newestKey={newest?.key ?? null}
+          layout={layout}
+        />
       ) : null}
 
       {done ? (
         <AllegiancesBookplate
           url={model.url}
           line="the full lineage, every roll and addition"
-          width={twoColumns ? 260 : 320}
+          width={layout.bookplateWidth}
           style={{
-            right: twoColumns ? 70 : 96,
+            right: layout.bookplateRight,
             bottom: 100,
             animation: "look-stamp 700ms cubic-bezier(.2,1.3,.4,1) both",
             transform: "rotate(-1.5deg)",
@@ -241,6 +224,144 @@ export function AllegiancesLineage({
       ) : null}
     </AllegiancesPage>
   );
+}
+
+function RowView({
+  row,
+  reveal,
+  done,
+  layout,
+}: Readonly<{
+  row: Row;
+  reveal: LineageReveal | undefined;
+  done: boolean;
+  layout: Layout;
+}>) {
+  if (row.kind === "section") {
+    if (!sectionOpen(row, reveal)) return null;
+    return (
+      <div style={{ animation: "look-wipe 700ms ease both" }}>
+        <AllegiancesSection
+          heading={row.heading}
+          note={row.note}
+          size={layout.twoColumns ? 0.92 : 1}
+        />
+      </div>
+    );
+  }
+  const state = lineageCatState(reveal, row.cat.key);
+  if (state === "hidden") return null;
+  return (
+    <Entry
+      cat={row.cat}
+      state={state}
+      reveal={reveal}
+      newest={row.newest && done}
+      spriteSize={layout.spriteSize}
+      fontSize={layout.fontSize}
+    />
+  );
+}
+
+function Plate({
+  cat,
+  model,
+  reveal,
+  done,
+  newestKey,
+  layout,
+}: Readonly<{
+  cat: LineageCat;
+  model: LineageModel;
+  reveal: LineageReveal | undefined;
+  done: boolean;
+  newestKey: string | null;
+  layout: Layout;
+}>) {
+  const state = lineageCatState(reveal, cat.key);
+  const url = lineageSpriteUrl(state, reveal, cat.previewUrl);
+  if (!url) return null;
+  const charging = state === "charging";
+  const animation =
+    state === "revealing"
+      ? "look-stamp-flat 700ms cubic-bezier(.2,1.3,.4,1) both"
+      : "look-pop 500ms ease both";
+  return (
+    <AllegiancesPlate
+      key={`${cat.key}-${state}`}
+      width={layout.plateWidth}
+      style={{ top: 214, left: layout.plateLeft, animation }}
+      caption={
+        charging ? (
+          <ChargingCaption cat={cat} />
+        ) : (
+          <NamedCaption
+            cat={cat}
+            number={model.cats.indexOf(cat) + 1}
+            newest={done && cat.key === newestKey}
+          />
+        )
+      }
+    >
+      <div
+        style={{
+          animation: charging
+            ? "look-flicker 0.5s steps(3) infinite"
+            : undefined,
+          filter: charging ? "sepia(.6) contrast(.8)" : undefined,
+        }}
+      >
+        <LookSprite url={url} alt={cat.label} size={layout.plateSprite} />
+      </div>
+    </AllegiancesPlate>
+  );
+}
+
+const CAPTION_LEAD = {
+  fontStyle: "normal",
+  fontVariant: "small-caps",
+} as const;
+
+function ChargingCaption({ cat }: Readonly<{ cat: LineageCat }>) {
+  return (
+    <>
+      <b style={CAPTION_LEAD}>Plate.</b> the next{" "}
+      {lineageRank(cat).toLowerCase()} of the {cat.branchLabel ?? "origin"}{" "}
+      line, still being drawn…
+    </>
+  );
+}
+
+function NamedCaption({
+  cat,
+  number,
+  newest,
+}: Readonly<{ cat: LineageCat; number: number; newest: boolean }>) {
+  const line = cat.branchLabel ? ` of the ${cat.branchLabel} line` : "";
+  const ending = newest ? ", newest of them all." : ".";
+  return (
+    <>
+      <b style={CAPTION_LEAD}>Plate {romanNumeral(number)}.</b> {cat.label},{" "}
+      {lineageRank(cat).toLowerCase()}
+      {line}
+      {ending}
+    </>
+  );
+}
+
+/** What the roster line says the cat gained at this stop. */
+function gainedText(cat: LineageCat): string {
+  if (cat.level === 0) return `${STARTER_THEME.blurb}.`;
+  const tags = additionTags(cat.additions, 3, 22);
+  if (tags.length === 0) return "";
+  return `${tags.map((tag) => tag.replace(/^\+/, "")).join(", ")}.`;
+}
+
+function entryAnimation(state: LineageCatState): string | undefined {
+  if (state === "revealing")
+    return "look-wipe 1100ms cubic-bezier(.3,0,.2,1) both";
+  if (state === "shown") return undefined;
+  return "look-pop 400ms ease both";
 }
 
 function Entry({
@@ -258,14 +379,6 @@ function Entry({
   spriteSize: number;
   fontSize: number;
 }>) {
-  const rank = lineageRank(cat).toLowerCase();
-  const tags = additionTags(cat.additions, 3, 22);
-  const gained =
-    cat.level === 0
-      ? `${STARTER_THEME.blurb}.`
-      : tags.length
-        ? `${tags.map((tag) => tag.replace(/^\+/, "")).join(", ")}.`
-        : "";
   const url = lineageSpriteUrl(state, reveal, cat.previewUrl);
   const charging = state === "charging";
   return (
@@ -277,12 +390,7 @@ function Entry({
         alignItems: "center",
         minHeight: spriteSize - 2,
         margin: "0 0 8px",
-        animation:
-          state === "revealing"
-            ? "look-wipe 1100ms cubic-bezier(.3,0,.2,1) both"
-            : state === "shown"
-              ? undefined
-              : "look-pop 400ms ease both",
+        animation: entryAnimation(state),
       }}
     >
       <div
@@ -296,69 +404,101 @@ function Entry({
         <LookSprite url={url} alt={cat.label} size={spriteSize} />
       </div>
       {charging ? (
-        <p
-          style={{
-            fontSize,
-            lineHeight: 1.28,
-            margin: 0,
-            color: AL_FAINT,
-            fontStyle: "italic",
-          }}
-        >
-          <b
-            style={{
-              fontStyle: "normal",
-              fontWeight: 600,
-              fontVariant: "small-caps",
-              letterSpacing: ".2em",
-              color: AL_RED,
-              animation: "look-pulse 1s ease-in-out infinite",
-            }}
-          >
-            — — —
-          </b>
-          —{rank}; the scribe waits on StarClan…
-        </p>
+        <ChargingLine cat={cat} fontSize={fontSize} />
       ) : (
-        <p style={{ fontSize, lineHeight: 1.28, margin: 0 }}>
-          <b
-            style={{
-              fontWeight: 600,
-              fontVariant: "small-caps",
-              letterSpacing: ".04em",
-              fontSize: fontSize + 1,
-              color: newest ? AL_RED : undefined,
-              position: "relative",
-            }}
-          >
-            {cat.label}
-            {state === "revealing" ? (
-              <span
-                aria-hidden="true"
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  bottom: -2,
-                  height: 2,
-                  background: AL_RED,
-                  animation: "look-ink 900ms ease 900ms both",
-                }}
-              />
-            ) : null}
-          </b>
-          —{cat.level > 0 ? `${rank}; ` : ""}
-          {describeCat(cat.params)}
-          {gained ? (
-            <>
-              {" "}
-              <i>{gained}</i>
-            </>
-          ) : (
-            "."
-          )}
-        </p>
+        <WrittenLine
+          cat={cat}
+          state={state}
+          newest={newest}
+          fontSize={fontSize}
+        />
       )}
     </div>
+  );
+}
+
+function ChargingLine({
+  cat,
+  fontSize,
+}: Readonly<{ cat: LineageCat; fontSize: number }>) {
+  return (
+    <p
+      style={{
+        fontSize,
+        lineHeight: 1.28,
+        margin: 0,
+        color: AL_FAINT,
+        fontStyle: "italic",
+      }}
+    >
+      <b
+        style={{
+          fontStyle: "normal",
+          fontWeight: 600,
+          fontVariant: "small-caps",
+          letterSpacing: ".2em",
+          color: AL_RED,
+          animation: "look-pulse 1s ease-in-out infinite",
+        }}
+      >
+        — — —
+      </b>
+      —{lineageRank(cat).toLowerCase()}; the scribe waits on StarClan…
+    </p>
+  );
+}
+
+function WrittenLine({
+  cat,
+  state,
+  newest,
+  fontSize,
+}: Readonly<{
+  cat: LineageCat;
+  state: LineageCatState;
+  newest: boolean;
+  fontSize: number;
+}>) {
+  const gained = gainedText(cat);
+  const rankLead = cat.level > 0 ? `${lineageRank(cat).toLowerCase()}; ` : "";
+  return (
+    <p style={{ fontSize, lineHeight: 1.28, margin: 0 }}>
+      <b
+        style={{
+          fontWeight: 600,
+          fontVariant: "small-caps",
+          letterSpacing: ".04em",
+          fontSize: fontSize + 1,
+          color: newest ? AL_RED : undefined,
+          position: "relative",
+        }}
+      >
+        {cat.label}
+        {state === "revealing" ? (
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              left: 0,
+              bottom: -2,
+              height: 2,
+              background: AL_RED,
+              animation: "look-ink 900ms ease 900ms both",
+            }}
+          />
+        ) : null}
+      </b>
+      —{rankLead}
+      {describeCat(cat.params)}
+      {gained ? (
+        <>
+          {" "}
+          <i>{gained}</i>
+        </>
+      ) : (
+        "."
+      )}
+    </p>
   );
 }
 

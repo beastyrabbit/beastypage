@@ -3,6 +3,7 @@
 import {
   type BatchBoardCat,
   type BatchBoardModel,
+  type BatchBoardStage,
   stageStripWindow,
 } from "../batchModel";
 import { describeCat } from "../describeCat";
@@ -23,6 +24,16 @@ import {
 } from "./AllegiancesPage";
 
 const ROWS_PER_COLUMN = 10;
+
+function rosterFontSize(compact: boolean, rowHeight: number): number {
+  if (compact) return 15;
+  return rowHeight >= 60 ? 17.5 : 15.5;
+}
+
+function stageColour(stage: BatchBoardStage): string {
+  if (stage.current) return AL_RED;
+  return stage.revealed ? AL_INK : AL_FAINT;
+}
 
 /**
  * The Nursery: every kit in the pool is a roster line with its number; the
@@ -49,7 +60,7 @@ export function AllegiancesBatch({ model }: Readonly<BatchBoardProps>) {
   const rowHeight = Math.min(68, Math.floor(600 / rows));
   const spriteSize = Math.min(56, rowHeight - 8);
   const compact = columnCount >= 3;
-  const fontSize = compact ? 15 : rowHeight >= 60 ? 17.5 : 15.5;
+  const fontSize = rosterFontSize(compact, rowHeight);
   const gone = model.eliminated.length;
   const plate = model.spotlight;
 
@@ -73,7 +84,7 @@ export function AllegiancesBatch({ model }: Readonly<BatchBoardProps>) {
           }}
         >
           <AllegiancesSection
-            heading={columnIndex === 0 ? "Kits" : " "}
+            heading={columnIndex === 0 ? "Kits" : " "}
             note={
               columnIndex === 0 ? "to be named by their new Clans" : "continued"
             }
@@ -121,58 +132,7 @@ export function AllegiancesBatch({ model }: Readonly<BatchBoardProps>) {
         </AllegiancesPlate>
       ) : null}
 
-      <div
-        style={{
-          position: "absolute",
-          left: 1200 - plateWidth,
-          top: plate ? 600 : 300,
-          width: plateWidth,
-          borderTop: `1px solid ${AL_RULE}`,
-          borderBottom: `1px solid ${AL_RULE}`,
-          padding: "10px 0",
-          textAlign: "center",
-          transition: "top 500ms ease",
-        }}
-      >
-        <div
-          key={model.remaining}
-          style={{
-            fontSize: 64,
-            lineHeight: 1,
-            fontWeight: 500,
-            animation: "look-pop 400ms ease both",
-          }}
-        >
-          {model.remaining}
-          <small style={{ fontSize: 22, color: AL_FAINT }}> / {n}</small>
-        </div>
-        <div
-          style={{
-            fontVariant: "small-caps",
-            letterSpacing: ".3em",
-            fontSize: 14,
-            color: "#5a4a3a",
-          }}
-        >
-          {model.phase === "done"
-            ? "kits for the adopt run"
-            : `until ${model.finalCount} remain`}
-        </div>
-        <div
-          style={{
-            marginTop: 6,
-            fontStyle: "italic",
-            fontSize: 15,
-            color: model.phase === "awaitingCull" ? AL_RED : AL_FAINT,
-            animation:
-              model.phase === "awaitingCull"
-                ? "look-pulse 1.4s ease-in-out infinite"
-                : undefined,
-          }}
-        >
-          {model.statusLabel}
-        </div>
-      </div>
+      <Tally model={model} top={plate ? 600 : 300} width={plateWidth} />
 
       {model.qrUrl ? (
         <AllegiancesBookplate
@@ -191,7 +151,72 @@ export function AllegiancesBatch({ model }: Readonly<BatchBoardProps>) {
   );
 }
 
+function Tally({
+  model,
+  top,
+  width,
+}: Readonly<{ model: BatchBoardModel; top: number; width: number }>) {
+  const awaiting = model.phase === "awaitingCull";
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 1200 - width,
+        top,
+        width,
+        borderTop: `1px solid ${AL_RULE}`,
+        borderBottom: `1px solid ${AL_RULE}`,
+        padding: "10px 0",
+        textAlign: "center",
+        transition: "top 500ms ease",
+      }}
+    >
+      <div
+        key={model.remaining}
+        style={{
+          fontSize: 64,
+          lineHeight: 1,
+          fontWeight: 500,
+          animation: "look-pop 400ms ease both",
+        }}
+      >
+        {model.remaining}
+        <small style={{ fontSize: 22, color: AL_FAINT }}>
+          {" "}
+          / {model.poolCount}
+        </small>
+      </div>
+      <div
+        style={{
+          fontVariant: "small-caps",
+          letterSpacing: ".3em",
+          fontSize: 14,
+          color: "#5a4a3a",
+        }}
+      >
+        {model.phase === "done"
+          ? "kits for the adopt run"
+          : `until ${model.finalCount} remain`}
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          fontStyle: "italic",
+          fontSize: 15,
+          color: awaiting ? AL_RED : AL_FAINT,
+          animation: awaiting
+            ? "look-pulse 1.4s ease-in-out infinite"
+            : undefined,
+        }}
+      >
+        {model.statusLabel}
+      </div>
+    </div>
+  );
+}
+
 function StageStrip({ model }: Readonly<{ model: BatchBoardModel }>) {
+  const revealing = model.phase === "revealing";
   return (
     <div
       style={{
@@ -212,16 +237,12 @@ function StageStrip({ model }: Readonly<{ model: BatchBoardModel }>) {
           {index > 0 ? " · " : ""}
           <span
             style={{
-              color: stage.current
-                ? AL_RED
-                : stage.revealed
-                  ? AL_INK
-                  : AL_FAINT,
+              color: stageColour(stage),
               fontWeight: stage.revealed ? 500 : 400,
               borderBottom: stage.current ? `2px solid ${AL_RED}` : undefined,
               opacity: stage.revealed || stage.current ? 1 : 0.6,
               animation:
-                stage.current && model.phase === "revealing"
+                stage.current && revealing
                   ? "look-pulse 0.9s ease-in-out infinite"
                   : undefined,
             }}
@@ -234,6 +255,11 @@ function StageStrip({ model }: Readonly<{ model: BatchBoardModel }>) {
       {model.stages.length}
     </div>
   );
+}
+
+function nameColour(cat: BatchBoardCat): string {
+  if (cat.eliminated) return AL_FAINT;
+  return cat.marked || cat.spotlight ? AL_RED : AL_INK;
 }
 
 function Entry({
@@ -253,6 +279,7 @@ function Entry({
 }>) {
   const out = cat.eliminated;
   const tick = useChangeTick(cat.previewUrl);
+  const flash = !out && tick > 0;
   return (
     <div
       style={{
@@ -277,11 +304,7 @@ function Entry({
       <div
         key={tick}
         style={{
-          animation: out
-            ? undefined
-            : tick > 0
-              ? "look-flash 600ms ease both"
-              : undefined,
+          animation: flash ? "look-flash 600ms ease both" : undefined,
           transition: "filter 900ms ease, opacity 900ms ease",
           filter: out ? "grayscale(1) contrast(.8)" : undefined,
           opacity: out ? 0.45 : 1,
@@ -308,11 +331,7 @@ function Entry({
             fontVariant: "small-caps",
             letterSpacing: ".04em",
             fontSize: fontSize + 1,
-            color: out
-              ? AL_FAINT
-              : cat.marked || cat.spotlight
-                ? AL_RED
-                : AL_INK,
+            color: nameColour(cat),
             background: cat.potential ? "rgba(250, 204, 21, .55)" : undefined,
             padding: cat.potential ? "0 3px" : undefined,
             animation: cat.marked
@@ -325,54 +344,52 @@ function Entry({
         </b>
         {compact ? null : <>—{describeCat(cat.params)}.</>}
       </p>
-      {out ? (
-        <>
-          <div
-            style={{
-              position: "absolute",
-              left: 40 + spriteSize,
-              top: "50%",
-              height: 2,
-              width: `calc(100% - ${40 + spriteSize}px)`,
-              background: AL_RED,
-              transform: "rotate(-1.2deg)",
-              transformOrigin: "left",
-              opacity: 0.85,
-              animation: "look-ink 900ms cubic-bezier(.3,0,.2,1) both",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              right: 0,
-              top: -2,
-              fontStyle: "italic",
-              fontSize: 12,
-              color: AL_RED,
-              transform: "rotate(-3deg)",
-              animation: "look-stamp-flat 500ms ease 700ms both",
-            }}
-          >
-            went home · stage {cat.eliminatedAtStage}
-          </div>
-        </>
-      ) : null}
-      {cat.marked ? (
-        <div
-          style={{
-            position: "absolute",
-            right: 0,
-            top: -2,
-            fontStyle: "italic",
-            fontSize: 12,
-            color: AL_RED,
-            transform: "rotate(-3deg)",
-            animation: "look-stamp-flat 400ms ease both",
-          }}
-        >
-          marked to leave
-        </div>
-      ) : null}
+      {out ? <StrikeOut cat={cat} spriteSize={spriteSize} /> : null}
+      {cat.marked ? <Note text="marked to leave" delayMs={0} /> : null}
+    </div>
+  );
+}
+
+function StrikeOut({
+  cat,
+  spriteSize,
+}: Readonly<{ cat: BatchBoardCat; spriteSize: number }>) {
+  return (
+    <>
+      <div
+        style={{
+          position: "absolute",
+          left: 40 + spriteSize,
+          top: "50%",
+          height: 2,
+          width: `calc(100% - ${40 + spriteSize}px)`,
+          background: AL_RED,
+          transform: "rotate(-1.2deg)",
+          transformOrigin: "left",
+          opacity: 0.85,
+          animation: "look-ink 900ms cubic-bezier(.3,0,.2,1) both",
+        }}
+      />
+      <Note text={`went home · stage ${cat.eliminatedAtStage}`} delayMs={700} />
+    </>
+  );
+}
+
+function Note({ text, delayMs }: Readonly<{ text: string; delayMs: number }>) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        right: 0,
+        top: -2,
+        fontStyle: "italic",
+        fontSize: 12,
+        color: AL_RED,
+        transform: "rotate(-3deg)",
+        animation: `look-stamp-flat 500ms ease ${delayMs}ms both`,
+      }}
+    >
+      {text}
     </div>
   );
 }

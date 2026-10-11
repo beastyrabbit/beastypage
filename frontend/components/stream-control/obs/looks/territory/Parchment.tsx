@@ -238,7 +238,7 @@ export function ScaleBar() {
         color: MAP_INK,
       }}
     >
-      0
+      {"0"}
       <i
         style={{
           display: "inline-block",
@@ -250,7 +250,7 @@ export function ScaleBar() {
           background: `repeating-linear-gradient(90deg,${MAP_INK} 0 55px,transparent 55px 110px)`,
         }}
       />
-      50 fox-lengths
+      {"50 fox-lengths"}
     </div>
   );
 }

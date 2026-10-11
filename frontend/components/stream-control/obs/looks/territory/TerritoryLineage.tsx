@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type LineageCatState,
   type LineageReveal,
   lineageBranchOpen,
   lineageCatState,
@@ -67,6 +68,35 @@ const TREES: [number, number][] = [
   [1170, 560],
 ];
 
+/** Cats shrink as more trails share the map. */
+function branchScale(count: number): number {
+  if (count >= 4) return 0.66;
+  return count === 3 ? 0.92 : 1;
+}
+
+function mapSubtitle(
+  trails: number,
+  totalCount: number,
+  reveal: LineageReveal | undefined,
+): string {
+  if (!reveal || reveal.done) {
+    return `${trails} trail${trails === 1 ? "" : "s"} walked from camp · ${totalCount} cats`;
+  }
+  return `walking the trails · ${reveal.revealedKeys.size} of ${totalCount} cats placed`;
+}
+
+/** Landing drop mid-ceremony; a staggered pop when the finished map mounts. */
+function stopAnimation(
+  state: LineageCatState,
+  inCeremony: boolean,
+  delayMs: number,
+): string | undefined {
+  if (state === "revealing") {
+    return "look-drop 700ms cubic-bezier(.2,1.2,.4,1) both";
+  }
+  return inCeremony ? undefined : `look-pop 500ms ease ${delayMs}ms both`;
+}
+
 /**
  * A hand-inked territory map: the starter sits in camp, one dotted trail per
  * branch (in the branch's ink) leads to a named landmark, and every stop on
@@ -85,8 +115,7 @@ export function TerritoryLineage({
   const count = Math.max(1, branches.length);
   const spread = count === 1 ? 0 : Math.min(120, 40 * (count - 1) + 30);
   const levels = model.maxLevels;
-  const sizeScale =
-    (count >= 4 ? 0.66 : count === 3 ? 0.92 : 1) * (levels >= 3 ? 0.85 : 1);
+  const sizeScale = branchScale(count) * (levels >= 3 ? 0.85 : 1);
   const done = !reveal || reveal.done;
 
   const trails = branches.map((branch, index) => {
@@ -258,11 +287,7 @@ export function TerritoryLineage({
 
       <Cartouche
         title={`${starter?.label ?? "The"}'s Territory`}
-        subtitle={
-          done
-            ? `${count} trail${count === 1 ? "" : "s"} walked from camp · ${model.totalCount} cats`
-            : `walking the trails · ${reveal?.revealedKeys.size ?? 0} of ${model.totalCount} cats placed`
-        }
+        subtitle={mapSubtitle(count, model.totalCount, reveal)}
         code={`EVOLUTION · ${branches.map((b) => b.label).join(" · ")}`}
       />
       <Compass top={186} />
@@ -376,12 +401,11 @@ export function TerritoryLineage({
                   sub={`${lineageRank(cat)} · ${additionTags(cat.additions, 1, 12)[0] ?? ""}`}
                   accent={ink}
                   style={{
-                    animation:
-                      state === "revealing"
-                        ? "look-drop 700ms cubic-bezier(.2,1.2,.4,1) both"
-                        : reveal
-                          ? undefined
-                          : `look-pop 500ms ease ${300 + trailIndex * 200 + stopIndex * 350}ms both`,
+                    animation: stopAnimation(
+                      state,
+                      Boolean(reveal),
+                      300 + trailIndex * 200 + stopIndex * 350,
+                    ),
                   }}
                 >
                   <LookSprite

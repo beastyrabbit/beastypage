@@ -14,6 +14,7 @@ import {
   additionTags,
   type LineageBranch,
   type LineageCat,
+  type LineageModel,
   lineageRank,
 } from "../lineageModel";
 import { scatter } from "../motion";
@@ -26,6 +27,36 @@ const BEDROCK_H = 290;
 const LEFT = 100;
 const RIGHT = 1280;
 const BAND_FILLS = ["#a08c6c", "#7d5a3f", "#6b5d55", "#8a7257"];
+
+/** Specimen numbers: level by level, left to right across the branches. */
+function numberFossils(
+  branches: readonly LineageBranch[],
+  levels: number,
+): Map<string, number> {
+  const numbers = new Map<string, number>();
+  let counter = 0;
+  for (let level = 1; level <= levels; level++) {
+    for (const branch of branches) {
+      const cat = branch.cats[level - 1];
+      if (cat) numbers.set(cat.key, ++counter);
+    }
+  }
+  return numbers;
+}
+
+function sectionCode(
+  model: LineageModel,
+  reveal: LineageReveal | undefined,
+): string {
+  if (!reveal || reveal.done) {
+    const branches = model.branches.length;
+    const branchWord = branches === 1 ? "BRANCH" : "BRANCHES";
+    const horizonWord = model.maxLevels === 1 ? "HORIZON" : "HORIZONS";
+    return `EVOLUTION · ${model.totalCount} CATS · ${branches} ${branchWord} · ${model.maxLevels} ${horizonWord}`;
+  }
+  const sampling = reveal.charging ? " · SAMPLING…" : "";
+  return `EXCAVATING · ${reveal.revealedKeys.size}/${model.totalCount} SPECIMENS${sampling}`;
+}
 
 function wavy(y: number): string {
   return `M0 ${y} C 220 ${y - 20}, 330 ${y + 30}, 520 ${y + 12} S 980 ${y - 20}, 1280 ${y + 20}`;
@@ -55,15 +86,7 @@ export function StrataLineage({ model, reveal }: Readonly<LineageBoardProps>) {
   const starterSize = Math.min(230, BEDROCK_H - 60);
   const starterLeft = columns === 1 ? 560 : 640 - starterSize / 2;
   const done = !reveal || reveal.done;
-  const fossilNumber = new Map<string, number>();
-  let counter = 0;
-  for (let level = 1; level <= levels; level++) {
-    for (const branch of branches) {
-      const cat = branch.cats[level - 1];
-      if (cat) fossilNumber.set(cat.key, ++counter);
-    }
-  }
-  const excavated = reveal ? reveal.revealedKeys.size : model.cats.length;
+  const fossilNumber = numberFossils(branches, levels);
 
   return (
     <div
@@ -194,9 +217,7 @@ export function StrataLineage({ model, reveal }: Readonly<LineageBoardProps>) {
             marginTop: 10,
           }}
         >
-          {done
-            ? `EVOLUTION · ${model.totalCount} CATS · ${branches.length} BRANCH${branches.length === 1 ? "" : "ES"} · ${levels} HORIZON${levels === 1 ? "" : "S"}`
-            : `EXCAVATING · ${excavated}/${model.totalCount} SPECIMENS${reveal?.charging ? " · SAMPLING…" : ""}`}
+          {sectionCode(model, reveal)}
         </div>
       </div>
 
@@ -500,10 +521,6 @@ function Fossil({
   const charging = state === "charging";
   const revealing = state === "revealing";
   const url = lineageSpriteUrl(state, reveal, cat.previewUrl);
-  const meta =
-    cat.level === 0
-      ? "the origin"
-      : additionTags(cat.additions, 3, 16).join(" · ");
   const tagStyle =
     tagSide === "left"
       ? { right: size + 24, top: size / 2 - 20, textAlign: "right" as const }
@@ -520,21 +537,13 @@ function Fossil({
           border: `1.5px dashed ${withAlpha("#efe9dc", 0.6)}`,
           borderRadius: "50%",
           transform: "translate(-50%,-50%)",
-          animation: charging
-            ? "look-pulse 0.8s ease-in-out infinite"
-            : revealing
-              ? "look-pop 600ms ease both"
-              : undefined,
+          animation: haloAnimation(state),
         }}
       />
       <div
         style={{
           position: "relative",
-          animation: revealing
-            ? "look-wipe-up 1300ms cubic-bezier(.3,0,.2,1) both"
-            : charging
-              ? "look-flicker 0.5s steps(3) infinite"
-              : undefined,
+          animation: spriteAnimation(state),
           filter: charging
             ? "sepia(.8) contrast(.6) brightness(.8)"
             : "drop-shadow(0 0 1px rgba(0,0,0,.9)) drop-shadow(0 10px 14px rgba(0,0,0,.6))",
@@ -542,27 +551,7 @@ function Fossil({
       >
         <LookSprite url={url} alt={cat.label} size={size} />
       </div>
-      {revealing
-        ? Array.from({ length: 8 }, (_, i) => (
-            <span
-              key={i.toString()}
-              aria-hidden="true"
-              style={{
-                position: "absolute",
-                left: size * (0.2 + scatter(i + number * 7) * 0.6),
-                top: size * 0.85,
-                width: 6 + scatter(i * 3 + 1) * 6,
-                height: 6 + scatter(i * 5 + 2) * 6,
-                borderRadius: "50%",
-                background: "#c9b48a",
-                opacity: 0,
-                ["--dx" as string]: `${Math.round((scatter(i * 11 + 3) - 0.5) * 120)}px`,
-                ["--dy" as string]: `${Math.round(-40 - scatter(i * 13 + 4) * 90)}px`,
-                animation: `look-dust 1100ms ease-out ${300 + i * 60}ms both`,
-              }}
-            />
-          ))
-        : null}
+      {revealing ? <DustPuffs size={size} seed={number} /> : null}
       <div
         style={{
           position: "absolute",
@@ -613,10 +602,61 @@ function Fossil({
           }}
         >
           <b style={{ fontWeight: 400, color: accent }}>{lineageRank(cat)}</b>
-          {charging ? " · sampling the stratum…" : meta ? ` · ${meta}` : ""}
+          {metaText(cat, charging)}
         </span>
       </div>
     </div>
+  );
+}
+
+function haloAnimation(state: LineageCatState): string | undefined {
+  if (state === "charging") return "look-pulse 0.8s ease-in-out infinite";
+  return state === "revealing" ? "look-pop 600ms ease both" : undefined;
+}
+
+function spriteAnimation(state: LineageCatState): string | undefined {
+  if (state === "revealing") {
+    return "look-wipe-up 1300ms cubic-bezier(.3,0,.2,1) both";
+  }
+  return state === "charging"
+    ? "look-flicker 0.5s steps(3) infinite"
+    : undefined;
+}
+
+/** " · +Lavender · +Tortie" style tail after the rank, or the sampling note. */
+function metaText(cat: LineageCat, charging: boolean): string {
+  if (charging) return " · sampling the stratum…";
+  const meta =
+    cat.level === 0
+      ? "the origin"
+      : additionTags(cat.additions, 3, 16).join(" · ");
+  return meta ? ` · ${meta}` : "";
+}
+
+/** Eight specks of soil thrown up as a fossil is excavated. */
+function DustPuffs({ size, seed }: Readonly<{ size: number; seed: number }>) {
+  return (
+    <>
+      {Array.from({ length: 8 }, (_, i) => (
+        <span
+          key={i.toString()}
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: size * (0.2 + scatter(i + seed * 7) * 0.6),
+            top: size * 0.85,
+            width: 6 + scatter(i * 3 + 1) * 6,
+            height: 6 + scatter(i * 5 + 2) * 6,
+            borderRadius: "50%",
+            background: "#c9b48a",
+            opacity: 0,
+            ["--dx" as string]: `${Math.round((scatter(i * 11 + 3) - 0.5) * 120)}px`,
+            ["--dy" as string]: `${Math.round(-40 - scatter(i * 13 + 4) * 90)}px`,
+            animation: `look-dust 1100ms ease-out ${300 + i * 60}ms both`,
+          }}
+        />
+      ))}
+    </>
   );
 }
 

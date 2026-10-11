@@ -1,9 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AllegiancesBatch } from "@/components/stream-control/obs/looks/allegiances/AllegiancesBatch";
 import {
+  type BatchBoardModel,
   type BatchPhase,
   buildBatchBoardModel,
 } from "@/components/stream-control/obs/looks/batchModel";
@@ -394,46 +395,223 @@ function resolvePhase(value: string | null): BatchPhase {
   return "done";
 }
 
-export function LookPreviewClient() {
+const PREVIEW_URL = "https://beastyrabbit.com/evolution/ashfern-preview";
+const LITTER_URL = "https://beastyrabbit.com/adoption/preview-litter";
+
+interface HarnessParams {
+  look: ShowLookId;
+  scene: Scene;
+  branches: number;
+  levels: number;
+  pool: number;
+  finalCount: number;
+  phase: BatchPhase;
+  spot: boolean;
+  scale: number;
+  /** still=1 freezes every animation at its end state (for screenshots). */
+  still: boolean;
+  /** auto=1 runs a fake batch show: reveal, wait, mark, cull … until done. */
+  auto: boolean;
+  /** charge=<ms> sets the ceremony's spin length (default 5s). */
+  chargeMs: number;
+}
+
+function useHarnessParams(): HarnessParams {
   const params = useSearchParams();
   const lookParam = params.get("look");
-  const look: ShowLookId = isShowLookId(lookParam) ? lookParam : "allegiances";
-  const scene = resolveScene(params.get("scene"));
-  const branches = Number(params.get("branches") ?? "3");
-  const levels = Number(params.get("levels") ?? "2");
-  const pool = Number(params.get("pool") ?? "16");
-  const finalCount = Number(params.get("final") ?? "10");
-  const phase = resolvePhase(params.get("phase"));
-  const spot = params.get("spot") === "1";
-  const scale = Number(params.get("scale") ?? "0.6");
+  const number = (key: string, fallback: string) =>
+    Number(params.get(key) ?? fallback);
+  return {
+    look: isShowLookId(lookParam) ? lookParam : "allegiances",
+    scene: resolveScene(params.get("scene")),
+    branches: number("branches", "3"),
+    levels: number("levels", "2"),
+    pool: number("pool", "16"),
+    finalCount: number("final", "10"),
+    phase: resolvePhase(params.get("phase")),
+    spot: params.get("spot") === "1",
+    scale: number("scale", "0.6"),
+    still: params.get("still") === "1",
+    auto: params.get("auto") === "1",
+    chargeMs: number("charge", "5000"),
+  };
+}
 
-  const evolutionCommand = useMemo(
-    () => mockEvolutionCommand(branches, levels),
-    [branches, levels],
+/** Each teaser request composes the next cat in a fixed sequence. */
+function useTeaserFrames(): () => Promise<string> {
+  const counter = useRef(1000);
+  return useCallback(() => {
+    counter.current += 1;
+    return composeCat(counter.current, false);
+  }, []);
+}
+
+type Sprites = readonly (string | null)[];
+
+function previewsFor(
+  cats: BatchStreamCat[],
+  urlFor: (index: number) => string | null,
+): Record<string, { url: string } | undefined> {
+  return Object.fromEntries(
+    cats.map((cat, i) => {
+      const url = urlFor(i);
+      return [cat.id, url ? { url } : undefined];
+    }),
   );
-  const poolCats = useMemo(() => mockPool(pool), [pool]);
-  const spriteCount = scene === "batch" ? pool : evolutionCommand.cats.length;
+}
+
+/** The board model while the simulated show runs. */
+function simulatedBoard(
+  poolCats: BatchStreamCat[],
+  sprites: Sprites,
+  finalCount: number,
+  sim: BatchSim,
+): BatchBoardModel {
+  // Alternate the sprite set per stage so every reveal visibly changes.
+  const shifted = (i: number) =>
+    sim.stageIndex % 2 ? i : (i + 1) % Math.max(1, sprites.length);
+  return buildBatchBoardModel({
+    title: "Adoption Elimination",
+    cats: poolCats,
+    finalCount,
+    saved: sim.phase === "done",
+    stages: STAGES,
+    phase: sim.phase,
+    stageIndex: sim.stageIndex,
+    previews: previewsFor(poolCats, (i) =>
+      sprites[i] ? (sprites[shifted(i)] ?? null) : null,
+    ),
+    eliminatedIds: sim.eliminatedIds,
+    fadingId: sim.fadingId,
+    markedId: sim.markedId,
+    potentialIds: sim.potentialIds,
+    favoriteIds: [poolCats[4]?.id ?? ""],
+    spotlightId: sim.spotlightId,
+    qrUrl: sim.phase === "done" ? LITTER_URL : null,
+  });
+}
+
+/** A frozen board for one phase: every odd kit up to the cull count has left. */
+function staticBoard(
+  poolCats: BatchStreamCat[],
+  sprites: Sprites,
+  finalCount: number,
+  phase: BatchPhase,
+  spot: boolean,
+): BatchBoardModel {
+  const culls = Math.max(0, poolCats.length - finalCount);
+  const stageIndex =
+    phase === "done" ? STAGES.length : Math.min(culls, STAGES.length - 1) - 1;
+  const eliminatedCount =
+    phase === "done" ? culls : Math.max(0, Math.min(culls, stageIndex));
+  const eliminatedIds = poolCats
+    .filter((_, i) => i % 2 === 1)
+    .slice(0, eliminatedCount)
+    .map((cat) => cat.id);
+  const alive = poolCats.filter((cat) => !eliminatedIds.includes(cat.id));
+  const culling = phase === "awaitingCull";
+  return buildBatchBoardModel({
+    title: "Adoption Elimination",
+    cats: poolCats,
+    finalCount,
+    saved: phase === "done",
+    stages: STAGES,
+    phase,
+    stageIndex: Math.max(0, stageIndex),
+    previews: previewsFor(poolCats, (i) => sprites[i] ?? null),
+    eliminatedIds,
+    fadingId: null,
+    markedId: culling ? (alive[3]?.id ?? null) : null,
+    potentialIds: culling ? [alive[1]?.id ?? ""] : [],
+    favoriteIds: [alive[4]?.id ?? ""],
+    spotlightId: spot ? (alive[4]?.id ?? null) : null,
+    qrUrl: phase === "done" ? LITTER_URL : null,
+  });
+}
+
+function BatchBoardFor({
+  look,
+  model,
+}: Readonly<{ look: ShowLookId; model: BatchBoardModel }>) {
+  const Batch = BATCH_BOARDS[look];
+  if (!Batch) {
+    return (
+      <p className="p-8 font-mono text-sm text-white/70">
+        {look} has no batch board here; its batch look is a full scene under
+        /dev/obs-batch-preview.
+      </p>
+    );
+  }
+  return <Batch model={model} />;
+}
+
+function Toolbar({
+  params: p,
+  href,
+}: Readonly<{
+  params: HarnessParams;
+  href: (overrides: Record<string, string>) => string;
+}>) {
+  const link = (key: string, value: string, active: boolean) => (
+    <a
+      key={value}
+      href={href({ [key]: value })}
+      className={active ? "underline" : "opacity-60"}
+    >
+      {value}
+    </a>
+  );
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-3 font-mono text-xs">
+      <span className="opacity-60">look:</span>
+      {SHOW_LOOK_IDS.map((id) => link("look", id, id === p.look))}
+      <span className="ml-4 opacity-60">scene:</span>
+      {(["evolution", "ceremony", "batch"] as const).map((s) =>
+        link("scene", s, s === p.scene),
+      )}
+      {p.scene === "batch" ? (
+        <>
+          <span className="ml-4 opacity-60">phase:</span>
+          {(["revealing", "awaitingCull", "done"] as const).map((phase) =>
+            link("phase", phase, phase === p.phase),
+          )}
+          <a
+            href={href({ spot: p.spot ? "0" : "1" })}
+            className="ml-4 opacity-60"
+          >
+            spotlight: {p.spot ? "on" : "off"}
+          </a>
+          <span className="ml-4 opacity-60">pool={p.pool}</span>
+        </>
+      ) : (
+        <span className="ml-4 opacity-60">
+          branches={p.branches} levels={p.levels}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function LookPreviewClient() {
+  const searchParams = useSearchParams();
+  const p = useHarnessParams();
+  const { look, scene, phase } = p;
+  const evolutionCommand = useMemo(
+    () => mockEvolutionCommand(p.branches, p.levels),
+    [p.branches, p.levels],
+  );
+  const poolCats = useMemo(() => mockPool(p.pool), [p.pool]);
+  const spriteCount = scene === "batch" ? p.pool : evolutionCommand.cats.length;
   const sprites = useMockSprites(
     spriteCount,
     scene === "batch" && phase !== "done",
   );
+  const sim = useBatchSimulation(p.auto, poolCats, p.finalCount);
 
-  // still=1 freezes every animation at its end state (for screenshots).
-  const still = params.get("still") === "1";
-
-  // auto=1 runs a fake batch show: reveal, wait, mark, cull … until done.
-  const auto = params.get("auto") === "1";
-  const sim = useBatchSimulation(auto, poolCats, finalCount);
-
-  // scene=ceremony plays the look's themed ceremony with mock teaser frames
-  // (charge=<ms> sets the spin length, default 5s).
   const [finished, setFinished] = useState(false);
-  const chargeMs = Number(params.get("charge") ?? "5000");
-  const teaser = useCallback(
-    () => composeCat(Math.floor(Math.random() * 100000), false),
-    [],
-  );
+  const teaser = useTeaserFrames();
   const finish = useCallback(() => setFinished(true), []);
+  const ceremonyRunning = scene === "ceremony" && !finished;
   const reveal = useLineageCeremony({
     cats: evolutionCommand.cats.map((cat, i) => ({
       key: cat.key,
@@ -444,175 +622,52 @@ export function LookPreviewClient() {
       previewUrl: sprites[i] ?? null,
     })),
     totalCount: evolutionCommand.totalCount,
-    chargeDurationMs: chargeMs,
+    chargeDurationMs: p.chargeMs,
     requestTeaserFrame: teaser,
     onFinish: finish,
-    enabled: scene === "ceremony" && !finished && sprites.length > 0,
+    enabled: ceremonyRunning && sprites.length > 0,
   });
 
-  const Look = SHOW_LOOKS[look];
-  const Batch = BATCH_BOARDS[look];
   let board: React.ReactNode;
-  if (scene !== "batch") {
+  if (scene === "batch") {
+    const model = p.auto
+      ? simulatedBoard(poolCats, sprites, p.finalCount, sim)
+      : staticBoard(poolCats, sprites, p.finalCount, phase, p.spot);
+    board = <BatchBoardFor look={look} model={model} />;
+  } else {
+    const Look = SHOW_LOOKS[look];
     const model = buildLineageModel(
       evolutionCommand,
       evolutionCommand.cats.map((cat, i) => ({
         key: cat.key,
         previewUrl: sprites[i] ?? null,
       })),
-      "https://beastyrabbit.com/evolution/ashfern-preview",
+      PREVIEW_URL,
     );
     board = (
       <Look.Lineage
         model={model}
-        reveal={scene === "ceremony" && !finished ? reveal : undefined}
+        reveal={ceremonyRunning ? reveal : undefined}
       />
     );
-  } else if (!Batch) {
-    board = (
-      <p className="p-8 font-mono text-sm text-white/70">
-        {look} has no batch board here; its batch look is a full scene under
-        /dev/obs-batch-preview.
-      </p>
-    );
-  } else if (auto) {
-    board = (
-      <Batch
-        model={buildBatchBoardModel({
-          title: "Adoption Elimination",
-          cats: poolCats,
-          finalCount,
-          saved: sim.phase === "done",
-          stages: STAGES,
-          phase: sim.phase,
-          stageIndex: sim.stageIndex,
-          previews: Object.fromEntries(
-            poolCats.map((cat, i) => [
-              cat.id,
-              sprites[i]
-                ? {
-                    url:
-                      sim.stageIndex % 2
-                        ? (sprites[i] as string)
-                        : (sprites[(i + 1) % sprites.length] as string),
-                  }
-                : undefined,
-            ]),
-          ),
-          eliminatedIds: sim.eliminatedIds,
-          fadingId: sim.fadingId,
-          markedId: sim.markedId,
-          potentialIds: sim.potentialIds,
-          favoriteIds: [poolCats[4]?.id ?? ""],
-          spotlightId: sim.spotlightId,
-          qrUrl:
-            sim.phase === "done"
-              ? "https://beastyrabbit.com/adoption/preview-litter"
-              : null,
-        })}
-      />
-    );
-  } else {
-    const culls = Math.max(0, pool - finalCount);
-    const stageIndex =
-      phase === "done" ? STAGES.length : Math.min(culls, STAGES.length - 1) - 1;
-    const eliminatedCount =
-      phase === "done" ? culls : Math.max(0, Math.min(culls, stageIndex));
-    const eliminatedIds = poolCats
-      .filter((_, i) => i % 2 === 1)
-      .slice(0, eliminatedCount)
-      .map((cat) => cat.id);
-    const alive = poolCats.filter((cat) => !eliminatedIds.includes(cat.id));
-    const model = buildBatchBoardModel({
-      title: "Adoption Elimination",
-      cats: poolCats,
-      finalCount,
-      saved: phase === "done",
-      stages: STAGES,
-      phase,
-      stageIndex: Math.max(0, stageIndex),
-      previews: Object.fromEntries(
-        poolCats.map((cat, i) => [
-          cat.id,
-          sprites[i] ? { url: sprites[i] as string } : undefined,
-        ]),
-      ),
-      eliminatedIds,
-      fadingId: null,
-      markedId: phase === "awaitingCull" ? (alive[3]?.id ?? null) : null,
-      potentialIds: phase === "awaitingCull" ? [alive[1]?.id ?? ""] : [],
-      favoriteIds: [alive[4]?.id ?? ""],
-      spotlightId: spot ? (alive[4]?.id ?? null) : null,
-      qrUrl:
-        phase === "done"
-          ? "https://beastyrabbit.com/adoption/preview-litter"
-          : null,
-    });
-    board = <Batch model={model} />;
   }
 
   const href = (overrides: Record<string, string>) => {
-    const next = new URLSearchParams(params.toString());
+    const next = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(overrides)) next.set(key, value);
     return `?${next.toString()}`;
   };
 
   return (
     <div className="min-h-screen bg-[#141820] p-4 text-sm text-white">
-      {still ? (
+      {p.still ? (
         <style>{`[data-look] *, [data-look] { animation-duration: 0s !important; animation-delay: 0s !important; }`}</style>
       ) : null}
-      <div className="mb-3 flex flex-wrap items-center gap-3 font-mono text-xs">
-        <span className="opacity-60">look:</span>
-        {SHOW_LOOK_IDS.map((id) => (
-          <a
-            key={id}
-            href={href({ look: id })}
-            className={id === look ? "underline" : "opacity-60"}
-          >
-            {id}
-          </a>
-        ))}
-        <span className="ml-4 opacity-60">scene:</span>
-        {(["evolution", "ceremony", "batch"] as const).map((s) => (
-          <a
-            key={s}
-            href={href({ scene: s })}
-            className={s === scene ? "underline" : "opacity-60"}
-          >
-            {s}
-          </a>
-        ))}
-        {scene === "batch" ? (
-          <>
-            <span className="ml-4 opacity-60">phase:</span>
-            {(["revealing", "awaitingCull", "done"] as const).map((p) => (
-              <a
-                key={p}
-                href={href({ phase: p })}
-                className={p === phase ? "underline" : "opacity-60"}
-              >
-                {p}
-              </a>
-            ))}
-            <a
-              href={href({ spot: spot ? "0" : "1" })}
-              className="ml-4 opacity-60"
-            >
-              spotlight: {spot ? "on" : "off"}
-            </a>
-            <span className="ml-4 opacity-60">pool={pool}</span>
-          </>
-        ) : (
-          <span className="ml-4 opacity-60">
-            branches={branches} levels={levels}
-          </span>
-        )}
-      </div>
+      <Toolbar params={p} href={href} />
       <div
         style={{
-          width: `${(1920 * scale).toString()}px`,
-          height: `${(1080 * scale).toString()}px`,
+          width: `${(1920 * p.scale).toString()}px`,
+          height: `${(1080 * p.scale).toString()}px`,
           overflow: "hidden",
           position: "relative",
           borderRadius: "6px",
@@ -624,7 +679,7 @@ export function LookPreviewClient() {
           style={{
             width: 1920,
             height: 1080,
-            transform: `scale(${scale.toString()})`,
+            transform: `scale(${p.scale.toString()})`,
             transformOrigin: "top left",
           }}
         >

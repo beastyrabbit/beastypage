@@ -1,13 +1,21 @@
 "use client";
 
 import {
+  type LineageCatState,
+  type LineageReveal,
   lineageBranchOpen,
   lineageCatState,
   lineageSpriteUrl,
 } from "../ceremony";
 import { LOOK_FONT_HAND } from "../fonts";
 import type { LineageBoardProps } from "../LookBoardProps";
-import { additionTags, lineageRank } from "../lineageModel";
+import {
+  additionTags,
+  type LineageBranch,
+  type LineageCat,
+  type LineageModel,
+  lineageRank,
+} from "../lineageModel";
 import {
   ContactSheet,
   CS_GREASE,
@@ -24,6 +32,46 @@ const STRIP_LEFT = 60;
 const FIRST_TOP = 124;
 const STRIP_GAP = 30;
 const BOTTOM_LIMIT = 880;
+
+function landed(state: LineageCatState): boolean {
+  return state === "shown" || state === "revealing";
+}
+
+function sheetCaption(
+  model: LineageModel,
+  reveal: LineageReveal | undefined,
+  rankWord: string,
+): string {
+  if (!reveal || reveal.done) {
+    return `EVOLUTION · ${model.totalCount} CATS · CONTACT SHEET · CIRCLE THE ${rankWord.toUpperCase()}S`;
+  }
+  const lightbox = reveal.charging ? " · LIGHTBOX ON" : "";
+  return `EXPOSING · ${reveal.revealedKeys.size}/${model.totalCount} FRAMES${lightbox}`;
+}
+
+/** Edge code listing what each landed stop added, e.g. "· 1 +LAVENDER". */
+function edgeCode(
+  branch: LineageBranch,
+  reveal: LineageReveal | undefined,
+): string {
+  const stops = branch.cats
+    .filter((cat) => landed(lineageCatState(reveal, cat.key)))
+    .map(
+      (cat) =>
+        ` · ${cat.level} ${additionTags(cat.additions, 2, 14).join(" ").toUpperCase()}`,
+    )
+    .join("");
+  return `${branch.label.toUpperCase()} ▸ ${branch.theme.label.toUpperCase()} · 0 ORIGIN${stops}`;
+}
+
+function frameCaption(
+  cat: LineageCat | null,
+  state: LineageCatState,
+): string | undefined {
+  if (!cat || state === "hidden") return undefined;
+  if (state === "charging") return "exposing…";
+  return `${cat.level} · ${lineageRank(cat)}`;
+}
 
 /**
  * One roll per branch, one frame per stop (frame 0 is the shared starter
@@ -59,24 +107,20 @@ export function ContactLineage({ model, reveal }: Readonly<LineageBoardProps>) {
   const tight = stripHeight < 170;
   const done = !reveal || reveal.done;
   const rankWord = lineageRank({ level: model.maxLevels });
-  const exposed = reveal ? reveal.revealedKeys.size : model.totalCount;
 
   return (
     <ContactSheet>
       <SheetHead
         title={`${starter?.label ?? "Lineage"} — ${rolls} roll${rolls === 1 ? "" : "s"}, ${model.maxLevels} stop${model.maxLevels === 1 ? "" : "s"} each`}
-        caption={
-          done
-            ? `EVOLUTION · ${model.totalCount} CATS · CONTACT SHEET · CIRCLE THE ${rankWord.toUpperCase()}S`
-            : `EXPOSING · ${exposed}/${model.totalCount} FRAMES${reveal?.charging ? " · LIGHTBOX ON" : ""}`
-        }
+        caption={sheetCaption(model, reveal, rankWord)}
       />
 
       {branches.map((branch, rollIndex) => {
         if (!lineageBranchOpen(reveal, branch.label)) return null;
-        const last = branch.cats[branch.cats.length - 1];
-        const lastState = last ? lineageCatState(reveal, last.key) : "hidden";
-        const lastLanded = lastState === "shown" || lastState === "revealing";
+        const last = branch.cats.at(-1);
+        const lastLanded = last
+          ? landed(lineageCatState(reveal, last.key))
+          : false;
         return (
           <FilmStrip
             key={branch.label}
@@ -87,18 +131,7 @@ export function ContactLineage({ model, reveal }: Readonly<LineageBoardProps>) {
             style={{
               animation: "look-rise 600ms cubic-bezier(.2,1,.3,1) both",
             }}
-            edgeBottom={
-              tight
-                ? undefined
-                : `${branch.label.toUpperCase()} ▸ ${branch.theme.label.toUpperCase()} · 0 ORIGIN${branch.cats
-                    .map((cat) =>
-                      lineageCatState(reveal, cat.key) === "shown" ||
-                      lineageCatState(reveal, cat.key) === "revealing"
-                        ? ` · ${cat.level} ${additionTags(cat.additions, 2, 14).join(" ").toUpperCase()}`
-                        : "",
-                    )
-                    .join("")}`
-            }
+            edgeBottom={tight ? undefined : edgeCode(branch, reveal)}
           >
             {Array.from({ length: frameCount - 1 }, (_, i) => (
               <FrameMarker
@@ -132,13 +165,7 @@ export function ContactLineage({ model, reveal }: Readonly<LineageBoardProps>) {
                   left={frameLeft(i + 1)}
                   width={frameWidth}
                   height={frameHeight}
-                  cap={
-                    cat && state !== "hidden"
-                      ? exposing
-                        ? "exposing…"
-                        : `${cat.level} · ${lineageRank(cat)}`
-                      : undefined
-                  }
+                  cap={frameCaption(cat, state)}
                   capColor={exposing ? CS_GREASE : undefined}
                   number={String(i + 1)}
                   url={url}
@@ -181,10 +208,10 @@ export function ContactLineage({ model, reveal }: Readonly<LineageBoardProps>) {
       >
         {branches.map((branch, rollIndex) => {
           const lastIndex = branch.cats.length;
-          const last = branch.cats[lastIndex - 1];
+          const last = branch.cats.at(-1);
           if (!last) return null;
           const state = lineageCatState(reveal, last.key);
-          if (state !== "shown" && state !== "revealing") return null;
+          if (!landed(state)) return null;
           return (
             <GreaseEllipse
               key={branch.label}

@@ -1,12 +1,18 @@
 "use client";
 
 import {
+  type LineageCatState,
+  type LineageReveal,
   lineageBranchOpen,
   lineageCatState,
   lineageSpriteUrl,
 } from "../ceremony";
 import type { LineageBoardProps } from "../LookBoardProps";
-import { additionTags, type LineageCat } from "../lineageModel";
+import {
+  additionTags,
+  type LineageCat,
+  type LineageModel,
+} from "../lineageModel";
 import { useTypewriter } from "../motion";
 import { GB_DIM, GB_INK, GB_SCREEN } from "./gbSprite";
 import {
@@ -52,39 +58,14 @@ export function HandheldLineage({
   );
   const fontScale = rowHeight < 110 ? 0.8 : 1;
   const done = !reveal || reveal.done;
-  const newest = model.cats[model.cats.length - 1] ?? null;
+  const newest = model.cats.at(-1) ?? null;
   const active = reveal?.activeKey
     ? (model.cats.find((c) => c.key === reveal.activeKey) ?? null)
     : null;
-  const focus = reveal && !reveal.done ? active : newest;
+  const focus = done ? newest : active;
   const focusParent = focus ? parentOf(focus, model.cats) : null;
-  const highlightKey =
-    reveal && !reveal.done
-      ? reveal.revealing
-        ? active?.key
-        : null
-      : newest?.key;
-
-  const message = (() => {
-    if (!reveal)
-      return newest && focusParent
-        ? `${focusParent.label.toUpperCase()} evolved into ${newest.label.toUpperCase()}!`
-        : "The lineage is complete!";
-    switch (reveal.step.kind) {
-      case "summon":
-        return `${(model.starter?.label ?? "A KIT").toUpperCase()} enters the chamber.`;
-      case "banner":
-        return `The ${(reveal.activeBranch ?? "").toUpperCase()} line begins!`;
-      case "charge":
-        return `What? ${(focusParent?.label ?? "").toUpperCase()} is evolving!`;
-      case "reveal":
-        return `${(focusParent?.label ?? "").toUpperCase()} evolved into ${(focus?.label ?? "").toUpperCase()}!`;
-      case "waiting":
-        return "…";
-      case "finale":
-        return `All ${model.totalCount} cats recorded!`;
-    }
-  })();
+  const highlightKey = highlightKeyFor(reveal, active, newest);
+  const message = textBoxMessage(model, reveal, focus, focusParent);
   const typed = useTypewriter(message, 28, Boolean(reveal));
 
   return (
@@ -206,12 +187,7 @@ export function HandheldLineage({
                   key={`sprite-${level.toString()}`}
                   style={{
                     opacity: state === "hidden" ? 0 : 1,
-                    animation:
-                      state === "charging"
-                        ? "gb-evolve 0.5s steps(2) infinite"
-                        : state === "revealing"
-                          ? "gb-flash 900ms steps(4) both"
-                          : undefined,
+                    animation: spriteAnimation(state),
                   }}
                 >
                   <LcdSprite
@@ -303,6 +279,53 @@ export function HandheldLineage({
       </LcdBox>
     </HandheldShell>
   );
+}
+
+/** The name row to invert: the landing cat mid-ceremony, the newest at the end. */
+function highlightKeyFor(
+  reveal: LineageReveal | undefined,
+  active: LineageCat | null,
+  newest: LineageCat | null,
+): string | null | undefined {
+  if (!reveal || reveal.done) return newest?.key;
+  return reveal.revealing ? active?.key : null;
+}
+
+function spriteAnimation(state: LineageCatState): string | undefined {
+  if (state === "charging") return "gb-evolve 0.5s steps(2) infinite";
+  return state === "revealing" ? "gb-flash 900ms steps(4) both" : undefined;
+}
+
+function shout(label: string | null | undefined, fallback = ""): string {
+  return (label ?? fallback).toUpperCase();
+}
+
+/** What the text box types for the current step. */
+function textBoxMessage(
+  model: LineageModel,
+  reveal: LineageReveal | undefined,
+  focus: LineageCat | null,
+  focusParent: LineageCat | null,
+): string {
+  if (!reveal) {
+    return focus && focusParent
+      ? `${shout(focusParent.label)} evolved into ${shout(focus.label)}!`
+      : "The lineage is complete!";
+  }
+  switch (reveal.step.kind) {
+    case "summon":
+      return `${shout(model.starter?.label, "A KIT")} enters the chamber.`;
+    case "banner":
+      return `The ${shout(reveal.activeBranch)} line begins!`;
+    case "charge":
+      return `What? ${shout(focusParent?.label)} is evolving!`;
+    case "reveal":
+      return `${shout(focusParent?.label)} evolved into ${shout(focus?.label)}!`;
+    case "waiting":
+      return "…";
+    case "finale":
+      return `All ${model.totalCount} cats recorded!`;
+  }
 }
 
 function parentOf(cat: LineageCat, cats: LineageCat[]): LineageCat | null {
