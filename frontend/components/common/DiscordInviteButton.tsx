@@ -483,7 +483,7 @@ export function DiscordInviteButton({
           open
           aria-modal="true"
           aria-labelledby="discord-invite-title"
-          className="relative w-full max-w-md transform bg-transparent text-inherit overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-b from-background via-background/95 to-background shadow-[0_40px_120px_-30px_rgba(15,15,45,0.65)] ring-1 ring-border/40 transition-all duration-200 ease-out"
+          className="relative w-full max-w-md transform bg-transparent text-inherit overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-b from-background via-background/95 to-background shadow-[0_40px_120px_-30px_rgba(15,15,45,0.65)] ring-1 ring-border/40 transition-all duration-200 ease-out motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95"
         >
           <div
             ref={contentRef}
@@ -581,7 +581,7 @@ export function DiscordInviteButton({
         type="button"
         onClick={handleOpen}
         className={cn(
-          "rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background transition hover:opacity-90",
+          "rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background transition hover:opacity-90 active:scale-[0.96]",
           className,
         )}
       >

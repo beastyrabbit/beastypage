@@ -6,6 +6,125 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Motion tokens. Registered in @theme so `motion-safe:` / `group-hover:`
+   variants compile (classes in @layer utilities never get variants). */
+@theme {
+  --ease-out-soft: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-soft: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --animate-shimmer: shimmer 8s linear infinite;
+  --animate-shine: shine 1.2s cubic-bezier(0.23, 1, 0.32, 1) 1;
+  --animate-float: float 8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  --animate-pulse-glow: pulse-glow 4s ease-in-out infinite;
+  --animate-pulse-soft: pulse-soft 4s ease-in-out infinite;
+  --animate-pan: pan 36s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
+  --animate-drift: drift 14s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
+  --animate-track-in: track-in 700ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  --animate-rise: rise 700ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  --animate-pop: pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+
+  @keyframes shimmer {
+    from {
+      background-position: 200% center;
+    }
+    to {
+      background-position: -200% center;
+    }
+  }
+  /* one-shot gloss sweep for `-translate-x-full` overlays */
+  @keyframes shine {
+    from {
+      translate: -100% 0;
+    }
+    to {
+      translate: 100% 0;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 48%, transparent);
+    }
+    50% {
+      opacity: 0.88;
+      box-shadow: 0 0 0 10px color-mix(in oklab, var(--primary) 0%, transparent);
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.9;
+      transform: scale(1.02);
+    }
+  }
+  @keyframes pan {
+    from {
+      transform: scale(1.06) translate3d(-1.2%, 0, 0);
+    }
+    to {
+      transform: scale(1.06) translate3d(1.2%, 0, 0);
+    }
+  }
+  @keyframes drift {
+    from {
+      translate: 0 0;
+      scale: 1;
+    }
+    to {
+      translate: -22px 16px;
+      scale: 1.1;
+    }
+  }
+  /* settles into whatever `tracking-*` the element already has */
+  @keyframes track-in {
+    from {
+      letter-spacing: calc(var(--tw-tracking, 0.3em) - 0.16em);
+      opacity: 0;
+    }
+    to {
+      letter-spacing: var(--tw-tracking, 0.3em);
+      opacity: 1;
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      translate: 0 11px;
+      filter: blur(5px);
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
+      filter: blur(0);
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      scale: 0.84;
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+    }
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -142,19 +261,24 @@
   }
 }
 
-.glass-card {
-  @apply rounded-3xl border border-white/10 bg-black/40 shadow-2xl backdrop-blur-xl transition-all duration-500;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
-    0 20px 40px -10px rgba(0, 0, 0, 0.3);
-}
+/* In @layer components so utilities on the element can override timing and
+   lift; the hover lift uses `translate` so `hover:-translate-y-*` replaces it
+   instead of stacking on top. */
+@layer components {
+  .glass-card {
+    @apply rounded-3xl border border-white/10 bg-black/40 shadow-2xl backdrop-blur-xl transition-all duration-500;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+      0 20px 40px -10px rgba(0, 0, 0, 0.3);
+  }
 
-.glass-card:hover {
-  @apply border-white/20 bg-black/50;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 25px 50px -12px rgba(0, 0, 0, 0.4);
-  transform: translateY(-2px);
+  .glass-card:hover {
+    @apply border-white/20 bg-black/50;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 25px 50px -12px rgba(0, 0, 0, 0.4);
+    translate: 0 -2px;
+  }
 }
 
 .section-eyebrow {
@@ -169,16 +293,34 @@
   @apply border-white/10 bg-white/10 text-foreground shadow-lg;
 }
 
-.nav-pill--active {
-  @apply border-transparent text-white shadow-lg;
+.nav-pill {
+  position: relative;
+  isolation: isolate;
 }
 
-.nav-pill[data-accent="hub"].nav-pill--active {
+.nav-pill:active {
+  scale: 0.96;
+}
+
+.nav-pill--active {
+  @apply border-transparent text-white;
+}
+
+/* Active pill background, rendered as a motion layoutId element inside the
+   active link so it slides between items on route change. */
+.nav-ink {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 9999px;
+}
+
+.nav-ink[data-accent="hub"] {
   background: linear-gradient(135deg, oklch(0.45 0.15 270), oklch(0.6 0.2 320));
   box-shadow: 0 4px 20px -4px oklch(0.5 0.2 290 / 0.5);
 }
 
-.nav-pill[data-accent="stream"].nav-pill--active {
+.nav-ink[data-accent="stream"] {
   background: linear-gradient(
     135deg,
     oklch(0.65 0.22 140),
@@ -187,12 +329,12 @@
   box-shadow: 0 4px 20px -4px oklch(0.6 0.2 140 / 0.5);
 }
 
-.nav-pill[data-accent="quick-share"].nav-pill--active {
+.nav-ink[data-accent="quick-share"] {
   background: linear-gradient(135deg, oklch(0.62 0.14 55), oklch(0.48 0.12 35));
   box-shadow: 0 4px 20px -4px oklch(0.55 0.13 45 / 0.45);
 }
 
-.nav-pill[data-accent="collection"].nav-pill--active {
+.nav-ink[data-accent="collection"] {
   background: linear-gradient(
     135deg,
     oklch(0.7 0.15 250),
@@ -201,17 +343,17 @@
   box-shadow: 0 4px 20px -4px oklch(0.65 0.15 280 / 0.5);
 }
 
-.nav-pill[data-accent="personal"].nav-pill--active {
+.nav-ink[data-accent="personal"] {
   background: linear-gradient(135deg, oklch(0.3 0.05 270), oklch(0.4 0.1 300));
   box-shadow: 0 4px 20px -4px oklch(0.35 0.1 285 / 0.5);
 }
 
-.nav-pill[data-accent="projects"].nav-pill--active {
+.nav-ink[data-accent="projects"] {
   background: linear-gradient(135deg, oklch(0.7 0.18 85), oklch(0.55 0.15 40));
   box-shadow: 0 4px 20px -4px oklch(0.6 0.15 60 / 0.5);
 }
 
-.nav-pill[data-accent="dash"].nav-pill--active {
+.nav-ink[data-accent="dash"] {
   background: linear-gradient(135deg, oklch(0.65 0.2 155), oklch(0.5 0.16 140));
   box-shadow: 0 4px 20px -4px oklch(0.55 0.18 150 / 0.5);
 }
@@ -644,111 +786,6 @@
     -ms-interpolation-mode: nearest-neighbor;
     image-rendering: pixelated;
   }
-
-  .animate-shine {
-    animation: shine 8s ease-in-out infinite;
-  }
-
-  .animate-float {
-    animation: float 6s ease-in-out infinite;
-  }
-
-  .animate-pulse-glow {
-    animation: pulse-glow 4s ease-in-out infinite;
-  }
-
-  .delay-100 {
-    animation-delay: 100ms;
-  }
-
-  .delay-200 {
-    animation-delay: 200ms;
-  }
-
-  .delay-300 {
-    animation-delay: 300ms;
-  }
-
-  .animate-pulse-soft {
-    animation: pulse-soft 4s ease-in-out infinite;
-  }
-
-  .animate-shimmer {
-    animation: shimmer 8s linear infinite;
-  }
-
-  .animate-stagger-1 {
-    animation-delay: 100ms;
-  }
-
-  .animate-stagger-2 {
-    animation-delay: 200ms;
-  }
-
-  .animate-stagger-3 {
-    animation-delay: 300ms;
-  }
-
-  .animate-stagger-4 {
-    animation-delay: 400ms;
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: 200% center;
-  }
-
-  100% {
-    background-position: -200% center;
-  }
-}
-
-@keyframes shine {
-  0% {
-    background-position: 200% center;
-  }
-
-  100% {
-    background-position: -200% center;
-  }
-}
-
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes pulse-glow {
-  0%,
-  100% {
-    opacity: 1;
-    box-shadow: 0 0 0 0px rgba(var(--primary), 0.7);
-  }
-
-  50% {
-    opacity: 0.8;
-    box-shadow: 0 0 0 10px rgba(var(--primary), 0);
-  }
-}
-
-@keyframes pulse-soft {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.9;
-    transform: scale(1.02);
-  }
 }
 
 /* react-colorful overrides for palette generator color picker */
@@ -769,4 +806,310 @@
   width: 16px !important;
   height: 16px !important;
   border-width: 2px !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Site-wide micro-interactions. Only transform/opacity/colour move.   */
+/* ------------------------------------------------------------------ */
+@layer components {
+  /* Breathing ring behind a call to action (every 4s). */
+  .cta-ring {
+    position: relative;
+    isolation: isolate;
+  }
+  .cta-ring::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    border: 1px solid rgb(251 191 36 / 0.55);
+    pointer-events: none;
+    animation: cta-ring 4s ease-out 2s infinite;
+  }
+
+  /* Underline that draws in from the left. */
+  .link-underline {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 1px;
+    transition:
+      background-size 250ms var(--ease-out-soft),
+      color 200ms;
+  }
+  .link-underline:hover {
+    background-size: 100% 1px;
+  }
+
+  /* A small image that peeks up from behind the host's top edge on hover. */
+  .peek-host {
+    position: relative;
+    display: inline-block;
+  }
+  .peek-wrap {
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    width: 22px;
+    height: 18px;
+    margin-left: -11px;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .peek {
+    translate: 0 100%;
+    transition: translate 350ms var(--ease-spring);
+  }
+  .peek-host:hover .peek {
+    translate: 0 20%;
+  }
+
+  /* Paw prints trot across the word on hover; each paw sets --i. */
+  .paw-walk {
+    position: relative;
+    display: inline-block;
+  }
+  .paw-walk__paw {
+    position: absolute;
+    top: 0.1em;
+    left: calc(var(--i) * 26% - 2px);
+    opacity: 0;
+    rotate: calc(var(--i) * 11deg - 16deg);
+    color: rgb(252 211 77);
+    pointer-events: none;
+  }
+  .paw-walk:hover .paw-walk__paw {
+    animation: paw-hop 1.3s ease-out calc(var(--i) * 160ms) infinite;
+  }
+
+  /* Terminal caret after a word on hover. */
+  .caret-hover {
+    position: relative;
+  }
+  .caret-hover::after {
+    content: "▍";
+    position: absolute;
+    left: calc(100% + 0.1em);
+    top: 0;
+    opacity: 0;
+    color: rgb(252 211 77);
+  }
+  .caret-hover:hover::after {
+    animation: caret 1s steps(1) infinite;
+  }
+
+  /* Per-icon hover verbs for pill links: data-verb="grow|lift|cloud|stamp|spin". */
+  .icon-verb svg {
+    transition:
+      scale 300ms var(--ease-spring),
+      translate 300ms var(--ease-spring);
+  }
+  .icon-verb[data-verb="grow"]:hover svg {
+    scale: 1.2;
+  }
+  .icon-verb[data-verb="lift"]:hover svg {
+    translate: 0 -2.5px;
+  }
+  .icon-verb[data-verb="cloud"]:hover svg {
+    animation: cloud 1.2s ease-in-out infinite;
+  }
+  .icon-verb[data-verb="stamp"]:hover svg {
+    animation: stamp 500ms var(--ease-out-soft) 1;
+  }
+  .icon-verb[data-verb="spin"]:hover svg {
+    animation: spin-once 700ms var(--ease-out-soft) 1;
+  }
+
+  /* Head-tilt on hover, squash on press (profile pictures). */
+  .hover-tilt {
+    transition:
+      rotate 400ms var(--ease-spring),
+      scale 400ms var(--ease-spring),
+      border-color 300ms;
+  }
+  .hover-tilt:hover {
+    rotate: -2.5deg;
+    scale: 1.025;
+    border-color: rgb(251 191 36 / 0.45);
+  }
+  .hover-tilt:active {
+    scale: 0.97 1.03;
+    transition-duration: 120ms;
+  }
+
+  /* Tag pills: lift and tilt by --tilt on hover. */
+  .hover-tag {
+    transition:
+      translate 200ms var(--ease-out-soft),
+      rotate 250ms var(--ease-spring),
+      border-color 200ms,
+      color 200ms,
+      background-color 200ms;
+  }
+  .hover-tag:hover {
+    translate: 0 -1.5px;
+    rotate: var(--tilt, 0deg);
+    border-color: rgb(251 191 36 / 0.4);
+    color: rgb(254 243 199);
+    background-color: rgb(251 191 36 / 0.08);
+  }
+
+  /* Header brand: icon wiggles, wordmark gets one amber sweep. */
+  .brand-mark {
+    transform-origin: 50% 60%;
+  }
+  .brand:hover .brand-mark {
+    animation: wiggle 450ms ease-out 1;
+  }
+  .brand-word {
+    background-image: linear-gradient(
+      90deg,
+      var(--foreground) 0%,
+      var(--foreground) 42%,
+      #fcd34d 50%,
+      var(--foreground) 58%,
+      var(--foreground) 100%
+    );
+    background-size: 200% auto;
+    background-position: 200% center;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .brand:hover .brand-word {
+    animation: shimmer 700ms ease-out 1;
+  }
+
+  /* Sticky header grows a shadow as the page scrolls (CSS scroll timeline). */
+  @supports (animation-timeline: scroll()) {
+    .header-scroll-shadow {
+      animation: header-shadow linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 120px;
+    }
+  }
+}
+
+@keyframes cta-ring {
+  0% {
+    scale: 1;
+    opacity: 0.5;
+  }
+  40%,
+  100% {
+    scale: 1.35;
+    opacity: 0;
+  }
+}
+
+@keyframes paw-hop {
+  0% {
+    opacity: 0;
+    translate: 0 6px;
+    scale: 0.5;
+  }
+  25% {
+    opacity: 0.9;
+    translate: 0 -2px;
+    scale: 1;
+  }
+  60% {
+    opacity: 0.9;
+    translate: 0 0;
+    scale: 0.95;
+  }
+  100% {
+    opacity: 0;
+    translate: 0 0;
+    scale: 0.9;
+  }
+}
+
+@keyframes caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes wiggle {
+  0% {
+    rotate: 0deg;
+  }
+  25% {
+    rotate: -10deg;
+  }
+  55% {
+    rotate: 7deg;
+  }
+  80% {
+    rotate: -3deg;
+  }
+  100% {
+    rotate: 0deg;
+  }
+}
+
+@keyframes stamp {
+  0% {
+    scale: 1;
+  }
+  40% {
+    scale: 0.76;
+  }
+  70% {
+    scale: 1.2;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+@keyframes spin-once {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes cloud {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 3px -1.5px;
+  }
+}
+
+@keyframes header-shadow {
+  from {
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+  }
+  to {
+    box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Ambient loops stop entirely for people who asked for less motion;
+   entrances are gated with `motion-safe:` at the call sites. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer,
+  .animate-float,
+  .animate-pulse-glow,
+  .animate-pulse-soft,
+  .animate-pan,
+  .animate-drift,
+  .cta-ring::after,
+  .paw-walk__paw,
+  .icon-verb svg,
+  .brand-mark,
+  .brand-word,
+  .caret-hover::after {
+    animation: none !important;
+  }
 }
