@@ -61,7 +61,14 @@ async function normalizeUnsupportedImage(buffer: Buffer): Promise<Buffer> {
     sequentialRead: true,
   });
   const metadata = await image.metadata();
-  if (!metadata.width || !metadata.height) {
+  const supportedBySharp =
+    metadata.format === "tiff" ||
+    (metadata.format === "heif" && metadata.mediaType === "image/avif");
+  if (
+    !metadata.width ||
+    !metadata.height ||
+    !supportedBySharp
+  ) {
     throw new Error("Unsupported or unreadable raster image header");
   }
   assertImageDimensionsWithinLimits({
