@@ -41,6 +41,28 @@ export interface CeremonyCatInput {
   branchLabel: string | null;
   archetype: string | null;
   previewUrl: string | null;
+  /** What the cat gained; the reveal lingers a little longer per addition. */
+  additions?: readonly unknown[];
+}
+
+/** Extra reveal time per addition, matching EvolutionCeremony's chip stagger. */
+export const REVEAL_MS_PER_ADDITION = 180;
+
+/**
+ * How long a step holds before the ceremony advances. Same numbers as the
+ * generator page's EvolutionCeremony: the charge uses the command's spin
+ * length and a reveal grows by 180 ms per addition the cat shows.
+ */
+export function stepDurationMs(
+  step: CeremonyStep,
+  cats: readonly CeremonyCatInput[],
+  chargeDurationMs: number,
+): number {
+  if (step.kind === "charge") return chargeDurationMs;
+  const base = CEREMONY_STEP_MS[step.kind];
+  if (step.kind !== "reveal") return base;
+  const additions = cats[step.index]?.additions?.length ?? 0;
+  return base + additions * REVEAL_MS_PER_ADDITION;
 }
 
 export interface LineageReveal {
@@ -177,8 +199,7 @@ export function useLineageCeremony({
   // Timed auto-advance for every animated step.
   useEffect(() => {
     if (!enabled) return;
-    const duration =
-      step.kind === "charge" ? chargeDurationMs : CEREMONY_STEP_MS[step.kind];
+    const duration = stepDurationMs(step, catsRef.current, chargeDurationMs);
     if (step.kind === "finale") {
       const timer = window.setTimeout(() => onFinishRef.current(), duration);
       return () => window.clearTimeout(timer);

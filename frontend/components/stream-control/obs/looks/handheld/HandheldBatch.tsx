@@ -1,6 +1,6 @@
 "use client";
 
-import type { BatchBoardCat } from "../batchModel";
+import { type BatchBoardCat, stageStripWindow } from "../batchModel";
 import type { BatchBoardProps } from "../LookBoardProps";
 import { chunkBySizes, splitColumns } from "../layout";
 import { useChangeTick, useTypewriter } from "../motion";
@@ -118,7 +118,7 @@ export function HandheldBatch({ model }: Readonly<BatchBoardProps>) {
           <span
             style={{ color: GB_DIM, whiteSpace: "nowrap", overflow: "hidden" }}
           >
-            {model.stages.map((s) => (
+            {stageStripWindow(model.stages, 7).map((s) => (
               <span
                 key={s.id}
                 style={{
