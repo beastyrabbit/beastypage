@@ -201,7 +201,12 @@ export const createUpload = internalMutation({
     }
     const existingSlugs = await ctx.db
       .query("quick_share_uploads")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .withIndex("by_slug_and_active_and_retainedUntil", (q) =>
+        q
+          .eq("slug", args.slug)
+          .eq("active", true)
+          .gt("retainedUntil", args.now),
+      )
       .take(QUICK_SHARE_POLICY.collectionMaxItems + 1);
     if (existingSlugs.length > 0) {
       const collectionOwnerExists = existingSlugs.some(
@@ -520,7 +525,13 @@ export const getPublicCollection = internalQuery({
   handler: async (ctx, args) => {
     const uploads = await ctx.db
       .query("quick_share_uploads")
-      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .withIndex("by_slug_and_active_and_state_and_publicExpiresAt", (q) =>
+        q
+          .eq("slug", args.slug)
+          .eq("active", true)
+          .eq("state", "ready")
+          .gt("publicExpiresAt", args.now),
+      )
       .order("desc")
       .take(QUICK_SHARE_POLICY.collectionMaxItems);
     return uploads

@@ -235,7 +235,7 @@ describe("Quick Share Convex policy", () => {
     ).rejects.toThrow("SLUG_COLLISION");
   });
 
-  it("caps total collection rows even when failed items free active slots", async () => {
+  it("ignores inactive collection rows when enforcing the collection limit", async () => {
     const t = convexTest(schema, modules);
     const now = Date.now();
     const first = await t.mutation(
@@ -264,7 +264,50 @@ describe("Quick Share Convex policy", () => {
         ...createArgs("Collect1", { now: now + 1 }),
         collectionReceiptHash: "receipt-Collect1",
       }),
-    ).rejects.toThrow("COLLECTION_LIMIT");
+    ).resolves.toMatchObject({ slug: "Collect1" });
+  });
+
+  it("keeps an older ready item visible past stale collection rows", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Collect2", { now: now - 1_000 }),
+    );
+    await t.run(async (ctx) => {
+      const original = await ctx.db.get(first.id);
+      if (!original) throw new Error("Expected a collection upload");
+      await ctx.db.patch(first.id, {
+        state: "ready",
+        publicKey: "derivatives/older",
+        publicMime: "image/png",
+        publicSize: 1,
+        publicExpiresAt: now + 10_000,
+      });
+      const { _id: _uploadId, _creationTime, ...row } = original;
+      for (
+        let index = 0;
+        index < QUICK_SHARE_POLICY.collectionMaxItems;
+        index += 1
+      ) {
+        await ctx.db.insert("quick_share_uploads", {
+          ...row,
+          state: "failed",
+          active: false,
+          receiptHash: `stale-${index}`,
+          createdAt: now + index,
+        });
+      }
+    });
+
+    await expect(
+      t.query(internal.quickShare.getPublicCollection, {
+        slug: "Collect2",
+        now,
+      }),
+    ).resolves.toMatchObject([
+      { key: "derivatives/older", mime: "image/png", size: 1 },
+    ]);
   });
 
   it("bounds public collection and slug moderation reads for legacy collections", async () => {

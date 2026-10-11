@@ -605,6 +605,17 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_slug", ["slug"])
+    .index("by_slug_and_active_and_retainedUntil", [
+      "slug",
+      "active",
+      "retainedUntil",
+    ])
+    .index("by_slug_and_active_and_state_and_publicExpiresAt", [
+      "slug",
+      "active",
+      "state",
+      "publicExpiresAt",
+    ])
     .index("by_receiptHash", ["receiptHash"])
     .index("by_ownerTokenIdentifier_and_publicExpiresAt", [
       "ownerTokenIdentifier",
