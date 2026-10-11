@@ -1,4 +1,4 @@
-import { internal } from "./_generated/api.js";
+import { api, internal } from "./_generated/api.js";
 import type { Id } from "./_generated/dataModel.js";
 import type { ActionCtx } from "./_generated/server.js";
 import { httpAction } from "./_generated/server.js";
@@ -60,6 +60,16 @@ export const options = httpAction(
       headers: CORS_HEADERS,
     }),
 );
+
+/**
+ * Compatibility endpoint for frontend bundles that predate managed Catdex
+ * upload tokens. It returns the managed endpoint, so the storage ID is still
+ * bound to a short-lived reservation before a legacy create call attaches it.
+ */
+export const legacyUploadUrl = httpAction(async (ctx) => {
+  const uploadUrl = await ctx.runMutation(api.catdex.generateUploadUrl, {});
+  return json({ uploadUrl });
+});
 
 export const upload = httpAction(async (ctx, request) => {
   const token = new URL(request.url).searchParams.get("token");

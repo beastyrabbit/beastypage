@@ -51,6 +51,22 @@ type MassUploadEntry = {
 };
 
 const MASS_UPLOAD_HOLD_MS = 5000;
+const CATDEX_UPLOAD_CLIENT_KEY = "catdex-upload:client-key";
+
+function getCatdexUploadClientKey(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const existing = window.localStorage.getItem(CATDEX_UPLOAD_CLIENT_KEY);
+    if (existing && /^[A-Za-z0-9_-]{16,80}$/.test(existing)) return existing;
+    const generated =
+      window.crypto?.randomUUID?.() ??
+      `${Date.now()}-${window.crypto.getRandomValues(new Uint32Array(1))[0]}`;
+    window.localStorage.setItem(CATDEX_UPLOAD_CLIENT_KEY, generated);
+    return generated;
+  } catch {
+    return undefined;
+  }
+}
 
 type SubmitModalProps = {
   open: boolean;
@@ -209,12 +225,18 @@ export default function CatdexPage() {
       if (!rarityId) throw new Error("Rarity is required.");
       if (!defaultFile) throw new Error("Default card art is required.");
 
+      const clientKey = getCatdexUploadClientKey();
       const defaultUpload = await uploadToStorage(
         defaultFile,
         generateUploadUrlMutation,
+        clientKey,
       );
       const customUpload = customFile
-        ? await uploadToStorage(customFile, generateUploadUrlMutation)
+        ? await uploadToStorage(
+            customFile,
+            generateUploadUrlMutation,
+            clientKey,
+          )
         : null;
 
       await createCatMutation({
@@ -831,9 +853,10 @@ function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
 
 async function uploadToStorage(
   file: File,
-  generateUploadUrl: () => Promise<string>,
+  generateUploadUrl: (args: { clientKey?: string }) => Promise<string>,
+  clientKey?: string,
 ): Promise<{ storageId: string; fileName: string; uploadToken: string }> {
-  const uploadUrl = await generateUploadUrl();
+  const uploadUrl = await generateUploadUrl({ clientKey });
   const configuredSiteOrigin = process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
   const uploadTarget = new URL(
     uploadUrl,

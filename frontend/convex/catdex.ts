@@ -20,7 +20,8 @@ const CARD_UPLOAD_CONTENT_TYPES = new Set(["image/png", "image/jpeg"]);
 const THUMBNAIL_RETRY_AFTER_MS = 30 * 60 * 1000;
 const CATDEX_UPLOAD_TTL_MS = 30 * 60 * 1000;
 const MAX_UPLOAD_CLEANUP_BATCH = 100;
-const MAX_UPLOADS_PER_HOUR = 60;
+const MAX_UPLOADS_PER_CLIENT_PER_HOUR = 12;
+const MAX_GLOBAL_UPLOADS_PER_HOUR = 600;
 const MAX_THUMBNAIL_ATTEMPTS = 3;
 
 export type CatdexPayload = Awaited<ReturnType<typeof catdexRecordToClient>>;
@@ -225,19 +226,37 @@ export const getDoc = internalQuery({
  * object before the create mutation attaches it to a Catdex record.
  */
 export const generateUploadUrl = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { clientKey: v.optional(v.string()) },
+  handler: async (ctx, args) => {
     const now = Date.now();
+    const identity = await ctx.auth.getUserIdentity();
+    const rateKey = identity?.tokenIdentifier
+      ? `identity:${identity.tokenIdentifier}`
+      : args.clientKey && /^[A-Za-z0-9_-]{16,80}$/.test(args.clientKey)
+        ? `client:${args.clientKey}`
+        : undefined;
+    if (rateKey) {
+      const recentClientUploads = await ctx.db
+        .query("catdex_uploads")
+        .withIndex("byRateKeyAndCreatedAt", (q) =>
+          q.eq("rateKey", rateKey).gt("createdAt", now - 60 * 60 * 1000),
+        )
+        .take(MAX_UPLOADS_PER_CLIENT_PER_HOUR + 1);
+      if (recentClientUploads.length >= MAX_UPLOADS_PER_CLIENT_PER_HOUR) {
+        throw new Error("Too many pending uploads; try again later");
+      }
+    }
     const recentUploads = await ctx.db
       .query("catdex_uploads")
       .withIndex("byCreatedAt", (q) => q.gt("createdAt", now - 60 * 60 * 1000))
-      .take(MAX_UPLOADS_PER_HOUR + 1);
-    if (recentUploads.length >= MAX_UPLOADS_PER_HOUR) {
+      .take(MAX_GLOBAL_UPLOADS_PER_HOUR + 1);
+    if (recentUploads.length >= MAX_GLOBAL_UPLOADS_PER_HOUR) {
       throw new Error("Too many pending uploads; try again later");
     }
     const token = crypto.randomUUID();
     await ctx.db.insert("catdex_uploads", {
       token,
+      ...(rateKey ? { rateKey } : {}),
       status: "pending",
       expiresAt: now + CATDEX_UPLOAD_TTL_MS,
       createdAt: now,
@@ -358,13 +377,15 @@ async function consumeCardUpload(
   token: string | undefined,
   storageId: Id<"_storage">,
 ) {
-  if (!token) {
-    throw new Error("Card upload token is required.");
-  }
-  const upload = await ctx.db
-    .query("catdex_uploads")
-    .withIndex("byToken", (q) => q.eq("token", token))
-    .unique();
+  const upload = token
+    ? await ctx.db
+        .query("catdex_uploads")
+        .withIndex("byToken", (q) => q.eq("token", token))
+        .unique()
+    : await ctx.db
+        .query("catdex_uploads")
+        .withIndex("byStorageId", (q) => q.eq("storageId", storageId))
+        .unique();
   if (!upload) {
     throw new Error("Card upload was not issued for this submission.");
   }

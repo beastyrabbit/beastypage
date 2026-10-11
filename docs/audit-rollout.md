@@ -61,3 +61,17 @@ New frontend bundles resolve palette images through the settings slug. The
 and the former `storageId` argument so old bundles remain compatible during a
 rolling deployment. Remove the `storageId` fallback after all old frontend
 replicas have been replaced and the compatibility window has expired.
+
+# Catdex upload rollout
+
+The `/api/storage/getUploadUrl` Convex HTTP route remains as a compatibility
+bridge for older Catdex bundles. It issues the managed `/catdex/upload` URL and
+therefore creates the same short-lived reservation as the current mutation.
+Legacy `catdex.create` calls may omit `uploadToken` only when the storage ID is
+attached to one of those valid reservations. Remove the bridge and make the
+token required after all old bundles have been replaced.
+
+Anonymous current bundles send a stable browser client key for upload
+reservations. Authenticated users are keyed by their Convex identity. Each key
+has a bounded hourly reservation budget, with a larger global backstop for
+legacy callers and clients that cannot persist a key.

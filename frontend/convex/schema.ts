@@ -148,6 +148,7 @@ export default defineSchema({
 
   catdex_uploads: defineTable({
     token: v.string(),
+    rateKey: v.optional(v.string()),
     storageId: v.optional(v.id("_storage")),
     status: v.union(v.literal("pending"), v.literal("attached")),
     expiresAt: v.number(),
@@ -157,6 +158,7 @@ export default defineSchema({
     .index("byToken", ["token"])
     .index("byStorageId", ["storageId"])
     .index("byCreatedAt", ["createdAt"])
+    .index("byRateKeyAndCreatedAt", ["rateKey", "createdAt"])
     .index("byExpiresAt", ["expiresAt"]),
 
   collection: defineTable({

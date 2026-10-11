@@ -64,6 +64,48 @@ describe("Catdex uploads", () => {
     expect(response.headers.get("access-control-allow-origin")).toBe("*");
   });
 
+  it("keeps the legacy upload flow bound to a managed reservation", async () => {
+    const t = convexTest(schema, modules);
+    const urlResponse = await t.fetch("/api/storage/getUploadUrl", {
+      method: "POST",
+    });
+    expect(urlResponse.status).toBe(200);
+    const { uploadUrl } = (await urlResponse.json()) as { uploadUrl: string };
+    expect(uploadUrl).toContain("/catdex/upload?token=");
+
+    const uploadResponse = await t.fetch(uploadPath(uploadUrl), {
+      method: "POST",
+      headers: { "content-type": "image/png" },
+      body: "png-fixture",
+    });
+    expect(uploadResponse.status).toBe(200);
+    const { storageId } = (await uploadResponse.json()) as {
+      storageId: Id<"_storage">;
+    };
+    const { seasonId, rarityId } = await t.run(async (ctx) => ({
+      seasonId: await ctx.db.insert("card_season", {
+        seasonName: "Fixture",
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+      rarityId: await ctx.db.insert("rarity", {
+        rarityName: "Common",
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    }));
+
+    await expect(
+      t.mutation(api.catdex.create, {
+        twitchUserName: "fixture",
+        catName: "legacy-cat",
+        seasonId,
+        rarityId,
+        defaultCard: { storageId, fileName: "card.png" },
+      }),
+    ).resolves.toMatchObject({ cat_name: "legacy-cat" });
+  });
+
   it("rejects bodies over the bounded upload size", async () => {
     const t = convexTest(schema, modules);
     const url = await t.mutation(api.catdex.generateUploadUrl, {});
@@ -166,10 +208,22 @@ describe("Catdex uploads", () => {
       }),
     }));
 
+    await t.mutation(api.catdex.create, {
+      twitchUserName: "fixture",
+      catName: "cat",
+      seasonId,
+      rarityId,
+      defaultCard: {
+        storageId: upload.storageId,
+        fileName: "card.png",
+        uploadToken: upload.token,
+      },
+    });
+
     await expect(
       t.mutation(api.catdex.create, {
         twitchUserName: "fixture",
-        catName: "cat",
+        catName: "cat-again",
         seasonId,
         rarityId,
         defaultCard: {
@@ -177,7 +231,7 @@ describe("Catdex uploads", () => {
           fileName: "card.png",
         },
       }),
-    ).rejects.toThrow("upload token is required");
+    ).rejects.toThrow("not issued");
   });
 
   it("deletes attached blobs after upload capabilities expire", async () => {

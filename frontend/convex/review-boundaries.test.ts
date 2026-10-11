@@ -636,19 +636,25 @@ it("paginates approved cards without including pending records", async () => {
 it("generates bounded managed upload reservations for Catdex submissions", async () => {
   vi.stubEnv("CONVEX_SITE_URL", "https://fixture.convex.site");
   const t = convexTest(schema, modules);
-  await expect(t.mutation(api.catdex.generateUploadUrl, {})).resolves.toMatch(
-    /\/catdex\/upload\?token=/,
-  );
+  const clientKey = "fixture-client-key";
+  await expect(
+    t.mutation(api.catdex.generateUploadUrl, { clientKey }),
+  ).resolves.toMatch(/\/catdex\/upload\?token=/);
   await expect(
     t.run((ctx) => ctx.db.query("catdex_uploads").take(100)),
   ).resolves.toHaveLength(1);
 
-  for (let i = 0; i < 59; i += 1) {
-    await t.mutation(api.catdex.generateUploadUrl, {});
+  for (let i = 0; i < 11; i += 1) {
+    await t.mutation(api.catdex.generateUploadUrl, { clientKey });
   }
-  await expect(t.mutation(api.catdex.generateUploadUrl, {})).rejects.toThrow(
-    "Too many pending uploads",
-  );
+  await expect(
+    t.mutation(api.catdex.generateUploadUrl, { clientKey }),
+  ).rejects.toThrow("Too many pending uploads");
+  await expect(
+    t.mutation(api.catdex.generateUploadUrl, {
+      clientKey: "another-client-key",
+    }),
+  ).resolves.toMatch(/\/catdex\/upload\?token=/);
 });
 
 it("resets only the authenticated user's variants and preserves the account", async () => {

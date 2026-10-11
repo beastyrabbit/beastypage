@@ -1,5 +1,6 @@
 import { httpRouter } from "convex/server";
 import {
+  legacyUploadUrl as catdexLegacyUploadUrl,
   upload as catdexUpload,
   options as catdexUploadOptions,
 } from "./catdexHttp.js";
@@ -7,6 +8,11 @@ import { userConfig } from "./discordHttp.js";
 import { quickShareInternal } from "./quickShareHttp.js";
 
 const http = httpRouter();
+http.route({
+  path: "/api/storage/getUploadUrl",
+  method: "POST",
+  handler: catdexLegacyUploadUrl,
+});
 http.route({
   path: "/catdex/upload",
   method: "POST",
