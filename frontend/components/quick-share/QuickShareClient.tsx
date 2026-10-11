@@ -1038,6 +1038,7 @@ export function QuickShareClient() {
                   multiple
                   accept="image/*,video/*,.heic,.heif,.avif,.tif,.tiff,.mkv,.avi"
                   className="sr-only"
+                  disabled={busy}
                   onChange={(event) => {
                     const selected = Array.from(event.target.files ?? []);
                     // The picker can still be opened while an existing poll is
@@ -1053,7 +1054,8 @@ export function QuickShareClient() {
                 />
                 <button
                   type="button"
-                  className="flex min-h-44 w-full flex-col items-center justify-center rounded-lg border border-dashed border-border px-6 py-8 text-center transition hover:border-amber-500/60 hover:bg-amber-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                  disabled={busy}
+                  className="flex min-h-44 w-full flex-col items-center justify-center rounded-lg border border-dashed border-border px-6 py-8 text-center transition hover:border-amber-500/60 hover:bg-amber-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <FileUp className="mb-4 size-7 text-amber-400" />
