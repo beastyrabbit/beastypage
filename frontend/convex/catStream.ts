@@ -350,6 +350,21 @@ export const reportBatchStage = mutation({
             awaitingCull: false,
             eliminatedIds: [],
           };
+    // The pool is finalCount + stage count by construction, so the last
+    // valid index (the "done" report) is the stage count. An overlay only
+    // ever moves one stage at a time; anything else is not a report.
+    const batch = command.batch;
+    const lastStage = batch
+      ? Math.max(0, batch.cats.length - batch.finalCount)
+      : Number.POSITIVE_INFINITY;
+    if (
+      !Number.isInteger(args.stageIndex) ||
+      args.stageIndex < 0 ||
+      args.stageIndex > lastStage ||
+      args.stageIndex > previous.stageIndex + 1
+    ) {
+      return;
+    }
     // Two overlay instances can report independently (the OBS source plus
     // the control page's preview iframe). Never let a slower instance
     // rewind the live state:
