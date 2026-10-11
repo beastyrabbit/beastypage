@@ -54,6 +54,7 @@ import {
   type LobbyMode,
 } from "./helpers";
 import { LookPanel } from "./LookPanel";
+import { useBatchTheme } from "./look/useBatchTheme";
 import { useOverlayTheme } from "./look/useOverlayTheme";
 import { PreviewCard } from "./PreviewCard";
 import { SettingsPanel } from "./SettingsPanel";
@@ -841,6 +842,10 @@ export function ControlShell() {
     rawSessionSettings,
     syncSessionSettings,
   );
+  const { theme: batchTheme, setTheme: setBatchTheme } = useBatchTheme(
+    rawSessionSettings,
+    syncSessionSettings,
+  );
 
   // Tell the lobby which mode's info to show (Look/Settings are not modes).
   useEffect(() => {
@@ -950,6 +955,8 @@ export function ControlShell() {
       rawSessionSettings,
       overlayTheme,
       setOverlayTheme,
+      batchTheme,
+      setBatchTheme,
       activeTab,
       setActiveTab,
       previewContainerRef,
@@ -1002,6 +1009,8 @@ export function ControlShell() {
     rawSessionSettings,
     overlayTheme,
     setOverlayTheme,
+    batchTheme,
+    setBatchTheme,
     activeTab,
   ]);
 

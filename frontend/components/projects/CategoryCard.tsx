@@ -1,5 +1,13 @@
+"use client";
+
 import { Gamepad2, PawPrint, Wrench } from "lucide-react";
 import Link from "next/link";
+import {
+  type ComponentType,
+  type ForwardRefExoticComponent,
+  type RefAttributes,
+  useRef,
+} from "react";
 import type {
   ProjectCategory,
   ProjectCategoryConfig,
@@ -7,16 +15,25 @@ import type {
 import ArrowNarrowRightIcon from "@/components/ui/arrow-narrow-right-icon";
 import PaintIcon from "@/components/ui/paint-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
+import type {
+  AnimatedIconHandle,
+  AnimatedIconProps,
+} from "@/components/ui/types";
 
-const CATEGORY_ICONS: Record<
-  ProjectCategory,
-  React.ComponentType<{ className?: string; size?: number }>
-> = {
-  "warrior-cats": PawPrint,
-  gacha: SparklesIcon,
-  artist: PaintIcon,
-  games: Gamepad2,
-  tools: Wrench,
+type AnimatedIcon = ForwardRefExoticComponent<
+  AnimatedIconProps & RefAttributes<AnimatedIconHandle>
+>;
+type StaticIcon = ComponentType<{ className?: string; size?: number }>;
+type CategoryIcon =
+  | { kind: "animated"; icon: AnimatedIcon }
+  | { kind: "static"; icon: StaticIcon };
+
+const CATEGORY_ICONS: Record<ProjectCategory, CategoryIcon> = {
+  "warrior-cats": { kind: "static", icon: PawPrint },
+  gacha: { kind: "animated", icon: SparklesIcon },
+  artist: { kind: "animated", icon: PaintIcon },
+  games: { kind: "static", icon: Gamepad2 },
+  tools: { kind: "static", icon: Wrench },
 };
 
 type ToolPreview = {
@@ -37,13 +54,21 @@ export function CategoryCard({
   toolCount,
   index,
 }: Readonly<CategoryCardProps>) {
-  const Icon = CATEGORY_ICONS[category.key];
+  const entry = CATEGORY_ICONS[category.key];
+  // Hovering anywhere on the card wakes the itshover icon, not just its svg.
+  const iconRef = useRef<AnimatedIconHandle>(null);
+  const wake = () => iconRef.current?.startAnimation();
+  const rest = () => iconRef.current?.stopAnimation();
 
   return (
     <Link
       href={category.href}
       data-category={category.key}
-      className="category-card glass-card group relative flex h-full flex-col gap-5 overflow-hidden p-7 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
+      onPointerEnter={wake}
+      onPointerLeave={rest}
+      onFocus={wake}
+      onBlur={rest}
+      className="category-card glass-card group relative flex h-full flex-col gap-5 overflow-hidden p-7 transition-all duration-500 motion-safe:hover:-translate-y-1.5 hover:shadow-2xl motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-8 fill-mode-backwards"
       style={{ animationDelay: `${index * 100}ms` }}
     >
       {/* Category-specific gradient overlay */}
@@ -52,17 +77,25 @@ export function CategoryCard({
         aria-hidden="true"
       />
 
-      {/* Shine effect */}
-      <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:animate-shine" />
+      {/* Shine effect: one gloss sweep per hover */}
+      <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/8 to-transparent motion-safe:group-hover:animate-shine" />
 
       {/* Content */}
       <div className="relative z-10 flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-white/10 p-3 transition-colors group-hover:bg-white/15">
-            <Icon
-              size={24}
-              className="text-foreground/80 group-hover:text-foreground"
-            />
+          <div className="rounded-xl bg-white/10 p-3 transition-[rotate,scale,background-color] duration-300 ease-spring motion-safe:group-hover:rotate-[5deg] motion-safe:group-hover:scale-[1.08] group-hover:bg-white/15">
+            {entry.kind === "animated" ? (
+              <entry.icon
+                ref={iconRef}
+                size={24}
+                className="text-foreground/80 group-hover:text-foreground"
+              />
+            ) : (
+              <entry.icon
+                size={24}
+                className="text-foreground/80 group-hover:text-foreground"
+              />
+            )}
           </div>
           <div>
             <h3

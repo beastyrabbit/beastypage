@@ -92,6 +92,10 @@ describe("anonymous capability ownership", () => {
       catData: { mode: "wizard-timeline", params: {} },
     });
     const id = profile.id as Id<"cat_profile">;
+    const publicProfile = await t.query(api.mapper.getBySlug, {
+      slugOrId: profile.slug,
+    });
+    expect(JSON.stringify(publicProfile)).not.toContain(profile.editToken);
 
     await expect(
       t.mutation(api.mapper.updateMeta, {

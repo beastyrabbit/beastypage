@@ -754,3 +754,37 @@ export function buildPartialBatchParams(
   }
   return params as unknown as CatParams;
 }
+
+/**
+ * A cat's fixed show number: its 1-based position in the command's pool.
+ * Numbers never change during a show (culled cats keep theirs), so chat
+ * can say "number 13" and the streamer finds it on the control board.
+ */
+export function batchCatNumber(
+  cats: readonly { id: string }[],
+  catId: string,
+): number {
+  const index = cats.findIndex((cat) => cat.id === catId);
+  return index < 0 ? 0 : index + 1;
+}
+
+/** Two-digit show number for overlays and the control board ("07", "23"). */
+export function formatBatchNumber(number: number): string {
+  return String(Math.max(0, Math.trunc(number))).padStart(2, "0");
+}
+
+/**
+ * Parse what the streamer typed into the pick-by-number field. Accepts
+ * "13", "#13", "no 13" and "cat 13"; rejects anything without a single
+ * number inside the pool.
+ */
+export function parseBatchNumberInput(
+  input: string,
+  poolSize: number,
+): number | null {
+  const match = /(\d{1,3})/.exec(input);
+  if (!match) return null;
+  const number = Number.parseInt(match[1], 10);
+  if (!Number.isFinite(number) || number < 1 || number > poolSize) return null;
+  return number;
+}

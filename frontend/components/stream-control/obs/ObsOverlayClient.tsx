@@ -104,6 +104,7 @@ import type { OBSClassicWheelHandle } from "../OBSClassicWheel";
 import type { LobbySettings } from "../OBSLobby";
 import { decideCommandAction } from "./commandPolicy";
 import { BatchScene } from "./scenes/BatchScene";
+import { resolveBatchTheme } from "./themes/batchThemeMeta";
 import { BrbScene } from "./scenes/BrbScene";
 import { EvolutionScene } from "./scenes/EvolutionScene";
 import { LobbyCountdownScene } from "./scenes/LobbyCountdownScene";
@@ -3275,6 +3276,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     sessionSettingsRecord,
   );
   const overlayTheme = resolveOverlayTheme(sessionSettingsRecord);
+  const batchTheme = resolveBatchTheme(sessionSettingsRecord);
   const obsLayoutSpread = resolveOverlaySpread(
     sessionSettingsRecord,
     overlayTheme,
@@ -3969,6 +3971,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         command={withLiveBatchSlug(batchCommand, session?.currentCommand)}
         liveState={session?.batchState ?? null}
         apiKey={apiKey}
+        theme={batchTheme}
       />,
     );
   }

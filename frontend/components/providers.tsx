@@ -3,6 +3,7 @@
 import { ClerkProvider, useAuth } from "@clerk/nextjs";
 import { shadcn } from "@clerk/ui/themes";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
 import { PosthogProvider } from "@/components/posthog-provider";
 import convex from "@/lib/convexClient";
@@ -21,7 +22,9 @@ export function AppProviders({ children }: Readonly<{ children: ReactNode }>) {
       appearance={{ theme: shadcn }}
     >
       <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <PosthogProvider>{children}</PosthogProvider>
+        <MotionConfig reducedMotion="user">
+          <PosthogProvider>{children}</PosthogProvider>
+        </MotionConfig>
       </ConvexProviderWithClerk>
     </ClerkProvider>
   );
