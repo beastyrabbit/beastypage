@@ -11,12 +11,34 @@ import XIcon from "@/components/ui/x-icon";
 import { api } from "@/convex/_generated/api";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 
+const MAX_SLUG_LENGTH = 40;
+const COPY_SUFFIX = "-copy";
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function saveFailureMessage(error: string | undefined): string {
+  if (error === "password_required")
+    return "Password required to overwrite this tree";
+  if (error === "invalid_password") return "Incorrect password";
+  return error ?? "Failed to save tree";
+}
+
 interface SaveTreeDialogProps {
   currentName: string;
   currentCreator?: string;
   currentSlug: string;
   hasPassword?: boolean;
   onSave: (
+    name: string,
+    creatorName: string,
+    password?: string,
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    slug?: string;
+    isNew?: boolean;
+  }>;
+  onSaveAsNew?: (
+    slug: string,
     name: string,
     creatorName: string,
     password?: string,
@@ -35,6 +57,7 @@ export function SaveTreeDialog({
   currentSlug,
   hasPassword: initialHasPassword,
   onSave,
+  onSaveAsNew,
   onClose,
 }: Readonly<SaveTreeDialogProps>) {
   const defaultCreatorName = useDefaultCreatorName();
@@ -49,6 +72,10 @@ export function SaveTreeDialog({
   );
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [saveAsNew, setSaveAsNew] = useState(false);
+  const [newSlug, setNewSlug] = useState(
+    `${currentSlug.slice(0, MAX_SLUG_LENGTH - COPY_SUFFIX.length)}${COPY_SUFFIX}`,
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -68,10 +95,38 @@ export function SaveTreeDialog({
     };
   }, []);
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+
   // Check if the current slug exists and has a password
   const slugCheck = useQuery(api.ancestryTree.checkSlug, { slug: currentSlug });
   const slugExists = slugCheck?.exists ?? false;
   const treeHasPassword = initialHasPassword ?? slugCheck?.hasPassword ?? false;
+
+  const handleSaveFailure = (saveError: string | undefined) => {
+    if (saveError === "edit_token_required" && onSaveAsNew) {
+      setSaveAsNew(true);
+      setError(
+        "This tree is read-only in this browser. Save a copy under a new slug to continue editing.",
+      );
+      return;
+    }
+    if (saveError === "edit_token_required") {
+      setError(
+        "This tree can only be edited from the browser where it was created, or with its password.",
+      );
+      return;
+    }
+    setError(saveFailureMessage(saveError));
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -99,13 +154,7 @@ export function SaveTreeDialog({
       );
 
       if (!result.success) {
-        if (result.error === "password_required") {
-          setError("Password required to overwrite this tree");
-        } else if (result.error === "invalid_password") {
-          setError("Incorrect password");
-        } else {
-          setError(result.error ?? "Failed to save tree");
-        }
+        handleSaveFailure(result.error);
         return;
       }
 
@@ -114,6 +163,49 @@ export function SaveTreeDialog({
       setSaveSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save tree");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveAsNew = async () => {
+    if (!onSaveAsNew) return;
+    if (!name.trim()) {
+      setError("Please enter a tree name");
+      return;
+    }
+    if (!newSlug.trim()) {
+      setError("Please enter a new tree slug");
+      return;
+    }
+    if (!SLUG_PATTERN.test(newSlug.trim())) {
+      setError(
+        "Use lowercase letters, numbers, and single hyphens in the slug",
+      );
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      const result = await onSaveAsNew(
+        newSlug.trim(),
+        name.trim(),
+        creatorName.trim(),
+        newPassword || undefined,
+      );
+      if (!result.success) {
+        setError(
+          result.error === "slug_taken"
+            ? "That slug is already in use. Choose another."
+            : (result.error ?? "Failed to save tree copy"),
+        );
+        return;
+      }
+      setSavedSlug(result.slug ?? newSlug.trim());
+      setSaveSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save tree copy");
     } finally {
       setIsSaving(false);
     }
@@ -145,6 +237,10 @@ export function SaveTreeDialog({
     window.open(getTreeUrl(), "_blank", "noopener,noreferrer");
   }, [getTreeUrl]);
 
+  let saveButtonLabel = "Save Tree";
+  if (slugExists) saveButtonLabel = "Update Tree";
+  if (saveAsNew) saveButtonLabel = "Save as New Tree";
+
   // Success state
   if (saveSuccess) {
     let copyIcon = <CopyIcon size={16} />;
@@ -155,28 +251,17 @@ export function SaveTreeDialog({
     }
 
     return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-        role="button"
-        tabIndex={0}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) onClose();
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            onClose();
-          }
-          if (
-            (event.key === "Enter" || event.key === " ") &&
-            event.target === event.currentTarget
-          ) {
-            event.preventDefault();
-            onClose();
-          }
-        }}
-      >
-        <div className="glass-card relative w-full max-w-md p-6">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <button
+          type="button"
+          aria-label="Close dialog backdrop"
+          className="absolute inset-0 cursor-default"
+          onClick={onClose}
+        />
+        <dialog
+          open
+          className="glass-card relative z-10 w-full max-w-md p-6 text-inherit"
+        >
           <button
             type="button"
             onClick={onClose}
@@ -232,34 +317,23 @@ export function SaveTreeDialog({
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       </div>
     );
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      role="button"
-      tabIndex={0}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-        if (
-          (event.key === "Enter" || event.key === " ") &&
-          event.target === event.currentTarget
-        ) {
-          event.preventDefault();
-          onClose();
-        }
-      }}
-    >
-      <div className="glass-card relative w-full max-w-md p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <button
+        type="button"
+        aria-label="Close dialog backdrop"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <dialog
+        open
+        className="glass-card relative z-10 w-full max-w-md p-6 text-inherit"
+      >
         <button
           type="button"
           onClick={onClose}
@@ -271,6 +345,29 @@ export function SaveTreeDialog({
         <h2 className="mb-6 text-xl font-bold">Save Ancestry Tree</h2>
 
         <div className="space-y-4">
+          {saveAsNew && (
+            <div>
+              <label
+                htmlFor="newTreeSlug"
+                className="block text-sm font-medium mb-1"
+              >
+                New Tree Slug <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                id="newTreeSlug"
+                maxLength={MAX_SLUG_LENGTH}
+                value={newSlug}
+                onChange={(e) => setNewSlug(e.target.value)}
+                placeholder="e.g., thunderclan-copy"
+                className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm placeholder:text-muted-foreground focus:border-amber-500 focus:outline-none"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                This creates a new tree with its own edit permission.
+              </p>
+            </div>
+          )}
+
           <div>
             <label
               htmlFor="treeName"
@@ -307,7 +404,7 @@ export function SaveTreeDialog({
           </div>
 
           {/* Password Section */}
-          {slugExists && treeHasPassword ? (
+          {!saveAsNew && slugExists && treeHasPassword ? (
             // Tree exists and has password - need to enter it to overwrite
             <div>
               <label
@@ -369,7 +466,7 @@ export function SaveTreeDialog({
             </button>
             <button
               type="button"
-              onClick={handleSave}
+              onClick={saveAsNew ? handleSaveAsNew : handleSave}
               disabled={isSaving || !name.trim()}
               className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
             >
@@ -378,11 +475,11 @@ export function SaveTreeDialog({
               ) : (
                 <Save className="size-4" />
               )}
-              {slugExists ? "Update Tree" : "Save Tree"}
+              {saveButtonLabel}
             </button>
           </div>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

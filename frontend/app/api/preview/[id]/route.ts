@@ -16,6 +16,11 @@ const RENDERER_BASE = normalizeRendererBase(
 );
 const PREVIEW_SIZE = 360;
 const RENDER_TIMEOUT_MS = 30_000;
+const MAX_ENCODED_CAT_DATA_CHARS = 512 * 1024;
+const MAX_DECODED_CAT_DATA_BYTES = 256 * 1024;
+const MAX_CAT_DATA_DEPTH = 32;
+const MAX_CAT_DATA_CONTAINER_ENTRIES = 10_000;
+const MAX_CAT_DATA_STRING_CHARS = 64 * 1024;
 const PNG_DATA_URL_REGEX = /^data:image\/png;base64,([A-Za-z0-9+/=\s]+)$/;
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -41,24 +46,64 @@ function dataUrlToPngBuffer(dataUrl: string): Buffer | null {
   return buffer.length > 0 ? buffer : null;
 }
 
-function fromBase64(encoded: string): string {
-  return Buffer.from(encoded, "base64").toString("utf-8");
+function isBoundedJsonValue(value: unknown, depth = 0): boolean {
+  if (depth > MAX_CAT_DATA_DEPTH) return false;
+  if (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "number"
+  ) {
+    return true;
+  }
+  if (typeof value === "string") {
+    return value.length <= MAX_CAT_DATA_STRING_CHARS;
+  }
+  if (Array.isArray(value)) {
+    return (
+      value.length <= MAX_CAT_DATA_CONTAINER_ENTRIES &&
+      value.every((entry) => isBoundedJsonValue(entry, depth + 1))
+    );
+  }
+  if (!isPlainRecord(value)) return false;
+  const entries = Object.entries(value);
+  return (
+    entries.length <= MAX_CAT_DATA_CONTAINER_ENTRIES &&
+    entries.every(
+      ([key, entry]) =>
+        key.length <= MAX_CAT_DATA_STRING_CHARS &&
+        isBoundedJsonValue(entry, depth + 1),
+    )
+  );
 }
 
-function decodeEncodedCatData(encoded: string): Record<string, unknown> | null {
+type EncodedCatDataResult =
+  | { data: Record<string, unknown> }
+  | { error: "invalid" | "too-large" };
+
+function decodeEncodedCatData(encoded: string): EncodedCatDataResult {
   try {
-    const parsed: unknown = JSON.parse(fromBase64(encoded));
-    if (!isPlainRecord(parsed)) return null;
+    const decoded = Buffer.from(encoded, "base64");
+    if (decoded.length > MAX_DECODED_CAT_DATA_BYTES) {
+      return { error: "too-large" };
+    }
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(decoded);
+    const parsed: unknown = JSON.parse(text);
+    if (!isBoundedJsonValue(parsed) || !isPlainRecord(parsed)) {
+      return { error: "invalid" };
+    }
     const params = parsed.params ?? parsed.finalParams;
-    if (params !== undefined && !isPlainRecord(params)) return null;
-    return parsed;
+    if (params !== undefined && !isPlainRecord(params)) {
+      return { error: "invalid" };
+    }
+    return { data: parsed };
   } catch {
-    return null;
+    return { error: "invalid" };
   }
 }
 
 async function renderCatData(
   catData: Record<string, unknown>,
+  requestSignal?: AbortSignal,
 ): Promise<NextResponse> {
   const baseParams = catData?.params ?? catData?.finalParams ?? catData ?? {};
   const spriteNumber =
@@ -88,10 +133,15 @@ async function renderCatData(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(renderPayload),
-      signal: controller.signal,
+      signal: requestSignal
+        ? AbortSignal.any([controller.signal, requestSignal])
+        : controller.signal,
     });
   } catch (error) {
     console.error("Renderer request failed", error);
+    if (requestSignal?.aborted) {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
     if (isAbortError(error)) {
       return NextResponse.json(
         { error: "Renderer request timed out" },
@@ -159,15 +209,26 @@ export async function GET(
 
   // Mode 2: Direct cat data provided via query param
   if (encodedCatData) {
+    if (encodedCatData.length > MAX_ENCODED_CAT_DATA_CHARS) {
+      return NextResponse.json(
+        { error: "Encoded cat data is too large" },
+        { status: 413 },
+      );
+    }
     try {
-      const catData = decodeEncodedCatData(encodedCatData);
-      if (!catData) {
-        return NextResponse.json(
-          { error: "Invalid encoded cat data" },
-          { status: 400 },
-        );
+      const decoded = decodeEncodedCatData(encodedCatData);
+      if (!("data" in decoded)) {
+        return decoded.error === "too-large"
+          ? NextResponse.json(
+              { error: "Decoded cat data is too large" },
+              { status: 413 },
+            )
+          : NextResponse.json(
+              { error: "Invalid encoded cat data" },
+              { status: 400 },
+            );
       }
-      return await renderCatData(catData);
+      return await renderCatData(decoded.data, request.signal);
     } catch (error) {
       console.error("Failed to render from encoded data", error);
       return NextResponse.json(
@@ -208,7 +269,7 @@ export async function GET(
       );
     }
 
-    return await renderCatData(catData);
+    return await renderCatData(catData, request.signal);
   } catch (error) {
     console.error("Failed to generate preview", error);
     return NextResponse.json(

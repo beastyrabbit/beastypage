@@ -8,12 +8,34 @@ const network = vi.hoisted(() => ({
 	lookup: vi.fn(),
 	request: vi.fn(),
 	close: vi.fn(),
+	agentOptions: undefined as
+		| {
+				connect?: {
+					lookup?: (
+						hostname: string,
+						options: { all?: boolean },
+						callback: (error: Error | null, address: unknown) => void,
+					) => void;
+				};
+		  }
+		| undefined,
 }));
 
 vi.mock("node:dns/promises", () => ({ lookup: network.lookup }));
 vi.mock("undici", () => ({
 	request: network.request,
 	Agent: class {
+		constructor(options: {
+			connect?: {
+				lookup?: (
+					hostname: string,
+					options: { all?: boolean },
+					callback: (error: Error | null, address: unknown) => void,
+				) => void;
+			};
+		}) {
+			network.agentOptions = options;
+		}
 		close = network.close;
 	},
 }));
@@ -95,6 +117,13 @@ describe("remote downloads", () => {
 		expect(network.request.mock.calls[1]?.[0].pathname).toBe(
 			"/final%20image.png",
 		);
+		const lookup = network.agentOptions?.connect?.lookup;
+		if (!lookup) throw new Error("Expected pinned lookup");
+		const allCallback = vi.fn();
+		lookup("example.com", { all: true }, allCallback);
+		expect(allCallback).toHaveBeenCalledWith(null, [
+			{ address: "93.184.216.34", family: 4 },
+		]);
 	});
 
 	it("rejects a redirect whose DNS includes a private address before making another request", async () => {

@@ -9,6 +9,16 @@ import { action, internalAction } from "./_generated/server.js";
 
 const DATA_URL_REGEX = /^data:([^;]+);base64,([A-Za-z0-9+/=\s]+)$/;
 
+function constantTimeEqual(left: string, right: string) {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    difference |=
+      (left.codePointAt(index) ?? 0) ^ (right.codePointAt(index) ?? 0);
+  }
+  return difference === 0;
+}
+
 type StoragePayload = {
   dataUrl: string;
   filename?: string;
@@ -207,7 +217,7 @@ export const upsertMapperPreviews = action({
   },
   handler: async (ctx, args): Promise<unknown> => {
     const expectedToken = process.env.PREVIEW_REFRESH_TOKEN;
-    if (!expectedToken || args.adminToken !== expectedToken) {
+    if (!expectedToken || !constantTimeEqual(args.adminToken, expectedToken)) {
       throw new Error("Not authorized to update mapper previews");
     }
     const payload: MapperPreviewUpdate = {

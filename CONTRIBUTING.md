@@ -22,12 +22,16 @@ Thank you for your interest in contributing! This document provides guidelines f
 3. Install dependencies:
    ```bash
    cd frontend
-   pnpm install
+   pnpm install --ignore-scripts
    ```
 4. Start the development server:
    ```bash
    pnpm run dev
    ```
+
+   The frontend `prepare` hook runs Convex code generation. After configuring
+   `CONVEX_DEPLOYMENT`, refresh generated types explicitly with
+   `pnpm exec convex codegen`.
 
 ## How to Contribute
 

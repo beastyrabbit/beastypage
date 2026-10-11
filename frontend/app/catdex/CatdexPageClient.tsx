@@ -51,6 +51,22 @@ type MassUploadEntry = {
 };
 
 const MASS_UPLOAD_HOLD_MS = 5000;
+const CATDEX_UPLOAD_CLIENT_KEY = "catdex-upload:client-key";
+
+function getCatdexUploadClientKey(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const existing = window.localStorage.getItem(CATDEX_UPLOAD_CLIENT_KEY);
+    if (existing && /^[A-Za-z0-9_-]{16,80}$/.test(existing)) return existing;
+    const generated =
+      window.crypto?.randomUUID?.() ??
+      `${Date.now()}-${window.crypto.getRandomValues(new Uint32Array(1))[0]}`;
+    window.localStorage.setItem(CATDEX_UPLOAD_CLIENT_KEY, generated);
+    return generated;
+  } catch {
+    return undefined;
+  }
+}
 
 type SubmitModalProps = {
   open: boolean;
@@ -80,6 +96,7 @@ export default function CatdexPage() {
   const seasons = useQuery(api.seasons.list, {});
   const rarities = useQuery(api.rarities.list, {});
   const hasPending = useQuery(api.catdex.hasPending, {});
+  const generateUploadUrlMutation = useMutation(api.catdex.generateUploadUrl);
   const createCatMutation = useMutation(api.catdex.create);
 
   const [search, setSearch] = useState("");
@@ -208,9 +225,18 @@ export default function CatdexPage() {
       if (!rarityId) throw new Error("Rarity is required.");
       if (!defaultFile) throw new Error("Default card art is required.");
 
-      const defaultUpload = await uploadToStorage(defaultFile);
+      const clientKey = getCatdexUploadClientKey();
+      const defaultUpload = await uploadToStorage(
+        defaultFile,
+        generateUploadUrlMutation,
+        clientKey,
+      );
       const customUpload = customFile
-        ? await uploadToStorage(customFile)
+        ? await uploadToStorage(
+            customFile,
+            generateUploadUrlMutation,
+            clientKey,
+          )
         : null;
 
       await createCatMutation({
@@ -226,18 +252,20 @@ export default function CatdexPage() {
         defaultCard: {
           storageId: defaultUpload.storageId as Id<"_storage">,
           fileName: defaultUpload.fileName,
+          uploadToken: defaultUpload.uploadToken,
         },
         ...(customUpload
           ? {
               customCard: {
                 storageId: customUpload.storageId as Id<"_storage">,
                 fileName: customUpload.fileName,
+                uploadToken: customUpload.uploadToken,
               },
             }
           : {}),
       });
     },
-    [createCatMutation],
+    [createCatMutation, generateUploadUrlMutation],
   );
 
   useEffect(() => {
@@ -825,25 +853,21 @@ function InfoRow({ label, value }: Readonly<{ label: string; value: string }>) {
 
 async function uploadToStorage(
   file: File,
-): Promise<{ storageId: string; fileName: string }> {
-  const getUrlResponse = await fetch(
-    `${CONVEX_HTTP_URL}/api/storage/getUploadUrl`,
-    {
-      method: "POST",
-    },
-  );
-  if (!getUrlResponse.ok) {
-    const text = await getUrlResponse.text();
-    throw new Error(
-      `Unable to request upload URL (${getUrlResponse.status}): ${text}`,
-    );
-  }
-  const { uploadUrl } = await getUrlResponse.json();
-  if (!uploadUrl) {
-    throw new Error("Convex did not return an upload URL.");
+  generateUploadUrl: (args: { clientKey?: string }) => Promise<string>,
+  clientKey?: string,
+): Promise<{ storageId: string; fileName: string; uploadToken: string }> {
+  const uploadUrl = await generateUploadUrl({ clientKey });
+  const configuredSiteOrigin = process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
+  const uploadTarget = new URL(
+    uploadUrl,
+    configuredSiteOrigin || window.location.origin,
+  ).toString();
+  const uploadToken = new URL(uploadTarget).searchParams.get("token");
+  if (!uploadToken) {
+    throw new Error("Upload URL did not include an upload token.");
   }
 
-  const uploadResponse = await fetch(uploadUrl, {
+  const uploadResponse = await fetch(uploadTarget, {
     method: "POST",
     headers: {
       "Content-Type": file.type || "application/octet-stream",
@@ -858,7 +882,7 @@ async function uploadToStorage(
   if (!storageId) {
     throw new Error("Upload completed but storageId was missing.");
   }
-  return { storageId, fileName: file.name };
+  return { storageId, fileName: file.name, uploadToken };
 }
 
 function inferEntryDefaults(fileName: string): {

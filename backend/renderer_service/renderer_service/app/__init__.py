@@ -12,6 +12,7 @@ from typing import Any, Literal, TypeVar
 import anyio
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.types import Message, Receive, Scope, Send
 
 from ..config import settings
 from ..models import (
@@ -23,6 +24,7 @@ from ..models import (
     SpritesheetFrame,
 )
 from ..renderer import RenderPipeline
+from ..renderer.document_schema import InvalidCatDocument
 
 T = TypeVar("T")
 
@@ -33,6 +35,20 @@ class QueueOverloadedError(RuntimeError):
 
 class CircuitOpenError(RuntimeError):
     """Raised when the circuit breaker is open."""
+
+
+class RendererInputError(ValueError):
+    """Raised for input that is syntactically valid JSON but not renderable."""
+
+    def __init__(self, detail: object) -> None:
+        # Do not echo an attacker-controlled megabyte-sized value in the response.
+        super().__init__(str(detail)[:512])
+
+
+MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024
+HTTP_REQUEST = "http.request"
+HTTP_RESPONSE_START = "http.response.start"
+HTTP_RESPONSE_BODY = "http.response.body"
 
 
 @dataclass
@@ -136,6 +152,9 @@ class RendererSupervisor:
                 result = await anyio.to_thread.run_sync(
                     job.execute, abandon_on_cancel=True
                 )
+            except RendererInputError as exc:
+                if not job.future.done():
+                    job.future.set_exception(exc)
             except Exception as exc:  # noqa: BLE001
                 if not job.future.done():
                     job.future.set_exception(exc)
@@ -164,6 +183,96 @@ class RendererSupervisor:
             else 0.0,
             "worker_count": self.worker_count,
         }
+
+
+class RequestBodyLimitMiddleware:
+    def __init__(self, app: Callable, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        content_length = self._content_length(scope)
+        if content_length is not None and content_length > self.max_bytes:
+            await self._send_too_large(send)
+            return
+
+        # Read the request before handing control to FastAPI.  Raising from a
+        # wrapped ``receive`` function is too late: Starlette's request parser
+        # can turn that exception into a generic 400 response.  Keeping the
+        # bounded body in memory also means downstream code sees one normal,
+        # complete ASGI request and cannot consume bytes beyond the cap.
+        body_buffer = bytearray()
+        terminal_message: Message | None = None
+        while True:
+            message = await receive()
+            if message["type"] != HTTP_REQUEST:
+                terminal_message = message
+                break
+
+            chunk = message.get("body", b"")
+            if len(body_buffer) + len(chunk) > self.max_bytes:
+                await self._send_too_large(send)
+                return
+            body_buffer.extend(chunk)
+            if not message.get("more_body", False):
+                break
+
+        body = bytes(body_buffer)
+        del body_buffer
+        replayed = False
+
+        async def replay_receive() -> Message:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                if terminal_message is not None:
+                    return terminal_message
+                return {"type": HTTP_REQUEST, "body": body, "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay_receive, send)
+
+    @staticmethod
+    def _content_length(scope: Scope) -> int | None:
+        for key, value in scope.get("headers", []):
+            if key.lower() != b"content-length":
+                continue
+            try:
+                return int(value)
+            except ValueError:
+                return None
+        return None
+
+    async def _send_too_large(self, send: Send) -> None:
+        body = (
+            '{"detail":"Renderer request body is too large '
+            f'(maximum {self.max_bytes} bytes)"}}'
+        ).encode("utf-8")
+        await send(
+            {
+                "type": HTTP_RESPONSE_START,
+                "status": status.HTTP_413_CONTENT_TOO_LARGE,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode("ascii")),
+                ],
+            }
+        )
+        await send({"type": HTTP_RESPONSE_BODY, "body": body, "more_body": False})
+
+
+def _create_renderer_supervisor(pipeline: RenderPipeline) -> RendererSupervisor:
+    return RendererSupervisor(
+        pipeline,
+        max_queue_size=getattr(settings, "max_queue_size", 120),
+        worker_count=getattr(settings, "worker_count", 4),
+        circuit_failure_threshold=getattr(settings, "circuit_failure_threshold", 8),
+        circuit_reset_seconds=getattr(settings, "circuit_reset_seconds", 12),
+    )
 
 
 def create_app() -> FastAPI:
@@ -196,23 +305,14 @@ def create_app() -> FastAPI:
             {"name": "diagnostics", "description": "Health and operational metrics"},
         ],
     )
+
+    app.add_middleware(RequestBodyLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
+
     pipeline = RenderPipeline(
         canvas_size=settings.default_canvas_size,
         expected_catalog_hash=os.getenv("CAT_SYSTEM_CATALOG_HASH", "unknown"),
     )
-    supervisor = RendererSupervisor(
-        pipeline,
-        max_queue_size=settings.max_queue_size
-        if hasattr(settings, "max_queue_size")
-        else 120,
-        worker_count=settings.worker_count if hasattr(settings, "worker_count") else 4,
-        circuit_failure_threshold=settings.circuit_failure_threshold
-        if hasattr(settings, "circuit_failure_threshold")
-        else 8,
-        circuit_reset_seconds=settings.circuit_reset_seconds
-        if hasattr(settings, "circuit_reset_seconds")
-        else 12,
-    )
+    supervisor = _create_renderer_supervisor(pipeline)
 
     app.add_middleware(
         CORSMiddleware,
@@ -256,6 +356,11 @@ def create_app() -> FastAPI:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Renderer recovering from failures. Please retry.",
             ) from None
+        except RendererInputError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from None
 
     @app.post(
         "/render/batch",
@@ -277,6 +382,11 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Renderer recovering from failures. Please retry.",
+            ) from None
+        except RendererInputError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
             ) from None
 
     @app.get("/palettes", tags=["palettes"], summary="List available color palettes")
@@ -319,7 +429,10 @@ def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderRe
     )
     show_diagnostics = not request.options or request.options.diagnostics
 
-    result = pipeline.render(render_source, collect_layers=collect_layers)
+    try:
+        result = pipeline.render(render_source, collect_layers=collect_layers)
+    except InvalidCatDocument as exc:
+        raise RendererInputError(exc) from exc
     image_bytes = _image_to_data_url(result.composed)
     return RenderResponse(
         image=image_bytes,
@@ -336,38 +449,41 @@ def _render_single(pipeline: RenderPipeline, request: RenderRequest) -> RenderRe
 def _render_batch(
     pipeline: RenderPipeline, request: BatchRenderRequest
 ) -> BatchRenderResponse:
-    if request.payload.document is not None:
-        document = pipeline.adapter.normalize_document(request.payload.document)
-        base_params = {
-            **document.traits,
-            **pipeline.adapter.to_renderer_params(
-                document,
-                pipeline.repository.sprite_number_for_pose,
-            ),
-        }
-    else:
-        base_params = {**request.payload.params}
-        if request.payload.poseName is not None:
-            base_params["poseName"] = request.payload.poseName
-        if request.payload.spriteNumber is not None:
-            base_params.setdefault("spriteNumber", request.payload.spriteNumber)
+    try:
+        if request.payload.document is not None:
+            document = pipeline.adapter.normalize_document(request.payload.document)
+            base_params = {
+                **document.traits,
+                **pipeline.adapter.to_renderer_params(
+                    document,
+                    pipeline.repository.sprite_number_for_pose,
+                ),
+            }
+        else:
+            base_params = {**request.payload.params}
+            if request.payload.poseName is not None:
+                base_params["poseName"] = request.payload.poseName
+            if request.payload.spriteNumber is not None:
+                base_params.setdefault("spriteNumber", request.payload.spriteNumber)
 
-    options = request.options
-    frame_mode = options.frame_mode if options else "composed"
-    layer_identifier: str | None = None
-    if options and options.layer_id is not None:
-        layer_identifier = _coerce_layer_identifier(pipeline, options.layer_id)
+        options = request.options
+        frame_mode = options.frame_mode if options else "composed"
+        layer_identifier: str | None = None
+        if options and options.layer_id is not None:
+            layer_identifier = _coerce_layer_identifier(pipeline, options.layer_id)
 
-    batch_result = pipeline.render_batch(
-        base_params,
-        request.variants,
-        include_base=options.include_base if options else True,
-        tile_size=options.tile_size if options else None,
-        columns=options.columns if options else None,
-        include_sources=options.include_sources if options else False,
-        frame_mode=frame_mode,
-        layer_identifier=layer_identifier,
-    )
+        batch_result = pipeline.render_batch(
+            base_params,
+            request.variants,
+            include_base=options.include_base if options else True,
+            tile_size=options.tile_size if options else None,
+            columns=options.columns if options else None,
+            include_sources=options.include_sources if options else False,
+            frame_mode=frame_mode,
+            layer_identifier=layer_identifier,
+        )
+    except (InvalidCatDocument, RendererInputError) as exc:
+        raise RendererInputError(exc) from exc
 
     sheet_data = _image_to_data_url(batch_result.sheet)
     frames = [
@@ -419,5 +535,5 @@ def _image_to_data_url(image) -> str:
 def _coerce_layer_identifier(pipeline: RenderPipeline, layer: str) -> str:
     layer_ids = {operation.layer_id for operation in pipeline.executor.operations}
     if layer not in layer_ids:
-        raise ValueError(f"Unknown layer identifier '{layer}'")
+        raise RendererInputError(f"Unknown layer identifier '{layer}'")
     return layer

@@ -1,10 +1,10 @@
 ARG CAT_SYSTEM_CATALOG_HASH=unknown
 
-FROM node:24-alpine AS builder
+FROM node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS builder
 ARG CAT_SYSTEM_CATALOG_HASH
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY tsconfig.json ./
 COPY src/ src/
 RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
@@ -12,7 +12,7 @@ RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
 RUN npm run build
 RUN npm prune --omit=dev
 
-FROM node:24-alpine
+FROM node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
 WORKDIR /app
 ARG CAT_SYSTEM_CATALOG_HASH
 LABEL dev.beastypage.cat-system.catalog-hash=${CAT_SYSTEM_CATALOG_HASH}

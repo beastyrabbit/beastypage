@@ -11,7 +11,7 @@ import { extractPalette, type PaletteResponse } from "../utils/api-client.js";
 import { buildPaletteEmbed } from "../utils/embed-builder.js";
 import { dataUrlToBase64 } from "../utils/data-url.js";
 
-const IMAGE_URL_REGEX = /\.(png|jpe?g|gif|webp|bmp|tiff?)(\?|$)/i;
+const IMAGE_URL_REGEX = /\.(png|jpe?g|gif|webp|bmp|tiff?|avif)(\?|$)/i;
 const MAX_PALETTE_IMAGE_BYTES = 5 * 1024 * 1024;
 const BLOCKED_HOSTNAMES = new Set(["localhost", "0.0.0.0", "::", "::1"]);
 const DISCORD_IMAGE_HOST_ALLOWLIST = new Set([

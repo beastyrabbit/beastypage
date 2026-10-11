@@ -120,8 +120,14 @@ export const create = mutation({
     const nowTs = Date.now();
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Sign in to host a session");
+    if (!args.viewerKey) throw new Error("Viewer key is required");
     if (args.allowedOptions && args.allowedOptions.length > 2000)
       throw new Error("Too many choices");
+    const existing = await ctx.db
+      .query("stream_sessions")
+      .withIndex("byViewerKey", (q) => q.eq("viewerKey", args.viewerKey))
+      .first();
+    if (existing) throw new Error("Viewer key already in use");
     const insertDoc = {
       ownerTokenIdentifier: identity.tokenIdentifier,
       voteRound: 0,
@@ -160,6 +166,8 @@ export const update = mutation({
     const doc = await ctx.db.get(args.id);
     if (!doc) return null;
     await requireHost(ctx, doc);
+    if (args.viewerKey !== undefined && args.viewerKey !== doc.viewerKey)
+      throw new Error("Viewer key cannot be changed");
     if (args.allowedOptions && args.allowedOptions.length > 2000)
       throw new Error("Too many choices");
     const roundChanged =

@@ -6,6 +6,12 @@
  */
 
 import { createCanvas, type Image, loadImage } from "@napi-rs/canvas";
+import sharp from "sharp";
+import {
+  assertImageDimensionsWithinLimits,
+  assertImageSourceWithinLimits,
+  MAX_SOURCE_PIXELS,
+} from "../image-source-limits";
 import {
   adjustBrightness,
   adjustHue,
@@ -32,6 +38,42 @@ const DEFAULT_OPTIONS: Required<KMeansOptions> = {
   blackWhiteThreshold: 15,
 };
 
+async function normalizeUnsupportedImage(buffer: Buffer): Promise<Buffer> {
+  try {
+    // Canvas handles the common PNG/JPEG/GIF/WebP/BMP formats directly. Keep
+    // those bytes intact to avoid an unnecessary decode/re-encode cycle.
+    assertImageSourceWithinLimits(buffer);
+    return buffer;
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      error.message !== "Unsupported or unreadable raster image header"
+    ) {
+      throw error;
+    }
+  }
+
+  // Sharp/libvips supplies codecs that Skia does not (notably TIFF and AVIF).
+  // Read metadata with the same pixel ceiling before decoding so an unusual
+  // source cannot bypass the decompression-bomb guard above.
+  const image = sharp(buffer, {
+    limitInputPixels: MAX_SOURCE_PIXELS,
+    sequentialRead: true,
+  });
+  const metadata = await image.metadata();
+  const supportedBySharp =
+    metadata.format === "tiff" ||
+    (metadata.format === "heif" && metadata.mediaType === "image/avif");
+  if (!metadata.width || !metadata.height || !supportedBySharp) {
+    throw new Error("Unsupported or unreadable raster image header");
+  }
+  assertImageDimensionsWithinLimits({
+    width: metadata.width,
+    height: metadata.height,
+  });
+  return image.png().toBuffer();
+}
+
 // ---------------------------------------------------------------------------
 // Image pixel access (server-side replacement for image-processing.ts)
 // ---------------------------------------------------------------------------
@@ -41,7 +83,13 @@ export async function getImagePixelsServer(buffer: Buffer): Promise<{
   width: number;
   height: number;
 }> {
-  const img = await loadImage(buffer);
+  const normalizedBuffer = await normalizeUnsupportedImage(buffer);
+  const dimensions = assertImageSourceWithinLimits(normalizedBuffer);
+
+  const img = await loadImage(normalizedBuffer);
+  if (img.width !== dimensions.width || img.height !== dimensions.height) {
+    throw new Error("Decoded image dimensions do not match the image header");
+  }
   let width = img.width;
   let height = img.height;
 
@@ -253,13 +301,14 @@ function colorBrightness(color: RGB): number {
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function extractColorsServer(
-  imageBuffer: Buffer,
+type DecodedImage = Awaited<ReturnType<typeof getImagePixelsServer>>;
+
+function extractColorsFromPixels(
+  image: DecodedImage,
   options?: KMeansOptions,
-): Promise<ExtractedColor[]> {
+): ExtractedColor[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const { data, width, height } = await getImagePixelsServer(imageBuffer);
-  const pixels = samplePixels(data, width, height, opts);
+  const pixels = samplePixels(image.data, image.width, image.height, opts);
 
   const uniqueCount = countUniqueColors(pixels);
   if (uniqueCount < 2) throw new Error("Not enough unique colors in image");
@@ -286,17 +335,16 @@ export async function extractColorsServer(
     .sort((a, b) => b.prevalence - a.prevalence);
 }
 
-export async function extractFamilyColorsServer(
-  imageBuffer: Buffer,
+function extractFamilyColorsFromPixels(
+  image: DecodedImage,
   topColors: ExtractedColor[],
   options?: KMeansOptions,
   similarityThreshold = 50,
-): Promise<ExtractedColor[]> {
+): ExtractedColor[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const { data, width, height } = await getImagePixelsServer(imageBuffer);
 
   function recursiveExtract(threshold: number): ExtractedColor[] {
-    const pixels = samplePixels(data, width, height, opts);
+    const pixels = samplePixels(image.data, image.width, image.height, opts);
 
     const uniqueCount = countUniqueColors(pixels);
     if (uniqueCount < 2) return [];
@@ -321,10 +369,8 @@ export async function extractFamilyColorsServer(
       };
     });
 
-    // Sort by brightness (brightest first)
     allColors.sort((a, b) => b.brightness - a.brightness);
 
-    // Filter out colors too similar to top colors
     const familyColors: ExtractedColor[] = [];
     for (const color of allColors) {
       const isTooSimilar = topColors.some(
@@ -337,7 +383,6 @@ export async function extractFamilyColorsServer(
       if (familyColors.length >= opts.k) break;
     }
 
-    // Retry with lower threshold if not enough colors
     if (familyColors.length < opts.k && threshold > 5) {
       return recursiveExtract(threshold - 5);
     }
@@ -346,6 +391,50 @@ export async function extractFamilyColorsServer(
   }
 
   return recursiveExtract(similarityThreshold);
+}
+
+export async function extractColorsServer(
+  imageBuffer: Buffer,
+  options?: KMeansOptions,
+): Promise<ExtractedColor[]> {
+  return extractColorsFromPixels(
+    await getImagePixelsServer(imageBuffer),
+    options,
+  );
+}
+
+export async function extractFamilyColorsServer(
+  imageBuffer: Buffer,
+  topColors: ExtractedColor[],
+  options?: KMeansOptions,
+  similarityThreshold = 50,
+): Promise<ExtractedColor[]> {
+  return extractFamilyColorsFromPixels(
+    await getImagePixelsServer(imageBuffer),
+    topColors,
+    options,
+    similarityThreshold,
+  );
+}
+
+/** Extract both palette groups while decoding the source image only once. */
+export async function extractPaletteColorsServer(
+  imageBuffer: Buffer,
+  options?: KMeansOptions,
+): Promise<{
+  colors: ExtractedColor[];
+  familyColors: ExtractedColor[];
+}> {
+  const image = await getImagePixelsServer(imageBuffer);
+  const colors = extractColorsFromPixels(image, options);
+  let familyColors: ExtractedColor[] = [];
+  try {
+    familyColors = extractFamilyColorsFromPixels(image, colors, options);
+  } catch {
+    // Family colors are an optional enhancement. Preserve the existing
+    // behavior of returning dominant colors when this secondary pass fails.
+  }
+  return { colors, familyColors };
 }
 
 export function generatePaletteImage(

@@ -5,6 +5,7 @@ import { listLimit, requireHost } from "./streamAccess.js";
 import { docIdToString } from "./utils.js";
 
 type ParticipantDoc = Doc<"stream_participants">;
+const MAX_PARTICIPANTS_PER_SESSION = 500;
 
 export const list = query({
   args: {
@@ -79,6 +80,13 @@ export const create = mutation({
       )
       .first();
     if (existing) return streamParticipantToClient(existing);
+    const participantCount = await ctx.db
+      .query("stream_participants")
+      .withIndex("bySession", (q) => q.eq("sessionId", args.sessionId))
+      .take(MAX_PARTICIPANTS_PER_SESSION);
+    if (participantCount.length >= MAX_PARTICIPANTS_PER_SESSION) {
+      throw new Error("This session has reached its participant limit");
+    }
     if (!session.allowRepeatIps && args.fingerprint) {
       const duplicate = await ctx.db
         .query("stream_participants")

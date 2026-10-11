@@ -20,7 +20,32 @@ function upstreamUrl(request: Request) {
   return base;
 }
 
+function isInternalPath(request: Request) {
+  const rawPathname = new URL(request.url).pathname;
+  let pathname = rawPathname;
+  // The canonical worker endpoint is authenticated by the media service and
+  // must remain reachable through this public base URL. Reject encoded forms
+  // that could bypass an upstream path policy by decoding a bounded number of
+  // times and only blocking when decoding changes an internal path.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(pathname);
+    } catch {
+      // Malformed paths are not public media paths; fail closed.
+      return true;
+    }
+    if (decoded === pathname) {
+      return rawPathname !== decoded && decoded.includes("/api/internal/");
+    }
+    pathname = decoded;
+  }
+  return rawPathname !== pathname && pathname.includes("/api/internal/");
+}
+
 async function proxy(request: Request) {
+  if (isInternalPath(request))
+    return new Response("Not found", { status: 404 });
   const headers = new Headers(request.headers);
   headers.delete("host");
   headers.delete("connection");

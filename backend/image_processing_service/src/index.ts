@@ -29,10 +29,21 @@ const server = serve({
 console.log(`[image-processing] listening on http://localhost:${config.port}`);
 
 // Graceful shutdown
+let shuttingDown = false;
+
 function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log("[image-processing] shutting down...");
-  server.close();
-  process.exit(0);
+  // Stop accepting new requests, then let in-flight worker requests finish
+  // before terminating. Calling process.exit immediately here aborts worker
+  // threads and can leave clients with truncated responses.
+  server.close((error) => {
+    if (error) {
+      console.error("[image-processing] failed to close server", error);
+      process.exitCode = 1;
+    }
+  });
 }
 
 process.on("SIGINT", shutdown);

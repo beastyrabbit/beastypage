@@ -168,6 +168,7 @@ export function ControlShell() {
   // Cat profile state — for "Links & Actions" / history entry
   const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
   const [currentSlug, setCurrentSlug] = useState<string | null>(null);
+  const [currentEditToken, setCurrentEditToken] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [catNameDraft, setCatNameDraft] = useState("");
   const [creatorNameDraft, setCreatorNameDraft] = useState("");
@@ -556,6 +557,7 @@ export function ControlShell() {
       setHasTint(generatedHasTint);
       setCurrentProfileId(null);
       setCurrentSlug(null);
+      setCurrentEditToken(null);
       setShareLink(null);
       setMetaDirty(false);
       toast.success("Spin triggered!");
@@ -574,6 +576,7 @@ export function ControlShell() {
         if (spinRequestSeqRef.current !== requestSeq) return;
         setCurrentProfileId(profile.id);
         setCurrentSlug(profile.slug);
+        setCurrentEditToken(profile.editToken ?? null);
         const origin =
           typeof window !== "undefined" ? window.location.origin : "";
         setShareLink(`${origin}/view/${profile.slug}`);
@@ -673,6 +676,7 @@ export function ControlShell() {
         id: currentProfileId as Id<"cat_profile">,
         catName: catNameDraft.trim() || undefined,
         creatorName: creatorNameDraft.trim() || undefined,
+        editToken: currentEditToken ?? undefined,
       });
       setMetaDirty(false);
       toast.success("Saved to history!");
@@ -682,7 +686,13 @@ export function ControlShell() {
     } finally {
       setMetaSaving(false);
     }
-  }, [currentProfileId, catNameDraft, creatorNameDraft, updateMapperMeta]);
+  }, [
+    currentEditToken,
+    currentProfileId,
+    catNameDraft,
+    creatorNameDraft,
+    updateMapperMeta,
+  ]);
 
   // Variant selection handler
   const handleVariantSelect = useCallback(

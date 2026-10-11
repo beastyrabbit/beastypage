@@ -8,7 +8,6 @@ import { track } from "@/lib/analytics";
 import { fetchColorNames } from "@/lib/color-extraction/color-names";
 import { rgbToHex, rgbToHsl } from "@/lib/color-extraction/color-utils";
 import {
-  getColorAtPosition,
   getScaledDimensions,
   imageToDataUrl,
   loadImageFromFile,
@@ -80,18 +79,39 @@ export function ColorPaletteClient({
   const [state, setState] = useState<PaletteState>(INITIAL_STATE);
   const [selection, setSelection] = useState<SelectionState>(INITIAL_SELECTION);
   const extractionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const extractionFrameRef = useRef<number | null>(null);
+  const imageGenerationRef = useRef(0);
+  const extractionGenerationRef = useRef(0);
+  const pixelDataRef = useRef<{
+    data: Uint8ClampedArray;
+    width: number;
+    height: number;
+  } | null>(null);
   const hasExtractedRef = useRef(false);
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
+      imageGenerationRef.current += 1;
+      extractionGenerationRef.current += 1;
       if (extractionTimeoutRef.current) {
         clearTimeout(extractionTimeoutRef.current);
+        extractionTimeoutRef.current = null;
+      }
+      if (extractionFrameRef.current !== null) {
+        cancelAnimationFrame(extractionFrameRef.current);
+        extractionFrameRef.current = null;
       }
     };
   }, []);
 
   const handleImageLoad = useCallback(async (source: File | string) => {
+    const generation = ++imageGenerationRef.current;
+    extractionGenerationRef.current += 1;
+    if (extractionTimeoutRef.current) {
+      clearTimeout(extractionTimeoutRef.current);
+      extractionTimeoutRef.current = null;
+    }
     setState((prev) => ({ ...prev, isProcessing: true, error: null }));
 
     try {
@@ -99,6 +119,8 @@ export function ColorPaletteClient({
         typeof source === "string"
           ? await loadImageFromUrl(source)
           : await loadImageFromFile(source);
+
+      if (generation !== imageGenerationRef.current) return;
 
       const dataUrl = imageToDataUrl(img);
 
@@ -114,6 +136,7 @@ export function ColorPaletteClient({
       setSelection(INITIAL_SELECTION);
       track("palette_creator_image_uploaded", {});
     } catch (err) {
+      if (generation !== imageGenerationRef.current) return;
       setState((prev) => ({
         ...prev,
         isProcessing: false,
@@ -135,11 +158,16 @@ export function ColorPaletteClient({
 
   // Fetch color names from API and update state
   const fetchAndUpdateColorNames = useCallback(
-    async (topColors: ExtractedColor[], familyColors: ExtractedColor[]) => {
+    async (
+      topColors: ExtractedColor[],
+      familyColors: ExtractedColor[],
+      generation: number,
+    ) => {
       try {
         // Combine all colors for name fetching
         const allColors = [...topColors, ...familyColors];
         const nameMap = await fetchColorNames(allColors);
+        if (generation !== extractionGenerationRef.current) return;
 
         // Update colors with names - use passed-in arrays as source of truth
         // to avoid stale state issues from async fetch
@@ -166,19 +194,22 @@ export function ColorPaletteClient({
 
   // Extract colors function that handles both top and family colors
   const performExtraction = useCallback(() => {
-    if (!state.image) return;
+    const image = state.image;
+    if (!image) return;
+    const generation = ++extractionGenerationRef.current;
 
     setState((prev) => ({ ...prev, isProcessing: true, error: null }));
 
-    requestAnimationFrame(() => {
+    extractionFrameRef.current = requestAnimationFrame(() => {
+      if (generation !== extractionGenerationRef.current) return;
       try {
-        const topColors = extractColors(state.image!, {
+        const topColors = extractColors(image, {
           k: state.topColorCount,
           filterBlackWhite: state.filterBlackWhite,
         });
 
         const familyColors = extractFamilyColors(
-          state.image!,
+          image,
           topColors,
           {
             k: state.familyColorCount,
@@ -187,6 +218,7 @@ export function ColorPaletteClient({
           50,
         );
 
+        if (generation !== extractionGenerationRef.current) return;
         setState((prev) => ({
           ...prev,
           topColors,
@@ -204,8 +236,9 @@ export function ColorPaletteClient({
         toast.success(`Extracted ${topColors.length} top colors${familyMsg}`);
 
         // Fetch color names in the background (don't block UI)
-        fetchAndUpdateColorNames(topColors, familyColors);
+        void fetchAndUpdateColorNames(topColors, familyColors, generation);
       } catch (err) {
+        if (generation !== extractionGenerationRef.current) return;
         setState((prev) => ({
           ...prev,
           isProcessing: false,
@@ -237,6 +270,37 @@ export function ColorPaletteClient({
       performExtraction();
     }, 300);
   }, [state.image, performExtraction]);
+
+  useEffect(() => {
+    const image = state.image;
+    if (!image) {
+      pixelDataRef.current = null;
+      return;
+    }
+
+    const { width, height } = getScaledDimensions(image);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      pixelDataRef.current = null;
+      return;
+    }
+    context.drawImage(image, 0, 0, width, height);
+    try {
+      pixelDataRef.current = {
+        data: context.getImageData(0, 0, width, height).data,
+        width,
+        height,
+      };
+    } catch {
+      pixelDataRef.current = null;
+    }
+    return () => {
+      pixelDataRef.current = null;
+    };
+  }, [state.image]);
 
   const handleTopColorCountChange = useCallback((count: number) => {
     setState((prev) => ({ ...prev, topColorCount: count }));
@@ -273,8 +337,15 @@ export function ColorPaletteClient({
   }, []);
 
   const handleReset = useCallback(() => {
+    imageGenerationRef.current += 1;
     if (extractionTimeoutRef.current) {
       clearTimeout(extractionTimeoutRef.current);
+      extractionTimeoutRef.current = null;
+    }
+    extractionGenerationRef.current += 1;
+    if (extractionFrameRef.current !== null) {
+      cancelAnimationFrame(extractionFrameRef.current);
+      extractionFrameRef.current = null;
     }
     hasExtractedRef.current = false;
     setState(INITIAL_STATE);
@@ -286,11 +357,18 @@ export function ColorPaletteClient({
     (index: number, x: number, y: number, type: "dominant" | "accent") => {
       if (!state.image) return;
 
-      const { width, height } = getScaledDimensions(state.image);
-      const clampedX = Math.max(0, Math.min(width - 1, x));
-      const clampedY = Math.max(0, Math.min(height - 1, y));
+      const pixels = pixelDataRef.current;
+      if (!pixels) return;
+      const { width, height } = pixels;
+      const clampedX = Math.max(0, Math.min(width - 1, Math.floor(x)));
+      const clampedY = Math.max(0, Math.min(height - 1, Math.floor(y)));
 
-      const rgb = getColorAtPosition(state.image, clampedX, clampedY);
+      const offset = (clampedY * width + clampedX) * 4;
+      const rgb = {
+        r: pixels.data[offset] ?? 0,
+        g: pixels.data[offset + 1] ?? 0,
+        b: pixels.data[offset + 2] ?? 0,
+      };
       const hex = rgbToHex(rgb);
       const hsl = rgbToHsl(rgb);
 
@@ -385,10 +463,10 @@ export function ColorPaletteClient({
         />
       )}
 
-      {state.image && (
+      {state.image && state.imageDataUrl && (
         <>
           <ImageCanvas
-            imageDataUrl={state.imageDataUrl!}
+            imageDataUrl={state.imageDataUrl}
             imageDimensions={getScaledDimensions(state.image)}
             colors={state.topColors}
             familyColors={state.familyColors}

@@ -63,4 +63,6 @@ jobs:
         with:
           args: >
             -Dsonar.projectKey=beastyrabbit_beastypage_803faadd-70b0-4f3b-ac4d-78db79ddbf6c
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
             ${{ steps.pr.outputs.args }}

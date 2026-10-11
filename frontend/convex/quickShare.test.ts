@@ -5,7 +5,13 @@ import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { DAY_MS, MIB, startOfDay } from "./quickSharePolicy";
+import {
+  DAY_MS,
+  MIB,
+  QUICK_SHARE_POLICY,
+  startOfDay,
+  startOfHour,
+} from "./quickSharePolicy";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -163,6 +169,229 @@ describe("Quick Share Convex policy", () => {
     ).rejects.toThrow("HOURLY_LIMIT");
   });
 
+  it("charges collection items against active and hourly limits", async () => {
+    const t = convexTest(schema, modules);
+    const now = 1_800_000_000_000;
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Collect1", { rateIdentity: "ip:collection", now }),
+    );
+
+    const second = await t.mutation(internal.quickShare.createUpload, {
+      ...createArgs("Collect1", {
+        rateIdentity: "ip:collection",
+        now: now + 1,
+      }),
+      collectionReceiptHash: "receipt-Collect1",
+    });
+    expect(second.slug).toBe(first.slug);
+
+    const usage = await t.run(async (ctx) =>
+      ctx.db
+        .query("quick_share_usage")
+        .withIndex("by_identity_and_kind_and_windowStart", (q) =>
+          q
+            .eq("identity", "ip:collection")
+            .eq("kind", "hour")
+            .eq("windowStart", startOfHour(now)),
+        )
+        .unique(),
+    );
+    expect(usage?.starts).toBe(2);
+
+    await expect(
+      t.mutation(internal.quickShare.createUpload, {
+        ...createArgs("Collect1", {
+          rateIdentity: "ip:collection",
+          now: now + 2,
+        }),
+        collectionReceiptHash: "receipt-Collect1",
+      }),
+    ).rejects.toThrow("ACTIVE_LIMIT");
+  });
+
+  it("does not let an inactive item authorize collection appends", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Collect1", { now }),
+    );
+    await t.run((ctx) =>
+      ctx.db.patch(first.id, { state: "unsupported", active: false }),
+    );
+    await expect(
+      t.mutation(internal.quickShare.createUpload, {
+        ...createArgs("Collect1", { now: now + 1 }),
+        collectionReceiptHash: "wrong-receipt",
+      }),
+    ).rejects.toThrow("SLUG_COLLISION");
+    await expect(
+      t.mutation(internal.quickShare.createUpload, {
+        ...createArgs("Collect1", { now: now + 2 }),
+        collectionReceiptHash: "receipt-Collect1",
+      }),
+    ).rejects.toThrow("SLUG_COLLISION");
+  });
+
+  it("ignores inactive collection rows when enforcing the collection limit", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Collect1", { now }),
+    );
+    await t.run(async (ctx) => {
+      const original = await ctx.db.get(first.id);
+      if (!original) throw new Error("Expected a collection upload");
+      const { _id: _uploadId, _creationTime, ...row } = original;
+      for (
+        let index = 1;
+        index < QUICK_SHARE_POLICY.collectionMaxItems;
+        index += 1
+      ) {
+        await ctx.db.insert("quick_share_uploads", {
+          ...row,
+          state: "failed",
+          active: false,
+          receiptHash: `failed-${index}`,
+        });
+      }
+    });
+    await expect(
+      t.mutation(internal.quickShare.createUpload, {
+        ...createArgs("Collect1", { now: now + 1 }),
+        collectionReceiptHash: "receipt-Collect1",
+      }),
+    ).resolves.toMatchObject({ slug: "Collect1" });
+  });
+
+  it("keeps an older ready item visible past stale collection rows", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Collect2", { now: now - 1_000 }),
+    );
+    await t.run(async (ctx) => {
+      const original = await ctx.db.get(first.id);
+      if (!original) throw new Error("Expected a collection upload");
+      await ctx.db.patch(first.id, {
+        state: "ready",
+        publicKey: "derivatives/older",
+        publicMime: "image/png",
+        publicSize: 1,
+        publicExpiresAt: now + 10_000,
+      });
+      const { _id: _uploadId, _creationTime, ...row } = original;
+      for (
+        let index = 0;
+        index < QUICK_SHARE_POLICY.collectionMaxItems;
+        index += 1
+      ) {
+        await ctx.db.insert("quick_share_uploads", {
+          ...row,
+          state: "failed",
+          active: false,
+          receiptHash: `stale-${index}`,
+          createdAt: now + index,
+        });
+      }
+    });
+
+    await expect(
+      t.query(internal.quickShare.getPublicCollection, {
+        slug: "Collect2",
+        now,
+      }),
+    ).resolves.toMatchObject([
+      { key: "derivatives/older", mime: "image/png", size: 1 },
+    ]);
+  });
+
+  it("keeps live uploads visible in admin slug searches past stale rows", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const live = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("AdmLive1", { now }),
+    );
+    await t.run(async (ctx) => {
+      await ctx.db.patch(live.id, {
+        state: "ready",
+        publicKey: "derivatives/live",
+        publicMime: "image/png",
+        publicSize: 1,
+      });
+      const original = await ctx.db.get(live.id);
+      if (!original) throw new Error("Expected a live upload");
+      const { _id: _uploadId, _creationTime, ...row } = original;
+      for (
+        let index = 0;
+        index < QUICK_SHARE_POLICY.collectionMaxItems;
+        index += 1
+      ) {
+        await ctx.db.insert("quick_share_uploads", {
+          ...row,
+          state: "failed",
+          active: false,
+          receiptHash: `admin-stale-${index}`,
+          createdAt: now + index + 1,
+        });
+      }
+    });
+
+    await expect(
+      t.query(internal.quickShare.adminList, { slug: "AdmLive1" }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ originalKey: "originals/AdmLive1" }),
+      ]),
+    );
+  });
+
+  it("bounds public collection and slug moderation reads for legacy collections", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Collect1", { now }),
+    );
+    await t.run(async (ctx) => {
+      const original = await ctx.db.get(first.id);
+      if (!original) throw new Error("Expected a collection upload");
+      const { _id: _uploadId, _creationTime, ...row } = original;
+      await ctx.db.patch(first.id, {
+        state: "ready",
+        publicKey: "derivatives/first",
+        publicMime: "image/png",
+        publicSize: 1,
+      });
+      for (
+        let index = 1;
+        index < QUICK_SHARE_POLICY.collectionMaxItems + 1;
+        index += 1
+      ) {
+        await ctx.db.insert("quick_share_uploads", {
+          ...row,
+          state: "ready",
+          publicKey: `derivatives/${index}`,
+          publicMime: "image/png",
+          publicSize: 1,
+        });
+      }
+    });
+    expect(
+      await t.query(internal.quickShare.getPublicCollection, {
+        slug: "Collect1",
+        now,
+      }),
+    ).toHaveLength(QUICK_SHARE_POLICY.collectionMaxItems);
+    expect(
+      await t.query(internal.quickShare.adminList, { slug: "Collect1" }),
+    ).toHaveLength(QUICK_SHARE_POLICY.collectionMaxItems);
+  });
+
   it("revokes every active link for a banned exact IP", async () => {
     const t = convexTest(schema, modules);
     const first = await t.mutation(
@@ -286,6 +515,54 @@ describe("Quick Share Convex policy", () => {
     expect(recovered?.leaseExpiresAt).toBeUndefined();
   });
 
+  it("wakes the oldest pending job when processing finishes", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const first = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("WakeJob1", { now }),
+    );
+    const second = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("WakeJob2", { now: now + 1 }),
+    );
+    for (const upload of [first, second]) {
+      await t.mutation(internal.quickShare.markComplete, {
+        uploadId: upload.id,
+        receiptHash: `receipt-${upload.slug}`,
+        now: now + 2,
+      });
+    }
+    const jobs = await t.run((ctx) => ctx.db.query("quick_share_jobs").take(2));
+    const firstJob = jobs.find((job) => job.uploadId === first.id);
+    const secondJob = jobs.find((job) => job.uploadId === second.id);
+    if (!firstJob || !secondJob)
+      throw new Error("Expected both processing jobs");
+    await t.mutation(internal.quickShare.claimJob, {
+      jobId: firstJob._id,
+      leaseId: "test-lease",
+      now: now + 3,
+    });
+    await t.mutation(internal.quickShare.finishProcessJob, {
+      jobId: firstJob._id,
+      leaseId: "test-lease",
+      state: "ready",
+      publicKey: "derivatives/first",
+      publicMime: "image/png",
+      publicSize: 1,
+      now: now + 4,
+    });
+    const scheduled = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").take(20),
+    );
+    const secondDispatches = scheduled.filter(
+      (row) =>
+        row.name.endsWith(":dispatchJob") &&
+        (row.args[0] as { jobId: string }).jobId === secondJob._id,
+    );
+    expect(secondDispatches).toHaveLength(2);
+  });
+
   it("does not resurrect a share removed while processing", async () => {
     const t = convexTest(schema, modules);
     const created = await t.mutation(
@@ -346,6 +623,22 @@ describe("Quick Share Convex policy", () => {
       false,
       "UPLOAD_TIMED_OUT",
     ]);
+  });
+
+  it("does not abandon an old upload that received a recent part", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const created = await t.mutation(
+      internal.quickShare.createUpload,
+      createArgs("Recent01", { now: now - 2 * 60 * 60 * 1000 }),
+    );
+    await t.run(async (ctx) => {
+      await ctx.db.patch(created.id, { updatedAt: now });
+    });
+
+    await t.mutation(internal.quickShare.maintenance, {});
+    const upload = await t.run(async (ctx) => ctx.db.get(created.id));
+    expect([upload?.state, upload?.active]).toEqual(["uploading", true]);
   });
 
   it("reserves URL import capacity before download and refunds unused bytes", async () => {

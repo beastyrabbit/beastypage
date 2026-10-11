@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, usePaginatedQuery } from "convex/react";
 import { useCallback, useMemo, useState } from "react";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
 import { api } from "@/convex/_generated/api";
@@ -9,7 +9,11 @@ import type { CollectionEntry } from "@/convex/collection";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
 
 export default function CollectionFocusTestingPage() {
-  const entries = useQuery(api.collection.list, {});
+  const {
+    results: entries,
+    status: pageStatus,
+    loadMore,
+  } = usePaginatedQuery(api.collection.page, {}, { initialNumItems: 36 });
   const setFocus = useMutation(api.collection.setFocus);
   const [drafts, setDrafts] = useState<
     Record<string, { focusX: number; focusY: number }>
@@ -72,7 +76,7 @@ export default function CollectionFocusTestingPage() {
     [getDraft, setFocus],
   );
 
-  if (!entries) {
+  if (pageStatus === "LoadingFirstPage") {
     return (
       <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-12 text-sm text-muted-foreground">
         Loading collection focus editor…
@@ -206,6 +210,16 @@ export default function CollectionFocusTestingPage() {
           );
         })}
       </section>
+      {pageStatus !== "Exhausted" && entries.length > 0 && (
+        <button
+          type="button"
+          disabled={pageStatus !== "CanLoadMore"}
+          onClick={() => loadMore(36)}
+          className="self-center rounded-full border border-primary/50 bg-primary/15 px-5 py-2.5 text-sm font-medium text-primary transition hover:bg-primary/20 disabled:cursor-wait disabled:opacity-50"
+        >
+          {pageStatus === "LoadingMore" ? "Loading…" : "Load more artwork"}
+        </button>
+      )}
     </main>
   );
 }

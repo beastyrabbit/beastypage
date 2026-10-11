@@ -41,6 +41,7 @@ type Policy = {
   smallLifetimeMs: number;
   largeLifetimeMs: number;
   chunkBytes: number;
+  collectionMaxItems: number;
 };
 
 type ShareStatus = {
@@ -137,9 +138,22 @@ function errorMessage(error: unknown) {
   if (raw.includes("DAILY_BYTES_LIMIT")) {
     return "The daily transfer limit has been reached. Try again tomorrow.";
   }
+  if (raw.includes("COLLECTION_LIMIT")) {
+    return "This shared collection is full. Start a new share for more files.";
+  }
+  if (raw.includes("SLUG_COLLISION")) {
+    return "This shared collection is no longer accepting files. Start a new share.";
+  }
   if (raw.includes("IP_BANNED"))
     return "Sharing is unavailable from this network.";
   return raw.replace(/^Error:\s*/i, "");
+}
+
+function isAbortError(error: unknown) {
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
 }
 
 function shareUrl(slug: string, fallback: string) {
@@ -396,9 +410,15 @@ export function QuickShareClient() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [now, setNow] = useState(0);
   const [currentItemCount, setCurrentItemCount] = useState(1);
+  const processingAbortRef = useRef<AbortController | null>(null);
 
   const selectFile = useCallback(
     (nextFile: File | null, source: "file" | "clipboard") => {
+      // Selecting a new file supersedes any processing poll for the previous
+      // upload. Abort it before resetting the visible state so a late status
+      // response cannot overwrite the new selection.
+      processingAbortRef.current?.abort();
+      processingAbortRef.current = null;
       setFiles(nextFile ? [nextFile] : []);
       setFileSource(nextFile ? source : null);
       setActiveUpload(null);
@@ -505,6 +525,13 @@ export function QuickShareClient() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(
+    () => () => {
+      processingAbortRef.current?.abort();
+    },
+    [],
+  );
+
   const remember = useCallback(
     (created: ActiveUpload) => {
       setActiveUpload(created);
@@ -526,30 +553,61 @@ export function QuickShareClient() {
 
   const waitForProcessing = useCallback(
     async (upload: ActiveUpload) => {
+      processingAbortRef.current?.abort();
+      const controller = new AbortController();
+      processingAbortRef.current = controller;
+      const deadline = Date.now() + 10 * 60_000;
+      let delayMs = 2_000;
       setWork({ kind: "processing", label: "Preparing a chat-friendly file…" });
-      for (let attempt = 0; attempt < 600; attempt += 1) {
-        const status = await apiFetch<ShareStatus>(
-          `/i/api/uploads/${upload.uploadId}/status`,
-          {},
-          upload.receipt,
-        );
-        setCurrent(normalizeShare(status));
-        if (status.state === "ready") {
-          setWork({ kind: "done", label: "Your link is ready." });
-          await loadHistory();
-          return;
-        }
-        if (
-          status.state === "unsupported" ||
-          status.state === "failed" ||
-          status.state === "removed"
-        ) {
-          throw new Error(
-            status.failureMessage ??
-              "This file could not be made available for sharing.",
+      try {
+        while (Date.now() < deadline) {
+          const status = await apiFetch<ShareStatus>(
+            `/i/api/uploads/${upload.uploadId}/status`,
+            { signal: controller.signal },
+            upload.receipt,
           );
+          setCurrent(normalizeShare(status));
+          if (status.state === "ready") {
+            setWork({ kind: "done", label: "Your link is ready." });
+            await loadHistory();
+            return;
+          }
+          if (
+            status.state === "unsupported" ||
+            status.state === "failed" ||
+            status.state === "removed"
+          ) {
+            throw new Error(
+              status.failureMessage ??
+                "This file could not be made available for sharing.",
+            );
+          }
+          const remaining = Math.max(0, deadline - Date.now());
+          await new Promise<void>((resolve, reject) => {
+            let timer: number;
+            const onAbort = () => {
+              window.clearTimeout(timer);
+              controller.signal.removeEventListener("abort", onAbort);
+              reject(new DOMException("Polling aborted", "AbortError"));
+            };
+            timer = window.setTimeout(
+              () => {
+                controller.signal.removeEventListener("abort", onAbort);
+                resolve();
+              },
+              Math.min(delayMs, remaining),
+            );
+            controller.signal.addEventListener("abort", onAbort, {
+              once: true,
+            });
+            if (controller.signal.aborted) onAbort();
+          });
+          delayMs = Math.min(10_000, Math.round(delayMs * 1.5));
         }
-        await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+      } finally {
+        if (processingAbortRef.current === controller) {
+          processingAbortRef.current = null;
+        }
       }
       throw new Error(
         "Processing is taking longer than expected. Check Recent shares later.",
@@ -637,6 +695,32 @@ export function QuickShareClient() {
   async function startFileUpload(event: FormEvent, selectedFiles: File[]) {
     event.preventDefault();
     if (selectedFiles.length === 0 || !policy) return;
+    const maxSelection = Math.min(
+      policy.active,
+      policy.collectionMaxItems ?? policy.active,
+    );
+    if (selectedFiles.length > maxSelection) {
+      setWork({
+        kind: "error",
+        label: `Select at most ${maxSelection} files per share.`,
+      });
+      return;
+    }
+    const activeHistoryCount = history.filter(
+      (item) =>
+        item.publicExpiresAt > Date.now() &&
+        (item.state === "uploading" ||
+          item.state === "processing" ||
+          item.state === "ready"),
+    ).length;
+    if (activeHistoryCount + selectedFiles.length > policy.active) {
+      setWork({
+        kind: "error",
+        label:
+          "Too many shares are active. Wait for one to expire before creating another.",
+      });
+      return;
+    }
     const oversized = selectedFiles.find((item) => item.size > policy.maxBytes);
     if (oversized) {
       setWork({
@@ -691,7 +775,10 @@ export function QuickShareClient() {
           size: selectedFile.size,
           createdAt: Date.now(),
         };
-        collection ??= { slug: upload.slug, receipt: upload.receipt };
+        // Keep the latest active upload as the collection capability. If an
+        // earlier item is revoked or fails processing, the next item can still
+        // authorize the remainder of the batch without reusing stale state.
+        collection = { slug: upload.slug, receipt: upload.receipt };
         lastUpload = upload;
         remember(upload);
         await uploadParts(selectedFile, upload);
@@ -706,7 +793,9 @@ export function QuickShareClient() {
         });
       }
     } catch (error) {
-      setWork({ kind: "error", label: errorMessage(error) });
+      if (!isAbortError(error)) {
+        setWork({ kind: "error", label: errorMessage(error) });
+      }
     }
   }
 
@@ -717,7 +806,9 @@ export function QuickShareClient() {
     try {
       await uploadParts(file, activeUpload);
     } catch (error) {
-      setWork({ kind: "error", label: errorMessage(error) });
+      if (!isAbortError(error)) {
+        setWork({ kind: "error", label: errorMessage(error) });
+      }
     }
   }
 
@@ -752,7 +843,9 @@ export function QuickShareClient() {
       setCurrent(normalizeShare(result));
       await waitForProcessing(upload);
     } catch (error) {
-      setWork({ kind: "error", label: errorMessage(error) });
+      if (!isAbortError(error)) {
+        setWork({ kind: "error", label: errorMessage(error) });
+      }
     }
   }
 
@@ -981,8 +1074,13 @@ export function QuickShareClient() {
                   multiple
                   accept="image/*,video/*,.heic,.heif,.avif,.tif,.tiff,.mkv,.avi"
                   className="sr-only"
+                  disabled={busy}
                   onChange={(event) => {
                     const selected = Array.from(event.target.files ?? []);
+                    // The picker can still be opened while an existing poll is
+                    // running, so apply the same cancellation as selectFile.
+                    processingAbortRef.current?.abort();
+                    processingAbortRef.current = null;
                     setFiles(selected);
                     setFileSource(selected.length ? "file" : null);
                     setActiveUpload(null);
@@ -992,7 +1090,8 @@ export function QuickShareClient() {
                 />
                 <button
                   type="button"
-                  className="flex min-h-44 w-full flex-col items-center justify-center rounded-lg border border-dashed border-border px-6 py-8 text-center transition hover:border-amber-500/60 hover:bg-amber-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                  disabled={busy}
+                  className="flex min-h-44 w-full flex-col items-center justify-center rounded-lg border border-dashed border-border px-6 py-8 text-center transition hover:border-amber-500/60 hover:bg-amber-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <FileUp className="mb-4 size-7 text-amber-400" />

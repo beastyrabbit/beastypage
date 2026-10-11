@@ -1,77 +1,17 @@
-import { v } from "convex/values";
-import { type MutationCtx, mutation, query } from "./_generated/server.js";
-import { randomSlug } from "./utils.js";
-
-const SLUG_ALPHABET =
-  "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-const SLUG_LENGTH = 7;
-
-async function generateUniqueSlug(ctx: MutationCtx) {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    const candidate = randomSlug(SLUG_LENGTH, SLUG_ALPHABET);
-    const existing = await ctx.db
-      .query("pixelator_settings")
-      .withIndex("bySlug", (q) => q.eq("slug", candidate))
-      .unique();
-    if (!existing) {
-      return candidate;
-    }
-  }
-  throw new Error("Failed to generate unique settings slug");
-}
+import { mutation, query } from "./_generated/server.js";
+import {
+  getSettings,
+  saveSettings,
+  settingsArgs,
+  settingsSlugArgs,
+} from "./settings.js";
 
 export const save = mutation({
-  args: {
-    config: v.any(),
-    slug: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const now = Date.now();
-    const trimmed = args.slug?.trim();
-
-    if (trimmed) {
-      const existing = await ctx.db
-        .query("pixelator_settings")
-        .withIndex("bySlug", (q) => q.eq("slug", trimmed))
-        .unique();
-      if (existing) {
-        await ctx.db.patch(existing._id, {
-          config: args.config,
-          updatedAt: now,
-        });
-        return { slug: existing.slug, id: existing._id, updated: true };
-      }
-    }
-
-    const slug = trimmed || (await generateUniqueSlug(ctx));
-    const id = await ctx.db.insert("pixelator_settings", {
-      slug,
-      config: args.config,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    return { slug, id, updated: false };
-  },
+  args: settingsArgs,
+  handler: (ctx, args) => saveSettings(ctx, "pixelator_settings", args),
 });
 
 export const get = query({
-  args: {
-    slug: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const record = await ctx.db
-      .query("pixelator_settings")
-      .withIndex("bySlug", (q) => q.eq("slug", args.slug))
-      .unique();
-
-    if (!record) return null;
-    return {
-      slug: record.slug,
-      config: record.config,
-      id: record._id,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-    };
-  },
+  args: settingsSlugArgs,
+  handler: (ctx, args) => getSettings(ctx, "pixelator_settings", args.slug),
 });

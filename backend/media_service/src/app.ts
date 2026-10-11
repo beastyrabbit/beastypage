@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { getConnInfo } from "@hono/node-server/conninfo";
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
@@ -49,6 +50,17 @@ function statusCode(error: unknown) {
 }
 
 const PART_BYTES = 16 * 1024 * 1024;
+const JSON_BODY_BYTES = 64 * 1024;
+
+class RequestBodyError extends Error {
+	constructor(
+		message: string,
+		readonly status: 400 | 413,
+	) {
+		super(message);
+		this.name = "RequestBodyError";
+	}
+}
 
 async function readBodyLimited(
 	body: ReadableStream<Uint8Array> | null,
@@ -79,6 +91,30 @@ async function readBodyLimited(
 		offset += chunk.byteLength;
 	}
 	return result;
+}
+
+async function readJsonLimited(c: Context, limit = JSON_BODY_BYTES) {
+	const declaredLength = Number(c.req.header("content-length") ?? 0);
+	if (declaredLength > limit) {
+		throw new RequestBodyError("Request body is too large", 413);
+	}
+	let body: Uint8Array;
+	try {
+		body = await readBodyLimited(c.req.raw.body, limit);
+	} catch (error) {
+		if (error instanceof Error && error.message === "PART_TOO_LARGE") {
+			throw new RequestBodyError("Request body is too large", 413);
+		}
+		throw error;
+	}
+	if (body.byteLength === 0) {
+		throw new RequestBodyError("Request body must contain JSON", 400);
+	}
+	try {
+		return JSON.parse(new TextDecoder().decode(body)) as unknown;
+	} catch {
+		throw new RequestBodyError("Invalid JSON body", 400);
+	}
 }
 
 const downloadGrantSchema = z.object({
@@ -245,7 +281,7 @@ export function createApp(
 	});
 
 	app.post("/i/api/uploads", async (c) => {
-		const input = createSchema.parse(await c.req.json());
+		const input = createSchema.parse(await readJsonLimited(c));
 		const context = requestContext(c);
 		if (context.ip === "0.0.0.0") {
 			return c.json({ error: "Client IP could not be verified" }, 400);
@@ -313,6 +349,7 @@ export function createApp(
 					.abortMultipart(originalKey, multipartUploadId)
 					.catch(() => {});
 				if (
+					!input.collectionSlug &&
 					error instanceof Error &&
 					error.message.includes("SLUG_COLLISION")
 				) {
@@ -460,7 +497,7 @@ export function createApp(
 	});
 
 	app.post("/i/api/imports", async (c) => {
-		const input = importSchema.parse(await c.req.json());
+		const input = importSchema.parse(await readJsonLimited(c));
 		const context = requestContext(c);
 		if (context.ip === "0.0.0.0") {
 			return c.json({ error: "Client IP could not be verified" }, 400);
@@ -688,7 +725,7 @@ export function createApp(
 	app.post("/i/api/admin/bans", async (c) => {
 		const { bearer } = requestContext(c);
 		if (!bearer) return c.json({ error: "Unauthorized" }, 401);
-		const input = reasonSchema.parse(await c.req.json());
+		const input = reasonSchema.parse(await readJsonLimited(c));
 		const ip = normalizeIp(input.ip);
 		if (ip === "0.0.0.0") {
 			return c.json({ error: "This fallback address cannot be banned" }, 400);
@@ -708,7 +745,9 @@ export function createApp(
 	app.post("/i/api/admin/bans/remove", async (c) => {
 		const { bearer } = requestContext(c);
 		if (!bearer) return c.json({ error: "Unauthorized" }, 401);
-		const input = reasonSchema.pick({ ip: true }).parse(await c.req.json());
+		const input = reasonSchema
+			.pick({ ip: true })
+			.parse(await readJsonLimited(c));
 		const ip = normalizeIp(input.ip);
 		if (ip === "0.0.0.0") {
 			return c.json({ error: "This fallback address cannot be unbanned" }, 400);
@@ -780,8 +819,14 @@ export function createApp(
 		try {
 			result = await control.call<PublicUpload[]>("publicCollection", { slug });
 		} catch (error) {
-			// Allows the media service to roll out before the new Convex operation.
-			if (statusCode(error) < 500) throw error;
+			// Older Convex deployments reject the new operation explicitly. Only
+			// that compatibility response may fall back; auth and data errors must
+			// remain visible to the caller.
+			const isUnknownOperation =
+				statusCode(error) === 400 &&
+				error instanceof Error &&
+				/unknown operation/i.test(error.message);
+			if (!isUnknownOperation) throw error;
 			result = await control.call<PublicUpload>("public", { slug });
 		}
 		const items = Array.isArray(result) ? result : [result];

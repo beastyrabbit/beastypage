@@ -24,7 +24,7 @@ export const DEFAULT_RARITIES: Array<{
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const rarities = await ctx.db.query("rarity").collect();
+    const rarities = await ctx.db.query("rarity").take(200);
     rarities.sort((a, b) => (a.stars ?? 0) - (b.stars ?? 0));
     return rarities.map((doc) => rarityRecordToClient(doc));
   },

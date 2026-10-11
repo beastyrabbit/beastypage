@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const FALLBACK_IMG =
@@ -27,36 +27,74 @@ export function ProgressiveImage({
   imgStyle,
   loading = "lazy",
 }: Readonly<ProgressiveImageProps>) {
-  const [state, setState] = useState(() => ({
-    src: lowSrc ?? highSrc ?? FALLBACK_IMG,
-    sharp: !lowSrc || lowSrc === highSrc,
-  }));
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [highState, setHighState] = useState<{
+    loaded: string | null;
+    failed: string | null;
+    low: string | null | undefined;
+  }>({ loaded: null, failed: null, low: undefined });
+  const nextHigh = highSrc ?? lowSrc;
+  const baseSrc = lowSrc ?? highSrc ?? FALLBACK_IMG;
+  const highLoaded =
+    nextHigh !== undefined &&
+    highState.loaded === nextHigh &&
+    highState.low === lowSrc;
+  const highFailed =
+    nextHigh !== undefined &&
+    highState.failed === nextHigh &&
+    highState.low === lowSrc;
+  const state = {
+    src: highLoaded ? (nextHigh ?? baseSrc) : baseSrc,
+    sharp: !lowSrc || lowSrc === nextHigh || highLoaded || highFailed,
+  };
 
   useEffect(() => {
-    const nextHigh = highSrc ?? lowSrc;
-    if (!nextHigh) return;
-    if (state.src === nextHigh && state.sharp) return;
-    if (typeof window === "undefined") return;
+    if (!lowSrc || !nextHigh || lowSrc === nextHigh) return;
 
     let cancelled = false;
-    const img = new window.Image();
-    img.src = nextHigh;
-    img.onload = () => {
-      if (cancelled) return;
-      setState({ src: nextHigh, sharp: true });
+    let started = false;
+    let observer: IntersectionObserver | undefined;
+    const loadHigh = () => {
+      if (started || cancelled) return;
+      started = true;
+      const img = new Image();
+      img.src = nextHigh;
+      img.onload = () => {
+        if (cancelled) return;
+        setHighState({ loaded: nextHigh, failed: null, low: lowSrc });
+      };
+      img.onerror = () => {
+        if (cancelled) return;
+        setHighState({ loaded: null, failed: nextHigh, low: lowSrc });
+      };
     };
-    img.onerror = () => {
-      if (cancelled) return;
-      setState((prev) => ({ ...prev, sharp: true }));
-    };
+
+    if (loading === "eager" || typeof IntersectionObserver === "undefined") {
+      loadHigh();
+    } else {
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            loadHigh();
+            observer?.disconnect();
+          }
+        },
+        { rootMargin: "200px" },
+      );
+      if (containerRef.current) observer.observe(containerRef.current);
+    }
 
     return () => {
       cancelled = true;
+      observer?.disconnect();
     };
-  }, [highSrc, lowSrc, state.src, state.sharp]);
+  }, [loading, lowSrc, nextHigh]);
 
   return (
-    <div className={cn("relative h-full w-full overflow-hidden", className)}>
+    <div
+      ref={containerRef}
+      className={cn("relative h-full w-full overflow-hidden", className)}
+    >
       {/* biome-ignore lint/performance/noImgElement: progressive loading with dynamic src */}
       <img
         src={state.src}

@@ -8,6 +8,7 @@ export type PolicyResponse = {
 	smallLifetimeMs: number;
 	largeLifetimeMs: number;
 	chunkBytes: number;
+	collectionMaxItems: number;
 };
 
 export type UploadStatus = {

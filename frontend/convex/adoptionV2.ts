@@ -8,6 +8,8 @@ import { docIdToString, randomSlug, toId } from "./utils.js";
 const SLUG_ALPHABET =
   "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const SLUG_LENGTH = 9;
+const MAX_BATCH_CATS = 200;
+const MAX_BATCH_BYTES = 900 * 1024;
 
 type AdoptionBatchDoc = Doc<"adoption_batch">;
 type AdoptionBatchInsert = Omit<AdoptionBatchDoc, "_id" | "_creationTime">;
@@ -58,6 +60,21 @@ export const createBatch = mutation({
       throw new Error(
         "At least one cat is required to create an adoption batch",
       );
+    }
+    if (args.cats.length > MAX_BATCH_CATS) {
+      throw new Error(`A batch may contain at most ${MAX_BATCH_CATS} cats`);
+    }
+    const encodedBatch = JSON.stringify({
+      cats: args.cats,
+      title: args.title,
+      creatorName: args.creatorName,
+      settings: args.settings,
+    });
+    if (
+      !encodedBatch ||
+      new TextEncoder().encode(encodedBatch).byteLength > MAX_BATCH_BYTES
+    ) {
+      throw new Error("Adoption batch payload is too large");
     }
 
     const now = Date.now();
@@ -266,7 +283,7 @@ async function resolveProfilePreview(
   const images = await ctx.db
     .query("cat_images")
     .withIndex("byProfile", (q) => q.eq("catProfileId", profileId))
-    .collect();
+    .take(8);
 
   const find = (kind: "tiny" | "preview" | "full" | "spriteSheet") =>
     images.find((image) => image.kind === kind) ?? null;

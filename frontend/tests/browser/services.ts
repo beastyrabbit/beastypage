@@ -55,6 +55,8 @@ export function useQuery(
       return viewer;
     case "catdex:hasPending":
       return false;
+    case "ancestryTree:checkSlug":
+      return { exists: false, hasPassword: false };
     default:
       return [];
   }
@@ -71,11 +73,21 @@ const catdexCard = {
   rarity: "Common",
   updated: 1,
 };
-export const usePaginatedQuery = () => ({
-  results: new URL(location.href).searchParams.has("catdexCard")
-    ? [catdexCard]
-    : [],
-  status: "CanLoadMore",
-  loadMore: () => {},
-});
+export const usePaginatedQuery = (
+  reference: Parameters<typeof getFunctionName>[0],
+) => {
+  const functionName = getFunctionName(reference);
+  const isCollectionPage = functionName === "collection:page";
+  let results: (typeof artwork)[] | (typeof catdexCard)[] = [];
+  if (isCollectionPage) {
+    results = [artwork];
+  } else if (new URL(location.href).searchParams.has("catdexCard")) {
+    results = [catdexCard];
+  }
+  return {
+    results,
+    status: "CanLoadMore" as const,
+    loadMore: () => {},
+  };
+};
 export class ConvexReactClient {}

@@ -76,6 +76,10 @@ interface ParentPreview {
   name: CatName;
 }
 
+// Keep the client-side guard aligned with the Convex ancestryTree mutation.
+const MAX_CATS = 500;
+const LARGE_TREE_THRESHOLD = Math.floor(MAX_CATS * 0.8);
+
 function createTraitMutationPools(): MutationPool["traits"] {
   return Object.fromEntries(
     getInheritanceTraits()
@@ -143,8 +147,7 @@ function renderEstimateMessage(
   if (isHuge) {
     return (
       <span>
-        🚫 ~{estimated.toLocaleString()} cats — too large to render, will not
-        load
+        🚫 ~{estimated.toLocaleString()} cats — exceeds the {MAX_CATS}-cat limit
       </span>
     );
   }
@@ -167,6 +170,19 @@ export function AncestryTreeClient({
   const [tree, setTree] = useState<SerializedAncestryTree | null>(
     initialTree ?? null,
   );
+  // Capability returned when an anonymous tree is first created. It is kept
+  // only in the creator's browser and is never exposed by public queries.
+  const [treeEditToken, setTreeEditToken] = useState<string | null>(() => {
+    if (typeof window === "undefined" || !initialTree?.slug) return null;
+    try {
+      const key = `ancestry-tree-edit:${initialTree.slug}`;
+      return (
+        window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key)
+      );
+    } catch {
+      return null;
+    }
+  });
   const [config, setConfig] = useState<TreeGenerationConfig>(
     initialTree?.config ?? DEFAULT_TREE_CONFIG,
   );
@@ -218,6 +234,7 @@ export function AncestryTreeClient({
   });
 
   const saveTreeMutation = useMutation(api.ancestryTree.save);
+  const saveAsNewTreeMutation = useMutation(api.ancestryTree.saveAsNew);
 
   // Initialize sprite mapper on mount
   useEffect(() => {
@@ -667,6 +684,62 @@ export function AncestryTreeClient({
     [tree, isSpriteMapperReady],
   );
 
+  const handleAddChildWithoutPartner = useCallback(
+    async (parentCat: AncestryTreeCat, forcedGender: "M" | "F") => {
+      if (!tree || !isSpriteMapperReady) return;
+
+      setIsGenerating(true);
+      try {
+        const newPartnerParams = await generateRandomParamsV3();
+        const manager = AncestryTreeManager.deserialize(
+          tree,
+          mutationPoolRef.current,
+        );
+        manager.assignPartner(parentCat.id, newPartnerParams, undefined, false);
+
+        const currentCat = manager.getCat(parentCat.id);
+        const newPartnerId = currentCat?.partnerIds.at(-1);
+        if (!currentCat || !newPartnerId) return;
+
+        const motherId =
+          currentCat.gender === "F" ? currentCat.id : newPartnerId;
+        const fatherId =
+          currentCat.gender === "M" ? currentCat.id : newPartnerId;
+        const originalConfig = { ...manager.getTree().config };
+        manager.setConfig({ minChildren: 1, maxChildren: 1 });
+        manager.generateOffspring(
+          motherId,
+          fatherId,
+          currentCat.generation + 1,
+          forcedGender,
+        );
+        manager.setConfig(originalConfig);
+
+        const serialized = manager.serialize();
+        setTree(serialized);
+        const updatedCat = serialized.cats.find(
+          (cat) => cat.id === parentCat.id,
+        );
+        if (updatedCat) setSelectedCat(updatedCat);
+      } catch (error) {
+        console.error("Failed to add spouse and child:", error);
+      } finally {
+        setIsGenerating(false);
+      }
+    },
+    [isSpriteMapperReady, tree],
+  );
+
+  const getExistingPartnerId = useCallback(
+    (candidateId: string | undefined) => {
+      if (!candidateId || !tree) return undefined;
+      return tree.cats.some((cat) => cat.id === candidateId)
+        ? candidateId
+        : undefined;
+    },
+    [tree],
+  );
+
   // Handle add relative from graph placeholder click
   const handleAddRelativeFromGraph = useCallback(
     async (
@@ -678,98 +751,32 @@ export function AncestryTreeClient({
       setIsEditingRelations(false);
 
       if (type === "spouse") {
-        // Add new spouse (supports multiple spouses)
         await handleAssignRandomPartner(parentCat);
-      } else if (type === "father" || type === "mother") {
-        // Add a parent to the cat
-        await handleAddParent(parentCat, type);
-      } else {
-        // Add child - respect the son/daughter choice
-        const forcedGender: "M" | "F" = type === "son" ? "M" : "F";
-
-        // Check if otherParentId references a valid existing spouse
-        let validPartnerId: string | undefined;
-
-        if (otherParentId && tree) {
-          // Check if otherParentId exists in the tree
-          const partnerExists = tree.cats.some((c) => c.id === otherParentId);
-          if (partnerExists) {
-            validPartnerId = otherParentId;
-          }
-        }
-
-        if (validPartnerId) {
-          // Specific spouse indicated - add child with that spouse
-          await handleAddChildWithPartner(
-            parentCat,
-            validPartnerId,
-            forcedGender,
-          );
-        } else {
-          // No specific spouse - create new spouse first, then add child
-          if (!tree || !isSpriteMapperReady) return;
-
-          setIsGenerating(true);
-          try {
-            const newPartnerParams = await generateRandomParamsV3();
-            const manager = AncestryTreeManager.deserialize(
-              tree,
-              mutationPoolRef.current,
-            );
-
-            // First, assign a partner (without generating offspring)
-            manager.assignPartner(
-              parentCat.id,
-              newPartnerParams,
-              undefined,
-              false,
-            );
-
-            // Then generate a child with the correct gender
-            const currentCat = manager.getCat(parentCat.id);
-            if (currentCat && currentCat.partnerIds.length > 0) {
-              const newPartnerId = currentCat.partnerIds.at(-1)!;
-              const motherId =
-                currentCat.gender === "F" ? currentCat.id : newPartnerId;
-              const fatherId =
-                currentCat.gender === "M" ? currentCat.id : newPartnerId;
-
-              // Temporarily set config to generate exactly 1 child
-              const originalConfig = { ...manager.getTree().config };
-              manager.setConfig({ minChildren: 1, maxChildren: 1 });
-              manager.generateOffspring(
-                motherId,
-                fatherId,
-                currentCat.generation + 1,
-                forcedGender,
-              );
-              manager.setConfig(originalConfig);
-            }
-
-            const serialized = manager.serialize();
-            setTree(serialized);
-
-            // Update selectedCat with fresh data
-            const updatedCat = serialized.cats.find(
-              (c) => c.id === parentCat.id,
-            );
-            if (updatedCat) {
-              setSelectedCat(updatedCat);
-            }
-          } catch (error) {
-            console.error("Failed to add spouse and child:", error);
-          } finally {
-            setIsGenerating(false);
-          }
-        }
+        return;
       }
+      if (type === "father" || type === "mother") {
+        await handleAddParent(parentCat, type);
+        return;
+      }
+
+      const forcedGender: "M" | "F" = type === "son" ? "M" : "F";
+      const validPartnerId = getExistingPartnerId(otherParentId);
+      if (validPartnerId) {
+        await handleAddChildWithPartner(
+          parentCat,
+          validPartnerId,
+          forcedGender,
+        );
+        return;
+      }
+      await handleAddChildWithoutPartner(parentCat, forcedGender);
     },
     [
       handleAssignRandomPartner,
       handleAddChildWithPartner,
+      handleAddChildWithoutPartner,
       handleAddParent,
-      tree,
-      isSpriteMapperReady,
+      getExistingPartnerId,
     ],
   );
 
@@ -802,22 +809,31 @@ export function AncestryTreeClient({
     [tree, selectedCat],
   );
 
-  const handleSaveTree = useCallback(
+  const persistTree = useCallback(
     async (
+      slug: string,
       name: string,
       creatorName: string,
-      password?: string,
+      password: string | undefined,
+      asNew: boolean,
     ): Promise<{
       success: boolean;
       error?: string;
       slug?: string;
       isNew?: boolean;
+      editToken?: string;
     }> => {
       if (!tree) return { success: false, error: "No tree to save" };
+      if (tree.cats.length > MAX_CATS) {
+        return {
+          success: false,
+          error: `Tree exceeds the ${MAX_CATS}-cat limit. Remove cats before saving.`,
+        };
+      }
 
-      const updatedTree = { ...tree, name, creatorName };
+      const updatedTree = { ...tree, slug, name, creatorName };
       try {
-        const result = await saveTreeMutation({
+        const payload = {
           slug: updatedTree.slug,
           name: updatedTree.name,
           foundingMotherId: updatedTree.foundingMotherId,
@@ -831,18 +847,30 @@ export function AncestryTreeClient({
           config: updatedTree.config,
           creatorName: updatedTree.creatorName,
           password,
-        });
+          editToken: asNew ? undefined : (treeEditToken ?? undefined),
+        };
+        const result = asNew
+          ? await saveAsNewTreeMutation(payload)
+          : await saveTreeMutation(payload);
 
         if (!result.success) {
           return { success: false, error: result.error };
         }
 
         setTree(updatedTree);
-
-        // If password was set on new tree, track it
-        if (password && result.isNew) {
-          setHasPassword(true);
+        if (result.editToken) {
+          setTreeEditToken(result.editToken);
+          try {
+            const key = `ancestry-tree-edit:${updatedTree.slug}`;
+            window.localStorage.setItem(key, result.editToken);
+            window.sessionStorage.setItem(key, result.editToken);
+          } catch {
+            // Storage may be disabled; the in-memory token still works.
+          }
         }
+
+        // Keep the local password flag aligned with newly created copies.
+        if (result.isNew) setHasPassword(Boolean(password));
 
         // Update URL to include the slug using Next.js router
         const newUrl = `/projects/warrior-cats/ancestry-tree/${updatedTree.slug}`;
@@ -853,7 +881,12 @@ export function AncestryTreeClient({
           has_creator: creatorName.length > 0,
         });
 
-        return { success: true, slug: result.slug, isNew: result.isNew };
+        return {
+          success: true,
+          slug: result.slug,
+          isNew: result.isNew,
+          editToken: result.editToken,
+        };
       } catch (error) {
         console.error("Failed to save tree:", error);
         return {
@@ -862,7 +895,19 @@ export function AncestryTreeClient({
         };
       }
     },
-    [tree, saveTreeMutation, router],
+    [tree, treeEditToken, saveTreeMutation, saveAsNewTreeMutation, router],
+  );
+
+  const handleSaveTree = useCallback(
+    (name: string, creatorName: string, password?: string) =>
+      persistTree(tree?.slug ?? "", name, creatorName, password, false),
+    [tree, persistTree],
+  );
+
+  const handleSaveTreeAsNew = useCallback(
+    (slug: string, name: string, creatorName: string, password?: string) =>
+      persistTree(slug, name, creatorName, password, true),
+    [persistTree],
   );
 
   const handleBackToConfig = useCallback(() => {
@@ -994,9 +1039,9 @@ export function AncestryTreeClient({
                       avgChildren,
                       config.partnerChance ?? 1,
                     );
-                    const isLarge = estimated > 1000;
-                    const isHuge = estimated > 5000;
-                    const isTooLarge = estimated > 5000;
+                    const isLarge = estimated > LARGE_TREE_THRESHOLD;
+                    const isTooLarge = estimated > MAX_CATS;
+                    const isHuge = isTooLarge;
                     return (
                       <>
                         <div
@@ -1344,6 +1389,7 @@ export function AncestryTreeClient({
           currentSlug={tree.slug}
           hasPassword={hasPassword}
           onSave={handleSaveTree}
+          onSaveAsNew={handleSaveTreeAsNew}
           onClose={() => setShowSaveDialog(false)}
         />
       )}
