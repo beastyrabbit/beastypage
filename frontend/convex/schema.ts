@@ -124,13 +124,26 @@ export default defineSchema({
     customCardThumbStorageId: v.optional(v.id("_storage")),
     customCardThumbWidth: v.optional(v.number()),
     customCardThumbHeight: v.optional(v.number()),
+    thumbnailStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("processing"),
+        v.literal("complete"),
+        v.literal("failed"),
+      ),
+    ),
+    thumbnailAttemptedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("bySeason", ["seasonId"])
     .index("byRarity", ["rarityId"])
     .index("byApproval", ["approved"])
-    .index("byOwner", ["twitchUserName"]),
+    .index("byOwner", ["twitchUserName"])
+    .index("byThumbnailStatusAndAttemptedAt", [
+      "thumbnailStatus",
+      "thumbnailAttemptedAt",
+    ]),
 
   collection: defineTable({
     artistName: v.string(),
@@ -305,10 +318,12 @@ export default defineSchema({
     prizeName: v.string(),
     forced: v.boolean(),
     randomBucket: v.optional(v.number()),
+    actorKey: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("byPrize", ["prizeName"])
-    .index("byCreated", ["createdAt"]),
+    .index("byCreated", ["createdAt"])
+    .index("byActorKeyAndCreatedAt", ["actorKey", "createdAt"]),
 
   discord_challenge: defineTable({
     token: v.string(),

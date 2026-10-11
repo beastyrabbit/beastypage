@@ -10,6 +10,63 @@ import schema from "./schema";
 const modules = import.meta.glob("./**/*.ts");
 
 describe("bounded archive queries", () => {
+  it("only logs a prize that matches its random bucket", async () => {
+    const t = convexTest(schema, modules);
+
+    await expect(
+      t.mutation(api.wheel.logSpin, {
+        prizeName: "Singularity",
+        forced: false,
+        randomBucket: 0,
+      }),
+    ).rejects.toThrow("Prize does not match random bucket");
+    await expect(
+      t.mutation(api.wheel.logSpin, {
+        prizeName: "Moondust",
+        forced: false,
+      }),
+    ).rejects.toThrow("random bucket is required");
+    await expect(
+      t.mutation(api.wheel.logSpin, {
+        prizeName: "Moondust",
+        forced: false,
+        randomBucket: 0,
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it("rate-limits anonymous wheel logging", async () => {
+    const t = convexTest(schema, modules);
+    for (let i = 0; i < 30; i += 1) {
+      await expect(
+        t.mutation(api.wheel.logSpin, {
+          prizeName: "Moondust",
+          forced: false,
+          randomBucket: 0,
+        }),
+      ).resolves.toBeNull();
+    }
+    await expect(
+      t.mutation(api.wheel.logSpin, {
+        prizeName: "Moondust",
+        forced: false,
+        randomBucket: 0,
+      }),
+    ).rejects.toThrow("rate limit");
+
+    const signedIn = t.withIdentity({
+      subject: "wheel-user",
+      issuer: "https://identity.example",
+    });
+    await expect(
+      signedIn.mutation(api.wheel.logSpin, {
+        prizeName: "Moondust",
+        forced: false,
+        randomBucket: 0,
+      }),
+    ).resolves.toBeNull();
+  });
+
   it("makes artwork past the legacy collection cap reachable through pages", async () => {
     const t = convexTest(schema, modules);
     await t.run(async (ctx) => {

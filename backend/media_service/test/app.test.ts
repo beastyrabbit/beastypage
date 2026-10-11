@@ -33,6 +33,44 @@ afterEach(() => {
 });
 
 describe("raw media delivery", () => {
+	it.each([
+		["/i/api/uploads", undefined],
+		["/i/api/imports", undefined],
+		["/i/api/admin/bans", { authorization: "Bearer admin-token" }],
+	])("rejects oversized JSON bodies on %s", async (path, extraHeaders) => {
+		const { app } = createApp(config, {} as ObjectStore);
+		const response = await app.request(`https://beastyrabbit.com${path}`, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"content-length": String(64 * 1024 + 1),
+				...extraHeaders,
+			},
+			body: "{}",
+		});
+		expect(response.status).toBe(413);
+		expect(await response.json()).toEqual({
+			error: "Request body is too large",
+		});
+	});
+
+	it("rejects malformed JSON before calling the control plane", async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal("fetch", fetchMock);
+		const { app } = createApp(config, {} as ObjectStore);
+		const response = await app.request(
+			"https://beastyrabbit.com/i/api/imports",
+			{
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: "{",
+			},
+		);
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({ error: "Invalid JSON body" });
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
 	it("serves the selected later survivor consistently for GET and HEAD", async () => {
 		const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
 			const request = JSON.parse(String(init?.body));

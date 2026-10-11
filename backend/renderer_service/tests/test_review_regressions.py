@@ -1,7 +1,9 @@
 import pytest
+from fastapi.testclient import TestClient
 from PIL import Image
 from pydantic import ValidationError
 
+from renderer_service.app import create_app
 from renderer_service.models import BatchRenderRequest, BatchVariant, RenderOptions
 from renderer_service.renderer.pipeline import RenderPipeline
 
@@ -28,6 +30,85 @@ def test_small_batch_and_png_options():
     )
     with pytest.raises(ValidationError):
         RenderOptions(outputFormat="array")
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"blob": "x" * 50_000},
+        {"tree": [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]},
+    ],
+)
+def test_render_json_input_budget_rejects_large_or_deep_values(params):
+    with pytest.raises(ValidationError):
+        BatchRenderRequest.model_validate(
+            {"payload": {"params": params}, "variants": []}
+        )
+
+
+def test_batch_json_budget_rejects_cumulative_variant_payloads():
+    variants = [
+        {"id": str(index), "params": {"blob": "x" * 10_000}}
+        for index in range(20)
+    ]
+    with pytest.raises(ValidationError, match="Batch input JSON"):
+        BatchRenderRequest.model_validate(
+            {"payload": {"params": {}}, "variants": variants}
+        )
+
+
+def test_render_json_input_budget_rejects_too_many_nodes():
+    with pytest.raises(ValidationError, match="too many JSON values"):
+        BatchRenderRequest.model_validate(
+            {"payload": {"params": {"items": [None] * 20_000}}}
+        )
+
+
+def test_invalid_layer_does_not_open_renderer_circuit():
+    app = create_app()
+    payload = {
+        "payload": {"params": {}},
+        "options": {"frameMode": "layer", "layerId": "does-not-exist"},
+    }
+    with TestClient(app) as client:
+        responses = [client.post("/render/batch", json=payload) for _ in range(10)]
+        health = client.get("/health").json()
+
+    assert all(response.status_code == 422 for response in responses)
+    assert health["metrics"]["total_failed"] == 0
+    assert health["metrics"]["circuit_open"] is False
+
+
+def test_invalid_document_is_a_client_error_without_failure_counter():
+    app = create_app()
+    payload = {
+        "payload": {
+            "document": {
+                "schemaVersion": 1,
+                "traits": {"colour": 123},
+            }
+        }
+    }
+    with TestClient(app) as client:
+        response = client.post("/render", json=payload)
+        health = client.get("/health").json()
+
+    assert response.status_code == 422
+    assert health["metrics"]["total_failed"] == 0
+    assert health["metrics"]["circuit_open"] is False
+
+
+def test_request_body_limit_rejects_large_payload_before_json_validation():
+    app = create_app()
+    body = '{"payload":{"params":{"ignored":"' + ("x" * 2_100_000) + '"}}}'
+    with TestClient(app) as client:
+        response = client.post(
+            "/render",
+            content=body,
+            headers={"content-type": "application/json"},
+        )
+
+    assert response.status_code == 413
 
 
 @pytest.fixture(scope="module")

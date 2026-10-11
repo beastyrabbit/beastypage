@@ -137,50 +137,15 @@ jobs:
       - name: Verify the closed cat-system contract
         run: pnpm cat-system:build
 
-  tag-convex-changes:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: arc-beastypage
-    outputs:
-      convex: ${{ steps.diff.outputs.convex }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          fetch-depth: 0
-
-      - id: diff
-        env:
-          CURRENT_TAG: ${{ github.ref_name }}
-          CURRENT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-
-          previous_tag=$(
-            git tag --sort=-version:refname \
-              | grep -Fxv "$CURRENT_TAG" \
-              | sed -n '1p'
-          )
-
-          if [ -z "$previous_tag" ]; then
-            echo "No previous release tag found; deploying Convex by default."
-            echo "convex=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "Comparing frontend/convex changes from $previous_tag to $CURRENT_SHA"
-
-          if git diff --quiet "$previous_tag..$CURRENT_SHA" -- frontend/convex; then
-            echo "convex=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "convex=true" >> "$GITHUB_OUTPUT"
-          fi
-
   deploy-convex:
-    needs: [changes, tag-convex-changes, cat-system-contract]
+    # Every release tag deploys Convex. A previous deployment may have failed
+    # even when this release contains no Convex diff, and skipping here would
+    # leave production permanently behind until a future backend change.
+    needs: [changes, cat-system-contract]
     if: |
       always() && needs.cat-system-contract.result == 'success' &&
       ((github.event_name == 'push' &&
-        startsWith(github.ref, 'refs/tags/v') &&
-        needs.tag-convex-changes.outputs.convex == 'true') ||
+        startsWith(github.ref, 'refs/tags/v')) ||
        (github.event_name == 'workflow_dispatch' &&
         github.ref == 'refs/heads/main' &&
         inputs.deploy_convex))
@@ -277,7 +242,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=,enable=${{ github.event_name == 'push' }}
+            type=sha,prefix=sha-,enable=${{ github.event_name == 'push' }}
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=raw,value=smoke-${{ github.run_id }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
@@ -337,7 +302,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=,enable=${{ github.event_name == 'push' }}
+            type=sha,prefix=sha-,enable=${{ github.event_name == 'push' }}
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=raw,value=smoke-${{ github.run_id }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
@@ -406,7 +371,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=,enable=${{ github.event_name == 'push' }}
+            type=sha,prefix=sha-,enable=${{ github.event_name == 'push' }}
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=raw,value=smoke-${{ github.run_id }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
@@ -456,7 +421,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=,enable=${{ github.event_name == 'push' }}
+            type=sha,prefix=sha-,enable=${{ github.event_name == 'push' }}
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=raw,value=smoke-${{ github.run_id }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
@@ -525,7 +490,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=,enable=${{ github.event_name == 'push' }}
+            type=sha,prefix=sha-,enable=${{ github.event_name == 'push' }}
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=raw,value=smoke-${{ github.run_id }},enable=${{ github.event_name == 'workflow_dispatch' }}
 

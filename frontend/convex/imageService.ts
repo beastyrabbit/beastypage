@@ -64,6 +64,9 @@ export const generateForCat = internalAction({
     }
 
     if (!results.length) {
+      await ctx.runMutation(internal.catdex.markThumbnailFailed, {
+        id: args.id,
+      });
       return { success: false, reason: "nothing_to_generate" } as const;
     }
 

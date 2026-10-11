@@ -4,6 +4,17 @@ import { mutation, query } from "./_generated/server.js";
 import { STREAM_WHEEL_PRIZES } from "./streamWheel.js";
 
 type WheelSpinDoc = Doc<"wheel_spins">;
+const ANONYMOUS_SPINS_PER_MINUTE = 30;
+const AUTHENTICATED_SPINS_PER_MINUTE = 60;
+
+function prizeForRandomBucket(randomBucket: number) {
+  let cumulativeChance = 0;
+  for (const prize of STREAM_WHEEL_PRIZES) {
+    cumulativeChance += prize.chance;
+    if (randomBucket < cumulativeChance) return prize.name;
+  }
+  return STREAM_WHEEL_PRIZES.at(-1)?.name;
+}
 
 export const logSpin = mutation({
   args: {
@@ -12,8 +23,16 @@ export const logSpin = mutation({
     randomBucket: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const actorKey = identity?.tokenIdentifier ?? "anonymous";
+    const rateLimit = identity
+      ? AUTHENTICATED_SPINS_PER_MINUTE
+      : ANONYMOUS_SPINS_PER_MINUTE;
     if (args.forced) {
       throw new Error("Forced wheel spins are internal-only");
+    }
+    if (args.randomBucket === undefined) {
+      throw new Error("A random bucket is required");
     }
     if (!STREAM_WHEEL_PRIZES.some((prize) => prize.name === args.prizeName)) {
       throw new Error("Unknown wheel prize");
@@ -26,14 +45,26 @@ export const logSpin = mutation({
     ) {
       throw new Error("Invalid wheel random bucket");
     }
+    if (prizeForRandomBucket(args.randomBucket) !== args.prizeName) {
+      throw new Error("Prize does not match random bucket");
+    }
+    const windowStart = Date.now() - 60_000;
+    const recentSpins = await ctx.db
+      .query("wheel_spins")
+      .withIndex("byActorKeyAndCreatedAt", (q) =>
+        q.eq("actorKey", actorKey).gt("createdAt", windowStart),
+      )
+      .take(rateLimit + 1);
+    if (recentSpins.length >= rateLimit) {
+      throw new Error("Wheel spin rate limit exceeded; try again shortly");
+    }
     const doc: Omit<WheelSpinDoc, "_id" | "_creationTime"> = {
       prizeName: args.prizeName,
       forced: args.forced,
+      actorKey,
       createdAt: Date.now(),
     };
-    if (typeof args.randomBucket === "number") {
-      doc.randomBucket = args.randomBucket;
-    }
+    doc.randomBucket = args.randomBucket;
     await ctx.db.insert("wheel_spins", doc);
   },
 });

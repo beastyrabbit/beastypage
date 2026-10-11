@@ -7,8 +7,7 @@ import {
 import { api } from "@/convex/_generated/api";
 import { isDiscordServiceRequest } from "@/convex/discordAuth";
 import {
-  extractColorsServer,
-  extractFamilyColorsServer,
+  extractPaletteColorsServer,
   generatePaletteGridImage,
 } from "@/lib/color-extraction/server-extraction";
 import type { ExtractedColor } from "@/lib/color-extraction/types";
@@ -93,7 +92,7 @@ async function downloadImage(
 }
 
 type ExtractedPalette = {
-  colors: Awaited<ReturnType<typeof extractColorsServer>>;
+  colors: Awaited<ReturnType<typeof extractPaletteColorsServer>>["colors"];
   familyColors: ExtractedColor[];
 };
 
@@ -102,9 +101,9 @@ async function extractPalette(
   colorCount: number,
   signal: AbortSignal,
 ): Promise<Result<ExtractedPalette>> {
-  let colors: Awaited<ReturnType<typeof extractColorsServer>>;
+  let palette: Awaited<ReturnType<typeof extractPaletteColorsServer>>;
   try {
-    colors = await extractColorsServer(imageBuffer, { k: colorCount });
+    palette = await extractPaletteColorsServer(imageBuffer, { k: colorCount });
   } catch (error) {
     if (signal.aborted) return { response: abortedResponse() };
     console.error("[discord/palette] Color extraction failed", error);
@@ -116,21 +115,7 @@ async function extractPalette(
     };
   }
   if (signal.aborted) return { response: abortedResponse() };
-
-  let familyColors: ExtractedColor[] = [];
-  try {
-    familyColors = await extractFamilyColorsServer(imageBuffer, colors, {
-      k: colorCount,
-    });
-  } catch (error) {
-    if (signal.aborted) return { response: abortedResponse() };
-    console.warn(
-      "[discord/palette] Family extraction failed, using top colors only",
-      error,
-    );
-  }
-  if (signal.aborted) return { response: abortedResponse() };
-  return { value: { colors, familyColors } };
+  return { value: palette };
 }
 
 function generatePalette(

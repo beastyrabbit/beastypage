@@ -161,6 +161,7 @@ export const create = mutation({
       defaultCardName: args.defaultCard.fileName,
       createdAt: nowTs,
       updatedAt: nowTs,
+      thumbnailStatus: "pending" as const,
       ...(args.cardNumber !== undefined ? { cardNumber: args.cardNumber } : {}),
       ...(args.customCard
         ? {
@@ -387,8 +388,34 @@ export const applyThumbnailUpdates = internalMutation({
       applyCustomCardThumbnail(updates, args.customCard);
     }
 
+    const current = await ctx.db.get(args.id);
+    if (current) {
+      const hasDefault = Boolean(
+        current.defaultCardStorageId &&
+          (args.defaultCard?.thumbStorageId ||
+            current.defaultCardThumbStorageId),
+      );
+      const hasCustom = Boolean(
+        !current.customCardStorageId ||
+          args.customCard?.thumbStorageId ||
+          current.customCardThumbStorageId,
+      );
+      updates.thumbnailStatus = hasDefault && hasCustom ? "complete" : "failed";
+    }
+
     await ctx.db.patch(args.id, updates);
     return { success: true };
+  },
+});
+
+export const markThumbnailFailed = internalMutation({
+  args: { id: v.id("catdex") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      thumbnailStatus: "failed",
+      thumbnailAttemptedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
   },
 });
 
@@ -399,16 +426,64 @@ export const enqueueMissingThumbnails = internalMutation({
   handler: async (ctx, args) => {
     const max = Math.max(1, Math.min(args.limit ?? 25, 200));
     let enqueued = 0;
+    const now = Date.now();
+    const candidates = [
+      ...(await ctx.db
+        .query("catdex")
+        .withIndex("byThumbnailStatusAndAttemptedAt", (q) =>
+          q.eq("thumbnailStatus", "pending"),
+        )
+        .order("asc")
+        .take(max)),
+      ...(await ctx.db
+        .query("catdex")
+        .withIndex("byThumbnailStatusAndAttemptedAt", (q) =>
+          q.eq("thumbnailStatus", "processing"),
+        )
+        .order("asc")
+        .take(max)),
+      // Legacy imports predate thumbnailStatus. Keep this fallback bounded;
+      // successful/failing rows are stamped on their first attempt.
+      ...(await ctx.db
+        .query("catdex")
+        .withIndex("byThumbnailStatusAndAttemptedAt", (q) =>
+          q.eq("thumbnailStatus", undefined),
+        )
+        .order("asc")
+        .take(max)),
+    ];
+    const seen = new Set<string>();
 
-    for await (const cat of ctx.db.query("catdex")) {
+    for (const cat of candidates) {
+      if (seen.has(cat._id)) continue;
+      seen.add(cat._id);
+      if (
+        cat.thumbnailStatus === "failed" ||
+        cat.thumbnailStatus === "complete"
+      )
+        continue;
+      if (
+        cat.thumbnailStatus === "processing" &&
+        (cat.thumbnailAttemptedAt ?? now) > now - 30 * 60 * 1000
+      )
+        continue;
       const needsDefault = Boolean(
         cat.defaultCardStorageId && !cat.defaultCardThumbStorageId,
       );
       const needsCustom = Boolean(
         cat.customCardStorageId && !cat.customCardThumbStorageId,
       );
-      if (!needsDefault && !needsCustom) continue;
+      if (!needsDefault && !needsCustom) {
+        if (cat.thumbnailStatus === undefined) {
+          await ctx.db.patch(cat._id, { thumbnailStatus: "complete" });
+        }
+        continue;
+      }
 
+      await ctx.db.patch(cat._id, {
+        thumbnailStatus: "processing",
+        thumbnailAttemptedAt: now,
+      });
       await ctx.scheduler.runAfter(0, internal.imageService.generateForCat, {
         id: cat._id,
       });

@@ -24,6 +24,182 @@ import type {
 
 const MAX_DIMENSION = 1200;
 
+// Keep the decoded source bounded even though the processing canvas is
+// downscaled to MAX_DIMENSION. A compressed image can advertise dimensions
+// large enough to allocate hundreds of megabytes before drawImage gets a
+// chance to resize it.
+const MAX_SOURCE_DIMENSION = 16_384;
+const MAX_SOURCE_PIXELS = 25_000_000;
+
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+type ImageDimensions = { width: number; height: number };
+
+function readPngDimensions(buffer: Buffer): ImageDimensions | null {
+  if (buffer.length < 24 || !buffer.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    return null;
+  }
+  if (buffer.toString("ascii", 12, 16) !== "IHDR") return null;
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
+}
+
+function readGifDimensions(buffer: Buffer): ImageDimensions | null {
+  if (
+    buffer.length < 10 ||
+    (buffer.toString("ascii", 0, 6) !== "GIF87a" &&
+      buffer.toString("ascii", 0, 6) !== "GIF89a")
+  ) {
+    return null;
+  }
+  return {
+    width: buffer.readUInt16LE(6),
+    height: buffer.readUInt16LE(8),
+  };
+}
+
+function readWebpDimensions(buffer: Buffer): ImageDimensions | null {
+  if (
+    buffer.length < 20 ||
+    buffer.toString("ascii", 0, 4) !== "RIFF" ||
+    buffer.toString("ascii", 8, 12) !== "WEBP"
+  ) {
+    return null;
+  }
+
+  // WebP stores the dimensions in one of the three image chunks. Walk the
+  // chunk table so optional metadata chunks before the image are supported.
+  const byteAt = (index: number) => buffer[index] ?? 0;
+  let offset = 12;
+  while (offset + 8 <= buffer.length) {
+    const chunkType = buffer.toString("ascii", offset, offset + 4);
+    const chunkSize = buffer.readUInt32LE(offset + 4);
+    const dataOffset = offset + 8;
+    if (dataOffset > buffer.length || chunkSize > buffer.length - dataOffset) {
+      return null;
+    }
+
+    if (chunkType === "VP8X" && chunkSize >= 10) {
+      return {
+        width:
+          1 +
+          byteAt(dataOffset + 4) +
+          (byteAt(dataOffset + 5) << 8) +
+          (byteAt(dataOffset + 6) << 16),
+        height:
+          1 +
+          byteAt(dataOffset + 7) +
+          (byteAt(dataOffset + 8) << 8) +
+          (byteAt(dataOffset + 9) << 16),
+      };
+    }
+
+    if (chunkType === "VP8 " && chunkSize >= 10) {
+      const frameOffset = dataOffset + 3;
+      if (
+        buffer[frameOffset] === 0x9d &&
+        buffer[frameOffset + 1] === 0x01 &&
+        buffer[frameOffset + 2] === 0x2a &&
+        chunkSize >= 10
+      ) {
+        return {
+          width: buffer.readUInt16LE(dataOffset + 6) & 0x3fff,
+          height: buffer.readUInt16LE(dataOffset + 8) & 0x3fff,
+        };
+      }
+    }
+
+    if (chunkType === "VP8L" && chunkSize >= 5 && buffer[dataOffset] === 0x2f) {
+      const bits = buffer.readUInt32LE(dataOffset + 1);
+      return {
+        width: 1 + (bits & 0x3fff),
+        height: 1 + ((bits >>> 14) & 0x3fff),
+      };
+    }
+
+    // Chunks are padded to an even byte boundary.
+    offset = dataOffset + chunkSize + (chunkSize & 1);
+  }
+  return null;
+}
+
+function isJpegStartOfFrame(marker: number): boolean {
+  return (
+    marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)
+  );
+}
+
+function readJpegDimensions(buffer: Buffer): ImageDimensions | null {
+  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
+    return null;
+  }
+
+  // JPEG metadata can be large, but dimensions are expected in the first
+  // headers. Limit the scan so a malformed file cannot turn this guard into a
+  // second unbounded parser.
+  const scanLimit = Math.min(buffer.length, 64 * 1024);
+  let offset = 2;
+  while (offset + 3 < scanLimit) {
+    if (buffer[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    while (offset < scanLimit && buffer[offset] === 0xff) offset += 1;
+    if (offset >= scanLimit) return null;
+    const marker = buffer[offset] ?? 0;
+    offset += 1;
+
+    if (
+      marker === 0x01 ||
+      (marker >= 0xd0 && marker <= 0xd7) ||
+      marker === 0xd8 ||
+      marker === 0xd9
+    )
+      continue;
+    if (marker === 0xda) return null;
+    if (offset + 2 > scanLimit) return null;
+    const segmentLength = buffer.readUInt16BE(offset);
+    if (segmentLength < 2 || offset + segmentLength > scanLimit) return null;
+
+    if (isJpegStartOfFrame(marker) && segmentLength >= 7) {
+      return {
+        height: buffer.readUInt16BE(offset + 3),
+        width: buffer.readUInt16BE(offset + 5),
+      };
+    }
+    offset += segmentLength;
+  }
+  return null;
+}
+
+function readImageDimensions(buffer: Buffer): ImageDimensions | null {
+  return (
+    readPngDimensions(buffer) ??
+    readGifDimensions(buffer) ??
+    readWebpDimensions(buffer) ??
+    readJpegDimensions(buffer)
+  );
+}
+
+function assertSourceDimensionsWithinBounds(dimensions: ImageDimensions): void {
+  const { width, height } = dimensions;
+  if (
+    width < 1 ||
+    height < 1 ||
+    width > MAX_SOURCE_DIMENSION ||
+    height > MAX_SOURCE_DIMENSION ||
+    (width <= MAX_SOURCE_DIMENSION &&
+      height <= MAX_SOURCE_DIMENSION &&
+      width * height > MAX_SOURCE_PIXELS)
+  ) {
+    throw new Error(
+      `Image dimensions exceed processing limits (maximum ${MAX_SOURCE_DIMENSION}px per side and ${MAX_SOURCE_PIXELS.toLocaleString()} pixels)`,
+    );
+  }
+}
+
 const DEFAULT_OPTIONS: Required<KMeansOptions> = {
   k: 6,
   maxIterations: 20,
@@ -41,7 +217,13 @@ export async function getImagePixelsServer(buffer: Buffer): Promise<{
   width: number;
   height: number;
 }> {
+  const dimensions = readImageDimensions(buffer);
+  if (dimensions) assertSourceDimensionsWithinBounds(dimensions);
+
   const img = await loadImage(buffer);
+  // Keep a second check after decoding for formats without a cheap header
+  // parser and for any discrepancy between the header and decoder metadata.
+  assertSourceDimensionsWithinBounds({ width: img.width, height: img.height });
   let width = img.width;
   let height = img.height;
 
@@ -253,13 +435,14 @@ function colorBrightness(color: RGB): number {
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function extractColorsServer(
-  imageBuffer: Buffer,
+type DecodedImage = Awaited<ReturnType<typeof getImagePixelsServer>>;
+
+function extractColorsFromPixels(
+  image: DecodedImage,
   options?: KMeansOptions,
-): Promise<ExtractedColor[]> {
+): ExtractedColor[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const { data, width, height } = await getImagePixelsServer(imageBuffer);
-  const pixels = samplePixels(data, width, height, opts);
+  const pixels = samplePixels(image.data, image.width, image.height, opts);
 
   const uniqueCount = countUniqueColors(pixels);
   if (uniqueCount < 2) throw new Error("Not enough unique colors in image");
@@ -286,17 +469,16 @@ export async function extractColorsServer(
     .sort((a, b) => b.prevalence - a.prevalence);
 }
 
-export async function extractFamilyColorsServer(
-  imageBuffer: Buffer,
+function extractFamilyColorsFromPixels(
+  image: DecodedImage,
   topColors: ExtractedColor[],
   options?: KMeansOptions,
   similarityThreshold = 50,
-): Promise<ExtractedColor[]> {
+): ExtractedColor[] {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const { data, width, height } = await getImagePixelsServer(imageBuffer);
 
   function recursiveExtract(threshold: number): ExtractedColor[] {
-    const pixels = samplePixels(data, width, height, opts);
+    const pixels = samplePixels(image.data, image.width, image.height, opts);
 
     const uniqueCount = countUniqueColors(pixels);
     if (uniqueCount < 2) return [];
@@ -321,10 +503,8 @@ export async function extractFamilyColorsServer(
       };
     });
 
-    // Sort by brightness (brightest first)
     allColors.sort((a, b) => b.brightness - a.brightness);
 
-    // Filter out colors too similar to top colors
     const familyColors: ExtractedColor[] = [];
     for (const color of allColors) {
       const isTooSimilar = topColors.some(
@@ -337,7 +517,6 @@ export async function extractFamilyColorsServer(
       if (familyColors.length >= opts.k) break;
     }
 
-    // Retry with lower threshold if not enough colors
     if (familyColors.length < opts.k && threshold > 5) {
       return recursiveExtract(threshold - 5);
     }
@@ -346,6 +525,50 @@ export async function extractFamilyColorsServer(
   }
 
   return recursiveExtract(similarityThreshold);
+}
+
+export async function extractColorsServer(
+  imageBuffer: Buffer,
+  options?: KMeansOptions,
+): Promise<ExtractedColor[]> {
+  return extractColorsFromPixels(
+    await getImagePixelsServer(imageBuffer),
+    options,
+  );
+}
+
+export async function extractFamilyColorsServer(
+  imageBuffer: Buffer,
+  topColors: ExtractedColor[],
+  options?: KMeansOptions,
+  similarityThreshold = 50,
+): Promise<ExtractedColor[]> {
+  return extractFamilyColorsFromPixels(
+    await getImagePixelsServer(imageBuffer),
+    topColors,
+    options,
+    similarityThreshold,
+  );
+}
+
+/** Extract both palette groups while decoding the source image only once. */
+export async function extractPaletteColorsServer(
+  imageBuffer: Buffer,
+  options?: KMeansOptions,
+): Promise<{
+  colors: ExtractedColor[];
+  familyColors: ExtractedColor[];
+}> {
+  const image = await getImagePixelsServer(imageBuffer);
+  const colors = extractColorsFromPixels(image, options);
+  let familyColors: ExtractedColor[] = [];
+  try {
+    familyColors = extractFamilyColorsFromPixels(image, colors, options);
+  } catch {
+    // Family colors are an optional enhancement. Preserve the existing
+    // behavior of returning dominant colors when this secondary pass fails.
+  }
+  return { colors, familyColors };
 }
 
 export function generatePaletteImage(

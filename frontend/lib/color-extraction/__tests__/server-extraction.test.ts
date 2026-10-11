@@ -34,6 +34,17 @@ function makeTwoTonePng(
   return canvas.toBuffer("image/png");
 }
 
+/** Create only a PNG header, useful for testing pre-decode validation. */
+function makePngHeader(width: number, height: number): Buffer {
+  const header = Buffer.alloc(24);
+  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(header);
+  header.writeUInt32BE(13, 8);
+  header.write("IHDR", 12, "ascii");
+  header.writeUInt32BE(width, 16);
+  header.writeUInt32BE(height, 20);
+  return header;
+}
+
 describe("getImagePixelsServer", () => {
   it("returns data, width, and height for a valid PNG", async () => {
     const buf = makeSolidPng(128, 64, 32);
@@ -45,6 +56,21 @@ describe("getImagePixelsServer", () => {
     expect(result.height).toBe(20);
     expect(result.data).toBeInstanceOf(Uint8ClampedArray);
     expect(result.data).toHaveLength(20 * 20 * 4);
+  });
+
+  it("rejects oversized PNG dimensions before decoding the image", async () => {
+    // This is intentionally only a header: loadImage must never be reached.
+    const oversized = makePngHeader(5_001, 5_000);
+    await expect(getImagePixelsServer(oversized)).rejects.toThrow(
+      "Image dimensions exceed processing limits",
+    );
+  });
+
+  it("keeps resizing normal high-resolution images", async () => {
+    const buf = makeSolidPng(128, 64, 32, 1_300);
+    const result = await getImagePixelsServer(buf);
+    expect(result.width).toBe(1_200);
+    expect(result.height).toBe(1_200);
   });
 });
 

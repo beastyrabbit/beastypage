@@ -283,6 +283,11 @@ async function insertCatdexRecords(
       approved: record.approved,
       createdAt,
       updatedAt,
+      thumbnailStatus:
+        record.defaultCardThumb &&
+        (!record.customCard || record.customCardThumb)
+          ? "complete"
+          : "pending",
       defaultCardStorageId: storageId(record.defaultCard.storageId),
       defaultCardName: record.defaultCard.fileName,
     };
