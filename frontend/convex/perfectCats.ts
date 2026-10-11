@@ -261,11 +261,6 @@ export const requestMatchup = mutation({
       if (previous) await db.replace(previous._id, pendingMatchup);
       else await db.insert("perfect_matchups", pendingMatchup);
     }
-    await Promise.all([
-      db.patch(first._id, { lastShownAt: now, updatedAt: now }),
-      db.patch(second._id, { lastShownAt: now, updatedAt: now }),
-    ]);
-
     return {
       cats: [sanitizeCat(first), sanitizeCat(second)],
       needsSeed,

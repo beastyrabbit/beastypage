@@ -63,7 +63,11 @@ async function pinnedAgent(hostname: string) {
 	if (!selected) throw new RemoteImportError("Remote host has no address");
 	return new Agent({
 		connect: {
-			lookup: (_hostname, _options, callback) => {
+			lookup: (_hostname, options, callback) => {
+				if (options.all) {
+					callback(null, [selected]);
+					return;
+				}
 				callback(null, selected.address, selected.family);
 			},
 		},

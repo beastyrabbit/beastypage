@@ -257,6 +257,37 @@ describe("legacy voting transactions", () => {
     });
   });
 
+  it("bounds anonymous participant creation per session", async () => {
+    const t = convexTest(schema, modules);
+    const host = t.withIdentity({
+      subject: "participant-limit-host",
+      issuer: "https://identity.example",
+    });
+    const session = await host.mutation(api.streamSessionsV2.create, {
+      viewerKey: "participant-limit",
+      status: "live",
+      currentStep: "colour",
+      allowedOptions: ["WHITE"],
+    });
+    const sessionId = session!.id as Id<"stream_sessions">;
+    for (let index = 0; index < 500; index += 1) {
+      await t.mutation(api.streamParticipantsV2.create, {
+        sessionId,
+        viewerSession: `participant-token-${index.toString().padStart(30, "0")}`,
+        displayName: `Viewer ${index}`,
+        status: "active",
+      });
+    }
+    await expect(
+      t.mutation(api.streamParticipantsV2.create, {
+        sessionId,
+        viewerSession: "participant-token-overflow-000000000000000000",
+        displayName: "Overflow",
+        status: "active",
+      }),
+    ).rejects.toThrow("participant limit");
+  });
+
   it("admits host choices before opening viewer voting on creation and advancement", async () => {
     const t = convexTest(schema, modules);
     const host = t.withIdentity({

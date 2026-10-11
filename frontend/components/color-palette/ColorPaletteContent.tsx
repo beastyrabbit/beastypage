@@ -6,7 +6,6 @@ import { createPortal } from "react-dom";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import DownChevron from "@/components/ui/down-chevron";
 import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
 import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import {
   DEFAULT_POSE_NAME,
@@ -79,15 +78,11 @@ export function ColorPaletteContent({
     paletteSlug ? { slug: paletteSlug } : "skip",
   );
 
-  // Get image download URL from Convex storage for palette slug
-  const paletteConfig = paletteRecord?.config as
-    | { source: string; imageStorageId: string; colors: unknown[] }
-    | undefined;
+  // Get image download URL from the palette record; do not expose raw storage
+  // IDs as a public capability.
   const paletteImageUrl = useQuery(
     api.paletteGeneratorSettings.getImageUrl,
-    paletteConfig?.imageStorageId
-      ? { storageId: paletteConfig.imageStorageId as Id<"_storage"> }
-      : "skip",
+    paletteSlug ? { slug: paletteSlug } : "skip",
   );
 
   // Compute cat params with dark forest override

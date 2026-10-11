@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel.js";
 import { type MutationCtx, mutation, query } from "./_generated/server.js";
 import { randomSlug } from "./utils.js";
 
@@ -117,10 +118,22 @@ export const get = query({
 });
 
 export const getImageUrl = query({
-  args: {
-    storageId: v.id("_storage"),
-  },
+  args: { slug: v.string() },
   handler: async (ctx, args) => {
-    return await ctx.storage.getUrl(args.storageId);
+    const record = await ctx.db
+      .query("palette_generator_settings")
+      .withIndex("bySlug", (q) => q.eq("slug", args.slug))
+      .unique();
+    if (
+      !record ||
+      typeof record.config !== "object" ||
+      record.config === null
+    ) {
+      return null;
+    }
+    const imageStorageId = (record.config as { imageStorageId?: unknown })
+      .imageStorageId;
+    if (typeof imageStorageId !== "string") return null;
+    return await ctx.storage.getUrl(imageStorageId as Id<"_storage">);
   },
 });

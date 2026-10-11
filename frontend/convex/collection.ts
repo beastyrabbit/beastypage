@@ -72,8 +72,16 @@ export const setFocus = mutation({
     focusY: v.number(),
   },
   handler: async (ctx, args) => {
-    if (!(await ctx.auth.getUserIdentity())) {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
       throw new Error("Not authenticated");
+    }
+    const admins = (process.env.QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    if (!admins.includes(identity.tokenIdentifier)) {
+      throw new Error("Not authorized to edit collection focus");
     }
     const doc = await ctx.db.get(args.id);
     if (!doc) {

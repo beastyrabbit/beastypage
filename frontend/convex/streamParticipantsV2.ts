@@ -5,6 +5,7 @@ import { listLimit, requireHost } from "./streamAccess.js";
 import { docIdToString } from "./utils.js";
 
 type ParticipantDoc = Doc<"stream_participants">;
+const MAX_PARTICIPANTS_PER_SESSION = 500;
 
 export const list = query({
   args: {
@@ -70,6 +71,13 @@ export const create = mutation({
       throw new Error("Signups are closed");
     if (!args.viewerSession || args.viewerSession.length < 32)
       throw new Error("A private participant token is required");
+    const participantCount = await ctx.db
+      .query("stream_participants")
+      .withIndex("bySession", (q) => q.eq("sessionId", args.sessionId))
+      .take(MAX_PARTICIPANTS_PER_SESSION);
+    if (participantCount.length >= MAX_PARTICIPANTS_PER_SESSION) {
+      throw new Error("This session has reached its participant limit");
+    }
     const existing = await ctx.db
       .query("stream_participants")
       .withIndex("by_sessionId_and_viewerSession", (q) =>

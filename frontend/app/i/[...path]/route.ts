@@ -21,7 +21,23 @@ function upstreamUrl(request: Request) {
 }
 
 function isInternalPath(request: Request) {
-  return new URL(request.url).pathname.includes("/api/internal/");
+  let pathname = new URL(request.url).pathname;
+  // The catch-all route must not expose the media service's internal control
+  // endpoints through percent-encoded path segments. Decode a small bounded
+  // number of times because clients can encode an already encoded slash.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (pathname.includes("/api/internal/")) return true;
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(pathname);
+    } catch {
+      // Malformed paths are not public media paths; fail closed.
+      return true;
+    }
+    if (decoded === pathname) return false;
+    pathname = decoded;
+  }
+  return pathname.includes("/api/internal/");
 }
 
 async function proxy(request: Request) {
