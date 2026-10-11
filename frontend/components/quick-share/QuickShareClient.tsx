@@ -1040,6 +1040,10 @@ export function QuickShareClient() {
                   className="sr-only"
                   onChange={(event) => {
                     const selected = Array.from(event.target.files ?? []);
+                    // The picker can still be opened while an existing poll is
+                    // running, so apply the same cancellation as selectFile.
+                    processingAbortRef.current?.abort();
+                    processingAbortRef.current = null;
                     setFiles(selected);
                     setFileSource(selected.length ? "file" : null);
                     setActiveUpload(null);
