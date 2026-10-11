@@ -150,6 +150,36 @@ describe("Catdex uploads", () => {
     ).rejects.toThrow("not issued");
   });
 
+  it("rejects a known storage object when its upload token is omitted", async () => {
+    const t = convexTest(schema, modules);
+    const upload = await issueUpload(t);
+    const { seasonId, rarityId } = await t.run(async (ctx) => ({
+      seasonId: await ctx.db.insert("card_season", {
+        seasonName: "Fixture",
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+      rarityId: await ctx.db.insert("rarity", {
+        rarityName: "Common",
+        createdAt: 1,
+        updatedAt: 1,
+      }),
+    }));
+
+    await expect(
+      t.mutation(api.catdex.create, {
+        twitchUserName: "fixture",
+        catName: "cat",
+        seasonId,
+        rarityId,
+        defaultCard: {
+          storageId: upload.storageId,
+          fileName: "card.png",
+        },
+      }),
+    ).rejects.toThrow("upload token is required");
+  });
+
   it("deletes attached blobs after upload capabilities expire", async () => {
     const t = convexTest(schema, modules);
     const url = await t.mutation(api.catdex.generateUploadUrl, {});

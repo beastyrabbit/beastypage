@@ -20,11 +20,20 @@ export const get = query({
 });
 
 export const getImageUrl = query({
-  args: { slug: v.string() },
+  // Keep storageId optional for one rollout window so an older frontend
+  // bundle can continue to resolve images while new bundles use the slug.
+  args: {
+    slug: v.optional(v.string()),
+    storageId: v.optional(v.id("_storage")),
+  },
   handler: async (ctx, args) => {
+    const slug = args.slug;
+    if (!slug) {
+      return args.storageId ? await ctx.storage.getUrl(args.storageId) : null;
+    }
     const record = await ctx.db
       .query("palette_generator_settings")
-      .withIndex("bySlug", (q) => q.eq("slug", args.slug))
+      .withIndex("bySlug", (q) => q.eq("slug", slug))
       .unique();
     if (
       !record ||

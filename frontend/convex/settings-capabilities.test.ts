@@ -76,3 +76,17 @@ describe("legacy settings ownership", () => {
     ).rejects.toThrow("Not authorized");
   });
 });
+
+describe("palette image URL rollout", () => {
+  it("keeps resolving image URLs for legacy storageId callers", async () => {
+    const t = convexTest(schema, modules);
+    const storageId = await t.run((ctx) =>
+      ctx.storage.store(new Blob(["palette"], { type: "image/png" })),
+    );
+
+    const legacyUrl = await t.query(api.paletteGeneratorSettings.getImageUrl, {
+      storageId,
+    });
+    expect(legacyUrl).toEqual(expect.any(String));
+  });
+});

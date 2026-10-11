@@ -358,16 +358,13 @@ async function consumeCardUpload(
   token: string | undefined,
   storageId: Id<"_storage">,
 ) {
-  const upload = token
-    ? await ctx.db
-        .query("catdex_uploads")
-        .withIndex("byToken", (q) => q.eq("token", token))
-        .unique()
-    : await ctx.db
-        .query("catdex_uploads")
-        .withIndex("byStorageId", (q) => q.eq("storageId", storageId))
-        .unique();
-  if (!token && !upload) return;
+  if (!token) {
+    throw new Error("Card upload token is required.");
+  }
+  const upload = await ctx.db
+    .query("catdex_uploads")
+    .withIndex("byToken", (q) => q.eq("token", token))
+    .unique();
   if (!upload) {
     throw new Error("Card upload was not issued for this submission.");
   }

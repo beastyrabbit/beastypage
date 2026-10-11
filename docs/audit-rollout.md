@@ -50,3 +50,11 @@ Clients that need to change a legacy row should save the settings under a new
 slug. New rows return an `editToken`; clients must retain it and send it when
 updating an anonymous row. Authenticated rows can be updated by the same
 authenticated identity through `ownerTokenIdentifier`.
+
+# Palette image URL rollout
+
+New frontend bundles resolve palette images through the settings slug. The
+`paletteGeneratorSettings.getImageUrl` query temporarily accepts both `slug`
+and the former `storageId` argument so old bundles remain compatible during a
+rolling deployment. Remove the `storageId` fallback after all old frontend
+replicas have been replaced and the compatibility window has expired.
