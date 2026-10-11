@@ -15,7 +15,10 @@ export interface BatchViewCat {
   label: string;
   /** Rendered sprite at the current reveal stage, null until the first render lands. */
   previewUrl: string | null;
-  /** The cat's full params — looks that describe the cat in prose read these. */
+  /** Params at the stage `previewUrl` shows (unrevealed traits are the bare-kit
+   * placeholders) — looks that describe the cat in prose read these, so the
+   * prose never runs ahead of the reveal. Full params only once every stage
+   * is revealed. */
   params: CatParams;
   /** Streamer's removal candidate — only meaningful while awaiting a cull. */
   marked: boolean;
