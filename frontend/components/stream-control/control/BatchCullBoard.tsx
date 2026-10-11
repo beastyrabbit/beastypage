@@ -2,7 +2,7 @@
 
 import { useMutation } from "convex/react";
 import { Expand, Heart, Star } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import type { SpriteMapperApi } from "@/components/cat-builder/types";
@@ -12,6 +12,8 @@ import {
   type BatchTortiePlaceholders,
   buildBatchStagePlan,
   buildPartialBatchParams,
+  formatBatchNumber,
+  parseBatchNumberInput,
 } from "@/lib/adoption/streamBatch";
 import { cn } from "@/lib/utils";
 import { useStreamControl } from "./context";
@@ -33,6 +35,12 @@ function cullCardStateClass(
     return "border-yellow-400/70 bg-yellow-400/10 shadow-[0_0_14px_rgba(250,204,21,0.3)]";
   }
   return favorite ? "border-pink-400/50 bg-pink-400/5" : "border-border/30";
+}
+
+function numberBadgeClass(marked: boolean, potential: boolean): string {
+  if (marked) return "bg-red-500 text-white";
+  if (potential) return "bg-yellow-400 text-yellow-950";
+  return "bg-foreground/90 text-background";
 }
 
 function cullLabelClass(marked: boolean, potential: boolean): string {
@@ -64,6 +72,7 @@ export function BatchCullBoard() {
   const renderTokenRef = useRef(0);
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [culling, setCulling] = useState(false);
+  const [numberInput, setNumberInput] = useState("");
 
   const active = Boolean(command && liveState?.seq === command.seq);
   const stages = useMemo(
@@ -195,6 +204,38 @@ export function BatchCullBoard() {
     setBatchHighlight({ seq: command.seq, catId, kind }).catch(() => {});
   };
 
+  // Pick by number: chat says "number 13", the streamer types 13 and acts.
+  const typedNumber = parseBatchNumberInput(numberInput, command.cats.length);
+  const typedCat =
+    typedNumber === null ? null : (command.cats[typedNumber - 1] ?? null);
+  const typedGone = Boolean(typedCat && eliminated.has(typedCat.id));
+  const typedUsable = Boolean(typedCat) && !typedGone;
+  const markedCat = liveState.markedId
+    ? (survivors.find((cat) => cat.id === liveState.markedId) ?? null)
+    : null;
+  const numberHint = (() => {
+    if (numberInput.trim() === "") return null;
+    if (!typedCat)
+      return `No cat with that number (01–${formatBatchNumber(command.cats.length)})`;
+    if (typedGone) return `${formatBatchNumber(typedNumber ?? 0)} already left`;
+    return null;
+  })();
+  const actOnTyped = (
+    kind: "mark" | "potential" | "favorite" | "spotlight",
+  ) => {
+    if (!typedCat || !typedUsable) return;
+    if (kind === "mark") handleMark(typedCat.id);
+    else handleHighlight(typedCat.id, kind);
+  };
+  const handleNumberSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    actOnTyped("mark");
+  };
+  const handleRemoveMarked = () => {
+    if (!markedCat) return;
+    handleCull(markedCat.id);
+  };
+
   return (
     <section className="rounded-2xl border border-border/40 bg-background/80 p-5 backdrop-blur">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -203,7 +244,8 @@ export function BatchCullBoard() {
         </h3>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">
-            Click marks a cat for chat · double-click removes it
+            Type the number chat says, or click a card to mark it · double-click
+            removes
           </span>
           <span
             className={cn(
@@ -217,6 +259,73 @@ export function BatchCullBoard() {
           </span>
         </div>
       </div>
+
+      {/* Pick by number — chat says a number, the streamer types it */}
+      <form
+        onSubmit={handleNumberSubmit}
+        className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-border/40 bg-muted/20 p-3"
+      >
+        <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <span>Number</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            value={numberInput}
+            onChange={(event) => setNumberInput(event.target.value)}
+            placeholder="13"
+            aria-label="Cat number"
+            className="w-20 rounded-lg border border-border/50 bg-background px-3 py-1.5 font-mono text-lg font-bold tabular-nums text-foreground outline-none focus:border-amber-400"
+          />
+        </label>
+        <span className="min-w-28 text-sm text-muted-foreground">
+          {typedCat && typedUsable
+            ? typedCat.label
+            : (numberHint ?? "type what chat says")}
+        </span>
+        <button
+          type="submit"
+          disabled={!typedUsable || !awaiting}
+          className="rounded-lg border border-red-500/60 bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Mark
+        </button>
+        <button
+          type="button"
+          disabled={!typedUsable}
+          onClick={() => actOnTyped("potential")}
+          className="rounded-lg border border-yellow-400/60 bg-yellow-400/10 px-3 py-1.5 text-sm font-semibold text-yellow-200 transition hover:bg-yellow-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Potential
+        </button>
+        <button
+          type="button"
+          disabled={!typedUsable}
+          onClick={() => actOnTyped("favorite")}
+          className="rounded-lg border border-pink-400/60 bg-pink-400/10 px-3 py-1.5 text-sm font-semibold text-pink-200 transition hover:bg-pink-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Favourite
+        </button>
+        <button
+          type="button"
+          disabled={!typedUsable}
+          onClick={() => actOnTyped("spotlight")}
+          className="rounded-lg border border-sky-400/60 bg-sky-400/10 px-3 py-1.5 text-sm font-semibold text-sky-200 transition hover:bg-sky-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Show big
+        </button>
+        <span className="mx-1 h-6 w-px bg-border/50" aria-hidden="true" />
+        <button
+          type="button"
+          disabled={!awaiting || !markedCat}
+          onClick={handleRemoveMarked}
+          className="rounded-lg border border-red-500 bg-red-600 px-3 py-1.5 text-sm font-bold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {markedCat
+            ? `Remove ${formatBatchNumber(command.cats.indexOf(markedCat) + 1)}`
+            : "Remove marked"}
+        </button>
+      </form>
 
       {/* Spotlight — the cat currently shown big on stream */}
       {spotlightCat && (
@@ -235,6 +344,9 @@ export function BatchCullBoard() {
           )}
           <div className="flex flex-col gap-2">
             <span className="text-2xl font-bold text-foreground">
+              <span className="mr-2 rounded-md bg-sky-500 px-2 py-0.5 font-mono text-white">
+                {formatBatchNumber(command.cats.indexOf(spotlightCat) + 1)}
+              </span>
               {spotlightCat.label}
             </span>
             <span className="text-sm text-sky-300">
@@ -258,6 +370,7 @@ export function BatchCullBoard() {
           const potential = potentials.has(cat.id);
           const favorite = favorites.has(cat.id);
           const spotlighted = spotlightId === cat.id;
+          const numberLabel = formatBatchNumber(command.cats.indexOf(cat) + 1);
           return (
             <div key={cat.id} className="relative">
               <button
@@ -288,10 +401,18 @@ export function BatchCullBoard() {
                 )}
                 <span
                   className={cn(
-                    "mt-1 text-sm font-bold",
+                    "mt-1 flex items-center gap-1.5 text-sm font-bold",
                     cullLabelClass(marked, potential),
                   )}
                 >
+                  <span
+                    className={cn(
+                      "rounded-md px-1.5 font-mono text-base tabular-nums",
+                      numberBadgeClass(marked, potential),
+                    )}
+                  >
+                    {numberLabel}
+                  </span>
                   {cat.label}
                 </span>
               </button>
