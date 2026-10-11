@@ -28,6 +28,15 @@ omit the new token during the bridge, but the server still requires the stored
 client ID, exact current pair, expiry, and unused state. New clients send the
 token. Anonymous requests do not create unreachable stored matchups.
 
+The matchup capability table remains a residual availability risk: each
+distinct caller-supplied `clientId` can create one expiring row, and the
+current hourly bounded cleanup cannot prevent storage growth during a
+sustained flood of fresh IDs. Treat this as **high production risk** until an
+edge/IP rate limit or a signed stateless capability rollout is in place. Do
+not add a first-caller ownership rule, because it would let an attacker claim
+another client's identifier. Monitor table growth and cleanup lag before
+enabling higher-volume anonymous traffic.
+
 # Legacy settings rows
 
 The anonymous edit capability added to cat shares and tool settings cannot be

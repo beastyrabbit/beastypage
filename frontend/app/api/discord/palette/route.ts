@@ -57,8 +57,17 @@ export async function POST(request: NextRequest) {
   // Fetch the image
   let imageBuffer: Buffer;
   try {
-    imageBuffer = await downloadPublicImage(imageUrl);
+    imageBuffer = await downloadPublicImage(imageUrl, request.signal);
   } catch (error) {
+    if (request.signal.aborted) {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      return NextResponse.json(
+        { error: "Image download timed out" },
+        { status: 504 },
+      );
+    }
     console.error("[discord/palette] Failed to fetch image", error);
     return NextResponse.json(
       { error: "Failed to fetch image from URL" },
@@ -66,16 +75,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (request.signal.aborted) {
+    return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+  }
+
   // Extract colors
   let colors: Awaited<ReturnType<typeof extractColorsServer>>;
   try {
     colors = await extractColorsServer(imageBuffer, { k: colorCount });
   } catch (error) {
+    if (request.signal.aborted) {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
     console.error("[discord/palette] Color extraction failed", error);
     return NextResponse.json(
       { error: "Failed to extract colors from image" },
       { status: 500 },
     );
+  }
+
+  if (request.signal.aborted) {
+    return NextResponse.json({ error: "Request aborted" }, { status: 499 });
   }
 
   // Extract family/accent colors
@@ -85,10 +105,17 @@ export async function POST(request: NextRequest) {
       k: colorCount,
     });
   } catch (error) {
+    if (request.signal.aborted) {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
     console.warn(
       "[discord/palette] Family extraction failed, using top colors only",
       error,
     );
+  }
+
+  if (request.signal.aborted) {
+    return NextResponse.json({ error: "Request aborted" }, { status: 499 });
   }
 
   // Generate full palette grid image (with brightness/hue variations)
@@ -99,6 +126,9 @@ export async function POST(request: NextRequest) {
       familyColors.length > 0 ? familyColors : undefined,
     );
   } catch (error) {
+    if (request.signal.aborted) {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
     console.error("[discord/palette] Palette image generation failed", error);
     return NextResponse.json(
       { error: "Failed to generate palette image" },
@@ -117,6 +147,9 @@ export async function POST(request: NextRequest) {
   let customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?imageUrl=${encodeURIComponent(imageUrl)}`;
 
   try {
+    if (request.signal.aborted) {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
     const convexUrl = getServerConvexUrl();
     if (convexUrl) {
       const convex = new ConvexHttpClient(convexUrl);
@@ -134,6 +167,9 @@ export async function POST(request: NextRequest) {
           serviceToken: process.env.DISCORD_API_TOKEN ?? "",
         },
       );
+      if (request.signal.aborted) {
+        return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+      }
       slug = result.slug;
       customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?paletteSlug=${slug}`;
     } else {

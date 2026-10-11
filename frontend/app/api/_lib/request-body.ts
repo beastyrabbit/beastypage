@@ -24,6 +24,9 @@ export async function readRequestBody(
     }
   }
 
+  if (request.signal.aborted) {
+    throw new DOMException("Request aborted", "AbortError");
+  }
   if (!request.body) return "";
 
   const reader = request.body.getReader();

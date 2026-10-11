@@ -53,4 +53,17 @@ describe("readRequestBody", () => {
 
     await expect(pending).rejects.toMatchObject({ name: "AbortError" });
   });
+
+  it("rejects an already-aborted request without a body", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const request = new Request("http://localhost", {
+      method: "POST",
+      signal: controller.signal,
+    });
+
+    await expect(readRequestBody(request, 1024)).rejects.toMatchObject({
+      name: "AbortError",
+    });
+  });
 });

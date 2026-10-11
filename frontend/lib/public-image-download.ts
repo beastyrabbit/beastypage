@@ -30,8 +30,14 @@ export function assertPublicAddresses(
 }
 
 /** Resolve and pin every connection, including each redirect, under one deadline. */
-export async function downloadPublicImage(input: string): Promise<Buffer> {
-  const signal = AbortSignal.timeout(15_000);
+export async function downloadPublicImage(
+  input: string,
+  requestSignal?: AbortSignal,
+): Promise<Buffer> {
+  const timeoutSignal = AbortSignal.timeout(15_000);
+  const signal = requestSignal
+    ? AbortSignal.any([timeoutSignal, requestSignal])
+    : timeoutSignal;
   let url = validateImageUrl(input);
   for (let redirects = 0; redirects <= 5; redirects++) {
     signal.throwIfAborted();
@@ -42,7 +48,8 @@ export async function downloadPublicImage(input: string): Promise<Buffer> {
         verbatim: true,
       }),
       new Promise<never>((_, reject) => {
-        onAbort = () => reject(new Error("Image download timed out"));
+        onAbort = () =>
+          reject(signal.reason ?? new Error("Image download timed out"));
         signal.addEventListener("abort", onAbort, { once: true });
       }),
     ]).finally(() => signal.removeEventListener("abort", onAbort));
@@ -87,6 +94,7 @@ export async function downloadPublicImage(input: string): Promise<Buffer> {
         if (bytes > MAX_BYTES) throw new Error("Image exceeds 10 MB");
         chunks.push(Buffer.from(chunk));
       }
+      signal.throwIfAborted();
       if (!bytes) throw new Error("Image is empty");
       return Buffer.concat(chunks, bytes);
     } finally {
