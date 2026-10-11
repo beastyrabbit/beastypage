@@ -27,7 +27,7 @@ type ColorPaletteContentProps = {
   paletteSlug?: string | null;
 };
 
-type SpriteSelectorProps = {
+type SpriteSelectorProps = Readonly<{
   disabled: boolean;
   selectedSprite: string;
   poseOptions: string[];
@@ -37,7 +37,7 @@ type SpriteSelectorProps = {
   dropdownRef: RefObject<HTMLDivElement | null>;
   onToggle: () => void;
   onSelect: (poseName: string) => void;
-};
+}>;
 
 function SpriteSelector({
   disabled,

@@ -115,23 +115,23 @@ function getSpriteVariantsSubtitle(
   return "Sprite previews unavailable";
 }
 
-type TraitBreakdownProps = {
+type TraitBreakdownProps = Readonly<{
   traitRows: CatTraitDisplayRow[];
   traitsOpen: boolean;
   showDarkForestTint: boolean;
   onToggle: () => void;
   onToggleDarkForestTint: () => void;
-};
+}>;
 
 function TraitRow({
   row,
   showDarkForestTint,
   onToggleDarkForestTint,
-}: {
+}: Readonly<{
   row: CatTraitDisplayRow;
   showDarkForestTint: boolean;
   onToggleDarkForestTint: () => void;
-}) {
+}>) {
   if (row.traitId === "darkForest") {
     return (
       <div
@@ -253,7 +253,7 @@ function getSpriteVariantsStatus(
   return "Sprite previews unavailable for this cat.";
 }
 
-type SpriteVariantsProps = {
+type SpriteVariantsProps = Readonly<{
   open: boolean;
   subtitle: string;
   variants: SpriteVariantPreview[];
@@ -261,7 +261,7 @@ type SpriteVariantsProps = {
   loading: boolean;
   onToggle: () => void;
   onCopy: (dataUrl: string, filename: string) => Promise<void>;
-};
+}>;
 
 function SpriteVariants({
   open,

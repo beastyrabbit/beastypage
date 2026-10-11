@@ -76,11 +76,12 @@ export const usePaginatedQuery = (
 ) => {
   const functionName = getFunctionName(reference);
   const isCollectionPage = functionName === "collection:page";
-  const results = isCollectionPage
-    ? [artwork]
-    : new URL(location.href).searchParams.has("catdexCard")
-      ? [catdexCard]
-      : [];
+  let results: (typeof artwork)[] | (typeof catdexCard)[] = [];
+  if (isCollectionPage) {
+    results = [artwork];
+  } else if (new URL(location.href).searchParams.has("catdexCard")) {
+    results = [catdexCard];
+  }
   return {
     results,
     status: "CanLoadMore" as const,
