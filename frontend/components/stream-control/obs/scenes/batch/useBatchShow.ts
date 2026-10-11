@@ -13,6 +13,8 @@ import {
   BATCH_TORTIE_PLACEHOLDER_FALLBACK,
   BATCH_VERDICT_MS,
   type BatchLiveState,
+  type BatchStage,
+  type BatchStreamCat,
   type BatchStreamCommand,
   type BatchTortiePlaceholders,
   buildBatchStagePlan,
@@ -64,33 +66,58 @@ interface UseBatchShowArgs {
 
 const EMPTY_IDS: string[] = [];
 
-function beatOf(
-  kind: BatchBeat["kind"],
-  stageId: string,
-  startedAt: number,
-  durationMs: number,
-  anchor: BatchBeat["anchor"],
-  timeline: StageTimeline | null,
-  landedIds: string[],
-  extra: Partial<Pick<BatchBeat, "pendingCullId" | "verdictEndsAt">> = {},
-): BatchBeat {
-  return {
-    kind,
-    stageId,
-    startedAt,
-    durationMs,
-    anchor,
+interface BeatSpec {
+  kind: BatchBeat["kind"];
+  stageId: string;
+  startedAt: number;
+  durationMs: number;
+  anchor: BatchBeat["anchor"];
+  timeline: StageTimeline | null;
+  landedIds: string[];
+  pendingCullId?: string;
+  verdictEndsAt?: number;
+}
+
+function beatOf({
+  timeline,
+  pendingCullId,
+  verdictEndsAt,
+  ...base
+}: BeatSpec): BatchBeat {
+  const beat: BatchBeat = {
+    ...base,
     order: timeline?.order ?? EMPTY_IDS,
-    landedIds,
     changedIds: timeline?.changedIds ?? EMPTY_IDS,
     unchangedIds: timeline?.unchangedIds ?? EMPTY_IDS,
     rareIds: timeline?.rareIds ?? EMPTY_IDS,
     groups: timeline?.groups ?? [],
-    ...extra,
   };
+  if (pendingCullId !== undefined) beat.pendingCullId = pendingCullId;
+  if (verdictEndsAt !== undefined) beat.verdictEndsAt = verdictEndsAt;
+  return beat;
 }
 
-const LOADING_BEAT = beatOf("loading", "loading", 0, 0, "server", null, []);
+function windupBeat(stageId: string, startedAt: number): BatchBeat {
+  return beatOf({
+    kind: "windup",
+    stageId,
+    startedAt,
+    durationMs: 0,
+    anchor: "server",
+    timeline: null,
+    landedIds: EMPTY_IDS,
+  });
+}
+
+const LOADING_BEAT = beatOf({
+  kind: "loading",
+  stageId: "loading",
+  startedAt: 0,
+  durationMs: 0,
+  anchor: "server",
+  timeline: null,
+  landedIds: [],
+});
 
 function sameBeat(a: BatchBeat, b: BatchBeat): boolean {
   return (
@@ -104,6 +131,395 @@ function sameBeat(a: BatchBeat, b: BatchBeat): boolean {
     a.pendingCullId === b.pendingCullId &&
     a.verdictEndsAt === b.verdictEndsAt
   );
+}
+
+type ReportedState = {
+  stageFor: number | null;
+  awaitingFor: number | null;
+  stamp: { k: number; firstAt: number; lastAt: number } | null;
+};
+type LocalAnchor = { k: number; at: number };
+type TimelineEntry = {
+  k: number;
+  timeline: StageTimeline;
+  inputs: StageCatInput[];
+};
+type CullPlayback = { count: number; seenAt: number; reduced: boolean };
+
+/** The engine's refs as one tick sees them; steps mutate only through these. */
+interface TickRefs {
+  reported: { current: ReportedState };
+  localAnchor: { current: LocalAnchor | null };
+  timeline: { current: TimelineEntry | null };
+  cull: { current: CullPlayback | null };
+  seenEliminations: { current: number };
+  published: { current: Record<string, StagePreview> };
+  staged: { current: Map<number, Map<string, StagePreview>> };
+  placeholders: { current: BatchTortiePlaceholders };
+  reducedMotion: { current: boolean };
+}
+
+/** Everything one evaluation reads: live state, stage plan, refs and the renderer hooks. */
+interface TickContext {
+  now: number;
+  current: BatchLiveState | null;
+  stages: BatchStage[];
+  cats: BatchStreamCat[];
+  maxEliminations: number;
+  eliminated: string[];
+  eliminatedNow: Set<string>;
+  refs: TickRefs;
+  report: (stageIndex: number, awaitingCull: boolean) => void;
+  stageFrames: (stage: number) => void;
+  frameStage: (stage: number) => number;
+  setPublished: (next: Record<string, StagePreview>) => void;
+}
+
+/** The stage and departing cat a tick settles on; committed once at the end. */
+interface TickCursor {
+  stage: number;
+  fading: string | null;
+}
+
+type StageAnchor = { at: number; anchor: BatchBeat["anchor"] };
+
+/** A stage's deal facts, shared by the cull, verdict and awaiting steps. */
+interface StagePlay {
+  stageId: string;
+  timeline: StageTimeline;
+  anchor: StageAnchor;
+  landed: string[];
+}
+
+/** A pass over one stage ends in its beat, or advances to the next stage. */
+type StageStep = BatchBeat | "advance";
+
+function sendStageReport(ctx: TickContext, target: number): void {
+  ctx.report(target, false);
+  ctx.refs.reported.current.stageFor = target;
+  ctx.refs.reported.current.stamp = {
+    k: target,
+    firstAt: ctx.now,
+    lastAt: ctx.now,
+  };
+}
+
+/** Reports `next` and moves the cursor there; the next pass evaluates it. */
+function advanceTo(
+  ctx: TickContext,
+  cursor: TickCursor,
+  next: number,
+): "advance" {
+  sendStageReport(ctx, next);
+  cursor.stage = next;
+  cursor.fading = null;
+  ctx.refs.timeline.current = null;
+  ctx.refs.localAnchor.current = null;
+  return "advance";
+}
+
+/** Step 2: the other instance advanced, or our own report echoed. */
+function resyncStage(ctx: TickContext, cursor: TickCursor): void {
+  const { current } = ctx;
+  if (!current || current.stageIndex <= cursor.stage) return;
+  cursor.stage = current.stageIndex;
+  cursor.fading = null;
+  ctx.refs.seenEliminations.current = Math.max(
+    ctx.refs.seenEliminations.current,
+    Math.min(cursor.stage, ctx.maxEliminations),
+  );
+}
+
+/** Every stage revealed: report it once, then hold the done beat. */
+function doneBeat(ctx: TickContext, stage: number): BatchBeat {
+  if (ctx.refs.reported.current.stageFor !== stage) sendStageReport(ctx, stage);
+  const last = ctx.refs.timeline.current;
+  return beatOf({
+    kind: "done",
+    stageId: "done",
+    startedAt: last ? last.timeline.totalMs : 0,
+    durationMs: 0,
+    anchor: "server",
+    timeline: null,
+    landedIds: EMPTY_IDS,
+  });
+}
+
+/** Step 5a: frames for this stage must be staged before the deal. */
+function framesStaged(
+  ctx: TickContext,
+  stage: number,
+  survivors: readonly BatchStreamCat[],
+): boolean {
+  const staged = ctx.refs.staged.current.get(ctx.frameStage(stage));
+  return survivors.every((cat) => staged?.has(cat.id));
+}
+
+/** Unbounded windup while frames render; stamped once the server has this stage. */
+function stagingWindup(
+  ctx: TickContext,
+  stage: number,
+  stageId: string,
+): BatchBeat {
+  ctx.stageFrames(stage);
+  const { current } = ctx;
+  const stamp =
+    current && current.stageIndex === stage ? current.stageStartedAt : 0;
+  return windupBeat(stageId, stamp ?? 0);
+}
+
+/** Step 5b: the server's stamp for this stage, or the local anchor kept while it never echoed. */
+function resolveAnchor(ctx: TickContext, stage: number): StageAnchor | null {
+  const { current, refs } = ctx;
+  const serverAnchor =
+    current &&
+    current.stageIndex === stage &&
+    typeof current.stageStartedAt === "number"
+      ? current.stageStartedAt
+      : null;
+  const localAnchor = refs.localAnchor.current;
+  const local = localAnchor?.k === stage ? localAnchor.at : null;
+  if (serverAnchor !== null && local !== null) {
+    // A late stamp replaces the local anchor only when they agree closely.
+    if (Math.abs(serverAnchor - local) < STAMP_SWITCH_TOLERANCE_MS) {
+      refs.localAnchor.current = null;
+      return { at: serverAnchor, anchor: "server" };
+    }
+    return { at: local, anchor: "local" };
+  }
+  if (serverAnchor !== null) return { at: serverAnchor, anchor: "server" };
+  if (local !== null) return { at: local, anchor: "local" };
+  return awaitStamp(ctx, stage);
+}
+
+/** Stamp wait (amendment 1): report once, re-send every 2 s, anchor locally after 6 s. */
+function awaitStamp(ctx: TickContext, stage: number): StageAnchor | null {
+  const { now, refs } = ctx;
+  const reported = refs.reported.current;
+  if (reported.stageFor !== stage) {
+    sendStageReport(ctx, stage);
+  } else if (
+    reported.stamp?.k === stage &&
+    now - reported.stamp.lastAt >= STAMP_RETRY_MS
+  ) {
+    ctx.report(stage, false);
+    reported.stamp.lastAt = now;
+  }
+  if (
+    reported.stamp?.k === stage &&
+    now - reported.stamp.firstAt >= STAMP_LOCAL_AFTER_MS
+  ) {
+    refs.localAnchor.current = { k: stage, at: now };
+    return { at: now, anchor: "local" };
+  }
+  return null;
+}
+
+/** Step 5c: the stage timeline, built once per stage. */
+function stageTimeline(
+  ctx: TickContext,
+  stage: number,
+  survivors: readonly BatchStreamCat[],
+): StageTimeline {
+  const entry = ctx.refs.timeline.current;
+  if (entry?.k === stage) return entry.timeline;
+  const inputs = stageInputs(
+    survivors,
+    ctx.stages,
+    stage,
+    ctx.refs.placeholders.current,
+  );
+  const timeline = buildStageBeats(inputs, ctx.stages[stage], {
+    reducedMotion: ctx.refs.reducedMotion.current,
+  });
+  ctx.refs.timeline.current = { k: stage, inputs, timeline };
+  return timeline;
+}
+
+/** Publish every landed frame not yet shown (several at once = catch-up). */
+function publishLanded(
+  ctx: TickContext,
+  stage: number,
+  landed: readonly string[],
+): void {
+  const frames = ctx.refs.staged.current.get(ctx.frameStage(stage));
+  const published = ctx.refs.published.current;
+  const updates: Record<string, StagePreview> = {};
+  for (const id of landed) {
+    const frame = frames?.get(id);
+    if (frame && published[id] !== frame) updates[id] = frame;
+  }
+  if (Object.keys(updates).length === 0) return;
+  ctx.refs.published.current = { ...published, ...updates };
+  ctx.setPublished(ctx.refs.published.current);
+}
+
+/** How long the windup / deal / hold beat runs, measured from the stage anchor. */
+function timelineBeatDuration(
+  timeline: StageTimeline,
+  kind: "windup" | "deal" | "hold",
+): number {
+  if (kind === "windup") return timeline.windupMs;
+  if (kind === "deal") return timeline.holdFromMs;
+  return timeline.totalMs;
+}
+
+/** Windup → deal → hold on the stage anchor; the hold pre-renders the next stage. */
+function dealBeat(
+  ctx: TickContext,
+  cursor: TickCursor,
+  play: StagePlay,
+  elapsed: number,
+): BatchBeat {
+  const { stageId, timeline, anchor, landed } = play;
+  const kind = timelineBeatAt(timeline, elapsed);
+  if (kind === "hold" && cursor.stage + 1 < ctx.stages.length) {
+    ctx.stageFrames(cursor.stage + 1);
+  }
+  cursor.fading = null;
+  return beatOf({
+    kind,
+    stageId,
+    startedAt: anchor.at,
+    durationMs: timelineBeatDuration(timeline, kind),
+    anchor: anchor.anchor,
+    timeline,
+    landedIds: landed,
+  });
+}
+
+/** Step 3: a cull landed for this stage → depart / repack, then advance. */
+function cullBeat(
+  ctx: TickContext,
+  cursor: TickCursor,
+  play: StagePlay,
+): StageStep | null {
+  const { eliminated, now, current, refs } = ctx;
+  if (eliminated.length <= refs.seenEliminations.current) return null;
+  const playing = refs.cull.current;
+  const cull =
+    playing?.count === eliminated.length
+      ? playing
+      : {
+          count: eliminated.length,
+          seenAt: now,
+          reduced: refs.reducedMotion.current,
+        };
+  refs.cull.current = cull;
+  const cullAnchor: BatchBeat["anchor"] =
+    typeof current?.lastCullAt === "number" ? "server" : "local";
+  const cullAt = current?.lastCullAt ?? cull.seenAt;
+  const departMs = cull.reduced ? BATCH_BEAT_MS.departReduced : BATCH_DEPART_MS;
+  const repackMs = cull.reduced ? BATCH_BEAT_MS.repackReduced : BATCH_REPACK_MS;
+  const since = now - cullAt;
+  const last = eliminated[eliminated.length - 1];
+  const { stageId, timeline, landed } = play;
+  if (since < departMs) {
+    cursor.fading = last;
+    return beatOf({
+      kind: "depart",
+      stageId,
+      startedAt: cullAt,
+      durationMs: departMs,
+      anchor: cullAnchor,
+      timeline,
+      landedIds: landed,
+      pendingCullId: last,
+    });
+  }
+  if (since < departMs + repackMs) {
+    cursor.fading = null;
+    return beatOf({
+      kind: "repack",
+      stageId,
+      startedAt: cullAt + departMs,
+      durationMs: repackMs,
+      anchor: cullAnchor,
+      timeline,
+      landedIds: landed,
+    });
+  }
+  refs.seenEliminations.current = eliminated.length;
+  refs.cull.current = null;
+  return advanceTo(ctx, cursor, cursor.stage + 1);
+}
+
+/** Step 4: an armed cull counts down on the server's clock. */
+function verdictBeat(
+  ctx: TickContext,
+  cursor: TickCursor,
+  play: StagePlay,
+): BatchBeat | null {
+  const { current, now } = ctx;
+  if (!current?.pendingCullId || typeof current.verdictAt !== "number") {
+    return null;
+  }
+  cursor.fading = null;
+  return beatOf({
+    kind: "verdict",
+    stageId: play.stageId,
+    startedAt: current.verdictAt - BATCH_VERDICT_MS,
+    durationMs: Math.max(0, current.verdictAt - now),
+    anchor: "server",
+    timeline: play.timeline,
+    landedIds: play.landed,
+    pendingCullId: current.pendingCullId,
+    verdictEndsAt: current.verdictAt,
+  });
+}
+
+/** Culls remain: wait for the control page, reporting awaitingCull once per stage. */
+function awaitingBeat(
+  ctx: TickContext,
+  cursor: TickCursor,
+  play: StagePlay,
+): BatchBeat | null {
+  if (ctx.eliminated.length >= ctx.maxEliminations) return null;
+  const reported = ctx.refs.reported.current;
+  if (reported.awaitingFor !== cursor.stage) {
+    reported.awaitingFor = cursor.stage;
+    ctx.report(cursor.stage, true);
+  }
+  cursor.fading = null;
+  const { stageId, timeline, anchor, landed } = play;
+  return beatOf({
+    kind: "awaiting",
+    stageId,
+    startedAt: anchor.at + timeline.totalMs,
+    durationMs: 0,
+    anchor: anchor.anchor,
+    timeline,
+    landedIds: landed,
+  });
+}
+
+/** One pass over the stage under the cursor: its beat, or "advance" once it rolled on. */
+function evaluateStage(ctx: TickContext, cursor: TickCursor): StageStep {
+  const { stage } = cursor;
+  if (stage >= ctx.stages.length) return doneBeat(ctx, stage);
+  const stageId = ctx.stages[stage].id;
+  const survivors = ctx.cats.filter((cat) => !ctx.eliminatedNow.has(cat.id));
+  if (!framesStaged(ctx, stage, survivors)) {
+    return stagingWindup(ctx, stage, stageId);
+  }
+  const anchor = resolveAnchor(ctx, stage);
+  if (!anchor) return windupBeat(stageId, 0);
+  const timeline = stageTimeline(ctx, stage, survivors);
+  const elapsed = ctx.now - anchor.at;
+  const landed = landedAt(timeline, elapsed);
+  publishLanded(ctx, stage, landed);
+  const play: StagePlay = { stageId, timeline, anchor, landed };
+  if (elapsed < timeline.totalMs) return dealBeat(ctx, cursor, play, elapsed);
+  // The stage has rolled. Pre-render the next one while we wait.
+  if (stage + 1 < ctx.stages.length) ctx.stageFrames(stage + 1);
+  const cull = cullBeat(ctx, cursor, play);
+  if (cull) return cull;
+  const verdict = verdictBeat(ctx, cursor, play);
+  if (verdict) return verdict;
+  const awaiting = awaitingBeat(ctx, cursor, play);
+  if (awaiting) return awaiting;
+  // No culls left: straight on to the next stage.
+  return advanceTo(ctx, cursor, stage + 1);
 }
 
 /**
@@ -157,24 +573,16 @@ export function useBatchShow({
   const mountedRef = useRef(true);
   const failedRenderLoggedRef = useRef(false);
   // Each report fires once per k; the stamp wait re-sends (amendment 1).
-  const reportedRef = useRef<{
-    stageFor: number | null;
-    awaitingFor: number | null;
-    stamp: { k: number; firstAt: number; lastAt: number } | null;
-  }>({ stageFor: null, awaitingFor: null, stamp: null });
-  const localAnchorRef = useRef<{ k: number; at: number } | null>(null);
-  const timelineRef = useRef<{
-    k: number;
-    timeline: StageTimeline;
-    inputs: StageCatInput[];
-  } | null>(null);
+  const reportedRef = useRef<ReportedState>({
+    stageFor: null,
+    awaitingFor: null,
+    stamp: null,
+  });
+  const localAnchorRef = useRef<LocalAnchor | null>(null);
+  const timelineRef = useRef<TimelineEntry | null>(null);
   // The cull currently being played out (depart/repack): remembers when
   // this instance first saw it (fallback anchor) and the motion setting.
-  const cullRef = useRef<{
-    count: number;
-    seenAt: number;
-    reduced: boolean;
-  } | null>(null);
+  const cullRef = useRef<CullPlayback | null>(null);
   // Culls processed so far. Derived from the stage being revealed (each of
   // the first `maxEliminations` stages needs exactly one cull to advance),
   // NOT from eliminatedIds.length: reloading right after a cull landed but
@@ -351,19 +759,18 @@ export function useBatchShow({
    * Runs on every tick and on every live/staging change.
    */
   const evaluate = useCallback(() => {
-    const now = Date.now();
-    const current = liveRef.current;
-    let stage = kRef.current;
-    let fading = fadingRef.current;
-
+    const cursor: TickCursor = {
+      stage: kRef.current,
+      fading: fadingRef.current,
+    };
     const commit = (next: BatchBeat) => {
-      if (stage !== kRef.current) {
-        kRef.current = stage;
-        setK(stage);
+      if (cursor.stage !== kRef.current) {
+        kRef.current = cursor.stage;
+        setK(cursor.stage);
       }
-      if (fading !== fadingRef.current) {
-        fadingRef.current = fading;
-        setFadingId(fading);
+      if (cursor.fading !== fadingRef.current) {
+        fadingRef.current = cursor.fading;
+        setFadingId(cursor.fading);
       }
       if (!sameBeat(beatRef.current, next)) {
         beatRef.current = next;
@@ -376,288 +783,43 @@ export function useBatchShow({
       return;
     }
 
-    // Step 2: the other instance advanced, or our own report echoed.
-    if (current && current.stageIndex > stage) {
-      stage = current.stageIndex;
-      fading = null;
-      seenEliminationsRef.current = Math.max(
-        seenEliminationsRef.current,
-        Math.min(stage, maxEliminations),
-      );
-    }
-
+    const current = liveRef.current;
     const eliminated = current?.eliminatedIds ?? EMPTY_IDS;
-    const eliminatedNow = new Set(eliminated);
-
-    const sendStageReport = (target: number) => {
-      report(target, false);
-      reportedRef.current.stageFor = target;
-      reportedRef.current.stamp = { k: target, firstAt: now, lastAt: now };
+    const ctx: TickContext = {
+      now: Date.now(),
+      current,
+      stages,
+      cats: command.cats,
+      maxEliminations,
+      eliminated,
+      eliminatedNow: new Set(eliminated),
+      refs: {
+        reported: reportedRef,
+        localAnchor: localAnchorRef,
+        timeline: timelineRef,
+        cull: cullRef,
+        seenEliminations: seenEliminationsRef,
+        published: publishedRef,
+        staged: stagedRef,
+        placeholders: placeholdersRef,
+        reducedMotion: reducedMotionRef,
+      },
+      report,
+      stageFrames,
+      frameStage,
+      setPublished,
     };
-    const advanceTo = (next: number) => {
-      sendStageReport(next);
-      stage = next;
-      fading = null;
-      timelineRef.current = null;
-      localAnchorRef.current = null;
-    };
+    resyncStage(ctx, cursor);
 
     // Two passes at most: a stage that completes can advance once per tick.
-    for (let pass = 0; pass < 2; pass++) {
-      if (stage >= stages.length) {
-        if (reportedRef.current.stageFor !== stage) sendStageReport(stage);
-        const last = timelineRef.current;
-        commit(
-          beatOf(
-            "done",
-            "done",
-            last ? last.timeline.totalMs : 0,
-            0,
-            "server",
-            null,
-            EMPTY_IDS,
-          ),
-        );
-        return;
-      }
-
-      const stageId = stages[stage].id;
-      const survivors = command.cats.filter(
-        (cat) => !eliminatedNow.has(cat.id),
-      );
-
-      // Step 5a: frames for this stage must be staged before the deal.
-      const staged = stagedRef.current.get(frameStage(stage));
-      const complete = survivors.every((cat) => staged?.has(cat.id));
-      if (!complete) {
-        stageFrames(stage);
-        const stamp =
-          current && current.stageIndex === stage ? current.stageStartedAt : 0;
-        commit(
-          beatOf("windup", stageId, stamp ?? 0, 0, "server", null, EMPTY_IDS),
-        );
-        return;
-      }
-
-      // Step 5b: the server's stamp for this stage, or a local anchor when
-      // the stamp never echoes (amendment 1).
-      const serverAnchor =
-        current &&
-        current.stageIndex === stage &&
-        typeof current.stageStartedAt === "number"
-          ? current.stageStartedAt
-          : null;
-      let anchorAt: number | null = null;
-      let anchor: BatchBeat["anchor"] = "server";
-      const local =
-        localAnchorRef.current?.k === stage ? localAnchorRef.current.at : null;
-      if (serverAnchor !== null && local !== null) {
-        if (Math.abs(serverAnchor - local) < STAMP_SWITCH_TOLERANCE_MS) {
-          localAnchorRef.current = null;
-          anchorAt = serverAnchor;
-        } else {
-          anchorAt = local;
-          anchor = "local";
-        }
-      } else if (serverAnchor !== null) {
-        anchorAt = serverAnchor;
-      } else if (local !== null) {
-        anchorAt = local;
-        anchor = "local";
-      } else {
-        const reported = reportedRef.current;
-        if (reported.stageFor !== stage) {
-          sendStageReport(stage);
-        } else if (
-          reported.stamp?.k === stage &&
-          now - reported.stamp.lastAt >= STAMP_RETRY_MS
-        ) {
-          report(stage, false);
-          reported.stamp.lastAt = now;
-        }
-        if (
-          reported.stamp?.k === stage &&
-          now - reported.stamp.firstAt >= STAMP_LOCAL_AFTER_MS
-        ) {
-          localAnchorRef.current = { k: stage, at: now };
-          anchorAt = now;
-          anchor = "local";
-        } else {
-          commit(beatOf("windup", stageId, 0, 0, "server", null, EMPTY_IDS));
-          return;
-        }
-      }
-
-      // Step 5c: the stage timeline, built once per stage.
-      let entry = timelineRef.current;
-      if (!entry || entry.k !== stage) {
-        const inputs = stageInputs(
-          survivors,
-          stages,
-          stage,
-          placeholdersRef.current,
-        );
-        entry = {
-          k: stage,
-          inputs,
-          timeline: buildStageBeats(inputs, stages[stage], {
-            reducedMotion: reducedMotionRef.current,
-          }),
-        };
-        timelineRef.current = entry;
-      }
-      const timeline = entry.timeline;
-      const elapsed = now - anchorAt;
-      const landed = landedAt(timeline, elapsed);
-
-      // Publish every landed frame not yet shown (several at once = catch-up).
-      const frames = stagedRef.current.get(frameStage(stage));
-      const updates: Record<string, StagePreview> = {};
-      for (const id of landed) {
-        const frame = frames?.get(id);
-        if (frame && publishedRef.current[id] !== frame) updates[id] = frame;
-      }
-      if (Object.keys(updates).length > 0) {
-        publishedRef.current = { ...publishedRef.current, ...updates };
-        setPublished(publishedRef.current);
-      }
-
-      if (elapsed < timeline.totalMs) {
-        const kind = timelineBeatAt(timeline, elapsed);
-        const durationMs =
-          kind === "windup"
-            ? timeline.windupMs
-            : kind === "deal"
-              ? timeline.holdFromMs
-              : timeline.totalMs;
-        if (kind === "hold" && stage + 1 < stages.length) {
-          stageFrames(stage + 1);
-        }
-        fading = null;
-        commit(
-          beatOf(kind, stageId, anchorAt, durationMs, anchor, timeline, landed),
-        );
-        return;
-      }
-
-      // The stage has rolled. Pre-render the next one while we wait.
-      if (stage + 1 < stages.length) stageFrames(stage + 1);
-
-      // Step 3: a cull landed for this stage → depart / repack / advance.
-      if (eliminated.length > seenEliminationsRef.current) {
-        const cull =
-          cullRef.current?.count === eliminated.length
-            ? cullRef.current
-            : {
-                count: eliminated.length,
-                seenAt: now,
-                reduced: reducedMotionRef.current,
-              };
-        cullRef.current = cull;
-        const cullAnchor: BatchBeat["anchor"] =
-          typeof current?.lastCullAt === "number" ? "server" : "local";
-        const cullAt = current?.lastCullAt ?? cull.seenAt;
-        const departMs = cull.reduced
-          ? BATCH_BEAT_MS.departReduced
-          : BATCH_DEPART_MS;
-        const repackMs = cull.reduced
-          ? BATCH_BEAT_MS.repackReduced
-          : BATCH_REPACK_MS;
-        const since = now - cullAt;
-        const last = eliminated[eliminated.length - 1];
-        if (since < departMs) {
-          fading = last;
-          commit(
-            beatOf(
-              "depart",
-              stageId,
-              cullAt,
-              departMs,
-              cullAnchor,
-              timeline,
-              landed,
-              {
-                pendingCullId: last,
-              },
-            ),
-          );
-          return;
-        }
-        if (since < departMs + repackMs) {
-          fading = null;
-          commit(
-            beatOf(
-              "repack",
-              stageId,
-              cullAt + departMs,
-              repackMs,
-              cullAnchor,
-              timeline,
-              landed,
-            ),
-          );
-          return;
-        }
-        seenEliminationsRef.current = eliminated.length;
-        cullRef.current = null;
-        advanceTo(stage + 1);
-        continue;
-      }
-
-      // Step 4: an armed cull counts down on the server's clock.
-      if (current?.pendingCullId && typeof current.verdictAt === "number") {
-        fading = null;
-        commit(
-          beatOf(
-            "verdict",
-            stageId,
-            current.verdictAt - BATCH_VERDICT_MS,
-            Math.max(0, current.verdictAt - now),
-            "server",
-            timeline,
-            landed,
-            {
-              pendingCullId: current.pendingCullId,
-              verdictEndsAt: current.verdictAt,
-            },
-          ),
-        );
-        return;
-      }
-
-      if (eliminated.length < maxEliminations) {
-        if (reportedRef.current.awaitingFor !== stage) {
-          reportedRef.current.awaitingFor = stage;
-          report(stage, true);
-        }
-        fading = null;
-        commit(
-          beatOf(
-            "awaiting",
-            stageId,
-            anchorAt + timeline.totalMs,
-            0,
-            anchor,
-            timeline,
-            landed,
-          ),
-        );
-        return;
-      }
-
-      // No culls left: straight on to the next stage.
-      advanceTo(stage + 1);
+    let next: StageStep = "advance";
+    for (let pass = 0; pass < 2 && next === "advance"; pass++) {
+      next = evaluateStage(ctx, cursor);
     }
     commit(
-      beatOf(
-        "windup",
-        stages[stage]?.id ?? "done",
-        0,
-        0,
-        "server",
-        null,
-        EMPTY_IDS,
-      ),
+      next === "advance"
+        ? windupBeat(stages[cursor.stage]?.id ?? "done", 0)
+        : next,
     );
   }, [command.cats, frameStage, maxEliminations, report, stageFrames, stages]);
 

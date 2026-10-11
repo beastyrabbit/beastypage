@@ -128,6 +128,13 @@ interface MockFrame {
   shifted: boolean;
 }
 
+/** The deal-order ids that have landed in this frame. */
+function landedIdsFor(frame: MockFrame, order: string[]): string[] {
+  if (frame.beat === "loading" || frame.beat === "windup") return [];
+  if (frame.landedCount === "all") return order;
+  return order.slice(0, frame.landedCount);
+}
+
 function buildView(
   frame: MockFrame,
   urls: readonly (string | null)[],
@@ -145,12 +152,7 @@ function buildView(
   const timeline = buildStageBeats(mockInputs(survivorNumbers), stage, {
     reducedMotion,
   });
-  const landedIds =
-    frame.beat === "loading" || frame.beat === "windup"
-      ? []
-      : frame.landedCount === "all"
-        ? timeline.order
-        : timeline.order.slice(0, frame.landedCount);
+  const landedIds = landedIdsFor(frame, timeline.order);
   const landed = new Set(landedIds);
   const changed = new Set(timeline.changedIds);
   const labelById = new Map(
@@ -287,52 +289,83 @@ function useMockSprites(count: number): (string | null)[] {
   return urls;
 }
 
-/** The static frame the URL asks for. */
-function staticFrame(
-  state: PreviewState,
-  beatParam: string | null,
-  landedParam: number | null,
-  verdictSeconds: number | null,
-  shorthand: "depart" | "repack" | null,
+type Shorthand = "depart" | "repack";
+
+interface StaticFrameOptions {
+  state: PreviewState;
+  beatParam: string | null;
+  landedParam: number | null;
+  verdictSeconds: number | null;
+  shorthand: Shorthand | null;
+  pool: number;
+  maxEliminations: number;
+  readyAt: number;
+}
+
+/** The beat each state implies when the URL names none. */
+const STATE_BEAT: Record<PreviewState, BatchBeatKind> = {
+  loading: "loading",
+  revealing: "deal",
+  awaiting: "awaiting",
+  done: "done",
+};
+
+function isBeatKind(value: string | null): value is BatchBeatKind {
+  return (BEATS as readonly string[]).includes(value ?? "");
+}
+
+/** depart=1 / repack=1 pick a beat without naming it. */
+function shorthandParam(
+  params: Pick<URLSearchParams, "get">,
+): Shorthand | null {
+  if (params.get("depart") === "1") return "depart";
+  if (params.get("repack") === "1") return "repack";
+  return null;
+}
+
+function resolveBeat(options: StaticFrameOptions): BatchBeatKind {
+  if (options.shorthand) return options.shorthand;
+  if (isBeatKind(options.beatParam)) return options.beatParam;
+  return STATE_BEAT[options.state];
+}
+
+/** Culled numbers: the finale drops the top of the pool, repack adds #16. */
+function culledFor(
+  beat: BatchBeatKind,
   pool: number,
   maxEliminations: number,
-  readyAt: number,
-): MockFrame {
-  const beat: BatchBeatKind =
-    shorthand ??
-    ((BEATS as readonly string[]).includes(beatParam ?? "")
-      ? (beatParam as BatchBeatKind)
-      : state === "loading"
-        ? "loading"
-        : state === "revealing"
-          ? "deal"
-          : state === "done"
-            ? "done"
-            : "awaiting");
+): number[] {
+  if (beat === "done")
+    return Array.from({ length: maxEliminations }, (_, i) => pool - i);
   const defaultCulls = DEFAULT_CULLS.filter((n) => n <= pool).slice(
     0,
     maxEliminations,
   );
-  const culled =
-    beat === "done"
-      ? Array.from({ length: maxEliminations }, (_, i) => pool - i)
-      : beat === "repack"
-        ? [...defaultCulls, PENDING_NUMBER]
-        : defaultCulls;
+  return beat === "repack" ? [...defaultCulls, PENDING_NUMBER] : defaultCulls;
+}
+
+function landedCountFor(
+  beat: BatchBeatKind,
+  options: StaticFrameOptions,
+): number | "all" {
+  if (beat !== "deal") return "all";
+  return options.landedParam ?? (options.state === "revealing" ? "all" : 0);
+}
+
+/** The static frame the URL asks for. */
+function staticFrame(options: StaticFrameOptions): MockFrame {
+  const beat = resolveBeat(options);
   const verdict = beat === "verdict" || beat === "depart";
   return {
     stageIndex: beat === "done" ? MOCK_STAGES.length - 1 : MOCK_STAGE_INDEX,
     beat,
-    landedCount:
-      beat === "deal"
-        ? (landedParam ?? (state === "revealing" ? "all" : 0))
-        : "all",
-    culled,
+    landedCount: landedCountFor(beat, options),
+    culled: culledFor(beat, options.pool, options.maxEliminations),
     pending: verdict ? PENDING_NUMBER : null,
     departing: beat === "depart" ? PENDING_NUMBER : null,
     verdictEndsAt:
-      beat === "verdict" && readyAt > 0
-        ? readyAt + (verdictSeconds ?? 3) * 1000
+      beat === "verdict" && options.readyAt > 0
+        ? options.readyAt + (options.verdictSeconds ?? 3) * 1000
         : null,
     shifted: false,
   };
@@ -444,9 +477,7 @@ function autoFrame(
     sim.pending ??
     (survivors.includes(PENDING_NUMBER)
       ? PENDING_NUMBER
-      : (survivors
-          .filter((n) => (n - 1) % 3 !== 0 && n !== 6 && n !== 12)
-          .at(-1) ??
+      : (survivors.findLast((n) => (n - 1) % 3 !== 0 && n !== 6 && n !== 12) ??
         survivors.at(-1) ??
         1));
   const verdictEndsAt = awaitingFrom + AUTO_AWAIT_MS + AUTO_VERDICT_MS;
@@ -550,12 +581,7 @@ export function BatchPreviewClient() {
   const beatParam = params.get("beat");
   const landedParam = intParam(params.get("landed"));
   const verdictSeconds = intParam(params.get("verdict"));
-  const shorthand =
-    params.get("depart") === "1"
-      ? "depart"
-      : params.get("repack") === "1"
-        ? "repack"
-        : null;
+  const shorthand = shorthandParam(params);
   const reducedMotion = params.get("rm") === "1";
   const auto = params.get("auto") === "1";
   const chrome = params.get("chrome") !== "0";
@@ -575,16 +601,16 @@ export function BatchPreviewClient() {
   const frame = useMemo(
     () =>
       autoFrameState ??
-      staticFrame(
+      staticFrame({
         state,
         beatParam,
         landedParam,
         verdictSeconds,
         shorthand,
-        count,
-        Math.max(0, count - finalCount),
+        pool: count,
+        maxEliminations: Math.max(0, count - finalCount),
         readyAt,
-      ),
+      }),
     [
       autoFrameState,
       state,

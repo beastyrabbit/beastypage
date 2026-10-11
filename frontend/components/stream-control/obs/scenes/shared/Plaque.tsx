@@ -132,6 +132,56 @@ function titleFontSize(title: string): string {
 
 const DEFAULT_FREE_POSITION = { left: 32, bottom: 28 } as const;
 
+type FreePosition = NonNullable<PlaqueProps["freePosition"]>;
+
+/** The look's slot in "slot" mode (null until it mounts); null in every other mode. */
+function findPlaqueSlot(
+  container: HTMLElement | null,
+  mode: LookChrome["plaque"],
+): HTMLElement | null {
+  if (mode !== "slot") return null;
+  return container?.querySelector<HTMLElement>("[data-plaque-slot]") ?? null;
+}
+
+interface PlaqueRootStyleOptions {
+  free: boolean;
+  /** "free" mode position; null in "slot" mode. */
+  position: FreePosition | null;
+  breathing: boolean;
+  style: CSSProperties | undefined;
+}
+
+function plaqueRootStyle(options: PlaqueRootStyleOptions): CSSProperties {
+  const { free, position, breathing, style } = options;
+  return {
+    position: free ? "absolute" : "relative",
+    ...position,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    gap: 4,
+    width: free ? undefined : "100%",
+    height: free ? undefined : "100%",
+    maxWidth: free ? 560 : undefined,
+    boxSizing: "border-box",
+    color: INK,
+    textShadow: free ? SHADOW : undefined,
+    pointerEvents: "none",
+    animation: breathing
+      ? "obs-plaque-breathe 4.8s ease-in-out infinite"
+      : undefined,
+    ...style,
+  };
+}
+
+/** Free mode outlines the ink so it reads over any look; slot mode has the look's backing. */
+function plaqueInkStroke(free: boolean): CSSProperties {
+  return free
+    ? { paintOrder: "stroke", WebkitTextStroke: `0.5px ${MUTED}` }
+    : {};
+}
+
 function sameRect(a: Rect | null, b: Rect | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -171,12 +221,7 @@ export function Plaque({
   // Slot lookup: the look may mount the slot late or move it per beat.
   // biome-ignore lint/correctness/useExhaustiveDependencies: slotKey/beatKey are the re-lookup triggers
   useLayoutEffect(() => {
-    if (mode !== "slot") {
-      setSlot(null);
-      return;
-    }
-    const found = container?.querySelector<HTMLElement>("[data-plaque-slot]");
-    setSlot(found ?? null);
+    setSlot(findPlaqueSlot(container, mode));
   }, [container, mode, slotKey, beatKey]);
 
   const rendered = mode === "free" || (mode === "slot" && slot !== null);
@@ -215,30 +260,13 @@ export function Plaque({
   if (!rendered) return null;
 
   const free = mode === "free";
-  const position = free ? (freePosition ?? DEFAULT_FREE_POSITION) : null;
-  const rootStyle: CSSProperties = {
-    position: free ? "absolute" : "relative",
-    ...(position ?? {}),
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-    alignItems: "flex-start",
-    gap: 4,
-    width: free ? undefined : "100%",
-    height: free ? undefined : "100%",
-    maxWidth: free ? 560 : undefined,
-    boxSizing: "border-box",
-    color: INK,
-    textShadow: free ? SHADOW : undefined,
-    pointerEvents: "none",
-    animation: breathing
-      ? "obs-plaque-breathe 4.8s ease-in-out infinite"
-      : undefined,
-    ...style,
-  };
-  const inkStroke: CSSProperties = free
-    ? { paintOrder: "stroke", WebkitTextStroke: `0.5px ${MUTED}` }
-    : {};
+  const rootStyle = plaqueRootStyle({
+    free,
+    position: free ? (freePosition ?? DEFAULT_FREE_POSITION) : null,
+    breathing,
+    style,
+  });
+  const inkStroke = plaqueInkStroke(free);
   const tally = capPlaqueTally(model.tally);
 
   const content = (

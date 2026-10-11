@@ -186,11 +186,12 @@ export function AllegiancesLineage({
     model.cats.findLast(
       (cat) => lineageCatState(reveal, cat.key) === "shown",
     ) ?? null;
-  const plateCat = done
-    ? newest
-    : activeCat && lineageCatState(reveal, activeCat.key) !== "hidden"
-      ? activeCat
-      : lastShownCat;
+  let plateCat: LineageCat | null = lastShownCat;
+  if (done) {
+    plateCat = newest;
+  } else if (activeCat && lineageCatState(reveal, activeCat.key) !== "hidden") {
+    plateCat = activeCat;
+  }
   const lineLabel = model.starter?.label ?? "the line";
 
   return (

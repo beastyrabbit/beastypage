@@ -240,7 +240,7 @@ export function evolutionLedger(
     command.totalCount,
     command.chargeDurationMs ?? DEFAULT_CHARGE_MS,
   );
-  const live = state && state.seq === command.seq ? state : null;
+  const live = state?.seq === command.seq ? state : null;
   const held = typeof live?.holdStartedAt === "number";
   const elapsed = live?.skipToBoard
     ? schedule.totalMs
@@ -335,12 +335,12 @@ export function isShowLive(
     const batch = command.batch as BatchStreamCommand;
     const state = session?.batchState;
     const total = buildBatchStagePlan(batch.config, batch.cats).length;
-    return !(state && state.seq === command.seq && state.stageIndex >= total);
+    return !(state?.seq === command.seq && state.stageIndex >= total);
   }
   if (command.type === "evolution" && command.evolution) {
     const evolution = command.evolution as EvolutionStreamCommand;
     const state = session?.evolutionState;
-    const live = state && state.seq === command.seq ? state : null;
+    const live = state?.seq === command.seq ? state : null;
     if (live?.skipToBoard) return false;
     const timestamp =
       typeof command.timestamp === "number" ? command.timestamp : now;

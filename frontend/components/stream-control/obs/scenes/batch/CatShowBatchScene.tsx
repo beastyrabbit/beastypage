@@ -63,6 +63,16 @@ const CSS = `
 
 type Area = { x: number; y: number; w: number; h: number };
 
+/** Tent caption: the excused notice under the judge's verdict, else the cat's name. */
+function tentCaption(
+  verdict: boolean,
+  beat: BatchShowView["beat"]["kind"],
+  label: string,
+): string {
+  if (!verdict) return label;
+  return beat === "depart" ? "excused" : "excused in…";
+}
+
 function Pedestals({
   cats,
   area,
@@ -112,13 +122,7 @@ function Pedestals({
             <div className="base" />
             <div className="tent">
               <b>{cat.numberLabel}</b>
-              <span>
-                {verdict
-                  ? beat === "depart"
-                    ? "excused"
-                    : "excused in…"
-                  : cat.label}
-              </span>
+              <span>{tentCaption(verdict, beat, cat.label)}</span>
             </div>
             {cat.favorite || done ? <i className="ros" /> : null}
           </div>

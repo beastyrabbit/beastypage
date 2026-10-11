@@ -609,7 +609,7 @@ export const finalizeBatchCull = internalMutation({
   },
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
-    if (!session) return null;
+    if (!session) return;
     const command = session.currentCommand;
     const state = session.batchState;
     if (
@@ -620,14 +620,13 @@ export const finalizeBatchCull = internalMutation({
       state.pendingCullId !== args.catId ||
       state.verdictAt !== args.verdictAt
     ) {
-      return null;
+      return;
     }
     const now = Date.now();
     await ctx.db.patch(session._id, {
       batchState: applyBatchCull(state, args.catId, now),
       updatedAt: now,
     });
-    return null;
   },
 });
 
@@ -646,7 +645,7 @@ function evolutionClockFor(
   const command = session.currentCommand;
   if (command?.type !== "evolution" || command.seq !== seq) return null;
   const stored = session.evolutionState;
-  const state = stored && stored.seq === seq ? stored : { seq, offsetMs: 0 };
+  const state = stored?.seq === seq ? stored : { seq, offsetMs: 0 };
   return { timestamp: command.timestamp, state };
 }
 
@@ -698,7 +697,7 @@ export const releaseEvolution = mutation({
   handler: async (ctx, args) => {
     const session = await requireSession(ctx);
     const clock = evolutionClockFor(session, args.seq);
-    if (!clock || clock.state.holdStartedAt === undefined) return;
+    if (clock?.state.holdStartedAt === undefined) return;
     const now = Date.now();
     await ctx.db.patch(session._id, {
       evolutionState: releasedEvolutionState(clock.state, now),
@@ -716,21 +715,20 @@ export const autoReleaseEvolution = internalMutation({
   },
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
-    if (!session) return null;
+    if (!session) return;
     const state = session.evolutionState;
     if (
       !state ||
       state.seq !== args.seq ||
       state.holdStartedAt !== args.holdStartedAt
     ) {
-      return null;
+      return;
     }
     const now = Date.now();
     await ctx.db.patch(session._id, {
       evolutionState: releasedEvolutionState(state, now),
       updatedAt: now,
     });
-    return null;
   },
 });
 

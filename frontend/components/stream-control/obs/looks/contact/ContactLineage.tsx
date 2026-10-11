@@ -38,6 +38,13 @@ function landed(state: LineageCatState): boolean {
   return state === "shown" || state === "revealing";
 }
 
+/** Caption suffix while the lightbox is on (a cat is rolling). */
+function lightboxNote(charging: boolean, roll: LineageRoll | null): string {
+  if (!charging) return "";
+  if (!roll) return " · LIGHTBOX ON";
+  return ` · LIGHTBOX ON · ${roll.traitLabel} ${(roll.index + 1).toString()}/${roll.count.toString()}`;
+}
+
 function sheetCaption(
   model: LineageModel,
   reveal: LineageReveal | undefined,
@@ -46,13 +53,7 @@ function sheetCaption(
   if (!reveal || reveal.done) {
     return `EVOLUTION · ${model.totalCount} CATS · CONTACT SHEET · CIRCLE THE ${rankWord.toUpperCase()}S`;
   }
-  const roll = reveal.roll;
-  const lightbox =
-    reveal.charging && roll
-      ? ` · LIGHTBOX ON · ${roll.traitLabel} ${(roll.index + 1).toString()}/${roll.count.toString()}`
-      : reveal.charging
-        ? " · LIGHTBOX ON"
-        : "";
+  const lightbox = lightboxNote(reveal.charging, reveal.roll);
   return `EXPOSING · ${reveal.revealedKeys.size}/${model.totalCount} FRAMES${lightbox}`;
 }
 

@@ -132,9 +132,9 @@ describe("lineageSpriteUrl", () => {
       typeof lineageSpriteUrl
     >[1];
   it("never shows the finished cat while charging", () => {
-    expect(lineageSpriteUrl("charging", reveal(null, null), "final.png")).toBe(
-      null,
-    );
+    expect(
+      lineageSpriteUrl("charging", reveal(null, null), "final.png"),
+    ).toBeNull();
     expect(
       lineageSpriteUrl("charging", reveal(null, "parent.png"), "final.png"),
     ).toBe("parent.png");
@@ -159,6 +159,6 @@ describe("lineageSpriteUrl", () => {
         reveal("candidate.png", "parent.png"),
         "final.png",
       ),
-    ).toBe(null);
+    ).toBeNull();
   });
 });

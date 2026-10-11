@@ -449,10 +449,52 @@ function hiddenTraitValue(trait: AnyCatTraitDefinition): {
   return { present: true, value: "none" };
 }
 
+type PartialTraitValue = { present: boolean; value?: unknown };
+
+/** A present list value, cloned; anything else is an empty list. */
+function presentList(current: PartialTraitValue): unknown[] {
+  return current.present && Array.isArray(current.value)
+    ? cloneValue(current.value)
+    : [];
+}
+
+function writeLegacyList(
+  params: Record<string, unknown>,
+  key: string,
+  singleKey: string | undefined,
+  current: PartialTraitValue,
+): void {
+  const list = presentList(current);
+  params[key] = list;
+  if (!singleKey) return;
+  if (list.length > 0) params[singleKey] = list[0];
+  else delete params[singleKey];
+}
+
+function writeLegacyTortie(
+  params: Record<string, unknown>,
+  current: PartialTraitValue,
+): void {
+  const layers = presentList(current);
+  params.tortie = layers;
+  params.isTortie = layers.length > 0;
+}
+
+function writeLegacyBooleanAlias(
+  params: Record<string, unknown>,
+  key: string,
+  aliases: readonly string[],
+  current: PartialTraitValue,
+): void {
+  const enabled = current.present && Boolean(current.value);
+  params[key] = enabled;
+  for (const alias of aliases) params[alias] = enabled;
+}
+
 function writeLegacyTraitValue(
   params: Record<string, unknown>,
   trait: AnyCatTraitDefinition,
-  current: { present: boolean; value?: unknown },
+  current: PartialTraitValue,
 ): void {
   const value = current.value;
   switch (trait.legacy.strategy) {
@@ -460,33 +502,29 @@ function writeLegacyTraitValue(
       if (current.present) params[trait.legacy.key] = cloneValue(value);
       else delete params[trait.legacy.key];
       break;
-    case "list": {
-      const list =
-        current.present && Array.isArray(value) ? cloneValue(value) : [];
-      params[trait.legacy.key] = list;
-      if (trait.legacy.singleKey) {
-        if (list.length > 0) params[trait.legacy.singleKey] = list[0];
-        else delete params[trait.legacy.singleKey];
-      }
+    case "list":
+      writeLegacyList(
+        params,
+        trait.legacy.key,
+        trait.legacy.singleKey,
+        current,
+      );
       break;
-    }
     case "pose":
       if (current.present) params[trait.legacy.key] = value;
       else delete params[trait.legacy.key];
       break;
-    case "tortie": {
-      const layers =
-        current.present && Array.isArray(value) ? cloneValue(value) : [];
-      params.tortie = layers;
-      params.isTortie = layers.length > 0;
+    case "tortie":
+      writeLegacyTortie(params, current);
       break;
-    }
-    case "booleanAlias": {
-      const enabled = current.present && Boolean(value);
-      params[trait.legacy.key] = enabled;
-      for (const alias of trait.legacy.aliases) params[alias] = enabled;
+    case "booleanAlias":
+      writeLegacyBooleanAlias(
+        params,
+        trait.legacy.key,
+        trait.legacy.aliases,
+        current,
+      );
       break;
-    }
   }
 }
 
@@ -609,6 +647,90 @@ function isAbsentToken(value: unknown): boolean {
   );
 }
 
+type SimpleStage = Extract<BatchStage, { type: "simple" }>;
+type SlotStage = Extract<BatchStage, { type: "accessory" | "scar" }>;
+type TortieSubStage = Extract<BatchStage, { type: "tortie-sub" }>;
+type RegistryStage = Extract<BatchStage, { type: "registry" }>;
+
+/** The final coat choice (pelt + pattern) as the generator reads it. */
+function finalCoatChoice(finalParams: Record<string, unknown>): string {
+  return getCoatChoiceValue({
+    peltName:
+      typeof finalParams.peltName === "string"
+        ? finalParams.peltName
+        : undefined,
+    coatPattern:
+      typeof finalParams.coatPattern === "string"
+        ? finalParams.coatPattern
+        : undefined,
+  });
+}
+
+function labelledStageValue(value: string): BatchStageValue {
+  return { value, label: formatBatchValue(value) };
+}
+
+function simpleStageValue(
+  finalParams: Record<string, unknown>,
+  stage: SimpleStage,
+): BatchStageValue | null {
+  if (stage.param === "peltName") {
+    return labelledStageValue(finalCoatChoice(finalParams));
+  }
+  if (stage.param === "poseName") {
+    const pose = finalParams.poseName;
+    if (typeof pose !== "string" || pose === "") return null;
+    return { value: pose, label: formatPoseName(pose) };
+  }
+  if (stage.param === "shading" || stage.param === "reverse") {
+    if (finalParams[stage.param] !== true) return null;
+    return {
+      value: "true",
+      label: stage.param === "shading" ? "Shaded" : "Mirrored",
+    };
+  }
+  const raw = finalParams[stage.param];
+  if (isAbsentToken(raw)) return null;
+  return labelledStageValue(stringifyTraitValue(raw));
+}
+
+function slotStageValue(
+  cat: BatchStreamCat,
+  stage: SlotStage,
+): BatchStageValue | null {
+  const slots =
+    stage.type === "accessory"
+      ? cat.catData.accessorySlots
+      : cat.catData.scarSlots;
+  const slot = slots[stage.slotIndex];
+  if (!slot || slot === "none") return null;
+  return labelledStageValue(slot);
+}
+
+function tortieSubStageValue(
+  cat: BatchStreamCat,
+  stage: TortieSubStage,
+): BatchStageValue | null {
+  const value = cat.catData.tortieSlots[stage.layerIndex]?.[stage.subElement];
+  if (!value) return null;
+  return labelledStageValue(value);
+}
+
+function registryStageValue(
+  cat: BatchStreamCat,
+  stage: RegistryStage,
+): BatchStageValue | null {
+  const finalValue = canonicalTraits(cat, catSystem)?.[stage.traitId];
+  if (stage.strategy === "single") {
+    if (isAbsentToken(finalValue)) return null;
+    return labelledStageValue(stringifyTraitValue(finalValue));
+  }
+  const list = Array.isArray(finalValue) ? finalValue : [];
+  const item: unknown = list[stage.slotIndex ?? 0];
+  if (item === undefined) return null;
+  return labelledStageValue(stringifyTraitValue(item));
+}
+
 /**
  * The value `stage` reveals on `cat`, or null when the stage leaves the cat
  * as it was ("none", missing slot, false boolean, missing tortie layer).
@@ -618,65 +740,20 @@ export function stageValueFor(
   cat: BatchStreamCat,
   stage: BatchStage,
 ): BatchStageValue | null {
-  const finalParams = cat.catData.params as unknown as Record<string, unknown>;
-  if (stage.type === "simple") {
-    if (stage.param === "peltName") {
-      const value = getCoatChoiceValue({
-        peltName:
-          typeof finalParams.peltName === "string"
-            ? finalParams.peltName
-            : undefined,
-        coatPattern:
-          typeof finalParams.coatPattern === "string"
-            ? finalParams.coatPattern
-            : undefined,
-      });
-      return { value, label: formatBatchValue(value) };
-    }
-    if (stage.param === "poseName") {
-      const pose = finalParams.poseName;
-      if (typeof pose !== "string" || pose === "") return null;
-      return { value: pose, label: formatPoseName(pose) };
-    }
-    if (stage.param === "shading" || stage.param === "reverse") {
-      if (finalParams[stage.param] !== true) return null;
-      return {
-        value: "true",
-        label: stage.param === "shading" ? "Shaded" : "Mirrored",
-      };
-    }
-    const raw = finalParams[stage.param];
-    if (isAbsentToken(raw)) return null;
-    const value = stringifyTraitValue(raw);
-    return { value, label: formatBatchValue(value) };
+  switch (stage.type) {
+    case "simple":
+      return simpleStageValue(
+        cat.catData.params as unknown as Record<string, unknown>,
+        stage,
+      );
+    case "accessory":
+    case "scar":
+      return slotStageValue(cat, stage);
+    case "tortie-sub":
+      return tortieSubStageValue(cat, stage);
+    case "registry":
+      return registryStageValue(cat, stage);
   }
-  if (stage.type === "accessory" || stage.type === "scar") {
-    const slots =
-      stage.type === "accessory"
-        ? cat.catData.accessorySlots
-        : cat.catData.scarSlots;
-    const slot = slots[stage.slotIndex];
-    if (!slot || slot === "none") return null;
-    return { value: slot, label: formatBatchValue(slot) };
-  }
-  if (stage.type === "tortie-sub") {
-    const layer = cat.catData.tortieSlots[stage.layerIndex];
-    if (!layer) return null;
-    const value = layer[stage.subElement];
-    if (!value) return null;
-    return { value, label: formatBatchValue(value) };
-  }
-  const finalValue = canonicalTraits(cat, catSystem)?.[stage.traitId];
-  if (stage.strategy === "single") {
-    if (isAbsentToken(finalValue)) return null;
-    const value = stringifyTraitValue(finalValue);
-    return { value, label: formatBatchValue(value) };
-  }
-  const list = Array.isArray(finalValue) ? finalValue : [];
-  const item: unknown = list[stage.slotIndex ?? 0];
-  if (item === undefined) return null;
-  const value = stringifyTraitValue(item);
-  return { value, label: formatBatchValue(value) };
 }
 
 /**
@@ -725,96 +802,119 @@ export function stageChanged(
   return list[stage.slotIndex ?? 0] !== undefined;
 }
 
-/**
- * Render params for a cat with stages 0..revealedThrough applied
- * (revealedThrough = -1 renders the unrevealed base kit). Mirrors the
- * adoption generator's buildInitialState/applyStageValue/buildRenderParams.
- */
-export function buildPartialBatchParams(
+/** What the stages up to `revealedThrough` have uncovered, per stage type. */
+interface BatchReveal {
+  simple: Record<string, unknown> & { peltName: string; coatPattern?: string };
+  accessorySlots: string[];
+  scarSlots: string[];
+  genericValues: Map<string, PartialTraitValue>;
+  tortieRevealed: Map<number, Record<"mask" | "pattern" | "colour", boolean>>;
+}
+
+function revealSimpleStage(
+  reveal: BatchReveal,
+  finalParams: Record<string, unknown>,
+  stage: SimpleStage,
+): void {
+  if (stage.param === "peltName") {
+    applyCoatChoice(reveal.simple, finalCoatChoice(finalParams));
+    return;
+  }
+  reveal.simple[stage.param] = finalParams[stage.param] ?? "none";
+}
+
+function revealSlotStage(
+  reveal: BatchReveal,
+  cat: BatchStreamCat,
+  stage: SlotStage,
+): void {
+  if (stage.type === "accessory") {
+    reveal.accessorySlots[stage.slotIndex] =
+      cat.catData.accessorySlots[stage.slotIndex] ?? "none";
+    return;
+  }
+  reveal.scarSlots[stage.slotIndex] =
+    cat.catData.scarSlots[stage.slotIndex] ?? "none";
+}
+
+function revealTortieSubStage(
+  reveal: BatchReveal,
+  stage: TortieSubStage,
+): void {
+  const revealed = reveal.tortieRevealed.get(stage.layerIndex) ?? {
+    mask: false,
+    pattern: false,
+    colour: false,
+  };
+  revealed[stage.subElement] = true;
+  reveal.tortieRevealed.set(stage.layerIndex, revealed);
+}
+
+function revealRegistryStage(
+  reveal: BatchReveal,
+  finalTraits: Record<string, unknown> | null,
+  stage: RegistryStage,
+): void {
+  const finalValue = finalTraits?.[stage.traitId];
+  if (stage.strategy === "single") {
+    reveal.genericValues.set(stage.traitId, {
+      present: finalValue !== undefined,
+      value: finalValue,
+    });
+    return;
+  }
+  const list = Array.isArray(finalValue) ? finalValue : [];
+  reveal.genericValues.set(stage.traitId, {
+    present: true,
+    value: list.slice(0, (stage.slotIndex ?? 0) + 1),
+  });
+}
+
+function collectReveal(
   cat: BatchStreamCat,
   stages: BatchStage[],
   revealedThrough: number,
-  placeholders: BatchTortiePlaceholders = BATCH_TORTIE_PLACEHOLDER_FALLBACK,
-  system: CatSystemDefinition = catSystem,
-): CatParams {
-  const finalParams = cat.catData.params as unknown as Record<string, unknown>;
-  const finalTraits = canonicalTraits(cat, system);
-
-  // Everything revealed → render the real params untouched.
-  if (revealedThrough >= stages.length - 1) {
-    return cat.catData.params;
-  }
-
-  const simple: Record<string, unknown> & {
-    peltName: string;
-    coatPattern?: string;
-  } = { ...BATCH_STAGE_PLACEHOLDERS, peltName: "SingleColour" };
-  const accessorySlots: string[] = [];
-  const scarSlots: string[] = [];
-  const genericValues = new Map<
-    string,
-    { present: boolean; value?: unknown }
-  >();
-  const tortieRevealed = new Map<
-    number,
-    { mask: boolean; pattern: boolean; colour: boolean }
-  >();
-
+  finalParams: Record<string, unknown>,
+  finalTraits: Record<string, unknown> | null,
+): BatchReveal {
+  const reveal: BatchReveal = {
+    simple: { ...BATCH_STAGE_PLACEHOLDERS, peltName: "SingleColour" },
+    accessorySlots: [],
+    scarSlots: [],
+    genericValues: new Map(),
+    tortieRevealed: new Map(),
+  };
   for (
     let index = 0;
     index <= revealedThrough && index < stages.length;
     index++
   ) {
     const stage = stages[index];
-    if (stage.type === "simple") {
-      if (stage.param === "peltName") {
-        applyCoatChoice(
-          simple,
-          getCoatChoiceValue({
-            peltName:
-              typeof finalParams.peltName === "string"
-                ? finalParams.peltName
-                : undefined,
-            coatPattern:
-              typeof finalParams.coatPattern === "string"
-                ? finalParams.coatPattern
-                : undefined,
-          }),
-        );
-      } else {
-        simple[stage.param] = finalParams[stage.param] ?? "none";
-      }
-    } else if (stage.type === "accessory") {
-      accessorySlots[stage.slotIndex] =
-        cat.catData.accessorySlots[stage.slotIndex] ?? "none";
-    } else if (stage.type === "scar") {
-      scarSlots[stage.slotIndex] =
-        cat.catData.scarSlots[stage.slotIndex] ?? "none";
-    } else if (stage.type === "tortie-sub") {
-      const revealed = tortieRevealed.get(stage.layerIndex) ?? {
-        mask: false,
-        pattern: false,
-        colour: false,
-      };
-      revealed[stage.subElement] = true;
-      tortieRevealed.set(stage.layerIndex, revealed);
-    } else {
-      const finalValue = finalTraits?.[stage.traitId];
-      if (stage.strategy === "single") {
-        genericValues.set(stage.traitId, {
-          present: finalValue !== undefined,
-          value: finalValue,
-        });
-      } else {
-        const list = Array.isArray(finalValue) ? finalValue : [];
-        genericValues.set(stage.traitId, {
-          present: true,
-          value: list.slice(0, (stage.slotIndex ?? 0) + 1),
-        });
-      }
+    switch (stage.type) {
+      case "simple":
+        revealSimpleStage(reveal, finalParams, stage);
+        break;
+      case "accessory":
+      case "scar":
+        revealSlotStage(reveal, cat, stage);
+        break;
+      case "tortie-sub":
+        revealTortieSubStage(reveal, stage);
+        break;
+      case "registry":
+        revealRegistryStage(reveal, finalTraits, stage);
+        break;
     }
   }
+  return reveal;
+}
 
+/** Revealed tortie layers; unrevealed sub-elements show the placeholders. */
+function revealedTortieLayers(
+  cat: BatchStreamCat,
+  tortieRevealed: BatchReveal["tortieRevealed"],
+  placeholders: BatchTortiePlaceholders,
+): BatchTortieLayer[] {
   const tortie: BatchTortieLayer[] = [];
   for (const [layerIndex, revealed] of tortieRevealed) {
     const slot = cat.catData.tortieSlots[layerIndex];
@@ -825,12 +925,20 @@ export function buildPartialBatchParams(
       colour: revealed.colour ? slot.colour : placeholders.colour,
     });
   }
+  return tortie;
+}
 
-  const accessories = accessorySlots.filter(
+/** The flat (legacy) render params for the reveal so far. */
+function flatPartialParams(
+  reveal: BatchReveal,
+  finalParams: Record<string, unknown>,
+  tortie: BatchTortieLayer[],
+): Record<string, unknown> {
+  const { simple } = reveal;
+  const accessories = reveal.accessorySlots.filter(
     (value) => value && value !== "none",
   );
-  const scars = scarSlots.filter((value) => value && value !== "none");
-
+  const scars = reveal.scarSlots.filter((value) => value && value !== "none");
   const params: Record<string, unknown> = {
     spriteNumber: 8,
     poseName: simple.poseName || DEFAULT_POSE_NAME,
@@ -856,74 +964,185 @@ export function buildPartialBatchParams(
     const value = simple[key];
     if (value && value !== "none") params[key] = value;
   }
+  return params;
+}
 
-  if (finalTraits) {
-    const partialTraits = cloneValue(finalTraits);
-    const definitions = new Map(
-      system.traits.map((trait) => [trait.id, trait] as const),
+/** The legacy trait id a non-registry stage reveals. */
+function legacyTraitIdFor(stage: BatchStage): string | null {
+  switch (stage.type) {
+    case "registry":
+      return null;
+    case "accessory":
+      return "accessories";
+    case "scar":
+      return "scars";
+    case "tortie-sub":
+      return "tortie";
+    case "simple":
+      if (stage.param === "peltName") return "pelt";
+      if (stage.param === "poseName") return "pose";
+      return stage.param;
+  }
+}
+
+function legacyStageTraitIds(stages: BatchStage[]): Set<string> {
+  const ids = new Set<string>();
+  for (const stage of stages) {
+    const id = legacyTraitIdFor(stage);
+    if (id !== null) ids.add(id);
+  }
+  return ids;
+}
+
+type TraitDefinitions = Map<string, AnyCatTraitDefinition>;
+
+/** Legacy traits follow the flat params: staged ones always, the rest only when present. */
+function applyLegacyPartialTraits(
+  partialTraits: Record<string, unknown>,
+  params: Record<string, unknown>,
+  system: CatSystemDefinition,
+  definitions: TraitDefinitions,
+  legacyIds: Set<string>,
+): void {
+  for (const traitId of legacyIds) {
+    const definition = definitions.get(traitId);
+    if (!definition) continue;
+    setPartialTrait(
+      partialTraits,
+      traitId,
+      normalizePartialTraitValue(
+        definition,
+        readLegacyTraitValue(params, definition),
+      ),
     );
-
-    // Keep the canonical envelope in lockstep with the established flat
-    // reveal. This prevents the renderer from seeing final values early.
-    const legacyStageTraitIds = new Set<string>();
-    for (const stage of stages) {
-      if (stage.type === "registry") continue;
-      if (stage.type === "accessory") legacyStageTraitIds.add("accessories");
-      else if (stage.type === "scar") legacyStageTraitIds.add("scars");
-      else if (stage.type === "tortie-sub") legacyStageTraitIds.add("tortie");
-      else if (stage.param === "peltName") legacyStageTraitIds.add("pelt");
-      else if (stage.param === "poseName") legacyStageTraitIds.add("pose");
-      else legacyStageTraitIds.add(stage.param);
-    }
-    for (const traitId of legacyStageTraitIds) {
-      const definition = definitions.get(traitId);
-      if (!definition) continue;
+  }
+  for (const definition of system.traits) {
+    if (legacyIds.has(definition.id)) continue;
+    const current = readLegacyTraitValue(params, definition);
+    if (current.present) {
       setPartialTrait(
         partialTraits,
-        traitId,
-        normalizePartialTraitValue(
-          definition,
-          readLegacyTraitValue(params, definition),
-        ),
+        definition.id,
+        normalizePartialTraitValue(definition, current),
       );
     }
-    for (const definition of system.traits) {
-      if (legacyStageTraitIds.has(definition.id)) continue;
-      const current = readLegacyTraitValue(params, definition);
-      if (current.present) {
-        setPartialTrait(
-          partialTraits,
-          definition.id,
-          normalizePartialTraitValue(definition, current),
-        );
-      }
+  }
+  if (legacyIds.has("pelt")) {
+    if (typeof params.coatPattern === "string") {
+      partialTraits.coatPattern = params.coatPattern;
+    } else {
+      delete partialTraits.coatPattern;
     }
-    if (legacyStageTraitIds.has("pelt")) {
-      if (typeof params.coatPattern === "string") {
-        partialTraits.coatPattern = params.coatPattern;
-      } else {
-        delete partialTraits.coatPattern;
-      }
-    }
+  }
+}
 
-    for (const stage of stages) {
-      if (stage.type !== "registry") continue;
-      const definition = definitions.get(stage.traitId);
-      if (!definition) continue;
-      const current =
-        genericValues.get(stage.traitId) ?? hiddenTraitValue(definition);
-      setPartialTrait(partialTraits, stage.traitId, current);
-      writeLegacyTraitValue(params, definition, current);
-    }
+/** Registry traits: the revealed value, or the hidden default, in both envelopes. */
+function applyRegistryPartialTraits(
+  partialTraits: Record<string, unknown>,
+  params: Record<string, unknown>,
+  stages: BatchStage[],
+  definitions: TraitDefinitions,
+  genericValues: Map<string, PartialTraitValue>,
+): void {
+  for (const stage of stages) {
+    if (stage.type !== "registry") continue;
+    const definition = definitions.get(stage.traitId);
+    if (!definition) continue;
+    const current =
+      genericValues.get(stage.traitId) ?? hiddenTraitValue(definition);
+    setPartialTrait(partialTraits, stage.traitId, current);
+    writeLegacyTraitValue(params, definition, current);
+  }
+}
 
-    params.schemaVersion =
-      typeof finalParams.schemaVersion === "number"
-        ? finalParams.schemaVersion
-        : system.schemaVersion;
-    params.traits = partialTraits;
-    if (finalParams.unknownTraits !== undefined) {
-      params.unknownTraits = cloneValue(finalParams.unknownTraits);
-    }
+interface PartialTraitsArgs {
+  finalParams: Record<string, unknown>;
+  finalTraits: Record<string, unknown>;
+  stages: BatchStage[];
+  genericValues: Map<string, PartialTraitValue>;
+  system: CatSystemDefinition;
+}
+
+/**
+ * Keeps the canonical envelope in lockstep with the established flat
+ * reveal. This prevents the renderer from seeing final values early.
+ */
+function attachPartialTraits(
+  params: Record<string, unknown>,
+  {
+    finalParams,
+    finalTraits,
+    stages,
+    genericValues,
+    system,
+  }: PartialTraitsArgs,
+): void {
+  const partialTraits = cloneValue(finalTraits);
+  const definitions: TraitDefinitions = new Map(
+    system.traits.map((trait) => [trait.id, trait] as const),
+  );
+  const legacyIds = legacyStageTraitIds(stages);
+  applyLegacyPartialTraits(
+    partialTraits,
+    params,
+    system,
+    definitions,
+    legacyIds,
+  );
+  applyRegistryPartialTraits(
+    partialTraits,
+    params,
+    stages,
+    definitions,
+    genericValues,
+  );
+  params.schemaVersion =
+    typeof finalParams.schemaVersion === "number"
+      ? finalParams.schemaVersion
+      : system.schemaVersion;
+  params.traits = partialTraits;
+  if (finalParams.unknownTraits !== undefined) {
+    params.unknownTraits = cloneValue(finalParams.unknownTraits);
+  }
+}
+
+/**
+ * Render params for a cat with stages 0..revealedThrough applied
+ * (revealedThrough = -1 renders the unrevealed base kit). Mirrors the
+ * adoption generator's buildInitialState/applyStageValue/buildRenderParams.
+ */
+export function buildPartialBatchParams(
+  cat: BatchStreamCat,
+  stages: BatchStage[],
+  revealedThrough: number,
+  placeholders: BatchTortiePlaceholders = BATCH_TORTIE_PLACEHOLDER_FALLBACK,
+  system: CatSystemDefinition = catSystem,
+): CatParams {
+  const finalParams = cat.catData.params as unknown as Record<string, unknown>;
+  const finalTraits = canonicalTraits(cat, system);
+
+  // Everything revealed → render the real params untouched.
+  if (revealedThrough >= stages.length - 1) {
+    return cat.catData.params;
+  }
+
+  const reveal = collectReveal(
+    cat,
+    stages,
+    revealedThrough,
+    finalParams,
+    finalTraits,
+  );
+  const tortie = revealedTortieLayers(cat, reveal.tortieRevealed, placeholders);
+  const params = flatPartialParams(reveal, finalParams, tortie);
+  if (finalTraits) {
+    attachPartialTraits(params, {
+      finalParams,
+      finalTraits,
+      stages,
+      genericValues: reveal.genericValues,
+      system,
+    });
   }
   return params as unknown as CatParams;
 }

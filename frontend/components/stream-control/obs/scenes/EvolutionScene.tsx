@@ -40,7 +40,11 @@ import type {
   EvolutionStreamCat,
   EvolutionStreamCommand,
 } from "@/lib/evolution/streamEvolution";
-import { type LineageReveal, useLineageCeremony } from "../looks/ceremony";
+import {
+  type LineageReveal,
+  type LineageRoll,
+  useLineageCeremony,
+} from "../looks/ceremony";
 import { LOOK_CHROME, LOOK_ERUPTS_IN_MATERIAL } from "../looks/LookBoardProps";
 import { buildLineageModel } from "../looks/lineageModel";
 import type { ShowLookId } from "../looks/lookMeta";
@@ -88,6 +92,104 @@ function additionAnchorId(addition: EvolutionAddition): string {
 }
 
 const CANVAS_MID_X = OBS_CANVAS_WIDTH / 2;
+
+/** Index of the cat a ceremony step is on: the kit for summon, -1 outside a cat. */
+function activeStepIndex(step: LineageReveal["step"]): number {
+  if (step.kind === "summon") return 0;
+  if ("index" in step) return step.index;
+  return -1;
+}
+
+/** Leader line origin: the plaque edge facing the canvas centre. */
+function lineOriginFor(plaqueRect: Rect | null): Point | null {
+  if (!plaqueRect) return null;
+  const onRight = plaqueRect.x + plaqueRect.width / 2 > CANVAS_MID_X;
+  return {
+    x: onRight ? plaqueRect.x : plaqueRect.x + plaqueRect.width,
+    y: plaqueRect.y + plaqueRect.height / 2,
+  };
+}
+
+/** The addition the current roll lands on the active cat; null outside a roll. */
+function landedAdditionFor(
+  roll: LineageRoll | null,
+  cat: EvolutionStreamCat | null,
+): EvolutionAddition | null {
+  if (!roll || !cat) return null;
+  return cat.additions[roll.index];
+}
+
+/** One leader target on the active cat once its rect is measured. */
+function leaderTargetsFor(
+  activeKey: string | null,
+  rect: Rect | undefined,
+  anchor: Point | null,
+): LeaderTarget[] {
+  if (!activeKey || !rect) return [];
+  return [{ id: activeKey, rect, anchor }];
+}
+
+type PlaqueText = Pick<PlaqueModel, "title" | "status">;
+
+function rollPlaqueText(roll: LineageRoll | null): PlaqueText {
+  if (roll?.phase === "land" && roll.valueLabel) {
+    // Name the value the moment it lands, with the confetti and the line.
+    return { title: roll.valueLabel, status: "landed" };
+  }
+  const title = roll?.traitLabel ?? "";
+  if (roll && roll.count > 1) {
+    return {
+      title,
+      status: `rolling · ${(roll.index + 1).toString()} of ${roll.count.toString()}`,
+    };
+  }
+  return { title, status: "rolling…" };
+}
+
+interface EvolutionPlaqueInput {
+  stepKind: LineageReveal["step"]["kind"];
+  roll: LineageRoll | null;
+  activeBranch: string | null;
+  landedValues: readonly string[];
+  held: boolean;
+  /** Level of the active cat (1 when there is none). */
+  activeLevel: number;
+  totalCount: number;
+}
+
+/** Plaque title/status per ceremony step (never numerals). */
+function evolutionPlaqueModel(input: EvolutionPlaqueInput): PlaqueModel {
+  let text: PlaqueText = { title: "", status: "" };
+  switch (input.stepKind) {
+    case "summon":
+      text = { title: "THE KIT", status: "StarClan has plans for this one…" };
+      break;
+    case "banner":
+      text = { title: input.activeBranch ?? "", status: "a new line begins" };
+      break;
+    case "roll":
+      text = rollPlaqueText(input.roll);
+      break;
+    case "reveal":
+      text = {
+        title: input.landedValues.length
+          ? input.landedValues.join(" · ")
+          : "NOTHING CHANGED",
+        status: `RISEN TO ${stageRank(input.activeLevel).toUpperCase()}`,
+      };
+      break;
+    case "finale":
+      text = {
+        title: "COMPLETE",
+        status: `${input.totalCount.toString()} cats`,
+      };
+      break;
+    case "done":
+      break;
+  }
+  const status = input.held ? "HELD · say the word" : text.status;
+  return { title: text.title, status, tally: [], numerals: null };
+}
 
 /** Reduced motion: every look animation inside the wrapper collapses to its end state. */
 const FRAME_STYLES = `
@@ -151,8 +253,7 @@ export function EvolutionShowFrame({
 
   const step = reveal.step;
   const roll = reveal.roll;
-  const activeIndex =
-    step.kind === "summon" ? 0 : "index" in step ? step.index : -1;
+  const activeIndex = activeStepIndex(step);
   const activeCat = activeIndex >= 0 ? (cats[activeIndex] ?? null) : null;
   // Measure per frame only while something lands or enters (land phase,
   // reveal): that is when the leader line and the confetti origin need the
@@ -194,76 +295,37 @@ export function EvolutionShowFrame({
     landedParams?.poseName ?? DEFAULT_POSE_NAME,
     Boolean(landedParams?.reverse),
   );
-  const addition = roll && activeCat ? activeCat.additions[roll.index] : null;
+  const addition = landedAdditionFor(roll, activeCat);
   const anchor =
     anchors && addition
       ? (anchors.points[anchorForParam(additionAnchorId(addition))] ?? null)
       : null;
 
-  const plaqueModel = useMemo<PlaqueModel>(() => {
-    let title = "";
-    let status = "";
-    switch (step.kind) {
-      case "summon":
-        title = "THE KIT";
-        status = "StarClan has plans for this one…";
-        break;
-      case "banner":
-        title = reveal.activeBranch ?? "";
-        status = "a new line begins";
-        break;
-      case "roll":
-        if (roll?.phase === "land" && roll.valueLabel) {
-          // Name the value the moment it lands, with the confetti and the line.
-          title = roll.valueLabel;
-          status = "landed";
-        } else {
-          title = roll?.traitLabel ?? "";
-          status =
-            roll && roll.count > 1
-              ? `rolling · ${(roll.index + 1).toString()} of ${roll.count.toString()}`
-              : "rolling…";
-        }
-        break;
-      case "reveal":
-        title = reveal.landedValues.length
-          ? reveal.landedValues.join(" · ")
-          : "NOTHING CHANGED";
-        status = `RISEN TO ${stageRank(activeCat?.level ?? 1).toUpperCase()}`;
-        break;
-      case "finale":
-        title = "COMPLETE";
-        status = `${totalCount.toString()} cats`;
-        break;
-      case "done":
-        break;
-    }
-    if (reveal.held) status = "HELD · say the word";
-    return { title, status, tally: [], numerals: null };
-  }, [
-    step.kind,
-    roll,
-    reveal.activeBranch,
-    reveal.landedValues,
-    reveal.held,
-    activeCat,
-    totalCount,
-  ]);
+  const plaqueModel = useMemo<PlaqueModel>(
+    () =>
+      evolutionPlaqueModel({
+        stepKind: step.kind,
+        roll,
+        activeBranch: reveal.activeBranch,
+        landedValues: reveal.landedValues,
+        held: reveal.held,
+        activeLevel: activeCat?.level ?? 1,
+        totalCount,
+      }),
+    [
+      step.kind,
+      roll,
+      reveal.activeBranch,
+      reveal.landedValues,
+      reveal.held,
+      activeCat,
+      totalCount,
+    ],
+  );
 
-  const lineFrom: Point | null = plaqueRect
-    ? {
-        x:
-          plaqueRect.x + plaqueRect.width / 2 > CANVAS_MID_X
-            ? plaqueRect.x
-            : plaqueRect.x + plaqueRect.width,
-        y: plaqueRect.y + plaqueRect.height / 2,
-      }
-    : null;
+  const lineFrom = lineOriginFor(plaqueRect);
   const targetRect = reveal.activeKey ? rects.get(reveal.activeKey) : undefined;
-  const lineTargets: LeaderTarget[] =
-    targetRect && reveal.activeKey
-      ? [{ id: reveal.activeKey, rect: targetRect, anchor }]
-      : [];
+  const lineTargets = leaderTargetsFor(reveal.activeKey, targetRect, anchor);
   const linesVisible = roll?.phase === "land" || step.kind === "reveal";
   const entranceKey = `${reveal.activeKey ?? ""}:${roll ? roll.index.toString() : "r"}`;
 
@@ -449,7 +511,7 @@ export function EvolutionScene({
       return {
         candidates: urls.slice(0, candidates.length),
         landed:
-          urls.length === descriptors.length ? urls[urls.length - 1] : null,
+          urls.length === descriptors.length ? (urls.at(-1) ?? null) : null,
       };
     },
     [command, pools],

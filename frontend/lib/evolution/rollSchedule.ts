@@ -128,18 +128,21 @@ export function stepAt(
   schedule: CeremonySchedule,
   elapsedMs: number,
 ): ScheduledStep {
-  if (elapsedMs >= schedule.totalMs) {
-    return {
-      step: { kind: "done" },
-      startMs: schedule.totalMs,
-      endMs: Number.POSITIVE_INFINITY,
-    };
-  }
+  if (elapsedMs >= schedule.totalMs) return doneStep(schedule);
   for (const scheduled of schedule.steps) {
     if (elapsedMs < scheduled.endMs) return scheduled;
   }
   // Unreachable for a well-formed schedule; keep the type honest.
-  return schedule.steps[schedule.steps.length - 1];
+  return schedule.steps.at(-1) ?? doneStep(schedule);
+}
+
+/** The implicit "done" step from the end of the schedule on. */
+function doneStep(schedule: CeremonySchedule): ScheduledStep {
+  return {
+    step: { kind: "done" },
+    startMs: schedule.totalMs,
+    endMs: Number.POSITIVE_INFINITY,
+  };
 }
 
 function findRoll(
@@ -206,7 +209,7 @@ export interface RollPhaseState {
  */
 export function rollFrameTimes(strobeMs: number): number[] {
   const starts: number[] = [];
-  if (!(strobeMs > 0)) return starts;
+  if (strobeMs <= 0) return starts;
   const { spinupFrac, cruiseFrac, frameFast, frameSlowStart, frameSlowEnd } =
     CEREMONY_MS;
   const slowdownStart = spinupFrac + cruiseFrac;
@@ -260,19 +263,20 @@ export function rollPhaseAt(
       frameCount,
     };
   }
-  const frac = elapsed / strobeMs;
-  const phase: RollPhase =
-    frac < CEREMONY_MS.spinupFrac
-      ? "spinup"
-      : frac < CEREMONY_MS.spinupFrac + CEREMONY_MS.cruiseFrac
-        ? "cruise"
-        : "slowdown";
+  const phase = strobePhaseAt(elapsed / strobeMs);
   let frameIndex = 0;
   for (let i = 0; i < frameTimes.length; i += 1) {
     if (frameTimes[i] <= elapsed) frameIndex = i;
     else break;
   }
   return { phase, progress, frameIndex, frameCount };
+}
+
+/** Strobe phase at `frac` of the strobe span: spinup < 15 %, cruise < 60 %, slowdown after. */
+function strobePhaseAt(frac: number): RollPhase {
+  if (frac < CEREMONY_MS.spinupFrac) return "spinup";
+  if (frac < CEREMONY_MS.spinupFrac + CEREMONY_MS.cruiseFrac) return "cruise";
+  return "slowdown";
 }
 
 /** mulberry32. */
@@ -296,7 +300,7 @@ export function rollSeed(
   const text = `${seq.toString()}:${catKey}:${addition.toString()}`;
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i += 1) {
-    hash ^= text.charCodeAt(i);
+    hash ^= text.codePointAt(i) ?? 0;
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return hash >>> 0;

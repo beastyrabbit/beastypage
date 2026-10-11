@@ -153,42 +153,67 @@ function splitStage(survivors: readonly StageCatInput[]): StageSplit {
   return { changedIds, unchangedIds, groups, rareIds };
 }
 
-export function buildStageBeats(
-  survivors: readonly StageCatInput[],
-  _stage: BatchStage,
-  options?: { reducedMotion?: boolean },
-): StageTimeline {
-  const { changedIds, unchangedIds, groups, rareIds } = splitStage(survivors);
-  const reduced = Boolean(options?.reducedMotion);
-  const changedCount = changedIds.length;
-  const quick = changedCount > 0 && changedCount <= BATCH_BEAT_MS.quickMax;
-  const zero = changedCount === 0;
+/** How the deal paces a stage: nothing changed, a quick roll (≤ 3 changed) or the full deal. */
+type StagePace = "zero" | "quick" | "full";
 
-  const windupMs = reduced
-    ? 0
-    : zero
-      ? BATCH_BEAT_MS.windupZero
-      : quick
-        ? BATCH_BEAT_MS.windupQuick
-        : BATCH_BEAT_MS.windup;
-  const holdMs = reduced
-    ? BATCH_BEAT_MS.holdReduced
-    : zero
-      ? BATCH_BEAT_MS.holdZero
-      : quick
-        ? BATCH_BEAT_MS.holdQuick
-        : BATCH_BEAT_MS.holdAfter;
-  const step = quick
-    ? BATCH_BEAT_MS.stepQuick
-    : Math.min(
-        BATCH_BEAT_MS.stepMax,
-        Math.max(
-          BATCH_BEAT_MS.stepMin,
-          Math.round(BATCH_BEAT_MS.stepBudget / Math.max(1, changedCount)),
-        ),
-      );
-  const gap = quick ? 0 : BATCH_BEAT_MS.groupGap;
+function stagePace(changedCount: number): StagePace {
+  if (changedCount === 0) return "zero";
+  if (changedCount <= BATCH_BEAT_MS.quickMax) return "quick";
+  return "full";
+}
 
+const WINDUP_MS: Record<StagePace, number> = {
+  zero: BATCH_BEAT_MS.windupZero,
+  quick: BATCH_BEAT_MS.windupQuick,
+  full: BATCH_BEAT_MS.windup,
+};
+
+const HOLD_MS: Record<StagePace, number> = {
+  zero: BATCH_BEAT_MS.holdZero,
+  quick: BATCH_BEAT_MS.holdQuick,
+  full: BATCH_BEAT_MS.holdAfter,
+};
+
+/** Landing step inside a group: fixed for a quick roll, else the budget split over the changed cats. */
+function stepMs(changedCount: number, quick: boolean): number {
+  if (quick) return BATCH_BEAT_MS.stepQuick;
+  return Math.min(
+    BATCH_BEAT_MS.stepMax,
+    Math.max(
+      BATCH_BEAT_MS.stepMin,
+      Math.round(BATCH_BEAT_MS.stepBudget / Math.max(1, changedCount)),
+    ),
+  );
+}
+
+/** Extra beat before the last of ≥ 2 groups when it is small; a quick roll skips it. */
+function preLastHoldMs(
+  groups: readonly BatchBeatGroup[],
+  index: number,
+  quick: boolean,
+): number {
+  const isLast = index === groups.length - 1;
+  if (quick || !isLast || groups.length < 2) return 0;
+  return groups[index].catIds.length <= BATCH_BEAT_MS.preLastMax
+    ? BATCH_BEAT_MS.preLastHold
+    : 0;
+}
+
+interface DealPace {
+  windupMs: number;
+  step: number;
+  gap: number;
+  quick: boolean;
+  reduced: boolean;
+}
+
+/** When every survivor lands: unchanged cats at the windup, then the groups in order. */
+function scheduleLandings(
+  unchangedIds: readonly string[],
+  groups: readonly BatchBeatGroup[],
+  pace: DealPace,
+): { landAt: Map<string, number>; order: string[]; lastLanding: number } {
+  const { windupMs, step, gap, quick, reduced } = pace;
   const landAt = new Map<string, number>();
   const order: string[] = [];
   for (const id of unchangedIds) {
@@ -197,18 +222,14 @@ export function buildStageBeats(
   }
   let lastLanding = windupMs;
   groups.forEach((group, index) => {
-    const isLast = index === groups.length - 1;
-    const preLast =
-      !quick &&
-      isLast &&
-      groups.length >= 2 &&
-      group.catIds.length <= BATCH_BEAT_MS.preLastMax
-        ? BATCH_BEAT_MS.preLastHold
-        : 0;
     // The gap is measured from the previous group's last landing and is
     // never shorter than a step, so a quick roll (gap 0) stays sequential.
     const start =
-      index === 0 ? windupMs : lastLanding + Math.max(gap, step) + preLast;
+      index === 0
+        ? windupMs
+        : lastLanding +
+          Math.max(gap, step) +
+          preLastHoldMs(groups, index, quick);
     group.catIds.forEach((id, j) => {
       const at = reduced ? 0 : start + j * step;
       landAt.set(id, at);
@@ -216,6 +237,30 @@ export function buildStageBeats(
       lastLanding = at;
     });
   });
+  return { landAt, order, lastLanding };
+}
+
+export function buildStageBeats(
+  survivors: readonly StageCatInput[],
+  _stage: BatchStage,
+  options?: { reducedMotion?: boolean },
+): StageTimeline {
+  const { changedIds, unchangedIds, groups, rareIds } = splitStage(survivors);
+  const reduced = Boolean(options?.reducedMotion);
+  const changedCount = changedIds.length;
+  const pace = stagePace(changedCount);
+  const quick = pace === "quick";
+
+  const windupMs = reduced ? 0 : WINDUP_MS[pace];
+  const holdMs = reduced ? BATCH_BEAT_MS.holdReduced : HOLD_MS[pace];
+  const step = stepMs(changedCount, quick);
+  const gap = quick ? 0 : BATCH_BEAT_MS.groupGap;
+
+  const { landAt, order, lastLanding } = scheduleLandings(
+    unchangedIds,
+    groups,
+    { windupMs, step, gap, quick, reduced },
+  );
   const holdFromMs = reduced ? 0 : lastLanding;
   return {
     windupMs,

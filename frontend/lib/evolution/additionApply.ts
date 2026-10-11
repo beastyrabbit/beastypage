@@ -51,7 +51,7 @@ export function applyAdditionsParams(
 export function rollParentFor<T extends { level: number; catData: unknown }>(
   cats: readonly T[],
   index: number,
-): unknown | null {
+): unknown {
   const cat = cats[index];
   if (!cat) return null;
   const parent = cat.level <= 1 ? cats[0] : cats[index - 1];
@@ -91,7 +91,7 @@ const WILD_OPEN_CHANCE = 0.5;
 function cleanString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  return trimmed ? trimmed : null;
+  return trimmed || null;
 }
 
 function uniqueClean(values: readonly unknown[]): string[] {
@@ -118,11 +118,11 @@ function documentToParams(document: CatDocument): CatParams {
   return {
     ...legacy,
     schemaVersion: document.schemaVersion,
-    traits: JSON.parse(JSON.stringify(document.traits)),
+    traits: structuredClone(document.traits),
     // readCatDocument yields `unknownTraits: {}`; the generator's projection
     // omits an empty one, so candidates must too or they differ from base.
     ...(document.unknownTraits && Object.keys(document.unknownTraits).length > 0
-      ? { unknownTraits: JSON.parse(JSON.stringify(document.unknownTraits)) }
+      ? { unknownTraits: structuredClone(document.unknownTraits) }
       : {}),
   } as unknown as CatParams;
 }
@@ -137,6 +137,50 @@ function tortieKey(layer: TortieLayer): string {
   return [layer.mask, layer.pattern, layer.colour]
     .map((part) => (part ?? "").toUpperCase())
     .join("/");
+}
+
+/** Coat roll: the short-hair poses minus the base's own (never long hair), as full params. */
+function coatRollCandidates(base: CatParams, count: number): CatParams[] {
+  const basePose = base.poseName ?? null;
+  const poses = COAT_ROLL_POSES.filter(
+    (pose) => pose !== basePose && pose !== LONG_HAIR_POSE,
+  );
+  return poses.slice(0, count).map((poseName) => ({
+    ...base,
+    poseName,
+    spriteNumber: legacySpriteNumberForPoseName(poseName) ?? base.spriteNumber,
+    ...(base.traits ? { traits: { ...base.traits, pose: poseName } } : {}),
+  }));
+}
+
+/**
+ * Tortie colour picker: the clan palette (+ base colours) when `archetype`
+ * has one — wild clans open up to the full pool half the time — else the
+ * full pool.
+ */
+function tortieColourPicker(
+  pools: EvolutionPools,
+  archetype: string | null | undefined,
+  random: () => number,
+): () => string | null {
+  const fullColours = uniqueClean([
+    ...pools.baseColours,
+    ...pools.experimentalColours,
+  ]);
+  const clanAssigned = archetype
+    ? pools.clanColours?.[archetype as EvolutionArchetype]
+    : undefined;
+  const clanColours =
+    clanAssigned && clanAssigned.length > 0
+      ? uniqueClean([...clanAssigned, ...pools.baseColours])
+      : null;
+  const wild = archetype ? WILD_ARCHETYPE_SET.has(archetype) : false;
+  return () => {
+    if (!clanColours) return pickOne(fullColours, random);
+    if (wild && random() < WILD_OPEN_CHANCE)
+      return pickOne(fullColours, random);
+    return pickOne(clanColours, random);
+  };
 }
 
 /**
@@ -157,39 +201,10 @@ export function rollCandidates(
 ): CatParams[] {
   if (addition.kind === "trait") return [];
 
-  if (addition.kind === "coat") {
-    const basePose = base.poseName ?? null;
-    const poses = COAT_ROLL_POSES.filter(
-      (pose) => pose !== basePose && pose !== LONG_HAIR_POSE,
-    );
-    return poses.slice(0, count).map((poseName) => ({
-      ...base,
-      poseName,
-      spriteNumber:
-        legacySpriteNumberForPoseName(poseName) ?? base.spriteNumber,
-      ...(base.traits ? { traits: { ...base.traits, pose: poseName } } : {}),
-    }));
-  }
+  if (addition.kind === "coat") return coatRollCandidates(base, count);
 
   const parent = normalizeEvolutionStarter(base);
-  const fullColours = uniqueClean([
-    ...pools.baseColours,
-    ...pools.experimentalColours,
-  ]);
-  const clanAssigned = archetype
-    ? pools.clanColours?.[archetype as EvolutionArchetype]
-    : undefined;
-  const clanColours =
-    clanAssigned && clanAssigned.length > 0
-      ? uniqueClean([...clanAssigned, ...pools.baseColours])
-      : null;
-  const wild = archetype ? WILD_ARCHETYPE_SET.has(archetype) : false;
-  const teaseColour = () => {
-    if (!clanColours) return pickOne(fullColours, random);
-    if (wild && random() < WILD_OPEN_CHANCE)
-      return pickOne(fullColours, random);
-    return pickOne(clanColours, random);
-  };
+  const teaseColour = tortieColourPicker(pools, archetype, random);
   const randomLayer = (): TortieLayer | null => {
     const mask = pickOne(pools.tortieMasks, random);
     const pattern = pickOne(pools.tortiePatterns, random);

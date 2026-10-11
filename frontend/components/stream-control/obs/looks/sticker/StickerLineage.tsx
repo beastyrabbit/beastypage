@@ -368,15 +368,21 @@ function Slot({
           }}
         >
           {lineageRank(cat).toUpperCase()}
-          {roll?.valueLabel
-            ? ` · +${roll.valueLabel}`
-            : firstTag
-              ? ` · ${firstTag}`
-              : ""}
+          {rankSuffix(roll?.valueLabel, firstTag)}
         </div>
       ) : null}
     </div>
   );
+}
+
+/** Rank-line suffix: the value just landed, else the cat's first tag. */
+function rankSuffix(
+  valueLabel: string | null | undefined,
+  firstTag: string | undefined,
+): string {
+  if (valueLabel) return ` · +${valueLabel}`;
+  if (firstTag) return ` · ${firstTag}`;
+  return "";
 }
 
 function PlacedSticker({

@@ -121,7 +121,7 @@ export function ceremonyElapsedMs(
   seq: number,
   state: EvolutionLiveState | null | undefined,
 ): number {
-  const live = state && state.seq === seq ? state : null;
+  const live = state?.seq === seq ? state : null;
   const offset = live?.offsetMs ?? 0;
   const held =
     typeof live?.holdStartedAt === "number"
@@ -146,7 +146,7 @@ export function ceremonyPhaseForReload(
   state: EvolutionLiveState | null | undefined,
   now: number,
 ): "ceremony" | "tree" {
-  if (state && state.seq === seq && state.skipToBoard) return "tree";
+  if (state?.seq === seq && state.skipToBoard) return "tree";
   const elapsed = ceremonyElapsedMs(now, commandTimestamp, seq, state);
   return elapsed >= scheduleFor(command).totalMs ? "tree" : "ceremony";
 }

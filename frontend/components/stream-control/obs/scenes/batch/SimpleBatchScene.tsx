@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import type { ReactElement } from "react";
 import { cn } from "@/lib/utils";
 import { QrBadge } from "../../QrBadge";
 import { OBS_PANEL_STYLE } from "../../themes/panelStyle";
 import { packSquares } from "./batchLayout";
 import { BatchSprite } from "./batchShared";
-import type { BatchSceneViewProps } from "./batchView";
+import type { BatchSceneViewProps, BatchViewCat } from "./batchView";
 
 /** Inner size of the cat grid on the 1280×1080 canvas. */
 const GRID_WIDTH = 1280 - 64 - 32 - 4;
@@ -27,6 +28,71 @@ function catLabelColourClass(marked: boolean, potential: boolean): string {
   if (marked) return "text-red-300";
   if (potential) return "text-yellow-200";
   return "text-white/90";
+}
+
+/**
+ * Side column: the QR once the litter is saved, else the spotlight (one cat
+ * shown big beside the grid, never over it), else a hint.
+ */
+function sideColumn(
+  done: boolean,
+  qrUrl: string | null,
+  spotlight: BatchViewCat | null,
+): ReactElement {
+  if (done && qrUrl) {
+    return (
+      <div
+        className="flex shrink-0 flex-col items-center justify-center"
+        style={{ width: SIDE_WIDTH }}
+      >
+        <QrBadge url={qrUrl} label="Scan for the litter" size={185} />
+      </div>
+    );
+  }
+  if (spotlight) {
+    return (
+      <div
+        className="relative flex shrink-0 flex-col items-center justify-center rounded-3xl border-2 px-3 py-6"
+        style={{
+          width: SIDE_WIDTH,
+          background: "rgba(8, 8, 10, 0.94)",
+          borderColor: "rgba(56, 189, 248, 0.5)",
+          boxShadow: "0 0 50px rgba(56,189,248,0.2)",
+        }}
+      >
+        <span
+          className="obs-batch-num"
+          style={{ left: 14, top: 14, height: 44, fontSize: 24 }}
+        >
+          {spotlight.numberLabel}
+        </span>
+        {spotlight.previewUrl ? (
+          <Image
+            src={spotlight.previewUrl}
+            alt={spotlight.label}
+            width={270}
+            height={270}
+            unoptimized
+            className="image-render-pixel object-contain"
+            style={{ width: 270, height: 270 }}
+          />
+        ) : (
+          <div style={{ width: 270, height: 270 }} aria-hidden="true" />
+        )}
+        <span className="mt-2 max-w-full truncate text-2xl font-black text-white">
+          {spotlight.label}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-3xl border-2 border-dashed px-6 text-center font-mono text-sm text-white/35"
+      style={{ width: SIDE_WIDTH, borderColor: "rgba(255,255,255,0.12)" }}
+    >
+      {done ? "saving the litter…" : "show a cat to see it big"}
+    </div>
+  );
 }
 
 /**
@@ -148,56 +214,7 @@ export function SimpleBatchScene({ view }: Readonly<BatchSceneViewProps>) {
           ))}
         </div>
 
-        {/* Side column: the QR once the litter is saved, else the spotlight
-            (one cat shown big beside the grid, never over it). */}
-        {done && qrUrl ? (
-          <div
-            className="flex shrink-0 flex-col items-center justify-center"
-            style={{ width: SIDE_WIDTH }}
-          >
-            <QrBadge url={qrUrl} label="Scan for the litter" size={185} />
-          </div>
-        ) : spotlight ? (
-          <div
-            className="relative flex shrink-0 flex-col items-center justify-center rounded-3xl border-2 px-3 py-6"
-            style={{
-              width: SIDE_WIDTH,
-              background: "rgba(8, 8, 10, 0.94)",
-              borderColor: "rgba(56, 189, 248, 0.5)",
-              boxShadow: "0 0 50px rgba(56,189,248,0.2)",
-            }}
-          >
-            <span
-              className="obs-batch-num"
-              style={{ left: 14, top: 14, height: 44, fontSize: 24 }}
-            >
-              {spotlight.numberLabel}
-            </span>
-            {spotlight.previewUrl ? (
-              <Image
-                src={spotlight.previewUrl}
-                alt={spotlight.label}
-                width={270}
-                height={270}
-                unoptimized
-                className="image-render-pixel object-contain"
-                style={{ width: 270, height: 270 }}
-              />
-            ) : (
-              <div style={{ width: 270, height: 270 }} aria-hidden="true" />
-            )}
-            <span className="mt-2 max-w-full truncate text-2xl font-black text-white">
-              {spotlight.label}
-            </span>
-          </div>
-        ) : (
-          <div
-            className="flex shrink-0 items-center justify-center rounded-3xl border-2 border-dashed px-6 text-center font-mono text-sm text-white/35"
-            style={{ width: SIDE_WIDTH, borderColor: "rgba(255,255,255,0.12)" }}
-          >
-            {done ? "saving the litter…" : "show a cat to see it big"}
-          </div>
-        )}
+        {sideColumn(done, qrUrl, spotlight)}
       </div>
     </div>
   );

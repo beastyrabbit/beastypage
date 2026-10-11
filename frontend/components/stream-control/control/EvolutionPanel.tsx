@@ -52,7 +52,11 @@ import {
 import { cn } from "@/lib/utils";
 import type { ShowLookId } from "../obs/looks/lookMeta";
 import { useStreamControl } from "./context";
-import { evolutionLedger, pacingAvailable } from "./helpers";
+import {
+  type EvolutionLedger,
+  evolutionLedger,
+  pacingAvailable,
+} from "./helpers";
 import { useFollowGuard } from "./useFollowGuard";
 
 const CLAN_ORDER: EvolutionArchetype[] = [
@@ -126,10 +130,10 @@ const LEDGER_BUTTON =
 function SettingsFrame({
   live,
   children,
-}: {
+}: Readonly<{
   live: boolean;
   children: ReactNode;
-}) {
+}>) {
   if (!live) return <>{children}</>;
   return (
     <details className="group">
@@ -139,6 +143,45 @@ function SettingsFrame({
       <div className="mt-3">{children}</div>
     </details>
   );
+}
+
+/** Ms until a hold auto-releases; null when this show is not held. */
+function autoReleaseMsFor(
+  liveState: EvolutionLiveState | null,
+  seq: number,
+  now: number,
+): number | null {
+  if (liveState?.seq !== seq || typeof liveState.holdStartedAt !== "number")
+    return null;
+  return Math.max(0, EVOLUTION_HOLD_MAX_MS - (now - liveState.holdStartedAt));
+}
+
+/** Clock pill: the auto-release countdown while held, else time left or "board". */
+function ledgerClockLabel(
+  ledger: EvolutionLedger,
+  autoReleaseMs: number | null,
+): string {
+  if (ledger.held && autoReleaseMs !== null)
+    return `held · auto-release in ${formatDuration(autoReleaseMs / 1000)}`;
+  if (ledger.done) return "board";
+  return `${formatDuration(ledger.etaMs / 1000)} left`;
+}
+
+function holdButtonTitle(canPace: boolean, held: boolean): string {
+  if (!canPace) return "Classic chamber runs on its own clock";
+  return held ? "Resume the ceremony" : "Park the roll at its near miss";
+}
+
+function ledgerRows(ledger: EvolutionLedger): Array<[string, string]> {
+  const roll = ledger.roll
+    ? `${ledger.roll.index + 1}/${ledger.roll.count} · ${ledger.roll.traitLabel} · ${ledger.roll.phase}`
+    : "—";
+  return [
+    ["Step", ledger.stepLabel],
+    ["Branch", ledger.branch ?? "—"],
+    ["Rank", ledger.rank ?? "—"],
+    ["Roll", roll],
+  ];
 }
 
 /**
@@ -153,13 +196,13 @@ function EvolutionLedgerCard({
   showLook,
   commandBusy,
   endShow,
-}: {
+}: Readonly<{
   command: EvolutionStreamCommand & { seq: number; timestamp: number };
   liveState: EvolutionLiveState | null;
   showLook: ShowLookId;
   commandBusy: boolean;
   endShow: () => Promise<void>;
-}) {
+}>) {
   const holdEvolution = useMutation(api.catStream.holdEvolution);
   const releaseEvolution = useMutation(api.catStream.releaseEvolution);
   const revealEvolutionAt = useMutation(api.catStream.revealEvolutionAt);
@@ -172,14 +215,7 @@ function EvolutionLedgerCard({
   const ledger = evolutionLedger(command, liveState, now);
   const canPace = pacingAvailable(showLook);
   const { seq } = command;
-  const holdStartedAt =
-    liveState?.seq === seq && typeof liveState.holdStartedAt === "number"
-      ? liveState.holdStartedAt
-      : null;
-  const autoReleaseMs =
-    holdStartedAt === null
-      ? null
-      : Math.max(0, EVOLUTION_HOLD_MAX_MS - (now - holdStartedAt));
+  const autoReleaseMs = autoReleaseMsFor(liveState, seq, now);
   const report = (error: unknown, fallback: string) =>
     toast.error(error instanceof Error ? error.message : fallback);
   const handleHold = () => {
@@ -205,17 +241,7 @@ function EvolutionLedgerCard({
       report(error, "Failed to skip to the board"),
     );
   };
-  const rows: Array<[string, string]> = [
-    ["Step", ledger.stepLabel],
-    ["Branch", ledger.branch ?? "—"],
-    ["Rank", ledger.rank ?? "—"],
-    [
-      "Roll",
-      ledger.roll
-        ? `${ledger.roll.index + 1}/${ledger.roll.count} · ${ledger.roll.traitLabel} · ${ledger.roll.phase}`
-        : "—",
-    ],
-  ];
+  const rows = ledgerRows(ledger);
 
   return (
     <section
@@ -237,11 +263,7 @@ function EvolutionLedgerCard({
               : "border-border/40 text-muted-foreground",
           )}
         >
-          {ledger.held && autoReleaseMs !== null
-            ? `held · auto-release in ${formatDuration(autoReleaseMs / 1000)}`
-            : ledger.done
-              ? "board"
-              : `${formatDuration(ledger.etaMs / 1000)} left`}
+          {ledgerClockLabel(ledger, autoReleaseMs)}
         </span>
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
@@ -252,31 +274,18 @@ function EvolutionLedgerCard({
           </div>
         ))}
       </dl>
-      <div
-        className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted/40"
-        role="progressbar"
+      <progress
+        className="mt-3 block h-1.5 w-full appearance-none overflow-hidden rounded-full border-0 bg-muted/40 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-amber-500 [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-muted/40 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-amber-500 [&::-webkit-progress-value]:transition-[width] [&::-webkit-progress-value]:duration-300"
         aria-label="Ceremony progress"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={Math.round(ledger.progress * 100)}
-      >
-        <div
-          className="h-full rounded-full bg-amber-500 transition-[width] duration-300"
-          style={{ width: `${Math.round(ledger.progress * 100)}%` }}
-        />
-      </div>
+        max={100}
+        value={Math.round(ledger.progress * 100)}
+      />
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={handleHold}
           disabled={!canPace || ledger.done}
-          title={
-            canPace
-              ? ledger.held
-                ? "Resume the ceremony"
-                : "Park the roll at its near miss"
-              : "Classic chamber runs on its own clock"
-          }
+          title={holdButtonTitle(canPace, ledger.held)}
           className={cn(
             LEDGER_BUTTON,
             ledger.held

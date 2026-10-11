@@ -9,7 +9,10 @@ import {
   type BatchPhase,
   buildBatchBoardModel,
 } from "@/components/stream-control/obs/looks/batchModel";
-import { useLineageCeremony } from "@/components/stream-control/obs/looks/ceremony";
+import {
+  type LineageReveal,
+  useLineageCeremony,
+} from "@/components/stream-control/obs/looks/ceremony";
 import { ContactBatch } from "@/components/stream-control/obs/looks/contact/ContactBatch";
 import { HandheldBatch } from "@/components/stream-control/obs/looks/handheld/HandheldBatch";
 import {
@@ -34,6 +37,7 @@ import type {
 } from "@/lib/evolution/evolutionGenerator";
 import {
   buildCeremonySchedule,
+  type CeremonyStep,
   rollLandMs,
   scheduleCatsFromCommand,
 } from "@/lib/evolution/rollSchedule";
@@ -390,6 +394,123 @@ function stageChanges(
   return { changedIds, valueLabels };
 }
 
+/** Handle the simulation steps share: state, a cancel-aware push and wait. */
+interface SimRun {
+  state: BatchSim;
+  cancelled: boolean;
+  push(next: Partial<BatchSim>): void;
+  /** Resolves false once the effect was torn down. */
+  wait(ms: number): Promise<boolean>;
+}
+
+function createSimRun(emit: (state: BatchSim) => void): SimRun {
+  const run: SimRun = {
+    state: SIM_IDLE,
+    cancelled: false,
+    push(next) {
+      run.state = { ...run.state, ...next };
+      if (!run.cancelled) emit(run.state);
+    },
+    wait(ms) {
+      return new Promise((resolve) => {
+        setTimeout(() => resolve(!run.cancelled), ms);
+      });
+    },
+  };
+  return run;
+}
+
+/** Windup → deal (unchanged kits first, 120 ms apart) → hold → spotlight on every third stage. */
+async function simulateDeal(
+  run: SimRun,
+  alive: BatchStreamCat[],
+): Promise<boolean> {
+  const { changedIds, valueLabels } = stageChanges(
+    alive,
+    STAGES[run.state.stageIndex].id,
+  );
+  run.push({
+    phase: "revealing",
+    beat: "windup",
+    landedIds: [],
+    changedIds,
+    valueLabels,
+    markedId: null,
+    potentialIds: [],
+    pendingCullId: null,
+    verdictAt: null,
+    fadingId: null,
+  });
+  if (!(await run.wait(600))) return false;
+  const order = [
+    ...alive.filter((c) => !changedIds.includes(c.id)),
+    ...alive.filter((c) => changedIds.includes(c.id)),
+  ].map((c) => c.id);
+  run.push({ beat: "deal" });
+  for (const id of order) {
+    run.push({ landedIds: [...run.state.landedIds, id] });
+    if (!(await run.wait(120))) return false;
+  }
+  run.push({ beat: "hold" });
+  if (!(await run.wait(900))) return false;
+  const spotlightId =
+    run.state.stageIndex % 3 === 1 ? (alive[2]?.id ?? null) : null;
+  run.push({ spotlightId });
+  return true;
+}
+
+/** Awaiting (a marked + a potential kit) → verdict (3 s) → depart → repack. */
+async function simulateCull(
+  run: SimRun,
+  alive: BatchStreamCat[],
+): Promise<boolean> {
+  const victim = alive[alive.length - 1 - (run.state.stageIndex % 3)];
+  run.push({
+    phase: "awaitingCull",
+    beat: "awaiting",
+    markedId: victim?.id ?? null,
+    potentialIds: [alive[1]?.id ?? ""],
+  });
+  if (!(await run.wait(1500)) || !victim) return false;
+  run.push({
+    beat: "verdict",
+    pendingCullId: victim.id,
+    verdictAt: Date.now() + 3000,
+  });
+  if (!(await run.wait(3000))) return false;
+  run.push({
+    phase: "revealing",
+    beat: "depart",
+    eliminatedIds: [...run.state.eliminatedIds, victim.id],
+    fadingId: victim.id,
+    markedId: null,
+    potentialIds: [],
+    verdictAt: null,
+  });
+  if (!(await run.wait(1600))) return false;
+  run.push({ beat: "repack", fadingId: null, pendingCullId: null });
+  return run.wait(400);
+}
+
+/** Runs the stages in order; once enough kits left, the rest only deal. */
+async function runBatchSimulation(
+  run: SimRun,
+  cats: BatchStreamCat[],
+  culls: number,
+): Promise<void> {
+  while (!run.cancelled && run.state.stageIndex < STAGES.length) {
+    const alive = cats.filter((c) => !run.state.eliminatedIds.includes(c.id));
+    if (!(await simulateDeal(run, alive))) return;
+    if (run.state.eliminatedIds.length < culls) {
+      if (!(await simulateCull(run, alive))) return;
+    } else {
+      await run.wait(800);
+    }
+    run.push({ stageIndex: run.state.stageIndex + 1 });
+  }
+  run.push({ phase: "done", beat: "done", spotlightId: null });
+}
+
 /**
  * Drives a fake elimination show on a timer through the real beats: windup
  * → deal (landed ids 120 ms apart, unchanged first) → hold → awaiting (a
@@ -405,93 +526,10 @@ function useBatchSimulation(
   const [sim, setSim] = useState<BatchSim>(SIM_IDLE);
   useEffect(() => {
     if (!enabled) return;
-    const culls = Math.max(0, cats.length - finalCount);
-    let cancelled = false;
-    let state: BatchSim = SIM_IDLE;
-    const push = (next: Partial<BatchSim>) => {
-      state = { ...state, ...next };
-      if (!cancelled) setSim(state);
-    };
-    const wait = (ms: number) =>
-      new Promise<void>((resolve) => setTimeout(resolve, ms));
-    (async () => {
-      while (!cancelled && state.stageIndex < STAGES.length) {
-        const alive = cats.filter((c) => !state.eliminatedIds.includes(c.id));
-        const { changedIds, valueLabels } = stageChanges(
-          alive,
-          STAGES[state.stageIndex].id,
-        );
-        push({
-          phase: "revealing",
-          beat: "windup",
-          landedIds: [],
-          changedIds,
-          valueLabels,
-          markedId: null,
-          potentialIds: [],
-          pendingCullId: null,
-          verdictAt: null,
-          fadingId: null,
-        });
-        await wait(600);
-        if (cancelled) return;
-        const order = [
-          ...alive.filter((c) => !changedIds.includes(c.id)),
-          ...alive.filter((c) => changedIds.includes(c.id)),
-        ].map((c) => c.id);
-        push({ beat: "deal" });
-        for (const id of order) {
-          push({ landedIds: [...state.landedIds, id] });
-          await wait(120);
-          if (cancelled) return;
-        }
-        push({ beat: "hold" });
-        await wait(900);
-        if (cancelled) return;
-        push({
-          spotlightId:
-            state.stageIndex % 3 === 1 ? (alive[2]?.id ?? null) : null,
-        });
-        if (state.eliminatedIds.length < culls) {
-          const victim = alive[alive.length - 1 - (state.stageIndex % 3)];
-          push({
-            phase: "awaitingCull",
-            beat: "awaiting",
-            markedId: victim?.id ?? null,
-            potentialIds: [alive[1]?.id ?? ""],
-          });
-          await wait(1500);
-          if (cancelled || !victim) return;
-          push({
-            beat: "verdict",
-            pendingCullId: victim.id,
-            verdictAt: Date.now() + 3000,
-          });
-          await wait(3000);
-          if (cancelled) return;
-          push({
-            phase: "revealing",
-            beat: "depart",
-            eliminatedIds: [...state.eliminatedIds, victim.id],
-            fadingId: victim.id,
-            markedId: null,
-            potentialIds: [],
-            verdictAt: null,
-          });
-          await wait(1600);
-          if (cancelled) return;
-          push({ beat: "repack", fadingId: null, pendingCullId: null });
-          await wait(400);
-          if (cancelled) return;
-        } else {
-          await wait(800);
-        }
-        push({ stageIndex: state.stageIndex + 1 });
-      }
-      push({ phase: "done", beat: "done", spotlightId: null });
-    })();
+    const run = createSimRun(setSim);
+    void runBatchSimulation(run, cats, Math.max(0, cats.length - finalCount));
     return () => {
-      cancelled = true;
+      run.cancelled = true;
     };
   }, [enabled, cats, finalCount]);
   return sim;
@@ -746,6 +784,105 @@ function Toolbar({
   );
 }
 
+/** The live state hold=1 / offset= / skip=1 fake; null when none is set. */
+function harnessLiveState(
+  hold: boolean,
+  offsetMs: number,
+  skip: boolean,
+  mountTime: number,
+): EvolutionLiveState | null {
+  if (!hold && !offsetMs && !skip) return null;
+  const state: EvolutionLiveState = { seq: 1, offsetMs };
+  if (hold) state.holdStartedAt = mountTime + 1;
+  if (skip) state.skipToBoard = true;
+  return state;
+}
+
+/** Roll frames without a renderer: 12 random composites + a landed one, kept per cat:addition. */
+function useLandedFrames(command: EvolutionStreamCommand) {
+  const [landedFrames, setLandedFrames] = useState<ReadonlyMap<string, string>>(
+    () => new Map(),
+  );
+  const requestRollFrames = useCallback(
+    async (catIndex: number, addition: number, seed: number) => {
+      const candidates = await Promise.all(
+        Array.from({ length: 12 }, (_, k) => composeCat(seed + k, false)),
+      );
+      const landed = await composeCat(seed + 99, false);
+      const key = `${command.cats[catIndex]?.key ?? catIndex.toString()}:${addition.toString()}`;
+      setLandedFrames((previous) => new Map(previous).set(key, landed));
+      return { candidates, landed };
+    },
+    [command],
+  );
+  return { landedFrames, requestRollFrames };
+}
+
+/** Ceremony cats: each kit's sprite plus its parent's (the root shows its own). */
+function ceremonyCats(command: EvolutionStreamCommand, sprites: Sprites) {
+  return command.cats.map((cat, i) => ({
+    key: cat.key,
+    label: cat.label,
+    level: cat.level,
+    branchLabel: cat.branchLabel,
+    archetype: cat.archetype,
+    previewUrl: sprites[i] ?? null,
+    parentUrl: sprites[cat.level <= 1 ? 0 : i - 1] ?? null,
+    additions: cat.additions,
+  }));
+}
+
+/** The cat a ceremony step is on: the summon shows the first, the board none. */
+function activeCatIndex(step: CeremonyStep): number {
+  if ("index" in step) return step.index;
+  return step.kind === "summon" ? 0 : -1;
+}
+
+/** The landed frame the active roll must never show before its land ms. */
+function landedFrameFor(
+  frames: ReadonlyMap<string, string>,
+  reveal: LineageReveal,
+): string | null {
+  if (!reveal.roll || !reveal.activeKey) return null;
+  return (
+    frames.get(`${reveal.activeKey}:${reveal.roll.index.toString()}`) ?? null
+  );
+}
+
+/** Land ms of the active roll, once the ceremony is on a cat. */
+function activeRollLandMs(
+  schedule: ReturnType<typeof buildCeremonySchedule>,
+  activeIndex: number,
+  roll: LineageReveal["roll"],
+): number | null {
+  if (!roll || activeIndex < 0) return null;
+  return rollLandMs(schedule, activeIndex, roll.index);
+}
+
+/** The batch board: the running simulation under auto=1, else the static frame the URL asks for. */
+function batchBoardModel(
+  p: HarnessParams,
+  poolCats: BatchStreamCat[],
+  sprites: Sprites,
+  sim: BatchSim,
+  mountTime: number,
+): BatchBoardModel {
+  if (p.auto) return simulatedBoard(poolCats, sprites, p.finalCount, sim);
+  const verdictEndsAt =
+    p.verdictSeconds !== null ? mountTime + p.verdictSeconds * 1000 : null;
+  return staticBoard(poolCats, sprites, p, verdictEndsAt);
+}
+
+/** The current query with `overrides` applied. */
+function withParams(
+  current: { toString(): string },
+  overrides: Record<string, string>,
+): string {
+  const next = new URLSearchParams(current.toString());
+  for (const [key, value] of Object.entries(overrides)) next.set(key, value);
+  return `?${next.toString()}`;
+}
+
 export function LookPreviewClient() {
   const searchParams = useSearchParams();
   const p = useHarnessParams();
@@ -764,51 +901,19 @@ export function LookPreviewClient() {
 
   // The ceremony clock runs from mount; `t=` freezes it, `hold=1` holds it.
   const [mountTime] = useState(() => Date.now());
-  const liveState: EvolutionLiveState | null = useMemo(
-    () =>
-      p.hold || p.offsetMs || p.skip
-        ? {
-            seq: 1,
-            offsetMs: p.offsetMs,
-            ...(p.hold ? { holdStartedAt: mountTime + 1 } : {}),
-            ...(p.skip ? { skipToBoard: true } : {}),
-          }
-        : null,
+  const liveState = useMemo(
+    () => harnessLiveState(p.hold, p.offsetMs, p.skip, mountTime),
     [p.hold, p.offsetMs, p.skip, mountTime],
   );
   const [finished, setFinished] = useState(p.skip);
   const finish = useCallback(() => setFinished(true), []);
   const ceremonyRunning = scene === "ceremony" && !finished;
 
-  // Roll frames without a renderer: 12 random composites + a landed one.
-  const landedRef = useRef(new Map<string, string>());
-  const [, bumpLanded] = useState(0);
-  const requestRollFrames = useCallback(
-    async (catIndex: number, addition: number, seed: number) => {
-      const candidates = await Promise.all(
-        Array.from({ length: 12 }, (_, k) => composeCat(seed + k, false)),
-      );
-      const landed = await composeCat(seed + 99, false);
-      const key = `${evolutionCommand.cats[catIndex]?.key ?? catIndex.toString()}:${addition.toString()}`;
-      landedRef.current.set(key, landed);
-      bumpLanded((v) => v + 1);
-      return { candidates, landed };
-    },
-    [evolutionCommand],
-  );
+  const { landedFrames, requestRollFrames } = useLandedFrames(evolutionCommand);
 
   const rootRef = useRef<HTMLDivElement | null>(null);
   const reveal = useLineageCeremony({
-    cats: evolutionCommand.cats.map((cat, i) => ({
-      key: cat.key,
-      label: cat.label,
-      level: cat.level,
-      branchLabel: cat.branchLabel,
-      archetype: cat.archetype,
-      previewUrl: sprites[i] ?? null,
-      parentUrl: sprites[cat.level <= 1 ? 0 : i - 1] ?? null,
-      additions: cat.additions,
-    })),
+    cats: ceremonyCats(evolutionCommand, sprites),
     totalCount: evolutionCommand.totalCount,
     chargeDurationMs: p.chargeMs,
     startedAt: mountTime,
@@ -834,35 +939,13 @@ export function LookPreviewClient() {
       ),
     [evolutionCommand, p.chargeMs],
   );
-  const activeIndex =
-    "index" in reveal.step
-      ? reveal.step.index
-      : reveal.step.kind === "summon"
-        ? 0
-        : -1;
-  const landMs =
-    reveal.roll && activeIndex >= 0
-      ? rollLandMs(schedule, activeIndex, reveal.roll.index)
-      : null;
-  const landedSrc =
-    reveal.roll && reveal.activeKey
-      ? (landedRef.current.get(
-          `${reveal.activeKey}:${reveal.roll.index.toString()}`,
-        ) ?? null)
-      : null;
+  const activeIndex = activeCatIndex(reveal.step);
+  const landMs = activeRollLandMs(schedule, activeIndex, reveal.roll);
+  const landedSrc = landedFrameFor(landedFrames, reveal);
 
   let board: React.ReactNode;
   if (scene === "batch") {
-    const model = p.auto
-      ? simulatedBoard(poolCats, sprites, p.finalCount, sim)
-      : staticBoard(
-          poolCats,
-          sprites,
-          p,
-          p.verdictSeconds !== null
-            ? mountTime + p.verdictSeconds * 1000
-            : null,
-        );
+    const model = batchBoardModel(p, poolCats, sprites, sim, mountTime);
     board = <BatchBoardFor look={look} model={model} />;
   } else {
     const Look = SHOW_LOOKS[look];
@@ -887,11 +970,8 @@ export function LookPreviewClient() {
     );
   }
 
-  const href = (overrides: Record<string, string>) => {
-    const next = new URLSearchParams(searchParams.toString());
-    for (const [key, value] of Object.entries(overrides)) next.set(key, value);
-    return `?${next.toString()}`;
-  };
+  const href = (overrides: Record<string, string>) =>
+    withParams(searchParams, overrides);
 
   return (
     <div

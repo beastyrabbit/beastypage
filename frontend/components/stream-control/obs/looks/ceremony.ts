@@ -2,7 +2,14 @@
 
 import confetti from "canvas-confetti";
 import { useReducedMotion } from "motion/react";
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type RefObject,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { getArchetypeTheme } from "@/components/evolution/archetypes";
 import { rollTraitLabel, rollValueLabel } from "@/lib/evolution/additionApply";
 import type { EvolutionAddition } from "@/lib/evolution/evolutionGenerator";
@@ -10,12 +17,15 @@ import {
   buildCandidateOrder,
   buildCeremonySchedule,
   CEREMONY_MS,
+  type CeremonySchedule,
   type CeremonyStep,
   type RollPhase,
+  type RollPhaseState,
   rollBudgetMs,
   rollLandMs,
   rollPhaseAt,
   rollSeed,
+  type ScheduledStep,
   stepAt,
 } from "@/lib/evolution/rollSchedule";
 import {
@@ -180,6 +190,189 @@ function rollKeyOf(catKey: string, addition: number): string {
   return `${catKey}:${addition.toString()}`;
 }
 
+type RollStep = Extract<CeremonyStep, { kind: "roll" }>;
+type RevealStep = Extract<CeremonyStep, { kind: "reveal" }>;
+
+/** The parts of a LineageReveal that depend on the roll/reveal step. */
+interface StepReveal {
+  roll: LineageRoll | null;
+  teaserUrl: string | null;
+  baseUrl: string | null;
+  landedValues: string[];
+  landing: LineageReveal["landing"];
+}
+
+/** What the roll/reveal helpers read: the clock, the active cat and its frames. */
+interface RevealContext {
+  schedule: CeremonySchedule;
+  scheduled: ScheduledStep;
+  elapsed: number;
+  reducedMotion: boolean;
+  cat: CeremonyCatInput;
+  frames: ReadonlyMap<string, RollFrames>;
+  orderFor: (
+    catKey: string,
+    addition: number,
+    frameCount: number,
+    candidateCount: number,
+  ) => number[];
+}
+
+function idleStepReveal(): StepReveal {
+  return {
+    roll: null,
+    teaserUrl: null,
+    baseUrl: null,
+    landedValues: [],
+    landing: null,
+  };
+}
+
+/** The cat the step is about, when the command has it. */
+function activeCatOf(
+  cats: readonly CeremonyCatInput[],
+  step: CeremonyStep,
+): CeremonyCatInput | null {
+  const index = activeIndexOf(step);
+  return index === null ? null : (cats[index] ?? null);
+}
+
+/** Branches of the revealed cats, plus the active cat's while its banner or roll plays. */
+function openBranchesFor(
+  cats: readonly CeremonyCatInput[],
+  through: number,
+  activeCat: CeremonyCatInput | null,
+  step: CeremonyStep,
+): Set<string> {
+  const open = new Set<string>();
+  for (const cat of cats.slice(0, through)) {
+    if (cat.branchLabel) open.add(cat.branchLabel);
+  }
+  if (
+    activeCat?.branchLabel &&
+    (step.kind === "banner" || step.kind === "roll")
+  ) {
+    open.add(activeCat.branchLabel);
+  }
+  return open;
+}
+
+/** The active cat and the SCHEDULED elapsed ms of its `addition` land (the step start when unknown). */
+function landingAt(
+  ctx: RevealContext,
+  catIndex: number,
+  addition: number,
+): LineageReveal["landing"] {
+  return {
+    key: ctx.cat.key,
+    at: rollLandMs(ctx.schedule, catIndex, addition) ?? ctx.scheduled.startMs,
+  };
+}
+
+/** What the cat looked like before this roll: the previous roll's landed frame, else the parent. */
+function rollBaseUrl(ctx: RevealContext, step: RollStep): string | null {
+  const previous =
+    step.addition > 0
+      ? ctx.frames.get(rollKeyOf(ctx.cat.key, step.addition - 1))
+      : undefined;
+  return previous?.landed ?? ctx.cat.parentUrl ?? null;
+}
+
+/** Frame on the active cat: the landed frame from the land phase on, else the strobe candidate once frames are ready. */
+function rollTeaserUrl(
+  ctx: RevealContext,
+  step: RollStep,
+  phase: RollPhaseState,
+  frames: RollFrames | undefined,
+): string | null {
+  if (phase.phase === "land") return frames?.landed ?? null;
+  const candidateCount = frames?.candidates.length ?? 0;
+  if (phase.frameIndex < 0 || !frames || candidateCount <= 0) return null;
+  const order = ctx.orderFor(
+    ctx.cat.key,
+    step.addition,
+    phase.frameCount,
+    candidateCount,
+  );
+  return frames.candidates[order[phase.frameIndex] ?? 0] ?? null;
+}
+
+/** Reveal during roll (i, j): phase, strobe/landed frame and the values landed so far. */
+function rollStepReveal(ctx: RevealContext, step: RollStep): StepReveal {
+  const { cat, scheduled } = ctx;
+  const additions = cat.additions ?? [];
+  const phase = rollPhaseAt(
+    ctx.elapsed - scheduled.startMs,
+    scheduled.endMs - scheduled.startMs,
+    ctx.reducedMotion,
+  );
+  const addition = additions[step.addition];
+  const frames = ctx.frames.get(rollKeyOf(cat.key, step.addition));
+  const landed = phase.phase === "land";
+  const landedCount = step.addition + (landed ? 1 : 0);
+  return {
+    roll: {
+      catKey: cat.key,
+      traitLabel: addition ? rollTraitLabel(addition) : "?",
+      index: step.addition,
+      count: step.count,
+      phase: phase.phase,
+      valueLabel: landed && addition ? rollValueLabel(addition) : null,
+      candidateCount: frames?.candidates.length ?? 0,
+      progress: phase.progress,
+    },
+    teaserUrl: rollTeaserUrl(ctx, step, phase, frames),
+    baseUrl: rollBaseUrl(ctx, step),
+    landedValues: additions.slice(0, landedCount).map(rollValueLabel),
+    landing:
+      landedCount > 0 ? landingAt(ctx, step.index, landedCount - 1) : null,
+  };
+}
+
+/** Reveal during reveal(i): the last roll frozen at land so its value survives the reveal. */
+function revealStepReveal(ctx: RevealContext, step: RevealStep): StepReveal {
+  const { cat } = ctx;
+  const additions = cat.additions ?? [];
+  const count = additions.length;
+  const landedValues = additions.map(rollValueLabel);
+  if (count === 0) {
+    return {
+      ...idleStepReveal(),
+      landedValues,
+      landing: { key: cat.key, at: ctx.scheduled.startMs },
+    };
+  }
+  const last = additions[count - 1];
+  const frames = ctx.frames.get(rollKeyOf(cat.key, count - 1));
+  return {
+    roll: {
+      catKey: cat.key,
+      traitLabel: rollTraitLabel(last),
+      index: count - 1,
+      count,
+      phase: "land",
+      valueLabel: rollValueLabel(last),
+      candidateCount: frames?.candidates.length ?? 0,
+      progress: 1,
+    },
+    teaserUrl: frames?.landed ?? null,
+    baseUrl: null,
+    landedValues,
+    landing: landingAt(ctx, step.index, count - 1),
+  };
+}
+
+/** The step-dependent part of the reveal; idle outside roll/reveal or without an active cat. */
+function stepRevealFor(
+  step: CeremonyStep,
+  ctx: RevealContext | null,
+): StepReveal {
+  if (!ctx) return idleStepReveal();
+  if (step.kind === "roll") return rollStepReveal(ctx, step);
+  if (step.kind === "reveal") return revealStepReveal(ctx, step);
+  return idleStepReveal();
+}
+
 export interface UseLineageCeremonyOptions {
   cats: readonly CeremonyCatInput[];
   totalCount: number;
@@ -267,11 +460,9 @@ export function useLineageCeremony({
   const [tickedMs, setTickedMs] = useState(() =>
     ceremonyElapsedMs(Date.now(), startedAt, seq, liveState),
   );
-  const elapsed = clockFrozen
-    ? clockOverrideMs
-    : enabled
-      ? tickedMs
-      : schedule.totalMs;
+  let elapsed = schedule.totalMs;
+  if (clockFrozen) elapsed = clockOverrideMs;
+  else if (enabled) elapsed = tickedMs;
   const scheduled = stepAt(schedule, elapsed);
   const step = scheduled.step;
   const done = step.kind === "done";
@@ -303,7 +494,7 @@ export function useLineageCeremony({
   // roll key; late results are still cached (the reveal reads `landed`).
   const framesRef = useRef(new Map<string, RollFrames>());
   const pendingRef = useRef(new Set<string>());
-  const [, bumpFrames] = useState(0);
+  const [, bumpFrames] = useReducer((version: number) => version + 1, 0);
   const stepIndex = done
     ? schedule.steps.length
     : schedule.steps.indexOf(scheduled);
@@ -334,7 +525,7 @@ export function useLineageCeremony({
             candidates: [...frames.candidates],
             landed: frames.landed,
           });
-          bumpFrames((version) => version + 1);
+          bumpFrames();
         })
         .catch((error) => {
           console.warn("[ceremony] roll frames failed", key, error);
@@ -366,104 +557,29 @@ export function useLineageCeremony({
     return order;
   };
 
-  const activeIndex = activeIndexOf(step);
-  const activeCat = activeIndex === null ? null : (cats[activeIndex] ?? null);
-  const additions = activeCat?.additions ?? [];
+  const activeCat = activeCatOf(cats, step);
   const through = revealedThrough(step, totalCount);
   const revealedKeys = new Set(cats.slice(0, through).map((cat) => cat.key));
-  const openBranches = new Set<string>();
-  for (const cat of cats.slice(0, through)) {
-    if (cat.branchLabel) openBranches.add(cat.branchLabel);
-  }
-  if (
-    activeCat?.branchLabel &&
-    (step.kind === "banner" || step.kind === "roll")
-  ) {
-    openBranches.add(activeCat.branchLabel);
-  }
-
-  let roll: LineageRoll | null = null;
-  let teaserUrl: string | null = null;
-  let baseUrl: string | null = null;
-  let landedValues: string[] = [];
-  let landing: LineageReveal["landing"] = null;
-  let chargeMs = rollBudgetMs(chargeDurationMs, 1);
-
-  if (step.kind === "roll" && activeCat) {
-    const budget = scheduled.endMs - scheduled.startMs;
-    chargeMs = budget;
-    const phase = rollPhaseAt(
-      elapsed - scheduled.startMs,
-      budget,
-      reducedMotion,
-    );
-    const addition = additions[step.addition];
-    const frames = framesRef.current.get(
-      rollKeyOf(activeCat.key, step.addition),
-    );
-    const candidateCount = frames?.candidates.length ?? 0;
-    const previousFrames =
-      step.addition > 0
-        ? framesRef.current.get(rollKeyOf(activeCat.key, step.addition - 1))
-        : undefined;
-    baseUrl = previousFrames?.landed ?? activeCat.parentUrl ?? null;
-    if (phase.phase === "land") {
-      teaserUrl = frames?.landed ?? null;
-    } else if (phase.frameIndex >= 0 && frames && candidateCount > 0) {
-      const order = orderFor(
-        activeCat.key,
-        step.addition,
-        phase.frameCount,
-        candidateCount,
-      );
-      teaserUrl = frames.candidates[order[phase.frameIndex] ?? 0] ?? null;
-    }
-    const landedCount = step.addition + (phase.phase === "land" ? 1 : 0);
-    landedValues = additions.slice(0, landedCount).map(rollValueLabel);
-    roll = {
-      catKey: activeCat.key,
-      traitLabel: addition ? rollTraitLabel(addition) : "?",
-      index: step.addition,
-      count: step.count,
-      phase: phase.phase,
-      valueLabel:
-        phase.phase === "land" && addition ? rollValueLabel(addition) : null,
-      candidateCount,
-      progress: phase.progress,
-    };
-    if (landedCount > 0) {
-      landing = {
-        key: activeCat.key,
-        at:
-          rollLandMs(schedule, step.index, landedCount - 1) ??
-          scheduled.startMs,
-      };
-    }
-  } else if (step.kind === "reveal" && activeCat) {
-    const count = additions.length;
-    landedValues = additions.map(rollValueLabel);
-    if (count > 0) {
-      const last = additions[count - 1];
-      const frames = framesRef.current.get(rollKeyOf(activeCat.key, count - 1));
-      teaserUrl = frames?.landed ?? null;
-      roll = {
-        catKey: activeCat.key,
-        traitLabel: rollTraitLabel(last),
-        index: count - 1,
-        count,
-        phase: "land",
-        valueLabel: rollValueLabel(last),
-        candidateCount: frames?.candidates.length ?? 0,
-        progress: 1,
-      };
-      landing = {
-        key: activeCat.key,
-        at: rollLandMs(schedule, step.index, count - 1) ?? scheduled.startMs,
-      };
-    } else {
-      landing = { key: activeCat.key, at: scheduled.startMs };
-    }
-  }
+  const openBranches = openBranchesFor(cats, through, activeCat, step);
+  const context: RevealContext | null = activeCat
+    ? {
+        schedule,
+        scheduled,
+        elapsed,
+        reducedMotion,
+        cat: activeCat,
+        frames: framesRef.current,
+        orderFor,
+      }
+    : null;
+  const { roll, teaserUrl, baseUrl, landedValues, landing } = stepRevealFor(
+    step,
+    context,
+  );
+  const chargeMs =
+    step.kind === "roll" && activeCat
+      ? scheduled.endMs - scheduled.startMs
+      : rollBudgetMs(chargeDurationMs, 1);
 
   // Confetti in the branch colours on each land, from the landing cat's rect.
   // Only a FRESH land fires (a reload mid-ceremony must not burst on mount).
@@ -520,11 +636,8 @@ export function useLineageCeremony({
     return () => window.clearTimeout(encore);
   }, [landingKey]);
 
-  const held = Boolean(
-    liveState &&
-      liveState.seq === seq &&
-      typeof liveState.holdStartedAt === "number",
-  );
+  const held =
+    liveState?.seq === seq && typeof liveState.holdStartedAt === "number";
 
   return {
     step,
