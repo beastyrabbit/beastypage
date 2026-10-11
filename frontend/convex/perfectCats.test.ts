@@ -126,4 +126,40 @@ describe("perfect cat matchups", () => {
     expect(remaining).toHaveLength(1);
     expect(remaining[0]?.clientId).toBe("fresh");
   });
+
+  it("bounds active matchup capabilities across rotating client IDs", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    await t.run(async (ctx) => {
+      const cats = await Promise.all(
+        ["first", "second"].map((name) =>
+          ctx.db.insert("perfect_cats", {
+            hash: name,
+            params: { name },
+            rating: 1500,
+            wins: 0,
+            losses: 0,
+            appearances: 0,
+            createdAt: now,
+            updatedAt: now,
+          }),
+        ),
+      );
+      for (let index = 0; index < 600; index += 1) {
+        await ctx.db.insert("perfect_matchups", {
+          clientId: `active-${index}`,
+          catAId: cats[0],
+          catBId: cats[1],
+          token: `token-${index}`,
+          createdAt: now,
+          expiresAt: now + 60_000,
+          consumed: false,
+        });
+      }
+    });
+
+    await expect(
+      t.mutation(api.perfectCats.requestMatchup, { clientId: "new-client" }),
+    ).rejects.toThrow("matchups are temporarily full");
+  });
 });

@@ -26,19 +26,21 @@ route sends the shared service credential. Deploy the route and matching
 Convex environment before removing the optional validator in a later cleanup.
 
 Perfect Cat matchup requests keep `clientId` optional for existing clients.
-Requests with an ID receive a stored, expiring matchup capability. Votes may
-omit the new token during the bridge, but the server still requires the stored
-client ID, exact current pair, expiry, and unused state. New clients send the
-token. Anonymous requests do not create unreachable stored matchups.
+Current browser pages use an in-memory page identity, so two tabs do not
+replace each other's pending matchup. Requests with an ID receive a stored,
+expiring matchup capability. Votes may omit the new token during the bridge,
+but the server still requires the stored client ID, exact current pair, expiry,
+and unused state. New clients send the token. Anonymous requests do not create
+unreachable stored matchups. Active persisted capabilities are capped at 600;
+expired rows are removed by the hourly bounded cleanup.
 
-The matchup capability table remains a residual availability risk: each
-distinct caller-supplied `clientId` can create one expiring row, and the
-current hourly bounded cleanup cannot prevent storage growth during a
-sustained flood of fresh IDs. Treat this as **high production risk** until an
-edge/IP rate limit or a signed stateless capability rollout is in place. Do
-not add a first-caller ownership rule, because it would let an attacker claim
-another client's identifier. Monitor table growth and cleanup lag before
-enabling higher-volume anonymous traffic.
+The matchup capability table still depends on the configured Convex mutation
+boundary for request admission. The active-row cap prevents unbounded storage
+growth from fresh IDs, while an edge/IP rate limit or signed stateless
+capability rollout would provide stronger abuse control before higher-volume
+anonymous traffic is enabled. Do not add a first-caller ownership rule,
+because it would let an attacker claim another client's identifier. Monitor
+table growth and cleanup lag.
 
 # Legacy settings rows
 
@@ -73,5 +75,6 @@ token required after all old bundles have been replaced.
 
 Anonymous current bundles send a stable browser client key for upload
 reservations. Authenticated users are keyed by their Convex identity. Each key
-has a bounded hourly reservation budget, with a larger global backstop for
-legacy callers and clients that cannot persist a key.
+has a bounded hourly reservation budget. Legacy callers and clients that cannot
+persist a key share a separate 60/hour fallback bucket, and all callers remain
+behind a 600/hour global backstop.

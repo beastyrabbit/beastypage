@@ -15,6 +15,10 @@ const MAX_REGISTERED_CATS = 32;
 const MAX_PARAMS_BYTES = 32 * 1024;
 const MATCHUP_TTL_MS = 15 * 60 * 1000;
 const MATCHUP_CLEANUP_BATCH_SIZE = 100;
+// Bound persisted capabilities even when callers rotate anonymous IDs. The
+// hourly cleanup removes expired rows, so this limits active storage without
+// adding a hot global counter document to every matchup transaction.
+const MAX_ACTIVE_MATCHUPS = 600;
 
 function validClientId(clientId: string | undefined) {
   const normalized = clientId?.trim() || `anonymous:${crypto.randomUUID()}`;
@@ -249,6 +253,15 @@ export const requestMatchup = mutation({
         .query("perfect_matchups")
         .withIndex("byClient", (q) => q.eq("clientId", clientId))
         .first();
+      if (!previous) {
+        const activeMatchups = await db
+          .query("perfect_matchups")
+          .withIndex("byExpiresAt", (q) => q.gt("expiresAt", now))
+          .take(MAX_ACTIVE_MATCHUPS + 1);
+        if (activeMatchups.length >= MAX_ACTIVE_MATCHUPS) {
+          throw new Error("Perfect Cat matchups are temporarily full");
+        }
+      }
       const pendingMatchup = {
         clientId,
         catAId: first._id,

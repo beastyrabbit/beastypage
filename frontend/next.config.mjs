@@ -79,10 +79,10 @@ const nextConfig = {
     root: projectRoot,
   },
   experimental: {
-    // Public JSON image routes enforce a stricter 16 MB limit themselves.
-    // Keep the proxy clone above that limit so it cannot silently truncate
-    // valid requests before the route-level check runs.
-    proxyClientMaxBodySize: "20mb",
+    // Pixelator accepts the historical 60 MB JSON body limit. The route and
+    // image-processing service apply stricter decoded-image limits after the
+    // request has been read.
+    proxyClientMaxBodySize: "64mb",
   },
   async rewrites() {
     // Proxy PostHog requests through /bubu to avoid ad-blockers

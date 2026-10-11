@@ -7,12 +7,13 @@ import {
 const BACKEND_BASE = (
   process.env.IMAGE_PROCESSING_INTERNAL_URL ?? "http://127.0.0.1:8002"
 ).replace(/\/$/, "");
-const MAX_BODY_BYTES = 16 * 1024 * 1024;
+const DEFAULT_MAX_BODY_BYTES = 16 * 1024 * 1024;
 
 interface ImageProcessingProxyOptions {
   endpoint: string;
   timeoutMs: number;
   timeoutMessage: string;
+  maxBodyBytes?: number;
   upstreamLabel?: string;
 }
 
@@ -20,6 +21,7 @@ export function createImageProcessingProxyHandler({
   endpoint,
   timeoutMs,
   timeoutMessage,
+  maxBodyBytes = DEFAULT_MAX_BODY_BYTES,
   upstreamLabel = "",
 }: ImageProcessingProxyOptions) {
   const label = upstreamLabel ? `${upstreamLabel} ` : "";
@@ -35,7 +37,7 @@ export function createImageProcessingProxyHandler({
 
     let body: string;
     try {
-      body = await readRequestBody(request, MAX_BODY_BYTES);
+      body = await readRequestBody(request, maxBodyBytes);
     } catch (error) {
       if (error instanceof RequestBodyTooLargeError) {
         return NextResponse.json(

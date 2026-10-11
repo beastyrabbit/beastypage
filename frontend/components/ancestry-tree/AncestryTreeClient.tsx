@@ -745,7 +745,8 @@ export function AncestryTreeClient({
             // Then generate a child with the correct gender
             const currentCat = manager.getCat(parentCat.id);
             if (currentCat && currentCat.partnerIds.length > 0) {
-              const newPartnerId = currentCat.partnerIds.at(-1)!;
+              const newPartnerId = currentCat.partnerIds.at(-1);
+              if (!newPartnerId) return;
               const motherId =
                 currentCat.gender === "F" ? currentCat.id : newPartnerId;
               const fatherId =

@@ -87,6 +87,17 @@ export function SaveTreeDialog({
     };
   }, []);
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+
   // Check if the current slug exists and has a password
   const slugCheck = useQuery(api.ancestryTree.checkSlug, { slug: currentSlug });
   const slugExists = slugCheck?.exists ?? false;
@@ -222,28 +233,18 @@ export function SaveTreeDialog({
     }
 
     return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-        role="button"
-        tabIndex={0}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) onClose();
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            onClose();
-          }
-          if (
-            (event.key === "Enter" || event.key === " ") &&
-            event.target === event.currentTarget
-          ) {
-            event.preventDefault();
-            onClose();
-          }
-        }}
-      >
-        <div className="glass-card relative w-full max-w-md p-6">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <button
+          type="button"
+          aria-label="Close dialog backdrop"
+          className="absolute inset-0 cursor-default"
+          onClick={onClose}
+        />
+        <div
+          className="glass-card relative z-10 w-full max-w-md p-6"
+          role="dialog"
+          aria-modal="true"
+        >
           <button
             type="button"
             onClick={onClose}
@@ -305,28 +306,18 @@ export function SaveTreeDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      role="button"
-      tabIndex={0}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          onClose();
-        }
-        if (
-          (event.key === "Enter" || event.key === " ") &&
-          event.target === event.currentTarget
-        ) {
-          event.preventDefault();
-          onClose();
-        }
-      }}
-    >
-      <div className="glass-card relative w-full max-w-md p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <button
+        type="button"
+        aria-label="Close dialog backdrop"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <div
+        className="glass-card relative z-10 w-full max-w-md p-6"
+        role="dialog"
+        aria-modal="true"
+      >
         <button
           type="button"
           onClick={onClose}

@@ -169,7 +169,7 @@ async function persistPalette(
         {
           dataUrl: `data:image/png;base64,${base64}`,
           colors: colorsPayload,
-          serviceToken: process.env.DISCORD_API_TOKEN ?? "",
+          serviceToken: (process.env.DISCORD_API_TOKEN ?? "").trim(),
         },
       );
       if (signal.aborted) return { response: abortedResponse() };

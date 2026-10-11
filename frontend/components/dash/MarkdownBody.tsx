@@ -10,7 +10,32 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// Sanitize HTML string: strip script tags, on* attributes, and javascript: URLs.
+const SAFE_HREF_SCHEMES = new Set(["http", "https", "mailto"]);
+
+function canonicalizeHref(href: string): string {
+  let canonical = "";
+  for (const character of href) {
+    if ((character.codePointAt(0) ?? 0) > 0x20) canonical += character;
+  }
+  return canonical;
+}
+
+function sanitizeHrefAttribute(
+  _match: string,
+  quote: string,
+  href: string,
+): string {
+  // Browsers remove C0 controls and spaces before parsing a URL, so canonicalize
+  // them before checking the scheme (e.g. `java\tscript:` is still executable).
+  const canonicalHref = canonicalizeHref(href);
+  const scheme = /^([a-z][a-z\d+.-]*):/i.exec(canonicalHref)?.[1];
+  if (scheme && !SAFE_HREF_SCHEMES.has(scheme.toLowerCase())) {
+    return `href=${quote}#${quote}`;
+  }
+  return `href=${quote}${href}${quote}`;
+}
+
+// Sanitize HTML string: strip script tags, on* attributes, and unsafe URLs.
 // Content originates from GitHub Releases API (trusted source) and passes through
 // our own markdown-to-HTML converter, so the sanitizer is a defense-in-depth measure.
 function sanitize(html: string): string {
@@ -23,8 +48,7 @@ function sanitize(html: string): string {
     .replace(/\bon\w+\s*=\s*"[^"]*"/gi, "")
     .replace(/\bon\w+\s*=\s*'[^']*'/gi, "")
     .replace(/\bon\w+\s*=\s*[^\s>]*/gi, "")
-    .replace(/href\s*=\s*"\s*javascript:[^"]*"/gi, 'href="#"')
-    .replace(/href\s*=\s*'\s*javascript:[^']*'/gi, "href='#'")
+    .replace(/href\s*=\s*(["'])([\s\S]*?)\1/gi, sanitizeHrefAttribute)
     .replace(/(?:src|href)\s*=\s*"data:[^"]*"/gi, 'src=""')
     .replace(/(?:src|href)\s*=\s*'data:[^']*'/gi, "src=''");
 }
