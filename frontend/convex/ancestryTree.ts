@@ -381,6 +381,7 @@ export const save = mutation({
     }
 
     // Create new tree
+    assertSlugFormat(args.slug);
     const { id, editToken } = await insertNewTree(ctx, args);
 
     return {

@@ -75,4 +75,16 @@ describe("legacy ancestry tree migration", () => {
       t.query(api.ancestryTree.getBySlug, { slug: treeData.slug }),
     ).resolves.toMatchObject({ name: treeData.name });
   });
+
+  it("rejects route-unsafe slugs on both save paths", async () => {
+    const t = convexTest(schema, modules);
+    const invalid = { ...treeData, slug: "not/a-valid-slug" };
+
+    await expect(t.mutation(api.ancestryTree.save, invalid)).rejects.toThrow(
+      "Invalid tree slug",
+    );
+    await expect(
+      t.mutation(api.ancestryTree.saveAsNew, invalid),
+    ).rejects.toThrow("Invalid tree slug");
+  });
 });
