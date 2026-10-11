@@ -7,6 +7,7 @@ import type {
 } from "@/lib/adoption/streamBatch";
 import type { SingleCatSettings } from "@/utils/singleCatVariants";
 import type { useVariants } from "@/utils/variants";
+import type { BatchThemeId } from "../obs/themes/batchThemeMeta";
 import type { OverlayThemeId } from "../obs/themes/themeMeta";
 import type { StreamSceneButtonId } from "../sceneState";
 import type { LobbyMode } from "./helpers";
@@ -119,6 +120,10 @@ export interface StreamControlApi {
   // Overlay look (session setting `overlayTheme`)
   overlayTheme: OverlayThemeId;
   setOverlayTheme: (id: OverlayThemeId) => void;
+
+  // Batch show look (session setting `batchTheme`)
+  batchTheme: BatchThemeId;
+  setBatchTheme: (id: BatchThemeId) => void;
 
   // Tabs — so the status bar can jump to a panel
   activeTab: ControlTabId;

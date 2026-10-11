@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { OVERLAY_THEME_META } from "../obs/themes/themeMeta";
 import { useStreamControl } from "./context";
 import { SliderControl } from "./controls";
+import { BatchLookPicker } from "./look/BatchLookPicker";
 import { ThemePicker } from "./look/ThemePicker";
 import { useFollowGuard } from "./useFollowGuard";
 
@@ -31,6 +32,8 @@ export function LookPanel() {
   const {
     overlayTheme,
     setOverlayTheme,
+    batchTheme,
+    setBatchTheme,
     syncSessionSettings,
     rawSessionSettings,
   } = useStreamControl();
@@ -73,6 +76,21 @@ export function LookPanel() {
         </div>
         <div className="p-4 sm:p-5">
           <ThemePicker value={overlayTheme} onChange={setOverlayTheme} />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-background/80 backdrop-blur">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-border/30 px-5 py-3">
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            Batch show look
+          </h3>
+          <p className="text-xs text-muted-foreground/70">
+            How the adoption elimination is drawn. Every look numbers the cats
+            so chat can say &ldquo;number 13&rdquo;.
+          </p>
+        </div>
+        <div className="p-4 sm:p-5">
+          <BatchLookPicker value={batchTheme} onChange={setBatchTheme} />
         </div>
       </section>
 
