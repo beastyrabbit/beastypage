@@ -253,9 +253,9 @@ jobs:
           driver: remote
           endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      # The private registry-login action is hosted behind Pangolin auth; pin
-      # this ref to a commit after the Forgejo repository is accessible.
-      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+      # The private registry-login action is hosted behind Pangolin auth; keep
+      # it pinned to the reviewed immutable Forgejo commit.
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@c1285eb4d761c067bc09565c079b9f3ba355f137
 
       - name: Extract metadata
         id: meta
@@ -372,7 +372,7 @@ jobs:
           driver: remote
           endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@c1285eb4d761c067bc09565c079b9f3ba355f137
 
       - name: Extract metadata
         id: meta
@@ -443,7 +443,7 @@ jobs:
           driver: remote
           endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@c1285eb4d761c067bc09565c079b9f3ba355f137
 
       - name: Extract metadata
         id: meta
@@ -495,7 +495,7 @@ jobs:
           driver: remote
           endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@c1285eb4d761c067bc09565c079b9f3ba355f137
 
       - name: Extract metadata
         id: meta
@@ -566,7 +566,7 @@ jobs:
           driver: remote
           endpoint: tcp://buildkitd.forgejo-runners.svc.cluster.local:1234
 
-      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@main
+      - uses: https://git.heerlab.com/beasty/forgejo-ci/actions/registry-login@c1285eb4d761c067bc09565c079b9f3ba355f137
 
       - name: Extract metadata
         id: meta
