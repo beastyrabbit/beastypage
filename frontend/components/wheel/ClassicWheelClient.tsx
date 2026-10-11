@@ -37,7 +37,7 @@ export function ClassicWheelClient() {
   const [showDebug, setShowDebug] = useState(false);
 
   const logSpin = useMutation(api.wheel.logSpin);
-  const stats = useQuery(api.wheel.stats);
+  const stats = useQuery(api.wheel.stats, {});
 
   const prizeStats = useMemo(() => {
     const map = new Map<string, { count: number }>();

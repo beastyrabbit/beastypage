@@ -13,7 +13,7 @@ dependencies = [
   "pydantic>=2.9.2",
   "pydantic-settings>=2.6.0",
   "pygame>=2.5.2",
-  "cairosvg>=2.9.0",
+  "cairosvg>=2.9.1",
 ]
 
 [project.optional-dependencies]

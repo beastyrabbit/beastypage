@@ -105,6 +105,44 @@ describe("preview route", () => {
     });
   });
 
+  it("rejects oversized decoded cat data before calling the renderer", async () => {
+    globalThis.fetch = vi.fn() as typeof fetch;
+
+    const response = await GET(
+      new NextRequest(
+        encodedCatUrl({ params: { note: "x".repeat(300 * 1024) } }),
+      ),
+      { params: Promise.resolve({ id: "_" }) },
+    );
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      error: "Decoded cat data is too large",
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects deeply nested decoded cat data before calling the renderer", async () => {
+    globalThis.fetch = vi.fn() as typeof fetch;
+    let nested: Record<string, unknown> = {};
+    for (let index = 0; index < 40; index += 1) {
+      nested = { child: nested };
+    }
+
+    const response = await GET(
+      new NextRequest(encodedCatUrl({ params: nested })),
+      {
+        params: Promise.resolve({ id: "_" }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Invalid encoded cat data",
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it("times out stuck renderer requests", async () => {
     vi.useFakeTimers();
     globalThis.fetch = vi.fn(

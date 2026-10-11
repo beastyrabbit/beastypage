@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalQuery, mutation, query } from "./_generated/server.js";
 
-export const totalCount = query({
+export const totalCount = internalQuery({
   args: {},
   handler: async (ctx) => {
     let count = 0;
@@ -21,10 +21,14 @@ type CollectionDoc = Doc<"collection">;
 export type CollectionEntry = Awaited<ReturnType<typeof collectionDocToClient>>;
 
 export const list = query({
-  args: {},
-  handler: async (ctx) => {
-    const entries = await ctx.db.query("collection").collect();
-    entries.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = Math.max(1, Math.min(args.limit ?? 200, 200));
+    const entries = await ctx.db
+      .query("collection")
+      .withIndex("byCreated", (q) => q)
+      .order("desc")
+      .take(limit);
     return Promise.all(entries.map((doc) => collectionDocToClient(ctx, doc)));
   },
 });
@@ -36,6 +40,9 @@ export const setFocus = mutation({
     focusY: v.number(),
   },
   handler: async (ctx, args) => {
+    if (!(await ctx.auth.getUserIdentity())) {
+      throw new Error("Not authenticated");
+    }
     const doc = await ctx.db.get(args.id);
     if (!doc) {
       throw new Error("Collection entry not found.");

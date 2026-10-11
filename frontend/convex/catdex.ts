@@ -1,9 +1,14 @@
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api.js";
+import { internal } from "./_generated/api.js";
 import type { Doc, Id } from "./_generated/dataModel.js";
 import type { QueryCtx } from "./_generated/server.js";
-import { mutation, query } from "./_generated/server.js";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server.js";
 import { docIdToString } from "./utils.js";
 
 type CatdexDoc = Doc<"catdex">;
@@ -15,9 +20,14 @@ export type CatdexPayload = Awaited<ReturnType<typeof catdexRecordToClient>>;
 export const page = query({
   args: { paginationOpts: paginationOptsValidator, approved: v.boolean() },
   handler: async (ctx, args) => {
+    if (!args.approved) {
+      throw new Error("Pending Catdex records require moderation access");
+    }
+    // Pending submissions are moderation data and must never be returned by
+    // this public query. Keep the argument for generated-client compatibility.
     const result = await ctx.db
       .query("catdex")
-      .withIndex("byApproval", (q) => q.eq("approved", args.approved))
+      .withIndex("byApproval", (q) => q.eq("approved", true))
       .order("desc")
       .paginate({
         ...args.paginationOpts,
@@ -53,17 +63,15 @@ export const list = query({
     approved: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const approved = args.approved;
-    const source =
-      typeof approved === "boolean"
-        ? ctx.db
-            .query("catdex")
-            .withIndex("byApproval", (q) => q.eq("approved", approved))
-        : ctx.db.query("catdex");
-    let cats = await source.order("desc").take(48);
-    if (typeof approved === "boolean") {
-      cats = cats.filter((c) => Boolean(c.approved) === approved);
+    if (args.approved === false) {
+      throw new Error("Pending Catdex records require moderation access");
     }
+    const approved = true;
+    const cats = await ctx.db
+      .query("catdex")
+      .withIndex("byApproval", (q) => q.eq("approved", approved))
+      .order("desc")
+      .take(48);
     cats.sort(
       (a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt),
     );
@@ -71,7 +79,7 @@ export const list = query({
   },
 });
 
-export const pendingCount = query({
+export const pendingCount = internalQuery({
   args: {},
   handler: async (ctx) => {
     // Compatibility endpoint for older clients. New clients use hasPending.
@@ -89,12 +97,12 @@ export const get = query({
   },
   handler: async (ctx, args) => {
     const doc = await ctx.db.get(args.id);
-    if (!doc) return null;
+    if (!doc?.approved) return null;
     return catdexRecordToClient(ctx, doc);
   },
 });
 
-export const getDoc = query({
+export const getDoc = internalQuery({
   args: {
     id: v.id("catdex"),
   },
@@ -147,7 +155,7 @@ export const create = mutation({
     if (!doc) {
       throw new Error("Failed to create catdex record");
     }
-    await ctx.scheduler.runAfter(0, api.imageService.generateForCat, {
+    await ctx.scheduler.runAfter(0, internal.imageService.generateForCat, {
       id: docId,
     });
     return catdexRecordToClient(ctx, doc);
@@ -303,7 +311,7 @@ function applyCustomCardThumbnail(
   }
 }
 
-export const applyThumbnailUpdates = mutation({
+export const applyThumbnailUpdates = internalMutation({
   args: {
     id: v.id("catdex"),
     defaultCard: v.optional(
@@ -345,7 +353,7 @@ export const applyThumbnailUpdates = mutation({
   },
 });
 
-export const enqueueMissingThumbnails = mutation({
+export const enqueueMissingThumbnails = internalMutation({
   args: {
     limit: v.optional(v.number()),
   },
@@ -362,7 +370,7 @@ export const enqueueMissingThumbnails = mutation({
       );
       if (!needsDefault && !needsCustom) continue;
 
-      await ctx.scheduler.runAfter(0, api.imageService.generateForCat, {
+      await ctx.scheduler.runAfter(0, internal.imageService.generateForCat, {
         id: cat._id,
       });
       enqueued += 1;

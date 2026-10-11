@@ -37,7 +37,7 @@ A pixel cat gacha platform featuring generators, wheels, and collection tools bu
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm --dir frontend install --frozen-lockfile
+pnpm --dir frontend install --frozen-lockfile --ignore-scripts
 pnpm --dir backend/media_service install --frozen-lockfile
 npm --prefix backend/discord-bot ci
 pnpm --dir backend/image_processing_service install --frozen-lockfile
@@ -53,6 +53,11 @@ URL is printed in the terminal; it is intentionally not hard-coded.
 The frontend uses the Convex development deployment configured through
 Infisical. Run `pnpm dev:convex` separately only when you intend to sync Convex
 functions and already have an interactive Convex CLI login.
+
+The frontend's `prepare` hook runs Convex code generation. Dependency installs
+skip lifecycle scripts so a local setup without `CONVEX_DEPLOYMENT` does not
+silently fail; run `pnpm --dir frontend exec convex codegen` after configuring
+Infisical when generated Convex types need refreshing.
 
 ### Frontend only
 
@@ -98,6 +103,8 @@ for the architecture, cost model, rollout lessons, and verification procedure.
 |----------|-------------|---------|
 | `PORT` | Server port | `3000` |
 | `RENDERER_INTERNAL_URL` | Renderer service URL | - |
+| `IMAGE_PROCESSING_INTERNAL_URL` | Image processing service URL | - |
+| `MEDIA_SERVICE_INTERNAL_URL` | Media service URL | - |
 
 ## Project Structure
 

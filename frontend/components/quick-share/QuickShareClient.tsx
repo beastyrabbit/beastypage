@@ -142,6 +142,13 @@ function errorMessage(error: unknown) {
   return raw.replace(/^Error:\s*/i, "");
 }
 
+function isAbortError(error: unknown) {
+  return (
+    (error instanceof DOMException && error.name === "AbortError") ||
+    (error instanceof Error && error.name === "AbortError")
+  );
+}
+
 function shareUrl(slug: string, fallback: string) {
   if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
     return `${window.location.origin}/i/${slug}`;
@@ -396,6 +403,7 @@ export function QuickShareClient() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [now, setNow] = useState(0);
   const [currentItemCount, setCurrentItemCount] = useState(1);
+  const processingAbortRef = useRef<AbortController | null>(null);
 
   const selectFile = useCallback(
     (nextFile: File | null, source: "file" | "clipboard") => {
@@ -505,6 +513,13 @@ export function QuickShareClient() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(
+    () => () => {
+      processingAbortRef.current?.abort();
+    },
+    [],
+  );
+
   const remember = useCallback(
     (created: ActiveUpload) => {
       setActiveUpload(created);
@@ -526,30 +541,61 @@ export function QuickShareClient() {
 
   const waitForProcessing = useCallback(
     async (upload: ActiveUpload) => {
+      processingAbortRef.current?.abort();
+      const controller = new AbortController();
+      processingAbortRef.current = controller;
+      const deadline = Date.now() + 10 * 60_000;
+      let delayMs = 2_000;
       setWork({ kind: "processing", label: "Preparing a chat-friendly file…" });
-      for (let attempt = 0; attempt < 600; attempt += 1) {
-        const status = await apiFetch<ShareStatus>(
-          `/i/api/uploads/${upload.uploadId}/status`,
-          {},
-          upload.receipt,
-        );
-        setCurrent(normalizeShare(status));
-        if (status.state === "ready") {
-          setWork({ kind: "done", label: "Your link is ready." });
-          await loadHistory();
-          return;
-        }
-        if (
-          status.state === "unsupported" ||
-          status.state === "failed" ||
-          status.state === "removed"
-        ) {
-          throw new Error(
-            status.failureMessage ??
-              "This file could not be made available for sharing.",
+      try {
+        while (Date.now() < deadline) {
+          const status = await apiFetch<ShareStatus>(
+            `/i/api/uploads/${upload.uploadId}/status`,
+            { signal: controller.signal },
+            upload.receipt,
           );
+          setCurrent(normalizeShare(status));
+          if (status.state === "ready") {
+            setWork({ kind: "done", label: "Your link is ready." });
+            await loadHistory();
+            return;
+          }
+          if (
+            status.state === "unsupported" ||
+            status.state === "failed" ||
+            status.state === "removed"
+          ) {
+            throw new Error(
+              status.failureMessage ??
+                "This file could not be made available for sharing.",
+            );
+          }
+          const remaining = Math.max(0, deadline - Date.now());
+          await new Promise<void>((resolve, reject) => {
+            let timer: number;
+            const onAbort = () => {
+              window.clearTimeout(timer);
+              controller.signal.removeEventListener("abort", onAbort);
+              reject(new DOMException("Polling aborted", "AbortError"));
+            };
+            timer = window.setTimeout(
+              () => {
+                controller.signal.removeEventListener("abort", onAbort);
+                resolve();
+              },
+              Math.min(delayMs, remaining),
+            );
+            controller.signal.addEventListener("abort", onAbort, {
+              once: true,
+            });
+            if (controller.signal.aborted) onAbort();
+          });
+          delayMs = Math.min(10_000, Math.round(delayMs * 1.5));
         }
-        await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+      } finally {
+        if (processingAbortRef.current === controller) {
+          processingAbortRef.current = null;
+        }
       }
       throw new Error(
         "Processing is taking longer than expected. Check Recent shares later.",
@@ -706,7 +752,9 @@ export function QuickShareClient() {
         });
       }
     } catch (error) {
-      setWork({ kind: "error", label: errorMessage(error) });
+      if (!isAbortError(error)) {
+        setWork({ kind: "error", label: errorMessage(error) });
+      }
     }
   }
 
@@ -717,7 +765,9 @@ export function QuickShareClient() {
     try {
       await uploadParts(file, activeUpload);
     } catch (error) {
-      setWork({ kind: "error", label: errorMessage(error) });
+      if (!isAbortError(error)) {
+        setWork({ kind: "error", label: errorMessage(error) });
+      }
     }
   }
 
@@ -752,7 +802,9 @@ export function QuickShareClient() {
       setCurrent(normalizeShare(result));
       await waitForProcessing(upload);
     } catch (error) {
-      setWork({ kind: "error", label: errorMessage(error) });
+      if (!isAbortError(error)) {
+        setWork({ kind: "error", label: errorMessage(error) });
+      }
     }
   }
 

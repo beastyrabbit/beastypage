@@ -78,6 +78,12 @@ const nextConfig = {
   turbopack: {
     root: projectRoot,
   },
+  experimental: {
+    // Public JSON image routes enforce a stricter 16 MB limit themselves.
+    // Keep the proxy clone above that limit so it cannot silently truncate
+    // valid requests before the route-level check runs.
+    proxyClientMaxBodySize: "20mb",
+  },
   async rewrites() {
     // Proxy PostHog requests through /bubu to avoid ad-blockers
     return [

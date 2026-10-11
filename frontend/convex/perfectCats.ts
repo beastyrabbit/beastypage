@@ -6,6 +6,21 @@ const INITIAL_RATING = 1500;
 const K_FACTOR = 24;
 const MINIMUM_POOL_SIZE = 16;
 const RECENT_VOTE_SAMPLE = 40;
+const COUNT_SAMPLE_LIMIT = 1_000;
+const MAX_REGISTERED_CATS = 32;
+const MAX_PARAMS_BYTES = 32 * 1024;
+const MATCHUP_TTL_MS = 15 * 60 * 1000;
+
+function validClientId(clientId: string | undefined) {
+  const normalized = clientId?.trim() || `anonymous:${crypto.randomUUID()}`;
+  if (
+    normalized.length > 128 ||
+    (normalized !== clientId && clientId !== undefined)
+  ) {
+    throw new Error("A valid client ID is required");
+  }
+  return normalized;
+}
 
 /** Default sort order (UTF-16 code units), independent of locale. */
 function compareCodeUnits(a: string, b: string): number {
@@ -59,10 +74,9 @@ function sanitizeCat(doc: Doc<"perfect_cats">) {
 }
 
 function pairKey(a: Id<"perfect_cats">, b: Id<"perfect_cats">): string {
-  const [first, second] = [
-    a as unknown as string,
-    b as unknown as string,
-  ].sort(compareCodeUnits);
+  const [first, second] = [a as unknown as string, b as unknown as string].sort(
+    compareCodeUnits,
+  );
   return `${first}__${second}`;
 }
 
@@ -107,9 +121,19 @@ export const registerCats = mutation({
     cats: v.array(v.object({ params: v.any() })),
   },
   handler: async ({ db }, args) => {
+    if (args.cats.length === 0 || args.cats.length > MAX_REGISTERED_CATS) {
+      throw new Error(`Register between 1 and ${MAX_REGISTERED_CATS} cats`);
+    }
     const now = Date.now();
     const results: Array<ReturnType<typeof sanitizeCat>> = [];
     for (const entry of args.cats) {
+      const encodedParams = JSON.stringify(entry.params);
+      if (
+        !encodedParams ||
+        new TextEncoder().encode(encodedParams).byteLength > MAX_PARAMS_BYTES
+      ) {
+        throw new Error("Cat parameters are too large");
+      }
       const hash = hashCatParams(entry.params);
       const existing = await db
         .query("perfect_cats")
@@ -145,6 +169,8 @@ type MatchupResponse = {
   cats: MatchupCat[];
   needsSeed: number;
   totalCats: number;
+  totalCatsCapped?: boolean;
+  matchupToken?: string;
 };
 
 export const requestMatchup = mutation({
@@ -152,8 +178,9 @@ export const requestMatchup = mutation({
     clientId: v.optional(v.string()),
   },
   handler: async ({ db }, args): Promise<MatchupResponse> => {
-    const allCats = await db.query("perfect_cats").collect();
-    const totalCats = allCats.length;
+    const clientId = validClientId(args.clientId);
+    const allCats = await db.query("perfect_cats").take(COUNT_SAMPLE_LIMIT + 1);
+    const totalCats = Math.min(allCats.length, COUNT_SAMPLE_LIMIT);
     const needsSeed = Math.max(0, MINIMUM_POOL_SIZE - totalCats);
 
     if (totalCats < 2) {
@@ -183,10 +210,10 @@ export const requestMatchup = mutation({
     }
 
     const seenPairs = new Set<string>();
-    if (args.clientId) {
+    if (clientId) {
       const recentVotes = await db
         .query("perfect_votes")
-        .withIndex("byClient", (q) => q.eq("clientId", args.clientId))
+        .withIndex("byClient", (q) => q.eq("clientId", clientId))
         .order("desc")
         .take(RECENT_VOTE_SAMPLE);
       for (const vote of recentVotes) {
@@ -206,6 +233,22 @@ export const requestMatchup = mutation({
     }
 
     const now = Date.now();
+    const previous = await db
+      .query("perfect_matchups")
+      .withIndex("byClient", (q) => q.eq("clientId", clientId))
+      .first();
+    const matchupToken = crypto.randomUUID();
+    const pendingMatchup = {
+      clientId,
+      catAId: first._id,
+      catBId: second._id,
+      token: matchupToken,
+      createdAt: now,
+      expiresAt: now + MATCHUP_TTL_MS,
+      consumed: false,
+    };
+    if (previous) await db.replace(previous._id, pendingMatchup);
+    else await db.insert("perfect_matchups", pendingMatchup);
     await Promise.all([
       db.patch(first._id, { lastShownAt: now, updatedAt: now }),
       db.patch(second._id, { lastShownAt: now, updatedAt: now }),
@@ -215,20 +258,42 @@ export const requestMatchup = mutation({
       cats: [sanitizeCat(first), sanitizeCat(second)],
       needsSeed,
       totalCats,
+      totalCatsCapped: allCats.length > COUNT_SAMPLE_LIMIT,
+      matchupToken,
     };
   },
 });
 
 export const submitVote = mutation({
   args: {
-    clientId: v.optional(v.string()),
+    clientId: v.string(),
     winnerId: v.id("perfect_cats"),
     loserId: v.id("perfect_cats"),
+    matchupToken: v.string(),
   },
   handler: async ({ db }, args) => {
+    const clientId = validClientId(args.clientId);
     if (args.winnerId === args.loserId) {
       throw new Error("Winner and loser must be different cats");
     }
+
+    const matchup = await db
+      .query("perfect_matchups")
+      .withIndex("byClient", (q) => q.eq("clientId", clientId))
+      .first();
+    const now = Date.now();
+    if (
+      !matchup ||
+      matchup.consumed ||
+      matchup.expiresAt < now ||
+      pairKey(matchup.catAId, matchup.catBId) !==
+        pairKey(args.winnerId, args.loserId) ||
+      args.matchupToken !== matchup.token
+    ) {
+      throw new Error("Vote requires the current unused matchup");
+    }
+    // Consuming the served pair and updating ratings share one transaction.
+    await db.patch(matchup._id, { consumed: true });
 
     const [winner, loser] = await Promise.all([
       db.get(args.winnerId),
@@ -246,7 +311,6 @@ export const submitVote = mutation({
     const winnerRating = winner.rating + K_FACTOR * (1 - expectedWinner);
     const loserRating = loser.rating + K_FACTOR * (0 - expectedLoser);
 
-    const now = Date.now();
     await Promise.all([
       db.patch(winner._id, {
         rating: winnerRating,
@@ -268,7 +332,7 @@ export const submitVote = mutation({
       catAId: args.winnerId,
       catBId: args.loserId,
       winnerId: args.winnerId,
-      clientId: args.clientId ?? "",
+      clientId,
       createdAt: now,
     });
 

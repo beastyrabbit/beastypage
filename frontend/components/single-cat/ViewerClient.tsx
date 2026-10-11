@@ -400,7 +400,8 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
   }, [catPayload]);
 
   useEffect(() => {
-    if (!rendererReady || !catPayload?.params) return;
+    if (!rendererReady || !catPayload?.params || !spriteVariantsOpen) return;
+    if (spriteVariants.length > 0) return;
     const generator = generatorRef.current;
     if (!generator) return;
 
@@ -429,54 +430,61 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
         }),
       );
 
-      previews.push(
-        ...(
-          await Promise.all(
-            poseChoices.map(
-              async (poseChoice): Promise<SpriteVariantPreview | null> => {
-                if (cancelled) return null;
-                try {
-                  const variantPayload = setCanonicalViewTrait(
-                    catPayload,
-                    "pose",
-                    poseChoice.poseName,
-                  );
-                  const result = await generator.generateCat(
-                    variantPayload.params,
-                  );
-                  const previewCanvas = document.createElement("canvas");
-                  previewCanvas.width = PREVIEW_CANVAS_SIZE;
-                  previewCanvas.height = PREVIEW_CANVAS_SIZE;
-                  const ctx = previewCanvas.getContext("2d");
-                  if (!ctx) return null;
-                  ctx.imageSmoothingEnabled = false;
-                  ctx.drawImage(
-                    result.canvas as HTMLCanvasElement,
-                    0,
-                    0,
-                    PREVIEW_CANVAS_SIZE,
-                    PREVIEW_CANVAS_SIZE,
-                  );
-                  return {
-                    id: poseChoice.id,
-                    spriteNumber: poseChoice.spriteNumber,
-                    poseName: poseChoice.poseName,
-                    name: poseChoice.name,
-                    dataUrl: previewCanvas.toDataURL("image/png"),
-                  };
-                } catch (err) {
-                  console.warn("Failed to render sprite variant", err);
-                  return null;
-                }
-              },
-            ),
-          )
-        ).filter(
-          (preview): preview is SpriteVariantPreview => preview !== null,
-        ),
-      );
+      let nextIndex = 0;
+      const renderPose = async (poseChoice: (typeof poseChoices)[number]) => {
+        if (cancelled) return null;
+        try {
+          const variantPayload = setCanonicalViewTrait(
+            catPayload,
+            "pose",
+            poseChoice.poseName,
+          );
+          const result = await generator.generateCat(variantPayload.params);
+          const previewCanvas = document.createElement("canvas");
+          previewCanvas.width = PREVIEW_CANVAS_SIZE;
+          previewCanvas.height = PREVIEW_CANVAS_SIZE;
+          const ctx = previewCanvas.getContext("2d");
+          if (!ctx) return null;
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(
+            result.canvas as HTMLCanvasElement,
+            0,
+            0,
+            PREVIEW_CANVAS_SIZE,
+            PREVIEW_CANVAS_SIZE,
+          );
+          return {
+            id: poseChoice.id,
+            spriteNumber: poseChoice.spriteNumber,
+            poseName: poseChoice.poseName,
+            name: poseChoice.name,
+            dataUrl: previewCanvas.toDataURL("image/png"),
+          };
+        } catch (err) {
+          console.warn("Failed to render sprite variant", err);
+          return null;
+        }
+      };
+      const worker = async () => {
+        while (!cancelled) {
+          const index = nextIndex++;
+          const poseChoice = poseChoices[index];
+          if (!poseChoice) return;
+          const preview = await renderPose(poseChoice);
+          if (preview) previews.push(preview);
+        }
+      };
+      const workerCount = Math.min(3, poseChoices.length);
+      await Promise.all(Array.from({ length: workerCount }, () => worker()));
       if (!cancelled) {
-        setSpriteVariants(previews);
+        const ordered = poseChoices
+          .map((poseChoice) =>
+            previews.find((preview) => preview.id === poseChoice.id),
+          )
+          .filter(
+            (preview): preview is SpriteVariantPreview => preview !== undefined,
+          );
+        setSpriteVariants(ordered);
         setSpriteVariantsLoading(false);
       }
     })();
@@ -484,7 +492,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
     return () => {
       cancelled = true;
     };
-  }, [rendererReady, catPayload]);
+  }, [rendererReady, catPayload, spriteVariants.length, spriteVariantsOpen]);
 
   const traitRows = useMemo(() => {
     if (!catPayload) return [];
@@ -617,12 +625,12 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
   const catDisplayName = useMemo(() => {
     const metaName = meta?.catName?.trim();
     if (metaName) return metaName;
+    const payloadParams = catPayload?.params as
+      | Record<string, unknown>
+      | undefined;
     const payloadName =
-      typeof (catPayload?.params as Record<string, unknown> | undefined)
-        ?.catName === "string"
-        ? (
-            (catPayload?.params as Record<string, unknown>).catName as string
-          ).trim()
+      typeof payloadParams?.catName === "string"
+        ? payloadParams.catName.trim()
         : "";
     return payloadName || "Shared Cat";
   }, [catPayload, meta]);
@@ -630,13 +638,12 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
   const creatorDisplayName = useMemo(() => {
     const metaCreator = meta?.creatorName?.trim();
     if (metaCreator) return metaCreator;
+    const payloadParams = catPayload?.params as
+      | Record<string, unknown>
+      | undefined;
     const payloadCreator =
-      typeof (catPayload?.params as Record<string, unknown> | undefined)
-        ?.creatorName === "string"
-        ? (
-            (catPayload?.params as Record<string, unknown>)
-              .creatorName as string
-          ).trim()
+      typeof payloadParams?.creatorName === "string"
+        ? payloadParams.creatorName.trim()
         : "";
     return payloadCreator || null;
   }, [catPayload, meta]);

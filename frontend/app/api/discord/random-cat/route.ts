@@ -1,6 +1,10 @@
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
+import {
+  RequestBodyTooLargeError,
+  readRequestBody,
+} from "@/app/api/_lib/request-body";
 import { RENDERER_BASE } from "@/app/api/renderer/_lib/proxy";
 import { api } from "@/convex/_generated/api";
 import { isDiscordServiceRequest } from "@/convex/discordAuth";
@@ -18,17 +22,36 @@ const DISCORD_IMAGE_SIZE = 500;
 
 const PUBLIC_BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ?? "https://beastyrabbit.com";
+const MAX_BODY_BYTES = 32 * 1024;
 
 export async function POST(request: NextRequest) {
+  if (!isDiscordServiceRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   let body: Record<string, unknown> = {};
-  const contentLength = request.headers.get("content-length");
-  const hasBody = contentLength !== null && contentLength !== "0";
-  if (hasBody) {
-    try {
-      body = (await request.json()) as Record<string, unknown>;
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  try {
+    const rawBody = await readRequestBody(request, MAX_BODY_BYTES);
+    if (rawBody.trim()) {
+      const parsed: unknown = JSON.parse(rawBody);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return NextResponse.json(
+          { error: "Invalid JSON body" },
+          { status: 400 },
+        );
+      }
+      body = parsed as Record<string, unknown>;
     }
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: "Request body is too large" },
+        { status: 413 },
+      );
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   // Build overrides from per-invocation options
@@ -65,8 +88,6 @@ export async function POST(request: NextRequest) {
   const discordUserId =
     typeof body.discord_user_id === "string" ? body.discord_user_id : undefined;
   if (discordUserId) {
-    if (!isDiscordServiceRequest(request))
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     try {
       const cfg = await discordConfig("get", {
         discordUserId,
@@ -115,7 +136,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(renderPayload),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.any([AbortSignal.timeout(30_000), request.signal]),
     });
 
     if (!rendererRes.ok) {
@@ -169,6 +190,9 @@ export async function POST(request: NextRequest) {
     imageDataUrl = canvas.toDataURL("image/png");
   } catch (error) {
     console.error("[discord/random-cat] Renderer request failed", error);
+    if (request.signal.aborted) {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
     return NextResponse.json(
       { error: "Renderer service unavailable" },
       { status: 502 },

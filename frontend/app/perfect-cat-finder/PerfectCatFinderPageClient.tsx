@@ -68,6 +68,7 @@ type MatchupResponse = {
   cats: MatchupCat[];
   needsSeed: number;
   totalCats: number;
+  matchupToken?: string;
 };
 
 type SeedResult = {
@@ -284,6 +285,7 @@ export default function PerfectCatFinderPage() {
   const [message, setMessage] = useState<string | null>(null);
   const messageTimeoutRef = useRef<number | null>(null);
   const [matchup, setMatchup] = useState<MatchupCat[]>([]);
+  const [matchupToken, setMatchupToken] = useState<string | null>(null);
   const [poolSize, setPoolSize] = useState(0);
   const [loading, setLoading] = useState(true);
   const [voteBusy, setVoteBusy] = useState(false);
@@ -362,11 +364,13 @@ export default function PerfectCatFinderPage() {
           params: toCanonicalRenderPayload(cat.params),
         }));
         setMatchup(normalized);
+        setMatchupToken(response.matchupToken ?? null);
         setPoolSize(response.totalCats);
         normalized.forEach((cat) => void ensurePreview(cat));
         track("perfect_cat_matchup_loaded", {});
       } else {
         setMatchup([]);
+        setMatchupToken(null);
         setPoolSize(response.totalCats);
       }
     } catch (err) {
@@ -389,7 +393,7 @@ export default function PerfectCatFinderPage() {
 
   const handleVote = useCallback(
     async (winner: MatchupCat) => {
-      if (!clientId || matchup.length < 2) return;
+      if (!clientId || !matchupToken || matchup.length < 2) return;
       const loser = matchup.find((cat) => cat.id !== winner.id);
       if (!loser) return;
       setVoteBusy(true);
@@ -399,6 +403,7 @@ export default function PerfectCatFinderPage() {
           clientId,
           winnerId: winner.id,
           loserId: loser.id,
+          matchupToken,
         });
       } catch (err) {
         console.error("Failed to submit vote", err);
@@ -408,7 +413,7 @@ export default function PerfectCatFinderPage() {
       }
       await loadMatchup();
     },
-    [clientId, loadMatchup, matchup, submitVote],
+    [clientId, loadMatchup, matchup, matchupToken, submitVote],
   );
 
   const handleCopySprite = useCallback(

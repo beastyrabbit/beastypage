@@ -228,6 +228,7 @@ jobs:
        (github.event_name == 'push' && needs.changes.outputs.frontend == 'true') ||
        (github.event_name == 'workflow_dispatch' && inputs.build_frontend))
     runs-on: arc-beastypage
+    timeout-minutes: 45
     environment: production
     permissions:
       contents: read
@@ -306,6 +307,7 @@ jobs:
        (github.event_name == 'push' && needs.changes.outputs.renderer == 'true') ||
        (github.event_name == 'workflow_dispatch' && inputs.build_renderer))
     runs-on: arc-beastypage
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
@@ -359,9 +361,10 @@ jobs:
        (github.event_name == 'push' && needs.changes.outputs.image_processing == 'true') ||
        (github.event_name == 'workflow_dispatch' && inputs.build_image_processing))
     runs-on: arc-beastypage
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
       - name: Enable pnpm
@@ -377,6 +380,7 @@ jobs:
        (github.event_name == 'push' && needs.changes.outputs.image_processing == 'true') ||
        (github.event_name == 'workflow_dispatch' && inputs.build_image_processing))
     runs-on: arc-beastypage
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
@@ -422,6 +426,7 @@ jobs:
        (github.event_name == 'push' && needs.changes.outputs.discord_bot == 'true') ||
        (github.event_name == 'workflow_dispatch' && inputs.build_discord_bot))
     runs-on: arc-beastypage
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
@@ -475,9 +480,10 @@ jobs:
        (github.event_name == 'push' && needs.changes.outputs.media == 'true') ||
        (github.event_name == 'workflow_dispatch' && inputs.build_media))
     runs-on: arc-beastypage
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
       - name: Enable pnpm
@@ -493,6 +499,7 @@ jobs:
        (github.event_name == 'push' && needs.changes.outputs.media == 'true') ||
        (github.event_name == 'workflow_dispatch' && inputs.build_media))
     runs-on: arc-beastypage
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write

@@ -1,12 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
-
-export const bodySizeLimit = "60mb";
+import {
+  RequestBodyTooLargeError,
+  readRequestBody,
+} from "@/app/api/_lib/request-body";
 
 const BACKEND_BASE = (
   process.env.IMAGE_PROCESSING_INTERNAL_URL ?? "http://127.0.0.1:8002"
 ).replace(/\/$/, "");
 
 const TIMEOUT_MS = 30_000;
+const MAX_BODY_BYTES = 16 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   const contentType = request.headers.get("content-type");
@@ -17,7 +20,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = await request.text();
+  let body: string;
+  try {
+    body = await readRequestBody(request, MAX_BODY_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: "Request body is too large" },
+        { status: 413 },
+      );
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
+    throw error;
+  }
   if (!body) {
     return NextResponse.json({ error: "Empty body" }, { status: 400 });
   }

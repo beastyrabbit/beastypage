@@ -1,4 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
+import {
+  RequestBodyTooLargeError,
+  readRequestBody,
+} from "@/app/api/_lib/request-body";
 
 function normalizeRendererBase(url: string) {
   const trimmed = url.replace(/\/$/, "");
@@ -13,6 +17,7 @@ export const RENDERER_BASE = normalizeRendererBase(
 );
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const MAX_RENDER_BODY_BYTES = 16 * 1024 * 1024;
 
 type Validator = (body: unknown) => string | null;
 
@@ -57,7 +62,13 @@ function selectResponseHeaders(upstream: Response): Headers {
   return headers;
 }
 
-function classifyError(error: unknown): { status: number; message: string } {
+function classifyError(
+  error: unknown,
+  requestSignal: AbortSignal,
+): { status: number; message: string } {
+  if (requestSignal.aborted) {
+    return { status: 499, message: "Request aborted" };
+  }
   if (error instanceof DOMException && error.name === "AbortError") {
     return { status: 504, message: "Renderer request timed out" };
   }
@@ -127,8 +138,21 @@ export async function proxyRendererJson(
     return NextResponse.json({ error: contentTypeError }, { status: 415 });
   }
 
-  const clone = request.clone();
-  const rawBody = await clone.text();
+  let rawBody: string;
+  try {
+    rawBody = await readRequestBody(request, MAX_RENDER_BODY_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: "Request body is too large" },
+        { status: 413 },
+      );
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
+    throw error;
+  }
   if (!rawBody) {
     return NextResponse.json(
       { error: "Request body must not be empty" },
@@ -163,7 +187,7 @@ export async function proxyRendererJson(
       method: "POST",
       headers: selectHeaders(request),
       body: rawBody,
-      signal: controller.signal,
+      signal: AbortSignal.any([controller.signal, request.signal]),
       redirect: "manual",
     });
 
@@ -215,7 +239,7 @@ export async function proxyRendererJson(
       `[renderer-proxy] upstream request failed for ${path}`,
       error,
     );
-    const { status, message } = classifyError(error);
+    const { status, message } = classifyError(error, request.signal);
     return NextResponse.json({ error: message }, { status });
   }
 }

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
 import { mutation, query } from "./_generated/server.js";
+import { STREAM_WHEEL_PRIZES } from "./streamWheel.js";
 
 type WheelSpinDoc = Doc<"wheel_spins">;
 
@@ -11,6 +12,20 @@ export const logSpin = mutation({
     randomBucket: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    if (args.forced) {
+      throw new Error("Forced wheel spins are internal-only");
+    }
+    if (!STREAM_WHEEL_PRIZES.some((prize) => prize.name === args.prizeName)) {
+      throw new Error("Unknown wheel prize");
+    }
+    if (
+      args.randomBucket !== undefined &&
+      (!Number.isInteger(args.randomBucket) ||
+        args.randomBucket < 0 ||
+        args.randomBucket >= 100)
+    ) {
+      throw new Error("Invalid wheel random bucket");
+    }
     const doc: Omit<WheelSpinDoc, "_id" | "_creationTime"> = {
       prizeName: args.prizeName,
       forced: args.forced,
@@ -24,9 +39,14 @@ export const logSpin = mutation({
 });
 
 export const stats = query({
-  args: {},
-  handler: async (ctx) => {
-    const records = await ctx.db.query("wheel_spins").collect();
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = Math.max(1, Math.min(args.limit ?? 10_000, 10_000));
+    const records = await ctx.db
+      .query("wheel_spins")
+      .withIndex("byCreated")
+      .order("desc")
+      .take(limit);
 
     const totals = new Map<
       string,
@@ -39,22 +59,24 @@ export const stats = query({
     const register = (doc: WheelSpinDoc) => {
       if (doc.forced) {
         totalForced += 1;
-        return;
       }
       const current = totals.get(doc.prizeName) ?? {
         count: 0,
         forced: 0,
         lastSpinAt: null,
       };
-      current.count += 1;
+      if (!doc.forced) current.count += 1;
+      if (doc.forced) current.forced += 1;
       current.lastSpinAt = current.lastSpinAt
         ? Math.max(current.lastSpinAt, doc.createdAt)
         : doc.createdAt;
       totals.set(doc.prizeName, current);
-      totalSpins += 1;
-      mostRecent = mostRecent
-        ? Math.max(mostRecent, doc.createdAt)
-        : doc.createdAt;
+      if (!doc.forced) {
+        totalSpins += 1;
+        mostRecent = mostRecent
+          ? Math.max(mostRecent, doc.createdAt)
+          : doc.createdAt;
+      }
     };
 
     records.forEach(register);
@@ -73,6 +95,7 @@ export const stats = query({
       totalForced,
       lastSpinAt: mostRecent,
       prizes: prizeStats,
+      truncated: records.length >= limit,
     };
   },
 });

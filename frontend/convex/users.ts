@@ -232,7 +232,7 @@ export const searchByUsername = query({
     const candidates = await ctx.db
       .query("users")
       .withIndex("byUsername")
-      .collect();
+      .take(2_000);
 
     return candidates
       .filter((u) => u.username?.toLowerCase().startsWith(trimmed))
@@ -254,14 +254,15 @@ export const resolveUsernames = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
 
-    const allUsers = await ctx.db.query("users").collect();
+    const requestedIds = args.userIds.slice(0, 100);
+    const allUsers = await ctx.db.query("users").take(5_000);
 
     const byClerkId = new Map<string, string>();
     for (const u of allUsers) {
       byClerkId.set(clerkUserId(u.tokenIdentifier), u.username ?? "unknown");
     }
 
-    return args.userIds.map((id) => ({
+    return requestedIds.map((id) => ({
       userId: id,
       username: byClerkId.get(id) ?? id,
     }));

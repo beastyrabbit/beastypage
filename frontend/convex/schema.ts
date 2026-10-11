@@ -150,7 +150,9 @@ export default defineSchema({
     focusY: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("byArtist", ["artistName"]),
+  })
+    .index("byArtist", ["artistName"])
+    .index("byCreated", ["createdAt"]),
 
   coinflipper_scores: defineTable({
     playerName: v.string(),
@@ -197,6 +199,8 @@ export default defineSchema({
   cat_shares: defineTable({
     slug: v.string(),
     data: v.any(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("bySlug", ["slug"])
@@ -205,6 +209,8 @@ export default defineSchema({
   single_cat_settings: defineTable({
     slug: v.string(),
     config: v.any(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -340,9 +346,23 @@ export default defineSchema({
     .index("byClient", ["clientId", "createdAt"])
     .index("byCats", ["catAId", "catBId", "createdAt"]),
 
+  perfect_matchups: defineTable({
+    clientId: v.string(),
+    catAId: v.id("perfect_cats"),
+    catBId: v.id("perfect_cats"),
+    token: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    consumed: v.boolean(),
+  })
+    .index("byClient", ["clientId"])
+    .index("byExpiresAt", ["expiresAt"]),
+
   palette_generator_settings: defineTable({
     slug: v.string(),
     config: v.any(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -352,6 +372,8 @@ export default defineSchema({
   pixelator_settings: defineTable({
     slug: v.string(),
     config: v.any(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -361,6 +383,8 @@ export default defineSchema({
   dash_settings: defineTable({
     slug: v.string(),
     config: v.any(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -384,6 +408,8 @@ export default defineSchema({
 
   ancestry_tree: defineTable({
     slug: v.string(),
+    editToken: v.optional(v.string()),
+    ownerTokenIdentifier: v.optional(v.string()),
     name: v.string(),
     foundingMotherId: v.string(),
     foundingFatherId: v.string(),

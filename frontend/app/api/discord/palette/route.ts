@@ -1,5 +1,9 @@
 import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
+import {
+  RequestBodyTooLargeError,
+  readRequestBody,
+} from "@/app/api/_lib/request-body";
 import { api } from "@/convex/_generated/api";
 import { isDiscordServiceRequest } from "@/convex/discordAuth";
 import {
@@ -13,14 +17,29 @@ import { downloadPublicImage } from "@/lib/public-image-download";
 
 const PUBLIC_BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ?? "https://beastyrabbit.com";
+const MAX_BODY_BYTES = 64 * 1024;
 
 export async function POST(request: NextRequest) {
   if (!isDiscordServiceRequest(request))
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   let body: Record<string, unknown>;
   try {
-    body = (await request.json()) as Record<string, unknown>;
-  } catch {
+    const rawBody = await readRequestBody(request, MAX_BODY_BYTES);
+    const parsed: unknown = JSON.parse(rawBody);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    body = parsed as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: "Request body is too large" },
+        { status: 413 },
+      );
+    }
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return NextResponse.json({ error: "Request aborted" }, { status: 499 });
+    }
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
@@ -109,7 +128,11 @@ export async function POST(request: NextRequest) {
 
       const result = await convex.action(
         api.paletteGeneratorSettingsActions.storeDiscordImage,
-        { dataUrl, colors: colorsPayload },
+        {
+          dataUrl,
+          colors: colorsPayload,
+          serviceToken: process.env.DISCORD_API_TOKEN ?? "",
+        },
       );
       slug = result.slug;
       customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?paletteSlug=${slug}`;

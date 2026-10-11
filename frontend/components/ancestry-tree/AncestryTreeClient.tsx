@@ -167,6 +167,18 @@ export function AncestryTreeClient({
   const [tree, setTree] = useState<SerializedAncestryTree | null>(
     initialTree ?? null,
   );
+  // Capability returned when an anonymous tree is first created. It is kept
+  // only in the creator's browser and is never exposed by public queries.
+  const [treeEditToken, setTreeEditToken] = useState<string | null>(() => {
+    if (typeof window === "undefined" || !initialTree?.slug) return null;
+    try {
+      return window.sessionStorage.getItem(
+        `ancestry-tree-edit:${initialTree.slug}`,
+      );
+    } catch {
+      return null;
+    }
+  });
   const [config, setConfig] = useState<TreeGenerationConfig>(
     initialTree?.config ?? DEFAULT_TREE_CONFIG,
   );
@@ -812,6 +824,7 @@ export function AncestryTreeClient({
       error?: string;
       slug?: string;
       isNew?: boolean;
+      editToken?: string;
     }> => {
       if (!tree) return { success: false, error: "No tree to save" };
 
@@ -831,6 +844,7 @@ export function AncestryTreeClient({
           config: updatedTree.config,
           creatorName: updatedTree.creatorName,
           password,
+          editToken: treeEditToken ?? undefined,
         });
 
         if (!result.success) {
@@ -838,6 +852,17 @@ export function AncestryTreeClient({
         }
 
         setTree(updatedTree);
+        if (result.editToken) {
+          setTreeEditToken(result.editToken);
+          try {
+            window.sessionStorage.setItem(
+              `ancestry-tree-edit:${updatedTree.slug}`,
+              result.editToken,
+            );
+          } catch {
+            // Storage may be disabled; the in-memory token still works.
+          }
+        }
 
         // If password was set on new tree, track it
         if (password && result.isNew) {
@@ -862,7 +887,7 @@ export function AncestryTreeClient({
         };
       }
     },
-    [tree, saveTreeMutation, router],
+    [tree, treeEditToken, saveTreeMutation, router],
   );
 
   const handleBackToConfig = useCallback(() => {

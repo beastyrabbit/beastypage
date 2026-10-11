@@ -17,20 +17,23 @@ replace_in_files() {
   pattern="$1"
   replacement="$2"
 
-  # Escape special sed characters
+  # Escape special sed replacement characters and make the placeholder a
+  # literal match. Without escaping, dots in URLs become regex wildcards and
+  # can rewrite unrelated content in the generated bundle.
+  escaped_pattern=$(printf '%s' "$pattern" | sed 's/[][\\.^$*|]/\\&/g')
   escaped_replacement=$(printf '%s' "$replacement" | sed 's/[&/\|]/\\&/g')
 
   # Replace in .next directory
   find /app/.next -type f \( -name "*.js" -o -name "*.json" -o -name "*.html" -o -name "*.rsc" \) 2>/dev/null | while read -r file; do
-    if grep -q "$pattern" "$file" 2>/dev/null; then
-      sed -i "s|$pattern|$escaped_replacement|g" "$file"
+    if grep -Fq -- "$pattern" "$file" 2>/dev/null; then
+      sed -i "s|$escaped_pattern|$escaped_replacement|g" "$file"
     fi
   done
 
   # Also check root files
   for file in /app/server.js /app/*.json; do
-    if [ -f "$file" ] && grep -q "$pattern" "$file" 2>/dev/null; then
-      sed -i "s|$pattern|$escaped_replacement|g" "$file"
+    if [ -f "$file" ] && grep -Fq -- "$pattern" "$file" 2>/dev/null; then
+      sed -i "s|$escaped_pattern|$escaped_replacement|g" "$file"
     fi
   done
 }

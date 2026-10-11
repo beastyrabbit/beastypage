@@ -13,6 +13,7 @@ import {
 	PutBucketLifecycleConfigurationCommand,
 	PutObjectCommand,
 	S3Client,
+	S3ServiceException,
 	UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import type { Config } from "./config.ts";
@@ -47,7 +48,8 @@ export class ObjectStore {
 			await this.client.send(
 				new HeadBucketCommand({ Bucket: this.config.s3Bucket }),
 			);
-		} catch {
+		} catch (error) {
+			if (!isMissingBucketError(error)) throw error;
 			await this.client.send(
 				new CreateBucketCommand({ Bucket: this.config.s3Bucket }),
 			);
@@ -194,4 +196,13 @@ export class ObjectStore {
 			new DeleteObjectCommand({ Bucket: this.config.s3Bucket, Key: key }),
 		);
 	}
+}
+
+function isMissingBucketError(error: unknown): boolean {
+	if (!(error instanceof S3ServiceException)) return false;
+	return (
+		error.$metadata.httpStatusCode === 404 ||
+		error.name === "NoSuchBucket" ||
+		error.name === "NotFound"
+	);
 }

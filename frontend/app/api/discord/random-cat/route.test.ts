@@ -39,15 +39,31 @@ import { POST } from "./route";
 function request() {
   return new NextRequest("http://localhost/api/discord/random-cat", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      authorization: `Bearer ${"x".repeat(32)}`,
+      "content-type": "application/json",
+    },
     body: JSON.stringify({}),
   });
 }
 
 describe("Discord random-cat renderer catalog guard", () => {
   beforeEach(() => {
+    vi.stubEnv("DISCORD_API_TOKEN", "x".repeat(32));
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+
+  it("rejects requests without the service bearer token", async () => {
+    const response = await POST(
+      new NextRequest("http://localhost/api/discord/random-cat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+    );
+
+    expect(response.status).toBe(401);
   });
 
   afterEach(() => {

@@ -1,10 +1,10 @@
 "use node";
 import { v } from "convex/values";
 import { Jimp } from "jimp";
-import { api } from "./_generated/api.js";
+import { internal } from "./_generated/api.js";
 import type { Id } from "./_generated/dataModel.js";
 import type { ActionCtx } from "./_generated/server.js";
-import { action } from "./_generated/server.js";
+import { internalAction } from "./_generated/server.js";
 
 type Variant = "default" | "custom";
 
@@ -22,12 +22,12 @@ type VariantResult = {
   payload: ThumbnailPayload;
 };
 
-export const generateForCat = action({
+export const generateForCat = internalAction({
   args: {
     id: v.id("catdex"),
   },
   handler: async (ctx, args) => {
-    const cat = await ctx.runQuery(api.catdex.getDoc, { id: args.id });
+    const cat = await ctx.runQuery(internal.catdex.getDoc, { id: args.id });
     if (!cat) {
       return { success: false, reason: "cat_not_found" } as const;
     }
@@ -74,7 +74,7 @@ export const generateForCat = action({
       (entry) => entry.variant === "custom",
     )?.payload;
 
-    await ctx.runMutation(api.catdex.applyThumbnailUpdates, {
+    await ctx.runMutation(internal.catdex.applyThumbnailUpdates, {
       id: args.id,
       ...(defaultCard ? { defaultCard } : {}),
       ...(customCard ? { customCard } : {}),

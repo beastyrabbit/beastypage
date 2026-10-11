@@ -1,6 +1,42 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server.js";
 
+const MAX_CATS = 500;
+const MAX_TREE_BYTES = 900 * 1024;
+const MAX_SLUG_LENGTH = 40;
+const MAX_NAME_LENGTH = 120;
+
+function assertTreeSize(args: {
+  slug: string;
+  name: string;
+  cats: unknown[];
+  config: unknown;
+}) {
+  if (args.slug.length === 0 || args.slug.length > MAX_SLUG_LENGTH) {
+    throw new Error("Invalid tree slug");
+  }
+  if (args.name.trim().length === 0 || args.name.length > MAX_NAME_LENGTH) {
+    throw new Error("Invalid tree name");
+  }
+  if (args.cats.length > MAX_CATS) {
+    throw new Error(`Tree exceeds the ${MAX_CATS} cat limit`);
+  }
+  let encoded: string;
+  try {
+    encoded = JSON.stringify({
+      slug: args.slug,
+      name: args.name,
+      cats: args.cats,
+      config: args.config,
+    });
+  } catch {
+    throw new Error("Invalid tree payload");
+  }
+  if (new TextEncoder().encode(encoded).byteLength > MAX_TREE_BYTES) {
+    throw new Error("Tree payload is too large");
+  }
+}
+
 /**
  * Password hashing utilities using Web Crypto PBKDF2
  *
@@ -232,8 +268,10 @@ export const save = mutation({
     config: configValidator,
     creatorName: v.optional(v.string()),
     password: v.optional(v.string()),
+    editToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    assertTreeSize(args);
     const now = Date.now();
 
     // Check if tree with this slug already exists
@@ -243,12 +281,24 @@ export const save = mutation({
       .first();
 
     if (existing) {
-      const passwordError = await existingTreePasswordError(
-        existing.passwordHash,
-        args.password,
-      );
-      if (passwordError) {
-        return { success: false, error: passwordError } as const;
+      const identity = await ctx.auth.getUserIdentity();
+      const owner =
+        existing.ownerTokenIdentifier &&
+        identity?.tokenIdentifier === existing.ownerTokenIdentifier;
+      const tokenMatch =
+        existing.editToken && args.editToken === existing.editToken;
+      if (!owner && !tokenMatch) {
+        if (existing.passwordHash) {
+          const passwordError = await existingTreePasswordError(
+            existing.passwordHash,
+            args.password,
+          );
+          if (passwordError) {
+            return { success: false, error: passwordError } as const;
+          }
+        } else {
+          return { success: false, error: "edit_token_required" } as const;
+        }
       }
 
       // Update existing tree
@@ -285,6 +335,7 @@ export const save = mutation({
         id: existing._id,
         slug: args.slug,
         isNew: false,
+        editToken: existing.editToken,
       } as const;
     }
 
@@ -300,6 +351,8 @@ export const save = mutation({
       updatedAt: number;
       creatorName?: string;
       passwordHash?: string;
+      editToken: string;
+      ownerTokenIdentifier?: string;
     } = {
       slug: args.slug,
       name: args.name,
@@ -309,6 +362,7 @@ export const save = mutation({
       config: args.config,
       createdAt: now,
       updatedAt: now,
+      editToken: crypto.randomUUID(),
     };
 
     if (args.creatorName !== undefined) {
@@ -319,9 +373,20 @@ export const save = mutation({
       insertData.passwordHash = await hashPassword(args.password);
     }
 
+    const identity = await ctx.auth.getUserIdentity();
+    if (identity?.tokenIdentifier) {
+      insertData.ownerTokenIdentifier = identity.tokenIdentifier;
+    }
+
     const id = await ctx.db.insert("ancestry_tree", insertData);
 
-    return { success: true, id, slug: args.slug, isNew: true } as const;
+    return {
+      success: true,
+      id,
+      slug: args.slug,
+      isNew: true,
+      editToken: insertData.editToken,
+    } as const;
   },
 });
 
@@ -353,7 +418,7 @@ export const getBySlug = query({
     if (!tree) return null;
 
     // Return tree data with hasPassword flag, but not the actual hash
-    const { passwordHash, ...treeData } = tree;
+    const { passwordHash, editToken, ownerTokenIdentifier, ...treeData } = tree;
     return { ...treeData, hasPassword: !!passwordHash };
   },
 });
@@ -363,7 +428,7 @@ export const list = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 20;
+    const limit = Math.max(1, Math.min(args.limit ?? 20, 100));
 
     const trees = await ctx.db
       .query("ancestry_tree")
@@ -399,6 +464,7 @@ export const update = mutation({
     config: v.optional(configValidator),
     creatorName: v.optional(v.string()),
     password: v.optional(v.string()),
+    editToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -410,18 +476,36 @@ export const update = mutation({
       return { success: false, error: "not_found" } as const;
     }
 
-    // Check password if tree has one
-    if (existing.passwordHash) {
-      if (!args.password) {
-        return { success: false, error: "password_required" } as const;
+    const identity = await ctx.auth.getUserIdentity();
+    const owner =
+      existing.ownerTokenIdentifier &&
+      identity?.tokenIdentifier === existing.ownerTokenIdentifier;
+    const tokenMatch =
+      existing.editToken && args.editToken === existing.editToken;
+    if (!owner && !tokenMatch) {
+      if (existing.passwordHash) {
+        if (!args.password) {
+          return { success: false, error: "password_required" } as const;
+        }
+        const isValid = await verifyPassword(
+          args.password,
+          existing.passwordHash,
+        );
+        if (!isValid) {
+          return { success: false, error: "invalid_password" } as const;
+        }
+      } else {
+        return { success: false, error: "edit_token_required" } as const;
       }
-      const isValid = await verifyPassword(
-        args.password,
-        existing.passwordHash,
-      );
-      if (!isValid) {
-        return { success: false, error: "invalid_password" } as const;
-      }
+    }
+
+    if (args.cats || args.config || args.name) {
+      assertTreeSize({
+        slug: args.slug,
+        name: args.name ?? existing.name,
+        cats: args.cats ?? existing.cats,
+        config: args.config ?? existing.config,
+      });
     }
 
     const updates: Record<string, unknown> = {
@@ -434,7 +518,12 @@ export const update = mutation({
     if (args.creatorName !== undefined) updates.creatorName = args.creatorName;
 
     await ctx.db.patch(existing._id, updates);
-    return { success: true, id: existing._id, slug: args.slug } as const;
+    return {
+      success: true,
+      id: existing._id,
+      slug: args.slug,
+      editToken: existing.editToken,
+    } as const;
   },
 });
 
@@ -442,6 +531,7 @@ export const remove = mutation({
   args: {
     slug: v.string(),
     password: v.optional(v.string()),
+    editToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -453,17 +543,26 @@ export const remove = mutation({
       return { success: false, error: "not_found" } as const;
     }
 
-    // Check password if tree is protected
-    if (existing.passwordHash) {
-      if (!args.password) {
-        return { success: false, error: "password_required" } as const;
-      }
-      const isValid = await verifyPassword(
-        args.password,
-        existing.passwordHash,
-      );
-      if (!isValid) {
-        return { success: false, error: "invalid_password" } as const;
+    const identity = await ctx.auth.getUserIdentity();
+    const owner =
+      existing.ownerTokenIdentifier &&
+      identity?.tokenIdentifier === existing.ownerTokenIdentifier;
+    const tokenMatch =
+      existing.editToken && args.editToken === existing.editToken;
+    if (!owner && !tokenMatch) {
+      if (existing.passwordHash) {
+        if (!args.password) {
+          return { success: false, error: "password_required" } as const;
+        }
+        const isValid = await verifyPassword(
+          args.password,
+          existing.passwordHash,
+        );
+        if (!isValid) {
+          return { success: false, error: "invalid_password" } as const;
+        }
+      } else {
+        return { success: false, error: "edit_token_required" } as const;
       }
     }
 
