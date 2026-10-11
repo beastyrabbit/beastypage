@@ -55,6 +55,8 @@ export function useQuery(
       return viewer;
     case "catdex:hasPending":
       return false;
+    case "ancestryTree:checkSlug":
+      return { exists: false, hasPassword: false };
     default:
       return [];
   }

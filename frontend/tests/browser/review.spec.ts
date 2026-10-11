@@ -271,6 +271,83 @@ test("profile describes the saved-variants reset truthfully", async ({
   });
 });
 
+test("ancestry save falls back to a validated save-as-new copy", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=ancestry-save`);
+  await page.getByRole("button", { name: "Open save dialog" }).click();
+  const dialog = page.locator("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("heading", { name: "Save Ancestry Tree" }),
+  ).toBeVisible();
+  await expect(dialog.getByLabel("New Tree Slug")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Save Tree" }).click();
+  await expect(
+    dialog.getByText(
+      "This tree is read-only in this browser. Save a copy under a new slug to continue editing.",
+    ),
+  ).toBeVisible();
+  const slug = dialog.getByLabel("New Tree Slug");
+  await expect(slug).toHaveValue(
+    "a-very-long-thunderclan-lineage-slu-copy",
+  );
+  await expect(slug).toHaveAttribute("maxlength", "40");
+  await slug.fill("Bad slug!");
+  await dialog.getByRole("button", { name: "Save as New Tree" }).click();
+  await expect(
+    dialog.getByText(
+      "Use lowercase letters, numbers, and single hyphens in the slug",
+    ),
+  ).toBeVisible();
+  await slug.fill("thunderclan-lineage-copy-2");
+  await dialog.getByRole("button", { name: "Save as New Tree" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Tree Saved!" }),
+  ).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText(
+    "Saved copy: thunderclan-lineage-copy-2",
+  );
+  await expect(dialog.getByText(/thunderclan-lineage-copy-2$/)).toBeVisible();
+  await page.screenshot({
+    path: "../.playwright-mcp/ancestry-save-as-new-success.png",
+    fullPage: true,
+  });
+  expect(errors).toEqual([]);
+});
+
+test("ancestry save dialog closes with Escape and backdrop on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${process.env.BROWSER_FIXTURE_URL}?view=ancestry-save`);
+  await page.getByRole("button", { name: "Open save dialog" }).click();
+  const dialog = page.locator("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("heading", { name: "Save Ancestry Tree" }),
+  ).toBeInViewport();
+  const dialogColor = await dialog.evaluate((element) =>
+    getComputedStyle(element).color,
+  );
+  expect(dialogColor).not.toBe("rgb(0, 0, 0)");
+  await page.screenshot({
+    path: "../.playwright-mcp/ancestry-save-mobile.png",
+    fullPage: true,
+  });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole("button", { name: "Open save dialog" }).click();
+  await expect(page.locator("dialog")).toBeVisible();
+  const backdrop = page.getByRole("button", { name: "Close dialog backdrop" });
+  const backdropBox = await backdrop.boundingBox();
+  expect(backdropBox).not.toBeNull();
+  await page.mouse.click(backdropBox!.x + 1, backdropBox!.y + 1);
+  await expect(page.locator("dialog")).toHaveCount(0);
+});
+
 test("collection dialog keeps its close control visible on mobile", async ({
   page,
 }) => {
