@@ -229,10 +229,11 @@ export function useLineageCeremony({
     setTeaserIndex(0);
     if (!enabled || step.kind !== "charge" || !requestTeaserFrame) return;
     const chargeIndex = step.index;
-    const frameCap = Math.min(
-      60,
-      Math.max(10, Math.floor(chargeDurationMs / 220)),
-    );
+    // Reduced motion: one still teaser instead of a strobing cycle (the
+    // cycle below only starts from the second frame).
+    const frameCap = prefersReducedMotion
+      ? 1
+      : Math.min(60, Math.max(10, Math.floor(chargeDurationMs / 220)));
     let cancelled = false;
     (async () => {
       for (let i = 0; i < frameCap; i += 1) {
@@ -249,7 +250,13 @@ export function useLineageCeremony({
     return () => {
       cancelled = true;
     };
-  }, [step, requestTeaserFrame, chargeDurationMs, enabled]);
+  }, [
+    step,
+    requestTeaserFrame,
+    chargeDurationMs,
+    enabled,
+    prefersReducedMotion,
+  ]);
   useEffect(() => {
     if (step.kind !== "charge" || teaserFrames.length < 2) return;
     const id = window.setInterval(
