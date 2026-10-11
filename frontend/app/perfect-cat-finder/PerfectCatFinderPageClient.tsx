@@ -398,6 +398,7 @@ export default function PerfectCatFinderPage() {
       if (!loser) return;
       setVoteBusy(true);
       track("perfect_cat_vote", {});
+      let voteSucceeded = false;
       try {
         await submitVote({
           clientId,
@@ -405,13 +406,16 @@ export default function PerfectCatFinderPage() {
           loserId: loser.id,
           ...(matchupToken ? { matchupToken } : {}),
         });
+        voteSucceeded = true;
       } catch (err) {
         console.error("Failed to submit vote", err);
         setError(err instanceof Error ? err.message : "Failed to submit vote");
       } finally {
         setVoteBusy(false);
       }
-      await loadMatchup();
+      if (voteSucceeded) {
+        await loadMatchup();
+      }
     },
     [clientId, loadMatchup, matchup, matchupToken, submitVote],
   );
