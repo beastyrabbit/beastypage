@@ -558,7 +558,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
 
   const handleToggleSpriteVariants = () => {
     const next = !spriteVariantsOpen;
-    if (next) {
+    if (next && spriteVariants.length === 0) {
       setSpriteVariantsAttempted(false);
       setSpriteVariantsLoading(rendererReady);
     }
