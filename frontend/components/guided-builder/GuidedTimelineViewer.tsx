@@ -102,12 +102,7 @@ export function GuidedTimelineViewer({
   const [creatorNameDraft, setCreatorNameDraft] = useState("");
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaSaved, setMetaSaved] = useState(false);
-  const [mapperEditToken, setMapperEditToken] = useState<string | null>(null);
   const updateMeta = useMutation(api.mapper.updateMeta);
-
-  useEffect(() => {
-    setMapperEditToken(slug ? readMapperEditToken(slug) : null);
-  }, [slug]);
 
   // Auto-fill creator name when username loads and field is still empty
   const creatorFilledRef = useRef(false);
@@ -354,7 +349,7 @@ export function GuidedTimelineViewer({
         id: recordId as Id<"cat_profile">,
         catName: trimmedCat || undefined,
         creatorName: trimmedCreator || undefined,
-        editToken: mapperEditToken ?? undefined,
+        editToken: (slug ? readMapperEditToken(slug) : null) ?? undefined,
       });
       const resolvedName = result?.catName ?? (trimmedCat || null);
       const resolvedCreator = result?.creatorName ?? (trimmedCreator || null);
