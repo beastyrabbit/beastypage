@@ -1,6 +1,7 @@
 import { v } from "convex/values";
+import { internal } from "./_generated/api.js";
 import type { Doc, Id } from "./_generated/dataModel.js";
-import { mutation, query } from "./_generated/server.js";
+import { internalMutation, mutation, query } from "./_generated/server.js";
 
 const INITIAL_RATING = 1500;
 const K_FACTOR = 24;
@@ -10,6 +11,7 @@ const COUNT_SAMPLE_LIMIT = 1_000;
 const MAX_REGISTERED_CATS = 32;
 const MAX_PARAMS_BYTES = 32 * 1024;
 const MATCHUP_TTL_MS = 15 * 60 * 1000;
+const MATCHUP_CLEANUP_BATCH_SIZE = 100;
 
 function validClientId(clientId: string | undefined) {
   const normalized = clientId?.trim() || `anonymous:${crypto.randomUUID()}`;
@@ -178,7 +180,12 @@ export const requestMatchup = mutation({
     clientId: v.optional(v.string()),
   },
   handler: async ({ db }, args): Promise<MatchupResponse> => {
-    const clientId = validClientId(args.clientId);
+    // Matchups require a stable client ID so that submitVote can redeem them.
+    // Anonymous callers can still receive a pair, but we do not create an
+    // unreachable pending row for a generated ID that is never returned.
+    const clientId = args.clientId?.trim()
+      ? validClientId(args.clientId)
+      : undefined;
     const allCats = await db.query("perfect_cats").take(COUNT_SAMPLE_LIMIT + 1);
     const totalCats = Math.min(allCats.length, COUNT_SAMPLE_LIMIT);
     const needsSeed = Math.max(0, MINIMUM_POOL_SIZE - totalCats);
@@ -233,22 +240,24 @@ export const requestMatchup = mutation({
     }
 
     const now = Date.now();
-    const previous = await db
-      .query("perfect_matchups")
-      .withIndex("byClient", (q) => q.eq("clientId", clientId))
-      .first();
-    const matchupToken = crypto.randomUUID();
-    const pendingMatchup = {
-      clientId,
-      catAId: first._id,
-      catBId: second._id,
-      token: matchupToken,
-      createdAt: now,
-      expiresAt: now + MATCHUP_TTL_MS,
-      consumed: false,
-    };
-    if (previous) await db.replace(previous._id, pendingMatchup);
-    else await db.insert("perfect_matchups", pendingMatchup);
+    const matchupToken = clientId ? crypto.randomUUID() : undefined;
+    if (clientId && matchupToken) {
+      const previous = await db
+        .query("perfect_matchups")
+        .withIndex("byClient", (q) => q.eq("clientId", clientId))
+        .first();
+      const pendingMatchup = {
+        clientId,
+        catAId: first._id,
+        catBId: second._id,
+        token: matchupToken,
+        createdAt: now,
+        expiresAt: now + MATCHUP_TTL_MS,
+        consumed: false,
+      };
+      if (previous) await db.replace(previous._id, pendingMatchup);
+      else await db.insert("perfect_matchups", pendingMatchup);
+    }
     await Promise.all([
       db.patch(first._id, { lastShownAt: now, updatedAt: now }),
       db.patch(second._id, { lastShownAt: now, updatedAt: now }),
@@ -264,12 +273,36 @@ export const requestMatchup = mutation({
   },
 });
 
+/** Remove expired matchup capabilities in bounded transactions. */
+export const cleanupExpiredMatchups = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const expired = await ctx.db
+      .query("perfect_matchups")
+      .withIndex("byExpiresAt", (q) => q.lte("expiresAt", Date.now()))
+      .take(MATCHUP_CLEANUP_BATCH_SIZE);
+    for (const matchup of expired) {
+      await ctx.db.delete(matchup._id);
+    }
+    if (expired.length === MATCHUP_CLEANUP_BATCH_SIZE) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.perfectCats.cleanupExpiredMatchups,
+        {},
+      );
+    }
+    return { deleted: expired.length };
+  },
+});
+
 export const submitVote = mutation({
   args: {
     clientId: v.string(),
     winnerId: v.id("perfect_cats"),
     loserId: v.id("perfect_cats"),
-    matchupToken: v.string(),
+    // Optional for clients that loaded a matchup before capability tokens
+    // were introduced. The stored client and pair still authorize the vote.
+    matchupToken: v.optional(v.string()),
   },
   handler: async ({ db }, args) => {
     const clientId = validClientId(args.clientId);
@@ -288,7 +321,7 @@ export const submitVote = mutation({
       matchup.expiresAt < now ||
       pairKey(matchup.catAId, matchup.catBId) !==
         pairKey(args.winnerId, args.loserId) ||
-      args.matchupToken !== matchup.token
+      (args.matchupToken !== undefined && args.matchupToken !== matchup.token)
     ) {
       throw new Error("Vote requires the current unused matchup");
     }

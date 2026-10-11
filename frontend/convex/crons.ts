@@ -17,4 +17,11 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "perfect-matchup-retention",
+  { hours: 1 },
+  internal.perfectCats.cleanupExpiredMatchups,
+  {},
+);
+
 export default crons;
