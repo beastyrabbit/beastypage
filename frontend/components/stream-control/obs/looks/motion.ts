@@ -47,7 +47,8 @@ export function useTypewriter(
 ): string {
   // The reduced-motion preference is only known on the client, so it must
   // not shape the first render (hydration); the effect applies it.
-  const instant = !enabled || Boolean(useReducedMotion());
+  const reducedMotion = useReducedMotion();
+  const instant = !enabled || Boolean(reducedMotion);
   const [length, setLength] = useState(enabled ? 0 : text.length);
   useEffect(() => {
     if (instant) {
