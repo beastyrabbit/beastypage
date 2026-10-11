@@ -67,7 +67,7 @@ async function pruneExpiredChallenges(ctx: MutationCtx, now: number) {
     .query("discord_challenge")
     .withIndex("byExpiresAt", (q) => q.lte("expiresAt", now))
     .take(100);
-  for (const challenge of expired) await ctx.db.delete(challenge._id);
+  await Promise.all(expired.map((challenge) => ctx.db.delete(challenge._id)));
 }
 
 async function createChallenge(

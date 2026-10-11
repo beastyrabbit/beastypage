@@ -475,12 +475,14 @@ export const cleanupExpiredUploads = internalMutation({
       .query("catdex_uploads")
       .withIndex("byExpiresAt", (q) => q.lt("expiresAt", Date.now()))
       .take(limit);
-    for (const upload of expired) {
-      if (upload.status === "attached" && upload.storageId) {
-        await ctx.storage.delete(upload.storageId);
-      }
-      await ctx.db.delete(upload._id);
-    }
+    await Promise.all(
+      expired.map(async (upload) => {
+        if (upload.status === "attached" && upload.storageId) {
+          await ctx.storage.delete(upload.storageId);
+        }
+        await ctx.db.delete(upload._id);
+      }),
+    );
     if (expired.length === limit) {
       await ctx.scheduler.runAfter(0, internal.catdex.cleanupExpiredUploads, {
         limit,

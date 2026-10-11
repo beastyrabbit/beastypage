@@ -372,16 +372,18 @@ export const resolveUsernames = query({
 
     assertClerkUserIds(args.userIds);
     const issuer = clerkIssuer(identity.tokenIdentifier);
-    const byClerkId = new Map<string, string>();
-    for (const userId of args.userIds) {
-      const user = await ctx.db
-        .query("users")
-        .withIndex("byTokenIdentifier", (q) =>
-          q.eq("tokenIdentifier", `${issuer}|${userId}`),
-        )
-        .unique();
-      if (user) byClerkId.set(userId, user.username ?? "unknown");
-    }
+    const resolvedUsers = await Promise.all(
+      args.userIds.map(async (userId) => {
+        const user = await ctx.db
+          .query("users")
+          .withIndex("byTokenIdentifier", (q) =>
+            q.eq("tokenIdentifier", `${issuer}|${userId}`),
+          )
+          .unique();
+        return [userId, user?.username ?? "unknown"] as const;
+      }),
+    );
+    const byClerkId = new Map(resolvedUsers);
 
     return args.userIds.map((id) => ({
       userId: id,

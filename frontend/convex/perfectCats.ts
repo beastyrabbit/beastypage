@@ -319,9 +319,7 @@ export const cleanupExpiredMatchups = internalMutation({
       .query("perfect_matchups")
       .withIndex("byExpiresAt", (q) => q.lte("expiresAt", Date.now()))
       .take(MATCHUP_CLEANUP_BATCH_SIZE);
-    for (const matchup of expired) {
-      await ctx.db.delete(matchup._id);
-    }
+    await Promise.all(expired.map((matchup) => ctx.db.delete(matchup._id)));
     if (expired.length === MATCHUP_CLEANUP_BATCH_SIZE) {
       await ctx.scheduler.runAfter(
         0,

@@ -71,24 +71,29 @@ export function createImageProcessingProxyHandler({
         redirect: "error",
       });
 
-      const data = await upstream.text();
-      clearTimeout(timeout);
+      const response = (data: string) =>
+        new NextResponse(data, {
+          status: upstream.status,
+          headers: {
+            "content-type":
+              upstream.headers.get("content-type") ?? "application/json",
+            "cache-control": "no-store",
+          },
+        });
 
       if (!upstream.ok) {
+        const data = await upstream.text();
+        clearTimeout(timeout);
         console.error(
           `[pixelator-proxy] ${label}upstream returned ${upstream.status}:`,
           data.slice(0, 500),
         );
+        return response(data);
       }
 
-      return new NextResponse(data, {
-        status: upstream.status,
-        headers: {
-          "content-type":
-            upstream.headers.get("content-type") ?? "application/json",
-          "cache-control": "no-store",
-        },
-      });
+      const data = await upstream.text();
+      clearTimeout(timeout);
+      return response(data);
     } catch (error) {
       clearTimeout(timeout);
       if (request.signal.aborted) {
