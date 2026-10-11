@@ -20,6 +20,19 @@ import {
   themeTokensToCssVars,
 } from "@/components/stream-control/obs/themes/themeMeta";
 import { type BatchStage, formatBatchNumber } from "@/lib/adoption/streamBatch";
+import type { CatParams } from "@/lib/cat-v3/types";
+
+/** Params for every mock cat — the prose looks describe these. */
+const MOCK_PARAMS: CatParams = {
+  spriteNumber: 0,
+  peltName: "Tabby",
+  colour: "SILVER",
+  isTortie: false,
+  eyeColour: "GREEN",
+  skinColour: "PINK",
+  shading: false,
+  reverse: false,
+};
 
 type PreviewState = "loading" | "revealing" | "awaiting" | "done";
 const STATES: readonly PreviewState[] = [
@@ -88,6 +101,7 @@ function buildView(
       numberLabel: formatBatchNumber(number),
       label: `Cat ${number.toString()}`,
       previewUrl: state === "loading" ? null : url,
+      params: MOCK_PARAMS,
       marked: awaiting && number === 16,
       potential: awaiting && (number === 3 || number === 23),
       favorite: number === 6 || number === 12,

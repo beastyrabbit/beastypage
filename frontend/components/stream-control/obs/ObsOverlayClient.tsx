@@ -103,8 +103,8 @@ import {
 import type { OBSClassicWheelHandle } from "../OBSClassicWheel";
 import type { LobbySettings } from "../OBSLobby";
 import { decideCommandAction } from "./commandPolicy";
+import { resolveShowLook } from "./looks/lookMeta";
 import { BatchScene } from "./scenes/BatchScene";
-import { resolveBatchTheme } from "./themes/batchThemeMeta";
 import { BrbScene } from "./scenes/BrbScene";
 import { EvolutionScene } from "./scenes/EvolutionScene";
 import { LobbyCountdownScene } from "./scenes/LobbyCountdownScene";
@@ -159,6 +159,7 @@ import {
   type WheelRewardState,
   wait,
 } from "./spinSupport";
+import { resolveBatchTheme } from "./themes/batchThemeMeta";
 import { OVERLAY_THEMES } from "./themes/registry";
 import {
   OVERLAY_THEME_META,
@@ -3270,6 +3271,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   );
   const overlayTheme = resolveOverlayTheme(sessionSettingsRecord);
   const batchTheme = resolveBatchTheme(sessionSettingsRecord);
+  const showLook = resolveShowLook(sessionSettingsRecord);
   const obsLayoutSpread = resolveOverlaySpread(
     sessionSettingsRecord,
     overlayTheme,
@@ -3952,6 +3954,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         key={`evolution-${evolutionCommand.seq}`}
         command={evolutionCommand}
         initialPhase={evolutionInitialPhase}
+        look={showLook}
       />,
     );
   }

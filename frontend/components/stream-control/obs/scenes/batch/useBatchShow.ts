@@ -16,6 +16,7 @@ import {
   buildPartialBatchParams,
   formatBatchNumber,
 } from "@/lib/adoption/streamBatch";
+import type { CatParams } from "@/lib/cat-v3/types";
 import {
   type BatchScenePhase,
   type BatchShowView,
@@ -23,9 +24,10 @@ import {
   batchStatusLabel,
 } from "./batchView";
 
-/** A rendered sprite, tagged with the stage it shows — looks keep the
- * previous stage's image until the next one is ready (no flicker). */
-type StagePreview = { url: string; stage: number };
+/** A rendered sprite, tagged with the stage it shows and the stage-limited
+ * params it was drawn from — looks keep the previous stage's image (and
+ * its description) until the next one is ready (no flicker). */
+type StagePreview = { url: string; stage: number; params: CatParams };
 
 /** Hold after a stage finishes revealing, before cull/advance. */
 const REVEAL_HOLD_MS = 2200;
@@ -184,7 +186,7 @@ export function useBatchShow({
               if (url && renderTokenRef.current === token) {
                 setPreviews((previous) => ({
                   ...previous,
-                  [cat.id]: { url, stage: revealedThrough },
+                  [cat.id]: { url, stage: revealedThrough, params },
                 }));
               }
             } catch (renderError) {
@@ -269,6 +271,10 @@ export function useBatchShow({
       numberLabel: formatBatchNumber(index + 1),
       label: cat.label,
       previewUrl: previews[cat.id]?.url ?? null,
+      // Never the final params: prose must not run ahead of the sprite.
+      params:
+        previews[cat.id]?.params ??
+        buildPartialBatchParams(cat, stages, -1, placeholdersRef.current),
       marked: awaiting && cat.id === markedId,
       potential: cat.id !== markedId && potentialSet.has(cat.id),
       favorite: favoriteSet.has(cat.id),

@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ObsOverlayClient } from "@/components/stream-control/obs/ObsOverlayClient";
+import { lookFontsClassName } from "./lookFonts";
 
 function OBSOverlayInner() {
   const searchParams = useSearchParams();
@@ -16,7 +17,13 @@ function OBSOverlayInner() {
     );
   }
 
-  return <ObsOverlayClient apiKey={apiKey} />;
+  // The show looks (evolution finale / batch show designs) read their web
+  // fonts from the CSS variables this class provides.
+  return (
+    <div className={lookFontsClassName}>
+      <ObsOverlayClient apiKey={apiKey} />
+    </div>
+  );
 }
 
 export default function OBSOverlayPage() {

@@ -10,7 +10,11 @@ export type BatchThemeId =
   | "album"
   | "catshow"
   | "claw"
-  | "nursery";
+  | "nursery"
+  | "allegiances"
+  | "handheld"
+  | "trench"
+  | "contact";
 
 export const BATCH_THEME_IDS: readonly BatchThemeId[] = [
   "simple",
@@ -19,6 +23,10 @@ export const BATCH_THEME_IDS: readonly BatchThemeId[] = [
   "catshow",
   "claw",
   "nursery",
+  "allegiances",
+  "handheld",
+  "trench",
+  "contact",
 ];
 
 /** Sessions without a saved batch look keep the original grid. */
@@ -78,6 +86,34 @@ export const BATCH_THEME_META: Record<BatchThemeId, BatchThemeMeta> = {
     blurb:
       "A seed tray on a potting bench, a numbered plant label in every cell. Culls are thinned to compost.",
     palette: ["#6b4a2e", "#1f1c1a", "#f6f1e4", "#b8502f", "#9bbf7a"],
+  },
+  allegiances: {
+    id: "allegiances",
+    label: "Allegiances page",
+    blurb:
+      "The Nursery as a Warriors book page: every kit is a roster line, culls are struck through in red ink.",
+    palette: ["#efe6d2", "#2a2320", "#8c2f1b", "#b5a68e", "#6a5a48"],
+  },
+  handheld: {
+    id: "handheld",
+    label: "Pocket Cat handheld",
+    blurb:
+      "A four-shade LCD: the pool is the PARTY list, culled kits go to BOX 1 · RELEASED, the text box types.",
+    palette: ["#9bbc0f", "#0f380f", "#306230", "#cfcabd", "#8e2f63"],
+  },
+  trench: {
+    id: "trench",
+    label: "Trench plan",
+    blurb:
+      "An excavation grid: every kit is a numbered find, culled squares are hatched and stamped BACKFILLED.",
+    palette: ["#eeeae0", "#4a4034", "#b3261e", "#f3d35a", "#2b2825"],
+  },
+  contact: {
+    id: "contact",
+    label: "Contact sheet",
+    blurb:
+      "Darkroom film strips with grease pencil: an X for every kit that went home, a loupe on the spotlight.",
+    palette: ["#0b0b0c", "#101010", "#d9d2c2", "#ff5a2b", "#f0b24a"],
   },
 };
 
