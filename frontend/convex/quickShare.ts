@@ -204,7 +204,7 @@ export const createUpload = internalMutation({
       .withIndex("by_slug", (q) => q.eq("slug", args.slug))
       .take(QUICK_SHARE_POLICY.collectionMaxItems + 1);
     if (existingSlugs.length > 0) {
-      const collectionOwner = existingSlugs.find(
+      const collectionOwnerExists = existingSlugs.some(
         (candidate) =>
           candidate.receiptHash === args.collectionReceiptHash &&
           candidate.rateIdentity === args.rateIdentity &&
@@ -212,7 +212,7 @@ export const createUpload = internalMutation({
           candidate.state !== "removed" &&
           candidate.retainedUntil > args.now,
       );
-      if (!collectionOwner) {
+      if (!collectionOwnerExists) {
         throw new Error("SLUG_COLLISION");
       }
       if (existingSlugs.length >= QUICK_SHARE_POLICY.collectionMaxItems) {

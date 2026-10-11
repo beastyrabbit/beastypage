@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server.js";
+import type { Doc } from "./_generated/dataModel.js";
+import { type MutationCtx, mutation, query } from "./_generated/server.js";
 
 const MAX_CATS = 500;
 const MAX_TREE_BYTES = 900 * 1024;
@@ -221,6 +222,24 @@ async function existingTreePasswordError(
     : "invalid_password";
 }
 
+async function treeEditError(
+  ctx: MutationCtx,
+  existing: Doc<"ancestry_tree">,
+  args: { editToken?: string; password?: string },
+): Promise<
+  "password_required" | "invalid_password" | "edit_token_required" | null
+> {
+  const identity = await ctx.auth.getUserIdentity();
+  const owner =
+    existing.ownerTokenIdentifier &&
+    identity?.tokenIdentifier === existing.ownerTokenIdentifier;
+  const tokenMatch =
+    existing.editToken && args.editToken === existing.editToken;
+  if (owner || tokenMatch) return null;
+  if (!existing.passwordHash) return "edit_token_required";
+  return existingTreePasswordError(existing.passwordHash, args.password);
+}
+
 const catValidator = v.object({
   id: v.string(),
   name: v.object({
@@ -281,24 +300,9 @@ export const save = mutation({
       .first();
 
     if (existing) {
-      const identity = await ctx.auth.getUserIdentity();
-      const owner =
-        existing.ownerTokenIdentifier &&
-        identity?.tokenIdentifier === existing.ownerTokenIdentifier;
-      const tokenMatch =
-        existing.editToken && args.editToken === existing.editToken;
-      if (!owner && !tokenMatch) {
-        if (existing.passwordHash) {
-          const passwordError = await existingTreePasswordError(
-            existing.passwordHash,
-            args.password,
-          );
-          if (passwordError) {
-            return { success: false, error: passwordError } as const;
-          }
-        } else {
-          return { success: false, error: "edit_token_required" } as const;
-        }
+      const editError = await treeEditError(ctx, existing, args);
+      if (editError) {
+        return { success: false, error: editError } as const;
       }
 
       // Update existing tree
@@ -476,27 +480,9 @@ export const update = mutation({
       return { success: false, error: "not_found" } as const;
     }
 
-    const identity = await ctx.auth.getUserIdentity();
-    const owner =
-      existing.ownerTokenIdentifier &&
-      identity?.tokenIdentifier === existing.ownerTokenIdentifier;
-    const tokenMatch =
-      existing.editToken && args.editToken === existing.editToken;
-    if (!owner && !tokenMatch) {
-      if (existing.passwordHash) {
-        if (!args.password) {
-          return { success: false, error: "password_required" } as const;
-        }
-        const isValid = await verifyPassword(
-          args.password,
-          existing.passwordHash,
-        );
-        if (!isValid) {
-          return { success: false, error: "invalid_password" } as const;
-        }
-      } else {
-        return { success: false, error: "edit_token_required" } as const;
-      }
+    const editError = await treeEditError(ctx, existing, args);
+    if (editError) {
+      return { success: false, error: editError } as const;
     }
 
     if (args.cats || args.config || args.name) {

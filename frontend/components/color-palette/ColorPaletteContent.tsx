@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import type { RefObject } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CatGeneratorApi } from "@/components/cat-builder/types";
@@ -25,6 +26,97 @@ type ColorPaletteContentProps = {
   imageUrl?: string | null;
   paletteSlug?: string | null;
 };
+
+type SpriteSelectorProps = {
+  disabled: boolean;
+  selectedSprite: string;
+  poseOptions: string[];
+  dropdownOpen: boolean;
+  dropdownPosition: { top: number; left: number };
+  buttonRef: RefObject<HTMLButtonElement | null>;
+  dropdownRef: RefObject<HTMLDivElement | null>;
+  onToggle: () => void;
+  onSelect: (poseName: string) => void;
+};
+
+function SpriteSelector({
+  disabled,
+  selectedSprite,
+  poseOptions,
+  dropdownOpen,
+  dropdownPosition,
+  buttonRef,
+  dropdownRef,
+  onToggle,
+  onSelect,
+}: SpriteSelectorProps) {
+  const portalTarget =
+    typeof window === "undefined" ? null : window.document.body;
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={onToggle}
+        disabled={disabled}
+        className="flex items-center gap-2 rounded-xl border border-border/50 px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:border-foreground/30 disabled:opacity-50"
+      >
+        <span>
+          {selectedSprite === "all"
+            ? "All Sprites"
+            : formatPoseName(selectedSprite)}
+        </span>
+        <DownChevron
+          size={16}
+          className={`transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {dropdownOpen &&
+        portalTarget &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed max-h-64 w-48 overflow-y-auto rounded-xl border border-border/50 bg-background/95 py-1 shadow-lg backdrop-blur-sm"
+            style={{
+              top: dropdownPosition.top,
+              left: dropdownPosition.left,
+              zIndex: 9999,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => onSelect("all")}
+              className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-foreground/10 ${
+                selectedSprite === "all"
+                  ? "bg-primary/20 text-primary"
+                  : "text-foreground"
+              }`}
+            >
+              All Sprites (Grid)
+            </button>
+            <div className="mx-2 my-1 border-t border-border/30" />
+            {poseOptions.map((poseName) => (
+              <button
+                key={poseName}
+                type="button"
+                onClick={() => onSelect(poseName)}
+                className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-foreground/10 ${
+                  selectedSprite === poseName
+                    ? "bg-primary/20 text-primary"
+                    : "text-foreground"
+                }`}
+              >
+                {formatPoseName(poseName)}
+              </button>
+            ))}
+          </div>,
+          portalTarget,
+        )}
+    </>
+  );
+}
 
 function extractCatParams(
   data: Record<string, unknown>,
@@ -310,74 +402,21 @@ export function ColorPaletteContent({
     };
   }, [dropdownOpen]);
 
-  // Sprite selector component (only shown when using slug)
   const spriteSelector = slug ? (
-    <>
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={handleDropdownToggle}
-        disabled={isRendering}
-        className="flex items-center gap-2 rounded-xl border border-border/50 px-4 py-2.5 text-sm font-medium text-foreground transition-all hover:border-foreground/30 disabled:opacity-50"
-      >
-        <span>
-          {selectedSprite === "all"
-            ? "All Sprites"
-            : formatPoseName(selectedSprite)}
-        </span>
-        <DownChevron
-          size={16}
-          className={`transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      {dropdownOpen &&
-        createPortal(
-          <div
-            ref={dropdownRef}
-            className="fixed max-h-64 w-48 overflow-y-auto rounded-xl border border-border/50 bg-background/95 py-1 shadow-lg backdrop-blur-sm"
-            style={{
-              top: dropdownPosition.top,
-              left: dropdownPosition.left,
-              zIndex: 9999,
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedSprite("all");
-                setDropdownOpen(false);
-              }}
-              className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-foreground/10 ${
-                selectedSprite === "all"
-                  ? "bg-primary/20 text-primary"
-                  : "text-foreground"
-              }`}
-            >
-              All Sprites (Grid)
-            </button>
-            <div className="mx-2 my-1 border-t border-border/30" />
-            {poseOptions.map((poseName) => (
-              <button
-                key={poseName}
-                type="button"
-                onClick={() => {
-                  setSelectedSprite(poseName);
-                  setDropdownOpen(false);
-                }}
-                className={`w-full px-4 py-2 text-left text-sm transition-colors hover:bg-foreground/10 ${
-                  selectedSprite === poseName
-                    ? "bg-primary/20 text-primary"
-                    : "text-foreground"
-                }`}
-              >
-                {formatPoseName(poseName)}
-              </button>
-            ))}
-          </div>,
-          document.body,
-        )}
-    </>
+    <SpriteSelector
+      disabled={isRendering}
+      selectedSprite={selectedSprite}
+      poseOptions={poseOptions}
+      dropdownOpen={dropdownOpen}
+      dropdownPosition={dropdownPosition}
+      buttonRef={buttonRef}
+      dropdownRef={dropdownRef}
+      onToggle={handleDropdownToggle}
+      onSelect={(poseName) => {
+        setSelectedSprite(poseName);
+        setDropdownOpen(false);
+      }}
+    />
   ) : null;
 
   // Show loading state while rendering sprite or loading palette

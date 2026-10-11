@@ -7,7 +7,7 @@ ARG PYTHON_VERSION=3.13
 ARG CAT_SYSTEM_CATALOG_HASH=unknown
 
 # Stage 1: Build with uv
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim@sha256:531f855bda2c73cd6ef67d56b733b357cea384185b3022bd09f05e002cd144ca AS builder
+FROM ghcr.io/astral-sh/uv@sha256:531f855bda2c73cd6ef67d56b733b357cea384185b3022bd09f05e002cd144ca AS builder
 ARG PYTHON_VERSION
 RUN test "$PYTHON_VERSION" = "3.13"
 ARG CAT_SYSTEM_CATALOG_HASH
@@ -32,7 +32,7 @@ RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
     || test "$(cat renderer_service/generated/catalog-hash.txt)" = "$CAT_SYSTEM_CATALOG_HASH"
 
 # Stage 2: Production image
-FROM python:3.13-slim-bookworm@sha256:a1165e272e578941b84abc79e4ab38a0305cd12803a5c4247979ac7655f4d641 AS runner
+FROM python@sha256:a1165e272e578941b84abc79e4ab38a0305cd12803a5c4247979ac7655f4d641 AS runner
 WORKDIR /app
 
 ARG CAT_SYSTEM_CATALOG_HASH

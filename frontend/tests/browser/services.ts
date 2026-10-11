@@ -75,14 +75,14 @@ export const usePaginatedQuery = (
   reference: Parameters<typeof getFunctionName>[0],
 ) => {
   const functionName = getFunctionName(reference);
+  const isCollectionPage = functionName === "collection:page";
+  const results = isCollectionPage
+    ? [artwork]
+    : new URL(location.href).searchParams.has("catdexCard")
+      ? [catdexCard]
+      : [];
   return {
-    results:
-      functionName === "collection:page" ||
-      new URL(location.href).searchParams.has("catdexCard")
-        ? functionName === "collection:page"
-          ? [artwork]
-          : [catdexCard]
-        : [],
+    results,
     status: "CanLoadMore" as const,
     loadMore: () => {},
   };
