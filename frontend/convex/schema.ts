@@ -91,7 +91,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("byName", ["seasonName"])
-    .index("byShort", ["shortName"]),
+    .index("byShort", ["shortName"])
+    .index("byCreatedAt", ["createdAt"]),
 
   rarity: defineTable({
     rarityName: v.string(),

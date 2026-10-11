@@ -1,13 +1,13 @@
+import { type ReactNode, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { useState, type ReactNode } from "react";
 import { Toaster } from "sonner";
+import Catdex from "../../app/catdex/CatdexPageClient";
 import Collection from "../../app/collection/CollectionPageClient";
 import Profile from "../../app/profile/page";
-import Catdex from "../../app/catdex/CatdexPageClient";
-import HostClient from "../../components/streamer/HostClient";
-import { QuickShareClient } from "../../components/quick-share/QuickShareClient";
-import { PixelatorClient } from "../../components/pixelator/PixelatorClient";
 import { SaveTreeDialog } from "../../components/ancestry-tree/SaveTreeDialog";
+import { PixelatorClient } from "../../components/pixelator/PixelatorClient";
+import { QuickShareClient } from "../../components/quick-share/QuickShareClient";
+import HostClient from "../../components/streamer/HostClient";
 import "../../app/globals.css";
 
 function AncestrySaveFixture() {

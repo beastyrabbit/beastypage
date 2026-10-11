@@ -291,9 +291,7 @@ test("ancestry save falls back to a validated save-as-new copy", async ({
     ),
   ).toBeVisible();
   const slug = dialog.getByLabel("New Tree Slug");
-  await expect(slug).toHaveValue(
-    "a-very-long-thunderclan-lineage-slu-copy",
-  );
+  await expect(slug).toHaveValue("a-very-long-thunderclan-lineage-slu-copy");
   await expect(slug).toHaveAttribute("maxlength", "40");
   await slug.fill("Bad slug!");
   await dialog.getByRole("button", { name: "Save as New Tree" }).click();
@@ -329,8 +327,8 @@ test("ancestry save dialog closes with Escape and backdrop on mobile", async ({
   await expect(
     dialog.getByRole("heading", { name: "Save Ancestry Tree" }),
   ).toBeInViewport();
-  const dialogColor = await dialog.evaluate((element) =>
-    getComputedStyle(element).color,
+  const dialogColor = await dialog.evaluate(
+    (element) => getComputedStyle(element).color,
   );
   expect(dialogColor).not.toBe("rgb(0, 0, 0)");
   await page.screenshot({

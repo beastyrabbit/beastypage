@@ -232,7 +232,6 @@ describe("Quick Share Convex policy", () => {
         collectionReceiptHash: "receipt-Collect1",
       }),
     ).rejects.toThrow("SLUG_COLLISION");
-
   });
 
   it("ignores inactive collection rows when enforcing the collection limit", async () => {

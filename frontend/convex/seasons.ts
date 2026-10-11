@@ -16,8 +16,11 @@ export const DEFAULT_SEASONS: Array<{ name: string; shortName: string }> = [
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const seasons = await ctx.db.query("card_season").take(200);
-    seasons.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    const seasons = await ctx.db
+      .query("card_season")
+      .withIndex("byCreatedAt", (q) => q)
+      .order("desc")
+      .take(200);
     return Promise.all(seasons.map((doc) => seasonRecordToClient(ctx, doc)));
   },
 });
