@@ -221,14 +221,8 @@ export const createUpload = internalMutation({
             )
             .take(QUICK_SHARE_POLICY.collectionMaxItems + 1)
         : [];
-      const collectionOwnerExists = receiptRows.some(
-        (candidate) =>
-          candidate.slug === args.slug &&
-          candidate.receiptHash === args.collectionReceiptHash &&
-          candidate.rateIdentity === args.rateIdentity &&
-          candidate.ipHash === args.ipHash &&
-          candidate.state !== "removed" &&
-          candidate.retainedUntil > args.now,
+      const collectionOwnerExists = receiptRows.some((candidate) =>
+        isCollectionOwner(candidate, args),
       );
       if (!collectionOwnerExists) {
         throw new Error("SLUG_COLLISION");
@@ -288,6 +282,26 @@ export const createUpload = internalMutation({
     return { id, slug: args.slug, publicExpiresAt, retainedUntil };
   },
 });
+
+function isCollectionOwner(
+  candidate: Doc<"quick_share_uploads">,
+  args: {
+    slug: string;
+    collectionReceiptHash?: string;
+    rateIdentity: string;
+    ipHash: string;
+    now: number;
+  },
+) {
+  return (
+    candidate.slug === args.slug &&
+    candidate.receiptHash === args.collectionReceiptHash &&
+    candidate.rateIdentity === args.rateIdentity &&
+    candidate.ipHash === args.ipHash &&
+    candidate.state !== "removed" &&
+    candidate.retainedUntil > args.now
+  );
+}
 
 export const getUpload = internalQuery({
   args: {
