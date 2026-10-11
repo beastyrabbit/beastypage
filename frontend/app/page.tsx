@@ -72,7 +72,7 @@ export default function HomePage() {
           <h1 className="mt-4 text-5xl font-bold leading-tight sm:text-6xl motion-safe:animate-rise motion-safe:[animation-delay:120ms]">
             Hey there, I&apos;m{" "}
             <span className="group/name text-gradient-personal animate-shimmer bg-[length:200%_auto]">
-              Beasty
+              {"Beasty"}
               <span className="inline-block transition-[rotate,translate] duration-400 ease-spring motion-safe:group-hover/name:rotate-[10deg] motion-safe:group-hover/name:-translate-y-1">
                 .
               </span>

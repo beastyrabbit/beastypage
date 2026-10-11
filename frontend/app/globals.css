@@ -287,15 +287,12 @@
 
 .nav-pill {
   @apply rounded-full border border-white/5 bg-white/5 px-4 py-1.5 text-sm font-medium text-muted-foreground transition-all duration-300;
+  position: relative;
+  isolation: isolate;
 }
 
 .nav-pill:hover {
   @apply border-white/10 bg-white/10 text-foreground shadow-lg;
-}
-
-.nav-pill {
-  position: relative;
-  isolation: isolate;
 }
 
 .nav-pill:active {
@@ -944,15 +941,13 @@
       translate 200ms var(--ease-out-soft),
       rotate 250ms var(--ease-spring),
       border-color 200ms,
-      color 200ms,
-      background-color 200ms;
+      color 200ms;
   }
   .hover-tag:hover {
     translate: 0 -1.5px;
     rotate: var(--tilt, 0deg);
     border-color: rgb(251 191 36 / 0.4);
     color: rgb(254 243 199);
-    background-color: rgb(251 191 36 / 0.08);
   }
 
   /* Header brand: icon wiggles, wordmark gets one amber sweep. */

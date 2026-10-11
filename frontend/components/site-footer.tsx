@@ -27,9 +27,9 @@ export function SiteFooter() {
                 className="peek"
               />
             </span>
-            lots of cats
+            {"lots of cats"}
           </span>
-          .
+          {"."}
         </p>
         <div className="flex flex-wrap items-center gap-4">
           {FOOTER_LINKS.map(({ href, label }) => (

@@ -145,12 +145,12 @@ function CardIcon({
   iconRef,
   size,
   className,
-}: {
+}: Readonly<{
   card: LinkCard;
   iconRef: RefObject<AnimatedIconHandle | null>;
   size: number;
   className?: string;
-}) {
+}>) {
   if (card.kind === "animated") {
     const Icon = card.icon;
     return <Icon ref={iconRef} size={size} className={className} />;
@@ -195,11 +195,11 @@ function SocialCard({
   card,
   index,
   size,
-}: {
+}: Readonly<{
   card: LinkCard;
   index: number;
   size: "lg" | "md";
-}) {
+}>) {
   const { ref, handlers } = useIconHover();
   const large = size === "lg";
   return (
@@ -228,7 +228,7 @@ function SocialCard({
   );
 }
 
-function SocialPill({ card }: { card: LinkCard }) {
+function SocialPill({ card }: Readonly<{ card: LinkCard }>) {
   const { ref, handlers } = useIconHover();
   return (
     <Link
