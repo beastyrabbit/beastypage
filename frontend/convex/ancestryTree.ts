@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
 import type { Doc } from "./_generated/dataModel.js";
 import { type MutationCtx, mutation, query } from "./_generated/server.js";
 
@@ -277,22 +277,50 @@ const configValidator = v.object({
   ),
 });
 
+const treeSaveFields = {
+  slug: v.string(),
+  name: v.string(),
+  foundingMotherId: v.string(),
+  foundingFatherId: v.string(),
+  cats: v.array(catValidator),
+  config: configValidator,
+  creatorName: v.optional(v.string()),
+  password: v.optional(v.string()),
+  editToken: v.optional(v.string()),
+};
+const treeSaveValidator = v.object(treeSaveFields);
+
+type TreeSaveArgs = Infer<typeof treeSaveValidator>;
+
+async function insertNewTree(ctx: MutationCtx, args: TreeSaveArgs) {
+  const now = Date.now();
+  const editToken = crypto.randomUUID();
+  const identity = await ctx.auth.getUserIdentity();
+  const insertData = {
+    slug: args.slug,
+    name: args.name,
+    foundingMotherId: args.foundingMotherId,
+    foundingFatherId: args.foundingFatherId,
+    cats: args.cats,
+    config: args.config,
+    createdAt: now,
+    updatedAt: now,
+    editToken,
+    ...(args.creatorName !== undefined && { creatorName: args.creatorName }),
+    ...(args.password && { passwordHash: await hashPassword(args.password) }),
+    ...(identity?.tokenIdentifier && {
+      ownerTokenIdentifier: identity.tokenIdentifier,
+    }),
+  };
+  const id = await ctx.db.insert("ancestry_tree", insertData);
+  return { id, editToken };
+}
+
 export const save = mutation({
-  args: {
-    slug: v.string(),
-    name: v.string(),
-    foundingMotherId: v.string(),
-    foundingFatherId: v.string(),
-    cats: v.array(catValidator),
-    config: configValidator,
-    creatorName: v.optional(v.string()),
-    password: v.optional(v.string()),
-    editToken: v.optional(v.string()),
-  },
+  args: treeSaveFields,
   handler: async (ctx, args) => {
     assertTreeSize(args);
     const now = Date.now();
-
     // Check if tree with this slug already exists
     const existing = await ctx.db
       .query("ancestry_tree")
@@ -344,52 +372,40 @@ export const save = mutation({
     }
 
     // Create new tree
-    const insertData: {
-      slug: string;
-      name: string;
-      foundingMotherId: string;
-      foundingFatherId: string;
-      cats: typeof args.cats;
-      config: typeof args.config;
-      createdAt: number;
-      updatedAt: number;
-      creatorName?: string;
-      passwordHash?: string;
-      editToken: string;
-      ownerTokenIdentifier?: string;
-    } = {
-      slug: args.slug,
-      name: args.name,
-      foundingMotherId: args.foundingMotherId,
-      foundingFatherId: args.foundingFatherId,
-      cats: args.cats,
-      config: args.config,
-      createdAt: now,
-      updatedAt: now,
-      editToken: crypto.randomUUID(),
-    };
-
-    if (args.creatorName !== undefined) {
-      insertData.creatorName = args.creatorName;
-    }
-
-    if (args.password) {
-      insertData.passwordHash = await hashPassword(args.password);
-    }
-
-    const identity = await ctx.auth.getUserIdentity();
-    if (identity?.tokenIdentifier) {
-      insertData.ownerTokenIdentifier = identity.tokenIdentifier;
-    }
-
-    const id = await ctx.db.insert("ancestry_tree", insertData);
+    const { id, editToken } = await insertNewTree(ctx, args);
 
     return {
       success: true,
       id,
       slug: args.slug,
       isNew: true,
-      editToken: insertData.editToken,
+      editToken,
+    } as const;
+  },
+});
+
+/**
+ * Save a copy under a new slug without ever attempting to edit the source.
+ * This is the migration-safe path for legacy trees that predate edit tokens.
+ */
+export const saveAsNew = mutation({
+  args: treeSaveFields,
+  handler: async (ctx, args) => {
+    assertTreeSize(args);
+
+    const existing = await ctx.db
+      .query("ancestry_tree")
+      .withIndex("bySlug", (q) => q.eq("slug", args.slug))
+      .first();
+    if (existing) return { success: false, error: "slug_taken" } as const;
+
+    const { id, editToken } = await insertNewTree(ctx, args);
+    return {
+      success: true,
+      id,
+      slug: args.slug,
+      isNew: true,
+      editToken,
     } as const;
   },
 });
