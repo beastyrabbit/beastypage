@@ -36,18 +36,64 @@ function readGifDimensions(buffer: Buffer): ImageDimensions | null {
   };
 }
 
-function readWebpDimensions(buffer: Buffer): ImageDimensions | null {
-  if (
-    buffer.length < 20 ||
-    buffer.toString("ascii", 0, 4) !== "RIFF" ||
-    buffer.toString("ascii", 8, 12) !== "WEBP"
-  ) {
-    return null;
+function isWebpHeader(buffer: Buffer): boolean {
+  return (
+    buffer.length >= 20 &&
+    buffer.toString("ascii", 0, 4) === "RIFF" &&
+    buffer.toString("ascii", 8, 12) === "WEBP"
+  );
+}
+
+function readWebpChunkDimensions(
+  buffer: Buffer,
+  chunkType: string,
+  dataOffset: number,
+  chunkSize: number,
+): ImageDimensions | null {
+  const byteAt = (index: number) => buffer[index] ?? 0;
+  if (chunkType === "VP8X" && chunkSize >= 10) {
+    return {
+      width:
+        1 +
+        byteAt(dataOffset + 4) +
+        (byteAt(dataOffset + 5) << 8) +
+        (byteAt(dataOffset + 6) << 16),
+      height:
+        1 +
+        byteAt(dataOffset + 7) +
+        (byteAt(dataOffset + 8) << 8) +
+        (byteAt(dataOffset + 9) << 16),
+    };
   }
+
+  if (
+    chunkType === "VP8 " &&
+    chunkSize >= 10 &&
+    buffer[dataOffset + 3] === 0x9d &&
+    buffer[dataOffset + 4] === 0x01 &&
+    buffer[dataOffset + 5] === 0x2a
+  ) {
+    return {
+      width: buffer.readUInt16LE(dataOffset + 6) & 0x3fff,
+      height: buffer.readUInt16LE(dataOffset + 8) & 0x3fff,
+    };
+  }
+
+  if (chunkType === "VP8L" && chunkSize >= 5 && buffer[dataOffset] === 0x2f) {
+    const bits = buffer.readUInt32LE(dataOffset + 1);
+    return {
+      width: 1 + (bits & 0x3fff),
+      height: 1 + ((bits >>> 14) & 0x3fff),
+    };
+  }
+  return null;
+}
+
+function readWebpDimensions(buffer: Buffer): ImageDimensions | null {
+  if (!isWebpHeader(buffer)) return null;
 
   // WebP stores the dimensions in one of the three image chunks. Walk the
   // chunk table so optional metadata chunks before the image are supported.
-  const byteAt = (index: number) => buffer[index] ?? 0;
   let offset = 12;
   while (offset + 8 <= buffer.length) {
     const chunkType = buffer.toString("ascii", offset, offset + 4);
@@ -56,44 +102,13 @@ function readWebpDimensions(buffer: Buffer): ImageDimensions | null {
     if (dataOffset > buffer.length || chunkSize > buffer.length - dataOffset) {
       return null;
     }
-
-    if (chunkType === "VP8X" && chunkSize >= 10) {
-      return {
-        width:
-          1 +
-          byteAt(dataOffset + 4) +
-          (byteAt(dataOffset + 5) << 8) +
-          (byteAt(dataOffset + 6) << 16),
-        height:
-          1 +
-          byteAt(dataOffset + 7) +
-          (byteAt(dataOffset + 8) << 8) +
-          (byteAt(dataOffset + 9) << 16),
-      };
-    }
-
-    if (chunkType === "VP8 " && chunkSize >= 10) {
-      const frameOffset = dataOffset + 3;
-      if (
-        buffer[frameOffset] === 0x9d &&
-        buffer[frameOffset + 1] === 0x01 &&
-        buffer[frameOffset + 2] === 0x2a
-      ) {
-        return {
-          width: buffer.readUInt16LE(dataOffset + 6) & 0x3fff,
-          height: buffer.readUInt16LE(dataOffset + 8) & 0x3fff,
-        };
-      }
-    }
-
-    if (chunkType === "VP8L" && chunkSize >= 5 && buffer[dataOffset] === 0x2f) {
-      const bits = buffer.readUInt32LE(dataOffset + 1);
-      return {
-        width: 1 + (bits & 0x3fff),
-        height: 1 + ((bits >>> 14) & 0x3fff),
-      };
-    }
-
+    const dimensions = readWebpChunkDimensions(
+      buffer,
+      chunkType,
+      dataOffset,
+      chunkSize,
+    );
+    if (dimensions) return dimensions;
     // Chunks are padded to an even byte boundary.
     offset = dataOffset + chunkSize + (chunkSize & 1);
   }
@@ -106,6 +121,41 @@ function isJpegStartOfFrame(marker: number): boolean {
   );
 }
 
+type JpegSegment = { nextOffset: number; dimensions?: ImageDimensions };
+
+function readJpegSegment(
+  buffer: Buffer,
+  offset: number,
+  scanLimit: number,
+): JpegSegment | null {
+  if (buffer[offset] !== 0xff) return { nextOffset: offset + 1 };
+  while (offset < scanLimit && buffer[offset] === 0xff) offset += 1;
+  if (offset >= scanLimit) return null;
+  const marker = buffer[offset] ?? 0;
+  offset += 1;
+
+  const standalone =
+    marker === 0x01 ||
+    (marker >= 0xd0 && marker <= 0xd7) ||
+    marker === 0xd8 ||
+    marker === 0xd9;
+  if (standalone) return { nextOffset: offset };
+  if (marker === 0xda || offset + 2 > scanLimit) return null;
+
+  const segmentLength = buffer.readUInt16BE(offset);
+  if (segmentLength < 2 || offset + segmentLength > scanLimit) return null;
+  if (isJpegStartOfFrame(marker) && segmentLength >= 7) {
+    return {
+      nextOffset: offset + segmentLength,
+      dimensions: {
+        height: buffer.readUInt16BE(offset + 3),
+        width: buffer.readUInt16BE(offset + 5),
+      },
+    };
+  }
+  return { nextOffset: offset + segmentLength };
+}
+
 function readJpegDimensions(buffer: Buffer): ImageDimensions | null {
   if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
     return null;
@@ -116,34 +166,10 @@ function readJpegDimensions(buffer: Buffer): ImageDimensions | null {
   const scanLimit = buffer.length;
   let offset = 2;
   while (offset + 3 < scanLimit) {
-    if (buffer[offset] !== 0xff) {
-      offset += 1;
-      continue;
-    }
-    while (offset < scanLimit && buffer[offset] === 0xff) offset += 1;
-    if (offset >= scanLimit) return null;
-    const marker = buffer[offset] ?? 0;
-    offset += 1;
-
-    if (
-      marker === 0x01 ||
-      (marker >= 0xd0 && marker <= 0xd7) ||
-      marker === 0xd8 ||
-      marker === 0xd9
-    )
-      continue;
-    if (marker === 0xda) return null;
-    if (offset + 2 > scanLimit) return null;
-    const segmentLength = buffer.readUInt16BE(offset);
-    if (segmentLength < 2 || offset + segmentLength > scanLimit) return null;
-
-    if (isJpegStartOfFrame(marker) && segmentLength >= 7) {
-      return {
-        height: buffer.readUInt16BE(offset + 3),
-        width: buffer.readUInt16BE(offset + 5),
-      };
-    }
-    offset += segmentLength;
+    const segment = readJpegSegment(buffer, offset, scanLimit);
+    if (!segment) return null;
+    if (segment.dimensions) return segment.dimensions;
+    offset = segment.nextOffset;
   }
   return null;
 }

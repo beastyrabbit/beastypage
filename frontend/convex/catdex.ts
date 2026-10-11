@@ -17,8 +17,65 @@ type RarityDoc = Doc<"rarity">;
 
 const MAX_CARD_UPLOAD_BYTES = 10 * 1024 * 1024;
 const CARD_UPLOAD_CONTENT_TYPES = new Set(["image/png", "image/jpeg"]);
+const THUMBNAIL_RETRY_AFTER_MS = 30 * 60 * 1000;
 
 export type CatdexPayload = Awaited<ReturnType<typeof catdexRecordToClient>>;
+
+async function thumbnailCandidates(
+  ctx: MutationCtx,
+  max: number,
+): Promise<CatdexDoc[]> {
+  const candidates = [
+    ...(await ctx.db
+      .query("catdex")
+      .withIndex("byThumbnailStatusAndAttemptedAt", (q) =>
+        q.eq("thumbnailStatus", "pending"),
+      )
+      .order("asc")
+      .take(max)),
+    ...(await ctx.db
+      .query("catdex")
+      .withIndex("byThumbnailStatusAndAttemptedAt", (q) =>
+        q.eq("thumbnailStatus", "processing"),
+      )
+      .order("asc")
+      .take(max)),
+    // Legacy imports predate thumbnailStatus. Keep this fallback bounded;
+    // successful/failing rows are stamped on their first attempt.
+    ...(await ctx.db
+      .query("catdex")
+      .withIndex("byThumbnailStatusAndAttemptedAt", (q) =>
+        q.eq("thumbnailStatus", undefined),
+      )
+      .order("asc")
+      .take(max)),
+  ];
+  const seen = new Set<string>();
+  return candidates.filter((cat) => {
+    if (seen.has(cat._id)) return false;
+    seen.add(cat._id);
+    return true;
+  });
+}
+
+function thumbnailNeeds(cat: CatdexDoc) {
+  return {
+    default: Boolean(
+      cat.defaultCardStorageId && !cat.defaultCardThumbStorageId,
+    ),
+    custom: Boolean(cat.customCardStorageId && !cat.customCardThumbStorageId),
+  };
+}
+
+function shouldSkipThumbnail(cat: CatdexDoc, now: number): boolean {
+  if (cat.thumbnailStatus === "failed" || cat.thumbnailStatus === "complete") {
+    return true;
+  }
+  return Boolean(
+    cat.thumbnailStatus === "processing" &&
+      (cat.thumbnailAttemptedAt ?? now) > now - THUMBNAIL_RETRY_AFTER_MS,
+  );
+}
 
 export const page = query({
   args: { paginationOpts: paginationOptsValidator, approved: v.boolean() },
@@ -434,53 +491,12 @@ export const enqueueMissingThumbnails = internalMutation({
     const max = Math.max(1, Math.min(args.limit ?? 25, 200));
     let enqueued = 0;
     const now = Date.now();
-    const candidates = [
-      ...(await ctx.db
-        .query("catdex")
-        .withIndex("byThumbnailStatusAndAttemptedAt", (q) =>
-          q.eq("thumbnailStatus", "pending"),
-        )
-        .order("asc")
-        .take(max)),
-      ...(await ctx.db
-        .query("catdex")
-        .withIndex("byThumbnailStatusAndAttemptedAt", (q) =>
-          q.eq("thumbnailStatus", "processing"),
-        )
-        .order("asc")
-        .take(max)),
-      // Legacy imports predate thumbnailStatus. Keep this fallback bounded;
-      // successful/failing rows are stamped on their first attempt.
-      ...(await ctx.db
-        .query("catdex")
-        .withIndex("byThumbnailStatusAndAttemptedAt", (q) =>
-          q.eq("thumbnailStatus", undefined),
-        )
-        .order("asc")
-        .take(max)),
-    ];
-    const seen = new Set<string>();
+    const candidates = await thumbnailCandidates(ctx, max);
 
     for (const cat of candidates) {
-      if (seen.has(cat._id)) continue;
-      seen.add(cat._id);
-      if (
-        cat.thumbnailStatus === "failed" ||
-        cat.thumbnailStatus === "complete"
-      )
-        continue;
-      if (
-        cat.thumbnailStatus === "processing" &&
-        (cat.thumbnailAttemptedAt ?? now) > now - 30 * 60 * 1000
-      )
-        continue;
-      const needsDefault = Boolean(
-        cat.defaultCardStorageId && !cat.defaultCardThumbStorageId,
-      );
-      const needsCustom = Boolean(
-        cat.customCardStorageId && !cat.customCardThumbStorageId,
-      );
-      if (!needsDefault && !needsCustom) {
+      if (shouldSkipThumbnail(cat, now)) continue;
+      const needs = thumbnailNeeds(cat);
+      if (!needs.default && !needs.custom) {
         if (cat.thumbnailStatus === undefined) {
           await ctx.db.patch(cat._id, { thumbnailStatus: "complete" });
         }

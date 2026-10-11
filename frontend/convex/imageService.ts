@@ -29,6 +29,69 @@ type VariantResult = {
 
 const MAX_SOURCE_BYTES = 16 * 1024 * 1024;
 
+async function readResponseBody(response: Response): Promise<Buffer | null> {
+  const contentLength = Number(response.headers.get("content-length") ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_SOURCE_BYTES) {
+    return null;
+  }
+  if (!response.body) return null;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      byteLength += value.byteLength;
+      if (byteLength > MAX_SOURCE_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return byteLength
+    ? Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)))
+    : null;
+}
+
+type ResizableImage = {
+  width: number;
+  height: number;
+  resize(options: { w: number; h: number }): unknown;
+};
+
+function resizeThumbnail(image: ResizableImage) {
+  const originalWidth = image.width;
+  const originalHeight = image.height;
+  if (
+    originalWidth < 1 ||
+    originalHeight < 1 ||
+    originalWidth > MAX_SOURCE_DIMENSION ||
+    originalHeight > MAX_SOURCE_DIMENSION ||
+    originalWidth * originalHeight > MAX_SOURCE_PIXELS
+  ) {
+    return null;
+  }
+
+  const maxDim = 256;
+  let newWidth = originalWidth;
+  let newHeight = originalHeight;
+  if (originalWidth > maxDim || originalHeight > maxDim) {
+    if (originalWidth > originalHeight) {
+      newWidth = maxDim;
+      newHeight = Math.round((originalHeight / originalWidth) * maxDim);
+    } else {
+      newHeight = maxDim;
+      newWidth = Math.round((originalWidth / originalHeight) * maxDim);
+    }
+    image.resize({ w: newWidth, h: newHeight });
+  }
+  return { width: originalWidth, height: originalHeight };
+}
+
 export const generateForCat = internalAction({
   args: {
     id: v.id("catdex"),
@@ -125,75 +188,22 @@ async function generateThumbnail(
       return null;
     }
 
-    const contentLength = Number(response.headers.get("content-length") ?? 0);
-    if (Number.isFinite(contentLength) && contentLength > MAX_SOURCE_BYTES) {
-      console.warn("Source image exceeds thumbnail size limit", {
-        catId,
-        variant,
-      });
-      return null;
-    }
-    if (!response.body) return null;
-    const reader = response.body.getReader();
-    const chunks: Uint8Array[] = [];
-    let byteLength = 0;
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        byteLength += value.byteLength;
-        if (byteLength > MAX_SOURCE_BYTES) {
-          await reader.cancel();
-          console.warn("Source image exceeds thumbnail size limit", {
-            catId,
-            variant,
-          });
-          return null;
-        }
-        chunks.push(value);
-      }
-    } finally {
-      reader.releaseLock();
-    }
-    if (!byteLength) return null;
-    const buffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+    const buffer = await readResponseBody(response);
+    if (!buffer) return null;
 
     // Reject oversized or unsupported raster headers before Jimp allocates a
     // decoded pixel buffer.
     assertImageSourceWithinLimits(buffer);
 
     // Read the original image with Jimp
-    const image = await Jimp.read(Buffer.from(buffer));
-    const originalWidth = image.width;
-    const originalHeight = image.height;
-    if (
-      originalWidth < 1 ||
-      originalHeight < 1 ||
-      originalWidth > MAX_SOURCE_DIMENSION ||
-      originalHeight > MAX_SOURCE_DIMENSION ||
-      originalWidth * originalHeight > MAX_SOURCE_PIXELS
-    ) {
+    const image = await Jimp.read(buffer);
+    const dimensions = resizeThumbnail(image);
+    if (!dimensions) {
       console.warn("Source image dimensions exceed thumbnail limits", {
         catId,
         variant,
       });
       return null;
-    }
-
-    // Resize with Jimp (256px max dimension, maintain aspect ratio)
-    const maxDim = 256;
-    let newWidth = originalWidth;
-    let newHeight = originalHeight;
-
-    if (originalWidth > maxDim || originalHeight > maxDim) {
-      if (originalWidth > originalHeight) {
-        newWidth = maxDim;
-        newHeight = Math.round((originalHeight / originalWidth) * maxDim);
-      } else {
-        newHeight = maxDim;
-        newWidth = Math.round((originalWidth / originalHeight) * maxDim);
-      }
-      image.resize({ w: newWidth, h: newHeight });
     }
 
     // Convert to JPEG with 85% quality
@@ -211,10 +221,10 @@ async function generateThumbnail(
       payload: {
         thumbStorageId,
         thumbName,
-        thumbWidth: newWidth,
-        thumbHeight: newHeight,
-        width: originalWidth,
-        height: originalHeight,
+        thumbWidth: image.width,
+        thumbHeight: image.height,
+        width: dimensions.width,
+        height: dimensions.height,
       },
     };
   } catch (error) {

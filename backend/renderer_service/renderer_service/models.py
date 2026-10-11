@@ -311,6 +311,44 @@ class BatchRenderOptions(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
 
+def _batch_working_pixels(options: BatchRenderOptions, frames: int) -> int:
+    tile = options.tile_size or 200
+    columns = min(options.columns or max(1, int(frames**0.5 + 0.999)), frames)
+    rows = (frames + columns - 1) // columns
+    pixels = columns * rows * tile * tile
+    pixels += frames * 200 * 200 * (2 if options.include_sources else 1)
+    if options.frame_mode == "layer":
+        pixels += frames * 200 * 200
+    return pixels
+
+
+def _validate_batch_json_budget(
+    request: BatchRenderRequest,
+) -> None:
+    usage = _validate_render_input_budget(
+        params=request.payload.params,
+        document=request.payload.document,
+        field="payload",
+    )
+    for variant in request.variants:
+        for name, value in (
+            ("params", variant.params),
+            ("overrides", variant.overrides),
+        ):
+            if value is not None:
+                usage += _json_value_budget(value, field=f"variant.{name}")
+        if usage.bytes > MAX_BATCH_JSON_BYTES:
+            raise ValueError(
+                "Batch input JSON exceeds the "
+                f"{MAX_BATCH_JSON_BYTES}-byte working budget"
+            )
+        if usage.nodes > MAX_BATCH_JSON_NODES:
+            raise ValueError(
+                "Batch input JSON exceeds the "
+                f"{MAX_BATCH_JSON_NODES}-value working budget"
+            )
+
+
 class BatchRenderRequest(BaseModel):
     payload: RenderParams
     variants: list[BatchVariant] = Field(default_factory=list, max_length=256)
@@ -322,38 +360,9 @@ class BatchRenderRequest(BaseModel):
         frames = len(self.variants) + int(options.include_base)
         if not 1 <= frames <= 256:
             raise ValueError("Batch must contain between 1 and 256 frames")
-        tile = options.tile_size or 200  # Upper bound for configured canvas size.
-        columns = min(options.columns or max(1, int(frames**0.5 + 0.999)), frames)
-        rows = (frames + columns - 1) // columns
-        pixels = columns * rows * tile * tile
-        pixels += frames * 200 * 200 * (2 if options.include_sources else 1)
-        if options.frame_mode == "layer":
-            pixels += frames * 200 * 200
-        if pixels > 16_000_000:
+        if _batch_working_pixels(options, frames) > 16_000_000:
             raise ValueError("Batch exceeds the 16 million pixel working budget")
-
-        usage = _validate_render_input_budget(
-            params=self.payload.params,
-            document=self.payload.document,
-            field="payload",
-        )
-        for variant in self.variants:
-            for name, value in (
-                ("params", variant.params),
-                ("overrides", variant.overrides),
-            ):
-                if value is not None:
-                    usage += _json_value_budget(value, field=f"variant.{name}")
-            if usage.bytes > MAX_BATCH_JSON_BYTES:
-                raise ValueError(
-                    "Batch input JSON exceeds the "
-                    f"{MAX_BATCH_JSON_BYTES}-byte working budget"
-                )
-            if usage.nodes > MAX_BATCH_JSON_NODES:
-                raise ValueError(
-                    "Batch input JSON exceeds the "
-                    f"{MAX_BATCH_JSON_NODES}-value working budget"
-                )
+        _validate_batch_json_budget(self)
         return self
 
 

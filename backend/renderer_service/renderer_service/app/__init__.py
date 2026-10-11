@@ -47,6 +47,7 @@ class RendererInputError(ValueError):
 
 
 MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024
+HTTP_REQUEST = "http.request"
 
 
 @dataclass
@@ -183,6 +184,51 @@ class RendererSupervisor:
         }
 
 
+def _request_body_too_large() -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        content={
+            "detail": (
+                "Renderer request body is too large "
+                f"(maximum {MAX_REQUEST_BODY_BYTES} bytes)"
+            )
+        },
+    )
+
+
+async def reject_oversized_requests(
+    request: Request, call_next: Callable
+) -> JSONResponse | Any:
+    raw_length = request.headers.get("content-length")
+    try:
+        content_length = int(raw_length) if raw_length is not None else None
+    except ValueError:
+        content_length = None
+    if content_length is not None and content_length > MAX_REQUEST_BODY_BYTES:
+        return _request_body_too_large()
+
+    received_bytes = 0
+    exceeded = False
+    original_receive = request.receive
+
+    async def limited_receive():
+        nonlocal received_bytes, exceeded
+        if exceeded:
+            return {"type": HTTP_REQUEST, "body": b"", "more_body": False}
+        message = await original_receive()
+        if message["type"] != HTTP_REQUEST:
+            return message
+        received_bytes += len(message.get("body", b""))
+        if received_bytes > MAX_REQUEST_BODY_BYTES:
+            exceeded = True
+            return {"type": HTTP_REQUEST, "body": b"", "more_body": False}
+        return message
+
+    limited_request = Request(request.scope, limited_receive)
+    response = await call_next(limited_request)
+    return _request_body_too_large() if exceeded else response
+
+
 def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -214,55 +260,7 @@ def create_app() -> FastAPI:
         ],
     )
 
-    @app.middleware("http")
-    async def reject_oversized_requests(
-        request: Request, call_next: Callable
-    ) -> JSONResponse | Any:
-        raw_length = request.headers.get("content-length")
-        try:
-            content_length = int(raw_length) if raw_length is not None else None
-        except ValueError:
-            content_length = None
-        if content_length is not None and content_length > MAX_REQUEST_BODY_BYTES:
-            return JSONResponse(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                content={
-                    "detail": (
-                        "Renderer request body is too large "
-                        f"(maximum {MAX_REQUEST_BODY_BYTES} bytes)"
-                    )
-                },
-            )
-        received_bytes = 0
-        exceeded = False
-        original_receive = request.receive
-
-        async def limited_receive():
-            nonlocal received_bytes, exceeded
-            if exceeded:
-                return {"type": "http.request", "body": b"", "more_body": False}
-            message = await original_receive()
-            if message["type"] != "http.request":
-                return message
-            received_bytes += len(message.get("body", b""))
-            if received_bytes > MAX_REQUEST_BODY_BYTES:
-                exceeded = True
-                return {"type": "http.request", "body": b"", "more_body": False}
-            return message
-
-        limited_request = Request(request.scope, limited_receive)
-        response = await call_next(limited_request)
-        if exceeded:
-            return JSONResponse(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                content={
-                    "detail": (
-                        "Renderer request body is too large "
-                        f"(maximum {MAX_REQUEST_BODY_BYTES} bytes)"
-                    )
-                },
-            )
-        return response
+    app.middleware("http")(reject_oversized_requests)
 
     pipeline = RenderPipeline(
         canvas_size=settings.default_canvas_size,
