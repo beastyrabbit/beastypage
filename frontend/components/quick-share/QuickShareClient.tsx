@@ -407,6 +407,11 @@ export function QuickShareClient() {
 
   const selectFile = useCallback(
     (nextFile: File | null, source: "file" | "clipboard") => {
+      // Selecting a new file supersedes any processing poll for the previous
+      // upload. Abort it before resetting the visible state so a late status
+      // response cannot overwrite the new selection.
+      processingAbortRef.current?.abort();
+      processingAbortRef.current = null;
       setFiles(nextFile ? [nextFile] : []);
       setFileSource(nextFile ? source : null);
       setActiveUpload(null);
