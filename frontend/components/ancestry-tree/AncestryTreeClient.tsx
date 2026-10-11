@@ -234,6 +234,7 @@ export function AncestryTreeClient({
   });
 
   const saveTreeMutation = useMutation(api.ancestryTree.save);
+  const saveAsNewTreeMutation = useMutation(api.ancestryTree.saveAsNew);
 
   // Initialize sprite mapper on mount
   useEffect(() => {
@@ -818,11 +819,13 @@ export function AncestryTreeClient({
     [tree, selectedCat],
   );
 
-  const handleSaveTree = useCallback(
+  const persistTree = useCallback(
     async (
+      slug: string,
       name: string,
       creatorName: string,
-      password?: string,
+      password: string | undefined,
+      asNew: boolean,
     ): Promise<{
       success: boolean;
       error?: string;
@@ -838,9 +841,9 @@ export function AncestryTreeClient({
         };
       }
 
-      const updatedTree = { ...tree, name, creatorName };
+      const updatedTree = { ...tree, slug, name, creatorName };
       try {
-        const result = await saveTreeMutation({
+        const payload = {
           slug: updatedTree.slug,
           name: updatedTree.name,
           foundingMotherId: updatedTree.foundingMotherId,
@@ -854,8 +857,11 @@ export function AncestryTreeClient({
           config: updatedTree.config,
           creatorName: updatedTree.creatorName,
           password,
-          editToken: treeEditToken ?? undefined,
-        });
+          editToken: asNew ? undefined : (treeEditToken ?? undefined),
+        };
+        const result = asNew
+          ? await saveAsNewTreeMutation(payload)
+          : await saveTreeMutation(payload);
 
         if (!result.success) {
           return { success: false, error: result.error };
@@ -873,10 +879,8 @@ export function AncestryTreeClient({
           }
         }
 
-        // If password was set on new tree, track it
-        if (password && result.isNew) {
-          setHasPassword(true);
-        }
+        // Keep the local password flag aligned with newly created copies.
+        if (result.isNew) setHasPassword(Boolean(password));
 
         // Update URL to include the slug using Next.js router
         const newUrl = `/projects/warrior-cats/ancestry-tree/${updatedTree.slug}`;
@@ -887,7 +891,12 @@ export function AncestryTreeClient({
           has_creator: creatorName.length > 0,
         });
 
-        return { success: true, slug: result.slug, isNew: result.isNew };
+        return {
+          success: true,
+          slug: result.slug,
+          isNew: result.isNew,
+          editToken: result.editToken,
+        };
       } catch (error) {
         console.error("Failed to save tree:", error);
         return {
@@ -896,7 +905,19 @@ export function AncestryTreeClient({
         };
       }
     },
-    [tree, treeEditToken, saveTreeMutation, router],
+    [tree, treeEditToken, saveTreeMutation, saveAsNewTreeMutation, router],
+  );
+
+  const handleSaveTree = useCallback(
+    (name: string, creatorName: string, password?: string) =>
+      persistTree(tree?.slug ?? "", name, creatorName, password, false),
+    [tree, persistTree],
+  );
+
+  const handleSaveTreeAsNew = useCallback(
+    (slug: string, name: string, creatorName: string, password?: string) =>
+      persistTree(slug, name, creatorName, password, true),
+    [persistTree],
   );
 
   const handleBackToConfig = useCallback(() => {
@@ -1378,6 +1399,7 @@ export function AncestryTreeClient({
           currentSlug={tree.slug}
           hasPassword={hasPassword}
           onSave={handleSaveTree}
+          onSaveAsNew={handleSaveTreeAsNew}
           onClose={() => setShowSaveDialog(false)}
         />
       )}

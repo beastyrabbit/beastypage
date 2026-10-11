@@ -26,6 +26,17 @@ interface SaveTreeDialogProps {
     slug?: string;
     isNew?: boolean;
   }>;
+  onSaveAsNew?: (
+    slug: string,
+    name: string,
+    creatorName: string,
+    password?: string,
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    slug?: string;
+    isNew?: boolean;
+  }>;
   onClose: () => void;
 }
 
@@ -35,6 +46,7 @@ export function SaveTreeDialog({
   currentSlug,
   hasPassword: initialHasPassword,
   onSave,
+  onSaveAsNew,
   onClose,
 }: Readonly<SaveTreeDialogProps>) {
   const defaultCreatorName = useDefaultCreatorName();
@@ -49,6 +61,8 @@ export function SaveTreeDialog({
   );
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [saveAsNew, setSaveAsNew] = useState(false);
+  const [newSlug, setNewSlug] = useState(`${currentSlug}-copy`);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -104,9 +118,16 @@ export function SaveTreeDialog({
         } else if (result.error === "invalid_password") {
           setError("Incorrect password");
         } else if (result.error === "edit_token_required") {
-          setError(
-            "This tree can only be edited from the browser where it was created, or with its password.",
-          );
+          if (onSaveAsNew) {
+            setSaveAsNew(true);
+            setError(
+              "This legacy tree is read-only. Save a copy under a new slug to continue editing.",
+            );
+          } else {
+            setError(
+              "This tree can only be edited from the browser where it was created, or with its password.",
+            );
+          }
         } else {
           setError(result.error ?? "Failed to save tree");
         }
@@ -118,6 +139,43 @@ export function SaveTreeDialog({
       setSaveSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save tree");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveAsNew = async () => {
+    if (!onSaveAsNew) return;
+    if (!name.trim()) {
+      setError("Please enter a tree name");
+      return;
+    }
+    if (!newSlug.trim()) {
+      setError("Please enter a new tree slug");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      const result = await onSaveAsNew(
+        newSlug.trim(),
+        name.trim(),
+        creatorName.trim(),
+        newPassword || undefined,
+      );
+      if (!result.success) {
+        setError(
+          result.error === "slug_taken"
+            ? "That slug is already in use. Choose another."
+            : (result.error ?? "Failed to save tree copy"),
+        );
+        return;
+      }
+      setSavedSlug(result.slug ?? newSlug.trim());
+      setSaveSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save tree copy");
     } finally {
       setIsSaving(false);
     }
@@ -275,6 +333,28 @@ export function SaveTreeDialog({
         <h2 className="mb-6 text-xl font-bold">Save Ancestry Tree</h2>
 
         <div className="space-y-4">
+          {saveAsNew && (
+            <div>
+              <label
+                htmlFor="newTreeSlug"
+                className="block text-sm font-medium mb-1"
+              >
+                New Tree Slug <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                id="newTreeSlug"
+                value={newSlug}
+                onChange={(e) => setNewSlug(e.target.value)}
+                placeholder="e.g., thunderclan-copy"
+                className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm placeholder:text-muted-foreground focus:border-amber-500 focus:outline-none"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                This creates a new tree with its own edit permission.
+              </p>
+            </div>
+          )}
+
           <div>
             <label
               htmlFor="treeName"
@@ -311,7 +391,7 @@ export function SaveTreeDialog({
           </div>
 
           {/* Password Section */}
-          {slugExists && treeHasPassword ? (
+          {!saveAsNew && slugExists && treeHasPassword ? (
             // Tree exists and has password - need to enter it to overwrite
             <div>
               <label
@@ -373,7 +453,7 @@ export function SaveTreeDialog({
             </button>
             <button
               type="button"
-              onClick={handleSave}
+              onClick={saveAsNew ? handleSaveAsNew : handleSave}
               disabled={isSaving || !name.trim()}
               className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-50"
             >
@@ -382,7 +462,11 @@ export function SaveTreeDialog({
               ) : (
                 <Save className="size-4" />
               )}
-              {slugExists ? "Update Tree" : "Save Tree"}
+              {saveAsNew
+                ? "Save as New Tree"
+                : slugExists
+                  ? "Update Tree"
+                  : "Save Tree"}
             </button>
           </div>
         </div>
