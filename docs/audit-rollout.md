@@ -27,3 +27,17 @@ Requests with an ID receive a stored, expiring matchup capability. Votes may
 omit the new token during the bridge, but the server still requires the stored
 client ID, exact current pair, expiry, and unused state. New clients send the
 token. Anonymous requests do not create unreachable stored matchups.
+
+# Legacy settings rows
+
+The anonymous edit capability added to cat shares and tool settings cannot be
+backfilled safely. Rows created before this change have neither an
+`ownerTokenIdentifier` nor an `editToken`, so they remain readable but are
+intentionally read-only. A caller must not be allowed to claim one by being the
+first person to submit an update, because that would let anyone take over a
+known slug.
+
+Clients that need to change a legacy row should save the settings under a new
+slug. New rows return an `editToken`; clients must retain it and send it when
+updating an anonymous row. Authenticated rows can be updated by the same
+authenticated identity through `ownerTokenIdentifier`.

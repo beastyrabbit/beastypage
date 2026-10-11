@@ -395,7 +395,9 @@ export function ClassicWheelClient() {
                 <tr className="border-b border-border/20">
                   <th className="px-4 py-2 text-left">Prize</th>
                   <th className="px-4 py-2 text-right">Chance</th>
-                  <th className="px-4 py-2 text-right">Spins</th>
+                  <th className="px-4 py-2 text-right">
+                    {stats?.truncated ? "Spins in sample" : "Spins"}
+                  </th>
                 </tr>
               </thead>
               <tbody>
