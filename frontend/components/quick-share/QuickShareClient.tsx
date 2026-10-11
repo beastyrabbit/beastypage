@@ -775,7 +775,10 @@ export function QuickShareClient() {
           size: selectedFile.size,
           createdAt: Date.now(),
         };
-        collection ??= { slug: upload.slug, receipt: upload.receipt };
+        // Keep the latest active upload as the collection capability. If an
+        // earlier item is revoked or fails processing, the next item can still
+        // authorize the remainder of the batch without reusing stale state.
+        collection = { slug: upload.slug, receipt: upload.receipt };
         lastUpload = upload;
         remember(upload);
         await uploadParts(selectedFile, upload);

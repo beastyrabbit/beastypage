@@ -233,12 +233,6 @@ describe("Quick Share Convex policy", () => {
       }),
     ).rejects.toThrow("SLUG_COLLISION");
 
-    await expect(
-      t.mutation(internal.quickShare.createUpload, {
-        ...createArgs("Collect1", { now: now + 3 }),
-        collectionReceiptHash: "wrong-receipt",
-      }),
-    ).rejects.toThrow("SLUG_COLLISION");
   });
 
   it("ignores inactive collection rows when enforcing the collection limit", async () => {

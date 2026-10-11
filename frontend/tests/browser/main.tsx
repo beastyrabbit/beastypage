@@ -25,9 +25,9 @@ function AncestrySaveFixture() {
         Open save dialog
       </button>
       {savedSlug && (
-        <p role="status" className="mt-4 text-sm text-emerald-400">
+        <output className="mt-4 block text-sm text-emerald-400">
           Saved copy: {savedSlug}
-        </p>
+        </output>
       )}
       {open && (
         <SaveTreeDialog

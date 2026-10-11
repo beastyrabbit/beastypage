@@ -307,7 +307,7 @@ test("ancestry save falls back to a validated save-as-new copy", async ({
   await expect(
     page.getByRole("heading", { name: "Tree Saved!" }),
   ).toBeVisible();
-  await expect(page.getByRole("status")).toHaveText(
+  await expect(page.locator("output")).toHaveText(
     "Saved copy: thunderclan-lineage-copy-2",
   );
   await expect(dialog.getByText(/thunderclan-lineage-copy-2$/)).toBeVisible();
