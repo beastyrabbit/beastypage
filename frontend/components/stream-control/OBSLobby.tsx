@@ -185,6 +185,7 @@ function buildLobbyChips(
             evolutionInfo.clans.length,
             evolutionInfo.targetLevel,
             evolutionInfo.spinSeconds,
+            "overlay",
           ),
         ),
       },

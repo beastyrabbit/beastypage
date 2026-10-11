@@ -13,13 +13,13 @@ const CSS = `
 .ns .bench{position:absolute;inset:0;background:repeating-linear-gradient(0deg,#7a5635 0 90px,#6b4a2e 90px 180px);box-shadow:inset 0 0 160px rgba(0,0,0,.5)}
 .ns .tray{position:absolute;left:50px;top:60px;width:800px;height:800px;background:#1f1c1a;padding:10px;box-sizing:content-box;border-radius:8px;box-shadow:0 20px 40px rgba(0,0,0,.5),inset 0 0 0 10px #2b2724}
 .ns .cell{position:absolute;background:radial-gradient(circle at 50% 70%,#4a3425,#2e2017 70%);border-radius:6px;box-shadow:inset 0 6px 12px rgba(0,0,0,.6);transition:opacity .9s ease}
-.ns .cell .sprite{position:absolute;filter:drop-shadow(0 6px 6px rgba(0,0,0,.6));transition:opacity .9s ease,transform .9s ease}
+.ns .cell .sprite{position:absolute;filter:drop-shadow(0 6px 6px rgba(0,0,0,.6));transition:opacity 1.5s ease,transform 1.5s ease}
 .ns .cell.thinning .sprite{opacity:0;transform:translateY(-40px)}
 .ns .label{position:absolute;left:6px;bottom:6px;right:14px;background:#f6f1e4;border-radius:2px 2px 8px 8px;padding:3px 6px;box-shadow:0 2px 4px rgba(0,0,0,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ns .label b{font:900 20px ${MONO};line-height:1;margin-right:6px}
 .ns .label span{font:700 10px ${SANS};color:#6b6459}
-.ns .label.flat{transform:rotate(-16deg);bottom:40%;left:10%;right:auto;width:60%;opacity:.6}
-.ns .label.flat span{text-decoration:line-through}
+.ns .label.flat{transform:rotate(-16deg);bottom:40%;left:10%;right:auto;width:85%;opacity:.6}
+.ns .label.flat span{font-size:14px;text-decoration:line-through}
 .ns .cell.pull .label{background:#e0322b;color:#fff;animation:ns-pulse 1.1s ease-in-out infinite}
 .ns .cell.pull .label span{color:#ffd1cc}
 .ns .cell.maybe .label{background:#ffd23f}
@@ -58,6 +58,8 @@ const CSS = `
 .ns .packet .qr{display:inline-block}
 .ns .packet span{display:block;margin-top:8px;font:italic 13px ${SERIF}}
 .ns .hd.fin{position:absolute;left:50px;top:50px}
+.ns .plq{position:absolute;left:60px;top:896px;width:560px;height:120px;--obs-plaque-ink:#f6f1e4;--obs-plaque-muted:#e9d8b8;--obs-plaque-accent:#ffb84a;--obs-plaque-font-serif:var(--obs-font-serif,Georgia,serif)}
+.ns .plq.fin{top:130px}
 @keyframes ns-pulse{50%{box-shadow:0 0 0 4px rgba(224,50,43,.5)}}
 `;
 
@@ -74,6 +76,10 @@ export function NurseryBatchScene({ view }: Readonly<BatchSceneViewProps>) {
   const cellH = 800 / rows;
   const inner = Math.min(cellW, cellH) - 10;
   const sprite = Math.max(48, Math.round(inner * 0.72));
+  const verdictId =
+    view.beat.kind === "verdict" || view.beat.kind === "depart"
+      ? (view.beat.pendingCullId ?? null)
+      : null;
 
   if (done) {
     const finalists = view.survivors;
@@ -120,6 +126,7 @@ export function NurseryBatchScene({ view }: Readonly<BatchSceneViewProps>) {
           <b>The Nursery</b>
           <i>{finalists.length} potted up on the windowsill</i>
         </div>
+        <div data-plaque-slot="" className="plq fin" />
       </div>
     );
   }
@@ -136,7 +143,7 @@ export function NurseryBatchScene({ view }: Readonly<BatchSceneViewProps>) {
               key={cat.id}
               className={cn(
                 "cell",
-                cat.marked && "pull",
+                (cat.marked || cat.id === verdictId) && "pull",
                 cat.potential && "maybe",
                 cat.favorite && !gone && "sun",
                 cat.fading && "thinning",
@@ -221,10 +228,12 @@ export function NurseryBatchScene({ view }: Readonly<BatchSceneViewProps>) {
           </b>
         </div>
       </div>
+      {/* The wrapper's plaque: a label strip under the tray. */}
+      <div data-plaque-slot="" className="plq" />
       <div className="note">
         {view.phase === "awaitingCull"
           ? `thin out one seedling after this watering — call its number (${view.cullNumber} of ${view.maxEliminations})`
-          : view.statusLabel}
+          : null}
       </div>
     </div>
   );

@@ -66,17 +66,19 @@ const BOX: CSSProperties = {
   background: "rgba(230,214,180,.9)",
 };
 
-/** Title box in the corner. */
+/** Title box in the corner; `plaqueSlot` mounts the plaque's slot under the subtitle. */
 export function Cartouche({
   title,
   subtitle,
   code,
   style,
+  plaqueSlot = false,
 }: Readonly<{
   title: string;
   subtitle: ReactNode;
   code: ReactNode;
   style?: CSSProperties;
+  plaqueSlot?: boolean;
 }>) {
   return (
     <div
@@ -111,6 +113,22 @@ export function Cartouche({
       >
         {subtitle}
       </p>
+      {plaqueSlot ? (
+        <div
+          data-plaque-slot=""
+          style={{
+            width: 460,
+            height: 110,
+            marginTop: 6,
+            overflow: "hidden",
+            ["--obs-plaque-ink" as string]: MAP_INK,
+            ["--obs-plaque-muted" as string]: MAP_MUTED,
+            ["--obs-plaque-accent" as string]: MAP_RED,
+            ["--obs-plaque-shadow" as string]: "none",
+            ["--obs-plaque-title-size" as string]: "36px",
+          }}
+        />
+      ) : null}
       <div
         style={{
           fontFamily: LOOK_FONT_MONO,
@@ -317,7 +335,7 @@ export function TreeDefs() {
   );
 }
 
-/** A cat on the map with its label plank beneath. */
+/** A cat on the map with its label plank beneath; `lineageKey` marks it for the leader line. */
 export function MapCat({
   x,
   y,
@@ -328,6 +346,7 @@ export function MapCat({
   accent,
   style,
   labelStyle,
+  lineageKey,
 }: Readonly<{
   x: number;
   y: number;
@@ -338,9 +357,11 @@ export function MapCat({
   accent?: string;
   style?: CSSProperties;
   labelStyle?: CSSProperties;
+  lineageKey?: string;
 }>) {
   return (
     <div
+      data-lineage-key={lineageKey}
       style={{
         position: "absolute",
         left: Math.round(x - size / 2),
@@ -386,13 +407,12 @@ export function MapCat({
           <small
             style={{
               display: "block",
-              fontFamily: LOOK_FONT_MONO,
-              fontStyle: "normal",
-              fontWeight: 400,
-              fontSize: 9.5,
-              letterSpacing: ".22em",
+              fontStyle: "italic",
+              fontWeight: 500,
+              fontSize: 16,
+              lineHeight: 1.2,
+              letterSpacing: ".01em",
               color: accent ?? MAP_MUTED,
-              textTransform: "uppercase",
               marginTop: 1,
             }}
           >

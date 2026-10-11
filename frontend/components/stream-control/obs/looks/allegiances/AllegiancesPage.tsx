@@ -25,7 +25,8 @@ export function AllegiancesPage({
   folio: string;
   children: ReactNode;
 }>) {
-  const page: CSSProperties = {
+  // The wrapper's plaque portals into this page: printed ink on paper, no glow.
+  const page = {
     position: "relative",
     width: 1280,
     height: 1080,
@@ -36,7 +37,13 @@ export function AllegiancesPage({
       linear-gradient(90deg, rgba(60,40,20,.30) 0, rgba(60,40,20,.10) 40px, transparent 120px),
       repeating-linear-gradient(0deg, rgba(0,0,0,.012) 0 2px, transparent 2px 5px),
       ${AL_PAPER}`,
-  };
+    "--obs-plaque-ink": AL_INK,
+    "--obs-plaque-muted": AL_MUTED,
+    "--obs-plaque-accent": AL_RED,
+    "--obs-plaque-shadow": "none",
+    "--obs-plaque-font-serif": LOOK_FONT_BOOK,
+    "--obs-plaque-font-mono": LOOK_FONT_MONO,
+  } as CSSProperties;
   return (
     <div style={page} data-look="allegiances">
       <style>{LOOK_KEYFRAMES}</style>

@@ -1,13 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   type BatchBoardCat,
+  type BatchBoardModel,
   type BatchBoardStage,
   stageStripWindow,
 } from "../batchModel";
 import type { BatchBoardProps } from "../LookBoardProps";
 import { chunkBySizes, splitColumns } from "../layout";
-import { useChangeTick, useTypewriter } from "../motion";
+import { useTypewriter } from "../motion";
 import { poolNumber } from "../shared";
 import { GB_DIM, GB_INK, GB_SCREEN } from "./gbSprite";
 import {
@@ -18,11 +20,71 @@ import {
   LcdSprite,
 } from "./HandheldShell";
 
-const TOP_H = 56;
+const TOP_H = 76;
 const TEXT_H = 122;
 const PAD = 16;
 const PARTY_W = 600;
 const ROWS_PER_COLUMN = 10;
+/** How often the text box re-reads the verdict clock. */
+const VERDICT_TICK_MS = 250;
+
+/** "NO KIT", "1 KIT", "4 KITS". */
+function kitCount(count: number): string {
+  if (count === 0) return "NO KIT";
+  return count === 1 ? "1 KIT" : `${count} KITS`;
+}
+
+/** "3", "2", "1" for the verdict clock, clamped like the wrapper's numeral. */
+function verdictDigit(endsAt: number | null, now: number): number {
+  if (endsAt === null) return 3;
+  return Math.max(1, Math.min(3, Math.ceil((endsAt - now) / 1000)));
+}
+
+/** Wall clock sampled every 250 ms while the verdict runs; 0 otherwise. */
+function useVerdictClock(active: boolean): number {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), VERDICT_TICK_MS);
+    return () => window.clearInterval(id);
+  }, [active]);
+  return now;
+}
+
+/**
+ * The text box line for a beat, in the handheld's voice. The verdict line
+ * ends in a live digit that is rendered separately so the typewriter does
+ * not retype it every second.
+ */
+function textBoxMessage(model: BatchBoardModel): string {
+  const tail = `${model.remaining} KITS → ${model.finalCount}`;
+  const trait = model.traitLabel.toUpperCase();
+  const changed = model.survivors.filter(
+    (cat) => cat.changed && !cat.fading,
+  ).length;
+  const leavingIndex = model.cats.findIndex((cat) => cat.fading);
+  const leaving = leavingIndex >= 0 ? poolNumber(leavingIndex) : "??";
+  switch (model.beat) {
+    case "loading":
+      return "SUMMONING THE PARTY…";
+    case "windup":
+    case "deal":
+      return `THE PARTY ROLLS FOR ${trait}…\n${tail}`;
+    case "hold":
+      return `${kitCount(changed)} CHANGED!\n${tail}`;
+    case "awaiting":
+      return `${model.remaining} KITS IN THE PARTY.\nWHO LEAVES? ▶ CHOOSE ONE`;
+    case "verdict":
+      return `#${model.verdictNumber ?? "??"} LEAVES IN `;
+    case "depart":
+      return `#${leaving} LEAVES THE PARTY.\n${tail}`;
+    case "repack":
+      return `MAKING ROOM…\n${tail}`;
+    case "done":
+      return `${model.remaining} KITS ARE READY FOR THE ADOPT RUN!\n${model.qrUrl ? "SEND VIA LINK?  ▶YES   NO" : "SAVING…"}`;
+  }
+}
 
 /**
  * PARTY screen: every kit still in the pool is a party row (number, sprite,
@@ -30,8 +92,10 @@ const ROWS_PER_COLUMN = 10;
  * takes over the box as a big LOOK view. Marked = inverted blinking row,
  * potential = "?" after the name, favourite = ♥.
  *
- * Motion: a new layer flashes every sprite (gb-flash), a culled row blinks
- * inverted then steps out, the LOOK sprite flashes in, the text box types.
+ * Motion: the LCD whites out once per stage at the first landing, each
+ * landed sprite flashes (gb-flash), a culled row blinks inverted then steps
+ * out over the depart beat, the LOOK sprite flashes in, the text box types
+ * and counts the verdict down in LCD digits.
  */
 export function HandheldBatch({ model }: Readonly<BatchBoardProps>) {
   const numbered = model.cats.map((cat, index) => ({ cat, index }));
@@ -62,19 +126,22 @@ export function HandheldBatch({ model }: Readonly<BatchBoardProps>) {
   );
   const spotlight = model.spotlight;
 
-  const message = (() => {
-    if (model.phase === "done") {
-      return `${model.remaining} KITS ARE READY FOR THE ADOPT RUN!\n${model.qrUrl ? "SEND VIA LINK?  ▶YES   NO" : "SAVING…"}`;
-    }
-    if (model.phase === "awaitingCull") {
-      return `${model.remaining} KITS IN THE PARTY.\nWHO LEAVES? ▶ CHOOSE ONE`;
-    }
-    return `${model.statusLabel.toUpperCase()}\n${model.remaining} KITS → ${model.finalCount}`;
-  })();
+  const verdict = model.beat === "verdict";
+  const now = useVerdictClock(verdict);
+  const message = textBoxMessage(model);
   const typed = useTypewriter(message, 24);
+  // The verdict digit follows the typed head once it is fully out.
+  const digit =
+    verdict && typed.length >= message.length
+      ? verdictDigit(model.verdictEndsAt, now)
+      : null;
+  // The LCD whites out once per stage, at the first landing of the deal.
+  const anyLanded = model.survivors.some((cat) => cat.landed);
+  const flash = model.beat === "deal" && anyLanded;
+  const trait = model.traitLabel.toUpperCase();
 
   return (
-    <HandheldShell>
+    <HandheldShell flash={flash} flashKey={String(model.stageIndex)}>
       <LcdBox
         style={{
           left: PAD,
@@ -82,23 +149,44 @@ export function HandheldBatch({ model }: Readonly<BatchBoardProps>) {
           right: PAD,
           height: TOP_H,
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          flexDirection: "column",
+          justifyContent: "center",
+          gap: 8,
           padding: "0 18px",
           fontSize: 15,
         }}
       >
-        <span>
-          ADOPT RUN ◆ STAGE{" "}
-          {Math.min(model.stageIndex + 1, model.stages.length)}/
-          {model.stages.length}
-        </span>
-        <span
-          key={model.remaining}
-          style={{ animation: "gb-flash 500ms steps(3) both" }}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            whiteSpace: "nowrap",
+          }}
         >
-          KITS {model.remaining}/{model.poolCount}
-        </span>
+          <span>
+            ADOPT RUN ◆ STAGE{" "}
+            {Math.min(model.stageIndex + 1, model.stages.length)}/
+            {model.stages.length}
+            {trait ? ` ◆ ${trait}` : ""}
+          </span>
+          <span
+            key={model.remaining}
+            style={{ animation: "gb-flash 500ms steps(3) both" }}
+          >
+            KITS {model.remaining}/{model.poolCount}
+          </span>
+        </div>
+        <div
+          style={{
+            fontSize: 11,
+            color: GB_DIM,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {model.statusLabel.toUpperCase()}
+        </div>
       </LcdBox>
 
       <LcdBox
@@ -271,6 +359,14 @@ export function HandheldBatch({ model }: Readonly<BatchBoardProps>) {
         }}
       >
         {typed}
+        {digit !== null ? (
+          <span
+            key={digit}
+            style={{ animation: "gb-flash 400ms steps(2) both" }}
+          >
+            {digit}…
+          </span>
+        ) : null}
         {model.qrUrl ? <LcdLink url={model.qrUrl} /> : null}
       </LcdBox>
     </HandheldShell>
@@ -282,8 +378,9 @@ function stageColour(stage: BatchBoardStage): string {
   return stage.revealed ? GB_DIM : "rgba(48,98,48,.35)";
 }
 
+/** The leave fills the 1600 ms depart beat; the engine drops the row after it. */
 function rowAnimation(cat: BatchBoardCat): string | undefined {
-  if (cat.fading) return "look-leave 900ms steps(5) forwards";
+  if (cat.fading) return "look-leave 1500ms steps(5) forwards";
   return cat.marked ? "gb-blink 1.2s steps(1) infinite" : undefined;
 }
 
@@ -309,7 +406,8 @@ function PartyRow({
 }>) {
   const inverted = cat.marked;
   const small = height < 36;
-  const tick = useChangeTick(cat.previewUrl);
+  // Flashes once per stage: `landed` resets at the next windup.
+  const landed = cat.landed && cat.changed && !cat.fading;
   const ink = inverted ? GB_SCREEN : GB_INK;
   return (
     <div
@@ -328,12 +426,16 @@ function PartyRow({
       }}
     >
       <div
-        key={tick}
         style={{
-          animation: tick > 0 ? "gb-flash 600ms steps(3) both" : undefined,
+          animation: landed ? "gb-flash 600ms steps(3) both" : undefined,
         }}
       >
-        <LcdSprite url={cat.previewUrl} alt={cat.label} size={height - 4} />
+        <LcdSprite
+          url={cat.previewUrl}
+          alt={cat.label}
+          size={height - 4}
+          catId={cat.id}
+        />
       </div>
       <div
         style={{

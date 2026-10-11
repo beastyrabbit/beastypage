@@ -3,6 +3,7 @@
 import {
   type LineageCatState,
   type LineageReveal,
+  type LineageRoll,
   lineageBranchOpen,
   lineageCatState,
   lineageSpriteUrl,
@@ -37,9 +38,15 @@ function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
-/** What the left page says is happening right now. */
+/** What the left page says is happening right now: the roll by name, the value at land. */
 function ceremonyStatus(reveal: LineageReveal): string {
-  if (reveal.charging) return "opening a pack…";
+  const roll = reveal.roll;
+  if (reveal.charging) {
+    if (!roll) return "opening a pack…";
+    const trait = roll.traitLabel.toLowerCase();
+    if (roll.valueLabel) return `${trait}: ${roll.valueLabel}!`;
+    return `opening a pack · rolling ${trait} · ${(roll.index + 1).toString()} of ${roll.count.toString()}…`;
+  }
   if (reveal.step.kind === "banner") {
     return `new row: the ${reveal.activeBranch ?? ""} line`;
   }
@@ -50,11 +57,15 @@ function slotLabel(
   cat: LineageCat | null,
   state: LineageCatState,
   level: number,
+  roll: LineageRoll | null,
 ): string {
   if (!cat || state === "hidden") {
     return `${lineageRank({ level: level + 1 })} · ???`;
   }
-  return state === "charging" ? "opening…" : cat.label;
+  if (state !== "charging") return cat.label;
+  if (!roll) return "opening…";
+  if (roll.valueLabel) return roll.valueLabel;
+  return `${roll.traitLabel.toLowerCase()} · ${(roll.index + 1).toString()}/${roll.count.toString()}…`;
 }
 
 /**
@@ -118,6 +129,23 @@ export function StickerLineage({ model, reveal }: Readonly<LineageBoardProps>) {
             <span>set complete</span>
           )}
         </div>
+        {/* The plaque writes the roll under the starter sticker; always mounted. */}
+        <div
+          data-plaque-slot=""
+          style={{
+            position: "absolute",
+            left: 10,
+            top: 530,
+            width: 320,
+            height: 120,
+            overflow: "hidden",
+            ["--obs-plaque-ink" as string]: ST_NAVY,
+            ["--obs-plaque-muted" as string]: ST_BROWN,
+            ["--obs-plaque-accent" as string]: ST_PINK,
+            ["--obs-plaque-shadow" as string]: "none",
+            ["--obs-plaque-title-size" as string]: "30px",
+          }}
+        />
         {done ? (
           <CompleteShout
             style={{ bottom: 100, fontSize: 40 }}
@@ -166,6 +194,7 @@ function StarterSticker({
     <>
       <div style={{ position: "relative", margin: "26px auto 0", width: 250 }}>
         <div
+          data-lineage-key={cat.key}
           style={{
             position: "relative",
             width: 250,
@@ -295,7 +324,8 @@ function Slot({
   const state = cat ? lineageCatState(reveal, cat.key) : "hidden";
   const empty = !cat || state === "hidden";
   const isNewest = Boolean(cat) && cat?.key === newestKey;
-  const firstTag = cat ? additionTags(cat.additions, 1, 14)[0] : undefined;
+  const roll = state === "charging" ? (reveal?.roll ?? null) : null;
+  const firstTag = cat ? additionTags(cat.additions, 1)[0] : undefined;
   return (
     <div
       style={{ position: "relative", width: slot + 20, textAlign: "center" }}
@@ -309,6 +339,8 @@ function Slot({
         <PlacedSticker
           cat={cat}
           state={state}
+          roll={roll}
+          landingAt={reveal?.landing?.at ?? null}
           url={lineageSpriteUrl(state, reveal, cat.previewUrl)}
           number={number}
           slot={slot}
@@ -325,9 +357,9 @@ function Slot({
           textOverflow: "ellipsis",
         }}
       >
-        {slotLabel(cat, state, level)}
+        {slotLabel(cat, state, level, roll)}
       </div>
-      {cat && !empty && state !== "charging" ? (
+      {cat && !empty && (state !== "charging" || roll?.valueLabel) ? (
         <div
           style={{
             font: `700 10px ${LOOK_FONT_SANS}`,
@@ -336,16 +368,28 @@ function Slot({
           }}
         >
           {lineageRank(cat).toUpperCase()}
-          {firstTag ? ` · ${firstTag}` : ""}
+          {rankSuffix(roll?.valueLabel, firstTag)}
         </div>
       ) : null}
     </div>
   );
 }
 
+/** Rank-line suffix: the value just landed, else the cat's first tag. */
+function rankSuffix(
+  valueLabel: string | null | undefined,
+  firstTag: string | undefined,
+): string {
+  if (valueLabel) return ` · +${valueLabel}`;
+  if (firstTag) return ` · ${firstTag}`;
+  return "";
+}
+
 function PlacedSticker({
   cat,
   state,
+  roll,
+  landingAt,
   url,
   number,
   slot,
@@ -353,14 +397,27 @@ function PlacedSticker({
 }: Readonly<{
   cat: LineageCat;
   state: LineageCatState;
+  roll: LineageRoll | null;
+  /** Scheduled land time of the latest land: keys the holo-star burst. */
+  landingAt: number | null;
   url: string | null;
   number: string;
   slot: number;
   holo: boolean;
 }>) {
   const charging = state === "charging";
+  const phase = roll?.phase;
+  // The foil hides the strobe; the near miss and the land show through it.
+  const mystery =
+    charging &&
+    phase !== "slowdown" &&
+    phase !== "nearmiss" &&
+    phase !== "land";
+  // The holo star is the look's own burst at the land and through the peel.
+  const burst = (charging && phase === "land") || state === "revealing";
   return (
     <div
+      data-lineage-key={cat.key}
       style={{
         position: "relative",
         margin: "0 auto",
@@ -375,21 +432,22 @@ function PlacedSticker({
         url={url}
         alt={cat.label}
         size={slot}
-        mystery={charging}
+        mystery={mystery}
         holo={holo}
-        ring={charging ? ST_PINK : undefined}
+        ring={charging && phase !== "land" ? ST_PINK : undefined}
       />
       <StickerNumber text={number} style={{ left: -6, top: -6 }} />
-      {charging ? (
+      {charging && phase !== "land" ? (
         <PackTag
           line1="PACK"
           line2={lineageRank(cat).toUpperCase()}
-          shaking
+          shaking={phase !== "nearmiss"}
           style={{ right: -40, top: -26, width: 90 }}
         />
       ) : null}
-      {holo ? (
+      {holo || burst ? (
         <i
+          key={burst ? (landingAt ?? 0).toString() : "holo"}
           style={{
             position: "absolute",
             right: -8,
@@ -402,6 +460,9 @@ function PlacedSticker({
             backgroundClip: "text",
             WebkitTextFillColor: "transparent",
             filter: "drop-shadow(0 1px 1px rgba(0,0,0,.4))",
+            animation: burst
+              ? "look-stamp 700ms cubic-bezier(.2,1.3,.4,1) both"
+              : undefined,
           }}
         >
           ★

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "convex/react";
-import { ArrowUpRight, Cat, Loader2 } from "lucide-react";
+import { ArrowUpRight, Cat, Loader2, Square } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -44,6 +44,8 @@ export function BatchPanel() {
     rawSessionSettings,
     currentBatchCommand,
     batchLiveState,
+    showLive,
+    endShow,
   } = useStreamControl();
   const { generator, ready: generatorReady } = useCatGenerator();
   const createBatch = useMutation(api.adoptionV2.createBatch);
@@ -363,7 +365,7 @@ export function BatchPanel() {
           <button
             type="button"
             onClick={handleStart}
-            disabled={starting || commandBusy || !generatorReady}
+            disabled={starting || commandBusy || showLive || !generatorReady}
             className={cn(
               "inline-flex items-center gap-2 rounded-xl bg-amber-600 px-6 py-3",
               "text-sm font-bold text-white shadow-lg shadow-amber-900/20 transition",
@@ -377,6 +379,21 @@ export function BatchPanel() {
             )}
             {starting ? "Rolling the pool…" : "Start Elimination"}
           </button>
+          {showLive ? (
+            <button
+              type="button"
+              onClick={() => void endShow()}
+              disabled={commandBusy}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-xl border border-red-500/50 px-4 py-3",
+                "text-sm font-semibold text-red-300 transition",
+                "hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50",
+              )}
+            >
+              <Square className="size-3.5" aria-hidden="true" />
+              End show
+            </button>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             {startCount} cats enter, {BATCH_FINAL_COUNT} survive — one cull
             after each of the first {stageCount} reveals.

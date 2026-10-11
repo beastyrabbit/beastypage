@@ -10,7 +10,6 @@ import { describeCat } from "../describeCat";
 import { LOOK_FONT_MONO } from "../fonts";
 import type { BatchBoardProps } from "../LookBoardProps";
 import { chunkBySizes, splitColumns } from "../layout";
-import { useChangeTick } from "../motion";
 import { LookSprite, poolNumber } from "../shared";
 import {
   AL_FAINT,
@@ -24,6 +23,8 @@ import {
 } from "./AllegiancesPage";
 
 const ROWS_PER_COLUMN = 10;
+/** The roster starts under the plaque slot (stage strip 204, slot 226–346). */
+const ROSTER_TOP = 352;
 
 function rosterFontSize(compact: boolean, rowHeight: number): number {
   if (compact) return 15;
@@ -72,13 +73,24 @@ export function AllegiancesBatch({ model }: Readonly<BatchBoardProps>) {
       folio="118"
     >
       <StageStrip model={model} />
+      {/* The wrapper's plaque (trait, roll status, tally) prints here, under the stage strip; always mounted. */}
+      <div
+        data-plaque-slot=""
+        style={{
+          position: "absolute",
+          top: 226,
+          left: 120,
+          width: 560,
+          height: 120,
+        }}
+      />
 
       {columns.map((column, columnIndex) => (
         <div
           key={column[0]?.cat.id ?? columnIndex}
           style={{
             position: "absolute",
-            top: 252,
+            top: ROSTER_TOP,
             left: 120 + columnIndex * (columnWidth + 24),
             width: columnWidth,
           }}
@@ -132,7 +144,7 @@ export function AllegiancesBatch({ model }: Readonly<BatchBoardProps>) {
         </AllegiancesPlate>
       ) : null}
 
-      <Tally model={model} top={plate ? 600 : 300} width={plateWidth} />
+      <Tally model={model} top={600} width={plateWidth} />
 
       {model.qrUrl ? (
         <AllegiancesBookplate
@@ -157,6 +169,9 @@ function Tally({
   width,
 }: Readonly<{ model: BatchBoardModel; top: number; width: number }>) {
   const awaiting = model.phase === "awaitingCull";
+  // The wrapper's plaque (under the stage strip) carries the status line;
+  // the tally only names the trait so the page never says the same thing twice.
+  const trait = model.traitLabel || null;
   return (
     <div
       style={{
@@ -168,7 +183,6 @@ function Tally({
         borderBottom: `1px solid ${AL_RULE}`,
         padding: "10px 0",
         textAlign: "center",
-        transition: "top 500ms ease",
       }}
     >
       <div
@@ -198,19 +212,22 @@ function Tally({
           ? "kits for the adopt run"
           : `until ${model.finalCount} remain`}
       </div>
-      <div
-        style={{
-          marginTop: 6,
-          fontStyle: "italic",
-          fontSize: 15,
-          color: awaiting ? AL_RED : AL_FAINT,
-          animation: awaiting
-            ? "look-pulse 1.4s ease-in-out infinite"
-            : undefined,
-        }}
-      >
-        {model.statusLabel}
-      </div>
+      {trait ? (
+        <div
+          style={{
+            marginTop: 6,
+            fontVariant: "small-caps",
+            letterSpacing: ".18em",
+            fontSize: 14,
+            color: awaiting ? AL_RED : AL_INK,
+            animation: awaiting
+              ? "look-pulse 1.4s ease-in-out infinite"
+              : undefined,
+          }}
+        >
+          {trait}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -278,8 +295,6 @@ function Entry({
   compact: boolean;
 }>) {
   const out = cat.eliminated;
-  const tick = useChangeTick(cat.previewUrl);
-  const flash = !out && tick > 0;
   return (
     <div
       style={{
@@ -302,15 +317,19 @@ function Entry({
         {number}
       </span>
       <div
-        key={tick}
         style={{
-          animation: flash ? "look-flash 600ms ease both" : undefined,
           transition: "filter 900ms ease, opacity 900ms ease",
           filter: out ? "grayscale(1) contrast(.8)" : undefined,
           opacity: out ? 0.45 : 1,
         }}
       >
-        <LookSprite url={cat.previewUrl} alt={cat.label} size={spriteSize} />
+        <LookSprite
+          url={cat.previewUrl}
+          alt={cat.label}
+          size={spriteSize}
+          catId={cat.id}
+          landed={!out && cat.landed && cat.changed}
+        />
       </div>
       <p
         style={{

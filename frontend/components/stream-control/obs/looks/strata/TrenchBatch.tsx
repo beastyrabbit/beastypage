@@ -10,7 +10,6 @@ import {
 import { LOOK_FONT_DISPLAY, LOOK_FONT_HAND, LOOK_FONT_MONO } from "../fonts";
 import type { BatchBoardProps } from "../LookBoardProps";
 import { packGrid } from "../layout";
-import { useChangeTick } from "../motion";
 import { LOOK_KEYFRAMES, LookQr, LookSprite, poolNumber } from "../shared";
 
 const INK = "#2b2825";
@@ -18,6 +17,8 @@ const SOIL = "#4a4034";
 const STRING = "#b3261e";
 const PAPER = "#eeeae0";
 const TRENCH = { left: 110, top: 160, width: 800, height: 860 };
+/** The finds register column; the plaque prints inside it, so it is as wide as the margin allows. */
+const REGISTER = { left: 940, top: 160, width: 300, pad: 16 };
 
 /** "A", "B", … for a grid column. */
 function columnLetter(column: number): string {
@@ -254,14 +255,14 @@ function FindsRegister({
     <div
       style={{
         position: "absolute",
-        left: 950,
-        top: 160,
-        width: 270,
+        left: REGISTER.left,
+        top: REGISTER.top,
+        width: REGISTER.width,
         height: model.qrUrl ? 620 : 860,
         background: "#fbfaf6",
         border: "1px solid #cfc9bd",
         boxShadow: "0 10px 24px rgba(0,0,0,.12)",
-        padding: "16px 16px",
+        padding: `${REGISTER.pad}px`,
         overflow: "hidden",
         transition: "height 500ms ease",
       }}
@@ -280,6 +281,26 @@ function FindsRegister({
       >
         FINDS REGISTER · {model.remaining} IN THE GROUND
       </h2>
+      {/* The wrapper's plaque (trait, roll status, tally) is the register's first entry; always mounted. The column is narrower than a tally can run, so the overrun fades at the edge. */}
+      <div
+        data-plaque-slot=""
+        style={{
+          width: "100%",
+          height: 120,
+          marginBottom: 6,
+          borderBottom: "1px solid #cfc9bd",
+          overflow: "hidden",
+          maskImage: "linear-gradient(90deg, #000 92%, transparent)",
+          WebkitMaskImage: "linear-gradient(90deg, #000 92%, transparent)",
+          ["--obs-plaque-ink" as string]: INK,
+          ["--obs-plaque-muted" as string]: "#6b665e",
+          ["--obs-plaque-accent" as string]: STRING,
+          ["--obs-plaque-shadow" as string]: "none",
+          ["--obs-plaque-title-size" as string]: "30px",
+          ["--obs-plaque-font-serif" as string]: LOOK_FONT_DISPLAY,
+          ["--obs-plaque-font-mono" as string]: LOOK_FONT_MONO,
+        }}
+      />
       <div
         style={{
           columnCount: twoCol ? 2 : 1,
@@ -364,11 +385,37 @@ function FindsRegister({
               : undefined,
           }}
         >
-          {model.statusLabel}
+          {registerNote(model)}
         </div>
       )}
     </div>
   );
+}
+
+/** The register's foot in the dig's voice; the trait stays named through the verdict. */
+function registerNote(model: BatchBoardModel): string {
+  const trait = model.traitLabel;
+  const leavingIndex = model.cats.findIndex((cat) => cat.fading);
+  const leaving = leavingIndex >= 0 ? poolNumber(leavingIndex) : "??";
+  switch (model.beat) {
+    case "loading":
+      return "surveying the site…";
+    case "windup":
+    case "deal":
+      return `brushing back for ${trait}…`;
+    case "hold":
+      return `${trait} exposed`;
+    case "awaiting":
+      return `${trait} exposed · say a square to backfill`;
+    case "verdict":
+      return `${trait} exposed · lifting F-${model.verdictNumber ?? "??"}…`;
+    case "depart":
+      return `F-${leaving} lifted · backfilling`;
+    case "repack":
+      return "tidying the plan…";
+    case "done":
+      return model.statusLabel;
+  }
 }
 
 function FindsBag({ url }: Readonly<{ url: string }>) {
@@ -499,15 +546,12 @@ function StageStrip({ model }: Readonly<{ model: BatchBoardModel }>) {
   );
 }
 
-function spriteAnimation(
-  cat: BatchBoardCat,
-  out: boolean,
-  tick: number,
-): string | undefined {
+/** Shake for 1000 ms, then lift out by 1600 ms: the depart beat's end, where the hatch and stamp take over. */
+function spriteAnimation(cat: BatchBoardCat): string | undefined {
   if (cat.fading) {
-    return "look-shake 500ms ease 2, look-leave 500ms ease 1000ms forwards";
+    return "look-shake 500ms ease 2, look-leave 600ms ease 1000ms forwards";
   }
-  return tick > 0 && !out ? "look-flash 700ms ease both" : undefined;
+  return undefined;
 }
 
 function labelColour(cat: BatchBoardCat, out: boolean): string {
@@ -535,7 +579,6 @@ function Square({
   compact: boolean;
 }>) {
   const out = cat.eliminated && !cat.fading;
-  const tick = useChangeTick(cat.previewUrl);
   return (
     <div
       style={{
@@ -563,9 +606,8 @@ function Square({
       )}
       {cat.spotlight && !out ? <SpotlightRing /> : null}
       <div
-        key={tick}
         style={{
-          animation: spriteAnimation(cat, out, tick),
+          animation: spriteAnimation(cat),
           opacity: out ? 0.22 : 1,
           filter: out
             ? "grayscale(1)"
@@ -573,7 +615,13 @@ function Square({
           transition: "opacity 600ms, filter 600ms",
         }}
       >
-        <LookSprite url={cat.previewUrl} alt={cat.label} size={sprite} />
+        <LookSprite
+          url={cat.previewUrl}
+          alt={cat.label}
+          size={sprite}
+          catId={cat.id}
+          landed={!out && cat.landed && cat.changed}
+        />
       </div>
       <div
         style={{

@@ -106,13 +106,14 @@ export function lineageRank(cat: Pick<LineageCat, "level">): string {
 }
 
 /**
- * Short "+Lavender" style tags for what a cat gained at its stop. Tortie
+ * "+Lavender Collar" style tags for what a cat gained at its stop, full
+ * words by default (pass `maxLength` to truncate with an ellipsis). Tortie
  * layers collapse to one tag; replacements show the new value.
  */
 export function additionTags(
   additions: readonly EvolutionAddition[],
   max = 3,
-  maxLength = 18,
+  maxLength = Number.POSITIVE_INFINITY,
 ): string[] {
   const tags: string[] = [];
   for (const addition of additions) {

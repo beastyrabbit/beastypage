@@ -252,17 +252,19 @@ export function LcdBox({
   );
 }
 
-/** A sprite quantised to the LCD palette. */
+/** A sprite quantised to the LCD palette; `catId` marks its root for the batch wrapper. */
 export function LcdSprite({
   url,
   alt,
   size,
   style,
+  catId,
 }: Readonly<{
   url: string | null;
   alt: string;
   size: number;
   style?: CSSProperties;
+  catId?: string;
 }>) {
   const gb = useGbSprite(url);
   return (
@@ -272,6 +274,7 @@ export function LcdSprite({
       size={size}
       style={style}
       placeholderColor={GB_DIM}
+      catId={catId}
     />
   );
 }

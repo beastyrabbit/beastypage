@@ -3,6 +3,7 @@
 import {
   type LineageCatState,
   type LineageReveal,
+  type LineageRoll,
   lineageBranchOpen,
   lineageCatState,
   lineageSpriteUrl,
@@ -37,6 +38,13 @@ function landed(state: LineageCatState): boolean {
   return state === "shown" || state === "revealing";
 }
 
+/** Caption suffix while the lightbox is on (a cat is rolling). */
+function lightboxNote(charging: boolean, roll: LineageRoll | null): string {
+  if (!charging) return "";
+  if (!roll) return " · LIGHTBOX ON";
+  return ` · LIGHTBOX ON · ${roll.traitLabel} ${(roll.index + 1).toString()}/${roll.count.toString()}`;
+}
+
 function sheetCaption(
   model: LineageModel,
   reveal: LineageReveal | undefined,
@@ -45,11 +53,11 @@ function sheetCaption(
   if (!reveal || reveal.done) {
     return `EVOLUTION · ${model.totalCount} CATS · CONTACT SHEET · CIRCLE THE ${rankWord.toUpperCase()}S`;
   }
-  const lightbox = reveal.charging ? " · LIGHTBOX ON" : "";
+  const lightbox = lightboxNote(reveal.charging, reveal.roll);
   return `EXPOSING · ${reveal.revealedKeys.size}/${model.totalCount} FRAMES${lightbox}`;
 }
 
-/** Edge code listing what each landed stop added, e.g. "· 1 +LAVENDER". */
+/** Edge code listing what each landed stop added, e.g. "· 1 +LAVENDER COLLAR". */
 function edgeCode(
   branch: LineageBranch,
   reveal: LineageReveal | undefined,
@@ -58,18 +66,24 @@ function edgeCode(
     .filter((cat) => landed(lineageCatState(reveal, cat.key)))
     .map(
       (cat) =>
-        ` · ${cat.level} ${additionTags(cat.additions, 2, 14).join(" ").toUpperCase()}`,
+        ` · ${cat.level} ${additionTags(cat.additions, 2).join(" ").toUpperCase()}`,
     )
     .join("");
   return `${branch.label.toUpperCase()} ▸ ${branch.theme.label.toUpperCase()} · 0 ORIGIN${stops}`;
 }
 
+/** The frame's caption: the roll while exposing ("accessory · 1/2…"), the value from the land on. */
 function frameCaption(
   cat: LineageCat | null,
   state: LineageCatState,
+  roll: LineageRoll | null,
 ): string | undefined {
   if (!cat || state === "hidden") return undefined;
-  if (state === "charging") return "exposing…";
+  if (state === "charging") {
+    if (!roll) return "exposing…";
+    if (roll.valueLabel) return roll.valueLabel.toLowerCase();
+    return `${roll.traitLabel.toLowerCase()} · ${(roll.index + 1).toString()}/${roll.count.toString()}…`;
+  }
   return `${cat.level} · ${lineageRank(cat)}`;
 }
 
@@ -131,7 +145,13 @@ export function ContactLineage({ model, reveal }: Readonly<LineageBoardProps>) {
             style={{
               animation: "look-rise 600ms cubic-bezier(.2,1,.3,1) both",
             }}
-            edgeBottom={tight ? undefined : edgeCode(branch, reveal)}
+            edgeBottom={
+              tight ? undefined : (
+                <span style={{ fontSize: 14, letterSpacing: ".12em" }}>
+                  {edgeCode(branch, reveal)}
+                </span>
+              )
+            }
           >
             {Array.from({ length: frameCount - 1 }, (_, i) => (
               <FrameMarker
@@ -159,22 +179,41 @@ export function ContactLineage({ model, reveal }: Readonly<LineageBoardProps>) {
                 ? lineageSpriteUrl(state, reveal, cat.previewUrl)
                 : null;
               const exposing = state === "charging";
+              const roll = exposing ? (reveal?.roll ?? null) : null;
+              // The lightbox strobe stops on the near miss and the land so the frame can be read.
+              const strobing =
+                exposing &&
+                roll?.phase !== "nearmiss" &&
+                roll?.phase !== "land";
               return (
-                <Frame
+                // The wrapper carries the lineage key the leader line targets.
+                <div
                   key={i.toString()}
-                  left={frameLeft(i + 1)}
-                  width={frameWidth}
-                  height={frameHeight}
-                  cap={frameCaption(cat, state)}
-                  capColor={exposing ? CS_GREASE : undefined}
-                  number={String(i + 1)}
-                  url={url}
-                  alt={cat?.label}
-                  sprite={cat && state !== "hidden" ? sprite : undefined}
-                  blank={!cat || state === "hidden"}
-                  exposing={exposing}
-                  developing={state === "revealing"}
-                />
+                  data-lineage-key={cat?.key}
+                  style={{
+                    position: "absolute",
+                    top: 33,
+                    left: frameLeft(i + 1),
+                    width: frameWidth,
+                    height: frameHeight,
+                  }}
+                >
+                  <Frame
+                    left={0}
+                    width={frameWidth}
+                    height={frameHeight}
+                    cap={frameCaption(cat, state, roll)}
+                    capColor={exposing ? CS_GREASE : undefined}
+                    number={String(i + 1)}
+                    url={url}
+                    alt={cat?.label}
+                    sprite={cat && state !== "hidden" ? sprite : undefined}
+                    blank={!cat || state === "hidden"}
+                    exposing={strobing}
+                    developing={state === "revealing"}
+                    style={{ top: 0 }}
+                  />
+                </div>
               );
             })}
             {last && lastLanded ? (
@@ -221,11 +260,28 @@ export function ContactLineage({ model, reveal }: Readonly<LineageBoardProps>) {
               ry={frameHeight * 0.56}
               tilt={rollIndex % 2 ? 2 : -3}
               draw={Boolean(reveal)}
-              delayMs={state === "revealing" ? 1200 : 0}
+              delayMs={state === "revealing" ? 900 : 0}
             />
           );
         })}
       </svg>
+
+      {/* The plaque writes the roll along the sheet's bottom edge; always mounted. */}
+      <div
+        data-plaque-slot=""
+        style={{
+          position: "absolute",
+          left: 40,
+          bottom: 20,
+          width: 560,
+          height: 110,
+          ["--obs-plaque-ink" as string]: "#d9d2c2",
+          ["--obs-plaque-muted" as string]: "#9a948a",
+          ["--obs-plaque-accent" as string]: CS_GREASE,
+          ["--obs-plaque-shadow" as string]: "none",
+          ["--obs-plaque-font-serif" as string]: LOOK_FONT_HAND,
+        }}
+      />
 
       {done ? (
         <>

@@ -23,6 +23,10 @@ export function batchBoardFromView(view: BatchShowView): BatchBoardModel {
     potential: cat.potential,
     favorite: cat.favorite,
     spotlight: cat.spotlight,
+    changed: cat.changed,
+    landed: cat.landed,
+    valueLabel: cat.valueLabel,
+    departing: cat.departing,
   }));
   const byId = new Map(cats.map((cat) => [cat.id, cat]));
   const pick = (id: string): BatchBoardCat | null => byId.get(id) ?? null;
@@ -35,10 +39,15 @@ export function batchBoardFromView(view: BatchShowView): BatchBoardModel {
   const spotlight = view.spotlight ? pick(view.spotlight.id) : null;
   const loading = view.phase === "loading";
   const done = view.phase === "done";
+  const beat = view.beat;
+  const pending = beat.pendingCullId
+    ? view.cats.find((cat) => cat.id === beat.pendingCullId)
+    : undefined;
 
   return {
     title: view.title,
     phase: view.phase,
+    beat: beat.kind,
     statusLabel: view.statusLabel,
     saved: view.qrUrl !== null,
     stageIndex: view.stageIndex,
@@ -48,6 +57,12 @@ export function batchBoardFromView(view: BatchShowView): BatchBoardModel {
       revealed: !loading && index <= view.stageIndex,
       current: !done && index === view.stageIndex,
     })),
+    traitLabel: view.traitLabel,
+    verdictNumber:
+      beat.kind === "verdict" && pending ? pending.numberLabel : null,
+    verdictEndsAt:
+      beat.kind === "verdict" ? (beat.verdictEndsAt ?? null) : null,
+    reducedMotion: view.reducedMotion,
     remaining: view.remaining,
     finalCount: view.finalCount,
     poolCount: view.poolSize,

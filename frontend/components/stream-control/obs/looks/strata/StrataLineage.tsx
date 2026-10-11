@@ -4,11 +4,12 @@ import { withAlpha } from "@/components/evolution/archetypes";
 import {
   type LineageCatState,
   type LineageReveal,
+  type LineageRoll,
   lineageBranchOpen,
   lineageCatState,
   lineageSpriteUrl,
 } from "../ceremony";
-import { LOOK_FONT_DISPLAY, LOOK_FONT_MONO, LOOK_FONT_SANS } from "../fonts";
+import { LOOK_FONT_DISPLAY, LOOK_FONT_MONO } from "../fonts";
 import type { LineageBoardProps } from "../LookBoardProps";
 import {
   additionTags,
@@ -193,9 +194,11 @@ export function StrataLineage({ model, reveal }: Readonly<LineageBoardProps>) {
         />
       </svg>
 
-      <div style={{ position: "absolute", left: 110, top: 30, maxWidth: 760 }}>
-        <h1 style={{ fontSize: 40, fontWeight: 600, lineHeight: 1, margin: 0 }}>
-          Section A–A′ · the {model.starter?.label ?? "Lineage"} Formation
+      <div style={{ position: "absolute", left: 110, top: 30, maxWidth: 630 }}>
+        <h1 style={{ fontSize: 36, fontWeight: 600, lineHeight: 1, margin: 0 }}>
+          Section A–A′ · the{" "}
+          {(model.starter?.label ?? "Lineage").replace(/^the\s+/i, "")}{" "}
+          Formation
         </h1>
         <p
           style={{
@@ -226,7 +229,7 @@ export function StrataLineage({ model, reveal }: Readonly<LineageBoardProps>) {
           position: "absolute",
           right: 60,
           top: 30,
-          width: 330,
+          width: 420,
           border: `1px solid ${withAlpha("#efe9dc", 0.35)}`,
           padding: "12px 14px",
           background: "rgba(14,15,20,.6)",
@@ -261,6 +264,20 @@ export function StrataLineage({ model, reveal }: Readonly<LineageBoardProps>) {
           note=""
           code="0"
           compact={branches.length > 3}
+        />
+        {/* The plaque reads the roll inside the legend; always mounted. */}
+        <div
+          data-plaque-slot=""
+          style={{
+            width: 420,
+            height: 120,
+            marginTop: 6,
+            overflow: "hidden",
+            ["--obs-plaque-ink" as string]: INK,
+            ["--obs-plaque-muted" as string]: MUTED,
+            ["--obs-plaque-shadow" as string]: "none",
+            ["--obs-plaque-title-size" as string]: "34px",
+          }}
         />
       </div>
 
@@ -352,6 +369,7 @@ export function StrataLineage({ model, reveal }: Readonly<LineageBoardProps>) {
               left={left}
               top={bandTop + 24}
               size={spriteSize}
+              tagWidth={Math.round(columnWidth - 40)}
             />
           );
         }),
@@ -368,6 +386,7 @@ export function StrataLineage({ model, reveal }: Readonly<LineageBoardProps>) {
           top={bedrockTop + 36}
           size={starterSize}
           tagSide="left"
+          tagWidth={Math.round(starterLeft - 150)}
         />
       ) : null}
 
@@ -506,6 +525,7 @@ function Fossil({
   top,
   size,
   tagSide = "below",
+  tagWidth,
 }: Readonly<{
   cat: LineageCat;
   branch: LineageBranch | null;
@@ -516,17 +536,26 @@ function Fossil({
   top: number;
   size: number;
   tagSide?: "below" | "left";
+  /** Room for the gain tag's full words (wraps past it). */
+  tagWidth: number;
 }>) {
   const accent = branch?.theme.from ?? "#fbbf24";
   const charging = state === "charging";
   const revealing = state === "revealing";
+  const roll = charging ? (reveal?.roll ?? null) : null;
+  const phase = roll?.phase ?? null;
   const url = lineageSpriteUrl(state, reveal, cat.previewUrl);
   const tagStyle =
     tagSide === "left"
       ? { right: size + 24, top: size / 2 - 20, textAlign: "right" as const }
       : { left: -20, top: size + 2 };
   return (
-    <div style={{ position: "absolute", left, top, width: size, height: size }}>
+    <div
+      data-lineage-key={cat.key}
+      style={{ position: "absolute", left, top, width: size, height: size }}
+    >
+      {/* The outer box owns the centering transform; look-pop animates
+          transform on the ring itself and would otherwise clobber it. */}
       <div
         style={{
           position: "absolute",
@@ -534,19 +563,28 @@ function Fossil({
           top: "50%",
           width: size * 1.25,
           height: size * 1.05,
-          border: `1.5px dashed ${withAlpha("#efe9dc", 0.6)}`,
-          borderRadius: "50%",
           transform: "translate(-50%,-50%)",
-          animation: haloAnimation(state),
         }}
-      />
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            border: `1.5px dashed ${withAlpha("#efe9dc", 0.6)}`,
+            borderRadius: "50%",
+            animation: haloAnimation(state, phase),
+          }}
+        />
+      </div>
       <div
         style={{
           position: "relative",
-          animation: spriteAnimation(state),
-          filter: charging
-            ? "sepia(.8) contrast(.6) brightness(.8)"
-            : "drop-shadow(0 0 1px rgba(0,0,0,.9)) drop-shadow(0 10px 14px rgba(0,0,0,.6))",
+          animation: spriteAnimation(state, phase),
+          // The landed frame is shown clean; candidates stay sepia.
+          filter:
+            charging && phase !== "land"
+              ? "sepia(.8) contrast(.6) brightness(.8)"
+              : "drop-shadow(0 0 1px rgba(0,0,0,.9)) drop-shadow(0 10px 14px rgba(0,0,0,.6))",
         }}
       >
         <LookSprite url={url} alt={cat.label} size={size} />
@@ -592,44 +630,68 @@ function Fossil({
         <span
           style={{
             display: "block",
-            fontFamily: LOOK_FONT_SANS,
-            fontWeight: 300,
-            fontSize: 13,
+            fontStyle: "italic",
+            fontWeight: 500,
+            fontSize: 22,
+            lineHeight: 1.15,
             color: "#e6dfcf",
-            marginTop: 2,
+            marginTop: 4,
             marginLeft: tagSide === "left" ? 0 : 30,
-            letterSpacing: ".02em",
+            width: tagWidth,
+            whiteSpace: "normal",
           }}
         >
-          <b style={{ fontWeight: 400, color: accent }}>{lineageRank(cat)}</b>
-          {metaText(cat, charging)}
+          <b style={{ fontWeight: 600, fontStyle: "normal", color: accent }}>
+            {lineageRank(cat)}
+          </b>
+          {metaText(cat, charging, roll)}
         </span>
       </div>
     </div>
   );
 }
 
-function haloAnimation(state: LineageCatState): string | undefined {
-  if (state === "charging") return "look-pulse 0.8s ease-in-out infinite";
+/** The sampling halo pulses, quickens through the slowdown and freezes on the near miss. */
+function haloAnimation(
+  state: LineageCatState,
+  phase: LineageRoll["phase"] | null,
+): string | undefined {
+  if (state === "charging") {
+    if (phase === "nearmiss" || phase === "land") return undefined;
+    if (phase === "slowdown") return "look-pulse 0.35s ease-in-out infinite";
+    return "look-pulse 0.8s ease-in-out infinite";
+  }
   return state === "revealing" ? "look-pop 600ms ease both" : undefined;
 }
 
-function spriteAnimation(state: LineageCatState): string | undefined {
+function spriteAnimation(
+  state: LineageCatState,
+  phase: LineageRoll["phase"] | null,
+): string | undefined {
   if (state === "revealing") {
     return "look-wipe-up 1300ms cubic-bezier(.3,0,.2,1) both";
   }
-  return state === "charging"
+  // The flicker stops on the near miss and the land so the frame can be read.
+  return state === "charging" && phase !== "nearmiss" && phase !== "land"
     ? "look-flicker 0.5s steps(3) infinite"
     : undefined;
 }
 
-/** " · +Lavender · +Tortie" style tail after the rank, or the sampling note. */
-function metaText(cat: LineageCat, charging: boolean): string {
-  if (charging) return " · sampling the stratum…";
+/** " · +Lavender Collar · +Tortie" tail after the rank, or the roll being sampled. */
+function metaText(
+  cat: LineageCat,
+  charging: boolean,
+  roll: LineageRoll | null,
+): string {
+  if (charging) {
+    if (!roll) return " · sampling the stratum…";
+    const trait = roll.traitLabel.toLowerCase();
+    if (roll.valueLabel) return ` · ${trait}: ${roll.valueLabel}`;
+    if (roll.count === 1) return ` · sampling for its ${trait}…`;
+    return ` · sampling for its ${trait} · ${(roll.index + 1).toString()} of ${roll.count.toString()}…`;
+  }
   const meta =
-    cat.level === 0
-      ? "the origin"
-      : additionTags(cat.additions, 3, 16).join(" · ");
+    cat.level === 0 ? "the origin" : additionTags(cat.additions).join(" · ");
   return meta ? ` · ${meta}` : "";
 }
 

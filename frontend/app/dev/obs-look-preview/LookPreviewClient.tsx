@@ -4,14 +4,21 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AllegiancesBatch } from "@/components/stream-control/obs/looks/allegiances/AllegiancesBatch";
 import {
+  type BatchBeatKind,
   type BatchBoardModel,
   type BatchPhase,
   buildBatchBoardModel,
 } from "@/components/stream-control/obs/looks/batchModel";
-import { useLineageCeremony } from "@/components/stream-control/obs/looks/ceremony";
+import {
+  type LineageReveal,
+  useLineageCeremony,
+} from "@/components/stream-control/obs/looks/ceremony";
 import { ContactBatch } from "@/components/stream-control/obs/looks/contact/ContactBatch";
 import { HandheldBatch } from "@/components/stream-control/obs/looks/handheld/HandheldBatch";
-import type { BatchBoardProps } from "@/components/stream-control/obs/looks/LookBoardProps";
+import {
+  type BatchBoardProps,
+  LOOK_ERUPTS_IN_MATERIAL,
+} from "@/components/stream-control/obs/looks/LookBoardProps";
 import { buildLineageModel } from "@/components/stream-control/obs/looks/lineageModel";
 import {
   isShowLookId,
@@ -20,6 +27,7 @@ import {
 } from "@/components/stream-control/obs/looks/lookMeta";
 import { SHOW_LOOKS } from "@/components/stream-control/obs/looks/registry";
 import { TrenchBatch } from "@/components/stream-control/obs/looks/strata/TrenchBatch";
+import { EvolutionShowFrame } from "@/components/stream-control/obs/scenes/EvolutionScene";
 import type { BatchStreamCat } from "@/lib/adoption/streamBatch";
 import type { CatParams } from "@/lib/cat-v3/types";
 import type {
@@ -27,7 +35,16 @@ import type {
   EvolutionArchetype,
   EvolutionCatData,
 } from "@/lib/evolution/evolutionGenerator";
-import type { EvolutionStreamCommand } from "@/lib/evolution/streamEvolution";
+import {
+  buildCeremonySchedule,
+  type CeremonyStep,
+  rollLandMs,
+  scheduleCatsFromCommand,
+} from "@/lib/evolution/rollSchedule";
+import type {
+  EvolutionLiveState,
+  EvolutionStreamCommand,
+} from "@/lib/evolution/streamEvolution";
 
 type Scene = "evolution" | "ceremony" | "batch";
 
@@ -244,6 +261,7 @@ function addition(seed: number): EvolutionAddition {
 function mockEvolutionCommand(
   branches: number,
   levels: number,
+  adds: number,
 ): EvolutionStreamCommand {
   const cats: EvolutionStreamCommand["cats"] = [
     {
@@ -266,7 +284,9 @@ function mockEvolutionCommand(
         level,
         branchLabel,
         archetype,
-        additions: [addition(b * 10 + level)],
+        additions: Array.from({ length: adds }, (_, k) =>
+          addition(b * 10 + level + k * 100),
+        ),
         catData: {
           params: mockParams(100 + b * 10 + level),
         } as unknown as EvolutionCatData,
@@ -297,6 +317,31 @@ function mockPool(count: number): BatchStreamCat[] {
 const STAGES = ["Pelt", "Eyes", "White", "Tortie", "Accessory", "Scar"].map(
   (label) => ({ id: label.toLowerCase(), label }),
 );
+/** Value words a changed kit shows per stage (cycled). */
+const STAGE_VALUES: Record<string, string[]> = {
+  pelt: ["Tabby", "Marbled", "Speckled"],
+  eyes: ["Amber", "Copper", "Blue"],
+  white: ["Little", "Tuxedo", "Mask"],
+  tortie: ["Ginger", "Cream"],
+  accessory: ["Maple Leaf", "Holly", "Red Collar"],
+  scar: ["Nicked Ear", "Bridge"],
+};
+
+const BEAT_KINDS: readonly BatchBeatKind[] = [
+  "loading",
+  "windup",
+  "deal",
+  "hold",
+  "awaiting",
+  "verdict",
+  "depart",
+  "repack",
+  "done",
+];
+
+function resolveBeat(value: string | null): BatchBeatKind | null {
+  return BEAT_KINDS.find((kind) => kind === value) ?? null;
+}
 
 interface BatchSim {
   phase: BatchPhase;
@@ -306,84 +351,185 @@ interface BatchSim {
   markedId: string | null;
   potentialIds: string[];
   spotlightId: string | null;
+  beat: BatchBeatKind;
+  landedIds: string[];
+  changedIds: string[];
+  valueLabels: Record<string, string | null>;
+  pendingCullId: string | null;
+  verdictAt: number | null;
+}
+
+const SIM_IDLE: BatchSim = {
+  phase: "revealing",
+  stageIndex: 0,
+  eliminatedIds: [],
+  fadingId: null,
+  markedId: null,
+  potentialIds: [],
+  spotlightId: null,
+  beat: "windup",
+  landedIds: [],
+  changedIds: [],
+  valueLabels: {},
+  pendingCullId: null,
+  verdictAt: null,
+};
+
+/** Every other surviving kit changes on a stage; the rest deal first. */
+function stageChanges(
+  alive: BatchStreamCat[],
+  stageId: string,
+): { changedIds: string[]; valueLabels: Record<string, string | null> } {
+  const words = STAGE_VALUES[stageId] ?? ["Changed"];
+  const changedIds: string[] = [];
+  const valueLabels: Record<string, string | null> = {};
+  alive.forEach((cat, i) => {
+    if (i % 2 === 0) {
+      changedIds.push(cat.id);
+      valueLabels[cat.id] = words[i % words.length];
+    } else {
+      valueLabels[cat.id] = null;
+    }
+  });
+  return { changedIds, valueLabels };
+}
+
+/** Handle the simulation steps share: state, a cancel-aware push and wait. */
+interface SimRun {
+  state: BatchSim;
+  cancelled: boolean;
+  push(next: Partial<BatchSim>): void;
+  /** Resolves false once the effect was torn down. */
+  wait(ms: number): Promise<boolean>;
+}
+
+function createSimRun(emit: (state: BatchSim) => void): SimRun {
+  const run: SimRun = {
+    state: SIM_IDLE,
+    cancelled: false,
+    push(next) {
+      run.state = { ...run.state, ...next };
+      if (!run.cancelled) emit(run.state);
+    },
+    wait(ms) {
+      return new Promise((resolve) => {
+        setTimeout(() => resolve(!run.cancelled), ms);
+      });
+    },
+  };
+  return run;
+}
+
+/** Windup → deal (unchanged kits first, 120 ms apart) → hold → spotlight on every third stage. */
+async function simulateDeal(
+  run: SimRun,
+  alive: BatchStreamCat[],
+): Promise<boolean> {
+  const { changedIds, valueLabels } = stageChanges(
+    alive,
+    STAGES[run.state.stageIndex].id,
+  );
+  run.push({
+    phase: "revealing",
+    beat: "windup",
+    landedIds: [],
+    changedIds,
+    valueLabels,
+    markedId: null,
+    potentialIds: [],
+    pendingCullId: null,
+    verdictAt: null,
+    fadingId: null,
+  });
+  if (!(await run.wait(600))) return false;
+  const order = [
+    ...alive.filter((c) => !changedIds.includes(c.id)),
+    ...alive.filter((c) => changedIds.includes(c.id)),
+  ].map((c) => c.id);
+  run.push({ beat: "deal" });
+  for (const id of order) {
+    run.push({ landedIds: [...run.state.landedIds, id] });
+    if (!(await run.wait(120))) return false;
+  }
+  run.push({ beat: "hold" });
+  if (!(await run.wait(900))) return false;
+  const spotlightId =
+    run.state.stageIndex % 3 === 1 ? (alive[2]?.id ?? null) : null;
+  run.push({ spotlightId });
+  return true;
+}
+
+/** Awaiting (a marked + a potential kit) → verdict (3 s) → depart → repack. */
+async function simulateCull(
+  run: SimRun,
+  alive: BatchStreamCat[],
+): Promise<boolean> {
+  const victim = alive[alive.length - 1 - (run.state.stageIndex % 3)];
+  run.push({
+    phase: "awaitingCull",
+    beat: "awaiting",
+    markedId: victim?.id ?? null,
+    potentialIds: [alive[1]?.id ?? ""],
+  });
+  if (!(await run.wait(1500)) || !victim) return false;
+  run.push({
+    beat: "verdict",
+    pendingCullId: victim.id,
+    verdictAt: Date.now() + 3000,
+  });
+  if (!(await run.wait(3000))) return false;
+  run.push({
+    phase: "revealing",
+    beat: "depart",
+    eliminatedIds: [...run.state.eliminatedIds, victim.id],
+    fadingId: victim.id,
+    markedId: null,
+    potentialIds: [],
+    verdictAt: null,
+  });
+  if (!(await run.wait(1600))) return false;
+  run.push({ beat: "repack", fadingId: null, pendingCullId: null });
+  return run.wait(400);
+}
+
+/** Runs the stages in order; once enough kits left, the rest only deal. */
+async function runBatchSimulation(
+  run: SimRun,
+  cats: BatchStreamCat[],
+  culls: number,
+): Promise<void> {
+  while (!run.cancelled && run.state.stageIndex < STAGES.length) {
+    const alive = cats.filter((c) => !run.state.eliminatedIds.includes(c.id));
+    if (!(await simulateDeal(run, alive))) return;
+    if (run.state.eliminatedIds.length < culls) {
+      if (!(await simulateCull(run, alive))) return;
+    } else {
+      await run.wait(800);
+    }
+    run.push({ stageIndex: run.state.stageIndex + 1 });
+  }
+  run.push({ phase: "done", beat: "done", spotlightId: null });
 }
 
 /**
- * Drives a fake elimination show on a timer: every stage reveals (2.4s),
- * waits for a cull (2.6s, with a marked + a potential kit), fades the marked
- * kit out (1.1s), advances; once enough kits left the stages roll on to the
- * finale. A spotlight pops up on every third stage.
+ * Drives a fake elimination show on a timer through the real beats: windup
+ * → deal (landed ids 120 ms apart, unchanged first) → hold → awaiting (a
+ * marked + a potential kit) → verdict (3 s) → depart → repack; once enough
+ * kits left the stages roll on to the finale. A spotlight pops up on every
+ * third stage.
  */
 function useBatchSimulation(
   enabled: boolean,
   cats: BatchStreamCat[],
   finalCount: number,
 ): BatchSim {
-  const [sim, setSim] = useState<BatchSim>({
-    phase: "revealing",
-    stageIndex: 0,
-    eliminatedIds: [],
-    fadingId: null,
-    markedId: null,
-    potentialIds: [],
-    spotlightId: null,
-  });
+  const [sim, setSim] = useState<BatchSim>(SIM_IDLE);
   useEffect(() => {
     if (!enabled) return;
-    const culls = Math.max(0, cats.length - finalCount);
-    let cancelled = false;
-    let state: BatchSim = {
-      phase: "revealing",
-      stageIndex: 0,
-      eliminatedIds: [],
-      fadingId: null,
-      markedId: null,
-      potentialIds: [],
-      spotlightId: null,
-    };
-    const push = (next: Partial<BatchSim>) => {
-      state = { ...state, ...next };
-      if (!cancelled) setSim(state);
-    };
-    const wait = (ms: number) =>
-      new Promise<void>((resolve) => setTimeout(resolve, ms));
-    (async () => {
-      while (!cancelled && state.stageIndex < STAGES.length) {
-        push({ phase: "revealing", markedId: null, potentialIds: [] });
-        await wait(2400);
-        if (cancelled) return;
-        const alive = cats.filter((c) => !state.eliminatedIds.includes(c.id));
-        push({
-          spotlightId:
-            state.stageIndex % 3 === 1 ? (alive[2]?.id ?? null) : null,
-        });
-        if (state.eliminatedIds.length < culls) {
-          const victim = alive[alive.length - 1 - (state.stageIndex % 3)];
-          push({
-            phase: "awaitingCull",
-            markedId: victim?.id ?? null,
-            potentialIds: [alive[1]?.id ?? ""],
-          });
-          await wait(2600);
-          if (cancelled || !victim) return;
-          push({
-            eliminatedIds: [...state.eliminatedIds, victim.id],
-            fadingId: victim.id,
-            markedId: null,
-            potentialIds: [],
-          });
-          await wait(1100);
-          if (cancelled) return;
-          push({ fadingId: null });
-        } else {
-          await wait(800);
-        }
-        push({ stageIndex: state.stageIndex + 1 });
-      }
-      push({ phase: "done", spotlightId: null });
-    })();
+    const run = createSimRun(setSim);
+    void runBatchSimulation(run, cats, Math.max(0, cats.length - finalCount));
     return () => {
-      cancelled = true;
+      run.cancelled = true;
     };
   }, [enabled, cats, finalCount]);
   return sim;
@@ -410,10 +556,26 @@ interface HarnessParams {
   scale: number;
   /** still=1 freezes every animation at its end state (for screenshots). */
   still: boolean;
-  /** auto=1 runs a fake batch show: reveal, wait, mark, cull … until done. */
+  /** auto=1 runs a fake batch show: windup, deal, hold, wait, verdict, cull … until done. */
   auto: boolean;
   /** charge=<ms> sets the ceremony's spin length (default 5s). */
   chargeMs: number;
+  /** t=<ms> freezes the ceremony clock at an elapsed ms. */
+  clockMs: number | null;
+  /** hold=1 marks the ceremony held (liveState.holdStartedAt). */
+  hold: boolean;
+  /** offset=<ms> → liveState.offsetMs. */
+  offsetMs: number;
+  /** skip=1 → the streamer skipped to the board. */
+  skip: boolean;
+  /** rm=1 forces the reduced-motion path. */
+  reducedMotion: boolean;
+  /** adds=<n> additions per mock cat (0 exercises the no-roll reveal). */
+  adds: number;
+  /** Static batch boards: beat kind, landed count, verdict seconds. */
+  beat: BatchBeatKind | null;
+  landed: number | null;
+  verdictSeconds: number | null;
 }
 
 function useHarnessParams(): HarnessParams {
@@ -421,6 +583,12 @@ function useHarnessParams(): HarnessParams {
   const lookParam = params.get("look");
   const number = (key: string, fallback: string) =>
     Number(params.get(key) ?? fallback);
+  const optional = (key: string) => {
+    const raw = params.get(key);
+    if (raw === null || raw === "") return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  };
   return {
     look: isShowLookId(lookParam) ? lookParam : "allegiances",
     scene: resolveScene(params.get("scene")),
@@ -434,16 +602,16 @@ function useHarnessParams(): HarnessParams {
     still: params.get("still") === "1",
     auto: params.get("auto") === "1",
     chargeMs: number("charge", "5000"),
+    clockMs: optional("t"),
+    hold: params.get("hold") === "1",
+    offsetMs: number("offset", "0"),
+    skip: params.get("skip") === "1",
+    reducedMotion: params.get("rm") === "1",
+    adds: Math.max(0, Math.floor(number("adds", "1"))),
+    beat: resolveBeat(params.get("beat")),
+    landed: optional("landed"),
+    verdictSeconds: optional("verdict"),
   };
-}
-
-/** Each teaser request composes the next cat in a fixed sequence. */
-function useTeaserFrames(): () => Promise<string> {
-  const counter = useRef(1000);
-  return useCallback(() => {
-    counter.current += 1;
-    return composeCat(counter.current, false);
-  }, []);
 }
 
 type Sprites = readonly (string | null)[];
@@ -488,6 +656,12 @@ function simulatedBoard(
     favoriteIds: [poolCats[4]?.id ?? ""],
     spotlightId: sim.spotlightId,
     qrUrl: sim.phase === "done" ? LITTER_URL : null,
+    beat: sim.beat,
+    landedIds: sim.landedIds,
+    changedIds: sim.changedIds,
+    valueLabels: sim.valueLabels,
+    pendingCullId: sim.pendingCullId,
+    verdictAt: sim.verdictAt,
   });
 }
 
@@ -495,10 +669,10 @@ function simulatedBoard(
 function staticBoard(
   poolCats: BatchStreamCat[],
   sprites: Sprites,
-  finalCount: number,
-  phase: BatchPhase,
-  spot: boolean,
+  p: HarnessParams,
+  verdictAt: number | null,
 ): BatchBoardModel {
+  const { finalCount, phase, spot } = p;
   const culls = Math.max(0, poolCats.length - finalCount);
   const stageIndex =
     phase === "done" ? STAGES.length : Math.min(culls, STAGES.length - 1) - 1;
@@ -510,6 +684,14 @@ function staticBoard(
     .map((cat) => cat.id);
   const alive = poolCats.filter((cat) => !eliminatedIds.includes(cat.id));
   const culling = phase === "awaitingCull";
+  const stage = STAGES[Math.max(0, Math.min(stageIndex, STAGES.length - 1))];
+  const { changedIds, valueLabels } = stageChanges(alive, stage.id);
+  const order = [
+    ...alive.filter((c) => !changedIds.includes(c.id)),
+    ...alive.filter((c) => changedIds.includes(c.id)),
+  ].map((c) => c.id);
+  const markedId = culling ? (alive[3]?.id ?? null) : null;
+  const beat = p.beat ?? (p.verdictSeconds !== null ? "verdict" : undefined);
   return buildBatchBoardModel({
     title: "Adoption Elimination",
     cats: poolCats,
@@ -521,11 +703,18 @@ function staticBoard(
     previews: previewsFor(poolCats, (i) => sprites[i] ?? null),
     eliminatedIds,
     fadingId: null,
-    markedId: culling ? (alive[3]?.id ?? null) : null,
+    markedId,
     potentialIds: culling ? [alive[1]?.id ?? ""] : [],
     favoriteIds: [alive[4]?.id ?? ""],
     spotlightId: spot ? (alive[4]?.id ?? null) : null,
     qrUrl: phase === "done" ? LITTER_URL : null,
+    ...(beat ? { beat } : {}),
+    changedIds,
+    valueLabels,
+    landedIds: p.landed === null ? order : order.slice(0, p.landed),
+    ...(verdictAt !== null
+      ? { pendingCullId: markedId ?? alive[3]?.id ?? null, verdictAt }
+      : {}),
   });
 }
 
@@ -585,11 +774,113 @@ function Toolbar({
         </>
       ) : (
         <span className="ml-4 opacity-60">
-          branches={p.branches} levels={p.levels}
+          branches={p.branches} levels={p.levels} adds={p.adds}
+          {p.clockMs !== null ? ` t=${p.clockMs.toString()}` : ""}
+          {p.hold ? " held" : ""}
+          {p.reducedMotion ? " rm" : ""}
         </span>
       )}
     </div>
   );
+}
+
+/** The live state hold=1 / offset= / skip=1 fake; null when none is set. */
+function harnessLiveState(
+  hold: boolean,
+  offsetMs: number,
+  skip: boolean,
+  mountTime: number,
+): EvolutionLiveState | null {
+  if (!hold && !offsetMs && !skip) return null;
+  const state: EvolutionLiveState = { seq: 1, offsetMs };
+  if (hold) state.holdStartedAt = mountTime + 1;
+  if (skip) state.skipToBoard = true;
+  return state;
+}
+
+/** Roll frames without a renderer: 12 random composites + a landed one, kept per cat:addition. */
+function useLandedFrames(command: EvolutionStreamCommand) {
+  const [landedFrames, setLandedFrames] = useState<ReadonlyMap<string, string>>(
+    () => new Map(),
+  );
+  const requestRollFrames = useCallback(
+    async (catIndex: number, addition: number, seed: number) => {
+      const candidates = await Promise.all(
+        Array.from({ length: 12 }, (_, k) => composeCat(seed + k, false)),
+      );
+      const landed = await composeCat(seed + 99, false);
+      const key = `${command.cats[catIndex]?.key ?? catIndex.toString()}:${addition.toString()}`;
+      setLandedFrames((previous) => new Map(previous).set(key, landed));
+      return { candidates, landed };
+    },
+    [command],
+  );
+  return { landedFrames, requestRollFrames };
+}
+
+/** Ceremony cats: each kit's sprite plus its parent's (the root shows its own). */
+function ceremonyCats(command: EvolutionStreamCommand, sprites: Sprites) {
+  return command.cats.map((cat, i) => ({
+    key: cat.key,
+    label: cat.label,
+    level: cat.level,
+    branchLabel: cat.branchLabel,
+    archetype: cat.archetype,
+    previewUrl: sprites[i] ?? null,
+    parentUrl: sprites[cat.level <= 1 ? 0 : i - 1] ?? null,
+    additions: cat.additions,
+  }));
+}
+
+/** The cat a ceremony step is on: the summon shows the first, the board none. */
+function activeCatIndex(step: CeremonyStep): number {
+  if ("index" in step) return step.index;
+  return step.kind === "summon" ? 0 : -1;
+}
+
+/** The landed frame the active roll must never show before its land ms. */
+function landedFrameFor(
+  frames: ReadonlyMap<string, string>,
+  reveal: LineageReveal,
+): string | null {
+  if (!reveal.roll || !reveal.activeKey) return null;
+  return (
+    frames.get(`${reveal.activeKey}:${reveal.roll.index.toString()}`) ?? null
+  );
+}
+
+/** Land ms of the active roll, once the ceremony is on a cat. */
+function activeRollLandMs(
+  schedule: ReturnType<typeof buildCeremonySchedule>,
+  activeIndex: number,
+  roll: LineageReveal["roll"],
+): number | null {
+  if (!roll || activeIndex < 0) return null;
+  return rollLandMs(schedule, activeIndex, roll.index);
+}
+
+/** The batch board: the running simulation under auto=1, else the static frame the URL asks for. */
+function batchBoardModel(
+  p: HarnessParams,
+  poolCats: BatchStreamCat[],
+  sprites: Sprites,
+  sim: BatchSim,
+  mountTime: number,
+): BatchBoardModel {
+  if (p.auto) return simulatedBoard(poolCats, sprites, p.finalCount, sim);
+  const verdictEndsAt =
+    p.verdictSeconds !== null ? mountTime + p.verdictSeconds * 1000 : null;
+  return staticBoard(poolCats, sprites, p, verdictEndsAt);
+}
+
+/** The current query with `overrides` applied. */
+function withParams(
+  current: { toString(): string },
+  overrides: Record<string, string>,
+): string {
+  const next = new URLSearchParams(current.toString());
+  for (const [key, value] of Object.entries(overrides)) next.set(key, value);
+  return `?${next.toString()}`;
 }
 
 export function LookPreviewClient() {
@@ -597,8 +888,8 @@ export function LookPreviewClient() {
   const p = useHarnessParams();
   const { look, scene, phase } = p;
   const evolutionCommand = useMemo(
-    () => mockEvolutionCommand(p.branches, p.levels),
-    [p.branches, p.levels],
+    () => mockEvolutionCommand(p.branches, p.levels, p.adds),
+    [p.branches, p.levels, p.adds],
   );
   const poolCats = useMemo(() => mockPool(p.pool), [p.pool]);
   const spriteCount = scene === "batch" ? p.pool : evolutionCommand.cats.length;
@@ -608,31 +899,53 @@ export function LookPreviewClient() {
   );
   const sim = useBatchSimulation(p.auto, poolCats, p.finalCount);
 
-  const [finished, setFinished] = useState(false);
-  const teaser = useTeaserFrames();
+  // The ceremony clock runs from mount; `t=` freezes it, `hold=1` holds it.
+  const [mountTime] = useState(() => Date.now());
+  const liveState = useMemo(
+    () => harnessLiveState(p.hold, p.offsetMs, p.skip, mountTime),
+    [p.hold, p.offsetMs, p.skip, mountTime],
+  );
+  const [finished, setFinished] = useState(p.skip);
   const finish = useCallback(() => setFinished(true), []);
   const ceremonyRunning = scene === "ceremony" && !finished;
+
+  const { landedFrames, requestRollFrames } = useLandedFrames(evolutionCommand);
+
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const reveal = useLineageCeremony({
-    cats: evolutionCommand.cats.map((cat, i) => ({
-      key: cat.key,
-      label: cat.label,
-      level: cat.level,
-      branchLabel: cat.branchLabel,
-      archetype: cat.archetype,
-      previewUrl: sprites[i] ?? null,
-    })),
+    cats: ceremonyCats(evolutionCommand, sprites),
     totalCount: evolutionCommand.totalCount,
     chargeDurationMs: p.chargeMs,
-    requestTeaserFrame: teaser,
+    startedAt: mountTime,
+    seq: 1,
+    liveState,
+    requestRollFrames,
     onFinish: finish,
-    enabled: ceremonyRunning && sprites.length > 0,
+    confetti: !LOOK_ERUPTS_IN_MATERIAL.has(look),
+    containerRef: rootRef,
+    enabled: ceremonyRunning,
+    clockOverrideMs: scene === "ceremony" ? p.clockMs : null,
+    reducedMotionOverride: p.reducedMotion ? true : undefined,
   });
+
+  // Verification hooks: the schedule, the current roll's land ms and the
+  // landed frame the active sprite must never show before it.
+  const schedule = useMemo(
+    () =>
+      buildCeremonySchedule(
+        scheduleCatsFromCommand(evolutionCommand),
+        evolutionCommand.totalCount,
+        p.chargeMs,
+      ),
+    [evolutionCommand, p.chargeMs],
+  );
+  const activeIndex = activeCatIndex(reveal.step);
+  const landMs = activeRollLandMs(schedule, activeIndex, reveal.roll);
+  const landedSrc = landedFrameFor(landedFrames, reveal);
 
   let board: React.ReactNode;
   if (scene === "batch") {
-    const model = p.auto
-      ? simulatedBoard(poolCats, sprites, p.finalCount, sim)
-      : staticBoard(poolCats, sprites, p.finalCount, phase, p.spot);
+    const model = batchBoardModel(p, poolCats, sprites, sim, mountTime);
     board = <BatchBoardFor look={look} model={model} />;
   } else {
     const Look = SHOW_LOOKS[look];
@@ -645,21 +958,31 @@ export function LookPreviewClient() {
       PREVIEW_URL,
     );
     board = (
-      <Look.Lineage
-        model={model}
-        reveal={ceremonyRunning ? reveal : undefined}
-      />
+      <EvolutionShowFrame
+        look={look}
+        reveal={reveal}
+        cats={evolutionCommand.cats}
+        totalCount={evolutionCommand.totalCount}
+        rootRef={rootRef}
+      >
+        <Look.Lineage model={model} reveal={reveal} />
+      </EvolutionShowFrame>
     );
   }
 
-  const href = (overrides: Record<string, string>) => {
-    const next = new URLSearchParams(searchParams.toString());
-    for (const [key, value] of Object.entries(overrides)) next.set(key, value);
-    return `?${next.toString()}`;
-  };
+  const href = (overrides: Record<string, string>) =>
+    withParams(searchParams, overrides);
 
   return (
-    <div className="min-h-screen bg-[#141820] p-4 text-sm text-white">
+    <div
+      className="min-h-screen bg-[#141820] p-4 text-sm text-white"
+      data-harness-root=""
+      data-schedule={scene === "batch" ? undefined : JSON.stringify(schedule)}
+      data-land-ms={landMs ?? undefined}
+      data-landed-src={
+        p.clockMs !== null ? (landedSrc ?? undefined) : undefined
+      }
+    >
       {p.still ? (
         <style>{`[data-look] *, [data-look] { animation-duration: 0s !important; animation-delay: 0s !important; }`}</style>
       ) : null}

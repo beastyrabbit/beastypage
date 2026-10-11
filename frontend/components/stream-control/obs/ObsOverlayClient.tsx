@@ -38,9 +38,10 @@ import {
 } from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
+  ceremonyPhaseForReload,
   type EvolutionStreamCommand,
-  estimateEvolutionCommandMs,
   parseEvolutionStreamCommand,
+  readEvolutionLiveState,
 } from "@/lib/evolution/streamEvolution";
 import { decodePortableSettings } from "@/lib/portable-settings";
 import {
@@ -3353,7 +3354,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
   const [countdownPreview, setCountdownPreview] = useState<string | null>(null);
   const [spinDone, setSpinDone] = useState(false);
   const [evolutionCommand, setEvolutionCommand] = useState<
-    (EvolutionStreamCommand & { seq: number }) | null
+    (EvolutionStreamCommand & { seq: number; timestamp: number }) | null
   >(null);
   const [evolutionInitialPhase, setEvolutionInitialPhase] = useState<
     "ceremony" | "tree"
@@ -3771,16 +3772,22 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
           break;
         }
         resetCommandState();
-        // After an overlay reload the ceremony may already be over — jump
-        // straight to the lineage + QR instead of replaying it.
-        const commandAgeMs = Date.now() - cmd.timestamp;
+        // After an overlay reload the ceremony may already be over (or
+        // skipped) — jump straight to the lineage + QR instead of replaying.
         setEvolutionInitialPhase(
-          Number.isFinite(commandAgeMs) &&
-            commandAgeMs > estimateEvolutionCommandMs(evolution)
-            ? "tree"
-            : "ceremony",
+          ceremonyPhaseForReload(
+            evolution,
+            cmdSeq,
+            cmd.timestamp,
+            session?.evolutionState ?? null,
+            Date.now(),
+          ),
         );
-        setEvolutionCommand({ ...evolution, seq: cmdSeq });
+        setEvolutionCommand({
+          ...evolution,
+          seq: cmdSeq,
+          timestamp: cmd.timestamp,
+        });
         setObsPhase("evolution");
         break;
       }
@@ -3827,6 +3834,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     }
   }, [
     session?.currentCommand,
+    session?.evolutionState,
     generationDisabled,
     initializing,
     handleWheelCommand,
@@ -3962,6 +3970,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         command={evolutionCommand}
         initialPhase={evolutionInitialPhase}
         look={showLook}
+        liveState={readEvolutionLiveState(session)}
       />,
     );
   }

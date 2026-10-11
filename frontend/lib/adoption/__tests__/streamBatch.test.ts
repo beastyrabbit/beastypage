@@ -7,13 +7,18 @@ import {
   earAccessoryProbeSystem,
 } from "@/lib/cat-system/testing/earAccessoryProbe";
 import probeArtifact from "@/lib/cat-system/testing/fixtures/cat-system-ear-accessory-probe.generated.json";
+import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
+  type BatchStage,
   type BatchStreamCat,
   batchStartCount,
   buildBatchStagePlan,
   buildPartialBatchParams,
+  formatBatchValue,
   parseBatchStreamCommand,
+  stageChanged,
+  stageValueFor,
   trimBatchPoolToStageCount,
 } from "../streamBatch";
 
@@ -332,5 +337,111 @@ describe("parseBatchStreamCommand", () => {
     expect(parseBatchStreamCommand(valid)).not.toBeNull();
     expect(parseBatchStreamCommand(null)).toBeNull();
     expect(parseBatchStreamCommand({ finalCount: 10, cats: [] })).toBeNull();
+  });
+});
+
+function stageById(stages: BatchStage[], id: string): BatchStage {
+  const stage = stages.find((candidate) => candidate.id === id);
+  if (!stage) throw new Error(`missing stage ${id}`);
+  return stage;
+}
+
+describe("formatBatchValue", () => {
+  it("title-cases raw tokens and keeps mixed-case words", () => {
+    expect(formatBatchValue("RED_COLLAR")).toBe("Red Collar");
+    expect(formatBatchValue("BROWNBEAR")).toBe("Brownbear");
+    expect(formatBatchValue("Tabby")).toBe("Tabby");
+    expect(formatBatchValue("SingleColour")).toBe("SingleColour");
+    expect(formatBatchValue("dilute")).toBe("Dilute");
+  });
+});
+
+describe("stageValueFor", () => {
+  const stages = buildBatchStagePlan(CONFIG);
+  const cat = makeCat();
+
+  it("reads simple, slot and tortie stages", () => {
+    expect(stageValueFor(cat, stageById(stages, "colour"))).toEqual({
+      value: "BLACK",
+      label: "Black",
+    });
+    expect(stageValueFor(cat, stageById(stages, "eyeColour2"))).toBeNull();
+    expect(stageValueFor(cat, stageById(stages, "peltName"))).toEqual({
+      value: "Tabby",
+      label: "Tabby",
+    });
+    expect(stageValueFor(cat, stageById(stages, "accessory-0"))).toEqual({
+      value: "BROWNBEAR",
+      label: "Brownbear",
+    });
+    expect(stageValueFor(cat, stageById(stages, "accessory-1"))).toBeNull();
+    expect(stageValueFor(cat, stageById(stages, "tortie-0-mask"))).toEqual({
+      value: "MASK",
+      label: "Mask",
+    });
+    expect(stageValueFor(cat, stageById(stages, "tortie-1-mask"))).toBeNull();
+  });
+
+  it("labels booleans and poses", () => {
+    expect(stageValueFor(cat, stageById(stages, "shading"))).toEqual({
+      value: "true",
+      label: "Shaded",
+    });
+    expect(stageValueFor(cat, stageById(stages, "reverse"))).toEqual({
+      value: "true",
+      label: "Mirrored",
+    });
+    const posed = makeCat();
+    (posed.catData.params as unknown as Record<string, unknown>).poseName =
+      "adult_long0";
+    expect(stageValueFor(posed, stageById(stages, "poseName"))).toEqual({
+      value: "adult_long0",
+      label: "Adult Long0",
+    });
+    const flat = makeCat();
+    (flat.catData.params as unknown as Record<string, unknown>).shading = false;
+    expect(stageValueFor(flat, stageById(stages, "shading"))).toBeNull();
+  });
+});
+
+describe("stageChanged", () => {
+  const stages = buildBatchStagePlan(CONFIG);
+  const index = (id: string) => stages.findIndex((stage) => stage.id === id);
+
+  it("compares each stage against the bare-kit placeholder", () => {
+    const cat = makeCat();
+    expect(stageChanged(cat, stages, index("colour"))).toBe(true);
+    const ginger = makeCat();
+    (ginger.catData.params as unknown as Record<string, unknown>).colour =
+      "GINGER";
+    expect(stageChanged(ginger, stages, index("colour"))).toBe(false);
+    expect(stageChanged(cat, stages, index("eyeColour2"))).toBe(false);
+    expect(stageChanged(cat, stages, index("accessory-1"))).toBe(false);
+    expect(stageChanged(cat, stages, index("accessory-0"))).toBe(true);
+  });
+
+  it("treats the first tortie sub-stage as the layer appearing", () => {
+    const cat = makeCat();
+    expect(stageChanged(cat, stages, index("tortie-0-mask"))).toBe(true);
+    const placeholderPattern = makeCat();
+    placeholderPattern.catData.tortieSlots[0] = {
+      mask: "MASK",
+      pattern: "SingleColour",
+      colour: "GOLDEN",
+    };
+    expect(
+      stageChanged(placeholderPattern, stages, index("tortie-0-pattern")),
+    ).toBe(false);
+    expect(stageChanged(cat, stages, index("tortie-0-pattern"))).toBe(true);
+    expect(stageChanged(cat, stages, index("tortie-1-mask"))).toBe(false);
+  });
+
+  it("does not flag the default pose on the last stage", () => {
+    const cat = makeCat();
+    (cat.catData.params as unknown as Record<string, unknown>).poseName =
+      DEFAULT_POSE_NAME;
+    expect(stages.at(-1)?.id).toBe("poseName");
+    expect(stageChanged(cat, stages, stages.length - 1)).toBe(false);
+    expect(stageChanged(makeCat(), stages, stages.length - 1)).toBe(true);
   });
 });

@@ -1,6 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type {
   CatGeneratorApi,
   SpriteMapperApi,
@@ -9,23 +19,47 @@ import {
   type CeremonyCat,
   EvolutionCeremony,
 } from "@/components/evolution/EvolutionCeremony";
+import { stageRank } from "@/components/evolution/evolutionDisplay";
+import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
+import type { CatParams } from "@/lib/cat-v3/types";
 import {
+  applyAdditionsParams,
+  rollBaseParams,
+  rollCandidates,
+  rollParentFor,
+} from "@/lib/evolution/additionApply";
+import {
+  type EvolutionAddition,
   type EvolutionPools,
   generateTeaserVariant,
 } from "@/lib/evolution/evolutionGenerator";
 import { buildEvolutionPools } from "@/lib/evolution/evolutionPools";
+import { CEREMONY_MS, seededRandom } from "@/lib/evolution/rollSchedule";
 import type {
+  EvolutionLiveState,
   EvolutionStreamCat,
   EvolutionStreamCommand,
 } from "@/lib/evolution/streamEvolution";
-import { useLineageCeremony } from "../looks/ceremony";
+import {
+  type LineageReveal,
+  type LineageRoll,
+  useLineageCeremony,
+} from "../looks/ceremony";
+import { LOOK_CHROME, LOOK_ERUPTS_IN_MATERIAL } from "../looks/LookBoardProps";
 import { buildLineageModel } from "../looks/lineageModel";
 import type { ShowLookId } from "../looks/lookMeta";
 import { SHOW_LOOKS } from "../looks/registry";
 import { QrBadge } from "../QrBadge";
+import { renderVariantFrames } from "../spinSupport";
+import { anchorForParam } from "../themes/traitAnchorMap";
+import { useSpriteAnchors } from "../themes/useSpriteAnchors";
+import { LeaderLines, type LeaderTarget } from "./shared/LeaderLines";
+import { Plaque, readPlaqueVars } from "./shared/Plaque";
+import type { PlaqueModel, Point, Rect } from "./shared/plaqueModel";
+import { OBS_CANVAS_WIDTH, useElementRects } from "./shared/useElementRects";
 
 interface EvolutionSceneProps {
-  command: EvolutionStreamCommand;
+  command: EvolutionStreamCommand & { seq: number; timestamp: number };
   /**
    * "ceremony" plays the full ceremony then shows the lineage; "tree" jumps
    * straight to the lineage + QR (used when the overlay reloads after the
@@ -34,9 +68,135 @@ interface EvolutionSceneProps {
   initialPhase: "ceremony" | "tree";
   /** Design of the lineage finale (session setting `showLook`). */
   look: ShowLookId;
+  /** session.evolutionState, null when absent. */
+  liveState: EvolutionLiveState | null;
 }
 
 type RenderedCat = EvolutionStreamCat & { previewUrl: string | null };
+
+/** Which sprite feature a landed addition points at (ParamIds of themes/traitAnchorMap). */
+const ADDITION_ANCHOR: Record<EvolutionAddition["kind"], string> = {
+  accessory: "accessory",
+  scar: "scar",
+  tortie: "tortie",
+  coat: "sprite",
+  // replacement uses `addition.slot` as the ParamId (see additionAnchorId).
+  replacement: "pelt",
+  trait: "pelt",
+};
+
+function additionAnchorId(addition: EvolutionAddition): string {
+  return addition.kind === "replacement"
+    ? addition.slot
+    : ADDITION_ANCHOR[addition.kind];
+}
+
+const CANVAS_MID_X = OBS_CANVAS_WIDTH / 2;
+
+/** Index of the cat a ceremony step is on: the kit for summon, -1 outside a cat. */
+function activeStepIndex(step: LineageReveal["step"]): number {
+  if (step.kind === "summon") return 0;
+  if ("index" in step) return step.index;
+  return -1;
+}
+
+/** Leader line origin: the plaque edge facing the canvas centre. */
+function lineOriginFor(plaqueRect: Rect | null): Point | null {
+  if (!plaqueRect) return null;
+  const onRight = plaqueRect.x + plaqueRect.width / 2 > CANVAS_MID_X;
+  return {
+    x: onRight ? plaqueRect.x : plaqueRect.x + plaqueRect.width,
+    y: plaqueRect.y + plaqueRect.height / 2,
+  };
+}
+
+/** The addition the current roll lands on the active cat; null outside a roll. */
+function landedAdditionFor(
+  roll: LineageRoll | null,
+  cat: EvolutionStreamCat | null,
+): EvolutionAddition | null {
+  if (!roll || !cat) return null;
+  return cat.additions[roll.index];
+}
+
+/** One leader target on the active cat once its rect is measured. */
+function leaderTargetsFor(
+  activeKey: string | null,
+  rect: Rect | undefined,
+  anchor: Point | null,
+): LeaderTarget[] {
+  if (!activeKey || !rect) return [];
+  return [{ id: activeKey, rect, anchor }];
+}
+
+type PlaqueText = Pick<PlaqueModel, "title" | "status">;
+
+function rollPlaqueText(roll: LineageRoll | null): PlaqueText {
+  if (roll?.phase === "land" && roll.valueLabel) {
+    // Name the value the moment it lands, with the confetti and the line.
+    return { title: roll.valueLabel, status: "landed" };
+  }
+  const title = roll?.traitLabel ?? "";
+  if (roll && roll.count > 1) {
+    return {
+      title,
+      status: `rolling · ${(roll.index + 1).toString()} of ${roll.count.toString()}`,
+    };
+  }
+  return { title, status: "rolling…" };
+}
+
+interface EvolutionPlaqueInput {
+  stepKind: LineageReveal["step"]["kind"];
+  roll: LineageRoll | null;
+  activeBranch: string | null;
+  landedValues: readonly string[];
+  held: boolean;
+  /** Level of the active cat (1 when there is none). */
+  activeLevel: number;
+  totalCount: number;
+}
+
+/** Plaque title/status per ceremony step (never numerals). */
+function evolutionPlaqueModel(input: EvolutionPlaqueInput): PlaqueModel {
+  let text: PlaqueText = { title: "", status: "" };
+  switch (input.stepKind) {
+    case "summon":
+      text = { title: "THE KIT", status: "StarClan has plans for this one…" };
+      break;
+    case "banner":
+      text = { title: input.activeBranch ?? "", status: "a new line begins" };
+      break;
+    case "roll":
+      text = rollPlaqueText(input.roll);
+      break;
+    case "reveal":
+      text = {
+        title: input.landedValues.length
+          ? input.landedValues.join(" · ")
+          : "NOTHING CHANGED",
+        status: `RISEN TO ${stageRank(input.activeLevel).toUpperCase()}`,
+      };
+      break;
+    case "finale":
+      text = {
+        title: "COMPLETE",
+        status: `${input.totalCount.toString()} cats`,
+      };
+      break;
+    case "done":
+      break;
+  }
+  const status = input.held ? "HELD · say the word" : text.status;
+  return { title: text.title, status, tally: [], numerals: null };
+}
+
+/** Reduced motion: every look animation inside the wrapper collapses to its end state. */
+const FRAME_STYLES = `
+@media (prefers-reduced-motion: reduce) {
+  [data-evolution-look], [data-evolution-look] * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
+}
+`;
 
 function lineageUrl(slug: string): string {
   return typeof window !== "undefined"
@@ -44,16 +204,179 @@ function lineageUrl(slug: string): string {
     : `/evolution/${slug}`;
 }
 
+function canvasDataUrl(result: {
+  imageDataUrl?: string | null;
+  canvas: unknown;
+}): string | null {
+  if (result.imageDataUrl) return result.imageDataUrl;
+  const canvas = result.canvas as { toDataURL?: (type: string) => string };
+  return typeof canvas.toDataURL === "function"
+    ? canvas.toDataURL("image/png")
+    : null;
+}
+
+export interface EvolutionShowFrameProps {
+  look: ShowLookId;
+  reveal: LineageReveal;
+  /** Command cats (params): the landed pose/feature the leader line points at. */
+  cats: readonly EvolutionStreamCat[];
+  totalCount: number;
+  /** Receives the root element (the hook measures confetti origins in it). */
+  rootRef?: RefObject<HTMLDivElement | null>;
+  children: ReactNode;
+}
+
+/**
+ * Root of the themed evolution show: the look, the plaque (title/status from
+ * the reveal, never numerals) and one leader line from the plaque to the
+ * active cat from the land phase through its reveal. Gated by LOOK_CHROME.
+ */
+export function EvolutionShowFrame({
+  look,
+  reveal,
+  cats,
+  totalCount,
+  rootRef,
+  children,
+}: Readonly<EvolutionShowFrameProps>): ReactElement {
+  const chrome = LOOK_CHROME[look];
+  const localRef = useRef<HTMLDivElement | null>(null);
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const setRoot = useCallback(
+    (el: HTMLDivElement | null) => {
+      localRef.current = el;
+      if (rootRef) rootRef.current = el;
+      setContainer(el);
+    },
+    [rootRef],
+  );
+
+  const step = reveal.step;
+  const roll = reveal.roll;
+  const activeIndex = activeStepIndex(step);
+  const activeCat = activeIndex >= 0 ? (cats[activeIndex] ?? null) : null;
+  // Measure per frame only while something lands or enters (land phase,
+  // reveal): that is when the leader line and the confetti origin need the
+  // moving rect. A whole-lineage measurement on every frame of a roll is
+  // layout work the strobe does not need.
+  const rects = useElementRects(
+    localRef,
+    "data-lineage-key",
+    [step.kind, reveal.activeKey, roll?.phase ?? null],
+    roll?.phase === "land" || step.kind === "reveal",
+  );
+  const [plaqueRect, setPlaqueRect] = useState<Rect | null>(null);
+  // The leader line mounts at canvas level, outside the look's plaque slot,
+  // so the slot's accent never reaches it by inheritance; read it off the
+  // slot (re-read per step: looks may swap the slot element per phase).
+  const [accent, setAccent] = useState<string | undefined>(undefined);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: look/step.kind are the re-read triggers
+  useLayoutEffect(() => {
+    if (!container) return;
+    setAccent(readPlaqueVars(container).accent);
+  }, [container, look, step.kind]);
+
+  // The landed frame's pose decides where the line ends on the sprite.
+  const rollKey =
+    roll && activeCat ? `${activeCat.key}:${roll.index.toString()}` : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rollKey identifies (cat, addition)
+  const landedParams = useMemo<CatParams | null>(() => {
+    if (!roll || !activeCat) return null;
+    try {
+      return applyAdditionsParams(
+        rollParentFor(cats, activeIndex),
+        activeCat.additions.slice(0, roll.index + 1),
+      );
+    } catch {
+      return null;
+    }
+  }, [rollKey]);
+  const anchors = useSpriteAnchors(
+    landedParams?.poseName ?? DEFAULT_POSE_NAME,
+    Boolean(landedParams?.reverse),
+  );
+  const addition = landedAdditionFor(roll, activeCat);
+  const anchor =
+    anchors && addition
+      ? (anchors.points[anchorForParam(additionAnchorId(addition))] ?? null)
+      : null;
+
+  const plaqueModel = useMemo<PlaqueModel>(
+    () =>
+      evolutionPlaqueModel({
+        stepKind: step.kind,
+        roll,
+        activeBranch: reveal.activeBranch,
+        landedValues: reveal.landedValues,
+        held: reveal.held,
+        activeLevel: activeCat?.level ?? 1,
+        totalCount,
+      }),
+    [
+      step.kind,
+      roll,
+      reveal.activeBranch,
+      reveal.landedValues,
+      reveal.held,
+      activeCat,
+      totalCount,
+    ],
+  );
+
+  const lineFrom = lineOriginFor(plaqueRect);
+  const targetRect = reveal.activeKey ? rects.get(reveal.activeKey) : undefined;
+  const lineTargets = leaderTargetsFor(reveal.activeKey, targetRect, anchor);
+  const linesVisible = roll?.phase === "land" || step.kind === "reveal";
+  const entranceKey = `${reveal.activeKey ?? ""}:${roll ? roll.index.toString() : "r"}`;
+
+  return (
+    <div
+      ref={setRoot}
+      data-evolution-look={look}
+      data-ceremony-step={step.kind}
+      data-roll-phase={roll?.phase ?? ""}
+      data-reduced-motion={reveal.reducedMotion ? "1" : "0"}
+      data-held={reveal.held ? "1" : "0"}
+      style={{ position: "relative", width: 1280, height: 1080 }}
+    >
+      <style>{FRAME_STYLES}</style>
+      {children}
+      {chrome.plaque !== "none" && step.kind !== "done" ? (
+        <Plaque
+          model={plaqueModel}
+          mode={chrome.plaque}
+          container={container}
+          slotKey={look}
+          beatKey={step.kind}
+          entranceKey={entranceKey}
+          onAnchorRect={setPlaqueRect}
+          breathing={reveal.held}
+        />
+      ) : null}
+      {chrome.lines ? (
+        <LeaderLines
+          from={lineFrom}
+          targets={lineTargets}
+          visible={linesVisible}
+          color={accent}
+          drawKey={entranceKey}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * Plays an evolution ceremony on stream: re-renders every cat from the
- * params in the command, feeds them progressively into EvolutionCeremony
- * (hands-off mode), then shows the lineage board of the selected look with
+ * params in the command, runs the clock-based themed ceremony inside the
+ * selected look (or the classic chamber), then shows the lineage board with
  * a QR code to the saved /evolution/[slug] page.
  */
 export function EvolutionScene({
   command,
   initialPhase,
   look,
+  liveState,
 }: Readonly<EvolutionSceneProps>) {
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const renderTokenRef = useRef(0);
@@ -94,11 +417,7 @@ export function EvolutionScene({
             const result = await generatorRef.current.generateCat(
               cat.catData.params,
             );
-            previewUrl =
-              result.imageDataUrl ??
-              ("toDataURL" in result.canvas
-                ? (result.canvas as HTMLCanvasElement).toDataURL("image/png")
-                : null);
+            previewUrl = canvasDataUrl(result);
           } catch (renderError) {
             console.warn(
               "[ObsOverlayClient] Failed to render evolution cat",
@@ -125,7 +444,7 @@ export function EvolutionScene({
     };
   }, [command]);
 
-  // Slot-machine tease frame for the upcoming cat, same as the generator page.
+  // Slot-machine tease frame for the upcoming cat (classic chamber only).
   const requestTeaserFrame = useCallback(
     async (index: number) => {
       const generator = generatorRef.current;
@@ -144,12 +463,7 @@ export function EvolutionScene({
           { archetype: upcoming.archetype },
         );
         const rendered = await generator.generateCat(params);
-        return (
-          rendered.imageDataUrl ??
-          ("toDataURL" in rendered.canvas
-            ? (rendered.canvas as HTMLCanvasElement).toDataURL("image/png")
-            : null)
-        );
+        return canvasDataUrl(rendered);
       } catch (teaserError) {
         console.warn(
           "[ObsOverlayClient] Failed to render teaser frame",
@@ -161,6 +475,55 @@ export function EvolutionScene({
     [command, pools],
   );
 
+  // One roll = one variant sheet: 12 wrong candidates + the landed frame.
+  // Rejects while the renderer loads so the hook retries on the next step.
+  const requestRollFrames = useCallback(
+    async (catIndex: number, addition: number, seed: number) => {
+      const generator = generatorRef.current;
+      if (!generator || !pools) throw new Error("renderer not ready");
+      const cat = command.cats[catIndex];
+      const target = cat?.additions[addition];
+      const base = rollBaseParams(command.cats, catIndex, addition);
+      if (!cat || !target || !base) return { candidates: [], landed: null };
+      const candidates = rollCandidates(
+        base,
+        target,
+        pools,
+        seededRandom(seed),
+        CEREMONY_MS.candidateCount,
+        cat.archetype,
+      );
+      const landedParams = applyAdditionsParams(
+        rollParentFor(command.cats, catIndex),
+        cat.additions.slice(0, addition + 1),
+      );
+      const option = { raw: null, display: "" };
+      const descriptors = [
+        ...candidates.map((params, k) => ({
+          id: `c${k.toString()}`,
+          option,
+          params,
+        })),
+        { id: "landed", option, params: landedParams },
+      ];
+      const frames = await renderVariantFrames(generator, base, descriptors);
+      const urls = frames.map((frame) => frame.canvas.toDataURL("image/png"));
+      return {
+        candidates: urls.slice(0, candidates.length),
+        landed:
+          urls.length === descriptors.length ? (urls.at(-1) ?? null) : null,
+      };
+    },
+    [command, pools],
+  );
+
+  // Skip to board from the control page (any look).
+  useEffect(() => {
+    if (liveState?.seq === command.seq && liveState.skipToBoard) {
+      setPhase("tree");
+    }
+  }, [liveState, command.seq]);
+
   const ceremonyCats: CeremonyCat[] = renderedCats.map((cat) => ({
     key: cat.key,
     label: cat.label,
@@ -171,16 +534,33 @@ export function EvolutionScene({
     previewUrl: cat.previewUrl,
   }));
 
-  // Every look except classic plays the ceremony inside its own board:
-  // the same steps and timings, drawn in the look's visual language.
+  // Every look except classic plays the ceremony inside its own board on
+  // the shared clock; the schedule needs every command cat from the start.
   const themedCeremony = look !== "classic";
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const finishCeremony = useCallback(() => setPhase("tree"), []);
+  const ignoreFinish = useCallback(() => {}, []);
   const reveal = useLineageCeremony({
-    cats: ceremonyCats,
+    cats: command.cats.map((cat, i) => ({
+      key: cat.key,
+      label: cat.label,
+      level: cat.level,
+      branchLabel: cat.branchLabel,
+      archetype: cat.archetype,
+      previewUrl: renderedCats[i]?.previewUrl ?? null,
+      // Same parent rule as rollParentFor: level ≤ 1 evolves from the starter.
+      parentUrl: renderedCats[cat.level <= 1 ? 0 : i - 1]?.previewUrl ?? null,
+      additions: cat.additions,
+    })),
     totalCount: command.totalCount,
     chargeDurationMs: command.chargeDurationMs,
-    requestTeaserFrame,
-    onFinish: finishCeremony,
+    startedAt: command.timestamp,
+    seq: command.seq,
+    liveState,
+    requestRollFrames: themedCeremony ? requestRollFrames : undefined,
+    onFinish: themedCeremony ? finishCeremony : ignoreFinish,
+    confetti: !LOOK_ERUPTS_IN_MATERIAL.has(look),
+    containerRef: rootRef,
     enabled: themedCeremony && phase === "ceremony",
   });
 
@@ -204,17 +584,20 @@ export function EvolutionScene({
     return (
       <div
         className="relative flex items-center justify-center"
+        data-evolution-look="classic"
         style={{ width: "1280px", height: "1080px", padding: "40px" }}
       >
         <div style={{ width: "920px", maxWidth: "100%" }}>
           <EvolutionCeremony
             cats={ceremonyCats}
             totalCount={command.totalCount}
-            onFinish={() => setPhase("tree")}
+            onFinish={finishCeremony}
             pools={pools}
             chargeDurationMs={command.chargeDurationMs}
             requestTeaserFrame={requestTeaserFrame}
             hideControls
+            pacing="overlay"
+            teaserFrameCap={12}
           />
         </div>
       </div>
@@ -223,9 +606,21 @@ export function EvolutionScene({
 
   const Lineage = SHOW_LOOKS[look].Lineage;
   return (
-    <Lineage
-      model={buildLineageModel(command, renderedCats, lineageUrl(command.slug))}
-      reveal={phase === "ceremony" ? reveal : undefined}
-    />
+    <EvolutionShowFrame
+      look={look}
+      reveal={reveal}
+      cats={command.cats}
+      totalCount={command.totalCount}
+      rootRef={rootRef}
+    >
+      <Lineage
+        model={buildLineageModel(
+          command,
+          renderedCats,
+          lineageUrl(command.slug),
+        )}
+        reveal={reveal}
+      />
+    </EvolutionShowFrame>
   );
 }

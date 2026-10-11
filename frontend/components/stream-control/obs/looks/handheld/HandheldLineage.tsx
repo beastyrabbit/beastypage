@@ -66,12 +66,15 @@ export function HandheldLineage({
   const focusParent = focus ? parentOf(focus, model.cats) : null;
   const highlightKey = highlightKeyFor(reveal, active, newest);
   const message = textBoxMessage(model, reveal, focus, focusParent);
-  const typed = useTypewriter(message, 28, Boolean(reveal));
+  const typed = useTypewriter(message, 22, Boolean(reveal));
+  // One whiteout per land, keyed by the scheduled land time (both instances agree).
+  const landing = reveal?.landing ?? null;
+  const flash = Boolean(landing) && landing?.key === reveal?.activeKey;
 
   return (
     <HandheldShell
-      flash={reveal?.step.kind === "reveal"}
-      flashKey={reveal?.activeKey ?? ""}
+      flash={flash}
+      flashKey={landing ? landing.at.toString() : ""}
     >
       <LcdBox
         style={{
@@ -154,10 +157,7 @@ export function HandheldLineage({
               const url = cat
                 ? lineageSpriteUrl(state, reveal, cat.previewUrl)
                 : null;
-              const tag =
-                cat && state !== "hidden" && state !== "charging"
-                  ? (additionTags(cat.additions, 1, 10)[0] ?? "")
-                  : "";
+              const tag = gainTag(cat, state, reveal);
               return [
                 <div
                   key={`arrow-${level.toString()}`}
@@ -181,13 +181,25 @@ export function HandheldLineage({
                   >
                     ▶
                   </b>
-                  {state === "charging" ? "???" : tag.toUpperCase()}
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: 14 * fontScale,
+                      lineHeight: 1.2,
+                      width: arrowWidth + 24,
+                      marginLeft: -12,
+                      whiteSpace: "normal",
+                    }}
+                  >
+                    {tag.toUpperCase()}
+                  </span>
                 </div>,
                 <div
                   key={`sprite-${level.toString()}`}
+                  data-lineage-key={cat?.key}
                   style={{
                     opacity: state === "hidden" ? 0 : 1,
-                    animation: spriteAnimation(state),
+                    animation: spriteAnimation(state, reveal),
                   }}
                 >
                   <LcdSprite
@@ -291,9 +303,40 @@ function highlightKeyFor(
   return reveal.revealing ? active?.key : null;
 }
 
-function spriteAnimation(state: LineageCatState): string | undefined {
-  if (state === "charging") return "gb-evolve 0.5s steps(2) infinite";
+/** The evolve strobe runs through spinup/cruise/slowdown; it stops on the near miss and the land. */
+function spriteAnimation(
+  state: LineageCatState,
+  reveal: LineageReveal | undefined,
+): string | undefined {
+  if (state === "charging") {
+    const phase = reveal?.roll?.phase;
+    if (phase === "nearmiss" || phase === "land") return undefined;
+    return "gb-evolve 0.5s steps(2) infinite";
+  }
   return state === "revealing" ? "gb-flash 900ms steps(4) both" : undefined;
+}
+
+/** The arrow's gain tag: "???" while rolling, the value from the land on, the full word once written. */
+function gainTag(
+  cat: LineageCat | null,
+  state: LineageCatState,
+  reveal: LineageReveal | undefined,
+): string {
+  if (!cat || state === "hidden") return "";
+  if (state === "charging") {
+    const value = reveal?.roll?.valueLabel;
+    return value ? `+${value}` : "???";
+  }
+  return additionTags(cat.additions, 1)[0] ?? "";
+}
+
+/** "ROLLING ACCESSORY… 1/2", then "ACCESSORY: LAVENDER!" from the land on. */
+function rollText(reveal: LineageReveal): string {
+  const roll = reveal.roll;
+  if (!roll) return "";
+  const trait = roll.traitLabel.toUpperCase();
+  if (roll.valueLabel) return `${trait}: ${roll.valueLabel.toUpperCase()}!`;
+  return `ROLLING ${trait}… ${(roll.index + 1).toString()}/${roll.count.toString()}`;
 }
 
 function shout(label: string | null | undefined, fallback = ""): string {
@@ -317,11 +360,17 @@ function textBoxMessage(
       return `${shout(model.starter?.label, "A KIT")} enters the chamber.`;
     case "banner":
       return `The ${shout(reveal.activeBranch)} line begins!`;
-    case "charge":
-      return `What? ${shout(focusParent?.label)} is evolving!`;
-    case "reveal":
-      return `${shout(focusParent?.label)} evolved into ${shout(focus?.label)}!`;
-    case "waiting":
+    case "roll":
+      return reveal.roll?.valueLabel
+        ? rollText(reveal)
+        : `${rollText(reveal)} What? ${shout(focusParent?.label)} is evolving!`;
+    case "reveal": {
+      const gained = reveal.landedValues.length
+        ? ` +${reveal.landedValues.join(", ").toUpperCase()}`
+        : "";
+      return `${shout(focusParent?.label)} evolved into ${shout(focus?.label)}!${gained}`;
+    }
+    case "done":
       return "…";
     case "finale":
       return `All ${model.totalCount} cats recorded!`;

@@ -47,7 +47,8 @@ export const SHOW_LOOK_META: Record<ShowLookId, ShowLookMeta> = {
     id: "classic",
     label: "Classic",
     blurb: "The original chamber and lineage board in the themed trim.",
-    evolution: "Chamber ceremony, then lineage cards per branch",
+    evolution:
+      "Chamber ceremony: one roll per gained trait, the near miss, then the land; lineage cards per branch",
     palette: ["#0a0a0a", "#f59e0b", "#fbbf24", "#e4e4e7", "#3f3f46"],
   },
   allegiances: {
@@ -55,7 +56,8 @@ export const SHOW_LOOK_META: Record<ShowLookId, ShowLookMeta> = {
     label: "Allegiances page",
     blurb:
       "A Warriors book page: every cat is a roster line in prose, written in as the ceremony goes.",
-    evolution: "The scribe writes each line; the newest cat gets the plate",
+    evolution:
+      "The scribe writes each line: one roll per gained trait, the near miss, then the land on the plate",
     palette: ["#efe6d2", "#2a2320", "#8c2f1b", "#b5a68e", "#6a5a48"],
   },
   handheld: {
@@ -63,7 +65,8 @@ export const SHOW_LOOK_META: Record<ShowLookId, ShowLookMeta> = {
     label: "Pocket Cat handheld",
     blurb:
       "A four-shade LCD in a plastic shell: evolution chart with level arrows and a typing text box.",
-    evolution: "“What? X is evolving!” with a whiteout on the reveal",
+    evolution:
+      "“What? X is evolving!”: one roll per gained trait, the near miss, then a whiteout on the land",
     palette: ["#9bbc0f", "#0f380f", "#306230", "#cfcabd", "#8e2f63"],
   },
   strata: {
@@ -71,7 +74,8 @@ export const SHOW_LOOK_META: Record<ShowLookId, ShowLookMeta> = {
     label: "Strata section",
     blurb:
       "A geological cliff section: the starter is bedrock, every level a stratum, every cat a fossil.",
-    evolution: "Fossils are excavated with a puff of dust",
+    evolution:
+      "One roll per gained trait while the stratum is sampled, the near miss, then the fossil lands in a puff of dust",
     palette: ["#0e0f14", "#a08c6c", "#7d5a3f", "#2d2b2a", "#b3261e"],
   },
   contact: {
@@ -79,7 +83,8 @@ export const SHOW_LOOK_META: Record<ShowLookId, ShowLookMeta> = {
     label: "Contact sheet",
     blurb:
       "Darkroom film strips, one roll per branch; frames expose and develop, pencil circles the keepers.",
-    evolution: "Frames develop from black, grease pencil draws itself",
+    evolution:
+      "One roll per gained trait on the lightbox, the near miss, then the frame develops on the land",
     palette: ["#0b0b0c", "#101010", "#d9d2c2", "#ff5a2b", "#f0b24a"],
   },
   territory: {
@@ -88,7 +93,7 @@ export const SHOW_LOOK_META: Record<ShowLookId, ShowLookMeta> = {
     blurb:
       "A hand-inked Clan map: trails ink themselves from camp and each cat walks to its landmark.",
     evolution:
-      "The charging cat walks the trail and lands with a pawprint burst",
+      "The cat walks the trail: one roll per gained trait, the near miss, then it lands with a pawprint burst",
     palette: ["#e6d6b4", "#3b2f22", "#4f6b3a", "#a0452b", "#9a3a5c"],
   },
   sticker: {
@@ -96,7 +101,8 @@ export const SHOW_LOOK_META: Record<ShowLookId, ShowLookMeta> = {
     label: "Sticker album",
     blurb:
       "A Panini-style evo set: one numbered sticker row per line, packs shake open, the newest is holo.",
-    evolution: "A pack shakes over the slot, the sticker peels in",
+    evolution:
+      "A pack shakes over the slot: one roll per gained trait, the near miss shows through the foil, then the sticker peels in",
     palette: ["#fbf7ee", "#1b2a4a", "#ffb84a", "#e05a7a", "#2f6fde"],
   },
 };

@@ -71,12 +71,35 @@ export const batchStateValidator = v.object({
   eliminatedIds: v.array(v.string()),
   /** Cat the streamer has marked as the removal candidate (shown to viewers). */
   markedId: v.optional(v.string()),
-  /** "Maybe leaves next" picks — shown yellow; reset after every cull. */
+  /** "Maybe leaves next" picks — shown yellow; kept across culls (minus the culled cat) until cleared. */
   potentialIds: v.optional(v.array(v.string())),
   /** Crowd favourites — persist across culls. */
   favoriteIds: v.optional(v.array(v.string())),
   /** Cat shown enlarged on the overlay and control board. */
   spotlightId: v.optional(v.string()),
+  /** Cat whose cull is armed; finalizeBatchCull applies it at verdictAt. */
+  pendingCullId: v.optional(v.string()),
+  /** Server ms the verdict lands. */
+  verdictAt: v.optional(v.number()),
+  /** Server ms the current stageIndex was entered (stamped by reportBatchStage). */
+  stageStartedAt: v.optional(v.number()),
+  /** Server ms the latest cull was finalised. */
+  lastCullAt: v.optional(v.number()),
+});
+
+/**
+ * Ceremony clock state for a running evolution show: the overlay instances
+ * and the control page all read the same offset/hold so they agree on the
+ * elapsed ms. Mirrors EvolutionLiveState in lib/evolution/streamEvolution.ts.
+ */
+export const evolutionStateValidator = v.object({
+  seq: v.number(),
+  /** Signed ms subtracted from the wall clock (holds fold in on release). */
+  offsetMs: v.number(),
+  /** Server ms the current hold began; absent when not held. */
+  holdStartedAt: v.optional(v.number()),
+  /** The streamer skipped the rest of the ceremony. */
+  skipToBoard: v.optional(v.boolean()),
 });
 
 export default defineSchema({
@@ -550,6 +573,7 @@ export default defineSchema({
     testMode: v.boolean(),
     lastWheelSpinForSeq: v.optional(v.number()),
     batchState: v.optional(batchStateValidator),
+    evolutionState: v.optional(evolutionStateValidator),
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("byUserId", ["userId"]),

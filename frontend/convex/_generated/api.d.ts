@@ -8,16 +8,12 @@
  * @module
  */
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
 import type * as adoptionV2 from "../adoptionV2.js";
 import type * as ancestryTree from "../ancestryTree.js";
 import type * as catShares from "../catShares.js";
 import type * as catStream from "../catStream.js";
 import type * as catdex from "../catdex.js";
+import type * as catdexHttp from "../catdexHttp.js";
 import type * as coinflipper from "../coinflipper.js";
 import type * as collection from "../collection.js";
 import type * as crons from "../crons.js";
@@ -41,6 +37,7 @@ import type * as quickShareHttp from "../quickShareHttp.js";
 import type * as quickSharePolicy from "../quickSharePolicy.js";
 import type * as rarities from "../rarities.js";
 import type * as seasons from "../seasons.js";
+import type * as settings from "../settings.js";
 import type * as singleCatSettings from "../singleCatSettings.js";
 import type * as streamAccess from "../streamAccess.js";
 import type * as streamParticipantsV2 from "../streamParticipantsV2.js";
@@ -52,20 +49,19 @@ import type * as users from "../users.js";
 import type * as utils from "../utils.js";
 import type * as wheel from "../wheel.js";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
 declare const fullApi: ApiFromModules<{
   adoptionV2: typeof adoptionV2;
   ancestryTree: typeof ancestryTree;
   catShares: typeof catShares;
   catStream: typeof catStream;
   catdex: typeof catdex;
+  catdexHttp: typeof catdexHttp;
   coinflipper: typeof coinflipper;
   collection: typeof collection;
   crons: typeof crons;
@@ -89,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   quickSharePolicy: typeof quickSharePolicy;
   rarities: typeof rarities;
   seasons: typeof seasons;
+  settings: typeof settings;
   singleCatSettings: typeof singleCatSettings;
   streamAccess: typeof streamAccess;
   streamParticipantsV2: typeof streamParticipantsV2;
@@ -100,11 +97,31 @@ declare const fullApi: ApiFromModules<{
   utils: typeof utils;
   wheel: typeof wheel;
 }>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
+
+export declare const components: {};

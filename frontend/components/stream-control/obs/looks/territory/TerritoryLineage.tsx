@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   type LineageCatState,
   type LineageReveal,
@@ -85,7 +86,11 @@ function mapSubtitle(
   return `walking the trails · ${reveal.revealedKeys.size} of ${totalCount} cats placed`;
 }
 
-/** Landing drop mid-ceremony; a staggered pop when the finished map mounts. */
+/**
+ * Landing drop mid-ceremony; a staggered pop only when a finished map mounts
+ * with no ceremony at all. A done `reveal` still counts as in-ceremony so the
+ * handoff to the board never re-pops every cat.
+ */
 function stopAnimation(
   state: LineageCatState,
   inCeremony: boolean,
@@ -182,24 +187,28 @@ export function TerritoryLineage({
       >
         <TreeDefs />
         <defs>
-          {trails.map(({ branch, path }, index) => (
+          {trails.map(({ branch, path, open }, index) => (
             <mask key={branch.label} id={`trail-mask-${index.toString()}`}>
-              <path
-                d={path}
-                fill="none"
-                stroke="#fff"
-                strokeWidth="26"
-                pathLength={1}
-                style={
-                  reveal
-                    ? {
-                        strokeDasharray: 1,
-                        strokeDashoffset: 1,
-                        animation: "look-draw 2600ms linear forwards",
-                      }
-                    : undefined
-                }
-              />
+              {/* Mounted with the trail (not at summon) so the ink draw plays at the banner. */}
+              {open ? (
+                <path
+                  key={`${branch.label}-${open.toString()}`}
+                  d={path}
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="26"
+                  pathLength={1}
+                  style={
+                    reveal
+                      ? {
+                          strokeDasharray: 1,
+                          strokeDashoffset: 1,
+                          animation: "look-draw 2600ms linear forwards",
+                        }
+                      : undefined
+                  }
+                />
+              ) : null}
             </mask>
           ))}
         </defs>
@@ -289,6 +298,7 @@ export function TerritoryLineage({
         title={`${starter?.label ?? "The"}'s Territory`}
         subtitle={mapSubtitle(count, model.totalCount, reveal)}
         code={`EVOLUTION · ${branches.map((b) => b.label).join(" · ")}`}
+        plaqueSlot
       />
       <Compass top={186} />
 
@@ -300,6 +310,7 @@ export function TerritoryLineage({
           label={starter.label}
           sub="origin · kit"
           accent="#8a6a2a"
+          lineageKey={starter.key}
           style={{
             animation:
               starterState === "revealing"
@@ -381,6 +392,7 @@ export function TerritoryLineage({
                 return (
                   <TrailWalker
                     key={cat.key}
+                    lineageKey={cat.key}
                     path={path}
                     from={from}
                     to={t}
@@ -398,8 +410,11 @@ export function TerritoryLineage({
                   y={point[1]}
                   size={size}
                   label={cat.label}
-                  sub={`${lineageRank(cat)} · ${additionTags(cat.additions, 1, 12)[0] ?? ""}`}
+                  sub={[lineageRank(cat), ...additionTags(cat.additions)].join(
+                    " · ",
+                  )}
                   accent={ink}
+                  lineageKey={cat.key}
                   style={{
                     animation: stopAnimation(
                       state,
@@ -451,8 +466,23 @@ export function TerritoryLineage({
   );
 }
 
-/** The charging cat walking the trail between two stops. */
+/** What the walker's caption says: the roll by name, the value from the land on. */
+function walkerCaption(reveal: LineageReveal): string {
+  const roll = reveal.roll;
+  if (!roll) return "walking the trail…";
+  const trait = roll.traitLabel.toLowerCase();
+  if (roll.valueLabel) return `${trait}: ${roll.valueLabel}`;
+  return `walking the trail · rolling its ${trait} · ${(roll.index + 1).toString()} of ${roll.count.toString()}…`;
+}
+
+/**
+ * The charging cat walking the trail between two stops. One walk spans every
+ * roll of the cat (count × the per-roll budget, both constant for the cat) so
+ * the animation string never changes mid-walk; a walker mounted mid-cat
+ * (reload) starts part-way, and a hold pauses it.
+ */
 function TrailWalker({
+  lineageKey,
   path,
   from,
   to,
@@ -461,6 +491,7 @@ function TrailWalker({
   url,
   alt,
 }: Readonly<{
+  lineageKey: string;
   path: string;
   from: number;
   to: number;
@@ -469,8 +500,15 @@ function TrailWalker({
   url: string | null;
   alt: string;
 }>) {
+  const roll = reveal.roll;
+  const durationMs = roll ? roll.count * reveal.chargeMs : reveal.chargeMs;
+  const [startOffsetMs] = useState(() =>
+    roll ? Math.round((roll.index + roll.progress) * reveal.chargeMs) : 0,
+  );
+  const landed = roll?.phase === "land";
   return (
     <div
+      data-lineage-key={lineageKey}
       style={{
         position: "absolute",
         left: 0,
@@ -482,13 +520,15 @@ function TrailWalker({
         offsetAnchor: "50% 60%",
         ["--from" as string]: `${Math.round(from * 100)}%`,
         ["--to" as string]: `${Math.round(to * 100)}%`,
-        animation: `map-walk ${reveal.chargeMs}ms linear forwards`,
+        animation: `map-walk ${durationMs.toString()}ms linear forwards`,
+        animationDelay: `${(-startOffsetMs).toString()}ms`,
+        animationPlayState: reveal.held ? "paused" : "running",
         zIndex: 2,
       }}
     >
       <div
         style={{
-          animation: "look-bob 0.5s ease-in-out infinite",
+          animation: landed ? undefined : "look-bob 0.5s ease-in-out infinite",
           filter: "drop-shadow(0 4px 0 rgba(59,47,34,.18))",
         }}
       >
@@ -503,11 +543,11 @@ function TrailWalker({
           whiteSpace: "nowrap",
           fontStyle: "italic",
           fontSize: 16,
-          color: MAP_MUTED,
-          animation: "look-pulse 1s ease-in-out infinite",
+          color: landed ? MAP_INK : MAP_MUTED,
+          animation: landed ? undefined : "look-pulse 1s ease-in-out infinite",
         }}
       >
-        walking the trail…
+        {walkerCaption(reveal)}
       </div>
     </div>
   );

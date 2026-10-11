@@ -5,6 +5,10 @@ import type {
   BatchLiveState,
   BatchStreamCommand,
 } from "@/lib/adoption/streamBatch";
+import type {
+  EvolutionLiveState,
+  EvolutionStreamCommand,
+} from "@/lib/evolution/streamEvolution";
 import type { SingleCatSettings } from "@/utils/singleCatVariants";
 import type { useVariants } from "@/utils/variants";
 import type { ShowLookId } from "../obs/looks/lookMeta";
@@ -112,8 +116,21 @@ export interface StreamControlApi {
   metaSaving: boolean;
 
   // Batch elimination show (live)
-  currentBatchCommand: (BatchStreamCommand & { seq: number }) | null;
+  currentBatchCommand:
+    | (BatchStreamCommand & { seq: number; timestamp: number })
+    | null;
   batchLiveState: BatchLiveState | null;
+
+  // Evolution ceremony (live)
+  currentEvolutionCommand:
+    | (EvolutionStreamCommand & { seq: number; timestamp: number })
+    | null;
+  evolutionLiveState: EvolutionLiveState | null;
+
+  /** A batch show (not done) or a ceremony (clock < total, not skipped) is on air; Start buttons disable on it. */
+  showLive: boolean;
+  /** "End show" → lobby after a confirm. */
+  endShow: () => Promise<void>;
 
   // Raw session settings snapshot — for panels with their own synced fields
   rawSessionSettings: Record<string, unknown> | null;

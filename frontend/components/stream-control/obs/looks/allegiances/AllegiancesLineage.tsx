@@ -4,6 +4,7 @@ import { STARTER_THEME } from "@/components/evolution/archetypes";
 import {
   type LineageCatState,
   type LineageReveal,
+  type LineageRoll,
   lineageBranchOpen,
   lineageCatState,
   lineageSpriteUrl,
@@ -20,6 +21,7 @@ import {
 import { LookSprite } from "../shared";
 import {
   AL_FAINT,
+  AL_MUTED,
   AL_RED,
   AllegiancesBookplate,
   AllegiancesPage,
@@ -47,6 +49,11 @@ interface Layout {
   plateSprite: number;
   bookplateWidth: number;
   bookplateRight: number;
+  /** The plaque slot: the margin under the plate (the plaque portals into it). */
+  slotLeft: number;
+  slotTop: number;
+  slotWidth: number;
+  slotTitleSize: number;
 }
 
 const WIDE: Layout = {
@@ -59,6 +66,10 @@ const WIDE: Layout = {
   plateSprite: 300,
   bookplateWidth: 320,
   bookplateRight: 96,
+  slotLeft: 780,
+  slotTop: 640,
+  slotWidth: 460,
+  slotTitleSize: 34,
 };
 
 const NARROW: Layout = {
@@ -71,6 +82,10 @@ const NARROW: Layout = {
   plateSprite: 220,
   bookplateWidth: 260,
   bookplateRight: 70,
+  slotLeft: 930,
+  slotTop: 560,
+  slotWidth: 320,
+  slotTitleSize: 28,
 };
 
 /** Origin section + starter, then one section per branch with its cats. */
@@ -162,11 +177,21 @@ export function AllegiancesLineage({
     ? chunkBySizes(rows, splitColumns(rows.length, Math.ceil(rows.length / 2)))
     : [rows];
 
-  // The plate shows the cat being written, else the newest.
+  // The plate shows the cat being written; during a banner (the next cat is
+  // still hidden) it keeps the last cat written so it never unmounts.
   const activeCat = reveal?.activeKey
     ? (model.cats.find((cat) => cat.key === reveal.activeKey) ?? null)
     : null;
-  const plateCat = done ? newest : activeCat;
+  const lastShownCat =
+    model.cats.findLast(
+      (cat) => lineageCatState(reveal, cat.key) === "shown",
+    ) ?? null;
+  let plateCat: LineageCat | null = lastShownCat;
+  if (done) {
+    plateCat = newest;
+  } else if (activeCat && lineageCatState(reveal, activeCat.key) !== "hidden") {
+    plateCat = activeCat;
+  }
   const lineLabel = model.starter?.label ?? "the line";
 
   return (
@@ -208,6 +233,24 @@ export function AllegiancesLineage({
           layout={layout}
         />
       ) : null}
+
+      {/* The plaque writes the roll in the margin under the plate; always mounted. */}
+      <div
+        data-plaque-slot=""
+        style={{
+          position: "absolute",
+          left: layout.slotLeft,
+          top: layout.slotTop,
+          width: layout.slotWidth,
+          height: 120,
+          overflow: "hidden",
+          ["--obs-plaque-ink" as string]: "#2a2320",
+          ["--obs-plaque-muted" as string]: AL_MUTED,
+          ["--obs-plaque-accent" as string]: AL_RED,
+          ["--obs-plaque-shadow" as string]: "none",
+          ["--obs-plaque-title-size" as string]: `${layout.slotTitleSize.toString()}px`,
+        }}
+      />
 
       {done ? (
         <AllegiancesBookplate
@@ -282,6 +325,10 @@ function Plate({
   const url = lineageSpriteUrl(state, reveal, cat.previewUrl);
   if (!url) return null;
   const charging = state === "charging";
+  const roll = charging ? (reveal?.roll ?? null) : null;
+  // The strobe stops on the near miss and the land so the frame can be read.
+  const strobing =
+    charging && roll?.phase !== "nearmiss" && roll?.phase !== "land";
   const animation =
     state === "revealing"
       ? "look-stamp-flat 700ms cubic-bezier(.2,1.3,.4,1) both"
@@ -293,7 +340,7 @@ function Plate({
       style={{ top: 214, left: layout.plateLeft, animation }}
       caption={
         charging ? (
-          <ChargingCaption cat={cat} />
+          <ChargingCaption cat={cat} roll={roll} />
         ) : (
           <NamedCaption
             cat={cat}
@@ -304,11 +351,15 @@ function Plate({
       }
     >
       <div
+        data-lineage-key={cat.key}
         style={{
-          animation: charging
+          animation: strobing
             ? "look-flicker 0.5s steps(3) infinite"
             : undefined,
-          filter: charging ? "sepia(.6) contrast(.8)" : undefined,
+          filter:
+            charging && roll?.phase !== "land"
+              ? "sepia(.6) contrast(.8)"
+              : undefined,
         }}
       >
         <LookSprite url={url} alt={cat.label} size={layout.plateSprite} />
@@ -322,12 +373,23 @@ const CAPTION_LEAD = {
   fontVariant: "small-caps",
 } as const;
 
-function ChargingCaption({ cat }: Readonly<{ cat: LineageCat }>) {
+/** The roll named in prose: "still rolling its accessory · 1 of 2…", then the value at land. */
+function rollClause(roll: LineageRoll | null): string {
+  if (!roll) return "still being drawn…";
+  const trait = roll.traitLabel.toLowerCase();
+  if (roll.valueLabel) return `its ${trait}: ${roll.valueLabel}.`;
+  return `still rolling its ${trait} · ${(roll.index + 1).toString()} of ${roll.count.toString()}…`;
+}
+
+function ChargingCaption({
+  cat,
+  roll,
+}: Readonly<{ cat: LineageCat; roll: LineageRoll | null }>) {
   return (
     <>
       <b style={CAPTION_LEAD}>Plate.</b> the next{" "}
       {lineageRank(cat).toLowerCase()} of the {cat.branchLabel ?? "origin"}{" "}
-      line, still being drawn…
+      line, {rollClause(roll)}
     </>
   );
 }
@@ -349,12 +411,18 @@ function NamedCaption({
   );
 }
 
-/** What the roster line says the cat gained at this stop. */
-function gainedText(cat: LineageCat): string {
+/**
+ * What the roster line says the cat gained at this stop. Tags the prose
+ * already states ("wearing red collar") are not repeated after it.
+ */
+function gainedText(cat: LineageCat, prose: string): string {
   if (cat.level === 0) return `${STARTER_THEME.blurb}.`;
-  const tags = additionTags(cat.additions, 3, 22);
+  const said = prose.toLowerCase();
+  const tags = additionTags(cat.additions)
+    .map((tag) => tag.replace(/^\+/, ""))
+    .filter((tag) => !said.includes(tag.toLowerCase()));
   if (tags.length === 0) return "";
-  return `${tags.map((tag) => tag.replace(/^\+/, "")).join(", ")}.`;
+  return `${tags.join(", ")}.`;
 }
 
 function entryAnimation(state: LineageCatState): string | undefined {
@@ -393,6 +461,7 @@ function Entry({
         animation: entryAnimation(state),
       }}
     >
+      {/* The plate carries the lineage key (line + confetti target), not this marginal sprite. */}
       <div
         style={{
           animation: charging
@@ -404,7 +473,11 @@ function Entry({
         <LookSprite url={url} alt={cat.label} size={spriteSize} />
       </div>
       {charging ? (
-        <ChargingLine cat={cat} fontSize={fontSize} />
+        <ChargingLine
+          cat={cat}
+          roll={reveal?.roll ?? null}
+          fontSize={fontSize}
+        />
       ) : (
         <WrittenLine
           cat={cat}
@@ -419,8 +492,9 @@ function Entry({
 
 function ChargingLine({
   cat,
+  roll,
   fontSize,
-}: Readonly<{ cat: LineageCat; fontSize: number }>) {
+}: Readonly<{ cat: LineageCat; roll: LineageRoll | null; fontSize: number }>) {
   return (
     <p
       style={{
@@ -443,7 +517,10 @@ function ChargingLine({
       >
         — — —
       </b>
-      —{lineageRank(cat).toLowerCase()}; the scribe waits on StarClan…
+      —{lineageRank(cat).toLowerCase()};{" "}
+      {roll
+        ? rollClause(roll).replace(/^its /, "")
+        : "the scribe waits on StarClan…"}
     </p>
   );
 }
@@ -459,7 +536,8 @@ function WrittenLine({
   newest: boolean;
   fontSize: number;
 }>) {
-  const gained = gainedText(cat);
+  const prose = describeCat(cat.params);
+  const gained = gainedText(cat, prose);
   const rankLead = cat.level > 0 ? `${lineageRank(cat).toLowerCase()}; ` : "";
   return (
     <p style={{ fontSize, lineHeight: 1.28, margin: 0 }}>
@@ -489,7 +567,7 @@ function WrittenLine({
         ) : null}
       </b>
       —{rankLead}
-      {describeCat(cat.params)}
+      {prose}
       {gained ? (
         <>
           {" "}

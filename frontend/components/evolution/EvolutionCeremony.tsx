@@ -5,10 +5,13 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { rollTraitLabel } from "@/lib/evolution/additionApply";
+import type { CeremonyPacing } from "@/lib/evolution/ceremonyEstimate";
 import type {
   EvolutionAddition,
   EvolutionPools,
 } from "@/lib/evolution/evolutionGenerator";
+import { chargeTotalMs } from "@/lib/evolution/rollSchedule";
 import { cn } from "@/lib/utils";
 import {
   type ArchetypeTheme,
@@ -24,6 +27,8 @@ import {
   pixelFontClass,
   stageRank,
 } from "./evolutionDisplay";
+
+export type { CeremonyPacing } from "@/lib/evolution/ceremonyEstimate";
 
 export type CeremonyCat = {
   key: string;
@@ -63,17 +68,32 @@ type EvolutionCeremonyProps = {
    * controls, ignores taps, and auto-finishes shortly after the finale.
    */
   hideControls?: boolean;
+  /** "page" (default) keeps the generator page's slow pacing; "overlay" matches the stream ceremony. */
+  pacing?: CeremonyPacing;
+  /** Teaser frames rendered per charge; default scales with the spin length. */
+  teaserFrameCap?: number;
 };
 
-// Base pacing at 1x — deliberately slow so each ceremony can breathe
-// (the charge matches what used to be the 0.25x pace).
-const STEP_DURATIONS: Record<CeremonyStep["kind"], number> = {
-  summon: 5000,
-  banner: 3500,
-  charge: 8400,
-  reveal: 6000,
-  waiting: 0,
-  finale: 0,
+// Pacing at 1x. "page" is deliberately slow so each ceremony can breathe
+// (the charge matches what used to be the 0.25x pace); "overlay" uses the
+// stream ceremony's numbers, its charge = chargeTotalMs(spin, additions).
+const PACING: Record<CeremonyPacing, Record<CeremonyStep["kind"], number>> = {
+  page: {
+    summon: 5000,
+    banner: 3500,
+    charge: 8400,
+    reveal: 6000,
+    waiting: 0,
+    finale: 0,
+  },
+  overlay: {
+    summon: 3000,
+    banner: 2000,
+    charge: 0,
+    reveal: 2000,
+    waiting: 0,
+    finale: 0,
+  },
 };
 
 const SPEEDS = [0.25, 0.5, 1, 2, 5] as const;
@@ -180,6 +200,8 @@ export function EvolutionCeremony({
   chargeDurationMs = 8400,
   requestTeaserFrame,
   hideControls = false,
+  pacing = "page",
+  teaserFrameCap,
 }: Readonly<EvolutionCeremonyProps>) {
   const prefersReducedMotion = useReducedMotion();
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -200,11 +222,26 @@ export function EvolutionCeremony({
     });
   }, []);
 
+  // Charge length for cat `index`: the overlay splits the spin over the
+  // additions like the themed engine; the page keeps the spin as is.
+  const chargeMsFor = useCallback(
+    (index: number) =>
+      pacing === "overlay"
+        ? chargeTotalMs(
+            chargeDurationMs,
+            catsRef.current[index]?.additions.length ?? 0,
+          )
+        : chargeDurationMs,
+    [pacing, chargeDurationMs],
+  );
+
   // Timed auto-advance for every animated step (paused in tap mode).
   useEffect(() => {
     if (!autoPlay) return;
     const duration =
-      step.kind === "charge" ? chargeDurationMs : STEP_DURATIONS[step.kind];
+      step.kind === "charge"
+        ? chargeMsFor(step.index)
+        : PACING[pacing][step.kind];
     if (duration <= 0) return;
     const chipCount =
       step.kind === "reveal"
@@ -213,7 +250,7 @@ export function EvolutionCeremony({
     const total = (duration + chipCount * 180) / speed;
     const timer = window.setTimeout(advance, total);
     return () => window.clearTimeout(timer);
-  }, [step, speed, autoPlay, chargeDurationMs, advance]);
+  }, [step, speed, autoPlay, pacing, chargeMsFor, advance]);
 
   // Resume from the waiting state as soon as the next cat is rendered.
   useEffect(() => {
@@ -290,10 +327,9 @@ export function EvolutionCeremony({
     const chargeIndex = step.index;
     // Frame budget scales with the spin length; renders run sequentially.
     // Generous cap — the contender swarm wants lots of distinct styles.
-    const frameCap = Math.min(
-      60,
-      Math.max(10, Math.floor(chargeDurationMs / speed / 220)),
-    );
+    const frameCap =
+      teaserFrameCap ??
+      Math.min(60, Math.max(10, Math.floor(chargeDurationMs / speed / 220)));
     let cancelled = false;
     (async () => {
       for (let i = 0; i < frameCap; i += 1) {
@@ -310,7 +346,7 @@ export function EvolutionCeremony({
     return () => {
       cancelled = true;
     };
-  }, [step, requestTeaserFrame, chargeDurationMs, speed]);
+  }, [step, requestTeaserFrame, chargeDurationMs, speed, teaserFrameCap]);
 
   const handleSectionClick = step.kind === "finale" ? onFinish : advance;
 
@@ -339,7 +375,7 @@ export function EvolutionCeremony({
           frames={teaserFrames}
           upcoming={cats[step.index] ?? null}
           theme={theme}
-          durationSeconds={chargeDurationMs / speed / 1000}
+          durationSeconds={chargeMsFor(step.index) / speed / 1000}
           reduced={Boolean(prefersReducedMotion)}
         />
       );
@@ -694,7 +730,6 @@ function ContenderSwarm({
   anchorRef,
   durationSeconds,
   glowColour,
-  chosenUrl,
 }: {
   frames: string[];
   reduced: boolean;
@@ -703,8 +738,6 @@ function ContenderSwarm({
   /** Charge length — schedules when the chosen one claims the spot. */
   durationSeconds: number;
   glowColour: string;
-  /** The REAL final form's sprite — what actually claims the spot. */
-  chosenUrl: string | null;
 }) {
   const [mounted, setMounted] = useState(false);
   const [contenders, setContenders] = useState<ContenderSpec[]>([]);
@@ -788,7 +821,7 @@ function ContenderSwarm({
       {chosen && (
         <ChosenContender
           spec={chosen}
-          url={chosenUrl ?? frames[chosen.id % frames.length]}
+          url={frames[chosen.id % frames.length]}
           anchorRef={anchorRef}
           glowColour={glowColour}
           approachMs={chosenApproachMs}
@@ -1004,6 +1037,29 @@ function ChargeScene({
   const rank = stageRank(upcoming?.level ?? 1).toUpperCase();
   const stageRef = useRef<HTMLDivElement | null>(null);
 
+  // Which addition is "rolling" right now: the charge is split evenly over
+  // the cat's additions, so the caption walks ROLLING · ACCESSORY · 1 of 2 …
+  const additions = upcoming?.additions ?? [];
+  const [elapsedMs, setElapsedMs] = useState(0);
+  useEffect(() => {
+    if (additions.length === 0) return;
+    const startedAt = Date.now();
+    const id = window.setInterval(
+      () => setElapsedMs(Date.now() - startedAt),
+      100,
+    );
+    return () => window.clearInterval(id);
+  }, [additions.length]);
+  const rollMs = (durationSeconds * 1000) / Math.max(1, additions.length);
+  const rollIndex = Math.min(
+    additions.length - 1,
+    Math.floor(elapsedMs / Math.max(1, rollMs)),
+  );
+  const rolling = additions[rollIndex];
+  const caption = rolling
+    ? `ROLLING · ${rollTraitLabel(rolling)} · ${(rollIndex + 1).toString()} of ${additions.length.toString()}`
+    : `THE ${rank} CEREMONY BEGINS…`;
+
   return (
     <motion.div
       className="grid h-full min-h-0 w-full grid-rows-[minmax(0,1fr)_auto] items-center justify-items-center gap-3 text-center sm:gap-4"
@@ -1071,7 +1127,6 @@ function ChargeScene({
         anchorRef={stageRef}
         durationSeconds={durationSeconds}
         glowColour={theme.from}
-        chosenUrl={upcoming?.previewUrl ?? null}
       />
       <motion.span
         className={cn(
@@ -1081,7 +1136,7 @@ function ChargeScene({
         animate={{ opacity: [1, 0.4, 1] }}
         transition={{ duration: 0.8, repeat: Number.POSITIVE_INFINITY }}
       >
-        THE {rank} CEREMONY BEGINS…
+        {caption}
       </motion.span>
     </motion.div>
   );
@@ -1117,13 +1172,17 @@ function RevealScene({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
     >
-      {/* Evolution flash — scoped to the ceremony panel only */}
+      {/* Evolution flash — a short radial burst from the hero, not a panel wash */}
       {!reduced ? (
         <motion.div
-          className="pointer-events-none absolute inset-0 z-20 bg-white"
-          initial={{ opacity: 0.55 }}
+          className="pointer-events-none absolute inset-0 z-20"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 46%, #fff 0, rgba(255,255,255,0) 60%)",
+          }}
+          initial={{ opacity: 0.9 }}
           animate={{ opacity: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
         />
       ) : null}
       <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden">
