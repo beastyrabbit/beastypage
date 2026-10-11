@@ -114,6 +114,24 @@ def test_request_body_limit_rejects_large_payload_before_json_validation():
     assert response.status_code == 413
 
 
+def test_request_body_limit_rejects_chunked_payload_without_content_length():
+    app = create_app()
+
+    def chunks():
+        yield b'{"payload":{"params":{"ignored":"'
+        yield b"x" * 2_100_000
+        yield b'"}}}'
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/render",
+            content=chunks(),
+            headers={"content-type": "application/json"},
+        )
+
+    assert response.status_code == 413
+
+
 @pytest.fixture(scope="module")
 def pipeline():
     return RenderPipeline()

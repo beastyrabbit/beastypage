@@ -220,11 +220,12 @@ jobs:
           CONVEX_DEPLOY_KEY: ${{ steps.ci-secrets.outputs.CONVEX_DEPLOY_KEY }}
 
   build-frontend:
-    needs: [changes, cat-system-contract]
+    needs: [changes, cat-system-contract, deploy-convex]
     # Build if: tag push, frontend files changed on main, or manual trigger
     if: |
       always() &&
       (needs.cat-system-contract.result == 'success' || needs.cat-system-contract.result == 'skipped') &&
+      (needs.deploy-convex.result == 'success' || needs.deploy-convex.result == 'skipped') &&
       (startsWith(github.ref, 'refs/tags/v') ||
        needs.changes.outputs.frontend == 'true' ||
        github.event.inputs.build_frontend == 'true')

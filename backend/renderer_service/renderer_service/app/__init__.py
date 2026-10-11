@@ -12,8 +12,7 @@ from typing import Any, Literal, TypeVar
 import anyio
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.types import Message, Receive, Scope, Send
 
 from ..config import settings
 from ..models import (
@@ -48,6 +47,8 @@ class RendererInputError(ValueError):
 
 MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024
 HTTP_REQUEST = "http.request"
+HTTP_RESPONSE_START = "http.response.start"
+HTTP_RESPONSE_BODY = "http.response.body"
 
 
 @dataclass
@@ -184,49 +185,68 @@ class RendererSupervisor:
         }
 
 
-def _request_body_too_large() -> JSONResponse:
-    return JSONResponse(
-        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-        content={
-            "detail": (
-                "Renderer request body is too large "
-                f"(maximum {MAX_REQUEST_BODY_BYTES} bytes)"
-            )
-        },
-    )
+class RequestBodyTooLargeError(Exception):
+    """Raised when a streamed request exceeds the renderer body budget."""
 
 
-async def reject_oversized_requests(
-    request: Request, call_next: Callable
-) -> JSONResponse | Any:
-    raw_length = request.headers.get("content-length")
-    try:
-        content_length = int(raw_length) if raw_length is not None else None
-    except ValueError:
-        content_length = None
-    if content_length is not None and content_length > MAX_REQUEST_BODY_BYTES:
-        return _request_body_too_large()
+class RequestBodyLimitMiddleware:
+    def __init__(self, app: Callable, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
 
-    received_bytes = 0
-    exceeded = False
-    original_receive = request.receive
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
 
-    async def limited_receive():
-        nonlocal received_bytes, exceeded
-        if exceeded:
-            return {"type": HTTP_REQUEST, "body": b"", "more_body": False}
-        message = await original_receive()
-        if message["type"] != HTTP_REQUEST:
+        content_length = self._content_length(scope)
+        if content_length is not None and content_length > self.max_bytes:
+            await self._send_too_large(send)
+            return
+
+        received_bytes = 0
+
+        async def limited_receive() -> Message:
+            nonlocal received_bytes
+            message = await receive()
+            if message["type"] == HTTP_REQUEST:
+                received_bytes += len(message.get("body", b""))
+                if received_bytes > self.max_bytes:
+                    raise RequestBodyTooLargeError
             return message
-        received_bytes += len(message.get("body", b""))
-        if received_bytes > MAX_REQUEST_BODY_BYTES:
-            exceeded = True
-            return {"type": HTTP_REQUEST, "body": b"", "more_body": False}
-        return message
 
-    limited_request = Request(request.scope, limited_receive)
-    response = await call_next(limited_request)
-    return _request_body_too_large() if exceeded else response
+        try:
+            await self.app(scope, limited_receive, send)
+        except RequestBodyTooLargeError:
+            await self._send_too_large(send)
+
+    @staticmethod
+    def _content_length(scope: Scope) -> int | None:
+        for key, value in scope.get("headers", []):
+            if key.lower() != b"content-length":
+                continue
+            try:
+                return int(value)
+            except ValueError:
+                return None
+        return None
+
+    async def _send_too_large(self, send: Send) -> None:
+        body = (
+            '{"detail":"Renderer request body is too large '
+            f'(maximum {self.max_bytes} bytes)"}}'
+        ).encode("utf-8")
+        await send(
+            {
+                "type": HTTP_RESPONSE_START,
+                "status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode("ascii")),
+                ],
+            }
+        )
+        await send({"type": HTTP_RESPONSE_BODY, "body": body, "more_body": False})
 
 
 def _create_renderer_supervisor(pipeline: RenderPipeline) -> RendererSupervisor:
@@ -270,7 +290,7 @@ def create_app() -> FastAPI:
         ],
     )
 
-    app.middleware("http")(reject_oversized_requests)
+    app.add_middleware(RequestBodyLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
 
     pipeline = RenderPipeline(
         canvas_size=settings.default_canvas_size,
