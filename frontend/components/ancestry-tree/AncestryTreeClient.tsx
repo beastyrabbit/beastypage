@@ -76,6 +76,10 @@ interface ParentPreview {
   name: CatName;
 }
 
+// Keep the client-side guard aligned with the Convex ancestryTree mutation.
+const MAX_CATS = 500;
+const LARGE_TREE_THRESHOLD = Math.floor(MAX_CATS * 0.8);
+
 function createTraitMutationPools(): MutationPool["traits"] {
   return Object.fromEntries(
     getInheritanceTraits()
@@ -143,8 +147,7 @@ function renderEstimateMessage(
   if (isHuge) {
     return (
       <span>
-        🚫 ~{estimated.toLocaleString()} cats — too large to render, will not
-        load
+        🚫 ~{estimated.toLocaleString()} cats — exceeds the {MAX_CATS}-cat limit
       </span>
     );
   }
@@ -1019,9 +1022,9 @@ export function AncestryTreeClient({
                       avgChildren,
                       config.partnerChance ?? 1,
                     );
-                    const isLarge = estimated > 1000;
-                    const isHuge = estimated > 5000;
-                    const isTooLarge = estimated > 5000;
+                    const isLarge = estimated > LARGE_TREE_THRESHOLD;
+                    const isTooLarge = estimated > MAX_CATS;
+                    const isHuge = isTooLarge;
                     return (
                       <>
                         <div
