@@ -104,10 +104,12 @@ function getSpriteVariantsSubtitle(
   loading: boolean,
   count: number,
   isOpen: boolean,
+  rendererReady: boolean,
 ): string {
   if (loading) return "Rendering preview sprites…";
   if (count > 0) return `${pluralize(count, "sprite")} available`;
   if (!isOpen) return "Expand to render poses";
+  if (!rendererReady) return "Preparing renderer…";
   return "Sprite previews unavailable";
 }
 
@@ -416,86 +418,102 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
 
     (async () => {
       const previews: SpriteVariantPreview[] = [];
-      const { default: spriteMapper } = await import(
-        "@/lib/single-cat/spriteMapper"
-      );
-      if (!spriteMapper.loaded) {
-        await spriteMapper.init();
-      }
-      const fallbackSpriteNumber =
-        typeof catPayload.params.spriteNumber === "number"
-          ? catPayload.params.spriteNumber
-          : 0;
-      const poseChoices = getAvailablePoseNames(spriteMapper).map(
-        (poseName: string) => ({
-          id: `pose-${poseName}`,
-          poseName,
-          spriteNumber: fallbackSpriteNumber,
-          name: formatPoseName(poseName),
-        }),
-      );
+      try {
+        const { default: spriteMapper } = await import(
+          "@/lib/single-cat/spriteMapper"
+        );
+        if (cancelled) return;
+        if (!spriteMapper.loaded) {
+          await spriteMapper.init();
+        }
+        if (cancelled) return;
 
-      let nextIndex = 0;
-      const renderPose = async (poseChoice: (typeof poseChoices)[number]) => {
-        if (cancelled) return null;
-        try {
-          const variantPayload = setCanonicalViewTrait(
-            catPayload,
-            "pose",
-            poseChoice.poseName,
-          );
-          const result = await generator.generateCat(variantPayload.params);
-          const previewCanvas = document.createElement("canvas");
-          previewCanvas.width = PREVIEW_CANVAS_SIZE;
-          previewCanvas.height = PREVIEW_CANVAS_SIZE;
-          const ctx = previewCanvas.getContext("2d");
-          if (!ctx) return null;
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(
-            result.canvas as HTMLCanvasElement,
-            0,
-            0,
-            PREVIEW_CANVAS_SIZE,
-            PREVIEW_CANVAS_SIZE,
-          );
-          return {
-            id: poseChoice.id,
-            spriteNumber: poseChoice.spriteNumber,
-            poseName: poseChoice.poseName,
-            name: poseChoice.name,
-            dataUrl: previewCanvas.toDataURL("image/png"),
-          };
-        } catch (err) {
-          console.warn("Failed to render sprite variant", err);
-          return null;
+        const fallbackSpriteNumber =
+          typeof catPayload.params.spriteNumber === "number"
+            ? catPayload.params.spriteNumber
+            : 0;
+        const poseChoices = getAvailablePoseNames(spriteMapper).map(
+          (poseName: string) => ({
+            id: `pose-${poseName}`,
+            poseName,
+            spriteNumber: fallbackSpriteNumber,
+            name: formatPoseName(poseName),
+          }),
+        );
+
+        let nextIndex = 0;
+        const renderPose = async (poseChoice: (typeof poseChoices)[number]) => {
+          if (cancelled) return null;
+          try {
+            const variantPayload = setCanonicalViewTrait(
+              catPayload,
+              "pose",
+              poseChoice.poseName,
+            );
+            const result = await generator.generateCat(variantPayload.params);
+            if (cancelled) return null;
+            const previewCanvas = document.createElement("canvas");
+            previewCanvas.width = PREVIEW_CANVAS_SIZE;
+            previewCanvas.height = PREVIEW_CANVAS_SIZE;
+            const ctx = previewCanvas.getContext("2d");
+            if (!ctx) return null;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(
+              result.canvas as HTMLCanvasElement,
+              0,
+              0,
+              PREVIEW_CANVAS_SIZE,
+              PREVIEW_CANVAS_SIZE,
+            );
+            return {
+              id: poseChoice.id,
+              spriteNumber: poseChoice.spriteNumber,
+              poseName: poseChoice.poseName,
+              name: poseChoice.name,
+              dataUrl: previewCanvas.toDataURL("image/png"),
+            };
+          } catch (err) {
+            console.warn("Failed to render sprite variant", err);
+            return null;
+          }
+        };
+        const worker = async () => {
+          while (!cancelled) {
+            const index = nextIndex++;
+            const poseChoice = poseChoices[index];
+            if (!poseChoice) return;
+            const preview = await renderPose(poseChoice);
+            if (preview) previews.push(preview);
+          }
+        };
+        const workerCount = Math.min(3, poseChoices.length);
+        await Promise.all(Array.from({ length: workerCount }, () => worker()));
+        if (!cancelled) {
+          const ordered = poseChoices
+            .map((poseChoice) =>
+              previews.find((preview) => preview.id === poseChoice.id),
+            )
+            .filter(
+              (preview): preview is SpriteVariantPreview =>
+                preview !== undefined,
+            );
+          setSpriteVariants(ordered);
         }
-      };
-      const worker = async () => {
-        while (!cancelled) {
-          const index = nextIndex++;
-          const poseChoice = poseChoices[index];
-          if (!poseChoice) return;
-          const preview = await renderPose(poseChoice);
-          if (preview) previews.push(preview);
+      } catch (err) {
+        if (!cancelled) {
+          console.warn("Failed to load sprite variants", err);
+          setSpriteVariants([]);
         }
-      };
-      const workerCount = Math.min(3, poseChoices.length);
-      await Promise.all(Array.from({ length: workerCount }, () => worker()));
-      if (!cancelled) {
-        const ordered = poseChoices
-          .map((poseChoice) =>
-            previews.find((preview) => preview.id === poseChoice.id),
-          )
-          .filter(
-            (preview): preview is SpriteVariantPreview => preview !== undefined,
-          );
-        setSpriteVariants(ordered);
-        setSpriteVariantsLoading(false);
+      } finally {
+        if (!cancelled) {
+          setSpriteVariantsLoading(false);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
+      setSpriteVariantsLoading(false);
     };
   }, [rendererReady, catPayload, spriteVariants.length, spriteVariantsOpen]);
 
@@ -508,6 +526,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
     spriteVariantsLoading,
     spriteVariants.length,
     spriteVariantsOpen,
+    rendererReady,
   );
 
   const showLoader = !!loadingMessage || (slug && mapperRecord === undefined);
