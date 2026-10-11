@@ -1,6 +1,21 @@
 import { v } from "convex/values";
+import { internal } from "./_generated/api.js";
 import type { MutationCtx, QueryCtx } from "./_generated/server.js";
-import { internalQuery, mutation, query } from "./_generated/server.js";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server.js";
+
+const USERNAME_SEARCH_MIGRATION = "usernameSearch";
+const MAX_RESOLVE_IDS = 100;
+const MAX_ID_LENGTH = 128;
+const MAX_BACKFILL_BATCH = 100;
+
+function usernameSearchValue(username: string | undefined): string | undefined {
+  return username?.trim().toLowerCase() || undefined;
+}
 
 /** Look up a user document by their auth token identifier. */
 async function getUserByToken(
@@ -107,9 +122,11 @@ export const getOrCreateUser = mutation({
     const existing = await getUserByToken(ctx, identity.tokenIdentifier);
     if (existing) {
       // Backfill apiKey for users created before the field existed
-      if (!existing.apiKey) {
+      const usernameSearch = usernameSearchValue(existing.username);
+      if (!existing.apiKey || existing.usernameSearch !== usernameSearch) {
         await ctx.db.patch(existing._id, {
-          apiKey: crypto.randomUUID(),
+          ...(existing.apiKey ? {} : { apiKey: crypto.randomUUID() }),
+          ...(usernameSearch ? { usernameSearch } : {}),
           updatedAt: Date.now(),
         });
         return await ctx.db.get(existing._id);
@@ -123,6 +140,9 @@ export const getOrCreateUser = mutation({
     const id = await ctx.db.insert("users", {
       tokenIdentifier: identity.tokenIdentifier,
       ...(username !== undefined && { username }),
+      ...(usernameSearchValue(username) && {
+        usernameSearch: usernameSearchValue(username),
+      }),
       showProfilePic: true,
       apiKey: crypto.randomUUID(),
       createdAt: Date.now(),
@@ -165,7 +185,10 @@ export const updateProfile = mutation({
 
     await ctx.db.patch(user._id, {
       updatedAt: Date.now(),
-      ...(validatedUsername !== undefined && { username: validatedUsername }),
+      ...(validatedUsername !== undefined && {
+        username: validatedUsername,
+        usernameSearch: usernameSearchValue(validatedUsername),
+      }),
     });
     return await ctx.db.get(user._id);
   },
@@ -215,6 +238,87 @@ function clerkUserId(tokenIdentifier: string): string {
   return parts.at(-1) ?? tokenIdentifier;
 }
 
+function clerkIssuer(tokenIdentifier: string): string {
+  const separator = tokenIdentifier.lastIndexOf("|");
+  return separator > 0 ? tokenIdentifier.slice(0, separator) : tokenIdentifier;
+}
+
+function assertClerkUserIds(userIds: string[]) {
+  if (userIds.length > MAX_RESOLVE_IDS) {
+    throw new Error(`Resolve at most ${MAX_RESOLVE_IDS} users at a time`);
+  }
+  for (const userId of userIds) {
+    if (
+      userId.length === 0 ||
+      userId.length > MAX_ID_LENGTH ||
+      userId.includes("|")
+    ) {
+      throw new Error("Invalid Clerk user ID");
+    }
+  }
+}
+
+/**
+ * Backfill the normalized username index in bounded, resumable batches.
+ * Run this internal mutation before enabling username search for legacy data.
+ */
+export const backfillUsernameSearch = internalMutation({
+  args: { batchSize: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const batchSize = Math.max(
+      1,
+      Math.min(args.batchSize ?? MAX_BACKFILL_BATCH, MAX_BACKFILL_BATCH),
+    );
+    const state = await ctx.db
+      .query("user_search_migrations")
+      .withIndex("byName", (q) => q.eq("name", USERNAME_SEARCH_MIGRATION))
+      .unique();
+    const cursor = state?.cursor;
+    const usersQuery = cursor
+      ? ctx.db
+          .query("users")
+          .withIndex("byTokenIdentifier", (q) =>
+            q.gt("tokenIdentifier", cursor),
+          )
+          .order("asc")
+      : ctx.db
+          .query("users")
+          .withIndex("byTokenIdentifier", (q) => q)
+          .order("asc");
+    const users = await usersQuery.take(batchSize);
+    for (const user of users) {
+      const usernameSearch = usernameSearchValue(user.username);
+      await ctx.db.patch(user._id, {
+        ...(usernameSearch ? { usernameSearch } : {}),
+      });
+    }
+
+    const now = Date.now();
+    const complete = users.length < batchSize;
+    const nextState: {
+      name: string;
+      cursor?: string;
+      complete: boolean;
+      updatedAt: number;
+    } = {
+      name: USERNAME_SEARCH_MIGRATION,
+      complete,
+      updatedAt: now,
+    };
+    const lastTokenIdentifier = users.at(-1)?.tokenIdentifier;
+    if (lastTokenIdentifier) nextState.cursor = lastTokenIdentifier;
+    if (state) await ctx.db.replace(state._id, nextState);
+    else await ctx.db.insert("user_search_migrations", nextState);
+
+    if (!complete) {
+      await ctx.scheduler.runAfter(0, internal.users.backfillUsernameSearch, {
+        batchSize,
+      });
+    }
+    return { processed: users.length, complete };
+  },
+});
+
 /**
  * Search users by username prefix. Returns up to 10 matches with their Clerk user ID.
  * Requires authentication.
@@ -228,19 +332,27 @@ export const searchByUsername = query({
     const trimmed = args.prefix.trim().toLowerCase();
     if (trimmed.length === 0) return [];
 
-    // Convex doesn't support LIKE queries, so fetch a range and filter
+    const migration = await ctx.db
+      .query("user_search_migrations")
+      .withIndex("byName", (q) => q.eq("name", USERNAME_SEARCH_MIGRATION))
+      .unique();
+    if (!migration?.complete) {
+      throw new Error("Username search index migration is incomplete");
+    }
+
     const candidates = await ctx.db
       .query("users")
-      .withIndex("byUsername")
-      .take(2_000);
+      .withIndex("byUsernameSearch", (q) =>
+        q
+          .gte("usernameSearch", trimmed)
+          .lt("usernameSearch", `${trimmed}\uffff`),
+      )
+      .take(10);
 
-    return candidates
-      .filter((u) => u.username?.toLowerCase().startsWith(trimmed))
-      .slice(0, 10)
-      .map((u) => ({
-        userId: clerkUserId(u.tokenIdentifier),
-        username: u.username ?? "unknown",
-      }));
+    return candidates.map((u) => ({
+      userId: clerkUserId(u.tokenIdentifier),
+      username: u.username ?? "unknown",
+    }));
   },
 });
 
@@ -254,15 +366,20 @@ export const resolveUsernames = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
 
-    const requestedIds = args.userIds.slice(0, 100);
-    const allUsers = await ctx.db.query("users").take(5_000);
-
+    assertClerkUserIds(args.userIds);
+    const issuer = clerkIssuer(identity.tokenIdentifier);
     const byClerkId = new Map<string, string>();
-    for (const u of allUsers) {
-      byClerkId.set(clerkUserId(u.tokenIdentifier), u.username ?? "unknown");
+    for (const userId of args.userIds) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("byTokenIdentifier", (q) =>
+          q.eq("tokenIdentifier", `${issuer}|${userId}`),
+        )
+        .unique();
+      if (user) byClerkId.set(userId, user.username ?? "unknown");
     }
 
-    return requestedIds.map((id) => ({
+    return args.userIds.map((id) => ({
       userId: id,
       username: byClerkId.get(id) ?? id,
     }));

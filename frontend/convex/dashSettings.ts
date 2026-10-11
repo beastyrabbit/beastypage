@@ -54,6 +54,7 @@ export const save = mutation({
       if (existing) {
         const identity = await ctx.auth.getUserIdentity();
         const owned =
+          !!existing.ownerTokenIdentifier &&
           identity?.tokenIdentifier === existing.ownerTokenIdentifier;
         if (
           !owned &&

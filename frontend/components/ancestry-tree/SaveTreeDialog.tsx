@@ -103,6 +103,10 @@ export function SaveTreeDialog({
           setError("Password required to overwrite this tree");
         } else if (result.error === "invalid_password") {
           setError("Incorrect password");
+        } else if (result.error === "edit_token_required") {
+          setError(
+            "This tree can only be edited from the browser where it was created, or with its password.",
+          );
         } else {
           setError(result.error ?? "Failed to save tree");
         }

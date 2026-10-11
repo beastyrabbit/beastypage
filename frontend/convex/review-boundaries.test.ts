@@ -9,6 +9,84 @@ import schema from "./schema";
 const modules = import.meta.glob("./**/*.ts");
 afterEach(() => vi.unstubAllEnvs());
 
+describe("anonymous capability ownership", () => {
+  it("does not treat two missing identities as the same owner", async () => {
+    const t = convexTest(schema, modules);
+    const cases = [
+      {
+        slug: "sharefixture",
+        create: () =>
+          t.mutation(api.catShares.create, {
+            slug: "sharefixture",
+            data: { params: {} },
+          }),
+        update: () =>
+          t.mutation(api.catShares.create, {
+            slug: "sharefixture",
+            data: { params: { changed: true } },
+          }),
+      },
+      {
+        slug: "dashfixture",
+        create: () =>
+          t.mutation(api.dashSettings.save, {
+            slug: "dashfixture",
+            config: { value: 1 },
+          }),
+        update: () =>
+          t.mutation(api.dashSettings.save, {
+            slug: "dashfixture",
+            config: { value: 2 },
+          }),
+      },
+      {
+        slug: "palettefixture",
+        create: () =>
+          t.mutation(api.paletteGeneratorSettings.save, {
+            slug: "palettefixture",
+            config: { value: 1 },
+          }),
+        update: () =>
+          t.mutation(api.paletteGeneratorSettings.save, {
+            slug: "palettefixture",
+            config: { value: 2 },
+          }),
+      },
+      {
+        slug: "pixelatorfixture",
+        create: () =>
+          t.mutation(api.pixelatorSettings.save, {
+            slug: "pixelatorfixture",
+            config: { value: 1 },
+          }),
+        update: () =>
+          t.mutation(api.pixelatorSettings.save, {
+            slug: "pixelatorfixture",
+            config: { value: 2 },
+          }),
+      },
+      {
+        slug: "singlecatfixture",
+        create: () =>
+          t.mutation(api.singleCatSettings.save, {
+            slug: "singlecatfixture",
+            config: { value: 1 },
+          }),
+        update: () =>
+          t.mutation(api.singleCatSettings.save, {
+            slug: "singlecatfixture",
+            config: { value: 2 },
+          }),
+      },
+    ];
+
+    for (const entry of cases) {
+      await entry.create();
+      await expect(entry.update()).rejects.toThrow(/Not authorized/);
+    }
+  });
+});
+
 describe("adoption authority", () => {
   it("keeps editor capabilities private and requires them to attach profiles and edit batches", async () => {
     const t = convexTest(schema, modules);

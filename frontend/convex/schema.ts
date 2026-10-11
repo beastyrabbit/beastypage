@@ -461,6 +461,9 @@ export default defineSchema({
   users: defineTable({
     tokenIdentifier: v.string(),
     username: v.optional(v.string()),
+    // Lower-case username used by case-insensitive prefix search. Optional
+    // during the online backfill of legacy user documents.
+    usernameSearch: v.optional(v.string()),
     showProfilePic: v.boolean(),
     apiKey: v.optional(v.string()),
     createdAt: v.number(),
@@ -468,7 +471,15 @@ export default defineSchema({
   })
     .index("byTokenIdentifier", ["tokenIdentifier"])
     .index("byUsername", ["username"])
+    .index("byUsernameSearch", ["usernameSearch"])
     .index("byApiKey", ["apiKey"]),
+
+  user_search_migrations: defineTable({
+    name: v.string(),
+    cursor: v.optional(v.string()),
+    complete: v.boolean(),
+    updatedAt: v.number(),
+  }).index("byName", ["name"]),
 
   cat_stream_sessions: defineTable({
     userId: v.id("users"),

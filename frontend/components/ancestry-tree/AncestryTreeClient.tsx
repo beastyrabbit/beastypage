@@ -172,8 +172,9 @@ export function AncestryTreeClient({
   const [treeEditToken, setTreeEditToken] = useState<string | null>(() => {
     if (typeof window === "undefined" || !initialTree?.slug) return null;
     try {
-      return window.sessionStorage.getItem(
-        `ancestry-tree-edit:${initialTree.slug}`,
+      const key = `ancestry-tree-edit:${initialTree.slug}`;
+      return (
+        window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key)
       );
     } catch {
       return null;
@@ -855,10 +856,9 @@ export function AncestryTreeClient({
         if (result.editToken) {
           setTreeEditToken(result.editToken);
           try {
-            window.sessionStorage.setItem(
-              `ancestry-tree-edit:${updatedTree.slug}`,
-              result.editToken,
-            );
+            const key = `ancestry-tree-edit:${updatedTree.slug}`;
+            window.localStorage.setItem(key, result.editToken);
+            window.sessionStorage.setItem(key, result.editToken);
           } catch {
             // Storage may be disabled; the in-memory token still works.
           }

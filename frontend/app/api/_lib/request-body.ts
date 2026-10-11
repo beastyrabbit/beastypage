@@ -52,6 +52,7 @@ export async function readRequestBody(
     }
   } finally {
     if (onAbort) request.signal.removeEventListener("abort", onAbort);
+    abortPromise.catch(() => undefined);
     reader.releaseLock();
   }
 

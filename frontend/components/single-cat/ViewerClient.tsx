@@ -100,9 +100,14 @@ function pluralize(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
-function getSpriteVariantsSubtitle(loading: boolean, count: number): string {
+function getSpriteVariantsSubtitle(
+  loading: boolean,
+  count: number,
+  isOpen: boolean,
+): string {
   if (loading) return "Rendering preview sprites…";
   if (count > 0) return `${pluralize(count, "sprite")} available`;
+  if (!isOpen) return "Expand to render poses";
   return "Sprite previews unavailable";
 }
 
@@ -502,6 +507,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
   const spriteVariantsSubtitle = getSpriteVariantsSubtitle(
     spriteVariantsLoading,
     spriteVariants.length,
+    spriteVariantsOpen,
   );
 
   const showLoader = !!loadingMessage || (slug && mapperRecord === undefined);
