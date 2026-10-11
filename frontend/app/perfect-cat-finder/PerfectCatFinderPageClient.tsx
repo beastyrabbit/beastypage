@@ -27,6 +27,7 @@ import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { renderCatV3 } from "@/lib/cat-v3/api";
 import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { createCatShare, encodeCatShare } from "@/lib/catShare";
+import { createPerfectCatClientId } from "./client-token";
 
 const PALETTE_MODES = [
   "off",
@@ -114,18 +115,10 @@ async function seedForMatchup(
   return false;
 }
 
-function useClientToken(key: string): string | null {
+function useClientToken(): string | null {
   const [token] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
-    const storageKey = `pcf:${key}`;
-    let existing = window.localStorage.getItem(storageKey);
-    if (!existing) {
-      existing =
-        window.crypto?.randomUUID?.() ??
-        `${Date.now()}-${window.crypto.getRandomValues(new Uint32Array(1))[0]}`;
-      window.localStorage.setItem(storageKey, existing);
-    }
-    return existing;
+    return createPerfectCatClientId();
   });
 
   return token;
@@ -275,7 +268,7 @@ function CatCard({
 }
 
 export default function PerfectCatFinderPage() {
-  const clientId = useClientToken("device");
+  const clientId = useClientToken();
   const requestMatchup = useMutation(api.perfectCats.requestMatchup);
   const registerCats = useMutation(api.perfectCats.registerCats);
   const submitVote = useMutation(api.perfectCats.submitVote);

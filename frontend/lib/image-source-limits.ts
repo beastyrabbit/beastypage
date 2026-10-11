@@ -36,6 +36,29 @@ function readGifDimensions(buffer: Buffer): ImageDimensions | null {
   };
 }
 
+function readBmpDimensions(buffer: Buffer): ImageDimensions | null {
+  if (buffer.length < 26 || buffer.toString("ascii", 0, 2) !== "BM") {
+    return null;
+  }
+
+  // Windows BMP files store a signed width/height in the DIB header. A
+  // negative height means top-down pixel order, so use its absolute value.
+  const dibSize = buffer.readUInt32LE(14);
+  if (dibSize === 12) {
+    return {
+      width: buffer.readUInt16LE(18),
+      height: buffer.readUInt16LE(20),
+    };
+  }
+  if (dibSize < 40) return null;
+  const width = buffer.readInt32LE(18);
+  const height = buffer.readInt32LE(22);
+  return {
+    width: Math.abs(width),
+    height: Math.abs(height),
+  };
+}
+
 function isWebpHeader(buffer: Buffer): boolean {
   return (
     buffer.length >= 20 &&
@@ -179,6 +202,8 @@ function readImageDimensions(buffer: Buffer): ImageDimensions {
   if (png) return png;
   const gif = readGifDimensions(buffer);
   if (gif) return gif;
+  const bmp = readBmpDimensions(buffer);
+  if (bmp) return bmp;
   const webp = readWebpDimensions(buffer);
   if (webp) return webp;
   const isJpeg = buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xd8;
@@ -188,8 +213,9 @@ function readImageDimensions(buffer: Buffer): ImageDimensions {
   throw new Error("Unsupported or unreadable raster image header");
 }
 
-export function assertImageSourceWithinLimits(buffer: Buffer): ImageDimensions {
-  const dimensions = readImageDimensions(buffer);
+export function assertImageDimensionsWithinLimits(
+  dimensions: ImageDimensions,
+): ImageDimensions {
   const { width, height } = dimensions;
   if (
     width < 1 ||
@@ -205,4 +231,8 @@ export function assertImageSourceWithinLimits(buffer: Buffer): ImageDimensions {
     );
   }
   return dimensions;
+}
+
+export function assertImageSourceWithinLimits(buffer: Buffer): ImageDimensions {
+  return assertImageDimensionsWithinLimits(readImageDimensions(buffer));
 }

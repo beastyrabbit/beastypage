@@ -6,7 +6,12 @@
  */
 
 import { createCanvas, type Image, loadImage } from "@napi-rs/canvas";
-import { assertImageSourceWithinLimits } from "../image-source-limits";
+import sharp from "sharp";
+import {
+  assertImageDimensionsWithinLimits,
+  assertImageSourceWithinLimits,
+  MAX_SOURCE_PIXELS,
+} from "../image-source-limits";
 import {
   adjustBrightness,
   adjustHue,
@@ -33,6 +38,39 @@ const DEFAULT_OPTIONS: Required<KMeansOptions> = {
   blackWhiteThreshold: 15,
 };
 
+async function normalizeUnsupportedImage(buffer: Buffer): Promise<Buffer> {
+  try {
+    // Canvas handles the common PNG/JPEG/GIF/WebP/BMP formats directly. Keep
+    // those bytes intact to avoid an unnecessary decode/re-encode cycle.
+    assertImageSourceWithinLimits(buffer);
+    return buffer;
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      error.message !== "Unsupported or unreadable raster image header"
+    ) {
+      throw error;
+    }
+  }
+
+  // Sharp/libvips supplies codecs that Skia does not (notably TIFF and AVIF).
+  // Read metadata with the same pixel ceiling before decoding so an unusual
+  // source cannot bypass the decompression-bomb guard above.
+  const image = sharp(buffer, {
+    limitInputPixels: MAX_SOURCE_PIXELS,
+    sequentialRead: true,
+  });
+  const metadata = await image.metadata();
+  if (!metadata.width || !metadata.height) {
+    throw new Error("Unsupported or unreadable raster image header");
+  }
+  assertImageDimensionsWithinLimits({
+    width: metadata.width,
+    height: metadata.height,
+  });
+  return image.png().toBuffer();
+}
+
 // ---------------------------------------------------------------------------
 // Image pixel access (server-side replacement for image-processing.ts)
 // ---------------------------------------------------------------------------
@@ -42,9 +80,10 @@ export async function getImagePixelsServer(buffer: Buffer): Promise<{
   width: number;
   height: number;
 }> {
-  const dimensions = assertImageSourceWithinLimits(buffer);
+  const normalizedBuffer = await normalizeUnsupportedImage(buffer);
+  const dimensions = assertImageSourceWithinLimits(normalizedBuffer);
 
-  const img = await loadImage(buffer);
+  const img = await loadImage(normalizedBuffer);
   if (img.width !== dimensions.width || img.height !== dimensions.height) {
     throw new Error("Decoded image dimensions do not match the image header");
   }
