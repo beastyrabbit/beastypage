@@ -53,12 +53,15 @@ const PART_BYTES = 16 * 1024 * 1024;
 const JSON_BODY_BYTES = 64 * 1024;
 
 class RequestBodyError extends Error {
-	constructor(
-		message: string,
-		readonly status: 400 | 413,
-	) {
+	// A plain field, not a constructor parameter property: the service runs
+	// under node --experimental-strip-types, which rejects parameter
+	// properties (ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX) at startup.
+	readonly status: 400 | 413;
+
+	constructor(message: string, status: 400 | 413) {
 		super(message);
 		this.name = "RequestBodyError";
+		this.status = status;
 	}
 }
 
