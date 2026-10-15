@@ -29,22 +29,47 @@ export const importCheckpoints = pgTable(
     step: text("step").notNull(),
     completedAt: tstz("completed_at").notNull().defaultNow(),
     rows: integer("rows").notNull(),
+    stats: jsonb("stats").$type<ImportStepStats>().notNull(),
     runId: uuid("run_id").notNull(),
   },
   (t) => [primaryKey({ columns: [t.archiveSha256, t.step] })],
 );
 
+/**
+ * Convex `_storage` id → imported file. Several storage ids can share one
+ * content-addressed file, so this survives a resumed import.
+ */
+export const importStorageMap = pgTable(
+  "import_storage_map",
+  {
+    archiveSha256: text("archive_sha256").notNull(),
+    storageId: text("storage_id").notNull(),
+    fileId: uuid("file_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.archiveSha256, t.storageId] })],
+);
+
+export interface ImportStepStats {
+  documents: number;
+  imported: number;
+  skipped: Record<string, number>;
+  quarantined: Record<string, number>;
+  repaired: Record<string, number>;
+}
+
+/** Describes the archive; never contains document content. */
 export interface ImportManifest {
+  /** File name only; the private location is not recorded. */
   archive: string;
   archiveBytes: number;
   freezeAt: string;
-  tables: Record<string, { documents: number }>;
-  storageFiles: number;
+  tables: string[];
+  storageObjects: number;
+  contractVersion: number;
 }
 
 export interface ImportReportSummary {
-  imported: Record<string, number>;
-  skipped: Record<string, number>;
-  quarantined: Record<string, number>;
-  files: { imported: number; deduplicated: number; quarantined: number };
+  contractVersion: number;
+  steps: Record<string, ImportStepStats>;
+  fingerprints: Record<string, string>;
 }

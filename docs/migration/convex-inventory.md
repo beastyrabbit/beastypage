@@ -28,7 +28,7 @@ run `pnpm --dir frontend run migration:inventory` and commit the result.
 | authHookCalls | 8 |
 | nestedStorageReferences | 71 |
 | externalCallerLines | 37 |
-| deploymentReferenceLines | 65 |
+| deploymentReferenceLines | 66 |
 
 ## Tables
 
@@ -553,11 +553,12 @@ Identifiers ending in `StorageId`. Entries outside schema-level `_storage` field
 | replace_in_files "$CONVEX_PLACEHOLDER_HOST" "$NEW_CONVEX_HOST" | `frontend/docker-entrypoint.sh:48` |
 | echo " - WARNING: NEXT_PUBLIC_CONVEX_URL not set (database connection may fail)" | `frontend/docker-entrypoint.sh:50` |
 | "migration:inventory": "tsx scripts/migration/convex-inventory.ts", | `frontend/package.json:24` |
-| "convex:dev": "convex dev", | `frontend/package.json:25` |
-| "deploy": "pnpm exec convex deploy", | `frontend/package.json:26` |
-| "prepare": "pnpm exec convex codegen" | `frontend/package.json:27` |
-| "convex": "^1.45.0", | `frontend/package.json:42` |
-| "convex-test": "^0.0.54", | `frontend/package.json:82` |
+| "import:convex": "tsx scripts/migration/import-convex.ts", | `frontend/package.json:25` |
+| "convex:dev": "convex dev", | `frontend/package.json:28` |
+| "deploy": "pnpm exec convex deploy", | `frontend/package.json:29` |
+| "prepare": "pnpm exec convex codegen" | `frontend/package.json:30` |
+| "convex": "^1.45.0", | `frontend/package.json:45` |
+| "convex-test": "^0.0.54", | `frontend/package.json:87` |
 | "cat-system:build": "pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run && sh frontend/scripts/write-version.sh | `package.json:12` |
 | "dev:convex": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/ | `package.json:17` |
 | "env:check:frontend": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev  | `package.json:23` |

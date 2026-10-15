@@ -280,6 +280,7 @@ CREATE TABLE "import_checkpoints" (
 	"step" text NOT NULL,
 	"completed_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"rows" integer NOT NULL,
+	"stats" jsonb NOT NULL,
 	"run_id" uuid NOT NULL,
 	CONSTRAINT "import_checkpoints_archive_sha256_step_pk" PRIMARY KEY("archive_sha256","step")
 );
@@ -292,6 +293,13 @@ CREATE TABLE "import_runs" (
 	"started_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"finished_at" timestamp with time zone,
 	"report" jsonb
+);
+--> statement-breakpoint
+CREATE TABLE "import_storage_map" (
+	"archive_sha256" text NOT NULL,
+	"storage_id" text NOT NULL,
+	"file_id" uuid NOT NULL,
+	CONSTRAINT "import_storage_map_archive_sha256_storage_id_pk" PRIMARY KEY("archive_sha256","storage_id")
 );
 --> statement-breakpoint
 CREATE TABLE "quick_share_bans" (

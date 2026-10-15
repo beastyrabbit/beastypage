@@ -1,5 +1,5 @@
 {
-  "id": "93003964-d02f-45eb-acea-957eddfe565b",
+  "id": "adcef0a5-40cc-49a9-9c87-2c255ce15169",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2716,6 +2716,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "stats": {
+          "name": "stats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
         "run_id": {
           "name": "run_id",
           "type": "uuid",
@@ -2791,6 +2797,45 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.import_storage_map": {
+      "name": "import_storage_map",
+      "schema": "",
+      "columns": {
+        "archive_sha256": {
+          "name": "archive_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "storage_id": {
+          "name": "storage_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_id": {
+          "name": "file_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "import_storage_map_archive_sha256_storage_id_pk": {
+          "name": "import_storage_map_archive_sha256_storage_id_pk",
+          "columns": [
+            "archive_sha256",
+            "storage_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},

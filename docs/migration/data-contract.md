@@ -170,7 +170,7 @@ New operational tables: `files`, `live_events`, `jobs`, `job_runs`,
 | `/api/preview/<slug-or-id>` | same | same |
 | `/adoption/<slug-or-id>` | `adoption_batch.slug`, then `legacy_id`, then `id` | same |
 | Stream host links (`getForHost`) | `stream_sessions.legacy_id`, then `id`, plus the owner check | same |
-| Convex storage URLs inside old pages | `files.legacy_id` | redirect route added in #110 |
+| Convex storage URLs (`*.convex.cloud/api/storage/<uuid>`) | not preserved: pages build them on every read and no table stores them; images already posted to Discord or elsewhere stop loading once the Convex project is deleted (#117) | — |
 
 ## Staging scrub (#112)
 

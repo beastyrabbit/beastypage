@@ -22,7 +22,7 @@
     "authHookCalls": 8,
     "nestedStorageReferences": 71,
     "externalCallerLines": 37,
-    "deploymentReferenceLines": 65
+    "deploymentReferenceLines": 66
   },
   "tables": [
     {
@@ -5821,26 +5821,31 @@
     {
       "file": "frontend/package.json",
       "line": 25,
+      "detail": "\"import:convex\": \"tsx scripts/migration/import-convex.ts\","
+    },
+    {
+      "file": "frontend/package.json",
+      "line": 28,
       "detail": "\"convex:dev\": \"convex dev\","
     },
     {
       "file": "frontend/package.json",
-      "line": 26,
+      "line": 29,
       "detail": "\"deploy\": \"pnpm exec convex deploy\","
     },
     {
       "file": "frontend/package.json",
-      "line": 27,
+      "line": 30,
       "detail": "\"prepare\": \"pnpm exec convex codegen\""
     },
     {
       "file": "frontend/package.json",
-      "line": 42,
+      "line": 45,
       "detail": "\"convex\": \"^1.45.0\","
     },
     {
       "file": "frontend/package.json",
-      "line": 82,
+      "line": 87,
       "detail": "\"convex-test\": \"^0.0.54\","
     },
     {
