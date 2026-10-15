@@ -3,6 +3,7 @@ import { api } from "@/convex/_generated/api";
 
 const handlers = createSettingsRouteHandlers({
   serviceName: "dash",
+  kind: "dash",
   get: (convex, slug) => convex.query(api.dashSettings.get, { slug }),
   save: (convex, args) => convex.mutation(api.dashSettings.save, args),
 });

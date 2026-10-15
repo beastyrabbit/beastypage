@@ -4819,14 +4819,14 @@
     },
     {
       "file": "frontend/app/api/dash-settings/route.ts",
-      "line": 6,
+      "line": 7,
       "kind": "query",
       "target": "api.dashSettings.get",
       "context": "server"
     },
     {
       "file": "frontend/app/api/dash-settings/route.ts",
-      "line": 7,
+      "line": 8,
       "kind": "mutation",
       "target": "api.dashSettings.save",
       "context": "server"
@@ -4847,28 +4847,28 @@
     },
     {
       "file": "frontend/app/api/palette-generator-settings/route.ts",
-      "line": 9,
+      "line": 10,
       "kind": "query",
       "target": "api.paletteGeneratorSettings.get",
       "context": "server"
     },
     {
       "file": "frontend/app/api/palette-generator-settings/route.ts",
-      "line": 11,
+      "line": 12,
       "kind": "mutation",
       "target": "api.paletteGeneratorSettings.save",
       "context": "server"
     },
     {
       "file": "frontend/app/api/pixelator-settings/route.ts",
-      "line": 8,
+      "line": 9,
       "kind": "query",
       "target": "api.pixelatorSettings.get",
       "context": "server"
     },
     {
       "file": "frontend/app/api/pixelator-settings/route.ts",
-      "line": 9,
+      "line": 10,
       "kind": "mutation",
       "target": "api.pixelatorSettings.save",
       "context": "server"
@@ -4882,21 +4882,21 @@
     },
     {
       "file": "frontend/app/api/single-cat-settings/route.ts",
-      "line": 6,
+      "line": 7,
       "kind": "query",
       "target": "api.singleCatSettings.get",
       "context": "server"
     },
     {
       "file": "frontend/app/api/single-cat-settings/route.ts",
-      "line": 7,
+      "line": 8,
       "kind": "mutation",
       "target": "api.singleCatSettings.save",
       "context": "server"
     },
     {
       "file": "frontend/app/dash/page.tsx",
-      "line": 37,
+      "line": 42,
       "kind": "query",
       "target": "api.dashSettings.get",
       "context": "server"
@@ -4917,7 +4917,7 @@
     },
     {
       "file": "frontend/app/single-cat-plus/page.tsx",
-      "line": 80,
+      "line": 85,
       "kind": "query",
       "target": "api.singleCatSettings.get",
       "context": "server"

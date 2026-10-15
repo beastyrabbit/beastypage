@@ -222,8 +222,9 @@ bot, media ─HTTP─┘   (zod input, auth context)   (authz, transactions)    
   service function and map typed errors to HTTP status codes.
 - Services own authorization and transactions. Repositories run SQL and
   nothing else.
-- Error contract: `{ "error": { "code": "not_found" | "forbidden" | "invalid_input" | "conflict" | "rate_limited" | "unavailable", "message": string } }`
-  with statuses 404, 403, 400, 409, 429 and 503.
+- Error contract: `{ "error": string, "code": "not_found" | "forbidden" | "invalid_input" | "conflict" | "rate_limited" | "unavailable" }`
+  with statuses 404, 403, 400, 409, 429 and 503. `error` stays a plain
+  string because existing clients read `body.error` as the message.
 - Isolation is `READ COMMITTED` by default. Read-modify-write sequences such
   as votes, wheel spins, Quick Share admission and job leases take
   `SELECT … FOR UPDATE`, or run at `SERIALIZABLE` with a bounded retry on

@@ -424,21 +424,21 @@ Shared validators with `v.any()`: evolutionCommandValidator.cats[].additions, ev
 | --- | --- | --- | --- |
 | query | `api.catShares.get` | server | `frontend/app/api/cat-share/route.ts:26` |
 | mutation | `api.catShares.create` | server | `frontend/app/api/cat-share/route.ts:86` |
-| query | `api.dashSettings.get` | server | `frontend/app/api/dash-settings/route.ts:6` |
-| mutation | `api.dashSettings.save` | server | `frontend/app/api/dash-settings/route.ts:7` |
+| query | `api.dashSettings.get` | server | `frontend/app/api/dash-settings/route.ts:7` |
+| mutation | `api.dashSettings.save` | server | `frontend/app/api/dash-settings/route.ts:8` |
 | action | `api.paletteGeneratorSettingsActions.storeDiscordImage` | server | `frontend/app/api/discord/palette/route.ts:167` |
 | mutation | `api.mapper.create` | server | `frontend/app/api/discord/random-cat/route.ts:285` |
-| query | `api.paletteGeneratorSettings.get` | server | `frontend/app/api/palette-generator-settings/route.ts:9` |
-| mutation | `api.paletteGeneratorSettings.save` | server | `frontend/app/api/palette-generator-settings/route.ts:11` |
-| query | `api.pixelatorSettings.get` | server | `frontend/app/api/pixelator-settings/route.ts:8` |
-| mutation | `api.pixelatorSettings.save` | server | `frontend/app/api/pixelator-settings/route.ts:9` |
+| query | `api.paletteGeneratorSettings.get` | server | `frontend/app/api/palette-generator-settings/route.ts:10` |
+| mutation | `api.paletteGeneratorSettings.save` | server | `frontend/app/api/palette-generator-settings/route.ts:12` |
+| query | `api.pixelatorSettings.get` | server | `frontend/app/api/pixelator-settings/route.ts:9` |
+| mutation | `api.pixelatorSettings.save` | server | `frontend/app/api/pixelator-settings/route.ts:10` |
 | query | `api.mapper.getBySlug` | server | `frontend/app/api/preview/[id]/route.ts:257` |
-| query | `api.singleCatSettings.get` | server | `frontend/app/api/single-cat-settings/route.ts:6` |
-| mutation | `api.singleCatSettings.save` | server | `frontend/app/api/single-cat-settings/route.ts:7` |
-| query | `api.dashSettings.get` | server | `frontend/app/dash/page.tsx:37` |
+| query | `api.singleCatSettings.get` | server | `frontend/app/api/single-cat-settings/route.ts:7` |
+| mutation | `api.singleCatSettings.save` | server | `frontend/app/api/single-cat-settings/route.ts:8` |
+| query | `api.dashSettings.get` | server | `frontend/app/dash/page.tsx:42` |
 | query | `api.ancestryTree.getBySlug` | server | `frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx:34` |
 | query | `api.ancestryTree.getBySlug` | server | `frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx:70` |
-| query | `api.singleCatSettings.get` | server | `frontend/app/single-cat-plus/page.tsx:80` |
+| query | `api.singleCatSettings.get` | server | `frontend/app/single-cat-plus/page.tsx:85` |
 
 ## Storage identifiers outside the schema
 

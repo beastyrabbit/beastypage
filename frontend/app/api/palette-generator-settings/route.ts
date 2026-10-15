@@ -4,6 +4,7 @@ import { parsePaletteGeneratorPayload } from "@/utils/paletteGeneratorVariants";
 
 const handlers = createSettingsRouteHandlers({
   serviceName: "palette generator",
+  kind: "paletteGenerator",
   parseConfig: parsePaletteGeneratorPayload,
   get: (convex, slug) =>
     convex.query(api.paletteGeneratorSettings.get, { slug }),
