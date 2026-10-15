@@ -1,0 +1,5892 @@
+{
+  "generatedFrom": "frontend/convex, frontend/{app,components,lib,utils,tests}, backend/*, CI",
+  "summary": {
+    "tables": 33,
+    "schemaAnyFields": 22,
+    "schemaStorageFields": 10,
+    "schemaIdReferences": 17,
+    "indexes": 90,
+    "functions": 165,
+    "publicFunctions": 112,
+    "internalFunctions": 48,
+    "crons": 5,
+    "httpRoutes": 5,
+    "scheduledCallSites": 22,
+    "useQuery": 40,
+    "useMutation": 72,
+    "useAction": 0,
+    "usePaginatedQuery": 3,
+    "clientHookFiles": 37,
+    "serverCallSites": 17,
+    "serverCallerFiles": 11,
+    "authHookCalls": 8,
+    "nestedStorageReferences": 71,
+    "externalCallerLines": 37,
+    "deploymentReferenceLines": 65
+  },
+  "tables": [
+    {
+      "name": "card_season",
+      "fields": [
+        "seasonName",
+        "shortName",
+        "cardBackStorageId",
+        "cardBackName",
+        "cardBackWidth",
+        "cardBackHeight",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [
+        "cardBackStorageId"
+      ],
+      "indexes": [
+        {
+          "name": "byName",
+          "fields": [
+            "seasonName"
+          ]
+        },
+        {
+          "name": "byShort",
+          "fields": [
+            "shortName"
+          ]
+        },
+        {
+          "name": "byCreatedAt",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rarity",
+      "fields": [
+        "rarityName",
+        "stars",
+        "chancePercent",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byName",
+          "fields": [
+            "rarityName"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "catdex",
+      "fields": [
+        "twitchUserName",
+        "catName",
+        "seasonId",
+        "rarityId",
+        "cardNumber",
+        "approved",
+        "defaultCardStorageId",
+        "defaultCardName",
+        "defaultCardWidth",
+        "defaultCardHeight",
+        "defaultCardThumbName",
+        "defaultCardThumbStorageId",
+        "defaultCardThumbWidth",
+        "defaultCardThumbHeight",
+        "customCardStorageId",
+        "customCardName",
+        "customCardWidth",
+        "customCardHeight",
+        "customCardThumbName",
+        "customCardThumbStorageId",
+        "customCardThumbWidth",
+        "customCardThumbHeight",
+        "thumbnailStatus",
+        "thumbnailAttemptedAt",
+        "thumbnailAttemptCount",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [
+        {
+          "path": "seasonId",
+          "table": "card_season"
+        },
+        {
+          "path": "rarityId",
+          "table": "rarity"
+        }
+      ],
+      "storageFields": [
+        "defaultCardStorageId",
+        "defaultCardThumbStorageId",
+        "customCardStorageId",
+        "customCardThumbStorageId"
+      ],
+      "indexes": [
+        {
+          "name": "bySeason",
+          "fields": [
+            "seasonId"
+          ]
+        },
+        {
+          "name": "byRarity",
+          "fields": [
+            "rarityId"
+          ]
+        },
+        {
+          "name": "byApproval",
+          "fields": [
+            "approved"
+          ]
+        },
+        {
+          "name": "byOwner",
+          "fields": [
+            "twitchUserName"
+          ]
+        },
+        {
+          "name": "byThumbnailStatusAndAttemptedAt",
+          "fields": [
+            "thumbnailStatus",
+            "thumbnailAttemptedAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "catdex_uploads",
+      "fields": [
+        "token",
+        "rateKey",
+        "storageId",
+        "status",
+        "expiresAt",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [
+        "storageId"
+      ],
+      "indexes": [
+        {
+          "name": "byToken",
+          "fields": [
+            "token"
+          ]
+        },
+        {
+          "name": "byStorageId",
+          "fields": [
+            "storageId"
+          ]
+        },
+        {
+          "name": "byCreatedAt",
+          "fields": [
+            "createdAt"
+          ]
+        },
+        {
+          "name": "byRateKeyAndCreatedAt",
+          "fields": [
+            "rateKey",
+            "createdAt"
+          ]
+        },
+        {
+          "name": "byExpiresAt",
+          "fields": [
+            "expiresAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "collection",
+      "fields": [
+        "artistName",
+        "animal",
+        "link",
+        "blurImgStorageId",
+        "blurImgName",
+        "previewImgStorageId",
+        "previewImgName",
+        "fullImgStorageId",
+        "fullImgName",
+        "previewImgWidth",
+        "previewImgHeight",
+        "fullImgWidth",
+        "fullImgHeight",
+        "focusX",
+        "focusY",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [
+        "blurImgStorageId",
+        "previewImgStorageId",
+        "fullImgStorageId"
+      ],
+      "indexes": [
+        {
+          "name": "byArtist",
+          "fields": [
+            "artistName"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "coinflipper_scores",
+      "fields": [
+        "playerName",
+        "score",
+        "createdAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byScore",
+          "fields": [
+            "score",
+            "createdAt"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cat_profile",
+      "fields": [
+        "slug",
+        "catData",
+        "catName",
+        "creatorName",
+        "ownerTokenIdentifier",
+        "editToken",
+        "adoptionBatchId",
+        "previewsUpdatedAt",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "catData"
+      ],
+      "idReferences": [
+        {
+          "path": "adoptionBatchId",
+          "table": "adoption_batch"
+        }
+      ],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "bySlug",
+          "fields": [
+            "slug"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cat_images",
+      "fields": [
+        "catProfileId",
+        "kind",
+        "storageId",
+        "filename",
+        "meta",
+        "width",
+        "height",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "meta"
+      ],
+      "idReferences": [
+        {
+          "path": "catProfileId",
+          "table": "cat_profile"
+        }
+      ],
+      "storageFields": [
+        "storageId"
+      ],
+      "indexes": [
+        {
+          "name": "byProfile",
+          "fields": [
+            "catProfileId"
+          ]
+        },
+        {
+          "name": "byProfileKind",
+          "fields": [
+            "catProfileId",
+            "kind"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cat_shares",
+      "fields": [
+        "slug",
+        "data",
+        "editToken",
+        "ownerTokenIdentifier",
+        "createdAt"
+      ],
+      "anyFields": [
+        "data"
+      ],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "bySlug",
+          "fields": [
+            "slug"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "single_cat_settings",
+      "fields": [
+        "slug",
+        "config",
+        "editToken",
+        "ownerTokenIdentifier",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "config"
+      ],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "bySlug",
+          "fields": [
+            "slug"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "adoption_batch",
+      "fields": [
+        "editToken",
+        "ownerTokenIdentifier",
+        "slug",
+        "title",
+        "creatorName",
+        "settings",
+        "cats",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "settings",
+        "cats[].catData"
+      ],
+      "idReferences": [
+        {
+          "path": "cats[].profileId",
+          "table": "cat_profile"
+        }
+      ],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "bySlug",
+          "fields": [
+            "slug"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stream_sessions",
+      "fields": [
+        "ownerTokenIdentifier",
+        "allowedOptions",
+        "voteRound",
+        "viewerKey",
+        "status",
+        "currentStep",
+        "stepIndex",
+        "stepHistory",
+        "params",
+        "allowRepeatIps",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "stepHistory",
+        "params"
+      ],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byViewerKey",
+          "fields": [
+            "viewerKey"
+          ]
+        },
+        {
+          "name": "byStatus",
+          "fields": [
+            "status"
+          ]
+        },
+        {
+          "name": "by_ownerTokenIdentifier_and_updatedAt",
+          "fields": [
+            "ownerTokenIdentifier",
+            "updatedAt"
+          ]
+        },
+        {
+          "name": "by_ownerTokenIdentifier_and_status_and_updatedAt",
+          "fields": [
+            "ownerTokenIdentifier",
+            "status",
+            "updatedAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stream_participants",
+      "fields": [
+        "sessionId",
+        "viewerSession",
+        "displayName",
+        "status",
+        "fingerprint",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [
+        {
+          "path": "sessionId",
+          "table": "stream_sessions"
+        }
+      ],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "bySession",
+          "fields": [
+            "sessionId"
+          ]
+        },
+        {
+          "name": "byViewerSession",
+          "fields": [
+            "viewerSession"
+          ]
+        },
+        {
+          "name": "by_sessionId_and_viewerSession",
+          "fields": [
+            "sessionId",
+            "viewerSession"
+          ]
+        },
+        {
+          "name": "by_sessionId_and_fingerprint",
+          "fields": [
+            "sessionId",
+            "fingerprint"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stream_votes",
+      "fields": [
+        "voteRound",
+        "sessionId",
+        "stepId",
+        "optionKey",
+        "optionMeta",
+        "votedBy",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "optionMeta"
+      ],
+      "idReferences": [
+        {
+          "path": "sessionId",
+          "table": "stream_sessions"
+        },
+        {
+          "path": "votedBy",
+          "table": "stream_participants"
+        }
+      ],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "bySession",
+          "fields": [
+            "sessionId"
+          ]
+        },
+        {
+          "name": "byStep",
+          "fields": [
+            "sessionId",
+            "stepId"
+          ]
+        },
+        {
+          "name": "by_sessionId_and_voteRound",
+          "fields": [
+            "sessionId",
+            "voteRound"
+          ]
+        },
+        {
+          "name": "by_sessionId_and_voteRound_and_votedBy",
+          "fields": [
+            "sessionId",
+            "voteRound",
+            "votedBy"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "wheel_spins",
+      "fields": [
+        "prizeName",
+        "forced",
+        "randomBucket",
+        "actorKey",
+        "createdAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byPrize",
+          "fields": [
+            "prizeName"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        },
+        {
+          "name": "byActorKeyAndCreatedAt",
+          "fields": [
+            "actorKey",
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "discord_challenge",
+      "fields": [
+        "token",
+        "answerHash",
+        "salt",
+        "expiresAt",
+        "createdAt",
+        "usedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byToken",
+          "fields": [
+            "token"
+          ]
+        },
+        {
+          "name": "byExpiresAt",
+          "fields": [
+            "expiresAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "perfect_cats",
+      "fields": [
+        "hash",
+        "params",
+        "rating",
+        "wins",
+        "losses",
+        "appearances",
+        "createdAt",
+        "updatedAt",
+        "lastShownAt"
+      ],
+      "anyFields": [
+        "params"
+      ],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byHash",
+          "fields": [
+            "hash"
+          ]
+        },
+        {
+          "name": "byRating",
+          "fields": [
+            "rating",
+            "createdAt"
+          ]
+        },
+        {
+          "name": "byUpdated",
+          "fields": [
+            "updatedAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "perfect_votes",
+      "fields": [
+        "catAId",
+        "catBId",
+        "winnerId",
+        "clientId",
+        "createdAt"
+      ],
+      "anyFields": [],
+      "idReferences": [
+        {
+          "path": "catAId",
+          "table": "perfect_cats"
+        },
+        {
+          "path": "catBId",
+          "table": "perfect_cats"
+        },
+        {
+          "path": "winnerId",
+          "table": "perfect_cats"
+        }
+      ],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byClient",
+          "fields": [
+            "clientId",
+            "createdAt"
+          ]
+        },
+        {
+          "name": "byCats",
+          "fields": [
+            "catAId",
+            "catBId",
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "perfect_matchups",
+      "fields": [
+        "clientId",
+        "catAId",
+        "catBId",
+        "token",
+        "createdAt",
+        "expiresAt",
+        "consumed"
+      ],
+      "anyFields": [],
+      "idReferences": [
+        {
+          "path": "catAId",
+          "table": "perfect_cats"
+        },
+        {
+          "path": "catBId",
+          "table": "perfect_cats"
+        }
+      ],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byClient",
+          "fields": [
+            "clientId"
+          ]
+        },
+        {
+          "name": "byExpiresAt",
+          "fields": [
+            "expiresAt"
+          ]
+        },
+        {
+          "name": "byConsumedAndExpiresAt",
+          "fields": [
+            "consumed",
+            "expiresAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "palette_generator_settings",
+      "fields": [
+        "slug",
+        "config",
+        "editToken",
+        "ownerTokenIdentifier",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "config"
+      ],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "bySlug",
+          "fields": [
+            "slug"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pixelator_settings",
+      "fields": [
+        "slug",
+        "config",
+        "editToken",
+        "ownerTokenIdentifier",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "config"
+      ],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "bySlug",
+          "fields": [
+            "slug"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dash_settings",
+      "fields": [
+        "slug",
+        "config",
+        "editToken",
+        "ownerTokenIdentifier",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "config"
+      ],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "bySlug",
+          "fields": [
+            "slug"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "discord_user_configs",
+      "fields": [
+        "discordUserId",
+        "accessoriesMin",
+        "accessoriesMax",
+        "scarsMin",
+        "scarsMax",
+        "tortiesMin",
+        "tortiesMax",
+        "darkForest",
+        "starclan",
+        "palettes",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byDiscordUserId",
+          "fields": [
+            "discordUserId"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ancestry_tree",
+      "fields": [
+        "slug",
+        "editToken",
+        "ownerTokenIdentifier",
+        "name",
+        "foundingMotherId",
+        "foundingFatherId",
+        "cats",
+        "config",
+        "creatorName",
+        "passwordHash",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "cats[].params",
+        "cats[].genetics"
+      ],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "bySlug",
+          "fields": [
+            "slug"
+          ]
+        },
+        {
+          "name": "byCreated",
+          "fields": [
+            "createdAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "users",
+      "fields": [
+        "tokenIdentifier",
+        "username",
+        "usernameSearch",
+        "showProfilePic",
+        "apiKey",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byTokenIdentifier",
+          "fields": [
+            "tokenIdentifier"
+          ]
+        },
+        {
+          "name": "byUsername",
+          "fields": [
+            "username"
+          ]
+        },
+        {
+          "name": "byUsernameSearch",
+          "fields": [
+            "usernameSearch"
+          ]
+        },
+        {
+          "name": "byApiKey",
+          "fields": [
+            "apiKey"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "user_search_migrations",
+      "fields": [
+        "name",
+        "cursor",
+        "complete",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byName",
+          "fields": [
+            "name"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cat_stream_sessions",
+      "fields": [
+        "userId",
+        "status",
+        "settings",
+        "currentCommand",
+        "testMode",
+        "lastWheelSpinForSeq",
+        "batchState",
+        "evolutionState",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "settings",
+        "currentCommand.params",
+        "currentCommand.slots"
+      ],
+      "idReferences": [
+        {
+          "path": "userId",
+          "table": "users"
+        }
+      ],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byUserId",
+          "fields": [
+            "userId"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "user_variants",
+      "fields": [
+        "userId",
+        "toolKey",
+        "variantId",
+        "name",
+        "slug",
+        "settings",
+        "isActive",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [
+        "settings"
+      ],
+      "idReferences": [
+        {
+          "path": "userId",
+          "table": "users"
+        }
+      ],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "byUserTool",
+          "fields": [
+            "userId",
+            "toolKey"
+          ]
+        },
+        {
+          "name": "byUserVariant",
+          "fields": [
+            "userId",
+            "toolKey",
+            "variantId"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "quick_share_uploads",
+      "fields": [
+        "slug",
+        "source",
+        "originalName",
+        "declaredMime",
+        "detectedMime",
+        "originalSize",
+        "originalKey",
+        "multipartUploadId",
+        "publicKey",
+        "publicMime",
+        "publicSize",
+        "importReservedBytes",
+        "state",
+        "receiptHash",
+        "ownerTokenIdentifier",
+        "rateIdentity",
+        "ipHash",
+        "rawIp",
+        "publicExpiresAt",
+        "retainedUntil",
+        "active",
+        "extendedAt",
+        "completedAt",
+        "failureCode",
+        "failureMessage",
+        "compatibilityWarning",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "by_slug",
+          "fields": [
+            "slug"
+          ]
+        },
+        {
+          "name": "by_slug_and_active_and_retainedUntil",
+          "fields": [
+            "slug",
+            "active",
+            "retainedUntil"
+          ]
+        },
+        {
+          "name": "by_slug_and_active_and_state_and_publicExpiresAt",
+          "fields": [
+            "slug",
+            "active",
+            "state",
+            "publicExpiresAt"
+          ]
+        },
+        {
+          "name": "by_receiptHash",
+          "fields": [
+            "receiptHash"
+          ]
+        },
+        {
+          "name": "by_ownerTokenIdentifier_and_publicExpiresAt",
+          "fields": [
+            "ownerTokenIdentifier",
+            "publicExpiresAt"
+          ]
+        },
+        {
+          "name": "by_rateIdentity_and_active",
+          "fields": [
+            "rateIdentity",
+            "active"
+          ]
+        },
+        {
+          "name": "by_ipHash_and_active",
+          "fields": [
+            "ipHash",
+            "active"
+          ]
+        },
+        {
+          "name": "by_ipHash_and_createdAt",
+          "fields": [
+            "ipHash",
+            "createdAt"
+          ]
+        },
+        {
+          "name": "by_state_and_createdAt",
+          "fields": [
+            "state",
+            "createdAt"
+          ]
+        },
+        {
+          "name": "by_state_and_updatedAt",
+          "fields": [
+            "state",
+            "updatedAt"
+          ]
+        },
+        {
+          "name": "by_active_and_publicExpiresAt",
+          "fields": [
+            "active",
+            "publicExpiresAt"
+          ]
+        },
+        {
+          "name": "by_retainedUntil",
+          "fields": [
+            "retainedUntil"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "quick_share_parts",
+      "fields": [
+        "uploadId",
+        "partNumber",
+        "etag",
+        "size",
+        "createdAt"
+      ],
+      "anyFields": [],
+      "idReferences": [
+        {
+          "path": "uploadId",
+          "table": "quick_share_uploads"
+        }
+      ],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "by_uploadId_and_partNumber",
+          "fields": [
+            "uploadId",
+            "partNumber"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "quick_share_jobs",
+      "fields": [
+        "uploadId",
+        "kind",
+        "status",
+        "attempts",
+        "leaseId",
+        "leaseExpiresAt",
+        "createdAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [
+        {
+          "path": "uploadId",
+          "table": "quick_share_uploads"
+        }
+      ],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "by_status_and_createdAt",
+          "fields": [
+            "status",
+            "createdAt"
+          ]
+        },
+        {
+          "name": "by_uploadId_and_kind",
+          "fields": [
+            "uploadId",
+            "kind"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "quick_share_usage",
+      "fields": [
+        "identity",
+        "kind",
+        "windowStart",
+        "starts",
+        "bytes",
+        "expiresAt",
+        "updatedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "by_identity_and_kind_and_windowStart",
+          "fields": [
+            "identity",
+            "kind",
+            "windowStart"
+          ]
+        },
+        {
+          "name": "by_expiresAt",
+          "fields": [
+            "expiresAt"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "quick_share_bans",
+      "fields": [
+        "ipHash",
+        "rawIp",
+        "rawIpExpiresAt",
+        "reason",
+        "active",
+        "createdBy",
+        "createdAt",
+        "removedAt"
+      ],
+      "anyFields": [],
+      "idReferences": [],
+      "storageFields": [],
+      "indexes": [
+        {
+          "name": "by_ipHash_and_active",
+          "fields": [
+            "ipHash",
+            "active"
+          ]
+        },
+        {
+          "name": "by_active_and_createdAt",
+          "fields": [
+            "active",
+            "createdAt"
+          ]
+        },
+        {
+          "name": "by_active_and_rawIpExpiresAt",
+          "fields": [
+            "active",
+            "rawIpExpiresAt"
+          ]
+        }
+      ]
+    }
+  ],
+  "sharedValidatorAnyFields": [
+    "evolutionCommandValidator.cats[].additions",
+    "evolutionCommandValidator.cats[].catData",
+    "batchCommandValidator.cats[].catData"
+  ],
+  "functions": [
+    {
+      "file": "frontend/convex/adoptionV2.ts",
+      "line": 40,
+      "module": "adoptionV2",
+      "name": "createBatch",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [
+        "adoption_batch"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/adoptionV2.ts",
+      "line": 157,
+      "module": "adoptionV2",
+      "name": "getBySlug",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/adoptionV2.ts",
+      "line": 180,
+      "module": "adoptionV2",
+      "name": "listBatches",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/adoptionV2.ts",
+      "line": 195,
+      "module": "adoptionV2",
+      "name": "updateBatchMeta",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/ancestryTree.ts",
+      "line": 328,
+      "module": "ancestryTree",
+      "name": "save",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/ancestryTree.ts",
+      "line": 401,
+      "module": "ancestryTree",
+      "name": "saveAsNew",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/ancestryTree.ts",
+      "line": 425,
+      "module": "ancestryTree",
+      "name": "checkSlug",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/ancestryTree.ts",
+      "line": 441,
+      "module": "ancestryTree",
+      "name": "getBySlug",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/ancestryTree.ts",
+      "line": 457,
+      "module": "ancestryTree",
+      "name": "list",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/ancestryTree.ts",
+      "line": 490,
+      "module": "ancestryTree",
+      "name": "update",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/ancestryTree.ts",
+      "line": 543,
+      "module": "ancestryTree",
+      "name": "remove",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catShares.ts",
+      "line": 39,
+      "module": "catShares",
+      "name": "create",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [
+        "cat_shares"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catShares.ts",
+      "line": 95,
+      "module": "catShares",
+      "name": "get",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 57,
+      "module": "catStream",
+      "name": "getSession",
+      "kind": "query",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 82,
+      "module": "catStream",
+      "name": "getSessionByApiKey",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 106,
+      "module": "catStream",
+      "name": "ensureSession",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [
+        "cat_stream_sessions"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 139,
+      "module": "catStream",
+      "name": "updateSettings",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 155,
+      "module": "catStream",
+      "name": "mergeSettings",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 171,
+      "module": "catStream",
+      "name": "triggerSpin",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 206,
+      "module": "catStream",
+      "name": "attachViewSlug",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 235,
+      "module": "catStream",
+      "name": "triggerWheel",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "wheel_spins"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 263,
+      "module": "catStream",
+      "name": "triggerEvolution",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 291,
+      "module": "catStream",
+      "name": "triggerBatch",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 322,
+      "module": "catStream",
+      "name": "reportBatchStage",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 403,
+      "module": "catStream",
+      "name": "markBatchCat",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 431,
+      "module": "catStream",
+      "name": "setBatchHighlight",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 518,
+      "module": "catStream",
+      "name": "cullBatchCat",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.catStream.finalizeBatchCull"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 587,
+      "module": "catStream",
+      "name": "cancelBatchCull",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 618,
+      "module": "catStream",
+      "name": "finalizeBatchCull",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 686,
+      "module": "catStream",
+      "name": "holdEvolution",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.catStream.autoReleaseEvolution"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 710,
+      "module": "catStream",
+      "name": "releaseEvolution",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 725,
+      "module": "catStream",
+      "name": "autoReleaseEvolution",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 755,
+      "module": "catStream",
+      "name": "revealEvolutionAt",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 774,
+      "module": "catStream",
+      "name": "skipEvolutionToBoard",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 795,
+      "module": "catStream",
+      "name": "attachBatchSlug",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 820,
+      "module": "catStream",
+      "name": "showLobby",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 840,
+      "module": "catStream",
+      "name": "showBrb",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 856,
+      "module": "catStream",
+      "name": "clearOverlay",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 876,
+      "module": "catStream",
+      "name": "toggleTestMode",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 133,
+      "module": "catdex",
+      "name": "page",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 162,
+      "module": "catdex",
+      "name": "hasPending",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 174,
+      "module": "catdex",
+      "name": "list",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 195,
+      "module": "catdex",
+      "name": "pendingCount",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 207,
+      "module": "catdex",
+      "name": "get",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 218,
+      "module": "catdex",
+      "name": "getDoc",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 234,
+      "module": "catdex",
+      "name": "generateUploadUrl",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [
+        "catdex_uploads"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [
+        "CONVEX_SITE_URL",
+        "NEXT_PUBLIC_CONVEX_SITE_URL"
+      ],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 298,
+      "module": "catdex",
+      "name": "create",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "catdex"
+      ],
+      "scheduler": [
+        "internal.imageService.generateForCat"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 424,
+      "module": "catdex",
+      "name": "getUploadReservation",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 439,
+      "module": "catdex",
+      "name": "attachUpload",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 464,
+      "module": "catdex",
+      "name": "cleanupExpiredUploads",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.catdex.cleanupExpiredUploads"
+      ],
+      "storageOps": [
+        "delete"
+      ],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 644,
+      "module": "catdex",
+      "name": "applyThumbnailUpdates",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 695,
+      "module": "catdex",
+      "name": "markThumbnailFailed",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 715,
+      "module": "catdex",
+      "name": "enqueueMissingThumbnails",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.imageService.generateForCat"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdexHttp.ts",
+      "line": 56,
+      "module": "catdexHttp",
+      "name": "options",
+      "kind": "httpAction",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdexHttp.ts",
+      "line": 69,
+      "module": "catdexHttp",
+      "name": "legacyUploadUrl",
+      "kind": "httpAction",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/catdexHttp.ts",
+      "line": 74,
+      "module": "catdexHttp",
+      "name": "upload",
+      "kind": "httpAction",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [
+        "store"
+      ],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/coinflipper.ts",
+      "line": 32,
+      "module": "coinflipper",
+      "name": "leaderboard",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/coinflipper.ts",
+      "line": 50,
+      "module": "coinflipper",
+      "name": "listScores",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/coinflipper.ts",
+      "line": 68,
+      "module": "coinflipper",
+      "name": "submitScore",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "coinflipper_scores"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 5,
+      "module": "collection",
+      "name": "totalCount",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [
+        "collection"
+      ],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 27,
+      "module": "collection",
+      "name": "page",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 55,
+      "module": "collection",
+      "name": "list",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 68,
+      "module": "collection",
+      "name": "setFocus",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [
+        "QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS"
+      ],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 104,
+      "module": "collection",
+      "name": "getDoc",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/dashSettings.ts",
+      "line": 9,
+      "module": "dashSettings",
+      "name": "save",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/dashSettings.ts",
+      "line": 14,
+      "module": "dashSettings",
+      "name": "get",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/discord.ts",
+      "line": 109,
+      "module": "discord",
+      "name": "issueChallenge",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/discord.ts",
+      "line": 117,
+      "module": "discord",
+      "name": "redeemChallenge",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/discordHttp.ts",
+      "line": 5,
+      "module": "discordHttp",
+      "name": "userConfig",
+      "kind": "httpAction",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/discordUserConfigInternal.ts",
+      "line": 19,
+      "module": "discordUserConfigInternal",
+      "name": "get",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/discordUserConfigInternal.ts",
+      "line": 46,
+      "module": "discordUserConfigInternal",
+      "name": "upsert",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "discord_user_configs"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/discordUserConfigInternal.ts",
+      "line": 87,
+      "module": "discordUserConfigInternal",
+      "name": "addPalette",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "discord_user_configs"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/discordUserConfigInternal.ts",
+      "line": 119,
+      "module": "discordUserConfigInternal",
+      "name": "removePalette",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/discordUserConfigInternal.ts",
+      "line": 139,
+      "module": "discordUserConfigInternal",
+      "name": "reset",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 105,
+      "module": "imageService",
+      "name": "generateForCat",
+      "kind": "internalAction",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 66,
+      "module": "importer",
+      "name": "prepareUploadUrls",
+      "kind": "internalAction",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [
+        "generateUploadUrl"
+      ],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 86,
+      "module": "importer",
+      "name": "ingestBundle",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [
+        "catdex",
+        "collection"
+      ],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/init.ts",
+      "line": 5,
+      "module": "init",
+      "name": "seed",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/mapper.ts",
+      "line": 85,
+      "module": "mapper",
+      "name": "create",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "cat_profile"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/mapper.ts",
+      "line": 123,
+      "module": "mapper",
+      "name": "get",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/mapper.ts",
+      "line": 131,
+      "module": "mapper",
+      "name": "getBySlug",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/mapper.ts",
+      "line": 152,
+      "module": "mapper",
+      "name": "updateMeta",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/mapper.ts",
+      "line": 185,
+      "module": "mapper",
+      "name": "listHistory",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/mapper.ts",
+      "line": 199,
+      "module": "mapper",
+      "name": "listForPreview",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/mapper.ts",
+      "line": 232,
+      "module": "mapper",
+      "name": "getPreviewRefs",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/mapper.ts",
+      "line": 241,
+      "module": "mapper",
+      "name": "applyPreviewUpdates",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/paletteGeneratorSettings.ts",
+      "line": 11,
+      "module": "paletteGeneratorSettings",
+      "name": "save",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/paletteGeneratorSettings.ts",
+      "line": 16,
+      "module": "paletteGeneratorSettings",
+      "name": "get",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/paletteGeneratorSettings.ts",
+      "line": 22,
+      "module": "paletteGeneratorSettings",
+      "name": "getImageUrl",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [
+        "getUrl"
+      ],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/paletteGeneratorSettingsActions.ts",
+      "line": 24,
+      "module": "paletteGeneratorSettingsActions",
+      "name": "storeDiscordImage",
+      "kind": "action",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [
+        "store"
+      ],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/perfectCats.ts",
+      "line": 133,
+      "module": "perfectCats",
+      "name": "registerCats",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/perfectCats.ts",
+      "line": 271,
+      "module": "perfectCats",
+      "name": "requestMatchup",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/perfectCats.ts",
+      "line": 315,
+      "module": "perfectCats",
+      "name": "cleanupExpiredMatchups",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.perfectCats.cleanupExpiredMatchups"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/perfectCats.ts",
+      "line": 334,
+      "module": "perfectCats",
+      "name": "submitVote",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/perfectCats.ts",
+      "line": 416,
+      "module": "perfectCats",
+      "name": "leaderboard",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/pixelatorSettings.ts",
+      "line": 9,
+      "module": "pixelatorSettings",
+      "name": "save",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/pixelatorSettings.ts",
+      "line": 14,
+      "module": "pixelatorSettings",
+      "name": "get",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/previews.ts",
+      "line": 197,
+      "module": "previews",
+      "name": "upsertMapperPreviewsInternal",
+      "kind": "internalAction",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/previews.ts",
+      "line": 213,
+      "module": "previews",
+      "name": "upsertMapperPreviews",
+      "kind": "action",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [
+        "PREVIEW_REFRESH_TOKEN"
+      ],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 166,
+      "module": "quickShare",
+      "name": "createUpload",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "quick_share_uploads"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 315,
+      "module": "quickShare",
+      "name": "getUpload",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 351,
+      "module": "quickShare",
+      "name": "recordPart",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "quick_share_parts"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 404,
+      "module": "quickShare",
+      "name": "markComplete",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 453,
+      "module": "quickShare",
+      "name": "finishImport",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 503,
+      "module": "quickShare",
+      "name": "failImport",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 532,
+      "module": "quickShare",
+      "name": "getPublicUpload",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 559,
+      "module": "quickShare",
+      "name": "getPublicCollection",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 594,
+      "module": "quickShare",
+      "name": "accountUploads",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 610,
+      "module": "quickShare",
+      "name": "extendUpload",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 644,
+      "module": "quickShare",
+      "name": "claimJob",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.quickShare.recoverJobLease"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 695,
+      "module": "quickShare",
+      "name": "retryDispatchJob",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.quickShareHttp.dispatchJob"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 711,
+      "module": "quickShare",
+      "name": "recoverJobLease",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.quickShare.recoverJobLease",
+        "internal.quickShareHttp.dispatchJob"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 744,
+      "module": "quickShare",
+      "name": "finishProcessJob",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 793,
+      "module": "quickShare",
+      "name": "adminList",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 844,
+      "module": "quickShare",
+      "name": "adminGet",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 859,
+      "module": "quickShare",
+      "name": "banIp",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "quick_share_bans"
+      ],
+      "scheduler": [
+        "internal.quickShare.revokeIpBatch"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 893,
+      "module": "quickShare",
+      "name": "revokeIpBatch",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.quickShare.revokeIpBatch"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 918,
+      "module": "quickShare",
+      "name": "unbanIp",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 939,
+      "module": "quickShare",
+      "name": "removeUpload",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 965,
+      "module": "quickShare",
+      "name": "queueRetentionDeletes",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.quickShare.queueRetentionDeletes"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 1006,
+      "module": "quickShare",
+      "name": "redispatchPendingJobs",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.quickShare.redispatchPendingJobs",
+        "internal.quickShareHttp.dispatchJob"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 1041,
+      "module": "quickShare",
+      "name": "maintenance",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.quickShare.maintenance",
+        "internal.quickShare.queueRetentionDeletes",
+        "internal.quickShare.redispatchPendingJobs"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 1116,
+      "module": "quickShare",
+      "name": "finishDeleteJob",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 1149,
+      "module": "quickShare",
+      "name": "policy",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 1168,
+      "module": "quickShare",
+      "name": "assertUploadState",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/quickShareHttp.ts",
+      "line": 31,
+      "module": "quickShareHttp",
+      "name": "dispatchJob",
+      "kind": "internalAction",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [
+        "internal.quickShare.retryDispatchJob"
+      ],
+      "storageOps": [],
+      "envVars": [
+        "QUICK_SHARE_INTERNAL_TOKEN",
+        "QUICK_SHARE_WORKER_URL"
+      ],
+      "fetches": true
+    },
+    {
+      "file": "frontend/convex/quickShareHttp.ts",
+      "line": 484,
+      "module": "quickShareHttp",
+      "name": "quickShareInternal",
+      "kind": "httpAction",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [
+        "QUICK_SHARE_INTERNAL_TOKEN"
+      ],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/rarities.ts",
+      "line": 24,
+      "module": "rarities",
+      "name": "list",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [
+        "rarity"
+      ],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/rarities.ts",
+      "line": 33,
+      "module": "rarities",
+      "name": "totalCount",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [
+        "rarity"
+      ],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/rarities.ts",
+      "line": 44,
+      "module": "rarities",
+      "name": "ensureDefaults",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/seasons.ts",
+      "line": 16,
+      "module": "seasons",
+      "name": "list",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/seasons.ts",
+      "line": 33,
+      "module": "seasons",
+      "name": "totalCount",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [
+        "card_season"
+      ],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/seasons.ts",
+      "line": 45,
+      "module": "seasons",
+      "name": "getDoc",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/seasons.ts",
+      "line": 83,
+      "module": "seasons",
+      "name": "ensureDefaults",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/singleCatSettings.ts",
+      "line": 9,
+      "module": "singleCatSettings",
+      "name": "save",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/singleCatSettings.ts",
+      "line": 14,
+      "module": "singleCatSettings",
+      "name": "get",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamParticipantsV2.ts",
+      "line": 10,
+      "module": "streamParticipantsV2",
+      "name": "list",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamParticipantsV2.ts",
+      "line": 45,
+      "module": "streamParticipantsV2",
+      "name": "get",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamParticipantsV2.ts",
+      "line": 55,
+      "module": "streamParticipantsV2",
+      "name": "create",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "stream_participants"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamParticipantsV2.ts",
+      "line": 124,
+      "module": "streamParticipantsV2",
+      "name": "update",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamSessionsV2.ts",
+      "line": 35,
+      "module": "streamSessionsV2",
+      "name": "list",
+      "kind": "query",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamSessionsV2.ts",
+      "line": 81,
+      "module": "streamSessionsV2",
+      "name": "get",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamSessionsV2.ts",
+      "line": 92,
+      "module": "streamSessionsV2",
+      "name": "getForHost",
+      "kind": "query",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamSessionsV2.ts",
+      "line": 108,
+      "module": "streamSessionsV2",
+      "name": "create",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [
+        "stream_sessions"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamSessionsV2.ts",
+      "line": 153,
+      "module": "streamSessionsV2",
+      "name": "update",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamVotesV2.ts",
+      "line": 48,
+      "module": "streamVotesV2",
+      "name": "list",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/streamVotesV2.ts",
+      "line": 74,
+      "module": "streamVotesV2",
+      "name": "create",
+      "kind": "mutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "stream_votes"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/userVariants.ts",
+      "line": 20,
+      "module": "userVariants",
+      "name": "list",
+      "kind": "query",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/userVariants.ts",
+      "line": 42,
+      "module": "userVariants",
+      "name": "upsert",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [
+        "user_variants"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/userVariants.ts",
+      "line": 106,
+      "module": "userVariants",
+      "name": "remove",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/userVariants.ts",
+      "line": 125,
+      "module": "userVariants",
+      "name": "rename",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/userVariants.ts",
+      "line": 144,
+      "module": "userVariants",
+      "name": "setActive",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/userVariants.ts",
+      "line": 164,
+      "module": "userVariants",
+      "name": "importBatch",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [
+        "user_variants"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/userVariants.ts",
+      "line": 230,
+      "module": "userVariants",
+      "name": "listAll",
+      "kind": "query",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/users.ts",
+      "line": 101,
+      "module": "users",
+      "name": "viewer",
+      "kind": "query",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/users.ts",
+      "line": 114,
+      "module": "users",
+      "name": "getOrCreateUser",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [
+        "users"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/users.ts",
+      "line": 158,
+      "module": "users",
+      "name": "updateProfile",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/users.ts",
+      "line": 200,
+      "module": "users",
+      "name": "regenerateApiKey",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/users.ts",
+      "line": 225,
+      "module": "users",
+      "name": "getUserByApiKey",
+      "kind": "internalQuery",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/users.ts",
+      "line": 265,
+      "module": "users",
+      "name": "backfillUsernameSearch",
+      "kind": "internalMutation",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [
+        "user_search_migrations"
+      ],
+      "scheduler": [
+        "internal.users.backfillUsernameSearch"
+      ],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/users.ts",
+      "line": 330,
+      "module": "users",
+      "name": "searchByUsername",
+      "kind": "query",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/users.ts",
+      "line": 367,
+      "module": "users",
+      "name": "resolveUsernames",
+      "kind": "query",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/users.ts",
+      "line": 398,
+      "module": "users",
+      "name": "resetSavedVariants",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/wheel.ts",
+      "line": 19,
+      "module": "wheel",
+      "name": "logSpin",
+      "kind": "mutation",
+      "usesAuth": true,
+      "tablesRead": [],
+      "tablesWritten": [
+        "wheel_spins"
+      ],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    },
+    {
+      "file": "frontend/convex/wheel.ts",
+      "line": 81,
+      "module": "wheel",
+      "name": "stats",
+      "kind": "query",
+      "usesAuth": false,
+      "tablesRead": [],
+      "tablesWritten": [],
+      "scheduler": [],
+      "storageOps": [],
+      "envVars": [],
+      "fetches": false
+    }
+  ],
+  "crons": [
+    {
+      "file": "frontend/convex/crons.ts",
+      "line": 9,
+      "name": "username-search-backfill",
+      "schedule": "interval { hours: 6 }",
+      "target": "internal.users.backfillUsernameSearch, {}"
+    },
+    {
+      "file": "frontend/convex/crons.ts",
+      "line": 16,
+      "name": "catdex-thumbnail-backfill",
+      "schedule": "interval { hours: 6 }",
+      "target": "internal.catdex.enqueueMissingThumbnails, { limit: 25 }"
+    },
+    {
+      "file": "frontend/convex/crons.ts",
+      "line": 23,
+      "name": "catdex-upload-retention",
+      "schedule": "interval { hours: 1 }",
+      "target": "internal.catdex.cleanupExpiredUploads, { limit: 100 }"
+    },
+    {
+      "file": "frontend/convex/crons.ts",
+      "line": 30,
+      "name": "quick-share-retention",
+      "schedule": "interval { hours: 1 }",
+      "target": "internal.quickShare.maintenance, {}"
+    },
+    {
+      "file": "frontend/convex/crons.ts",
+      "line": 37,
+      "name": "perfect-matchup-retention",
+      "schedule": "interval { hours: 1 }",
+      "target": "internal.perfectCats.cleanupExpiredMatchups, {}"
+    }
+  ],
+  "httpRoutes": [
+    {
+      "file": "frontend/convex/http.ts",
+      "line": 11,
+      "path": "/api/storage/getUploadUrl",
+      "method": "POST",
+      "handler": "catdexLegacyUploadUrl"
+    },
+    {
+      "file": "frontend/convex/http.ts",
+      "line": 16,
+      "path": "/catdex/upload",
+      "method": "POST",
+      "handler": "catdexUpload"
+    },
+    {
+      "file": "frontend/convex/http.ts",
+      "line": 21,
+      "path": "/catdex/upload",
+      "method": "OPTIONS",
+      "handler": "catdexUploadOptions"
+    },
+    {
+      "file": "frontend/convex/http.ts",
+      "line": 27,
+      "path": "/discord/user-config",
+      "method": "POST",
+      "handler": "userConfig"
+    },
+    {
+      "file": "frontend/convex/http.ts",
+      "line": 33,
+      "path": "/quick-share/internal",
+      "method": "POST",
+      "handler": "quickShareInternal"
+    }
+  ],
+  "scheduledCalls": [
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 568,
+      "target": "internal.catStream.finalizeBatchCull",
+      "delay": "VERDICT_MS"
+    },
+    {
+      "file": "frontend/convex/catStream.ts",
+      "line": 701,
+      "target": "internal.catStream.autoReleaseEvolution",
+      "delay": "HOLD_MAX_MS"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 364,
+      "target": "internal.imageService.generateForCat",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 487,
+      "target": "internal.catdex.cleanupExpiredUploads",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 743,
+      "target": "internal.imageService.generateForCat",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/perfectCats.ts",
+      "line": 324,
+      "target": "internal.perfectCats.cleanupExpiredMatchups",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 47,
+      "target": "internal.quickShareHttp.dispatchJob",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 62,
+      "target": "internal.quickShareHttp.dispatchJob",
+      "delay": "1_000"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 672,
+      "target": "internal.quickShare.recoverJobLease",
+      "delay": "JOB_LEASE_MS"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 703,
+      "target": "internal.quickShareHttp.dispatchJob",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 723,
+      "target": "internal.quickShare.recoverJobLease",
+      "delay": "(job.leaseExpiresAt as number) - now"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 736,
+      "target": "internal.quickShareHttp.dispatchJob",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 885,
+      "target": "internal.quickShare.revokeIpBatch",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 912,
+      "target": "internal.quickShare.revokeIpBatch",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 988,
+      "target": "internal.quickShare.queueRetentionDeletes",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 1017,
+      "target": "internal.quickShareHttp.dispatchJob",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 1023,
+      "target": "internal.quickShare.redispatchPendingJobs",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 1078,
+      "target": "internal.quickShare.queueRetentionDeletes",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 1081,
+      "target": "internal.quickShare.redispatchPendingJobs",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShare.ts",
+      "line": 1110,
+      "target": "internal.quickShare.maintenance",
+      "delay": "0"
+    },
+    {
+      "file": "frontend/convex/quickShareHttp.ts",
+      "line": 62,
+      "target": "internal.quickShare.retryDispatchJob",
+      "delay": "retryDelay(args.attempt)"
+    },
+    {
+      "file": "frontend/convex/users.ts",
+      "line": 318,
+      "target": "internal.users.backfillUsernameSearch",
+      "delay": "0"
+    }
+  ],
+  "clientCalls": [
+    {
+      "file": "frontend/app/ancestry-tree/[slug]/AncestryTreeViewClient.tsx",
+      "line": 82,
+      "kind": "useQuery",
+      "target": "api.ancestryTree.getBySlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/catdex/CatdexPageClient.tsx",
+      "line": 91,
+      "kind": "usePaginatedQuery",
+      "target": "api.catdex.page",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/catdex/CatdexPageClient.tsx",
+      "line": 96,
+      "kind": "useQuery",
+      "target": "api.seasons.list",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/catdex/CatdexPageClient.tsx",
+      "line": 97,
+      "kind": "useQuery",
+      "target": "api.rarities.list",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/catdex/CatdexPageClient.tsx",
+      "line": 98,
+      "kind": "useQuery",
+      "target": "api.catdex.hasPending",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/catdex/CatdexPageClient.tsx",
+      "line": 99,
+      "kind": "useMutation",
+      "target": "api.catdex.generateUploadUrl",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/catdex/CatdexPageClient.tsx",
+      "line": 100,
+      "kind": "useMutation",
+      "target": "api.catdex.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/coinflip/highscores/page.tsx",
+      "line": 13,
+      "kind": "useQuery",
+      "target": "api.coinflipper.listScores",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/coinflip/page.tsx",
+      "line": 30,
+      "kind": "useQuery",
+      "target": "api.coinflipper.leaderboard",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/coinflip/page.tsx",
+      "line": 31,
+      "kind": "useMutation",
+      "target": "api.coinflipper.submitScore",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/collection/CollectionPageClient.tsx",
+      "line": 20,
+      "kind": "usePaginatedQuery",
+      "target": "api.collection.page",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx",
+      "line": 287,
+      "kind": "useMutation",
+      "target": "api.perfectCats.requestMatchup",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx",
+      "line": 288,
+      "kind": "useMutation",
+      "target": "api.perfectCats.registerCats",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx",
+      "line": 289,
+      "kind": "useMutation",
+      "target": "api.perfectCats.submitVote",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx",
+      "line": 290,
+      "kind": "useQuery",
+      "target": "api.perfectCats.leaderboard",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/profile/page.tsx",
+      "line": 30,
+      "kind": "useQuery",
+      "target": "api.users.viewer",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/profile/page.tsx",
+      "line": 31,
+      "kind": "useMutation",
+      "target": "api.users.updateProfile",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/profile/page.tsx",
+      "line": 32,
+      "kind": "useMutation",
+      "target": "api.users.resetSavedVariants",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/profile/page.tsx",
+      "line": 33,
+      "kind": "useMutation",
+      "target": "api.users.regenerateApiKey",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/profile/page.tsx",
+      "line": 34,
+      "kind": "useQuery",
+      "target": "api.userVariants.listAll",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/profile/page.tsx",
+      "line": 38,
+      "kind": "useMutation",
+      "target": "api.userVariants.remove",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/profile/page.tsx",
+      "line": 39,
+      "kind": "useMutation",
+      "target": "api.userVariants.importBatch",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/tests/collection-focus/page.tsx",
+      "line": 16,
+      "kind": "usePaginatedQuery",
+      "target": "api.collection.page",
+      "context": "client"
+    },
+    {
+      "file": "frontend/app/tests/collection-focus/page.tsx",
+      "line": 17,
+      "kind": "useMutation",
+      "target": "api.collection.setFocus",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/adoption/AdoptionBatchClient.tsx",
+      "line": 89,
+      "kind": "useQuery",
+      "target": "api.adoptionV2.getBySlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/adoption/AdoptionGeneratorClient.tsx",
+      "line": 77,
+      "kind": "useMutation",
+      "target": "api.adoptionV2.createBatch",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/adoption/AdoptionGeneratorClient.tsx",
+      "line": 78,
+      "kind": "useMutation",
+      "target": "api.mapper.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/adoption/AdoptionGeneratorClient.tsx",
+      "line": 79,
+      "kind": "useMutation",
+      "target": "api.adoptionV2.updateBatchMeta",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/ancestry-tree/AncestryTreeClient.tsx",
+      "line": 236,
+      "kind": "useMutation",
+      "target": "api.ancestryTree.save",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/ancestry-tree/AncestryTreeClient.tsx",
+      "line": 237,
+      "kind": "useMutation",
+      "target": "api.ancestryTree.saveAsNew",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/ancestry-tree/FoundingCoupleSelector.tsx",
+      "line": 105,
+      "kind": "useQuery",
+      "target": "api.mapper.listHistory",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/ancestry-tree/SaveTreeDialog.tsx",
+      "line": 110,
+      "kind": "useQuery",
+      "target": "api.ancestryTree.checkSlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/auth/UserAuthButton.tsx",
+      "line": 17,
+      "kind": "useMutation",
+      "target": "api.users.getOrCreateUser",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/auth/UserAuthButton.tsx",
+      "line": 18,
+      "kind": "useQuery",
+      "target": "api.users.viewer",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/color-palette/ColorPaletteContent.tsx",
+      "line": 162,
+      "kind": "useQuery",
+      "target": "api.mapper.getBySlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/color-palette/ColorPaletteContent.tsx",
+      "line": 168,
+      "kind": "useQuery",
+      "target": "api.paletteGeneratorSettings.get",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/color-palette/ColorPaletteContent.tsx",
+      "line": 175,
+      "kind": "useQuery",
+      "target": "api.paletteGeneratorSettings.getImageUrl",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/common/DiscordInviteButton.tsx",
+      "line": 197,
+      "kind": "useMutation",
+      "target": "api.discord.issueChallenge",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/common/DiscordInviteButton.tsx",
+      "line": 198,
+      "kind": "useMutation",
+      "target": "api.discord.redeemChallenge",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/dash/DashClient.tsx",
+      "line": 32,
+      "kind": "useQuery",
+      "target": "api.userVariants.list",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/dash/DashClient.tsx",
+      "line": 36,
+      "kind": "useMutation",
+      "target": "api.userVariants.upsert",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/evolution/EvolutionBatchClient.tsx",
+      "line": 85,
+      "kind": "useQuery",
+      "target": "api.adoptionV2.getBySlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/evolution/EvolutionGeneratorClient.tsx",
+      "line": 157,
+      "kind": "useMutation",
+      "target": "api.adoptionV2.createBatch",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/evolution/EvolutionGeneratorClient.tsx",
+      "line": 158,
+      "kind": "useMutation",
+      "target": "api.mapper.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/evolution/EvolutionGeneratorClient.tsx",
+      "line": 159,
+      "kind": "useMutation",
+      "target": "api.adoptionV2.updateBatchMeta",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/evolution/EvolutionGeneratorClient.tsx",
+      "line": 160,
+      "kind": "useMutation",
+      "target": "api.mapper.updateMeta",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/evolution/EvolutionGeneratorClient.tsx",
+      "line": 201,
+      "kind": "useQuery",
+      "target": "api.mapper.getBySlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/guided-builder/GuidedBuilderClient.tsx",
+      "line": 475,
+      "kind": "useMutation",
+      "target": "api.mapper.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/guided-builder/GuidedTimelineViewer.tsx",
+      "line": 79,
+      "kind": "useQuery",
+      "target": "api.mapper.getBySlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/guided-builder/GuidedTimelineViewer.tsx",
+      "line": 105,
+      "kind": "useMutation",
+      "target": "api.mapper.updateMeta",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/single-cat/HistoryClient.tsx",
+      "line": 151,
+      "kind": "useQuery",
+      "target": "api.mapper.listHistory",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/single-cat/HistoryClient.tsx",
+      "line": 152,
+      "kind": "useQuery",
+      "target": "api.adoptionV2.listBatches",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/single-cat/HistoryClient.tsx",
+      "line": 153,
+      "kind": "useQuery",
+      "target": "api.ancestryTree.list",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/single-cat/SingleCatPlusClient.tsx",
+      "line": 990,
+      "kind": "useMutation",
+      "target": "api.mapper.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/single-cat/SingleCatPlusClient.tsx",
+      "line": 991,
+      "kind": "useMutation",
+      "target": "api.mapper.updateMeta",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/single-cat/ViewerClient.tsx",
+      "line": 363,
+      "kind": "useQuery",
+      "target": "api.mapper.getBySlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/BatchCullBoard.tsx",
+      "line": 305,
+      "kind": "useMutation",
+      "target": "api.catStream.markBatchCat",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/BatchCullBoard.tsx",
+      "line": 306,
+      "kind": "useMutation",
+      "target": "api.catStream.cullBatchCat",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/BatchCullBoard.tsx",
+      "line": 307,
+      "kind": "useMutation",
+      "target": "api.catStream.cancelBatchCull",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/BatchCullBoard.tsx",
+      "line": 308,
+      "kind": "useMutation",
+      "target": "api.catStream.setBatchHighlight",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/BatchPanel.tsx",
+      "line": 51,
+      "kind": "useMutation",
+      "target": "api.adoptionV2.createBatch",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/BatchPanel.tsx",
+      "line": 52,
+      "kind": "useMutation",
+      "target": "api.mapper.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/BatchPanel.tsx",
+      "line": 53,
+      "kind": "useMutation",
+      "target": "api.catStream.triggerBatch",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/BatchPanel.tsx",
+      "line": 54,
+      "kind": "useMutation",
+      "target": "api.catStream.attachBatchSlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 131,
+      "kind": "useQuery",
+      "target": "api.users.viewer",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 132,
+      "kind": "useQuery",
+      "target": "api.catStream.getSession",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 137,
+      "kind": "useMutation",
+      "target": "api.catStream.ensureSession",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 138,
+      "kind": "useMutation",
+      "target": "api.catStream.updateSettings",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 139,
+      "kind": "useMutation",
+      "target": "api.catStream.mergeSettings",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 140,
+      "kind": "useMutation",
+      "target": "api.catStream.triggerSpin",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 141,
+      "kind": "useMutation",
+      "target": "api.catStream.attachViewSlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 142,
+      "kind": "useMutation",
+      "target": "api.catStream.triggerWheel",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 143,
+      "kind": "useMutation",
+      "target": "api.catStream.showLobby",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 144,
+      "kind": "useMutation",
+      "target": "api.catStream.showBrb",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 145,
+      "kind": "useMutation",
+      "target": "api.catStream.clearOverlay",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 146,
+      "kind": "useMutation",
+      "target": "api.catStream.toggleTestMode",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 147,
+      "kind": "useMutation",
+      "target": "api.mapper.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 148,
+      "kind": "useMutation",
+      "target": "api.mapper.updateMeta",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
+      "line": 206,
+      "kind": "useMutation",
+      "target": "api.catStream.holdEvolution",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
+      "line": 207,
+      "kind": "useMutation",
+      "target": "api.catStream.releaseEvolution",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
+      "line": 208,
+      "kind": "useMutation",
+      "target": "api.catStream.revealEvolutionAt",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
+      "line": 209,
+      "kind": "useMutation",
+      "target": "api.catStream.skipEvolutionToBoard",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
+      "line": 372,
+      "kind": "useMutation",
+      "target": "api.adoptionV2.createBatch",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
+      "line": 373,
+      "kind": "useMutation",
+      "target": "api.mapper.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
+      "line": 374,
+      "kind": "useMutation",
+      "target": "api.catStream.triggerEvolution",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
+      "line": 393,
+      "kind": "useQuery",
+      "target": "api.mapper.getBySlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/obs/scenes/batch/useBatchShow.ts",
+      "line": 537,
+      "kind": "useMutation",
+      "target": "api.catStream.reportBatchStage",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/obs/useObsSession.ts",
+      "line": 49,
+      "kind": "useQuery",
+      "target": "api.catStream.getSessionByApiKey",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 345,
+      "kind": "useQuery",
+      "target": "api.streamSessionsV2.getForHost",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 347,
+      "kind": "useQuery",
+      "target": "api.streamSessionsV2.list",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 381,
+      "kind": "useQuery",
+      "target": "api.streamVotesV2.list",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 392,
+      "kind": "useQuery",
+      "target": "api.streamParticipantsV2.list",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 398,
+      "kind": "useMutation",
+      "target": "api.streamSessionsV2.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 399,
+      "kind": "useMutation",
+      "target": "api.streamSessionsV2.update",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 400,
+      "kind": "useMutation",
+      "target": "api.streamSessionsV2.update",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 401,
+      "kind": "useMutation",
+      "target": "api.streamVotesV2.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 402,
+      "kind": "useMutation",
+      "target": "api.streamParticipantsV2.update",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 403,
+      "kind": "useMutation",
+      "target": "api.mapper.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/ViewerClient.tsx",
+      "line": 164,
+      "kind": "useQuery",
+      "target": "api.streamSessionsV2.list",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/ViewerClient.tsx",
+      "line": 172,
+      "kind": "useQuery",
+      "target": "api.streamSessionsV2.get",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/ViewerClient.tsx",
+      "line": 186,
+      "kind": "useQuery",
+      "target": "api.streamVotesV2.list",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/ViewerClient.tsx",
+      "line": 198,
+      "kind": "useQuery",
+      "target": "api.streamParticipantsV2.list",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/ViewerClient.tsx",
+      "line": 217,
+      "kind": "useMutation",
+      "target": "api.streamParticipantsV2.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/ViewerClient.tsx",
+      "line": 218,
+      "kind": "useMutation",
+      "target": "api.streamVotesV2.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/visual-builder/VisualBuilderClient.tsx",
+      "line": 429,
+      "kind": "useMutation",
+      "target": "api.mapper.create",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/visual-builder/VisualBuilderLoader.tsx",
+      "line": 255,
+      "kind": "useQuery",
+      "target": "api.mapper.getBySlug",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/wheel/ClassicWheelClient.tsx",
+      "line": 56,
+      "kind": "useMutation",
+      "target": "api.wheel.logSpin",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/wheel/ClassicWheelClient.tsx",
+      "line": 57,
+      "kind": "useQuery",
+      "target": "api.wheel.stats",
+      "context": "client"
+    },
+    {
+      "file": "frontend/lib/useDefaultCreatorName.ts",
+      "line": 11,
+      "kind": "useQuery",
+      "target": "api.users.viewer",
+      "context": "client"
+    },
+    {
+      "file": "frontend/utils/variants.ts",
+      "line": 117,
+      "kind": "useQuery",
+      "target": "api.userVariants.list",
+      "context": "server"
+    },
+    {
+      "file": "frontend/utils/variants.ts",
+      "line": 121,
+      "kind": "useMutation",
+      "target": "api.userVariants.upsert",
+      "context": "server"
+    },
+    {
+      "file": "frontend/utils/variants.ts",
+      "line": 122,
+      "kind": "useMutation",
+      "target": "api.userVariants.remove",
+      "context": "server"
+    },
+    {
+      "file": "frontend/utils/variants.ts",
+      "line": 123,
+      "kind": "useMutation",
+      "target": "api.userVariants.rename",
+      "context": "server"
+    },
+    {
+      "file": "frontend/utils/variants.ts",
+      "line": 124,
+      "kind": "useMutation",
+      "target": "api.userVariants.setActive",
+      "context": "server"
+    },
+    {
+      "file": "frontend/utils/variants.ts",
+      "line": 125,
+      "kind": "useMutation",
+      "target": "api.userVariants.importBatch",
+      "context": "server"
+    }
+  ],
+  "serverCalls": [
+    {
+      "file": "frontend/app/api/cat-share/route.ts",
+      "line": 26,
+      "kind": "query",
+      "target": "api.catShares.get",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/cat-share/route.ts",
+      "line": 86,
+      "kind": "mutation",
+      "target": "api.catShares.create",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/dash-settings/route.ts",
+      "line": 6,
+      "kind": "query",
+      "target": "api.dashSettings.get",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/dash-settings/route.ts",
+      "line": 7,
+      "kind": "mutation",
+      "target": "api.dashSettings.save",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/discord/palette/route.ts",
+      "line": 167,
+      "kind": "action",
+      "target": "api.paletteGeneratorSettingsActions.storeDiscordImage",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/discord/random-cat/route.ts",
+      "line": 285,
+      "kind": "mutation",
+      "target": "api.mapper.create",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/palette-generator-settings/route.ts",
+      "line": 9,
+      "kind": "query",
+      "target": "api.paletteGeneratorSettings.get",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/palette-generator-settings/route.ts",
+      "line": 11,
+      "kind": "mutation",
+      "target": "api.paletteGeneratorSettings.save",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/pixelator-settings/route.ts",
+      "line": 8,
+      "kind": "query",
+      "target": "api.pixelatorSettings.get",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/pixelator-settings/route.ts",
+      "line": 9,
+      "kind": "mutation",
+      "target": "api.pixelatorSettings.save",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/preview/[id]/route.ts",
+      "line": 257,
+      "kind": "query",
+      "target": "api.mapper.getBySlug",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/single-cat-settings/route.ts",
+      "line": 6,
+      "kind": "query",
+      "target": "api.singleCatSettings.get",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/single-cat-settings/route.ts",
+      "line": 7,
+      "kind": "mutation",
+      "target": "api.singleCatSettings.save",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/dash/page.tsx",
+      "line": 37,
+      "kind": "query",
+      "target": "api.dashSettings.get",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx",
+      "line": 34,
+      "kind": "query",
+      "target": "api.ancestryTree.getBySlug",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx",
+      "line": 70,
+      "kind": "query",
+      "target": "api.ancestryTree.getBySlug",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/single-cat-plus/page.tsx",
+      "line": 80,
+      "kind": "query",
+      "target": "api.singleCatSettings.get",
+      "context": "server"
+    }
+  ],
+  "authHookCalls": [
+    {
+      "file": "frontend/app/profile/page.tsx",
+      "line": 29,
+      "kind": "useConvexAuth",
+      "target": "",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/auth/UserAuthButton.tsx",
+      "line": 14,
+      "kind": "useConvexAuth",
+      "target": "",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/common/VariantBar.tsx",
+      "line": 24,
+      "kind": "useConvexAuth",
+      "target": "",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/dash/DashClient.tsx",
+      "line": 29,
+      "kind": "useConvexAuth",
+      "target": "",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/site-header.tsx",
+      "line": 16,
+      "kind": "useConvexAuth",
+      "target": "",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/stream-control/control/ControlShell.tsx",
+      "line": 130,
+      "kind": "useConvexAuth",
+      "target": "",
+      "context": "client"
+    },
+    {
+      "file": "frontend/components/streamer/HostClient.tsx",
+      "line": 280,
+      "kind": "useConvexAuth",
+      "target": "",
+      "context": "client"
+    },
+    {
+      "file": "frontend/utils/variants.ts",
+      "line": 114,
+      "kind": "useConvexAuth",
+      "target": "",
+      "context": "server"
+    }
+  ],
+  "nestedStorageReferences": [
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 75,
+      "identifier": "defaultCardStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 75,
+      "identifier": "defaultCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 77,
+      "identifier": "customCardStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 77,
+      "identifier": "customCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 343,
+      "identifier": "defaultCardStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 353,
+      "identifier": "customCardStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 521,
+      "identifier": "defaultCardStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 522,
+      "identifier": "defaultCardStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 524,
+      "identifier": "defaultCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 525,
+      "identifier": "defaultCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 527,
+      "identifier": "customCardStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 528,
+      "identifier": "customCardStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 530,
+      "identifier": "customCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 531,
+      "identifier": "customCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 541,
+      "identifier": "defaultCardStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 546,
+      "identifier": "defaultCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 551,
+      "identifier": "customCardStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 556,
+      "identifier": "customCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 578,
+      "identifier": "cardBackStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 596,
+      "identifier": "thumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 608,
+      "identifier": "defaultCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 608,
+      "identifier": "thumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 628,
+      "identifier": "customCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 628,
+      "identifier": "thumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 649,
+      "identifier": "thumbStorageId"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 659,
+      "identifier": "thumbStorageId"
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 113,
+      "identifier": "blurImgStorageId"
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 114,
+      "identifier": "blurImgStorageId"
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 116,
+      "identifier": "previewImgStorageId"
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 117,
+      "identifier": "previewImgStorageId"
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 119,
+      "identifier": "fullImgStorageId"
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 120,
+      "identifier": "fullImgStorageId"
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 131,
+      "identifier": "blurImgStorageId"
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 132,
+      "identifier": "previewImgStorageId"
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 133,
+      "identifier": "fullImgStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 18,
+      "identifier": "thumbStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 188,
+      "identifier": "defaultCardStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 188,
+      "identifier": "defaultCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 193,
+      "identifier": "defaultCardStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 197,
+      "identifier": "customCardStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 197,
+      "identifier": "customCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 202,
+      "identifier": "customCardStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 235,
+      "identifier": "thumbStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 261,
+      "identifier": "thumbStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 267,
+      "identifier": "thumbStorageId"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 274,
+      "identifier": "thumbStorageId"
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 178,
+      "identifier": "cardBackStorageId"
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 196,
+      "identifier": "cardBackStorageId"
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 291,
+      "identifier": "defaultCardStorageId"
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 314,
+      "identifier": "defaultCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 330,
+      "identifier": "customCardStorageId"
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 337,
+      "identifier": "customCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 379,
+      "identifier": "blurImgStorageId"
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 384,
+      "identifier": "previewImgStorageId"
+    },
+    {
+      "file": "frontend/convex/importer.ts",
+      "line": 392,
+      "identifier": "fullImgStorageId"
+    },
+    {
+      "file": "frontend/convex/paletteGeneratorSettings.ts",
+      "line": 45,
+      "identifier": "imageStorageId"
+    },
+    {
+      "file": "frontend/convex/paletteGeneratorSettings.ts",
+      "line": 46,
+      "identifier": "imageStorageId"
+    },
+    {
+      "file": "frontend/convex/paletteGeneratorSettings.ts",
+      "line": 47,
+      "identifier": "imageStorageId"
+    },
+    {
+      "file": "frontend/convex/paletteGeneratorSettings.ts",
+      "line": 48,
+      "identifier": "imageStorageId"
+    },
+    {
+      "file": "frontend/convex/paletteGeneratorSettingsActions.ts",
+      "line": 78,
+      "identifier": "imageStorageId"
+    },
+    {
+      "file": "frontend/convex/schema.ts",
+      "line": 109,
+      "identifier": "cardBackStorageId"
+    },
+    {
+      "file": "frontend/convex/schema.ts",
+      "line": 135,
+      "identifier": "defaultCardStorageId"
+    },
+    {
+      "file": "frontend/convex/schema.ts",
+      "line": 140,
+      "identifier": "defaultCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/schema.ts",
+      "line": 143,
+      "identifier": "customCardStorageId"
+    },
+    {
+      "file": "frontend/convex/schema.ts",
+      "line": 148,
+      "identifier": "customCardThumbStorageId"
+    },
+    {
+      "file": "frontend/convex/schema.ts",
+      "line": 196,
+      "identifier": "blurImgStorageId"
+    },
+    {
+      "file": "frontend/convex/schema.ts",
+      "line": 198,
+      "identifier": "previewImgStorageId"
+    },
+    {
+      "file": "frontend/convex/schema.ts",
+      "line": 200,
+      "identifier": "fullImgStorageId"
+    },
+    {
+      "file": "frontend/convex/seasons.ts",
+      "line": 93,
+      "identifier": "cardBackStorageId"
+    },
+    {
+      "file": "frontend/convex/seasons.ts",
+      "line": 94,
+      "identifier": "cardBackStorageId"
+    },
+    {
+      "file": "frontend/convex/seasons.ts",
+      "line": 102,
+      "identifier": "cardBackStorageId"
+    }
+  ],
+  "externalCallers": [
+    {
+      "file": "frontend/app/api/_lib/settings-route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/api/cat-share/route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/api/discord/palette/route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/api/discord/random-cat/route.ts",
+      "line": 2,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/api/preview/[id]/route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/catdex/CatdexPageClient.tsx",
+      "line": 860,
+      "service": "Convex HTTP site URL",
+      "detail": "CONVEX_SITE_URL;"
+    },
+    {
+      "file": "frontend/app/dash/page.tsx",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/single-cat-plus/page.tsx",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/lib/discord-service.ts",
+      "line": 11,
+      "service": "Convex HTTP site URL",
+      "detail": "CONVEX_SITE_URL ?? process.env.NEXT_PUBLIC_CONVEX_SITE_URL;"
+    },
+    {
+      "file": "backend/discord-bot/src/utils/api-client.ts",
+      "line": 147,
+      "service": "discord-bot",
+      "detail": "const url = `${config.frontendApiUrl}/api/discord/user-config?discordUserId=${encodeURIComponent(discordUserId)}`;"
+    },
+    {
+      "file": "backend/discord-bot/src/utils/api-client.ts",
+      "line": 161,
+      "service": "discord-bot",
+      "detail": "const url = `${config.frontendApiUrl}/api/discord/user-config`;"
+    },
+    {
+      "file": "backend/media_service/src/app.ts",
+      "line": 10,
+      "service": "media_service",
+      "detail": "import { bearerFromHeader, ConvexControlPlane } from \"./convex.ts\";"
+    },
+    {
+      "file": "backend/media_service/src/config.ts",
+      "line": 11,
+      "service": "media_service",
+      "detail": "CONVEX_SITE_URL: z.url(),"
+    },
+    {
+      "file": "backend/media_service/src/config.ts",
+      "line": 33,
+      "service": "media_service",
+      "detail": "convexSiteUrl: string;"
+    },
+    {
+      "file": "backend/media_service/src/config.ts",
+      "line": 53,
+      "service": "media_service",
+      "detail": "convexSiteUrl: trimTrailingSlashes(parsed.CONVEX_SITE_URL),"
+    },
+    {
+      "file": "backend/media_service/src/convex.ts",
+      "line": 16,
+      "service": "media_service",
+      "detail": "`${this.config.convexSiteUrl}/quick-share/internal`,"
+    },
+    {
+      "file": "backend/media_service/src/processor.ts",
+      "line": 8,
+      "service": "media_service",
+      "detail": "import type { ConvexControlPlane } from \"./convex.ts\";"
+    },
+    {
+      "file": "backend/media_service/test/app.test.ts",
+      "line": 9,
+      "service": "media_service",
+      "detail": "convexSiteUrl: \"https://control.example\","
+    },
+    {
+      "file": "backend/media_service/test/processor.test.ts",
+      "line": 3,
+      "service": "media_service",
+      "detail": "import type { ConvexControlPlane } from \"../src/convex.ts\";"
+    },
+    {
+      "file": "frontend/convex/auth.config.ts",
+      "line": 3,
+      "service": "convex runtime",
+      "detail": "const jwtIssuerDomain = process.env.CLERK_JWT_ISSUER_DOMAIN;"
+    },
+    {
+      "file": "frontend/convex/catdex.ts",
+      "line": 289,
+      "service": "convex runtime",
+      "detail": "process.env.CONVEX_SITE_URL ?? process.env.NEXT_PUBLIC_CONVEX_SITE_URL;"
+    },
+    {
+      "file": "frontend/convex/collection.ts",
+      "line": 79,
+      "service": "convex runtime",
+      "detail": "const admins = (process.env.QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS ?? \"\")"
+    },
+    {
+      "file": "frontend/convex/discord.ts",
+      "line": 7,
+      "service": "convex runtime",
+      "detail": "const rawInviteSecret = (process.env.DISCORD_INVITE_SECRET ?? \"\").trim();"
+    },
+    {
+      "file": "frontend/convex/discordAuth.ts",
+      "line": 3,
+      "service": "convex runtime",
+      "detail": "const token = process.env.DISCORD_API_TOKEN;"
+    },
+    {
+      "file": "frontend/convex/imageService.ts",
+      "line": 315,
+      "service": "convex runtime",
+      "detail": "response = await fetch(downloadUrl);"
+    },
+    {
+      "file": "frontend/convex/paletteGeneratorSettingsActions.ts",
+      "line": 14,
+      "service": "convex runtime",
+      "detail": "const expected = (process.env.DISCORD_API_TOKEN ?? \"\").trim();"
+    },
+    {
+      "file": "frontend/convex/previews.ts",
+      "line": 219,
+      "service": "convex runtime",
+      "detail": "const expectedToken = process.env.PREVIEW_REFRESH_TOKEN;"
+    },
+    {
+      "file": "frontend/convex/quickShareHttp.ts",
+      "line": 37,
+      "service": "convex runtime",
+      "detail": "const workerUrl = process.env.QUICK_SHARE_WORKER_URL;"
+    },
+    {
+      "file": "frontend/convex/quickShareHttp.ts",
+      "line": 38,
+      "service": "convex runtime",
+      "detail": "const internalToken = process.env.QUICK_SHARE_INTERNAL_TOKEN;"
+    },
+    {
+      "file": "frontend/convex/quickShareHttp.ts",
+      "line": 48,
+      "service": "convex runtime",
+      "detail": "const response = await fetch(url, {"
+    },
+    {
+      "file": "frontend/convex/quickShareHttp.ts",
+      "line": 113,
+      "service": "convex runtime",
+      "detail": "const allowlist = (process.env.QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS ?? \"\")"
+    },
+    {
+      "file": "frontend/convex/quickShareHttp.ts",
+      "line": 485,
+      "service": "convex runtime",
+      "detail": "const expected = process.env.QUICK_SHARE_INTERNAL_TOKEN;"
+    },
+    {
+      "file": "frontend/convex/utils.ts",
+      "line": 35,
+      "service": "convex runtime",
+      "detail": "process.env.CONVEX_STORAGE_ORIGIN ||"
+    },
+    {
+      "file": "frontend/convex/utils.ts",
+      "line": 36,
+      "service": "convex runtime",
+      "detail": "process.env.CONVEX_SITE_ORIGIN ||"
+    },
+    {
+      "file": "frontend/convex/utils.ts",
+      "line": 37,
+      "service": "convex runtime",
+      "detail": "process.env.CONVEX_SELF_HOSTED_URL ||"
+    },
+    {
+      "file": "frontend/convex/utils.ts",
+      "line": 38,
+      "service": "convex runtime",
+      "detail": "process.env.NEXT_PUBLIC_CONVEX_URL ||"
+    }
+  ],
+  "deploymentReferences": [
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 31,
+      "detail": "deploy_convex:"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 32,
+      "detail": "description: 'Deploy Convex backend (main branch only)'"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 56,
+      "detail": "convex: ${{ steps.filter.outputs.convex }}"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 97,
+      "detail": "set_output convex '^frontend/convex/'"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 138,
+      "detail": "deploy-convex:"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 139,
+      "detail": "# Every release tag deploys Convex. A previous deployment may have failed"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 140,
+      "detail": "# even when this release contains no Convex diff, and skipping here would"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 146,
+      "detail": "(github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.deploy_convex == 'true'))"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 166,
+      "detail": "- name: Fetch Convex deploy secret from Infisical"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 169,
+      "detail": "REQUIRED_KEYS: CONVEX_DEPLOY_KEY"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 218,
+      "detail": "- run: pnpm exec convex deploy"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 220,
+      "detail": "CONVEX_DEPLOY_KEY: ${{ steps.ci-secrets.outputs.CONVEX_DEPLOY_KEY }}"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 223,
+      "detail": "needs: [changes, cat-system-contract, deploy-convex]"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 228,
+      "detail": "(needs.deploy-convex.result == 'success' || needs.deploy-convex.result == 'skipped') &&"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 274,
+      "detail": "REQUIRED_KEYS: CONVEX_DEPLOYMENT NEXT_PUBLIC_POSTHOG_KEY NEXT_PUBLIC_POSTHOG_HOST NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 323,
+      "detail": "# Note: NEXT_PUBLIC_CONVEX_URL uses a placeholder at build time"
+    },
+    {
+      "file": ".forgejo/workflows/build-images.yml",
+      "line": 335,
+      "detail": "CONVEX_DEPLOYMENT=${{ steps.ci-secrets.outputs.CONVEX_DEPLOYMENT }}"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 40,
+      "detail": "deploy_convex:"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 41,
+      "detail": "description: \"Deploy Convex backend (main branch only)\""
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 62,
+      "detail": "convex: ${{ steps.filter.outputs.convex }}"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 104,
+      "detail": "set_output convex '^frontend/convex/'"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 140,
+      "detail": "deploy-convex:"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 141,
+      "detail": "# Every release tag deploys Convex. A previous deployment may have failed"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 142,
+      "detail": "# even when this release contains no Convex diff, and skipping here would"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 151,
+      "detail": "inputs.deploy_convex))"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 172,
+      "detail": "- name: Fetch Convex deploy secret from Infisical"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 182,
+      "detail": "- name: Deploy Convex backend"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 184,
+      "detail": ": \"${CONVEX_DEPLOY_KEY:?Missing CONVEX_DEPLOY_KEY from Infisical prod /ci}\""
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 185,
+      "detail": "pnpm exec convex deploy"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 188,
+      "detail": "needs: [changes, cat-system-contract, deploy-convex]"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 192,
+      "detail": "(needs.deploy-convex.result == 'success' || needs.deploy-convex.result == 'skipped') &&"
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 222,
+      "detail": ": \"${CONVEX_DEPLOYMENT:?Missing CONVEX_DEPLOYMENT from Infisical prod /ci}\""
+    },
+    {
+      "file": ".github/workflows/build-images.yml",
+      "line": 260,
+      "detail": "CONVEX_DEPLOYMENT=${{ env.CONVEX_DEPLOYMENT }}"
+    },
+    {
+      "file": ".github/workflows/validate.yml",
+      "line": 42,
+      "detail": "# Ephemeral database; nothing here touches Convex or production data."
+    },
+    {
+      "file": ".github/workflows/validate.yml",
+      "line": 70,
+      "detail": "- name: Convex inventory is current"
+    },
+    {
+      "file": "frontend/Dockerfile",
+      "line": 18,
+      "detail": "ARG CONVEX_DEPLOYMENT"
+    },
+    {
+      "file": "frontend/Dockerfile",
+      "line": 21,
+      "detail": "ARG NEXT_PUBLIC_CONVEX_URL=https://placeholder.convex.cloud"
+    },
+    {
+      "file": "frontend/Dockerfile",
+      "line": 28,
+      "detail": "ENV CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}"
+    },
+    {
+      "file": "frontend/Dockerfile",
+      "line": 31,
+      "detail": "ENV NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}"
+    },
+    {
+      "file": "frontend/Dockerfile",
+      "line": 43,
+      "detail": "# Generated Convex types are committed; dependency installation skips scripts."
+    },
+    {
+      "file": "frontend/convex.json",
+      "line": 2,
+      "detail": "\"functions\": \"convex\","
+    },
+    {
+      "file": "frontend/docker-entrypoint.sh",
+      "line": 9,
+      "detail": "CONVEX_PLACEHOLDER_URL=\"https://placeholder.convex.cloud\""
+    },
+    {
+      "file": "frontend/docker-entrypoint.sh",
+      "line": 10,
+      "detail": "CONVEX_PLACEHOLDER_HOST=\"placeholder.convex.cloud\""
+    },
+    {
+      "file": "frontend/docker-entrypoint.sh",
+      "line": 43,
+      "detail": "# Convex URL injection"
+    },
+    {
+      "file": "frontend/docker-entrypoint.sh",
+      "line": 44,
+      "detail": "if [ -n \"$NEXT_PUBLIC_CONVEX_URL\" ]; then"
+    },
+    {
+      "file": "frontend/docker-entrypoint.sh",
+      "line": 45,
+      "detail": "echo \" - NEXT_PUBLIC_CONVEX_URL\""
+    },
+    {
+      "file": "frontend/docker-entrypoint.sh",
+      "line": 46,
+      "detail": "NEW_CONVEX_HOST=$(echo \"$NEXT_PUBLIC_CONVEX_URL\" | sed 's|https://||' | sed 's|/.*||')"
+    },
+    {
+      "file": "frontend/docker-entrypoint.sh",
+      "line": 47,
+      "detail": "replace_in_files \"$CONVEX_PLACEHOLDER_URL\" \"$NEXT_PUBLIC_CONVEX_URL\""
+    },
+    {
+      "file": "frontend/docker-entrypoint.sh",
+      "line": 48,
+      "detail": "replace_in_files \"$CONVEX_PLACEHOLDER_HOST\" \"$NEW_CONVEX_HOST\""
+    },
+    {
+      "file": "frontend/docker-entrypoint.sh",
+      "line": 50,
+      "detail": "echo \" - WARNING: NEXT_PUBLIC_CONVEX_URL not set (database connection may fail)\""
+    },
+    {
+      "file": "frontend/package.json",
+      "line": 24,
+      "detail": "\"migration:inventory\": \"tsx scripts/migration/convex-inventory.ts\","
+    },
+    {
+      "file": "frontend/package.json",
+      "line": 25,
+      "detail": "\"convex:dev\": \"convex dev\","
+    },
+    {
+      "file": "frontend/package.json",
+      "line": 26,
+      "detail": "\"deploy\": \"pnpm exec convex deploy\","
+    },
+    {
+      "file": "frontend/package.json",
+      "line": 27,
+      "detail": "\"prepare\": \"pnpm exec convex codegen\""
+    },
+    {
+      "file": "frontend/package.json",
+      "line": 42,
+      "detail": "\"convex\": \"^1.45.0\","
+    },
+    {
+      "file": "frontend/package.json",
+      "line": 82,
+      "detail": "\"convex-test\": \"^0.0.54\","
+    },
+    {
+      "file": "package.json",
+      "line": 12,
+      "detail": "\"cat-system:build\": \"pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run && sh frontend/scripts/write-version.sh"
+    },
+    {
+      "file": "package.json",
+      "line": 17,
+      "detail": "\"dev:convex\": \"infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/"
+    },
+    {
+      "file": "package.json",
+      "line": 23,
+      "detail": "\"env:check:frontend\": \"infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev "
+    },
+    {
+      "file": "package.json",
+      "line": 24,
+      "detail": "\"env:check:media\": \"infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --p"
+    },
+    {
+      "file": "scripts/check-required-env.mjs",
+      "line": 4,
+      "detail": "const convexDeployment = process.env.CONVEX_DEPLOYMENT?.trim();"
+    },
+    {
+      "file": "scripts/check-required-env.mjs",
+      "line": 6,
+      "detail": "convexDeployment && !/^(dev|prod):[a-z0-9-]+$/i.test(convexDeployment)"
+    },
+    {
+      "file": "scripts/check-required-env.mjs",
+      "line": 7,
+      "detail": "? [\"CONVEX_DEPLOYMENT\"]"
+    },
+    {
+      "file": "scripts/dev.mjs",
+      "line": 291,
+      "detail": "console.log(\"[dev] Starting services with the configured Convex deployment.\");"
+    },
+    {
+      "file": "scripts/dev.mjs",
+      "line": 293,
+      "detail": "\"[dev] Run `pnpm dev:convex` separately only to sync Convex code.\","
+    }
+  ]
+}

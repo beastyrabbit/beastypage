@@ -37,3 +37,45 @@ jobs:
         run: |
           pnpm --dir frontend exec playwright install --with-deps chromium
           pnpm --dir frontend exec playwright test
+
+  # PostgreSQL migration foundation (docs/migration/adr-0001-postgresql.md).
+  # Ephemeral database; nothing here touches Convex or production data.
+  database:
+    runs-on: arc-beastypage
+    env:
+      DATABASE_URL: postgresql://beastypage:beastypage@127.0.0.1:5432/beastypage
+    services:
+      postgres:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_DB: beastypage
+          POSTGRES_USER: beastypage
+          POSTGRES_PASSWORD: beastypage
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U beastypage -d beastypage"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.33.0 --activate
+      - name: Install dependencies
+        run: pnpm --dir frontend install --frozen-lockfile --ignore-scripts
+      - name: Convex inventory is current
+        run: pnpm --dir frontend run migration:inventory --check
+      - name: Schema matches committed migrations
+        run: pnpm --dir frontend run db:drift
+      - name: Apply migrations to an empty database
+        run: pnpm --dir frontend run db:migrate
+      - name: Re-applying migrations is a no-op
+        run: pnpm --dir frontend run db:migrate
+      - name: Schema version is compatible
+        run: pnpm --dir frontend run db:migrate --status
+      - name: Database and importer tests
+        run: pnpm --dir frontend run test:db

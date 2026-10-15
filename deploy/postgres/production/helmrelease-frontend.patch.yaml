@@ -1,0 +1,50 @@
+# TEMPLATE: changes to the frontend controller in
+# kub-homelab cluster/homelab/apps/webpage/beastypage/helmrelease.yaml.
+# Applied only as part of the approved cutover (#116), never before.
+controllers:
+  frontend:
+    initContainers:
+      # Runs once per rollout under the advisory lock; concurrent pods queue.
+      # Fails the rollout (pods never become Ready) when the database is
+      # newer than the image or the migration history does not match.
+      migrate:
+        image:
+          repository: ghcr.io/beastyrabbit/beastypage-frontend
+          tag: "<same tag as main container>"
+        command: ["node", "scripts/db/migrate.mjs"]
+        envFrom:
+          - secretRef:
+              name: beastypage-postgres-urls
+        env:
+          NODE_ENV: production
+        resources:
+          requests: { cpu: 10m, memory: 96Mi }
+          limits: { memory: 256Mi }
+    containers:
+      main:
+        envFrom:
+          - secretRef:
+              name: beastypage-postgres-urls
+        env:
+          DATABASE_POOL_MAX: "6"
+        probes:
+          readiness:
+            custom: true
+            spec:
+              httpGet:
+                path: /api/health/database
+                port: 3000
+              periodSeconds: 10
+              failureThreshold: 3
+persistence:
+  postgres-ca:
+    type: secret
+    name: beastypage-postgres-ca
+    advancedMounts:
+      frontend:
+        main:
+          - path: /etc/postgres-ca
+            readOnly: true
+        migrate:
+          - path: /etc/postgres-ca
+            readOnly: true

@@ -1,0 +1,67 @@
+# TEMPLATE for kub-homelab: append to cluster/homelab/apps/webpage/beastypage/infisical-sync.yaml
+# Secret values live only in Infisical (prod, /kubernetes/webpage/beastypage-postgres).
+# Keys expected there (names only, never values in Git):
+#   BEASTYPAGE_DB_OWNER_USERNAME   = beastypage_owner
+#   BEASTYPAGE_DB_OWNER_PASSWORD
+#   BEASTYPAGE_DB_APP_PASSWORD
+#   BEASTYPAGE_DB_IMPORT_PASSWORD
+---
+apiVersion: secrets.infisical.com/v1beta1
+kind: InfisicalStaticSecret
+metadata:
+  name: beastypage-postgres-secrets
+  namespace: webpage
+spec:
+  infisicalAuthRef:
+    name: kub-homelab-operator
+    namespace: tools
+  sources:
+    - projectId: 71562e7f-98e6-45f1-a031-ca8713b3f0dd
+      environmentSlug: prod
+      secretPath: /kubernetes/webpage/beastypage-postgres
+      recursive: false
+  targets:
+    - name: beastypage-postgres-owner
+      namespace: webpage
+      kind: Secret
+      creationPolicy: Orphan
+      secretType: kubernetes.io/basic-auth
+      template:
+        engineVersion: v1
+        data:
+          username: "{{ .BEASTYPAGE_DB_OWNER_USERNAME.Value }}"
+          password: "{{ .BEASTYPAGE_DB_OWNER_PASSWORD.Value }}"
+    - name: beastypage-postgres-app-role
+      namespace: webpage
+      kind: Secret
+      creationPolicy: Orphan
+      secretType: kubernetes.io/basic-auth
+      template:
+        engineVersion: v1
+        data:
+          username: beastypage_app
+          password: "{{ .BEASTYPAGE_DB_APP_PASSWORD.Value }}"
+    - name: beastypage-postgres-import-role
+      namespace: webpage
+      kind: Secret
+      creationPolicy: Orphan
+      secretType: kubernetes.io/basic-auth
+      template:
+        engineVersion: v1
+        data:
+          username: beastypage_import
+          password: "{{ .BEASTYPAGE_DB_IMPORT_PASSWORD.Value }}"
+    # Connection URLs with certificate verification against the CNPG CA,
+    # mounted at /etc/postgres-ca/ca.crt from secret beastypage-postgres-ca.
+    - name: beastypage-postgres-urls
+      namespace: webpage
+      kind: Secret
+      creationPolicy: Orphan
+      secretType: Opaque
+      template:
+        engineVersion: v1
+        data:
+          DATABASE_URL: "postgresql://beastypage_app:{{ .BEASTYPAGE_DB_APP_PASSWORD.Value | urlquery }}@beastypage-postgres-rw.webpage.svc:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt"
+          DATABASE_MIGRATION_URL: "postgresql://{{ .BEASTYPAGE_DB_OWNER_USERNAME.Value }}:{{ .BEASTYPAGE_DB_OWNER_PASSWORD.Value | urlquery }}@beastypage-postgres-rw.webpage.svc:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt"
+  syncOptions:
+    refreshInterval: 5m

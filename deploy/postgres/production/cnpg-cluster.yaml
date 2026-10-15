@@ -1,0 +1,94 @@
+# TEMPLATE for kub-homelab: cluster/homelab/apps/webpage/beastypage/cnpg-cluster.yaml
+# Not applied from this repository. Porting it into kub-homelab is a
+# production infrastructure change and needs explicit approval.
+# Decisions: docs/migration/adr-0001-postgresql.md sections 2, 3 and 12.
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: beastypage-postgres
+  namespace: webpage
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6
+
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+      dataDurability: required
+    parameters:
+      # Budget: 3 frontend replicas x (6 pool + 1 LISTEN) + migration +
+      # importer + admin headroom; see the ADR connection table.
+      max_connections: "100"
+      # bytea image rows: keep WAL and checkpoints sane during the import.
+      max_wal_size: "2GB"
+      wal_compression: "zstd"
+      log_min_duration_statement: "1000"
+
+  # Owner (DDL, migrations) is the bootstrap owner; the app role gets DML only
+  # (granted by the first migration's companion grant script, see operations.md).
+  managed:
+    roles:
+      - name: beastypage_app
+        ensure: present
+        login: true
+        connectionLimit: 30
+        passwordSecret:
+          name: beastypage-postgres-app-role
+      - name: beastypage_import
+        # Enabled only during a rehearsal or the cutover window.
+        ensure: present
+        login: false
+        connectionLimit: 4
+        passwordSecret:
+          name: beastypage-postgres-import-role
+
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: required
+    topologyKey: kubernetes.io/hostname
+
+  storage:
+    # Size from the #106 measurement: table data + files x 2.5 (WAL, bloat,
+    # growth). Placeholder until the export is measured.
+    size: 20Gi
+    storageClass: longhorn-single-replica
+
+  backup:
+    volumeSnapshot:
+      className: longhorn-cnpg-backup
+      online: true
+      onlineConfiguration:
+        immediateCheckpoint: false
+        waitForArchive: true
+      snapshotOwnerReference: backup
+      labels:
+        backup.heerlabs.com/provider: cnpg-volume-snapshot
+
+  bootstrap:
+    initdb:
+      database: beastypage
+      owner: beastypage_owner
+      secret:
+        name: beastypage-postgres-owner
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: beastypage-postgres-6h
+  namespace: webpage
+spec:
+  # Every 6 hours (RPO <= 6 h), staggered off the 00:20-00:55 CNPG window.
+  schedule: "0 10 */6 * * *"
+  backupOwnerReference: self
+  method: volumeSnapshot
+  cluster:
+    name: beastypage-postgres

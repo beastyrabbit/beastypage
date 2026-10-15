@@ -16,6 +16,7 @@ export default defineConfig({
             "**/.next/**",
             "tests/cat-v3/render.spec.ts",
             "tests/browser/**",
+            "**/*.db.test.ts",
           ],
         },
       },
@@ -28,12 +29,31 @@ export default defineConfig({
           globalSetup: ["./tests/renderer.global-setup.ts"],
         },
       },
+      {
+        // Real PostgreSQL. Needs DATABASE_URL or `pnpm run db:local up`.
+        extends: true,
+        test: {
+          name: "database",
+          environment: "node",
+          include: ["**/*.db.test.ts"],
+          exclude: ["**/node_modules/**"],
+          globalSetup: ["./tests/database.global-setup.ts"],
+          testTimeout: 30_000,
+          hookTimeout: 60_000,
+        },
+      },
     ],
     fileParallelism: false,
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),
+      // Next.js resolves `server-only` to an empty module on the server;
+      // tests run server code directly.
+      "server-only": path.resolve(
+        __dirname,
+        "node_modules/server-only/empty.js",
+      ),
     },
   },
 });
