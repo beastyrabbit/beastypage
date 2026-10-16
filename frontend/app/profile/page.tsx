@@ -1,7 +1,6 @@
 "use client";
 
 import { useClerk, useUser } from "@clerk/nextjs";
-import { useConvexAuth } from "convex/react";
 import {
   ChevronDown,
   ChevronRight,
@@ -19,6 +18,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PageHero } from "@/components/common/PageHero";
+import { useBackendAuth } from "@/lib/data";
 import {
   useAllUserVariants,
   useImportUserVariants,
@@ -34,7 +34,7 @@ export default function ProfilePage() {
   const [accountDeleting, setAccountDeleting] = useState(false);
   const clerk = useClerk();
   const { user: clerkUser } = useUser();
-  const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
+  const { isLoading: authLoading, isAuthenticated } = useBackendAuth();
   const viewer = useUserViewer();
   const updateProfile = useUpdateUserProfile();
   const resetSavedVariants = useResetSavedVariants();

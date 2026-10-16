@@ -34,6 +34,13 @@ current opaque cursor and returns `{ results, nextCursor }`; the hook exposes
 Convex's `{ results, status, loadMore, isLoading }` contract. Route handlers
 should use `encodeCursor`/`decodeCursor` and order by `(created_at, id)`.
 
+Authentication follows the selected backend through `useBackendAuth()`. In
+Convex mode it preserves `useConvexAuth()` state; in PostgreSQL mode it uses
+Clerk's loaded and signed-in state, so client pages do not wait for a paused
+Convex deployment. PostgreSQL mode still mounts a plain `ConvexProvider` for
+dual-path hooks that call Convex with `"skip"`; Convex mode keeps
+`ConvexProviderWithClerk`.
+
 `fetchJson` sends and receives JSON and throws `ApiError` with `status`, `code`
 and `message` for the server error contract. Pass its `signal` through to
 support cancellation when TanStack Query abandons a request.

@@ -1,11 +1,11 @@
 "use client";
 
-import { useConvexAuth } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { TOOL_MAP } from "@/lib/dash/registry.generated";
 import type { DashSettings, ToolWidgetMeta } from "@/lib/dash/types";
 import { APP_VERSION } from "@/lib/dash/version";
+import { useBackendAuth } from "@/lib/data";
 import { useUpsertUserVariant, useUserVariants } from "@/lib/data/users";
 import { DEFAULT_DASH_SETTINGS, parseDashPayload } from "@/utils/dashVariants";
 import { AddWidgetModal } from "./AddWidgetModal";
@@ -26,7 +26,7 @@ export function DashClient({
   initialSettings = null,
   initialLoadError = null,
 }: DashClientProps = {}) {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated } = useBackendAuth();
 
   // Load settings from Convex
   const convexVariants = useUserVariants("dash", isAuthenticated);

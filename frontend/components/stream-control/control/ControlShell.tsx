@@ -8,7 +8,6 @@
  */
 
 import { useClerk } from "@clerk/nextjs";
-import { useConvexAuth } from "convex/react";
 import { Cat, Dna, Loader2, Palette, Play, Settings2 } from "lucide-react";
 import { MotionConfig, motion, type Variants } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -22,6 +21,7 @@ import {
 } from "@/lib/cat-system";
 import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import type { SlotSelections } from "@/lib/cat-v3/types";
+import { useBackendAuth } from "@/lib/data";
 import { useCatCreate, useCatUpdateMeta } from "@/lib/data/cats";
 import {
   useAttachCatStreamViewSlug,
@@ -141,7 +141,7 @@ const NON_MODE_TABS: ReadonlySet<ControlTabId> = new Set(["look", "settings"]);
 
 export function ControlShell() {
   const clerk = useClerk();
-  const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
+  const { isLoading: authLoading, isAuthenticated } = useBackendAuth();
   const viewer = useUserViewer();
   const session = useCatStreamSession(isAuthenticated);
 

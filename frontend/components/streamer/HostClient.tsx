@@ -1,7 +1,6 @@
 "use client";
 
 import { SignInButton } from "@clerk/nextjs";
-import { useConvexAuth } from "convex/react";
 import {
   ClipboardCopy,
   Loader2,
@@ -32,6 +31,7 @@ import type { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
 import { track } from "@/lib/analytics";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
+import { useBackendAuth } from "@/lib/data";
 import { useCatCreate } from "@/lib/data/cats";
 import {
   useCreateStreamSession,
@@ -288,7 +288,7 @@ function renderLeaderPreview({
 }
 
 export function HostClient() {
-  const { isLoading, isAuthenticated } = useConvexAuth();
+  const { isLoading, isAuthenticated } = useBackendAuth();
   if (isLoading) return <p>Loading host account…</p>;
   if (!isAuthenticated)
     return (

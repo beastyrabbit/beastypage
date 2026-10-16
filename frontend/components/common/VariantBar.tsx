@@ -1,8 +1,8 @@
 "use client";
 
-import { useConvexAuth } from "convex/react";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useBackendAuth } from "@/lib/data";
 import { cn } from "@/lib/utils";
 import type { UseVariantsReturn } from "@/utils/variants";
 
@@ -21,7 +21,7 @@ export function VariantBar<T>({
   isDirty,
   showToast,
 }: Readonly<VariantBarProps<T>>) {
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated } = useBackendAuth();
   const {
     store,
     activeVariant,

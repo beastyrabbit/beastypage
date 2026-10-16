@@ -1,17 +1,17 @@
 "use client";
 
 import { useClerk, useUser } from "@clerk/nextjs";
-import { useConvexAuth } from "convex/react";
 import { Loader2, LogIn, LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useBackendAuth } from "@/lib/data";
 import { useEnsureUser, useUserViewer } from "@/lib/data/users";
 import { cn } from "@/lib/utils";
 
 export function UserAuthButton() {
   const clerk = useClerk();
   const { user: clerkUser } = useUser();
-  const { isLoading, isAuthenticated } = useConvexAuth();
+  const { isLoading, isAuthenticated } = useBackendAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const getOrCreateUser = useEnsureUser();
