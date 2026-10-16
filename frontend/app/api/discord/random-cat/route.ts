@@ -17,6 +17,10 @@ import {
 } from "@/lib/cat-v3/random-cat-server";
 import { getServerConvexUrl } from "@/lib/convexUrl";
 import { discordConfig } from "@/lib/discord-service";
+import { ANONYMOUS } from "@/server/auth/identity";
+import { dataBackend } from "@/server/backend";
+import { getDb } from "@/server/db/client";
+import { createProfile } from "@/server/services/cats";
 
 const DISCORD_IMAGE_SIZE = 500;
 
@@ -260,6 +264,32 @@ async function saveCat(
 ): Promise<string | undefined> {
   let slug: string | undefined;
   try {
+    const catData = {
+      params: { ...params, source: "discordkitten" },
+      accessorySlots: params.accessories ?? [],
+      scarSlots: params.scars ?? [],
+      tortieSlots: params.tortie ?? [],
+      counts: {
+        accessories: (params.accessories ?? []).length,
+        scars: (params.scars ?? []).length,
+        tortie: (params.tortie ?? []).length,
+      },
+    };
+    if (dataBackend() === "postgres") {
+      const discordUsername =
+        typeof body.discord_username === "string"
+          ? body.discord_username
+          : undefined;
+      const result = await createProfile(
+        getDb(),
+        {
+          catData: catDataToLegacyPersistence(catData),
+          creatorName: discordUsername || "Discord",
+        },
+        ANONYMOUS,
+      );
+      return result.slug;
+    }
     const convexUrl = getServerConvexUrl();
     if (!convexUrl) {
       console.warn(
@@ -267,17 +297,6 @@ async function saveCat(
       );
     } else {
       const convex = new ConvexHttpClient(convexUrl);
-      const catData = {
-        params: { ...params, source: "discordkitten" },
-        accessorySlots: params.accessories ?? [],
-        scarSlots: params.scars ?? [],
-        tortieSlots: params.tortie ?? [],
-        counts: {
-          accessories: (params.accessories ?? []).length,
-          scars: (params.scars ?? []).length,
-          tortie: (params.tortie ?? []).length,
-        },
-      };
       const discordUsername =
         typeof body.discord_username === "string"
           ? body.discord_username

@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { ArrowUpRight, Download, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -55,7 +54,6 @@ import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
-import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { track } from "@/lib/analytics";
 import {
@@ -75,6 +73,7 @@ import type { CatParams } from "@/lib/cat-v3/types";
 // `encodeCatShare` is still defined in the legacy pipeline and gives us a
 // portable payload for the old viewer and future React viewer work.
 import { createCatShare, encodeCatShare } from "@/lib/catShare";
+import { useCatCreate, useCatUpdateMeta } from "@/lib/data/cats";
 import type { PaletteId } from "@/lib/palettes";
 import type { SingleCatPortableSettings } from "@/lib/portable-settings";
 import {
@@ -987,8 +986,8 @@ export function SingleCatPlusClient({
     return "text-3xl tracking-[0.32em]";
   }, [rollerActiveValue]);
 
-  const createMapper = useMutation(api.mapper.create);
-  const updateMapperMeta = useMutation(api.mapper.updateMeta);
+  const createMapper = useCatCreate();
+  const updateMapperMeta = useCatUpdateMeta();
 
   const extendedModesArray = useMemo(
     () => Array.from(extendedModes),

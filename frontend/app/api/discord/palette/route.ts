@@ -13,6 +13,9 @@ import {
 import type { ExtractedColor } from "@/lib/color-extraction/types";
 import { getServerConvexUrl } from "@/lib/convexUrl";
 import { downloadPublicImage } from "@/lib/public-image-download";
+import { dataBackend } from "@/server/backend";
+import { getDb } from "@/server/db/client";
+import { storeDiscordImage as storePostgresDiscordImage } from "@/server/services/palette";
 
 const PUBLIC_BASE_URL =
   process.env.NEXT_PUBLIC_BASE_URL ?? "https://beastyrabbit.com";
@@ -160,6 +163,16 @@ async function persistPalette(
 
   try {
     if (signal.aborted) return { response: abortedResponse() };
+    if (dataBackend() === "postgres") {
+      const result = await storePostgresDiscordImage(getDb(), {
+        dataUrl: `data:image/png;base64,${imageBuffer.toString("base64")}`,
+        colors: colorsPayload,
+        serviceToken: (process.env.DISCORD_API_TOKEN ?? "").trim(),
+      });
+      slug = result.slug;
+      customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?paletteSlug=${slug}`;
+      return { value: { slug, customizeUrl } };
+    }
     const convexUrl = getServerConvexUrl();
     if (convexUrl) {
       const convex = new ConvexHttpClient(convexUrl);

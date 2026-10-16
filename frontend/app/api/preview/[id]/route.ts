@@ -2,6 +2,9 @@ import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
 import { api } from "@/convex/_generated/api";
 import { getServerConvexUrl } from "@/lib/convexUrl";
+import { dataBackend } from "@/server/backend";
+import { getDb } from "@/server/db/client";
+import { findProfile } from "@/server/services/cats";
 
 function normalizeRendererBase(url: string) {
   const trimmed = url.replace(/\/$/, "");
@@ -241,6 +244,30 @@ export async function GET(
   // Mode 1: Look up profile from Convex
   if (!profileId) {
     return NextResponse.json({ error: "Missing profile ID" }, { status: 400 });
+  }
+
+  if (dataBackend() === "postgres") {
+    try {
+      const profile = await findProfile(getDb(), profileId);
+      if (!profile)
+        return NextResponse.json(
+          { error: "Profile not found", code: "not_found" },
+          { status: 404 },
+        );
+      const catData = profile.catData;
+      if (!isPlainRecord(catData))
+        return NextResponse.json(
+          { error: "Cat data not found", code: "not_found" },
+          { status: 404 },
+        );
+      return await renderCatData(catData, request.signal);
+    } catch (error) {
+      console.error("Failed to generate PostgreSQL preview", error);
+      return NextResponse.json(
+        { error: "Failed to generate preview" },
+        { status: 500 },
+      );
+    }
   }
 
   const convexUrl = getServerConvexUrl();

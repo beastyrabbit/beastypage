@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
 import { ArrowUpRight, Loader2, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -22,9 +21,15 @@ import type {
 } from "@/components/cat-builder/types";
 import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
-import { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
 import type { CatParams } from "@/lib/cat-v3/types";
+import {
+  useAdoptionCreate,
+  useAdoptionUpdateMeta,
+  useCatCreate,
+  useCatProfile,
+  useCatUpdateMeta,
+} from "@/lib/data/cats";
 import {
   estimateCeremonySeconds,
   formatDuration,
@@ -154,10 +159,10 @@ function resolveHistoryStarter(
 }
 
 export function EvolutionGeneratorClient() {
-  const createBatch = useMutation(api.adoptionV2.createBatch);
-  const createMapper = useMutation(api.mapper.create);
-  const updateBatchMeta = useMutation(api.adoptionV2.updateBatchMeta);
-  const updateProfileMeta = useMutation(api.mapper.updateMeta);
+  const createBatch = useAdoptionCreate();
+  const createMapper = useCatCreate();
+  const updateBatchMeta = useAdoptionUpdateMeta();
+  const updateProfileMeta = useCatUpdateMeta();
   const defaultCreator = useDefaultCreatorName();
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const mapperRef = useRef<SpriteMapperApi | null>(null);
@@ -198,11 +203,8 @@ export function EvolutionGeneratorClient() {
   const [metadataSaving, setMetadataSaving] = useState(false);
 
   const trimmedHistorySlug = historySlug.trim();
-  const historyRecord = useQuery(
-    api.mapper.getBySlug,
-    starterMode === "history" && trimmedHistorySlug
-      ? { slugOrId: trimmedHistorySlug }
-      : "skip",
+  const historyRecord = useCatProfile(
+    starterMode === "history" && trimmedHistorySlug ? trimmedHistorySlug : null,
   ) as MapperRecord | null | undefined;
 
   useEffect(() => {

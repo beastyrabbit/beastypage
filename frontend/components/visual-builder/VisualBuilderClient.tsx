@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { Loader2, Minus, Plus } from "lucide-react";
 import Image from "next/image";
 import {
@@ -35,7 +34,6 @@ import DownChevron from "@/components/ui/down-chevron";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
-import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
 import { GenericTraitEditors } from "@/lib/cat-builder/GenericTraitEditors";
 import {
@@ -55,6 +53,7 @@ import {
 import { DEFAULT_POSE_NAME } from "@/lib/cat-v3/poseOptions";
 import type { CatParams, TortieLayer } from "@/lib/cat-v3/types";
 import { createCatShare } from "@/lib/catShare";
+import { useCatCreate } from "@/lib/data/cats";
 import type { PaletteMode } from "@/lib/palettes";
 import { getPaletteIds } from "@/lib/palettes";
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
@@ -426,7 +425,7 @@ export function VisualBuilderClient({
   );
   const previewRequestRef = useRef(0);
 
-  const createMapperRecord = useMutation(api.mapper.create);
+  const createMapperRecord = useCatCreate();
 
   useEffect(() => {
     spriteMapperRef.current = mapper ?? null;

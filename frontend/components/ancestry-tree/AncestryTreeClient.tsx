@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import {
   ArrowLeftRight,
   ArrowUpDown,
@@ -18,7 +17,6 @@ import GearIcon from "@/components/ui/gear-icon";
 import HistoryCircleIcon from "@/components/ui/history-circle-icon";
 import PaintIcon from "@/components/ui/paint-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
-import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
 import { generateWarriorName } from "@/lib/ancestry-tree/nameGenerator";
 import {
@@ -49,6 +47,7 @@ import {
   generateRandomParamsV3,
 } from "@/lib/cat-v3/randomGenerator";
 import type { CatParams } from "@/lib/cat-v3/types";
+import { useAncestrySave, useAncestrySaveAsNew } from "@/lib/data/cats";
 import type { PaletteId } from "@/lib/palettes";
 import { CatSidebar } from "./CatSidebar";
 import {
@@ -233,8 +232,8 @@ export function AncestryTreeClient({
     traits: createTraitMutationPools(),
   });
 
-  const saveTreeMutation = useMutation(api.ancestryTree.save);
-  const saveAsNewTreeMutation = useMutation(api.ancestryTree.saveAsNew);
+  const saveTreeMutation = useAncestrySave();
+  const saveAsNewTreeMutation = useAncestrySaveAsNew();
 
   // Initialize sprite mapper on mount
   useEffect(() => {

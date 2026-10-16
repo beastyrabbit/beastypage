@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
@@ -12,11 +11,15 @@ import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
-import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { toId } from "@/convex/utils";
 import { track } from "@/lib/analytics";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
+import {
+  useAdoptionCreate,
+  useAdoptionUpdateMeta,
+  useCatCreate,
+} from "@/lib/data/cats";
 import type { PaletteId } from "@/lib/palettes";
 
 interface LegacyBatchCat {
@@ -74,9 +77,9 @@ const LegacyCatGrid = memo(
 );
 
 export function AdoptionGeneratorClient() {
-  const createBatch = useMutation(api.adoptionV2.createBatch);
-  const createMapper = useMutation(api.mapper.create);
-  const updateBatchMeta = useMutation(api.adoptionV2.updateBatchMeta);
+  const createBatch = useAdoptionCreate();
+  const createMapper = useCatCreate();
+  const updateBatchMeta = useAdoptionUpdateMeta();
   const stylesheetRef = useRef<HTMLLinkElement | null>(null);
   const lastTokenRef = useRef<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
