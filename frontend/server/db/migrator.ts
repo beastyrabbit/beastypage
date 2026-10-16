@@ -37,7 +37,7 @@ function quoteIdentifier(identifier: string): string {
 async function grantRole(
   client: pg.PoolClient,
   role: string,
-  options: { truncate: boolean; appTimeouts: boolean },
+  options: { truncate: boolean },
   log: (line: string) => void,
 ): Promise<void> {
   const present = await client.query<{ present: boolean }>(
@@ -67,13 +67,6 @@ async function grantRole(
   await client.query(
     `alter default privileges for role ${owner} in schema public grant usage, select on sequences to ${target}`,
   );
-  if (options.appTimeouts) {
-    await client.query(`alter role ${target} set statement_timeout = '5s'`);
-    await client.query(`alter role ${target} set lock_timeout = '2s'`);
-    await client.query(
-      `alter role ${target} set idle_in_transaction_session_timeout = '10s'`,
-    );
-  }
   log(
     `[db:migrate] grants applied for ${role}${options.truncate ? " (including truncate for imports)" : ""}`,
   );
@@ -88,7 +81,7 @@ export async function applyRoleGrants(
   await grantRole(
     client,
     options.appRole ?? process.env.DATABASE_APP_ROLE ?? "beastypage_app",
-    { truncate: false, appTimeouts: true },
+    { truncate: false },
     log,
   );
   await grantRole(
@@ -96,7 +89,7 @@ export async function applyRoleGrants(
     options.importRole ??
       process.env.DATABASE_IMPORT_ROLE ??
       "beastypage_import",
-    { truncate: true, appTimeouts: false },
+    { truncate: true },
     log,
   );
 }

@@ -73,15 +73,20 @@ password is a throwaway value for an ephemeral container.
   is selected it fails, and pods stay out of rotation, when
   `db.version < SCHEMA_VERSION` or `SCHEMA_VERSION < db.compatible_from`.
 - After migrations, the same owner-held run applies idempotent grants. It
-  grants `beastypage_app` schema/table/sequence DML, default privileges and
-  the documented 5s/2s/10s role timeouts. The role name is configurable with
+  grants `beastypage_app` schema/table/sequence DML and default privileges.
+  The role name is configurable with
   `DATABASE_APP_ROLE` and a missing local role is logged and skipped. When
   present, `beastypage_import` receives the same DML and `TRUNCATE` plus
   sequence privileges so `import:convex --replace` can empty its tables.
-  Verify as the app role with `\dp public.*`, `\ddp`, `\du+ beastypage_app`,
-  `show statement_timeout`, and a harmless insert/update/delete using a
-  sequence. The migration runner repeats these statements safely on every
-  non-status run.
+  `server/db/pool.ts` and the live-event listener set `statement_timeout`,
+  `lock_timeout` and `idle_in_transaction_session_timeout` on each
+  application connection. Role-level settings are optional; only a superuser
+  or CNPG-managed role with the required admin authority can apply them. The
+  migration runner deliberately does not alter another role. Verify grants as
+  the app role with `\dp public.*`, `\ddp`, and a harmless
+  insert/update/delete using a sequence. Verify the three timeout values
+  through a connection created by the application pool. The migration runner
+  repeats the grant statements safely on every non-status run.
 
 ## Staging
 
@@ -122,12 +127,15 @@ explicit approval.** Nothing in this repository applies them.
     grant select, insert, update, delete on tables to beastypage_app;
   alter default privileges for role beastypage_owner in schema public
     grant usage, select on sequences to beastypage_app;
-  alter role beastypage_app set statement_timeout = '5s';
-  alter role beastypage_app set lock_timeout = '2s';
-  alter role beastypage_app set idle_in_transaction_session_timeout = '10s';
   ```
 
-  The import role needs the additional truncate privilege while its login is
+- The three timeout values are session settings supplied by
+  `server/db/pool.ts` for each application connection. An operator may set the
+  same values at role level only when a superuser or a CNPG-managed role has
+  the necessary authority; that optional setting is outside the owner-run
+  grant step.
+
+- The import role needs the additional truncate privilege while its login is
   enabled for a rehearsal or cutover:
 
   ```sql

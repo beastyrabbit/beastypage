@@ -223,6 +223,16 @@ report directory on encrypted storage outside the repository.
    referenced file's bytes hash to its stored SHA-256. Keep the archive and
    reports private with mode 0700/0600.
 
+   The migration init container runs `db:migrate` as
+   `beastypage_owner`. After Drizzle migrations and the schema-version write,
+   that owner-held runner invokes `applyRoleGrants`, which applies the app and
+   import schema/table/sequence/default-privilege grants before this import
+   command runs. Verify the app role with `\dp public.*`, `\ddp`, and a
+   harmless insert/update/delete plus sequence call. The application pool and
+   live-event listener set the three timeout values per connection; a role
+   default is optional, requires superuser/CNPG-managed-role authority, and is
+   not required for cutover.
+
    Before this command, the platform owner applies the normal kub-homelab Flux
    change enabling `beastypage_import` login and injects
    `DATABASE_IMPORT_URL` from the synchronized production secret. The role's

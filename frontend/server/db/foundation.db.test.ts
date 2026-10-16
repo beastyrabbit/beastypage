@@ -22,14 +22,24 @@ afterAll(async () => {
 /** A second empty database on the same server, for runner edge cases. */
 async function withScratchDatabase(run: (url: string) => Promise<void>) {
   const name = `beastypage_scratch_${randomBytes(4).toString("hex")}`;
-  await pool.query(`create database ${name}`);
+  await pool.query(`create database "${name}"`);
   const url = new URL(databaseUrl);
   url.pathname = `/${name}`;
   try {
     await run(url.toString());
   } finally {
-    await pool.query(`drop database if exists ${name} with (force)`);
+    await pool.query(`drop database if exists "${name}" with (force)`);
   }
+}
+
+function quoteIdentifier(identifier: string): string {
+  return `"${identifier.replaceAll('"', '""')}"`;
+}
+
+async function createLoginRole(role: string, password: string): Promise<void> {
+  await pool.query(
+    `create role ${quoteIdentifier(role)} login password '${password}' noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`,
+  );
 }
 
 describe("migration runner", () => {
@@ -50,44 +60,118 @@ describe("migration runner", () => {
   });
 
   it("applies idempotent app-role grants for DML and sequences", async () => {
-    const role = `beastypage_grant_${randomBytes(4).toString("hex")}`;
-    const password = randomBytes(12).toString("hex");
-    await pool.query(`create role "${role}" login password '${password}'`);
-    const appUrl = new URL(databaseUrl);
-    appUrl.username = role;
-    appUrl.password = password;
-    const appPool = createPool(
-      readDatabaseConfig("app", { DATABASE_URL: appUrl.toString() }),
-    );
+    const suffix = randomBytes(4).toString("hex");
+    const ownerRole = `beastypage_grant_owner_${suffix}`;
+    const appRole = `beastypage_grant_app_${suffix}`;
+    const importRole = `beastypage_grant_import_${suffix}`;
+    const ownerPassword = randomBytes(12).toString("hex");
+    const appPassword = randomBytes(12).toString("hex");
+    const importPassword = randomBytes(12).toString("hex");
+    const database = `beastypage_grant_${suffix}`;
+    const roles = [ownerRole, appRole, importRole];
+    const createdRoles: string[] = [];
+    let ownerPool: pg.Pool | undefined;
+    let appPool: pg.Pool | undefined;
+    let importPool: pg.Pool | undefined;
     try {
-      const owner = await pool.connect();
+      await createLoginRole(ownerRole, ownerPassword);
+      createdRoles.push(ownerRole);
+      await createLoginRole(appRole, appPassword);
+      createdRoles.push(appRole);
+      await createLoginRole(importRole, importPassword);
+      createdRoles.push(importRole);
+      const ownerAttributes = await pool.query<{
+        rolsuper: boolean;
+        rolcreaterole: boolean;
+      }>("select rolsuper, rolcreaterole from pg_roles where rolname = $1", [
+        ownerRole,
+      ]);
+      expect(ownerAttributes.rows[0]).toMatchObject({
+        rolsuper: false,
+        rolcreaterole: false,
+      });
+      await pool.query(
+        `create database ${quoteIdentifier(database)} owner ${quoteIdentifier(ownerRole)}`,
+      );
+
+      const ownerUrl = new URL(databaseUrl);
+      ownerUrl.pathname = `/${database}`;
+      ownerUrl.username = ownerRole;
+      ownerUrl.password = ownerPassword;
+      const appUrl = new URL(ownerUrl);
+      appUrl.username = appRole;
+      appUrl.password = appPassword;
+      const importUrl = new URL(ownerUrl);
+      importUrl.username = importRole;
+      importUrl.password = importPassword;
+      ownerPool = createPool(
+        readDatabaseConfig("migrate", {
+          DATABASE_URL: ownerUrl.toString(),
+          DATABASE_POOL_MAX: "1",
+        }),
+      );
+      appPool = createPool(
+        readDatabaseConfig("app", { DATABASE_URL: appUrl.toString() }),
+      );
+      importPool = createPool(
+        readDatabaseConfig("import", {
+          DATABASE_IMPORT_URL: importUrl.toString(),
+        }),
+      );
+
+      const ownerClientPool = ownerPool;
+      const appClientPool = appPool;
+      const importClientPool = importPool;
+      const owner = await ownerClientPool.connect();
       try {
         await runMigrations(owner, "grant-test", {
-          appRole: role,
-          importRole: `missing_import_${role}`,
+          appRole,
+          importRole,
+        });
+        await runMigrations(owner, "grant-test-rerun", {
+          appRole,
+          importRole,
         });
       } finally {
         owner.release();
       }
-      const inserted = await appPool.query<{ id: number }>(
+      const inserted = await appClientPool.query<{ id: number }>(
         "insert into live_events (topic, revision) values ('grant-test', 1) returning id",
       );
       const id = inserted.rows[0]?.id;
       expect(id).toBeTruthy();
-      await appPool.query("select nextval('live_events_id_seq')");
-      await appPool.query("select id from live_events where id = $1", [id]);
-      await appPool.query("update live_events set revision = 2 where id = $1", [
+      await appClientPool.query("select nextval('live_events_id_seq')");
+      await appClientPool.query("select id from live_events where id = $1", [
         id,
       ]);
-      await appPool.query("delete from live_events where id = $1", [id]);
-      const timeout = await appPool.query<{ value: string }>(
-        "select current_setting('statement_timeout') as value",
+      await appClientPool.query(
+        "update live_events set revision = 2 where id = $1",
+        [id],
       );
-      expect(timeout.rows[0]?.value).toBe("5s");
+      await appClientPool.query("delete from live_events where id = $1", [id]);
+      await appClientPool.query(
+        "insert into live_events (topic, revision) values ('grant-import', 1)",
+      );
+      await importClientPool.query("truncate live_events");
+      const remaining = await importClientPool.query<{ count: string }>(
+        "select count(*)::text as count from live_events",
+      );
+      expect(remaining.rows[0]?.count).toBe("0");
     } finally {
-      await appPool.end();
-      await pool.query(`drop owned by "${role}"`);
-      await pool.query(`drop role "${role}"`);
+      await Promise.allSettled([
+        ownerPool?.end(),
+        appPool?.end(),
+        importPool?.end(),
+      ]);
+      await pool.query(
+        `drop database if exists ${quoteIdentifier(database)} with (force)`,
+      );
+      for (const role of roles.filter((candidate) =>
+        createdRoles.includes(candidate),
+      )) {
+        await pool.query(`drop owned by ${quoteIdentifier(role)}`);
+        await pool.query(`drop role ${quoteIdentifier(role)}`);
+      }
     }
   });
 
