@@ -67,5 +67,3 @@ export async function fetchJson<T>(
 
   return payload as T;
 }
-
-export const apiFetch = fetchJson;

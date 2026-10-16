@@ -12,7 +12,3 @@ export const dataQueryKeys = {
   ],
   detail: (name: string, id: string): QueryKey => ["data", name, "detail", id],
 };
-
-export function dataQueryKey(name: string, args?: unknown): QueryKey {
-  return dataQueryKeys.query(name, args);
-}

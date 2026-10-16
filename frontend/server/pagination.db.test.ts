@@ -1,7 +1,7 @@
-import type pg from "pg";
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import { desc } from "drizzle-orm";
+import type pg from "pg";
+import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import { readDatabaseConfig } from "./db/config";
 import { createDatabase, createPool, type Database } from "./db/pool";
 import { dashSettings } from "./db/schema";

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { z, type ZodType } from "zod";
+import type { ZodType } from "zod";
 import { ServiceError } from "./errors";
 
 function invalidInput(message = "Invalid request input"): ServiceError {
@@ -35,8 +35,3 @@ export function parseSearchParams<T>(
   if (!parsed.success) throw invalidInput("Invalid query parameters");
   return parsed.data;
 }
-
-export const parseRequestJson = parseJsonBody;
-export const parseRequestSearchParams = parseSearchParams;
-
-export { z };

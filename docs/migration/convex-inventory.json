@@ -5840,12 +5840,12 @@
     },
     {
       "file": "frontend/package.json",
-      "line": 45,
+      "line": 46,
       "detail": "\"convex\": \"^1.45.0\","
     },
     {
       "file": "frontend/package.json",
-      "line": 87,
+      "line": 88,
       "detail": "\"convex-test\": \"^0.0.54\","
     },
     {

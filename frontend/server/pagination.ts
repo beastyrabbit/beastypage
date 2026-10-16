@@ -1,7 +1,7 @@
 import "server-only";
 
-import { sql, type SQL } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
+import { type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ServiceError } from "./errors";
 
@@ -69,5 +69,3 @@ export function createdAtIdBefore<
 >(table: T, cursor: PageCursor): SQL {
   return sql`(${table.createdAt}, ${table.id}) < (${new Date(cursor.createdAt)}, ${cursor.id})`;
 }
-
-export const keysetBefore = createdAtIdBefore;

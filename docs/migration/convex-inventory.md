@@ -557,8 +557,8 @@ Identifiers ending in `StorageId`. Entries outside schema-level `_storage` field
 | "convex:dev": "convex dev", | `frontend/package.json:28` |
 | "deploy": "pnpm exec convex deploy", | `frontend/package.json:29` |
 | "prepare": "pnpm exec convex codegen" | `frontend/package.json:30` |
-| "convex": "^1.45.0", | `frontend/package.json:45` |
-| "convex-test": "^0.0.54", | `frontend/package.json:87` |
+| "convex": "^1.45.0", | `frontend/package.json:46` |
+| "convex-test": "^0.0.54", | `frontend/package.json:88` |
 | "cat-system:build": "pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run && sh frontend/scripts/write-version.sh | `package.json:12` |
 | "dev:convex": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/ | `package.json:17` |
 | "env:check:frontend": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev  | `package.json:23` |

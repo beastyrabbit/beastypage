@@ -1,6 +1,6 @@
 import "server-only";
-import { auth } from "@clerk/nextjs/server";
 import { timingSafeEqual } from "node:crypto";
+import { auth } from "@clerk/nextjs/server";
 import { ServiceError } from "@/server/errors";
 
 /**
@@ -65,6 +65,3 @@ export async function requireAdmin(identity?: Identity): Promise<Identity> {
   }
   return resolved;
 }
-
-export const isAdmin = isAdminIdentity;
-export const requireAdminIdentity = requireAdmin;
