@@ -34,6 +34,24 @@ describe("POST /api/internal/quick-share", () => {
     expect(response.status).toBe(401);
   });
 
+  it("is unavailable while Convex remains the selected backend", async () => {
+    vi.stubEnv("DATA_BACKEND", "convex");
+    vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
+    const { POST } = await import("./route");
+    const response = await POST(
+      new NextRequest("http://localhost/api/internal/quick-share", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-quick-share-internal-token": "internal-token",
+        },
+        body: JSON.stringify({ op: "policy" }),
+      }),
+    );
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "Not found" });
+  });
+
   it("returns the policy through the PostgreSQL route", async () => {
     vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
