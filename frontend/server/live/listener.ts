@@ -37,6 +37,7 @@ export interface LiveListenerOptions {
 
 const DEFAULT_RECONNECT_BASE_MS = 100;
 const DEFAULT_RECONNECT_MAX_MS = 5_000;
+const CATCH_UP_BATCH_SIZE = 500;
 
 function createListenerClient(): ListenerClient {
   const config = readDatabaseConfig("app");
@@ -180,9 +181,27 @@ export class LiveEventListener {
       await client.connect();
       await client.query(`LISTEN ${LIVE_CHANNEL}`);
       if (this.stopped || this.client !== client) return;
+      const catchupPromise = this.catchUp(client);
+      this.catchupPromise = catchupPromise;
+      let catchupSucceeded = false;
+      try {
+        await catchupPromise;
+        catchupSucceeded = true;
+      } finally {
+        if (this.catchupPromise === catchupPromise) {
+          this.catchupPromise = null;
+          if (catchupSucceeded) {
+            this.connectedOnce = true;
+          } else {
+            this.catchupRequested = false;
+          }
+          if (catchupSucceeded && this.catchupRequested) {
+            this.catchupRequested = false;
+            this.scheduleCatchup();
+          }
+        }
+      }
       this.reconnectDelay = this.reconnectBaseMs;
-      await this.catchUp();
-      this.connectedOnce = true;
       const waiters = this.readyWaiters.splice(0);
       for (const resolve of waiters) resolve();
     } catch {
@@ -211,62 +230,104 @@ export class LiveEventListener {
       this.catchupRequested = true;
       return;
     }
-    this.catchupPromise = this.catchUp()
-      .catch((error) => {
-        console.error(
-          "[live] event replay failed",
-          error instanceof Error ? error.message : error,
-        );
-        const client = this.client;
+    const client = this.client;
+    const catchupPromise = this.catchUp(client).catch((error) => {
+      console.error(
+        "[live] event replay failed",
+        error instanceof Error ? error.message : error,
+      );
+      if (this.client === client) {
         this.client = null;
-        client?.removeAllListeners();
-        void client?.end().catch(() => undefined);
+        client.removeAllListeners();
+        void client.end().catch(() => undefined);
         this.scheduleReconnect();
-      })
-      .finally(() => {
-        this.catchupPromise = null;
-        if (this.catchupRequested) {
-          this.catchupRequested = false;
-          this.scheduleCatchup();
-        }
-      });
+      }
+    });
+    this.catchupPromise = catchupPromise;
+    void catchupPromise.finally(() => {
+      if (this.catchupPromise !== catchupPromise) return;
+      this.catchupPromise = null;
+      if (this.catchupRequested) {
+        this.catchupRequested = false;
+        this.scheduleCatchup();
+      }
+    });
   }
 
-  private async catchUp(): Promise<void> {
-    const client = this.client;
+  private async catchUp(
+    client: ListenerClient | null = this.client,
+  ): Promise<void> {
     if (!client || this.stopped) return;
 
-    const rows = await client
-      .query<EventRow>(
-        "select id, topic, revision, created_at from live_events where id > $1 order by id asc",
-        [this.lastEventId],
-      )
-      .then((result) => result.rows);
-    if (rows.length === 0) {
-      // A reconnect can occur after all events in the gap were pruned. There
-      // is then no row from which to infer the gap, so refresh subscriptions
-      // conservatively once a process has already had a connection.
-      if (this.connectedOnce && this.lastEventId > 0) {
-        this.refreshSubscribedTopics(this.lastEventId);
-      }
+    if (!this.connectedOnce) {
+      const result = await client.query<{ max_id: number | string | null }>(
+        "select coalesce(max(id), 0) as max_id from live_events",
+      );
+      this.lastEventId = Number(result.rows[0]?.max_id ?? 0);
       return;
     }
 
-    const firstEventId = Number(rows[0].id);
-    const hasRetentionGap = firstEventId > this.lastEventId + 1;
-    if (hasRetentionGap) {
-      this.refreshSubscribedTopics(firstEventId);
+    const events = new Map<string, LiveEvent>();
+    let sawRows = false;
+    let checkedGap = false;
+    for (;;) {
+      const rows = await client
+        .query<EventRow>(
+          `select id, topic, revision, created_at
+             from live_events where id > $1 order by id asc limit ${CATCH_UP_BATCH_SIZE}`,
+          [this.lastEventId],
+        )
+        .then((result) => result.rows);
+      if (rows.length === 0) break;
+      sawRows = true;
+
+      if (!checkedGap) {
+        checkedGap = true;
+        const firstEventId = Number(rows[0].id);
+        if (firstEventId > this.lastEventId + 1) {
+          for (const topic of this.subscribers.keys()) {
+            events.set(topic, {
+              id: firstEventId,
+              topic,
+              revision: 0,
+              createdAt: this.now(),
+            });
+          }
+        }
+      }
+
+      for (const row of rows) {
+        const id = Number(row.id);
+        this.lastEventId = Math.max(this.lastEventId, id);
+        const event: LiveEvent = {
+          id,
+          topic: row.topic,
+          revision: Number(row.revision),
+          createdAt: row.created_at,
+        };
+        const previous = events.get(event.topic);
+        if (
+          !previous ||
+          event.revision > previous.revision ||
+          (event.revision === previous.revision && event.id > previous.id)
+        ) {
+          events.set(event.topic, event);
+        }
+      }
+
+      if (rows.length < CATCH_UP_BATCH_SIZE) break;
     }
 
-    for (const row of rows) {
-      const id = Number(row.id);
-      this.lastEventId = Math.max(this.lastEventId, id);
-      this.dispatch({
-        id,
-        topic: row.topic,
-        revision: Number(row.revision),
-        createdAt: row.created_at,
-      });
+    if (!sawRows) {
+      // A reconnect can occur after all events in the gap were pruned. There
+      // is then no row from which to infer the gap, so refresh subscriptions
+      // conservatively once a process has already had a connection.
+      if (this.lastEventId > 0) this.refreshSubscribedTopics(this.lastEventId);
+      return;
+    }
+
+    for (const event of events.values()) {
+      this.dispatch(event);
     }
   }
 
@@ -320,6 +381,10 @@ export function subscribeLive(
 
 export function startLiveListener(): void {
   getLiveListener().start();
+}
+
+export function waitForLiveReady(): Promise<void> {
+  return getLiveListener().waitUntilReady();
 }
 
 export async function stopLiveListener(): Promise<void> {

@@ -33,8 +33,12 @@ the insert, so a rolled-back transaction never wakes a worker.
 ## Delayed and recurring jobs
 
 Use `runAfter` for delayed work. Workers sleep until the earliest pending
-`run_after` or a `NOTIFY beastypage_jobs`; they do not use polling. A recurring
-kind sets `recurringIntervalMs`, `recurringDedupeKey`, and `recurringPayload`.
+`run_after` or a `NOTIFY beastypage_jobs`; they do not use polling. Wake
+notifications are retained across a pump, so a notification that arrives while
+the due-job query is running is reconciled by the next loop. The dedicated
+LISTEN connection reconnects with backoff after a connection failure. A
+recurring kind sets `recurringIntervalMs`, `recurringDedupeKey`, and
+`recurringPayload`.
 The worker installs a missing singleton at startup and each terminal run
 enqueues the next occurrence in the same transaction as its completion.
 

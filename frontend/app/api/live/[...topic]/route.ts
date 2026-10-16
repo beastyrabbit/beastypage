@@ -4,7 +4,7 @@ import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { isServiceError, ServiceError } from "@/server/errors";
 import { errorResponse } from "@/server/http";
-import { subscribeLive } from "@/server/live/listener";
+import { subscribeLive, waitForLiveReady } from "@/server/live/listener";
 import { findLiveTopic } from "@/server/live/topics";
 
 export const runtime = "nodejs";
@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 const HEARTBEAT_MS = 15_000;
 const MAX_STREAM_MS = 15 * 60_000;
+const BACKPRESSURE_CLOSE_MS = 1_000;
 
 function errorJson(error: ServiceError): NextResponse {
   return NextResponse.json(
@@ -101,7 +102,44 @@ export async function GET(
       let unsubscribe: (() => void) | undefined;
       let heartbeat: ReturnType<typeof setInterval> | undefined;
       let expiry: ReturnType<typeof setTimeout> | undefined;
-      let refreshQueue = Promise.resolve();
+      let backpressureTimer: ReturnType<typeof setTimeout> | undefined;
+      let refreshRunning = false;
+      let refreshPending = false;
+
+      const clearBackpressureTimer = () => {
+        if (!backpressureTimer) return;
+        clearTimeout(backpressureTimer);
+        backpressureTimer = undefined;
+      };
+
+      const checkBackpressure = () => {
+        if (closed) return false;
+        const desiredSize = controller.desiredSize;
+        if (desiredSize === null || desiredSize > 0) {
+          clearBackpressureTimer();
+          return true;
+        }
+        if (!backpressureTimer) {
+          backpressureTimer = setTimeout(() => {
+            backpressureTimer = undefined;
+            if (!closed && (controller.desiredSize ?? 0) <= 0) close();
+          }, BACKPRESSURE_CLOSE_MS);
+          backpressureTimer.unref?.();
+        }
+        return false;
+      };
+
+      const enqueue = (chunk: Uint8Array): boolean => {
+        if (!checkBackpressure()) return false;
+        try {
+          controller.enqueue(chunk);
+          checkBackpressure();
+          return true;
+        } catch {
+          close();
+          return false;
+        }
+      };
 
       const close = () => {
         if (closed) return;
@@ -109,6 +147,7 @@ export async function GET(
         unsubscribe?.();
         if (heartbeat) clearInterval(heartbeat);
         if (expiry) clearTimeout(expiry);
+        clearBackpressureTimer();
         request.signal.removeEventListener("abort", close);
         try {
           controller.close();
@@ -119,32 +158,60 @@ export async function GET(
       closeStream = close;
 
       const refresh = () => {
-        refreshQueue = refreshQueue
-          .then(async () => {
-            if (closed) return;
-            const snapshot = await definition.loadSnapshot(
-              parsed,
-              authorization,
-              context,
-            );
-            if (closed || snapshot.revision <= lastSentRevision) return;
-            lastSentRevision = snapshot.revision;
-            controller.enqueue(
-              encoder.encode(snapshotEvent(snapshot.revision, snapshot.data)),
-            );
-          })
-          .catch((error) => {
+        if (closed) return;
+        if (refreshRunning) {
+          refreshPending = true;
+          return;
+        }
+        if (!checkBackpressure()) return;
+
+        refreshRunning = true;
+        void (async () => {
+          try {
+            do {
+              refreshPending = false;
+              if (closed || !checkBackpressure()) return;
+              const snapshot = await definition.loadSnapshot(
+                parsed,
+                authorization,
+                context,
+              );
+              if (closed) return;
+              if (snapshot.revision > lastSentRevision) {
+                if (
+                  !enqueue(
+                    encoder.encode(
+                      snapshotEvent(snapshot.revision, snapshot.data),
+                    ),
+                  )
+                ) {
+                  return;
+                }
+                lastSentRevision = snapshot.revision;
+              }
+            } while (refreshPending && !closed);
+          } catch (error) {
             console.error("[live] failed to refresh topic", error);
-          });
+          } finally {
+            refreshRunning = false;
+            if (refreshPending && !closed) refresh();
+          }
+        })();
       };
 
       unsubscribe = subscribeLive(topic, () => refresh());
       request.signal.addEventListener("abort", close, { once: true });
       heartbeat = setInterval(() => {
-        if (!closed) controller.enqueue(encoder.encode(": heartbeat\n\n"));
+        if (!closed) enqueue(encoder.encode(": heartbeat\n\n"));
       }, HEARTBEAT_MS);
       expiry = setTimeout(close, MAX_STREAM_MS);
-      refresh();
+      void waitForLiveReady()
+        .catch((error) => {
+          console.error("[live] listener did not become ready", error);
+        })
+        .finally(() => {
+          if (!closed) refresh();
+        });
     },
     cancel() {
       closeStream();

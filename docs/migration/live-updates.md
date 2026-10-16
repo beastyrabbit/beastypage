@@ -7,13 +7,16 @@ PostgreSQL delivers the notification only after commit. The notification
 contains the topic only; snapshots and other data stay in PostgreSQL.
 
 Each frontend process creates one dedicated `LISTEN beastypage_live` connection
-when the first SSE subscriber arrives. The listener remembers the highest
-`live_events.id`, replays rows after reconnect, and fans out matching topics in
-process. If pruning has removed part of the replay window (the retention
-window is one hour), every subscribed topic is refreshed. SSE sends an
+when the first SSE subscriber arrives. The first connection baselines at the
+current maximum `live_events.id`, so retained history is not replayed to a new
+process. The listener remembers the highest ID, replays rows after reconnect in batches
+of 500 rows, and coalesces each topic to one refresh per catch-up. If pruning
+has removed part of the replay window (the retention window is one hour), every
+subscribed topic is refreshed. SSE sends an
 authorized snapshot with `id: <revision>` and an `{ revision, data }` envelope,
 suppresses revisions that are not newer, emits a heartbeat every 15 seconds,
-and closes after 15 minutes.
+closes after 15 minutes, and closes sooner when the client applies sustained
+backpressure so it can reconnect with `Last-Event-ID`.
 
 ## Adding a topic
 

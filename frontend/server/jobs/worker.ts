@@ -16,6 +16,8 @@ const RECOVERY_INTERVAL_MS = 10 * 60_000;
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 30_000;
 const MAX_BACKOFF_MS = 60 * 60_000;
+const LISTEN_RECONNECT_BASE_MS = 100;
+const LISTEN_RECONNECT_MAX_MS = 5_000;
 
 export function shouldClaimJobs(
   env: Readonly<Record<string, string | undefined>> = process.env,
@@ -30,6 +32,8 @@ export interface JobWorkerOptions {
   concurrency?: number;
   recoveryIntervalMs?: number;
   shutdownTimeoutMs?: number;
+  reconnectBaseMs?: number;
+  reconnectMaxMs?: number;
   random?: () => number;
 }
 
@@ -85,10 +89,15 @@ class Worker implements JobWorker {
   private readonly concurrency: number;
   private readonly recoveryIntervalMs: number;
   private readonly shutdownTimeoutMs: number;
+  private readonly reconnectBaseMs: number;
+  private readonly reconnectMaxMs: number;
   private readonly random: () => number;
   private readonly active = new Set<Promise<void>>();
   private readonly wakeWaiters = new Set<() => void>();
+  private wakeGeneration = 0;
   private listener: pg.PoolClient | undefined;
+  private listenerReconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  private listenerReconnectDelay = LISTEN_RECONNECT_BASE_MS;
   private loopPromise: Promise<void> | undefined;
   private recoveryTimer: ReturnType<typeof setInterval> | undefined;
   private dueTimer: ReturnType<typeof setTimeout> | undefined;
@@ -111,18 +120,26 @@ class Worker implements JobWorker {
       1,
       options.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS,
     );
+    this.reconnectBaseMs = Math.max(
+      1,
+      options.reconnectBaseMs ?? LISTEN_RECONNECT_BASE_MS,
+    );
+    this.reconnectMaxMs = Math.max(
+      this.reconnectBaseMs,
+      options.reconnectMaxMs ?? LISTEN_RECONNECT_MAX_MS,
+    );
+    this.listenerReconnectDelay = this.reconnectBaseMs;
     this.random = options.random ?? Math.random;
   }
 
   async start(): Promise<void> {
     await this.ensureRecurringJobs();
-    this.listener = await this.pool.connect();
-    await this.listener.query("LISTEN beastypage_jobs");
-    this.listener.on("notification", () => this.wake());
-    this.listener.on("error", (error) => {
-      console.error("[jobs] LISTEN connection failed", error.message);
-      this.wake();
-    });
+    try {
+      await this.connectListener();
+    } catch (error) {
+      console.error("[jobs] LISTEN connection failed", errorMessage(error));
+      this.scheduleListenerReconnect();
+    }
 
     this.recoveryTimer = setInterval(() => {
       void this.recoverExpiredLeases().finally(() => this.wake());
@@ -138,6 +155,8 @@ class Worker implements JobWorker {
     this.wake();
     if (this.recoveryTimer) clearInterval(this.recoveryTimer);
     if (this.dueTimer) clearTimeout(this.dueTimer);
+    if (this.listenerReconnectTimer) clearTimeout(this.listenerReconnectTimer);
+    this.listenerReconnectTimer = undefined;
     this.dueTimer = undefined;
 
     const deadline = Date.now() + this.shutdownTimeoutMs;
@@ -149,31 +168,100 @@ class Worker implements JobWorker {
       ]);
     }
     await this.loopPromise;
-    this.listener?.removeAllListeners();
-    this.listener?.release();
+    const listener = this.listener;
+    this.listener = undefined;
+    listener?.removeAllListeners();
+    listener?.release();
     this.listener = undefined;
     this.stopped = true;
   }
 
   private wake() {
+    this.wakeGeneration += 1;
     for (const resolve of this.wakeWaiters) resolve();
     this.wakeWaiters.clear();
   }
 
-  private async waitForWake(): Promise<void> {
+  private async waitForWake(generation: number): Promise<void> {
     if (this.stopping) return;
-    await new Promise<void>((resolve) => this.wakeWaiters.add(resolve));
+    await new Promise<void>((resolve) => {
+      if (this.stopping || this.wakeGeneration !== generation) {
+        resolve();
+        return;
+      }
+      this.wakeWaiters.add(resolve);
+    });
+  }
+
+  private async connectListener(): Promise<void> {
+    const listener = await this.pool.connect();
+    if (this.stopping) {
+      listener.release(true);
+      return;
+    }
+
+    this.listener = listener;
+    let failed = false;
+    const fail = (error: unknown) => {
+      if (failed || this.listener !== listener) return;
+      failed = true;
+      console.error("[jobs] LISTEN connection failed", errorMessage(error));
+      this.listener = undefined;
+      listener.removeAllListeners();
+      listener.release(true);
+      this.scheduleListenerReconnect();
+    };
+
+    listener.on("notification", () => this.wake());
+    listener.on("error", fail);
+    listener.on("end", () => fail(new Error("LISTEN connection ended")));
+
+    try {
+      await listener.query("LISTEN beastypage_jobs");
+    } catch (error) {
+      fail(error);
+      throw error;
+    }
+
+    if (this.stopping || this.listener !== listener) return;
+    this.listenerReconnectDelay = this.reconnectBaseMs;
+    this.wake();
+  }
+
+  private scheduleListenerReconnect(): void {
+    if (this.stopping || this.listenerReconnectTimer) return;
+    const delay = this.listenerReconnectDelay;
+    this.listenerReconnectDelay = Math.min(
+      this.reconnectMaxMs,
+      Math.max(this.reconnectBaseMs, this.listenerReconnectDelay * 2),
+    );
+    this.listenerReconnectTimer = setTimeout(() => {
+      this.listenerReconnectTimer = undefined;
+      void this.reconnectListener();
+    }, delay);
+    this.listenerReconnectTimer.unref?.();
+  }
+
+  private async reconnectListener(): Promise<void> {
+    if (this.stopping || this.listener) return;
+    try {
+      await this.connectListener();
+    } catch (error) {
+      console.error("[jobs] LISTEN reconnect failed", errorMessage(error));
+      this.scheduleListenerReconnect();
+    }
   }
 
   private async runLoop(): Promise<void> {
     while (!this.stopping) {
+      const generation = this.wakeGeneration;
       try {
         await this.pump();
       } catch (error) {
         console.error("[jobs] worker loop failed", errorMessage(error));
       }
       if (this.stopping) break;
-      await this.waitForWake();
+      await this.waitForWake(generation);
     }
   }
 
