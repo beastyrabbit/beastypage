@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const getRequestIdentity = vi.fn();
 
-vi.mock("@/server/auth/identity", () => ({
+vi.mock("@/server/auth/identity", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/auth/identity")>()),
   getRequestIdentity,
 }));
 

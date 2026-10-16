@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { getRequestIdentity } from "@/server/auth/identity";
+import { getRequestIdentity, isAdminIdentity } from "@/server/auth/identity";
 import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
-import { isJobsAdminTokenIdentifier } from "@/server/jobs/admin";
 import { getJobStatus } from "@/server/jobs/status";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +17,7 @@ export async function GET() {
 
   try {
     const identity = await getRequestIdentity();
-    if (!isJobsAdminTokenIdentifier(identity.tokenIdentifier)) {
+    if (!isAdminIdentity(identity)) {
       return NextResponse.json(
         { error: "Forbidden", code: "forbidden" },
         { status: 403 },
