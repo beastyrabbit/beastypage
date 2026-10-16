@@ -50,7 +50,11 @@ spec:
         data:
           username: beastypage_import
           password: "{{ .BEASTYPAGE_DB_IMPORT_PASSWORD.Value }}"
-    - name: beastypage-staging-postgres-urls
+    # One Secret per credential so each consumer gets only its own URL:
+    # the frontend container mounts the app URL, the migration init
+    # container the owner URL. The import URL is mounted by no Deployment;
+    # only the operator's one-off import pod reads it during a window.
+    - name: beastypage-staging-postgres-app-url
       namespace: beastypage-staging
       kind: Secret # gitleaks:allow - values are rendered from Infisical
       creationPolicy: Orphan
@@ -59,7 +63,23 @@ spec:
         engineVersion: v1
         data:
           DATABASE_URL: "postgresql://beastypage_app:{{ .BEASTYPAGE_DB_APP_PASSWORD.Value | urlquery }}@beastypage-staging-postgres-rw.beastypage-staging.svc:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt"
+    - name: beastypage-staging-postgres-migration-url
+      namespace: beastypage-staging
+      kind: Secret # gitleaks:allow - values are rendered from Infisical
+      creationPolicy: Orphan
+      secretType: Opaque
+      template:
+        engineVersion: v1
+        data:
           DATABASE_MIGRATION_URL: "postgresql://{{ .BEASTYPAGE_DB_OWNER_USERNAME.Value }}:{{ .BEASTYPAGE_DB_OWNER_PASSWORD.Value | urlquery }}@beastypage-staging-postgres-rw.beastypage-staging.svc:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt"
+    - name: beastypage-staging-postgres-import-url
+      namespace: beastypage-staging
+      kind: Secret # gitleaks:allow - values are rendered from Infisical
+      creationPolicy: Orphan
+      secretType: Opaque
+      template:
+        engineVersion: v1
+        data:
           DATABASE_IMPORT_URL: "postgresql://beastypage_import:{{ .BEASTYPAGE_DB_IMPORT_PASSWORD.Value | urlquery }}@beastypage-staging-postgres-rw.beastypage-staging.svc:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt"
   syncOptions:
     refreshInterval: 5m

@@ -209,8 +209,9 @@ Then:
 2. Run `db:migrate --status` against the new cluster.
 3. Run the verification queries in the cutover runbook: row counts, file
    hashes, relationships.
-4. Point `beastypage-postgres-urls` at `beastypage-postgres-restore-rw` and
-   restart the frontend.
+4. Point the `beastypage-postgres-app-url` and
+   `beastypage-postgres-migration-url` secrets at
+   `beastypage-postgres-restore-rw` and restart the frontend.
 5. Record the measured restore time against the 1-hour RTO.
 
 Restore test status:

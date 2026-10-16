@@ -27,8 +27,9 @@ report directory on encrypted storage outside the repository.
      are at `/kubernetes/beastypage-staging/*`;
    - the `beastypage_import` role is login-enabled only for the rehearsal or
      cutover window through the kub-homelab Flux flow, and the approved
-     `DATABASE_IMPORT_URL` is available to the operator without putting its
-     value in this repository;
+     `DATABASE_IMPORT_URL` lives in its own `*-import-url` secret that only the
+     operator's one-off import pod mounts (never the frontend Deployment) and
+     never appears in this repository;
    - the staging restore drill is complete and its measured time is at most
      one hour, with the backup name and verification output attached;
    - the staging rehearsal has a maintainer sign-off;
@@ -234,11 +235,15 @@ report directory on encrypted storage outside the repository.
    not required for cutover.
 
    Before this command, the platform owner applies the normal kub-homelab Flux
-   change enabling `beastypage_import` login and injects
-   `DATABASE_IMPORT_URL` from the synchronized production secret. The role's
-   owner-applied DML, sequence and `TRUNCATE` grants are required by
-   `--replace`. After verification, disable that login again through Flux and
-   wait for reconciliation.
+   change enabling `beastypage_import` login. Run the import from a one-off
+   operator pod in namespace `webpage` that mounts only the
+   `beastypage-postgres-import-url` secret and the `beastypage-postgres-ca`
+   certificate at `/etc/postgres-ca`; the frontend Deployment never mounts the
+   import URL (it gets only `beastypage-postgres-app-url`, its init container
+   only `beastypage-postgres-migration-url`). The role's owner-applied DML,
+   sequence and `TRUNCATE` grants are required by `--replace`. After
+   verification, delete the operator pod, disable that login again through
+   Flux and wait for reconciliation.
 
    **Failure action:** stay in maintenance. For an importer defect, apply a
    forward fix and rerun with the same archive; for database damage, restore
