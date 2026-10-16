@@ -100,7 +100,9 @@ describe("catalog PostgreSQL service", () => {
     await expect(
       generateCatdexThumbnail(db, created.id, 1),
     ).resolves.toMatchObject({ success: true, generated: ["default"] });
-    expect((await listCatdex(db)).page).toHaveLength(0);
+    expect(
+      (await listCatdex(db)).page.some((entry) => entry.id === created.id),
+    ).toBe(false);
     const approved = await approveCatdex(
       db,
       created.id,
@@ -108,7 +110,9 @@ describe("catalog PostgreSQL service", () => {
       true,
     );
     expect(approved.approved).toBe(true);
-    expect((await listCatdex(db)).page).toHaveLength(1);
+    expect(
+      (await listCatdex(db)).page.find((entry) => entry.id === created.id),
+    ).toMatchObject({ id: created.id, approved: true });
     await expect(
       createCatdex(db, {
         twitchUserName: "FixtureOwner",
@@ -152,11 +156,11 @@ describe("catalog PostgreSQL service", () => {
         tokenIdentifier: "fixture|admin",
       }),
     ).resolves.toEqual({ focusX: 0, focusY: 100 });
-    expect((await listCollection(db)).page[0]).toMatchObject({
-      id: entry.id,
-      focusX: 0,
-      focusY: 100,
-    });
+    expect(
+      (await listCollection(db, { pageSize: 48 })).page.find(
+        (item) => item.id === entry.id,
+      ),
+    ).toMatchObject({ id: entry.id, focusX: 0, focusY: 100 });
   });
 
   it("runs the orphan sweep only after checking every file reference", async () => {
