@@ -66,12 +66,19 @@ function normalizeMime(value: string): string {
   return mime === "image/jpg" ? "image/jpeg" : mime;
 }
 
-/** Hashes and decodes the image header; returns problems instead of throwing. */
+/**
+ * Hashes and decodes the image header; returns problems instead of throwing.
+ * A declared raster type that differs from the decoded one is corrected to the
+ * decoded type and reported as a repair; any other declared type is a problem.
+ */
 export async function inspectFile(
   bytes: Buffer,
   meta: StorageMeta,
-): Promise<{ file: InspectedFile } | { problems: string[] }> {
+): Promise<
+  { file: InspectedFile; repairs: string[] } | { problems: string[] }
+> {
   const problems: string[] = [];
+  const repairs: string[] = [];
   const sha256Hex = createHash("sha256").update(bytes).digest("hex");
   if (meta.sha256Hex && meta.sha256Hex !== sha256Hex)
     problems.push("sha256 mismatch");
@@ -97,9 +104,16 @@ export async function inspectFile(
   if (!mimeType) {
     problems.push("unsupported image format");
   } else if (meta.contentType && normalizeMime(meta.contentType) !== mimeType) {
-    problems.push(
-      `content type ${meta.contentType} does not match detected ${mimeType}`,
-    );
+    const declared = normalizeMime(meta.contentType);
+    if (ALLOWED_MIME.has(declared)) {
+      repairs.push(
+        `content type ${declared} corrected to detected ${mimeType}`,
+      );
+    } else {
+      problems.push(
+        `content type ${meta.contentType} does not match detected ${mimeType}`,
+      );
+    }
   }
   if (mimeType && (width <= 0 || height <= 0))
     problems.push("image has no dimensions");
@@ -107,5 +121,6 @@ export async function inspectFile(
   if (problems.length > 0 || !mimeType) return { problems };
   return {
     file: { sha256Hex, byteSize: bytes.length, mimeType, width, height },
+    repairs,
   };
 }

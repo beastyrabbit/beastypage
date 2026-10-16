@@ -23,6 +23,11 @@ describe("import ids", () => {
         "/private/snapshot_1760529600123456789.zip",
       )?.toISOString(),
     ).toBe("2025-10-15T12:00:00.123Z");
+    expect(
+      freezeFromArchiveName(
+        "/private/snapshot_happy-otter-123_1760529600123456789.zip",
+      )?.toISOString(),
+    ).toBe("2025-10-15T12:00:00.123Z");
     expect(freezeFromArchiveName("/private/export.zip")).toBeNull();
   });
 });

@@ -576,6 +576,7 @@ async function importFiles(
       continue;
     }
     const file = inspected.file;
+    for (const kind of inspected.repairs) bump(stats.repaired, kind);
     const fileId = importedFileId(file.sha256Hex);
     if (seenSha.has(file.sha256Hex)) {
       bump(stats.repaired, "duplicate bytes share one file");

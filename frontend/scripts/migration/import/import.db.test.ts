@@ -128,6 +128,9 @@ describe("Convex importer", () => {
       "adoptionBatchId: dangling adoption_batch reference set to null": 1,
     });
     expect(s.perfect_matchups?.skipped).toEqual({ "already consumed": 1 });
+    expect(s.perfect_cats?.repaired).toEqual({
+      "lastShownAt 0 (never shown) set to null": 1,
+    });
     expect(s.discord_challenge?.skipped).toEqual({ "expired at freeze": 1 });
     expect(s.quick_share_parts?.skipped).toEqual({
       "upload no longer uploading": 1,
@@ -151,8 +154,11 @@ describe("Convex importer", () => {
 
   it("verifies, deduplicates and quarantines files", async () => {
     const files = first.steps.files;
-    expect(files?.imported).toBe(2);
-    expect(files?.repaired).toEqual({ "duplicate bytes share one file": 2 });
+    expect(files?.imported).toBe(3);
+    expect(files?.repaired).toEqual({
+      "duplicate bytes share one file": 1,
+      "content type image/png corrected to detected image/jpeg": 1,
+    });
     expect(files?.skipped).toEqual({ "unreferenced storage object": 1 });
     expect(Object.keys(files?.quarantined ?? {}).join(" ")).toMatch(
       /content type text\/plain|not a decodable image/,
@@ -167,6 +173,7 @@ describe("Convex importer", () => {
     );
     expect(rows.rows.map((r) => [r.mime_type, r.width, r.height])).toEqual([
       ["image/png", 4, 3],
+      ["image/jpeg", 3, 3],
       ["image/png", 2, 2],
     ]);
   });

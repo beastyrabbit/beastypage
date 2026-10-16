@@ -25,10 +25,10 @@ cd frontend
 pnpm run db:local up && pnpm run db:migrate          # or point DATABASE_IMPORT_URL at the target
 
 # Synthetic archive (no real data) for local rehearsal
-pnpm run import:fixture -- /tmp/fixture/snapshot_1760529600000000000.zip
+pnpm run import:fixture /tmp/fixture/snapshot_1760529600000000000.zip
 
-pnpm run import:convex -- \
-  --archive /private/convex/snapshot_<ns>.zip \
+pnpm run import:convex \
+  --archive /private/convex/snapshot_<deployment>_<ns>.zip \
   --report-dir /private/convex/import-<date> \
   --expected-issuer https://<clerk issuer> \
   [--freeze-at 2026-10-15T18:00:00Z] [--replace]
@@ -38,7 +38,7 @@ pnpm run import:convex -- \
 | --- | --- |
 | `--archive` | Path to the Convex export ZIP. The archive is streamed one entry at a time. |
 | `--report-dir` | Private output: `report.md`, `report.json` and `quarantine/<step>.jsonl`. |
-| `--freeze-at` | The write-freeze time. Defaults to the timestamp in `snapshot_<ns>.zip`. Short-lived rows that expired before it are skipped. |
+| `--freeze-at` | The write-freeze time. Defaults to the timestamp in `snapshot_[<deployment>_]<ns>.zip`. Short-lived rows that expired before it are skipped. |
 | `--expected-issuer` | The Clerk issuer. Every `tokenIdentifier` and owner column must start with `<issuer>\|`; anything else is quarantined. |
 | `--replace` | Empty every imported table before importing. Needed when the database already holds a different archive or rows created by the app (staging refills). |
 
@@ -99,7 +99,7 @@ contract change, followed by a re-run.
 
 ## Quick Share objects
 
-`pnpm run import:verify-quick-share -- --report-dir <private dir>` sends a
+`pnpm run import:verify-quick-share --report-dir <private dir>` sends a
 signed `HEAD` request for every imported upload's S3 objects. It never
 writes or deletes an object. Expected objects depend on the upload state:
 
@@ -112,13 +112,26 @@ writes or deletes an object. Expected objects depend on the upload state:
 
 Run it with the media service's S3 settings from Infisical (`/media`).
 
-## Open items before production use
+## First real export (#106, 2026-10-16)
 
-- [ ] Confirm the real export format against the first #106 archive:
-  - `_storage/documents.jsonl` field names and hash encoding (hex and base64
-    are both accepted)
-  - storage file names with or without an extension
-  - table folder names
-- [ ] Run the importer on the #106 archive and attach counts only (no
-  content) to #107 and #111.
-- [ ] Decide the cleanup for every quarantine reason found in real data.
+pnpm forwards a literal `--` to the script, which rejects it, so the
+commands above pass their options directly.
+
+The dashboard export confirmed the format:
+
+- The archive is named `snapshot_<deployment>_<ns>.zip`.
+- `_storage/documents.jsonl` has `_id`, `_creationTime`, `contentType`,
+  `internalId`, `sha256` (base64) and `size`.
+- Storage files are named `<storage id>.<extension>`.
+- Each table folder holds `documents.jsonl` and `generated_schema.jsonl`.
+
+The run imports cleanly and a second run gives identical fingerprints.
+Cleanup rules adopted for what real data contained:
+
+| Found | Rule |
+| --- | --- |
+| JPEG bytes labelled `image/png` | repaired: the decoded raster type is stored. A non-image declared type is still quarantined. |
+| `perfect_cats.lastShownAt = 0` | repaired: Convex inserts `0` for "never shown"; it becomes `NULL`. |
+| Rows whose required `userId` points at a deleted user | quarantined (left out of PostgreSQL). |
+
+- [ ] Attach counts only (no content) to #107 and #111.

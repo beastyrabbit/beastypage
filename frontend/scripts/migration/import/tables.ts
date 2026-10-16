@@ -677,7 +677,7 @@ export const STEPS: ImportStep[] = [
     name: "perfect_cats",
     source: "perfect_cats",
     target: schema.perfectCats,
-    map(doc) {
+    map(doc, ctx) {
       onlyFields(doc, [
         "hash",
         "params",
@@ -689,6 +689,11 @@ export const STEPS: ImportStep[] = [
         "updatedAt",
         "lastShownAt",
       ]);
+      // Convex inserts `lastShownAt: 0` for a cat that was never shown.
+      const lastShownAt =
+        doc.lastShownAt === 0 ? null : read.optTime(doc, "lastShownAt");
+      if (doc.lastShownAt === 0)
+        ctx.repair("lastShownAt 0 (never shown) set to null");
       return one({
         ...baseColumns("perfect_cats", doc),
         hash: read.str(doc, "hash"),
@@ -697,7 +702,7 @@ export const STEPS: ImportStep[] = [
         wins: read.int(doc, "wins"),
         losses: read.int(doc, "losses"),
         appearances: read.int(doc, "appearances"),
-        lastShownAt: read.optTime(doc, "lastShownAt"),
+        lastShownAt,
         ...timestamps(doc),
       });
     },

@@ -1,7 +1,7 @@
 // Imports a Convex export ZIP into PostgreSQL (#111). Never contacts Convex.
 //
 // Run (from frontend/):
-//   pnpm run import:convex -- --archive /private/snapshot_<ns>.zip \
+//   pnpm run import:convex --archive /private/snapshot_<ns>.zip \
 //     --report-dir /private/import-report [--freeze-at 2026-10-15T18:00:00Z] \
 //     [--expected-issuer https://clerk.example.com] [--replace]
 //
@@ -19,9 +19,12 @@ import {
 import { loadLocalDatabaseEnv } from "../db/env";
 import { runImport } from "./import/run";
 
-/** Convex names exports `snapshot_<unix ns>.zip`; the snapshot time is the freeze. */
+/**
+ * Convex names exports `snapshot_<unix ns>.zip` or, from the dashboard,
+ * `snapshot_<deployment>_<unix ns>.zip`; the snapshot time is the freeze.
+ */
 export function freezeFromArchiveName(path: string): Date | null {
-  const match = /snapshot_(\d{16,20})\.zip$/.exec(path);
+  const match = /snapshot_(?:[a-z0-9-]+_)?(\d{16,20})\.zip$/.exec(path);
   if (!match?.[1]) return null;
   return new Date(Number(BigInt(match[1]) / BigInt(1_000_000)));
 }

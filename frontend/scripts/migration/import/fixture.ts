@@ -1,5 +1,5 @@
 // Synthetic Convex export for tests and local rehearsals. Contains no real
-// data. Run: pnpm run import:fixture -- <out.zip>
+// data. Run: pnpm run import:fixture <out.zip>
 
 import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
@@ -70,6 +70,10 @@ export interface Fixture {
 export async function buildFixture(): Promise<Fixture> {
   const red = await png("#ff0000", 4, 3);
   const blue = await png("#0000ff", 2, 2);
+  // JPEG bytes that Convex labelled image/png: the type is corrected.
+  const green = await sharp(await png("#00ff00", 3, 3))
+    .jpeg()
+    .toBuffer();
   const text = Buffer.from("not an image");
   const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
   const storageDoc = (name: string, bytes: Buffer, contentType?: string) => ({
@@ -89,7 +93,7 @@ export async function buildFixture(): Promise<Fixture> {
     storageDoc("file-card-copy", red, "image/png"),
     storageDoc("file-thumb", blue),
     storageDoc("file-text", text, "text/plain"),
-    storageDoc("file-palette", blue, "image/png"),
+    storageDoc("file-palette", green, "image/png"),
     storageDoc("file-unreferenced", blue, "image/png"),
   ];
   // Base64 hash encoding must be accepted as well.
@@ -413,6 +417,8 @@ export async function buildFixture(): Promise<Fixture> {
         appearances: 1,
         createdAt: CREATED,
         updatedAt: CREATED,
+        // Convex writes 0 for a cat that was never shown.
+        lastShownAt: 0,
       }),
     ],
     perfect_votes: [

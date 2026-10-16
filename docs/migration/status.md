@@ -2,18 +2,20 @@
 
 The migration is forward-only (ADR 0001 §1). **Production still runs on
 Convex.** Nothing here has been deployed. No production export, secret
-change, homelab change, release tag or cutover has happened.
+change, homelab change, release tag or cutover has happened. One
+test export of production was taken on 2026-10-16 by the maintainer and is
+kept outside the repository.
 
-Status as of 2026-10-15, branch `t3code/65208027`.
+Status as of 2026-10-16, branch `t3code/65208027`.
 
 | Phase | Issue | State | Evidence in the repository | Still open |
 | --- | --- | --- | --- | --- |
 | 1. Inventory and architecture | #105 | **Done** | `frontend/scripts/migration/convex-inventory.ts` (`--check` in CI), [`convex-inventory.md`](convex-inventory.md), [ADR 0001](adr-0001-postgresql.md) | Machine-linked blockers between the issues |
-| Production measurement and export | #106 | Not started | Runbook steps in [`importer.md`](importer.md) | Needs the maintainer: dashboard sizes, one export, SHA-256, cost |
+| Production measurement and export | #106 | **Test export taken** (349 MB archive, SHA-256 recorded privately) | [`importer.md`](importer.md) | Actual export cost from the Convex usage page |
 | 2. PostgreSQL foundation | #108 | **Repository side done** | Drizzle, `db:local`, the CI `database` job, the migration runner with lock, version and fail-closed check, the bundled init-container runner, [`operations.md`](operations.md), `deploy/postgres/*` templates | kub-homelab CNPG cluster, Infisical paths, restore drill (need approval); volume size from #106 |
 | 3. Target schema and contracts | #107, #109 | **Done against code-derived fixtures** | `server/db/schema/*`, `server/db/contracts.ts`, `drizzle/0000_init.sql`, [`data-contract.md`](data-contract.md), legacy-link lookups and tests | Validation report on the real #106 archive |
-| Image storage | #110 | **Partial** | `files` table, content-addressed import, `/api/files/[id]` (ETag, 304, immutable, referenced-only), Quick Share S3 verifier | The `bytea` gate on real sizes; new uploads writing `files`; orphan cleanup job |
-| 4. Importer | #111 | **Done against the synthetic archive** | `scripts/migration/import*`, real-PostgreSQL tests (rerun fingerprints, crash plus resume, quarantine, offline guard), [`importer.md`](importer.md) | Format confirmation and a run on the #106 archive |
+| Image storage | #110 | **Partial** | `files` table, content-addressed import, `/api/files/[id]` (ETag, 304, immutable, referenced-only), Quick Share S3 verifier | Real sizes: 333 referenced images, 167 MB (largest 4.8 MB, median 159 kB), whole database 188 MB, so `bytea` stays; new uploads writing `files`; orphan cleanup job |
+| 4. Importer | #111 | **Done; runs cleanly on the real archive** | `scripts/migration/import*`, real-PostgreSQL tests (rerun fingerprints, crash plus resume, quarantine, offline guard), [`importer.md`](importer.md) | Decision on the 3 rows owned by a deleted user |
 | Staging data | #112 | Not started | Scrub policy in `data-contract.md`, staging template | Scrubber, staging namespace (approval) |
 | 5. Server data layer | #113 | **Started**: settings slice | `server/{errors,http,backend}.ts`, `server/auth/identity.ts`, `server/db/transaction.ts`, `server/services/settings.ts` behind `DATA_BACKEND`, Convex-vs-PostgreSQL parity tests, route tests | Catdex, collection, seasons, rarities, adoption, evolution, ancestry, perfect cats, coinflip, wheel, users and variants, cat shares and previews, Discord, Quick Share, Catdex uploads; client hooks (TanStack Query) |
 | 6. Live updates | #114 | Designed (ADR §10); `live_events` and `revision` columns exist | — | SSE route, LISTEN fan-out, three-replica test |
