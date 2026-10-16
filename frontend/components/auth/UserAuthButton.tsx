@@ -1,11 +1,11 @@
 "use client";
 
 import { useClerk, useUser } from "@clerk/nextjs";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import { Loader2, LogIn, LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { api } from "@/convex/_generated/api";
+import { useEnsureUser, useUserViewer } from "@/lib/data/users";
 import { cn } from "@/lib/utils";
 
 export function UserAuthButton() {
@@ -14,15 +14,15 @@ export function UserAuthButton() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const getOrCreateUser = useMutation(api.users.getOrCreateUser);
-  const viewer = useQuery(api.users.viewer);
+  const getOrCreateUser = useEnsureUser();
+  const viewer = useUserViewer();
   const hasCreatedRef = useRef(false);
 
   // Ensure user doc exists in Convex after login
   useEffect(() => {
     if (isAuthenticated && !hasCreatedRef.current) {
       hasCreatedRef.current = true;
-      getOrCreateUser().catch((err) => {
+      getOrCreateUser({}).catch((err) => {
         console.error("[UserAuthButton] getOrCreateUser failed:", err);
         hasCreatedRef.current = false;
       });

@@ -1,6 +1,13 @@
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "@/convex/_generated/api";
+import {
+  useImportUserVariants,
+  useRemoveUserVariant,
+  useRenameUserVariant,
+  useSetActiveUserVariant,
+  useUpsertUserVariant,
+  useUserVariants,
+} from "@/lib/data/users";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -114,15 +121,15 @@ export function useVariants<T>(
   const { isAuthenticated } = useConvexAuth();
 
   // Convex queries/mutations — only active when toolKey is provided and authenticated
-  const convexVariants = useQuery(
-    api.userVariants.list,
-    toolKey && isAuthenticated ? { toolKey } : "skip",
+  const convexVariants = useUserVariants(
+    toolKey,
+    Boolean(toolKey && isAuthenticated),
   );
-  const upsertVariant = useMutation(api.userVariants.upsert);
-  const removeVariant = useMutation(api.userVariants.remove);
-  const renameVariantMut = useMutation(api.userVariants.rename);
-  const setActiveMut = useMutation(api.userVariants.setActive);
-  const importBatchMut = useMutation(api.userVariants.importBatch);
+  const upsertVariant = useUpsertUserVariant();
+  const removeVariant = useRemoveUserVariant();
+  const renameVariantMut = useRenameUserVariant();
+  const setActiveMut = useSetActiveUserVariant();
+  const importBatchMut = useImportUserVariants();
 
   const useConvex = Boolean(toolKey && isAuthenticated);
 

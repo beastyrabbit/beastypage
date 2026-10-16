@@ -1,11 +1,12 @@
 import "server-only";
 
 import type { AnyJobKind } from "../types";
+import discordChallengePrune from "./discord-challenge-prune";
 import jobsPrune from "./jobs-prune";
 import livePrune from "./live-prune";
 
 /** Add one entry here when registering a concrete application job kind. */
-export const jobKinds = [livePrune, jobsPrune] as const;
+export const jobKinds = [livePrune, jobsPrune, discordChallengePrune] as const;
 
 export const jobKindRegistry = new Map<string, AnyJobKind>(
   jobKinds.map(

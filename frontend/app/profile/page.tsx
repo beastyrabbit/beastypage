@@ -1,7 +1,7 @@
 "use client";
 
 import { useClerk, useUser } from "@clerk/nextjs";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import {
   ChevronDown,
   ChevronRight,
@@ -19,7 +19,15 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PageHero } from "@/components/common/PageHero";
-import { api } from "@/convex/_generated/api";
+import {
+  useAllUserVariants,
+  useImportUserVariants,
+  useRegenerateUserApiKey,
+  useRemoveUserVariant,
+  useResetSavedVariants,
+  useUpdateUserProfile,
+  useUserViewer,
+} from "@/lib/data/users";
 import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
@@ -27,16 +35,13 @@ export default function ProfilePage() {
   const clerk = useClerk();
   const { user: clerkUser } = useUser();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
-  const viewer = useQuery(api.users.viewer);
-  const updateProfile = useMutation(api.users.updateProfile);
-  const resetSavedVariants = useMutation(api.users.resetSavedVariants);
-  const regenerateApiKey = useMutation(api.users.regenerateApiKey);
-  const allVariants = useQuery(
-    api.userVariants.listAll,
-    isAuthenticated ? {} : "skip",
-  );
-  const removeVariant = useMutation(api.userVariants.remove);
-  const importBatchMut = useMutation(api.userVariants.importBatch);
+  const viewer = useUserViewer();
+  const updateProfile = useUpdateUserProfile();
+  const resetSavedVariants = useResetSavedVariants();
+  const regenerateApiKey = useRegenerateUserApiKey();
+  const allVariants = useAllUserVariants(isAuthenticated);
+  const removeVariant = useRemoveUserVariant();
+  const importBatchMut = useImportUserVariants();
 
   const [username, setUsername] = useState("");
   const [saving, setSaving] = useState(false);
@@ -69,7 +74,7 @@ export default function ProfilePage() {
     setAccountDeleting(true);
     try {
       let remaining = true;
-      while (remaining) ({ remaining } = await resetSavedVariants());
+      while (remaining) ({ remaining } = await resetSavedVariants({}));
       toast.success("Saved variants reset");
       setAccountDeleting(false);
     } catch (err) {
@@ -241,7 +246,7 @@ export default function ProfilePage() {
               )
                 return;
               try {
-                await regenerateApiKey();
+                await regenerateApiKey({});
                 toast.success("API key regenerated");
               } catch (err) {
                 toast.error(
