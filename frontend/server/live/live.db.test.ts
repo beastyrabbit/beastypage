@@ -1,10 +1,10 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import pg from "pg";
 import { and, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
+import pg from "pg";
 import {
   afterAll,
   beforeAll,
@@ -15,13 +15,13 @@ import {
   it,
 } from "vitest";
 import { closeDatabase, getDb, getPool } from "@/server/db/client";
-import { withTransaction } from "@/server/db/transaction";
 import { liveEvents } from "@/server/db/schema/system";
-import { publishLive, pruneLiveEvents } from "@/server/live/publish";
+import { withTransaction } from "@/server/db/transaction";
 import {
   createLiveListenerForTests,
   stopLiveListener,
 } from "@/server/live/listener";
+import { pruneLiveEvents, publishLive } from "@/server/live/publish";
 import { TEST_LIVE_KEY } from "@/server/live/topics/test";
 
 const originalEnv = { ...process.env };

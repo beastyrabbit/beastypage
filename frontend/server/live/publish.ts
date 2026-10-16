@@ -1,8 +1,8 @@
 import "server-only";
 
 import { lt, sql } from "drizzle-orm";
-import { liveEvents } from "@/server/db/schema/system";
 import type { Database } from "@/server/db/pool";
+import { liveEvents } from "@/server/db/schema/system";
 import type { Transaction } from "@/server/db/transaction";
 
 export const LIVE_CHANNEL = "beastypage_live";

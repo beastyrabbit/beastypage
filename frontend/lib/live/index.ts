@@ -1,10 +1,10 @@
 export {
+  eventSourceUrl,
   type LiveEventSourceFactory,
   type LiveEventSourceLike,
   type LiveSnapshot,
-  type UseLiveOptions,
-  eventSourceUrl,
   parseSnapshot,
+  type UseLiveOptions,
   useLive,
   useLiveQuery,
   useLiveSnapshot,

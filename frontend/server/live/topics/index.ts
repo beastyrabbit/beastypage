@@ -1,7 +1,7 @@
 import "server-only";
 
-import type { LiveTopicDefinition } from "@/server/live/topics/types";
 import { testLiveTopic } from "@/server/live/topics/test";
+import type { LiveTopicDefinition } from "@/server/live/topics/types";
 
 // Future topic families add one descriptor to this list.
 export const liveTopics: LiveTopicDefinition[] = [
