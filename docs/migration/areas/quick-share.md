@@ -42,15 +42,17 @@ opaque UUID strings at the media boundary.
 
 ## Cutover order
 
-1. Deploy the media service with `CONTROL_PLANE_URL` set to the PostgreSQL
-   frontend route while leaving `DATA_BACKEND=convex`; verify no traffic is
-   sent to the new route yet.
+1. Before the window, deploy the media release that reads
+   `CONTROL_PLANE_URL` with the variable unset, so it still calls Convex.
+   Do not point it at the PostgreSQL route yet: `/api/internal/quick-share`
+   answers 404 while the frontend runs with `DATA_BACKEND=convex`.
 2. Import Quick Share metadata and open usage windows, return leased jobs to
    pending, and run the S3 verification script.
 3. Start the frontend job worker and verify a fake media endpoint accepts
    dispatches, retries and lease recovery.
-4. Set `DATA_BACKEND=postgres` on the frontend and perform create, multipart,
-   public-read, account and admin smoke checks.
+4. Inside the window, set `DATA_BACKEND=postgres` on the frontend and
+   `CONTROL_PLANE_URL` on the media service together, then perform create,
+   multipart, public-read, account and admin smoke checks.
 5. Drain old Convex/media workers, take the final backup, then lift the
    maintenance gate. PostgreSQL is the write source after this point; Convex
    is not written again.

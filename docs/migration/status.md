@@ -6,38 +6,43 @@ change, homelab change, release tag or cutover has happened. One
 test export of production was taken on 2026-10-16 by the maintainer and is
 kept outside the repository.
 
-Status as of 2026-10-16, branch `t3code/65208027`.
+Status as of 2026-10-16 (evening), branch `t3code/convex-postgres-migration`.
+Every area now has a PostgreSQL implementation behind `DATA_BACKEND=postgres`;
+Convex stays the default until the cutover.
 
 | Phase | Issue | State | Evidence in the repository | Still open |
 | --- | --- | --- | --- | --- |
 | 1. Inventory and architecture | #105 | **Done** | `frontend/scripts/migration/convex-inventory.ts` (`--check` in CI), [`convex-inventory.md`](convex-inventory.md), [ADR 0001](adr-0001-postgresql.md) | Machine-linked blockers between the issues |
 | Production measurement and export | #106 | **Test export taken** (349 MB archive, SHA-256 recorded privately) | [`importer.md`](importer.md) | Actual export cost from the Convex usage page |
-| 2. PostgreSQL foundation | #108 | **Repository side done** | Drizzle, `db:local`, the CI `database` job, the migration runner with lock, version and fail-closed check, the bundled init-container runner, [`operations.md`](operations.md), `deploy/postgres/*` templates | kub-homelab CNPG cluster, Infisical paths, restore drill (need approval); volume size from #106 |
-| 3. Target schema and contracts | #107, #109 | **Done against code-derived fixtures** | `server/db/schema/*`, `server/db/contracts.ts`, `drizzle/0000_init.sql`, [`data-contract.md`](data-contract.md), legacy-link lookups and tests | Validation report on the real #106 archive |
-| Image storage | #110 | **Partial** | `files` table, content-addressed import, `/api/files/[id]` (ETag, 304, immutable, referenced-only), Quick Share S3 verifier | Real sizes: 333 referenced images, 167 MB (largest 4.8 MB, median 159 kB), whole database 188 MB, so `bytea` stays; new uploads writing `files`; orphan cleanup job |
-| 4. Importer | #111 | **Done; runs cleanly on the real archive** | `scripts/migration/import*`, real-PostgreSQL tests (rerun fingerprints, crash plus resume, quarantine, offline guard), [`importer.md`](importer.md) | Counts on #107 and #111 (3 expected quarantined rows owned by a deleted user are dropped by decision) |
-| Staging data | #112 | Not started | Scrub policy in `data-contract.md`, staging template | Scrubber, staging namespace (approval) |
-| 5. Server data layer | #113 | **Started**: settings slice | `server/{errors,http,backend}.ts`, `server/auth/identity.ts`, `server/db/transaction.ts`, `server/services/settings.ts` behind `DATA_BACKEND`, Convex-vs-PostgreSQL parity tests, route tests | Catdex, collection, seasons, rarities, adoption, evolution, ancestry, perfect cats, coinflip, wheel, users and variants, cat shares and previews, Discord, Quick Share, Catdex uploads; client hooks (TanStack Query) |
-| 6. Live updates | #114 | Designed (ADR §10); `live_events` and `revision` columns exist | — | SSE route, LISTEN fan-out, three-replica test |
-| 7. Jobs and HTTP routes | #115 | Designed (ADR §11); `jobs` and `job_runs` tables exist | — | Worker, five recurring jobs, five routes, media `CONTROL_PLANE_URL` |
-| 8. Cutover | #116 | Outline only (ADR §13) | — | Runbook, staging rehearsal, approval |
-| 9. Decommission | #117 | Not started | — | Only after cutover evidence exists |
+| 2. PostgreSQL foundation | #108 | **Repository side done** | Drizzle, `db:local`, the CI `database` job, the migration runner with lock, version and fail-closed check, the bundled init-container runner, [`operations.md`](operations.md), `deploy/postgres/*` templates | kub-homelab CNPG cluster, Infisical paths, restore drill (need approval) |
+| 3. Target schema and contracts | #107, #109 | **Done**; validated on the real archive | `server/db/schema/*`, `server/db/contracts.ts`, `drizzle/0000_init.sql`, `drizzle/0001_quick_share_collection_slugs.sql` (Quick Share collection items share one slug; expand-only), [`data-contract.md`](data-contract.md) | Counts on #107 |
+| Image storage | #110 | **Done** | `files` table (`bytea`; 333 referenced images, 167 MB), `/api/files/[id]`, one decoding write path `storeFile` for uploads and generated images, `files.orphan-cleanup` job that fails closed when a new file reference column appears | — |
+| 4. Importer | #111 | **Done**; runs cleanly on the real archive | `scripts/migration/import*`, [`importer.md`](importer.md) | Counts on #111 (3 expected quarantined rows owned by a deleted user are dropped by decision) |
+| Staging data | #112 | **Tooling done** | `scrub:staging` (HMAC pseudonyms, regenerated tokens, staging password, `--verify`, loopback/explicit-database guard), [`staging.md`](staging.md) | Staging namespace and scrubbed archive (approval) |
+| 5. Server data layer | #113 | **Done** | Repositories, services and zod-validated routes for every area, dual-path client hooks (`lib/data/*`, TanStack Query), Convex-vs-PostgreSQL parity tests per area; area maps in [`areas/`](areas/) (catalog, cats, users, games, quick-share, stream) | — |
+| 6. Live updates | #114 | **Done** | `server/live/*` (publish in the writing transaction, one LISTEN per process with gap replay), `/api/live/[...topic]` SSE, `lib/live`, stream topics; three-replica test p95 ≈ 4 ms; browser check: control write reached the overlay in 26 ms; [`live-updates.md`](live-updates.md) | Measure again in the cluster |
+| 7. Jobs and HTTP routes | #115 | **Done** | `server/jobs/*` worker (SKIP LOCKED leases, backoff, dead jobs, recurring singletons), all crons and `scheduler.runAfter` sites as job kinds, `/api/internal/jobs/status`, the five HTTP routes, media `CONTROL_PLANE_URL` (falls back to Convex); [`jobs.md`](jobs.md) | — |
+| 8. Cutover | #116 | **Runbook and tools done** | `MAINTENANCE_MODE` gate (proxy 503 for writes, jobs paused, banner), `verify:import` (passes on the real archive: 35 tables, 336 files), `smoke:cutover`, [`cutover.md`](cutover.md) | Staging rehearsal, restore drill, approvals, the window itself |
+| 9. Decommission | #117 | Not started | — | After cutover: remove Convex code, `DATA_BACKEND`, the Convex provider (its websocket still connects in PostgreSQL mode), the dual-path hooks |
 
 ## Validation run for this state
 
-All commands run from `frontend/`. Timings are from the local run on
-2026-10-15.
+All commands run from `frontend/` on 2026-10-16.
 
 | Check | Command | Result |
 | --- | --- | --- |
 | Type check | `tsc --noEmit` | pass |
-| Lint | `biome lint .` | no errors; 77 warnings, all older than this work |
-| Unit tests | `vitest run --project unit` | 104 files, 796 tests pass |
-| Database tests (real PostgreSQL 18.6) | `pnpm run test:db` | pass: runner, constraints, legacy links, importer, settings parity, settings and file routes |
+| Lint and format | `biome check` on every file changed by the migration | no errors; 8 warnings in older component code |
+| Unit tests | `vitest run --project unit` | 117 files, 820 tests pass |
+| Database tests (real PostgreSQL 18) | `pnpm run test:db` | 42 files, 194 tests pass (three consecutive clean runs) |
 | Schema drift | `pnpm run db:drift` | no drift |
-| Migrations twice, then status | `db:migrate` ×2, `db:migrate --status` | pass |
-| Bundled runner in an image-like layout | `db:bundle`, then `node scripts/db/migrate.mjs` with `NODE_ENV=production` | pass |
-| Importer CLI end to end | `import:fixture`, then `import:convex` | report OK; private file modes |
 | Inventory up to date | `migration:inventory --check` | pass |
-| Production build | `next build` (CI placeholders) | pass; `/api/files/[id]` and `/api/health/database` built as dynamic routes |
-| Settings slice in a running app | `next dev` with `DATA_BACKEND=postgres` and Infisical dev secrets | `/api/health/database` returns ok. Dash settings create, read and edit all work; an edit with the wrong token returns 403. `/dash?slug=` renders the stored config from PostgreSQL. In a browser, `/single-cat-plus?variant=` applies the stored preset ("Settings loaded from URL", Calm mode), and an unknown variant shows "No preset found". Screenshots are in `.playwright-mcp/pg-*.png` (gitignored). |
+| Production build | `next build` (CI placeholders) | pass, no warnings |
+| Media service | `tsc`, `biome check`, `vitest run` in `backend/media_service` | pass, 59 tests |
+| Real archive | `import:convex` then `verify:import` | OK |
+| Running app on PostgreSQL | `next dev` with `DATA_BACKEND=postgres`, the imported archive and Infisical dev secrets, checked in a browser | Catdex, collection, perfect cats, coinflip, wheel, history, cat view (by slug and by old Convex ID), adoption batch and profile render from PostgreSQL with no runtime errors, broken images or Convex requests. A Perfect Cat vote and a signed-in username change were written through the UI. The overlay topic received a control write over SSE; a wrong API key got 403. |
+
+Two bugs were found only by the running-app check and fixed: route handlers
+could not read the Clerk session (the proxy now mounts `clerkMiddleware()`
+for PostgreSQL), and `useDataMutation` returned a new function after every
+call, which looped pages that list it in effect dependencies.

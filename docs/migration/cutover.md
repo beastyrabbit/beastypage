@@ -28,10 +28,15 @@ report directory on encrypted storage outside the repository.
    - the staging restore drill is complete and its measured time is at most
      one hour, with the backup name and verification output attached;
    - the staging rehearsal has a maintainer sign-off;
-   - the media service has already rolled out `CONTROL_PLANE_URL` pointing to
-     the PostgreSQL route (`/api/internal/quick-share`) while its frontend is
-     still on Convex, and a media-owner check shows no unexpected traffic to
-     that route; see [Quick Share](areas/quick-share.md);
+   - the media release that reads `CONTROL_PLANE_URL` is deployed with the
+     variable still unset, so it keeps calling Convex, and Quick Share works
+     unchanged. Do not point it at `/api/internal/quick-share` yet: that route
+     answers 404 until the frontend runs with `DATA_BACKEND=postgres`. See
+     [Quick Share](areas/quick-share.md);
+   - the frontend environment contains `CLERK_SECRET_KEY` (synced from
+     Infisical `/kubernetes/webpage/beastypage-clerk-secret`; check the name,
+     never the value). With `DATA_BACKEND=postgres` the proxy mounts
+     `clerkMiddleware()`, which needs it for every API request;
    - the release contains the same schema version as the target cluster and
      `pnpm exec biome check` and the migration test suite are green.
 
@@ -101,12 +106,10 @@ report directory on encrypted storage outside the repository.
 4. **Enable the maintenance gate and stop new jobs** — *platform owner,
    2–5 minutes; [APPROVAL REQUIRED]*
 
-   Apply the reviewed frontend deployment change through the normal GitOps
-   path, setting both flags on every replica:
+   Set `MAINTENANCE_MODE=1` and `JOBS_ENABLED=0` in the frontend's Infisical
+   secret (Flux reverts `kubectl set env`); Reloader restarts every replica:
 
    ```sh
-   kubectl -n webpage set env deployment/beastypage-frontend \
-     MAINTENANCE_MODE=1 JOBS_ENABLED=0
    kubectl -n webpage rollout status deployment/beastypage-frontend --timeout=10m
    curl -sS -X POST "https://<public-host>/api/cat-share" \
      -H 'content-type: application/json' -d '{}' -i | rg -e '^HTTP/' -e 'Retry-After' -e '"code"'
@@ -203,21 +206,26 @@ report directory on encrypted storage outside the repository.
 8. **Switch the application to PostgreSQL** — *platform owner and maintainer,
    5–15 minutes; [APPROVAL REQUIRED]*
 
-   Update the reviewed Infisical values and roll the frontend atomically:
+   The deployments are managed by Flux, so change the values in Infisical,
+   never with `kubectl set env` (Flux would revert it):
+
+   - frontend secret: `DATA_BACKEND=postgres`, `JOBS_ENABLED=1`, the
+     `DATABASE_URL` for `beastypage_app`;
+   - media secret (`beastypage-media-secret`):
+     `CONTROL_PLANE_URL=https://<public-host>/api/internal/quick-share`.
+
+   The Infisical operator syncs within five minutes and Reloader restarts
+   both deployments. Then wait for both rollouts:
 
    ```sh
-   # Infisical paths: /kubernetes/webpage/beastypage-postgres-* and /media.
-   # Set the frontend deployment values before restarting all replicas:
-   kubectl -n webpage set env deployment/beastypage-frontend \
-     DATA_BACKEND=postgres JOBS_ENABLED=1 \
-     CONTROL_PLANE_URL=https://<public-host>/api/internal/quick-share
    kubectl -n webpage rollout status deployment/beastypage-frontend --timeout=10m
+   kubectl -n webpage rollout status deployment/beastypage-media --timeout=10m
    ```
 
-   `CONTROL_PLANE_URL` must already have been rolled out to media in step 1;
-   this step only enables the PostgreSQL control plane. Convex-mode browser
-   writes use Convex's websocket and therefore cannot be stopped by the
-   frontend gate alone; pausing Convex in step 5 is mandatory.
+   Media switches its control plane here, inside the window, because the
+   PostgreSQL route only answers once the frontend runs on PostgreSQL.
+   Convex-mode browser writes use Convex's websocket and therefore cannot be
+   stopped by the frontend gate alone; pausing Convex in step 5 is mandatory.
 
    **Expected output:** every replica reports `DATA_BACKEND=postgres`, the
    database readiness endpoint is HTTP 200, and the jobs worker is running
@@ -254,9 +262,9 @@ report directory on encrypted storage outside the repository.
 
 10. **Lift the gate** — *maintainer, 2–5 minutes; [APPROVAL REQUIRED]*
 
+    Set `MAINTENANCE_MODE=0` in the frontend's Infisical secret, then:
+
     ```sh
-    kubectl -n webpage set env deployment/beastypage-frontend \
-      MAINTENANCE_MODE=0
     kubectl -n webpage rollout status deployment/beastypage-frontend --timeout=10m
     curl -fsS -X POST "https://<public-host>/api/<safe-write-route>" \
       -H 'content-type: application/json' -d '<operator-approved-body>' -i | rg '^HTTP/'
@@ -295,14 +303,14 @@ report directory on encrypted storage outside the repository.
 - [ ] CNPG clusters, Infisical paths and role credentials are verified.
 - [ ] Restore drill evidence meets the one-hour RTO.
 - [ ] Staging scrubbed rehearsal and sign-off are attached.
-- [ ] Media `CONTROL_PLANE_URL` rollout and no-traffic observation are attached.
+- [ ] The media release that reads `CONTROL_PLANE_URL` is live with it unset, and `CLERK_SECRET_KEY` is present in the frontend environment.
 - [ ] Final PostgreSQL backup is `Completed` and its name is recorded.
 - [ ] Maintenance write and read/health checks pass on every frontend replica.
 - [ ] Convex is paused; media is drained; `FREEZE_AT` and the no-write log query
   are recorded.
 - [ ] Final import used `--expected-issuer`; `verify:import` is `OK`.
-- [ ] `DATA_BACKEND=postgres`, `JOBS_ENABLED=1` and PostgreSQL
-  `CONTROL_PLANE_URL` are live on every replica.
+- [ ] `DATA_BACKEND=postgres` and `JOBS_ENABLED=1` are live on every frontend
+  replica, and media uses the PostgreSQL `CONTROL_PLANE_URL`.
 - [ ] `smoke:cutover` is `OK` with the maintenance write assertion.
 - [ ] **[APPROVAL REQUIRED]** Maintainer approved lifting the gate.
 - [ ] The post-cutover watch has no dead jobs, abnormal latency or error rates.
