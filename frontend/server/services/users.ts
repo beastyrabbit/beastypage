@@ -1,25 +1,32 @@
 import "server-only";
 
 import { randomUUID, timingSafeEqual } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
 import type { Identity } from "../auth/identity";
 import type { Database } from "../db/pool";
-import { users, userVariants } from "../db/schema";
 import { type Transaction, withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
+import type { UserRow } from "../repositories/users";
 import {
+  createUser,
   getUserByApiKey,
   getUserByTokenIdentifier,
   getUserByUsername,
-  listUserVariants,
+  getUsersByTokenIdentifiers,
+  searchUsersByUsernamePrefix,
+  setUserApiKey,
+  setUsername,
 } from "../repositories/users";
+import {
+  deleteFirstByUser,
+  listByUser as listUserVariants,
+} from "../repositories/userVariants";
 
 const MAX_RESOLVE_IDS = 100;
 const MAX_ID_LENGTH = 128;
 
 export type UserRecord = ReturnType<typeof toUserRecord>;
 
-function toUserRecord(row: typeof users.$inferSelect) {
+function toUserRecord(row: UserRow) {
   return {
     _id: row.id,
     _creationTime: row.createdAt.getTime(),
@@ -63,24 +70,15 @@ async function ensureUser(tx: Transaction, identity: Identity) {
   const existing = await getUserByTokenIdentifier(tx, identity.tokenIdentifier);
   if (existing) {
     if (!existing.apiKey) {
-      const [updated] = await tx
-        .update(users)
-        .set({ apiKey: randomUUID(), updatedAt: sql`now()` })
-        .where(eq(users.id, existing.id))
-        .returning();
+      const updated = await setUserApiKey(tx, existing.id, randomUUID());
       return updated ?? existing;
     }
     return existing;
   }
-  const [created] = await tx
-    .insert(users)
-    .values({
-      tokenIdentifier: identity.tokenIdentifier,
-      showProfilePic: true,
-      apiKey: randomUUID(),
-    })
-    .onConflictDoNothing({ target: users.tokenIdentifier })
-    .returning();
+  const created = await createUser(tx, {
+    tokenIdentifier: identity.tokenIdentifier,
+    apiKey: randomUUID(),
+  });
   if (created) return created;
   const raced = await getUserByTokenIdentifier(tx, identity.tokenIdentifier);
   if (!raced) throw new ServiceError("unavailable", "Failed to create user");
@@ -128,11 +126,7 @@ export async function updateProfile(
     const existing = await getUserByUsername(tx, validated);
     if (existing && existing.id !== user.id)
       throw new ServiceError("conflict", "Username is already taken");
-    const [updated] = await tx
-      .update(users)
-      .set({ username: validated, updatedAt: sql`now()` })
-      .where(eq(users.id, user.id))
-      .returning();
+    const updated = await setUsername(tx, user.id, validated);
     return toUserRecord(updated ?? user);
   });
 }
@@ -141,10 +135,7 @@ export async function regenerateApiKey(db: Database, identity: Identity) {
   return withTransaction(db, async (tx) => {
     const user = await requireExistingUser(tx, identity);
     const apiKey = randomUUID();
-    await tx
-      .update(users)
-      .set({ apiKey, updatedAt: sql`now()` })
-      .where(eq(users.id, user.id));
+    await setUserApiKey(tx, user.id, apiKey);
     return apiKey;
   });
 }
@@ -152,20 +143,8 @@ export async function regenerateApiKey(db: Database, identity: Identity) {
 export async function resetSavedVariants(db: Database, identity: Identity) {
   return withTransaction(db, async (tx) => {
     const user = await requireExistingUser(tx, identity);
-    const rows = await tx
-      .select({ id: userVariants.id })
-      .from(userVariants)
-      .where(eq(userVariants.userId, user.id))
-      .limit(100);
-    if (rows.length) {
-      await tx.delete(userVariants).where(
-        sql`${userVariants.id} in (${sql.join(
-          rows.map((row) => sql`${row.id}`),
-          sql`, `,
-        )})`,
-      );
-    }
-    return { remaining: rows.length === 100 };
+    const deleted = await deleteFirstByUser(tx, user.id, 100);
+    return { remaining: deleted === 100 };
   });
 }
 
@@ -190,8 +169,9 @@ export async function resolveUsernames(
       ? identity.tokenIdentifier.slice(0, separator)
       : identity.tokenIdentifier;
   return withTransaction(db, async (tx) => {
-    const rows = await Promise.all(
-      userIds.map((id) => getUserByTokenIdentifier(tx, `${issuer}|${id}`)),
+    const rows = await getUsersByTokenIdentifiers(
+      tx,
+      userIds.map((id) => `${issuer}|${id}`),
     );
     return userIds.map((id, index) => ({
       userId: id,
@@ -213,11 +193,7 @@ export async function searchByUsername(
     .replaceAll("%", "\\%")
     .replaceAll("_", "\\_");
   return withTransaction(db, async (tx) => {
-    const rows = await tx
-      .select()
-      .from(users)
-      .where(sql`${users.usernameSearch} like ${`${escaped}%`} escape '\\'`)
-      .limit(10);
+    const rows = await searchUsersByUsernamePrefix(tx, escaped);
     return rows.map((row) => ({
       userId: row.tokenIdentifier.slice(
         row.tokenIdentifier.lastIndexOf("|") + 1,

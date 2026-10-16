@@ -1,7 +1,7 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
-import { users, userVariants } from "../db/schema";
+import { eq, sql } from "drizzle-orm";
+import { users } from "../db/schema";
 import type { Transaction } from "../db/transaction";
 
 export async function getUserByTokenIdentifier(
@@ -34,16 +34,64 @@ export async function getUserByUsername(tx: Transaction, username: string) {
   return row ?? null;
 }
 
-export async function listUserVariants(
+export async function createUser(
+  tx: Transaction,
+  values: { tokenIdentifier: string; apiKey: string },
+) {
+  const [created] = await tx
+    .insert(users)
+    .values({ ...values, showProfilePic: true })
+    .onConflictDoNothing({ target: users.tokenIdentifier })
+    .returning();
+  return created ?? null;
+}
+
+export async function setUserApiKey(
   tx: Transaction,
   userId: string,
-  toolKey?: string,
+  apiKey: string,
 ) {
-  const conditions = [eq(userVariants.userId, userId)];
-  if (toolKey) conditions.push(eq(userVariants.toolKey, toolKey));
+  const [updated] = await tx
+    .update(users)
+    .set({ apiKey, updatedAt: sql`now()` })
+    .where(eq(users.id, userId))
+    .returning();
+  return updated ?? null;
+}
+
+export async function setUsername(
+  tx: Transaction,
+  userId: string,
+  username: string,
+) {
+  const [updated] = await tx
+    .update(users)
+    .set({ username, updatedAt: sql`now()` })
+    .where(eq(users.id, userId))
+    .returning();
+  return updated ?? null;
+}
+
+export async function searchUsersByUsernamePrefix(
+  tx: Transaction,
+  prefix: string,
+) {
   return tx
     .select()
-    .from(userVariants)
-    .where(and(...conditions))
-    .orderBy(userVariants.toolKey, userVariants.createdAt);
+    .from(users)
+    .where(sql`${users.usernameSearch} like ${`${prefix}%`} escape '\\'`)
+    .limit(10);
 }
+
+export async function getUsersByTokenIdentifiers(
+  tx: Transaction,
+  tokenIdentifiers: string[],
+) {
+  return Promise.all(
+    tokenIdentifiers.map((tokenIdentifier) =>
+      getUserByTokenIdentifier(tx, tokenIdentifier),
+    ),
+  );
+}
+
+export type UserRow = typeof users.$inferSelect;

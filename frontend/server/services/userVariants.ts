@@ -1,13 +1,21 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
 import type { Identity } from "../auth/identity";
 import { userVariantSettingsByTool } from "../db/contracts";
 import type { Database } from "../db/pool";
-import { userVariants } from "../db/schema";
 import { withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
 import { getUserByTokenIdentifier } from "../repositories/users";
+import type { UserVariantRow } from "../repositories/userVariants";
+import {
+  countByTool,
+  deactivateByTool,
+  deleteByUserToolVariant,
+  findByVariantId,
+  insertVariant,
+  listByUser,
+  updateVariant,
+} from "../repositories/userVariants";
 
 const MAX_VARIANTS_PER_TOOL = 100;
 
@@ -34,7 +42,7 @@ function validateSettings(toolKey: string, settings: unknown) {
   return result.data;
 }
 
-function toVariant(row: typeof userVariants.$inferSelect) {
+function toVariant(row: UserVariantRow) {
   return {
     _id: row.id,
     _creationTime: row.createdAt.getTime(),
@@ -55,12 +63,7 @@ export async function list(db: Database, identity: Identity, toolKey?: string) {
     if (!identity.tokenIdentifier) return [];
     const user = await getUserByTokenIdentifier(tx, identity.tokenIdentifier);
     if (!user) return [];
-    const conditions = [eq(userVariants.userId, user.id)];
-    if (toolKey) conditions.push(eq(userVariants.toolKey, toolKey));
-    const rows = await tx
-      .select()
-      .from(userVariants)
-      .where(and(...conditions));
+    const rows = await listByUser(tx, user.id, toolKey);
     return rows.map(toVariant);
   });
 }
@@ -80,66 +83,36 @@ export async function upsert(
   return withTransaction(db, async (tx) => {
     const user = await requireUser(tx, identity);
     const settings = validateSettings(args.toolKey, args.settings);
-    const [existing] = await tx
-      .select()
-      .from(userVariants)
-      .where(
-        and(
-          eq(userVariants.userId, user.id),
-          eq(userVariants.toolKey, args.toolKey),
-          eq(userVariants.variantId, args.variantId),
-        ),
-      )
-      .limit(1);
+    const existing = await findByVariantId(
+      tx,
+      user.id,
+      args.toolKey,
+      args.variantId,
+    );
     if (!existing) {
-      const [{ count }] = await tx
-        .select({ count: sql<number>`count(*)::int` })
-        .from(userVariants)
-        .where(
-          and(
-            eq(userVariants.userId, user.id),
-            eq(userVariants.toolKey, args.toolKey),
-          ),
-        );
+      const count = await countByTool(tx, user.id, args.toolKey);
       if (count >= MAX_VARIANTS_PER_TOOL)
         throw new ServiceError("conflict", "Variant limit reached");
     }
-    if (args.isActive)
-      await tx
-        .update(userVariants)
-        .set({ isActive: false })
-        .where(
-          and(
-            eq(userVariants.userId, user.id),
-            eq(userVariants.toolKey, args.toolKey),
-          ),
-        );
+    if (args.isActive) await deactivateByTool(tx, user.id, args.toolKey);
     if (existing) {
-      const [updated] = await tx
-        .update(userVariants)
-        .set({
-          name: args.name,
-          settings,
-          isActive: args.isActive,
-          ...(args.slug !== undefined ? { slug: args.slug } : {}),
-          updatedAt: sql`now()`,
-        })
-        .where(eq(userVariants.id, existing.id))
-        .returning();
-      return updated?.id ?? existing.id;
-    }
-    const [created] = await tx
-      .insert(userVariants)
-      .values({
-        userId: user.id,
-        toolKey: args.toolKey,
-        variantId: args.variantId,
+      const updated = await updateVariant(tx, existing.id, {
         name: args.name,
-        slug: args.slug,
         settings,
         isActive: args.isActive,
-      })
-      .returning();
+        ...(args.slug !== undefined ? { slug: args.slug } : {}),
+      });
+      return updated?.id ?? existing.id;
+    }
+    const created = await insertVariant(tx, {
+      userId: user.id,
+      toolKey: args.toolKey,
+      variantId: args.variantId,
+      name: args.name,
+      slug: args.slug,
+      settings,
+      isActive: args.isActive,
+    });
     if (!created)
       throw new ServiceError("unavailable", "Failed to save variant");
     return created.id;
@@ -154,19 +127,8 @@ export async function remove(
 ) {
   return withTransaction(db, async (tx) => {
     const user = await requireUser(tx, identity);
-    const [row] = await tx
-      .select({ id: userVariants.id })
-      .from(userVariants)
-      .where(
-        and(
-          eq(userVariants.userId, user.id),
-          eq(userVariants.toolKey, toolKey),
-          eq(userVariants.variantId, variantId),
-        ),
-      )
-      .limit(1);
+    const row = await deleteByUserToolVariant(tx, user.id, toolKey, variantId);
     if (!row) throw new ServiceError("not_found", "Variant not found");
-    await tx.delete(userVariants).where(eq(userVariants.id, row.id));
   });
 }
 
@@ -179,17 +141,10 @@ export async function rename(
 ) {
   return withTransaction(db, async (tx) => {
     const user = await requireUser(tx, identity);
-    const [row] = await tx
-      .update(userVariants)
-      .set({ name, updatedAt: sql`now()` })
-      .where(
-        and(
-          eq(userVariants.userId, user.id),
-          eq(userVariants.toolKey, toolKey),
-          eq(userVariants.variantId, variantId),
-        ),
-      )
-      .returning();
+    const existing = await findByVariantId(tx, user.id, toolKey, variantId);
+    const row = existing
+      ? await updateVariant(tx, existing.id, { name })
+      : null;
     if (!row) throw new ServiceError("not_found", "Variant not found");
   });
 }
@@ -202,26 +157,11 @@ export async function setActive(
 ) {
   return withTransaction(db, async (tx) => {
     const user = await requireUser(tx, identity);
-    await tx
-      .update(userVariants)
-      .set({ isActive: false })
-      .where(
-        and(
-          eq(userVariants.userId, user.id),
-          eq(userVariants.toolKey, toolKey),
-        ),
-      );
-    if (variantId)
-      await tx
-        .update(userVariants)
-        .set({ isActive: true })
-        .where(
-          and(
-            eq(userVariants.userId, user.id),
-            eq(userVariants.toolKey, toolKey),
-            eq(userVariants.variantId, variantId),
-          ),
-        );
+    await deactivateByTool(tx, user.id, toolKey);
+    if (variantId) {
+      const variant = await findByVariantId(tx, user.id, toolKey, variantId);
+      if (variant) await updateVariant(tx, variant.id, { isActive: true });
+    }
   });
 }
 
@@ -245,42 +185,21 @@ export async function importBatch(
     let activeDeactivated = false;
     for (const value of variants) {
       const settings = validateSettings(toolKey, value.settings);
-      const [existing] = await tx
-        .select({ id: userVariants.id })
-        .from(userVariants)
-        .where(
-          and(
-            eq(userVariants.userId, user.id),
-            eq(userVariants.toolKey, toolKey),
-            eq(userVariants.variantId, value.variantId),
-          ),
-        )
-        .limit(1);
+      const existing = await findByVariantId(
+        tx,
+        user.id,
+        toolKey,
+        value.variantId,
+      );
       if (existing) continue;
-      const [{ count }] = await tx
-        .select({ count: sql<number>`count(*)::int` })
-        .from(userVariants)
-        .where(
-          and(
-            eq(userVariants.userId, user.id),
-            eq(userVariants.toolKey, toolKey),
-          ),
-        );
+      const count = await countByTool(tx, user.id, toolKey);
       if (count >= MAX_VARIANTS_PER_TOOL) break;
       const isActive = value.isActive && !activeDeactivated;
       if (isActive) {
-        await tx
-          .update(userVariants)
-          .set({ isActive: false })
-          .where(
-            and(
-              eq(userVariants.userId, user.id),
-              eq(userVariants.toolKey, toolKey),
-            ),
-          );
+        await deactivateByTool(tx, user.id, toolKey);
         activeDeactivated = true;
       }
-      await tx.insert(userVariants).values({
+      await insertVariant(tx, {
         userId: user.id,
         toolKey,
         variantId: value.variantId,

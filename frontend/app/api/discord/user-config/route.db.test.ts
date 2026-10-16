@@ -31,6 +31,18 @@ describe("Discord user config route", () => {
     expect(response.status).toBe(401);
   });
 
+  it("rejects a configured service token shorter than Convex's minimum", async () => {
+    process.env.DISCORD_API_TOKEN = "short-token";
+    const response = await route.GET(
+      new NextRequest(
+        "http://localhost/api/discord/user-config?discordUserId=short",
+        { headers: { authorization: "Bearer short-token" } },
+      ),
+    );
+    expect(response.status).toBe(401);
+    process.env.DISCORD_API_TOKEN = "fixture-discord-service-token-1234567890";
+  });
+
   it("keeps the bot contract for get and patch", async () => {
     const id = `fixture-${crypto.randomUUID()}`;
     const get = await route.GET(

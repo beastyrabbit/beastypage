@@ -4,8 +4,10 @@ import { getRequestIdentity } from "@/server/auth/identity";
 import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
-import { parseJsonBody } from "@/server/request";
+import { parseJsonBody, parseSearchParams } from "@/server/request";
 import * as service from "@/server/services/userVariants";
+
+const querySchema = z.object({ toolKey: z.string().optional() });
 
 const bodySchema = z.object({
   operation: z.enum(["upsert", "remove", "rename", "setActive", "importBatch"]),
@@ -38,7 +40,8 @@ export async function GET(request: Request) {
       await service.list(
         getDb(),
         await getRequestIdentity(),
-        new URL(request.url).searchParams.get("toolKey") ?? undefined,
+        parseSearchParams(new URL(request.url).searchParams, querySchema)
+          .toolKey,
       ),
     );
   } catch (error) {

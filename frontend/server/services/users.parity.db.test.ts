@@ -1,11 +1,22 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
+import { ANONYMOUS } from "../auth/identity";
 import { closeDatabase, getDb } from "../db/client";
 import type { Database } from "../db/pool";
-import { getOrCreateUser, searchByUsername, updateProfile } from "./users";
+import {
+  findUserByApiKey,
+  getOrCreateUser,
+  regenerateApiKey,
+  resetSavedVariants,
+  resolveUsernames,
+  searchByUsername,
+  updateProfile,
+  viewer,
+} from "./users";
+import { upsert as upsertVariant } from "./userVariants";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 let db: Database;
@@ -16,35 +27,173 @@ beforeAll(() => {
 });
 afterAll(() => closeDatabase());
 
+function identity(subject = crypto.randomUUID()) {
+  return { tokenIdentifier: `https://parity.users|${subject}` };
+}
+
+async function markSearchReady(t: ReturnType<typeof convexTest>) {
+  await t.run((ctx) =>
+    ctx.db.insert("user_search_migrations", {
+      name: "usernameSearch",
+      complete: true,
+      updatedAt: 1,
+    }),
+  );
+}
+
 describe("users Convex/PostgreSQL parity", () => {
-  it("keeps profile writes and normalized searches equivalent", async () => {
-    const tokenIdentifier = `https://parity.users|${crypto.randomUUID()}`;
+  it("covers viewer, ensure, profile, search, resolve, key rotation and reset", async () => {
+    const owner = identity();
     const convex = convexTest(schema, modules);
-    const identity = { tokenIdentifier };
-    const convexUser = convex.withIdentity(identity);
-    await convexUser.mutation(api.users.getOrCreateUser, {});
-    await convex.run((ctx) =>
-      ctx.db.insert("user_search_migrations", {
-        name: "usernameSearch",
-        complete: true,
-        updatedAt: 1,
-      }),
+    const convexOwner = convex.withIdentity(owner);
+    const postgresCreated = await getOrCreateUser(db, owner);
+    await convexOwner.mutation(api.users.getOrCreateUser, {});
+    expect((await viewer(db, owner))?.tokenIdentifier).toBe(
+      owner.tokenIdentifier,
     );
-    await getOrCreateUser(db, identity);
-    await updateProfile(db, identity, "Parity_User");
-    await convexUser.mutation(api.users.updateProfile, {
+    expect(
+      (await convexOwner.query(api.users.viewer, {}))?.tokenIdentifier,
+    ).toBe(owner.tokenIdentifier);
+
+    await markSearchReady(convex);
+    await updateProfile(db, owner, "Parity_User");
+    await convexOwner.mutation(api.users.updateProfile, {
       username: "Parity_User",
     });
-    const postgresResult = await searchByUsername(db, identity, "PARITY");
-    const convexResult = await convexUser
-      .query(api.users.searchByUsername, { prefix: "PARITY" })
-      .catch(() => []);
+    expect(await searchByUsername(db, owner, "PARITY")).toEqual([
+      {
+        userId: owner.tokenIdentifier.split("|").at(-1),
+        username: "Parity_User",
+      },
+    ]);
     expect(
-      postgresResult.map(({ userId, username }) => ({ userId, username })),
-    ).toEqual(convexResult);
-    expect((await getOrCreateUser(db, identity)).usernameSearch).toBe(
-      "parity_user",
+      await convexOwner.query(api.users.searchByUsername, { prefix: "PARITY" }),
+    ).toEqual([
+      {
+        userId: owner.tokenIdentifier.split("|").at(-1),
+        username: "Parity_User",
+      },
+    ]);
+
+    const resolved = identity("resolved");
+    await getOrCreateUser(db, resolved);
+    await convex.withIdentity(resolved).mutation(api.users.getOrCreateUser, {});
+    await updateProfile(db, resolved, "Resolved_User");
+    await convex
+      .withIdentity(resolved)
+      .mutation(api.users.updateProfile, { username: "Resolved_User" });
+    expect(await resolveUsernames(db, owner, ["resolved", "missing"])).toEqual([
+      { userId: "resolved", username: "Resolved_User" },
+      { userId: "missing", username: "missing" },
+    ]);
+    expect(
+      await convexOwner.query(api.users.resolveUsernames, {
+        userIds: ["resolved", "missing"],
+      }),
+    ).toEqual([
+      { userId: "resolved", username: "Resolved_User" },
+      { userId: "missing", username: "missing" },
+    ]);
+
+    const oldKey = postgresCreated.apiKey as string;
+    const convexOldKey = (await convexOwner.query(api.users.viewer, {}))
+      ?.apiKey as string;
+    expect((await findUserByApiKey(db, oldKey))?.tokenIdentifier).toBe(
+      owner.tokenIdentifier,
     );
-    expect(convexUser).toBeTruthy();
+    expect(await findUserByApiKey(db, `${oldKey}wrong`)).toBeNull();
+    expect(
+      (
+        await convexOwner.query(internal.users.getUserByApiKey, {
+          apiKey: convexOldKey,
+        })
+      )?.tokenIdentifier,
+    ).toBe(owner.tokenIdentifier);
+    expect(
+      await convexOwner.query(internal.users.getUserByApiKey, {
+        apiKey: `${convexOldKey}wrong`,
+      }),
+    ).toBeNull();
+    const rotated = await regenerateApiKey(db, owner);
+    const convexRotated = await convexOwner.mutation(
+      api.users.regenerateApiKey,
+      {},
+    );
+    expect(rotated).not.toBe(oldKey);
+    expect(rotated).toMatch(/^[0-9a-f-]{36}$/);
+    expect(convexRotated).toMatch(/^[0-9a-f-]{36}$/);
+
+    await upsertVariant(db, owner, {
+      toolKey: "dash",
+      variantId: "reset",
+      name: "Reset",
+      settings: {},
+      isActive: false,
+    });
+    await convexOwner.mutation(api.userVariants.upsert, {
+      toolKey: "dash",
+      variantId: "reset",
+      name: "Reset",
+      settings: {},
+      isActive: false,
+    });
+    expect(await resetSavedVariants(db, owner)).toEqual({ remaining: false });
+    expect(
+      await convexOwner.mutation(api.users.resetSavedVariants, {}),
+    ).toEqual({ remaining: false });
+  });
+
+  it("matches anonymous and other-user authorization failures", async () => {
+    const owner = identity();
+    const other = identity();
+    const convex = convexTest(schema, modules);
+    const convexOwner = convex.withIdentity(owner);
+    const convexOther = convex.withIdentity(other);
+    await getOrCreateUser(db, owner);
+    await getOrCreateUser(db, other);
+    await convexOwner.mutation(api.users.getOrCreateUser, {});
+    await convexOther.mutation(api.users.getOrCreateUser, {});
+    await updateProfile(db, owner, "Owned_User");
+    await convexOwner.mutation(api.users.updateProfile, {
+      username: "Owned_User",
+    });
+
+    await expect(
+      updateProfile(db, ANONYMOUS, "Anonymous"),
+    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(
+      convexTest(schema, modules).mutation(api.users.updateProfile, {
+        username: "Anonymous",
+      }),
+    ).rejects.toThrow("Not authenticated");
+    await expect(updateProfile(db, other, "Owned_User")).rejects.toMatchObject({
+      code: "conflict",
+    });
+    await expect(
+      convexOther.mutation(api.users.updateProfile, { username: "Owned_User" }),
+    ).rejects.toThrow("already taken");
+    expect(await findUserByApiKey(db, "wrong-api-key")).toBeNull();
+  });
+
+  it("keeps username and resolve validation limits aligned", async () => {
+    const owner = identity();
+    const convex = convexTest(schema, modules).withIdentity(owner);
+    await getOrCreateUser(db, owner);
+    await convex.mutation(api.users.getOrCreateUser, {});
+    for (const username of ["x".repeat(31), "has space"]) {
+      await expect(updateProfile(db, owner, username)).rejects.toMatchObject({
+        code: "invalid_input",
+      });
+      await expect(
+        convex.mutation(api.users.updateProfile, { username }),
+      ).rejects.toThrow();
+    }
+    const ids = Array.from({ length: 101 }, (_, index) => `user_${index}`);
+    await expect(resolveUsernames(db, owner, ids)).rejects.toMatchObject({
+      code: "invalid_input",
+    });
+    await expect(
+      convex.query(api.users.resolveUsernames, { userIds: ids }),
+    ).rejects.toThrow("at most 100");
   });
 });

@@ -165,6 +165,7 @@ export function useDiscordChallenge() {
     mutationFn: () =>
       post<FunctionReturnType<typeof api.discord.issueChallenge>>(
         "/api/discord/challenge",
+        {},
       ),
   });
 }
