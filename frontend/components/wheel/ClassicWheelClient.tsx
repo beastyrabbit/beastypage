@@ -1,13 +1,12 @@
 "use client";
 
 import confetti from "canvas-confetti";
-import { useMutation, useQuery } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Wheel } from "spin-wheel";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
-import { api } from "@/convex/_generated/api";
 import { track } from "@/lib/analytics";
+import { useLogWheelSpin, useWheelStats } from "@/lib/data/games";
 import { cn } from "@/lib/utils";
 import {
   CLASSIC_WHEEL_ITEMS,
@@ -53,8 +52,8 @@ export function ClassicWheelClient() {
     }
   });
 
-  const logSpin = useMutation(api.wheel.logSpin);
-  const stats = useQuery(api.wheel.stats, {});
+  const logSpin = useLogWheelSpin();
+  const stats = useWheelStats();
 
   const prizeStats = useMemo(() => {
     const map = new Map<string, { count: number }>();

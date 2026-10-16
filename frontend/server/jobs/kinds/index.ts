@@ -8,6 +8,7 @@ import discordChallengePrune from "./discord-challenge-prune";
 import filesOrphanCleanup from "./files-orphan-cleanup";
 import jobsPrune from "./jobs-prune";
 import livePrune from "./live-prune";
+import perfectMatchupRetention from "./perfect-matchup-retention";
 
 /** Add one entry here when registering a concrete application job kind. */
 export const jobKinds = [
@@ -18,6 +19,7 @@ export const jobKinds = [
   catdexThumbnailBackfill,
   catdexUploadRetention,
   filesOrphanCleanup,
+  perfectMatchupRetention,
 ] as const;
 
 export const jobKindRegistry = new Map<string, AnyJobKind>(
