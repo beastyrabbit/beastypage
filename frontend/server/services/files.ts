@@ -1,6 +1,5 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { inspectFile } from "../../scripts/migration/import/files";
 import type { Database } from "../db/pool";
@@ -26,11 +25,95 @@ export interface StoredFile {
   height: number;
 }
 
+const STORED_FILE_COLUMNS = {
+  id: files.id,
+  sha256: files.sha256,
+  mimeType: files.mimeType,
+  byteSize: files.byteSize,
+  width: files.width,
+  height: files.height,
+};
+
+export interface StoreFileOptions {
+  maxBytes: number;
+  /** Allowed decoded types; the declared type is only a hint. */
+  allowedTypes: ReadonlySet<string>;
+  legacyId?: string | null;
+}
+
 /**
- * Stores a validated raster file, deduplicating by content hash. The import
- * inspector is shared so upload and migration accept exactly the same decoded
- * formats and dimension rules.
+ * Decodes and stores a raster file, deduplicating by content hash. The import
+ * inspector is shared so uploads, generated images and the migration accept
+ * exactly the same formats and record the detected type, never the declared
+ * one. Rejections throw `Error` with one of EMPTY_UPLOAD, FILE_TOO_LARGE,
+ * UNSUPPORTED_MEDIA_TYPE or INVALID_IMAGE as the message.
  */
+export async function storeFile(
+  db: Database | Transaction,
+  bytes: Buffer,
+  declaredType: string,
+  options: StoreFileOptions,
+): Promise<StoredFile> {
+  if (bytes.length === 0) throw new Error("EMPTY_UPLOAD");
+  if (bytes.length > options.maxBytes) throw new Error("FILE_TOO_LARGE");
+
+  const inspected = await inspectFile(bytes, {
+    id: "upload",
+    creationTime: null,
+    sha256Hex: null,
+    size: bytes.length,
+    contentType: declaredType,
+  });
+  if ("problems" in inspected) throw new Error("INVALID_IMAGE");
+  if (!options.allowedTypes.has(inspected.file.mimeType)) {
+    throw new Error("UNSUPPORTED_MEDIA_TYPE");
+  }
+
+  const { sha256Hex: sha256, mimeType, width, height } = inspected.file;
+  const findExisting = async () => {
+    const [row] = await db
+      .select(STORED_FILE_COLUMNS)
+      .from(files)
+      .where(sql`${files.sha256} = ${sha256}`)
+      .limit(1);
+    return row;
+  };
+  const withSize = (row: StoredRow): StoredFile => ({
+    id: row.id,
+    sha256: row.sha256,
+    mimeType: row.mimeType,
+    byteSize: row.byteSize,
+    width: row.width ?? width,
+    height: row.height ?? height,
+  });
+
+  const existing = await findExisting();
+  if (existing) return withSize(existing);
+  const [inserted] = await db
+    .insert(files)
+    .values({
+      sha256,
+      mimeType,
+      byteSize: bytes.byteLength,
+      width,
+      height,
+      bytes,
+      legacyId: options.legacyId ?? null,
+    })
+    .onConflictDoNothing({ target: files.sha256 })
+    .returning(STORED_FILE_COLUMNS);
+  if (inserted) return withSize(inserted);
+  const raced = await findExisting();
+  if (!raced) throw new Error("FILE_STORE_FAILED");
+  return withSize(raced);
+}
+
+type StoredRow = Omit<StoredFile, "width" | "height"> & {
+  width: number | null;
+  height: number | null;
+};
+
+/** Catdex card uploads: the declared type must already be PNG or JPEG. */
 export async function storeUploadedFile(
   tx: Transaction,
   bytes: Buffer,
@@ -42,96 +125,10 @@ export async function storeUploadedFile(
   if (!normalized || !CARD_UPLOAD_CONTENT_TYPES.has(normalized)) {
     throw new Error("UNSUPPORTED_MEDIA_TYPE");
   }
-
-  const inspected = await inspectFile(bytes, {
-    id: "upload",
-    creationTime: null,
-    sha256Hex: null,
-    size: bytes.length,
-    contentType: normalized,
+  return storeFile(tx, bytes, normalized, {
+    maxBytes: MAX_CARD_UPLOAD_BYTES,
+    allowedTypes: CARD_UPLOAD_CONTENT_TYPES,
   });
-  if ("problems" in inspected) {
-    throw new Error("INVALID_IMAGE");
-  }
-  if (!CARD_UPLOAD_CONTENT_TYPES.has(inspected.file.mimeType)) {
-    throw new Error("UNSUPPORTED_MEDIA_TYPE");
-  }
-
-  const sha256 = createHash("sha256").update(bytes).digest("hex");
-  const [existing] = await tx
-    .select({
-      id: files.id,
-      sha256: files.sha256,
-      mimeType: files.mimeType,
-      byteSize: files.byteSize,
-      width: files.width,
-      height: files.height,
-    })
-    .from(files)
-    .where(sql`${files.sha256} = ${sha256}`)
-    .limit(1);
-  if (existing) {
-    return {
-      id: existing.id,
-      sha256: existing.sha256,
-      mimeType: existing.mimeType,
-      byteSize: existing.byteSize,
-      width: existing.width ?? inspected.file.width,
-      height: existing.height ?? inspected.file.height,
-    };
-  }
-
-  const [inserted] = await tx
-    .insert(files)
-    .values({
-      sha256,
-      mimeType: inspected.file.mimeType,
-      byteSize: bytes.byteLength,
-      width: inspected.file.width,
-      height: inspected.file.height,
-      bytes,
-    })
-    .onConflictDoNothing({ target: files.sha256 })
-    .returning({
-      id: files.id,
-      sha256: files.sha256,
-      mimeType: files.mimeType,
-      byteSize: files.byteSize,
-      width: files.width,
-      height: files.height,
-    });
-  if (inserted) {
-    return {
-      id: inserted.id,
-      sha256: inserted.sha256,
-      mimeType: inserted.mimeType,
-      byteSize: inserted.byteSize,
-      width: inserted.width ?? inspected.file.width,
-      height: inserted.height ?? inspected.file.height,
-    };
-  }
-
-  const [raced] = await tx
-    .select({
-      id: files.id,
-      sha256: files.sha256,
-      mimeType: files.mimeType,
-      byteSize: files.byteSize,
-      width: files.width,
-      height: files.height,
-    })
-    .from(files)
-    .where(sql`${files.sha256} = ${sha256}`)
-    .limit(1);
-  if (!raced) throw new Error("FILE_STORE_FAILED");
-  return {
-    id: raced.id,
-    sha256: raced.sha256,
-    mimeType: raced.mimeType,
-    byteSize: raced.byteSize,
-    width: raced.width ?? inspected.file.width,
-    height: raced.height ?? inspected.file.height,
-  };
 }
 
 /**

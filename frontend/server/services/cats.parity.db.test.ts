@@ -380,11 +380,20 @@ describe("cats PostgreSQL services", () => {
         tiny: { dataUrl: "bad" },
       }),
     ).rejects.toMatchObject({ code: "invalid_input" });
+    // Bytes that only claim to be PNG are decoded and rejected.
+    await expect(
+      upsertMapperPreviews(db, {
+        id: profile.id,
+        adminToken: "preview-fixture-token",
+        tiny: { dataUrl: "data:image/png;base64,aGVsbG8=" },
+      }),
+    ).rejects.toMatchObject({ code: "invalid_input" });
     const preview = await upsertMapperPreviews(db, {
       id: profile.id,
       adminToken: "preview-fixture-token",
       tiny: {
-        dataUrl: "data:image/png;base64,aGVsbG8=",
+        dataUrl:
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
         filename: "tiny.png",
       },
     });
@@ -407,7 +416,8 @@ describe("cats PostgreSQL services", () => {
       "discord-fixture-token-012345678901234567890",
     );
     const palette = await storeDiscordImage(db, {
-      dataUrl: "data:image/png;base64,aGVsbG8=",
+      dataUrl:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
       colors: [{ hex: "#ffffff", rgb: [255, 255, 255], prevalence: 1 }],
       serviceToken: "discord-fixture-token-012345678901234567890",
     });

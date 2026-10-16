@@ -310,7 +310,8 @@ describe("cat routes on PostgreSQL", () => {
           id: profile.id,
           adminToken: "route-preview-token",
           tiny: {
-            dataUrl: "data:image/png;base64,aGVsbG8=",
+            dataUrl:
+              "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
             filename: "tiny.png",
           },
         }),
@@ -331,7 +332,10 @@ describe("cat routes on PostgreSQL", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(
         new Response(
-          JSON.stringify({ sheet: "data:image/png;base64,aGVsbG8=" }),
+          JSON.stringify({
+            sheet:
+              "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          }),
           { status: 200, headers: { "content-type": "application/json" } },
         ),
       );

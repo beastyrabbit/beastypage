@@ -1,9 +1,7 @@
 import "server-only";
-import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
 import type { Database } from "../db/pool";
-import { files } from "../db/schema";
 import { ServiceError } from "../errors";
+import { storeFile } from "./files";
 
 const MAX_FILE_BYTES = 16 * 1024 * 1024;
 const MIME_TYPES = new Set([
@@ -46,59 +44,30 @@ function parseDataUrl(value: string): { mimeType: string; bytes: Buffer } {
   return { mimeType, bytes };
 }
 
+/** Stores a generated image from a data URL; the decoded type is recorded. */
 export async function storeCatDataUrl(
   db: Database,
   dataUrl: string,
-  options: {
-    legacyId?: string;
-    width?: number | null;
-    height?: number | null;
-  } = {},
+  options: { legacyId?: string } = {},
 ): Promise<StoredCatFile> {
   const { mimeType, bytes } = parseDataUrl(dataUrl);
-  const sha256 = createHash("sha256").update(bytes).digest("hex");
-  const [existing] = await db
-    .select({
-      id: files.id,
-      mimeType: files.mimeType,
-      byteSize: files.byteSize,
-      sha256: files.sha256,
-    })
-    .from(files)
-    .where(eq(files.sha256, sha256))
-    .limit(1);
-  if (existing) return existing;
-  const [inserted] = await db
-    .insert(files)
-    .values({
+  try {
+    const {
+      id,
       sha256,
-      mimeType,
-      byteSize: bytes.length,
-      width: options.width ?? null,
-      height: options.height ?? null,
-      bytes,
-      legacyId: options.legacyId ?? null,
-    })
-    .onConflictDoNothing({ target: files.sha256 })
-    .returning({
-      id: files.id,
-      mimeType: files.mimeType,
-      byteSize: files.byteSize,
-      sha256: files.sha256,
+      byteSize,
+      mimeType: stored,
+    } = await storeFile(db, bytes, mimeType, {
+      maxBytes: MAX_FILE_BYTES,
+      allowedTypes: MIME_TYPES,
+      legacyId: options.legacyId,
     });
-  if (inserted) return inserted;
-  const [raced] = await db
-    .select({
-      id: files.id,
-      mimeType: files.mimeType,
-      byteSize: files.byteSize,
-      sha256: files.sha256,
-    })
-    .from(files)
-    .where(and(eq(files.sha256, sha256)))
-    .limit(1);
-  if (!raced) throw new ServiceError("unavailable", "Failed to store image");
-  return raced;
+    return { id, sha256, byteSize, mimeType: stored };
+  } catch (error) {
+    if (error instanceof Error && error.message === "FILE_STORE_FAILED")
+      throw new ServiceError("unavailable", "Failed to store image");
+    throw new ServiceError("invalid_input", "Invalid image payload");
+  }
 }
 
 export function dataUrlInfo(dataUrl: string) {
