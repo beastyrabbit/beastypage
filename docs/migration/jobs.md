@@ -57,3 +57,7 @@ Set `JOBS_ENABLED=0` to stop workers without changing application data routes.
 Expired leases are recovered every ten minutes. A retry uses exponential
 backoff starting at five seconds and capped at one hour, with jitter; after
 `maxAttempts` the job remains `dead` until inspected or removed by retention.
+Process shutdown stops new claims synchronously, but draining in-flight jobs is
+best-effort because the hosting server may exit immediately. Lease expiry
+recovers interrupted work, and job kinds must remain idempotent so retries are
+safe.

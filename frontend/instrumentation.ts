@@ -52,8 +52,30 @@ export function registerJobShutdown(
   if (globals.__beastypageJobShutdownRegistered) return;
   globals.__beastypageJobShutdownRegistered = true;
 
+  let worker: { stop(): Promise<void> } | undefined;
+  const workerReady = workerPromise.then(
+    (ready) => {
+      worker = ready;
+      return ready;
+    },
+    () => undefined,
+  );
   const shutdown = async () => {
-    const workerStop = workerPromise.then((worker) => worker.stop());
+    // Next may exit immediately after its own signal cleanup. Calling stop()
+    // synchronously when the worker is ready flips its stopping guard first;
+    // in-flight jobs then drain on a best-effort basis and remain lease-safe.
+    let workerStop: Promise<void>;
+    if (worker) {
+      try {
+        workerStop = worker.stop();
+      } catch (error) {
+        workerStop = Promise.reject(error);
+      }
+    } else {
+      workerStop = workerReady
+        .then((ready) => ready?.stop())
+        .then(() => undefined);
+    }
     await Promise.allSettled([
       withTimeout(workerStop, JOB_SHUTDOWN_TIMEOUT_MS),
       Promise.resolve().then(stopLive),

@@ -54,6 +54,7 @@ describe("job instrumentation startup guard", () => {
 
     expect(process.listenerCount("SIGTERM")).toBe(beforeTerm.length + 1);
     expect(process.listenerCount("SIGINT")).toBe(beforeInt.length + 1);
+    await Promise.resolve();
     process.emit("SIGTERM");
     await vi.waitFor(() => {
       expect(workerStop).toHaveBeenCalledTimes(1);
