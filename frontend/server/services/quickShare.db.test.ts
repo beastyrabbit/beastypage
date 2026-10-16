@@ -3,7 +3,11 @@ import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import { readDatabaseConfig } from "../db/config";
 import { createDatabase, createPool, type Database } from "../db/pool";
-import { quickShareJobs, quickShareUploads } from "../db/schema";
+import {
+  quickShareJobs,
+  quickShareUploads,
+  quickShareUsage,
+} from "../db/schema";
 import { handleQuickShareOperation } from "./quickShare";
 
 let pool: pg.Pool;
@@ -162,6 +166,58 @@ describe("Quick Share PostgreSQL service", () => {
           result.error.message === "ACTIVE_LIMIT",
       ),
     ).toHaveLength(1);
+  });
+
+  it("enforces hourly usage atomically under concurrent requests", async () => {
+    const suffix = `usage-race${Date.now()}`;
+    const now = 1_700_200_000_000;
+    const identity = `usage:${suffix}`;
+    const hourStart = new Date(
+      Math.floor(now / (60 * 60 * 1000)) * 60 * 60 * 1000,
+    );
+    await db.insert(quickShareUsage).values({
+      identity,
+      kind: "hour",
+      windowStart: hourStart,
+      starts: 9,
+      bytes: 0,
+      expiresAt: new Date(hourStart.getTime() + 2 * 60 * 60 * 1000),
+      updatedAt: new Date(now),
+    });
+    const results = await Promise.all(
+      [0, 1].map((index) =>
+        outcome(() =>
+          handleQuickShareOperation(
+            db,
+            "create",
+            input(`U${index}${suffix.slice(-6)}`, `${suffix}-${index}`, {
+              rateIdentity: identity,
+            }),
+            anonymous,
+            now + index,
+          ),
+        ),
+      ),
+    );
+    expect(
+      results.filter(
+        (result) => "value" in result && result.value?.status === 201,
+      ),
+    ).toHaveLength(1);
+    expect(
+      results.filter(
+        (result) =>
+          "error" in result &&
+          result.error instanceof Error &&
+          result.error.message === "HOURLY_LIMIT",
+      ),
+    ).toHaveLength(1);
+    await db
+      .delete(quickShareUploads)
+      .where(eq(quickShareUploads.rateIdentity, identity));
+    await db
+      .delete(quickShareUsage)
+      .where(eq(quickShareUsage.identity, identity));
   });
 
   it("admits owned collections and preserves public collection ordering", async () => {
