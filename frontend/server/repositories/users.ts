@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { users } from "../db/schema";
 import type { Transaction } from "../db/transaction";
 
@@ -29,14 +29,14 @@ export async function getUserByUsername(tx: Transaction, username: string) {
   const [row] = await tx
     .select()
     .from(users)
-    .where(sql`lower(${users.username}) = lower(${username})`)
+    .where(eq(users.username, username))
     .limit(1);
   return row ?? null;
 }
 
 export async function createUser(
   tx: Transaction,
-  values: { tokenIdentifier: string; apiKey: string },
+  values: { tokenIdentifier: string; apiKey: string; username?: string },
 ) {
   const [created] = await tx
     .insert(users)
@@ -80,7 +80,17 @@ export async function searchUsersByUsernamePrefix(
     .select()
     .from(users)
     .where(sql`${users.usernameSearch} like ${`${prefix}%`} escape '\\'`)
+    .orderBy(asc(users.usernameSearch), asc(users.id))
     .limit(10);
+}
+
+export async function touchUser(tx: Transaction, userId: string) {
+  const [updated] = await tx
+    .update(users)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(users.id, userId))
+    .returning();
+  return updated ?? null;
 }
 
 export async function getUsersByTokenIdentifiers(

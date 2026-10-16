@@ -1,11 +1,13 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import { api, internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { ANONYMOUS } from "../auth/identity";
 import { closeDatabase, getDb } from "../db/client";
 import type { Database } from "../db/pool";
+import { users } from "../db/schema";
 import {
   findUserByApiKey,
   getOrCreateUser,
@@ -173,6 +175,44 @@ describe("users Convex/PostgreSQL parity", () => {
       convexOther.mutation(api.users.updateProfile, { username: "Owned_User" }),
     ).rejects.toThrow("already taken");
     expect(await findUserByApiKey(db, "wrong-api-key")).toBeNull();
+  });
+
+  it("derives sanitized unique usernames and compares username claims exactly", async () => {
+    const claimed = {
+      ...identity(),
+      nickname: "--Mira Example__",
+      name: "Fallback Name",
+      email: "mira@example.test",
+    };
+    const first = await getOrCreateUser(db, claimed);
+    expect(first.username).toBe("MiraExample");
+    const collision = await getOrCreateUser(db, {
+      ...identity(),
+      nickname: "Mira Example",
+    });
+    expect(collision.username).toMatch(/^MiraExample-[a-f0-9]{4}$/);
+
+    const exactA = identity();
+    const exactB = identity();
+    await getOrCreateUser(db, exactA);
+    await getOrCreateUser(db, exactB);
+    await updateProfile(db, exactA, "CaseSensitive");
+    await expect(
+      updateProfile(db, exactB, "casesensitive"),
+    ).resolves.toMatchObject({
+      username: "casesensitive",
+    });
+    const [exactARow] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.tokenIdentifier, exactA.tokenIdentifier));
+    if (!exactARow) throw new Error("missing exact-case fixture");
+    await db
+      .update(users)
+      .set({ updatedAt: new Date(0) })
+      .where(eq(users.id, exactARow.id));
+    const touched = await updateProfile(db, exactA);
+    expect(touched.updatedAt).toBeGreaterThan(0);
   });
 
   it("keeps username and resolve validation limits aligned", async () => {

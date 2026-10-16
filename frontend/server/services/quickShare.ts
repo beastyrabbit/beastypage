@@ -508,7 +508,7 @@ async function recordPart(db: Database, body: OpBody, now: number) {
       createdAt: new Date(now),
     });
     await updateUpload(tx, upload.id, { updatedAt: new Date(now) });
-    return { ok: true };
+    return null;
   });
 }
 
@@ -599,7 +599,7 @@ async function failImport(db: Database, body: OpBody, now: number) {
       upload.source !== "url" ||
       upload.state !== "uploading"
     )
-      return { ok: true };
+      return null;
     if (upload.importReservedBytes !== null)
       await releaseImportReservation(tx, upload, 0, now);
     await updateUpload(tx, upload.id, {
@@ -610,7 +610,7 @@ async function failImport(db: Database, body: OpBody, now: number) {
       failureMessage: "The remote media could not be imported.",
       updatedAt: new Date(now),
     });
-    return { ok: true };
+    return null;
   });
 }
 
@@ -652,7 +652,7 @@ async function publicCollection(db: Database, slug: string, now: number) {
       QUICK_SHARE_POLICY.collectionMaxItems,
     ),
   );
-  return rows.map((row) => publicObject(row, now));
+  return rows.reverse().map((row) => publicObject(row, now));
 }
 
 async function claimJob(db: Database, body: OpBody, now: number) {
@@ -757,7 +757,7 @@ async function finishDelete(db: Database, body: OpBody) {
     await deleteJobs(tx, job.uploadId, job.id);
     await deleteJob(tx, job.id);
     await deleteUpload(tx, job.uploadId);
-    return { ok: true };
+    return null;
   });
 }
 
@@ -833,7 +833,7 @@ async function banIp(db: Database, body: OpBody, owner: string, now: number) {
       dedupeKey: requiredString(body, "ipHash"),
       payload: { ipHash: requiredString(body, "ipHash"), now },
     });
-    return { ok: true };
+    return null;
   });
 }
 
@@ -847,14 +847,14 @@ async function unbanIp(db: Database, body: OpBody, now: number) {
         rawIpExpiresAt: null,
         removedAt: new Date(now),
       });
-    return { ok: true };
+    return null;
   });
 }
 
 async function removeUpload(db: Database, body: OpBody, now: number) {
   return withTransaction(db, async (tx) => {
     const upload = await getUpload(tx, id(body, "uploadId"), true);
-    if (!upload) return { ok: true };
+    if (!upload) return null;
     await updateUpload(tx, upload.id, {
       active: false,
       state: "removed",
@@ -865,7 +865,7 @@ async function removeUpload(db: Database, body: OpBody, now: number) {
     });
     if (!(await getJobForUploadKind(tx, upload.id, "delete", true)))
       await enqueueMediaJob(tx, upload.id, "delete", new Date(now));
-    return { ok: true };
+    return null;
   });
 }
 

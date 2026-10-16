@@ -6,6 +6,11 @@ and moderation bans. The PostgreSQL implementation is selected only when
 `DATA_BACKEND=postgres`; the existing Convex implementation remains the
 default.
 
+Public collections select the newest eligible `collectionMaxItems` rows and
+return that window oldest-to-newest. Rows without all three public media
+fields are excluded in SQL. Internal state mutations preserve Convex's `null`
+response bodies.
+
 ## Mapping
 
 | Convex operation | PostgreSQL implementation |

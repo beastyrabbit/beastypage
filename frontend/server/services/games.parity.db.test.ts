@@ -7,7 +7,7 @@ import { api, internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { readDatabaseConfig } from "../db/config";
 import { createDatabase, createPool, type Database } from "../db/pool";
-import { perfectCats, perfectMatchups } from "../db/schema";
+import { perfectCats, perfectMatchups, wheelSpins } from "../db/schema";
 import {
   cleanupPerfectMatchups,
   coinflipLeaderboard,
@@ -228,6 +228,30 @@ describe("games Convex/PostgreSQL parity", () => {
       sampleSize: 2,
     });
     expect(await wheelStats(db, 2)).toMatchObject({ sampleSize: 2 });
+  });
+
+  it("uses Convex's forcedCount wheel field", async () => {
+    const now = Date.now() + 60_000;
+    const convex = convexTest(schema, modules);
+    await convex.run((ctx) =>
+      ctx.db.insert("wheel_spins", {
+        prizeName: "Moondust",
+        forced: true,
+        actorKey: `forced-${now}`,
+        createdAt: now,
+      }),
+    );
+    await db.insert(wheelSpins).values({
+      prizeName: "Moondust",
+      forced: true,
+      actorKey: `forced-${now}`,
+      createdAt: new Date(now),
+    });
+    const convexStats = await convex.query(api.wheel.stats, { limit: 1 });
+    const postgresStats = await wheelStats(db, 1);
+    expect(convexStats.prizes[0]).toHaveProperty("forcedCount", 1);
+    expect(postgresStats.prizes[0]).toHaveProperty("forcedCount", 1);
+    expect(postgresStats.prizes[0]).not.toHaveProperty("forced");
   });
 
   it("matches bounded expiry cleanup and idempotency", async () => {

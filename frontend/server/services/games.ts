@@ -447,7 +447,7 @@ export async function wheelStats(db: Database, limit?: number) {
   const records = rows.slice(0, bounded);
   const totals = new Map<
     string,
-    { count: number; forced: number; lastSpinAt: number | null }
+    { count: number; forcedCount: number; lastSpinAt: number | null }
   >();
   let totalSpins = 0;
   let totalForced = 0;
@@ -455,12 +455,12 @@ export async function wheelStats(db: Database, limit?: number) {
   for (const row of records) {
     const current = totals.get(row.prizeName) ?? {
       count: 0,
-      forced: 0,
+      forcedCount: 0,
       lastSpinAt: null,
     };
     if (row.forced) {
       totalForced += 1;
-      current.forced += 1;
+      current.forcedCount += 1;
     } else {
       totalSpins += 1;
       lastSpinAt = Math.max(lastSpinAt ?? 0, row.createdAt.getTime());

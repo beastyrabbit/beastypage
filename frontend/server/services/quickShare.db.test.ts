@@ -78,7 +78,7 @@ describe("Quick Share PostgreSQL service", () => {
         anonymous,
         1_700_000_000_100,
       ),
-    ).toEqual({ status: 200, body: { ok: true } });
+    ).toEqual({ status: 200, body: null });
     const completed = await handleQuickShareOperation(
       db,
       "complete",
@@ -330,6 +330,23 @@ describe("Quick Share PostgreSQL service", () => {
         createdAt: new Date(now + 2),
         updatedAt: new Date(now + 2),
       },
+      {
+        slug: publicSlug,
+        source: "file",
+        originalName: "incomplete.png",
+        originalSize: 1,
+        originalKey: "originals/public-incomplete",
+        state: "ready",
+        receiptHash: `incomplete-${now}`,
+        rateIdentity: `public-${now}`,
+        ipHash: `public-ip-${now}`,
+        rawIp: "192.0.2.1",
+        publicExpiresAt: new Date(now + 60_000),
+        retainedUntil: new Date(now + 60_000),
+        active: true,
+        createdAt: new Date(now + 3),
+        updatedAt: new Date(now + 3),
+      },
     ]);
     const firstRead = await handleQuickShareOperation(
       db,
@@ -347,8 +364,8 @@ describe("Quick Share PostgreSQL service", () => {
       now + 2,
     );
     expect(collectionRead.body).toEqual([
-      expect.objectContaining({ key: "derivatives/public-newest" }),
       expect.objectContaining({ key: "derivatives/public-new" }),
+      expect.objectContaining({ key: "derivatives/public-newest" }),
     ]);
 
     await db.delete(quickShareUploads).where(eq(quickShareUploads.slug, slug));

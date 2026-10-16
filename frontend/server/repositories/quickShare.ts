@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, gt, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, lte, sql } from "drizzle-orm";
 import {
   quickShareBans,
   quickShareJobs,
@@ -110,6 +110,9 @@ export async function findPublicCollectionUploads(
         eq(quickShareUploads.active, true),
         eq(quickShareUploads.state, "ready"),
         gt(quickShareUploads.publicExpiresAt, now),
+        isNotNull(quickShareUploads.publicKey),
+        isNotNull(quickShareUploads.publicMime),
+        isNotNull(quickShareUploads.publicSize),
       ),
     )
     .orderBy(desc(quickShareUploads.createdAt), desc(quickShareUploads.id))

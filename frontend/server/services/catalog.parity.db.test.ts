@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import type pg from "pg";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
@@ -9,6 +10,8 @@ import { jobKindRegistry } from "../jobs/kinds";
 import {
   approveCatdex,
   createCatdex,
+  ensureDefaultRarities,
+  ensureDefaultSeasons,
   generateCatdexThumbnail,
   issueCatdexUploadUrl,
   listCatdex,
@@ -178,5 +181,37 @@ describe("catalog PostgreSQL service", () => {
         },
       ),
     ).resolves.toMatchObject({ deleted: 0 });
+  });
+
+  it("serializes default setup and upload admission", async () => {
+    await Promise.all([
+      ensureDefaultSeasons(db),
+      ensureDefaultSeasons(db),
+      ensureDefaultRarities(db),
+      ensureDefaultRarities(db),
+    ]);
+    const seasonRows = await db
+      .select({ id: cardSeason.id })
+      .from(cardSeason)
+      .where(eq(cardSeason.seasonName, "BETA"));
+    const rarityRows = await db
+      .select({ id: rarity.id })
+      .from(rarity)
+      .where(eq(rarity.rarityName, "Moondust"));
+    expect(seasonRows).toHaveLength(1);
+    expect(rarityRows).toHaveLength(1);
+
+    const clientKey = `race-${Date.now()}-abcdefghijkl`;
+    const outcomes = await Promise.allSettled(
+      Array.from({ length: 20 }, () =>
+        issueCatdexUploadUrl(db, { tokenIdentifier: null }, clientKey),
+      ),
+    );
+    expect(outcomes.filter((item) => item.status === "fulfilled")).toHaveLength(
+      12,
+    );
+    expect(outcomes.filter((item) => item.status === "rejected")).toHaveLength(
+      8,
+    );
   });
 });

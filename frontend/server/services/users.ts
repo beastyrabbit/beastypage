@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { sql } from "drizzle-orm";
 import type { Identity } from "../auth/identity";
 import type { Database } from "../db/pool";
 import { type Transaction, withTransaction } from "../db/transaction";
@@ -15,6 +16,7 @@ import {
   searchUsersByUsernamePrefix,
   setUserApiKey,
   setUsername,
+  touchUser,
 } from "../repositories/users";
 import {
   deleteFirstByUser,
@@ -64,9 +66,42 @@ function constantTimeEqual(left: string, right: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+function sanitizeUsername(raw: string): string {
+  const filtered = raw.replace(/[^a-zA-Z0-9_-]/g, "");
+  let start = 0;
+  let end = filtered.length;
+  while (start < end && (filtered[start] === "-" || filtered[start] === "_"))
+    start++;
+  while (
+    end > start &&
+    (filtered[end - 1] === "-" || filtered[end - 1] === "_")
+  )
+    end--;
+  return filtered.slice(start, end).slice(0, 30);
+}
+
+async function deriveUsername(tx: Transaction, identity: Identity) {
+  const raw =
+    identity.nickname ??
+    identity.name ??
+    (identity.email ? identity.email.split("@")[0] : undefined);
+  if (!raw) return undefined;
+  const sanitized = sanitizeUsername(raw);
+  if (!sanitized) return undefined;
+  if (!(await getUserByUsername(tx, sanitized))) return sanitized;
+  for (let index = 0; index < 5; index++) {
+    const candidate = `${sanitized.slice(0, 25)}-${randomUUID().slice(0, 4)}`;
+    if (!(await getUserByUsername(tx, candidate))) return candidate;
+  }
+  return undefined;
+}
+
 async function ensureUser(tx: Transaction, identity: Identity) {
   if (!identity.tokenIdentifier)
     throw new ServiceError("forbidden", "Not authenticated");
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended('beastypage:users:ensure', 0))`,
+  );
   const existing = await getUserByTokenIdentifier(tx, identity.tokenIdentifier);
   if (existing) {
     if (!existing.apiKey) {
@@ -78,6 +113,7 @@ async function ensureUser(tx: Transaction, identity: Identity) {
   const created = await createUser(tx, {
     tokenIdentifier: identity.tokenIdentifier,
     apiKey: randomUUID(),
+    username: await deriveUsername(tx, identity),
   });
   if (created) return created;
   const raced = await getUserByTokenIdentifier(tx, identity.tokenIdentifier);
@@ -121,7 +157,10 @@ export async function updateProfile(
 ) {
   return withTransaction(db, async (tx) => {
     const user = await requireExistingUser(tx, identity);
-    if (username === undefined) return toUserRecord(user);
+    if (username === undefined) {
+      const touched = await touchUser(tx, user.id);
+      return toUserRecord(touched ?? user);
+    }
     const validated = validateUsername(username);
     const existing = await getUserByUsername(tx, validated);
     if (existing && existing.id !== user.id)

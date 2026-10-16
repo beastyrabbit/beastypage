@@ -30,6 +30,11 @@ The PostgreSQL services keep authorization, validation and transaction
 boundaries; all Drizzle reads and writes are in the users, userVariants and
 Discord repositories.
 
+Username uniqueness is case-sensitive, while prefix search follows the
+generated lowercase `username_search` index order. First sign-in derives a
+sanitized username from the Clerk nickname, name or email claim and appends a
+short collision suffix when needed.
+
 `discord.issueChallenge` and `discord.redeemChallenge` are public Convex
 mutations: Convex does not require a Clerk identity and has no per-caller
 rate limit. PostgreSQL keeps both operations anonymous-capable and applies no

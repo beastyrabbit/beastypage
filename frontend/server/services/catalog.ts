@@ -246,6 +246,9 @@ export async function countRarities(db: Database): Promise<number> {
 
 export async function ensureDefaultSeasons(db: Database) {
   await withTransaction(db, async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended('beastypage:catalog:defaults', 0))`,
+    );
     for (const entry of DEFAULT_SEASONS) {
       const [existing] = await tx
         .select({ id: cardSeason.id, shortName: cardSeason.shortName })
@@ -274,6 +277,9 @@ export async function ensureDefaultSeasons(db: Database) {
 
 export async function ensureDefaultRarities(db: Database) {
   await withTransaction(db, async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended('beastypage:catalog:defaults', 0))`,
+    );
     for (const entry of DEFAULT_RARITIES) {
       const [existing] = await tx
         .select({
@@ -585,24 +591,29 @@ export async function issueCatdexUploadUrl(
   const rateKey = identity.tokenIdentifier
     ? `identity:${identity.tokenIdentifier}`
     : anonymousRateKey;
-  const count = await countRecentUploads(db, rateKey, since);
-  if (
-    count >=
-    (rateKey ? MAX_UPLOADS_PER_CLIENT_PER_HOUR : MAX_UNKEYED_UPLOADS_PER_HOUR)
-  ) {
-    throw new ServiceError(
-      "rate_limited",
-      "Too many pending uploads; try again later",
-    );
-  }
-  if ((await countAllRecentUploads(db, since)) >= MAX_GLOBAL_UPLOADS_PER_HOUR) {
-    throw new ServiceError(
-      "rate_limited",
-      "Too many pending uploads; try again later",
-    );
-  }
   const token = randomUUID();
   await withTransaction(db, async (tx) => {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended('beastypage:catdex:upload-rate', 0))`,
+    );
+    const count = await countRecentUploads(tx, rateKey, since);
+    if (
+      count >=
+      (rateKey ? MAX_UPLOADS_PER_CLIENT_PER_HOUR : MAX_UNKEYED_UPLOADS_PER_HOUR)
+    ) {
+      throw new ServiceError(
+        "rate_limited",
+        "Too many pending uploads; try again later",
+      );
+    }
+    if (
+      (await countAllRecentUploads(tx, since)) >= MAX_GLOBAL_UPLOADS_PER_HOUR
+    ) {
+      throw new ServiceError(
+        "rate_limited",
+        "Too many pending uploads; try again later",
+      );
+    }
     await insertUploadReservation(tx, {
       token,
       rateKey,
@@ -765,6 +776,23 @@ function collectionPayload(
   };
 }
 
+type ThumbnailSource = {
+  variant: "default" | "custom";
+  id: string;
+  name: string | null;
+  bytes: Buffer | null;
+};
+
+type ThumbnailResult = {
+  variant: "default" | "custom";
+  name: string;
+  width: number;
+  height: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  buffer: Buffer;
+};
+
 export async function listCollectionLegacy(db: Database, limit = 200) {
   const bounded = Math.max(1, Math.min(limit, 200));
   const rows = await selectCollectionPage(db, {
@@ -800,7 +828,7 @@ export async function generateCatdexThumbnail(
   id: string,
   attempt: number,
 ) {
-  return withTransaction(db, async (tx) => {
+  const snapshot = await withTransaction(db, async (tx) => {
     const [cat] = await tx
       .select()
       .from(catdex)
@@ -811,7 +839,7 @@ export async function generateCatdexThumbnail(
       cat?.thumbnailStatus !== "processing" ||
       cat.thumbnailAttemptCount !== attempt
     ) {
-      return { success: false, reason: "stale_attempt" as const };
+      return { stale: true as const };
     }
     const sourceIds: Array<{
       variant: "default" | "custom";
@@ -835,95 +863,117 @@ export async function generateCatdexThumbnail(
         .update(catdex)
         .set({ thumbnailStatus: "complete", updatedAt: new Date() })
         .where(eq(catdex.id, id));
-      return { success: true, generated: [] as string[] };
+      return { stale: false as const, sources: [] as ThumbnailSource[] };
     }
-    const updates: Record<string, unknown> = { updatedAt: new Date() };
-    let temporaryFailure = false;
+    const sources: ThumbnailSource[] = [];
     for (const source of sourceIds) {
       const [file] = await tx
         .select({ bytes: files.bytes })
         .from(files)
         .where(eq(files.id, source.id))
         .limit(1);
-      if (!file) continue;
-      try {
-        assertImageSourceWithinLimits(file.bytes);
-        const metadata = await sharp(file.bytes, {
-          failOn: "error",
-        }).metadata();
-        const width = metadata.width ?? 0;
-        const height = metadata.height ?? 0;
-        if (!width || !height) continue;
-        const buffer = await sharp(file.bytes)
-          .resize({
-            width: 256,
-            height: 256,
-            fit: "inside",
-            withoutEnlargement: true,
-          })
-          .jpeg({ quality: 85 })
-          .toBuffer();
-        const thumb = await storeUploadedFile(tx, buffer, "image/jpeg");
-        const thumbName = `${source.name ?? source.variant}-card-thumb.jpg`;
-        if (source.variant === "default") {
-          Object.assign(updates, {
-            defaultCardThumbFileId: thumb.id,
-            defaultCardThumbName: thumbName,
-            defaultCardThumbWidth: thumb.width,
-            defaultCardThumbHeight: thumb.height,
-            defaultCardWidth: width,
-            defaultCardHeight: height,
-          });
-        } else {
-          Object.assign(updates, {
-            customCardThumbFileId: thumb.id,
-            customCardThumbName: thumbName,
-            customCardThumbWidth: thumb.width,
-            customCardThumbHeight: thumb.height,
-            customCardWidth: width,
-            customCardHeight: height,
-          });
-        }
-      } catch {
-        temporaryFailure = false;
-      }
+      sources.push({ ...source, bytes: file?.bytes ?? null });
     }
-    const needsDefault = Boolean(
-      cat.defaultCardFileId &&
-        !updates.defaultCardThumbFileId &&
-        !cat.defaultCardThumbFileId,
+    return { stale: false as const, sources };
+  });
+  if (snapshot.stale)
+    return { success: false, reason: "stale_attempt" as const };
+  if (!snapshot.sources.length)
+    return { success: true, generated: [] as string[] };
+
+  const generated: ThumbnailResult[] = [];
+  for (const source of snapshot.sources) {
+    if (!source.bytes) continue;
+    try {
+      assertImageSourceWithinLimits(source.bytes);
+      const metadata = await sharp(source.bytes, {
+        failOn: "error",
+      }).metadata();
+      const sourceWidth = metadata.width ?? 0;
+      const sourceHeight = metadata.height ?? 0;
+      if (!sourceWidth || !sourceHeight) continue;
+      const buffer = await sharp(source.bytes)
+        .resize({
+          width: 256,
+          height: 256,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+      const thumbnail = await sharp(buffer).metadata();
+      generated.push({
+        variant: source.variant,
+        name: `${source.name ?? source.variant}-card-thumb.jpg`,
+        width: thumbnail.width ?? 0,
+        height: thumbnail.height ?? 0,
+        sourceWidth,
+        sourceHeight,
+        buffer,
+      });
+    } catch {
+      // Invalid or undecodable source images are permanent failures.
+    }
+  }
+
+  return withTransaction(db, async (tx) => {
+    const [current] = await tx
+      .select()
+      .from(catdex)
+      .where(eq(catdex.id, id))
+      .for("update")
+      .limit(1);
+    if (
+      current?.thumbnailStatus !== "processing" ||
+      current.thumbnailAttemptCount !== attempt
+    )
+      return { success: false, reason: "stale_attempt" as const };
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    const generatedVariants: string[] = [];
+    for (const result of generated) {
+      if (
+        (result.variant === "default" && current.defaultCardThumbFileId) ||
+        (result.variant === "custom" && current.customCardThumbFileId)
+      )
+        continue;
+      const thumb = await storeUploadedFile(tx, result.buffer, "image/jpeg");
+      if (result.variant === "default") {
+        Object.assign(updates, {
+          defaultCardThumbFileId: thumb.id,
+          defaultCardThumbName: result.name,
+          defaultCardThumbWidth: thumb.width,
+          defaultCardThumbHeight: thumb.height,
+          defaultCardWidth: result.sourceWidth,
+          defaultCardHeight: result.sourceHeight,
+        });
+      } else {
+        Object.assign(updates, {
+          customCardThumbFileId: thumb.id,
+          customCardThumbName: result.name,
+          customCardThumbWidth: thumb.width,
+          customCardThumbHeight: thumb.height,
+          customCardWidth: result.sourceWidth,
+          customCardHeight: result.sourceHeight,
+        });
+      }
+      generatedVariants.push(result.variant);
+    }
+    const hasDefault = Boolean(
+      !current.defaultCardFileId ||
+        current.defaultCardThumbFileId ||
+        updates.defaultCardThumbFileId,
     );
-    const needsCustom = Boolean(
-      cat.customCardFileId &&
-        !updates.customCardThumbFileId &&
-        !cat.customCardThumbFileId,
+    const hasCustom = Boolean(
+      !current.customCardFileId ||
+        current.customCardThumbFileId ||
+        updates.customCardThumbFileId,
     );
-    const canRetry =
-      (needsDefault || needsCustom) &&
-      temporaryFailure &&
-      attempt < MAX_THUMBNAIL_ATTEMPTS;
     Object.assign(updates, {
-      thumbnailStatus:
-        needsDefault || needsCustom
-          ? canRetry
-            ? "pending"
-            : "failed"
-          : "complete",
-      thumbnailAttemptedAt: new Date(
-        Date.now() + (canRetry ? THUMBNAIL_RETRY_AFTER_MS : 0),
-      ),
+      thumbnailStatus: hasDefault && hasCustom ? "complete" : "failed",
+      thumbnailAttemptedAt: new Date(),
     });
     await tx.update(catdex).set(updates).where(eq(catdex.id, id));
-    return {
-      success: true,
-      generated: sourceIds
-        .filter((source) =>
-          source.variant === "default"
-            ? updates.defaultCardThumbFileId
-            : updates.customCardThumbFileId,
-        )
-        .map((source) => source.variant),
-    };
+    return { success: true, generated: generatedVariants };
   });
 }
 

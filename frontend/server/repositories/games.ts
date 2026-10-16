@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import type { Database } from "../db/pool";
 import {
   coinflipperScores,
@@ -52,7 +52,11 @@ export async function insertPerfectCat(
 }
 
 export async function selectPerfectPool(db: GamesDb) {
-  const all = await db.select().from(perfectCats).limit(257);
+  const all = await db
+    .select()
+    .from(perfectCats)
+    .orderBy(asc(perfectCats.createdAt), asc(perfectCats.id))
+    .limit(257);
   const top = await db
     .select()
     .from(perfectCats)

@@ -21,4 +21,7 @@ transactions. Matchup rows and both cat rows are locked before consuming a
 vote, so concurrent submissions count once. Retention runs hourly and removes
 at most 100 expired capabilities per invocation.
 
+Perfect-cat sampling preserves Convex creation order for the bounded base
+sample, and wheel prize records expose `forcedCount` in each prize summary.
+
 The stream wheel functions remain in the later stream slice.

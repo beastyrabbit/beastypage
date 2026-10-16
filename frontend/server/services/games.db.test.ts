@@ -4,6 +4,7 @@ import { readDatabaseConfig } from "../db/config";
 import { createDatabase, createPool, type Database } from "../db/pool";
 import { perfectCats, perfectVotes, wheelSpins } from "../db/schema";
 import { ServiceError } from "../errors";
+import { selectPerfectPool } from "../repositories/games";
 import {
   logWheelSpin,
   registerPerfectCats,
@@ -23,6 +24,20 @@ beforeAll(() => {
 afterAll(async () => pool.end());
 
 describe("games PostgreSQL concurrency", () => {
+  it("orders the bounded perfect-cat base sample by creation time", async () => {
+    const { all } = await selectPerfectPool(db);
+    for (let index = 1; index < all.length; index += 1) {
+      const previous = all[index - 1];
+      const current = all[index];
+      if (!previous || !current) continue;
+      expect(
+        previous.createdAt.getTime() < current.createdAt.getTime() ||
+          (previous.createdAt.getTime() === current.createdAt.getTime() &&
+            previous.id < current.id),
+      ).toBe(true);
+    }
+  });
+
   it("counts exactly one of two concurrent votes for one matchup", async () => {
     await registerPerfectCats(db, [
       { params: { params: {}, name: `vote-a-${Date.now()}` } },

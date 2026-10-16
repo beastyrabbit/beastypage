@@ -29,5 +29,11 @@ the decoded MIME and dimensions are stored with the bytes. The orphan cleanup
 job checks the complete schema-derived file foreign-key set before deleting
 rows older than the 24-hour grace period.
 
+Upload admission and default season/rarity setup use transaction-scoped
+advisory locks so concurrent requests cannot exceed the documented limits or
+create duplicate defaults. Thumbnail jobs read source bytes in a short
+transaction, process them outside the transaction, then re-check the attempt
+before storing results.
+
 No Convex code or database migration was changed. The catalog service does not
 create a write-back path to Convex.

@@ -486,7 +486,7 @@ describe("Quick Share operation parity", () => {
       anonymous,
       now + 1,
     );
-    expect(pFailed).toEqual({ status: 200, body: { ok: true } });
+    expect(pFailed).toEqual({ status: 200, body: null });
 
     const admin = { tokenIdentifier: "https://clerk.quick-share.test|admin" };
     const env = { QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS: admin.tokenIdentifier };
@@ -528,7 +528,7 @@ describe("Quick Share operation parity", () => {
       now,
       env,
     );
-    expect(pBan).toEqual({ status: 200, body: { ok: true } });
+    expect(pBan).toEqual({ status: 200, body: null });
     await expectError(
       () =>
         t.mutation(internal.quickShare.createUpload, {
@@ -563,7 +563,7 @@ describe("Quick Share operation parity", () => {
       now + 1,
       env,
     );
-    expect(pUnban).toEqual({ status: 200, body: { ok: true } });
+    expect(pUnban).toEqual({ status: 200, body: null });
 
     await t.mutation(internal.quickShare.removeUpload, {
       uploadId: cCreated.id,
@@ -577,7 +577,7 @@ describe("Quick Share operation parity", () => {
       now + 2,
       env,
     );
-    expect(pRemoved).toEqual({ status: 200, body: { ok: true } });
+    expect(pRemoved).toEqual({ status: 200, body: null });
     const [pDeleteJob] = (await db.select().from(quickShareJobs)).filter(
       (job) => job.uploadId === pUploadId && job.kind === "delete",
     );
@@ -614,7 +614,7 @@ describe("Quick Share operation parity", () => {
       anonymous,
       now + 3,
     );
-    expect(pDeleted).toEqual({ status: 200, body: { ok: true } });
+    expect(pDeleted).toEqual({ status: 200, body: null });
     expect(
       await t.query(internal.quickShare.adminGet, { uploadId: cCreated.id }),
     ).toBeNull();
@@ -806,7 +806,7 @@ describe("Quick Share operation parity", () => {
         now,
         env,
       ),
-    ).toEqual({ status: 200, body: { ok: true } });
+    ).toEqual({ status: 200, body: null });
     const bannedInput = uploadArgs(`B${prefix.slice(-7)}`, `${prefix}-ban`, {
       ipHash: banIp,
       now,
@@ -839,7 +839,7 @@ describe("Quick Share operation parity", () => {
         now + 1,
         env,
       ),
-    ).toEqual({ status: 200, body: { ok: true } });
+    ).toEqual({ status: 200, body: null });
     expect(
       (await t.mutation(internal.quickShare.createUpload, bannedInput)).slug,
     ).toBe(bannedInput.slug);
