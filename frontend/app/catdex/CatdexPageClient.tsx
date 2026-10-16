@@ -1,19 +1,25 @@
 "use client";
 
-import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
-import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { CatdexPayload } from "@/convex/catdex";
 import type { RarityPayload } from "@/convex/rarities";
 import type { SeasonPayload } from "@/convex/seasons";
 import { track } from "@/lib/analytics";
 import { CONVEX_HTTP_URL } from "@/lib/convexClient";
+import {
+  useCatalogCatdexPage,
+  useCatalogCreateCatdex,
+  useCatalogGenerateUploadUrl,
+  useCatalogHasPending,
+  useCatalogRarities,
+  useCatalogSeasons,
+} from "@/lib/data/catalog";
 import { cn } from "@/lib/utils";
 
 type SortKey =
@@ -88,16 +94,12 @@ export default function CatdexPage() {
     results: cats,
     status: pageStatus,
     loadMore,
-  } = usePaginatedQuery(
-    api.catdex.page,
-    { approved: true },
-    { initialNumItems: 48 },
-  );
-  const seasons = useQuery(api.seasons.list, {});
-  const rarities = useQuery(api.rarities.list, {});
-  const hasPending = useQuery(api.catdex.hasPending, {});
-  const generateUploadUrlMutation = useMutation(api.catdex.generateUploadUrl);
-  const createCatMutation = useMutation(api.catdex.create);
+  } = useCatalogCatdexPage({ approved: true });
+  const seasons = useCatalogSeasons();
+  const rarities = useCatalogRarities();
+  const hasPending = useCatalogHasPending();
+  const generateUploadUrlMutation = useCatalogGenerateUploadUrl();
+  const createCatMutation = useCatalogCreateCatdex();
 
   const [search, setSearch] = useState("");
   const [seasonFilter, setSeasonFilter] = useState<string>("all");
@@ -837,6 +839,7 @@ function absoluteUrl(url?: string | null): string | null {
       return url;
     }
   }
+  if (url.startsWith("/api/files/")) return url;
   const base = CONVEX_HTTP_URL.replace(/\/$/, "");
   if (url.startsWith("/")) return `${base}${url}`;
   return `${base}/${url}`;
@@ -860,7 +863,9 @@ async function uploadToStorage(
   const configuredSiteOrigin = process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
   const uploadTarget = new URL(
     uploadUrl,
-    configuredSiteOrigin || window.location.origin,
+    uploadUrl.startsWith("/api/")
+      ? window.location.origin
+      : configuredSiteOrigin || window.location.origin,
   ).toString();
   const uploadToken = new URL(uploadTarget).searchParams.get("token");
   if (!uploadToken) {
