@@ -14,6 +14,9 @@ import {
   deleteUsage,
   findActiveBan,
   findActiveByRateIdentity,
+  findActiveRetainedUploadsBySlug,
+  findFirstUploadBySlug,
+  findPublicCollectionUploads,
   findUploadsByReceipt,
   findUploadsBySlug,
   getJob,
@@ -331,12 +334,7 @@ async function assertCollectionAdmission(
     now: number;
   },
 ) {
-  const existing = await findUploadsBySlug(
-    tx,
-    args.slug,
-    QUICK_SHARE_POLICY.collectionMaxItems,
-    true,
-  );
+  const existing = await findUploadsBySlug(tx, args.slug, 1, true);
   if (existing.length === 0) return;
   const receipts = args.collectionReceiptHash
     ? await findUploadsByReceipt(
@@ -357,8 +355,12 @@ async function assertCollectionAdmission(
     )
   )
     throw new Error("SLUG_COLLISION");
-  const active = existing.filter(
-    (row) => row.active && row.retainedUntil.getTime() > args.now,
+  const active = await findActiveRetainedUploadsBySlug(
+    tx,
+    args.slug,
+    new Date(args.now),
+    QUICK_SHARE_POLICY.collectionMaxItems + 1,
+    true,
   );
   if (active.length >= QUICK_SHARE_POLICY.collectionMaxItems)
     throw new Error("COLLECTION_LIMIT");
@@ -635,20 +637,22 @@ function publicObject(
 }
 
 async function publicUploadBySlug(db: Database, slug: string, now: number) {
-  const rows = await withTransaction(db, (tx) =>
-    findUploadsBySlug(tx, slug, 1),
+  const row = await withTransaction(db, (tx) =>
+    findFirstUploadBySlug(tx, slug),
   );
-  return rows[0] ? publicObject(rows[0], now) : null;
+  return row ? publicObject(row, now) : null;
 }
 
 async function publicCollection(db: Database, slug: string, now: number) {
   const rows = await withTransaction(db, (tx) =>
-    findUploadsBySlug(tx, slug, QUICK_SHARE_POLICY.collectionMaxItems),
+    findPublicCollectionUploads(
+      tx,
+      slug,
+      new Date(now),
+      QUICK_SHARE_POLICY.collectionMaxItems,
+    ),
   );
-  return rows
-    .filter((row) => publicObject(row, now))
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
-    .map((row) => publicObject(row, now));
+  return rows.map((row) => publicObject(row, now));
 }
 
 async function claimJob(db: Database, body: OpBody, now: number) {
@@ -788,12 +792,13 @@ async function extend(
   });
 }
 
-async function adminList(db: Database, body: OpBody) {
+async function adminList(db: Database, body: OpBody, now: number) {
   const rows = await withTransaction(db, (tx) =>
     listAdminUploads(
       tx,
       optionalString(body, "slug"),
       optionalString(body, "ipHash"),
+      new Date(now),
     ),
   );
   return rows.map(adminUpload);
@@ -1095,7 +1100,7 @@ export async function handleQuickShareOperation(
     case "adminList":
       if (!isAdmin(owner, env))
         return { status: 403, body: { error: "Forbidden" } };
-      return { status: 200, body: await adminList(db, body) };
+      return { status: 200, body: await adminList(db, body, now) };
     case "adminGet":
       if (!isAdmin(owner, env))
         return { status: 403, body: { error: "Forbidden" } };

@@ -39,6 +39,14 @@ function input(
   };
 }
 
+async function outcome<T>(run: () => Promise<T>) {
+  try {
+    return { value: await run() };
+  } catch (error) {
+    return { error };
+  }
+}
+
 describe("Quick Share PostgreSQL service", () => {
   it("runs the upload, part, processing and public-read state machine", async () => {
     const suffix = `state${Date.now()}`;
@@ -127,27 +135,212 @@ describe("Quick Share PostgreSQL service", () => {
   it("enforces active admission atomically under concurrent requests", async () => {
     const suffix = `race${Date.now()}`;
     const requests = [0, 1, 2].map((index) =>
-      handleQuickShareOperation(
-        db,
-        "create",
-        input(`Q${index}ace00${index}`, `${suffix}-${index}`, {
-          rateIdentity: `race:${suffix}`,
-          ipHash: `race-hash:${suffix}`,
-        }),
-        anonymous,
-        1_700_100_000_000 + index,
-      ).catch((error: unknown) => ({
-        error: error instanceof Error ? error.message : String(error),
-      })),
+      outcome(() =>
+        handleQuickShareOperation(
+          db,
+          "create",
+          input(`Q${index}ace00${index}`, `${suffix}-${index}`, {
+            rateIdentity: `race:${suffix}`,
+            ipHash: `race-hash:${suffix}`,
+          }),
+          anonymous,
+          1_700_100_000_000 + index,
+        ),
+      ),
     );
     const results = await Promise.all(requests);
     expect(
-      results.filter((result) => "status" in result && result.status === 201),
+      results.filter(
+        (result) => "value" in result && result.value?.status === 201,
+      ),
     ).toHaveLength(2);
     expect(
       results.filter(
-        (result) => "error" in result && result.error === "ACTIVE_LIMIT",
+        (result) =>
+          "error" in result &&
+          result.error instanceof Error &&
+          result.error.message === "ACTIVE_LIMIT",
       ),
     ).toHaveLength(1);
+  });
+
+  it("admits owned collections and preserves public collection ordering", async () => {
+    const now = Date.now();
+    const owner = {
+      tokenIdentifier: `https://clerk.quick-share.test|collection-${now}`,
+    };
+    const slug = `C${String(now).slice(-7)}`;
+    const first = await handleQuickShareOperation(
+      db,
+      "create",
+      input(slug, `collection-first-${now}`),
+      owner,
+      now,
+    );
+    const firstId = (first.body as { id: string }).id;
+    const firstReceipt = `receipt-collection-first-${now}`;
+    await db
+      .update(quickShareUploads)
+      .set({
+        receiptHash: firstReceipt,
+        rateIdentity: `acct:${owner.tokenIdentifier}`,
+        ipHash: "collection-ip",
+      })
+      .where(eq(quickShareUploads.id, firstId));
+
+    const second = await handleQuickShareOperation(
+      db,
+      "create",
+      input(slug, `collection-second-${now}`, {
+        collectionReceiptHash: firstReceipt,
+        ipHash: "collection-ip",
+      }),
+      owner,
+      now + 1,
+    );
+    expect(second.status).toBe(201);
+    const stranger = await outcome(() =>
+      handleQuickShareOperation(
+        db,
+        "create",
+        input(slug, `collection-stranger-${now}`, {
+          collectionReceiptHash: firstReceipt,
+          ipHash: "collection-ip",
+        }),
+        { tokenIdentifier: null },
+        now + 2,
+      ),
+    );
+    if (!("error" in stranger)) throw new Error("expected stranger denial");
+    expect(stranger.error).toBeInstanceOf(Error);
+    expect((stranger.error as Error).message).toBe("SLUG_COLLISION");
+
+    const publicSlug = `P${String(now).slice(-7)}`;
+    await db.insert(quickShareUploads).values([
+      {
+        slug: publicSlug,
+        source: "file",
+        originalName: "old.png",
+        originalSize: 1,
+        originalKey: "originals/public-old",
+        state: "uploading",
+        receiptHash: `old-${now}`,
+        rateIdentity: `public-${now}`,
+        ipHash: `public-ip-${now}`,
+        rawIp: "192.0.2.1",
+        publicExpiresAt: new Date(now + 60_000),
+        retainedUntil: new Date(now + 60_000),
+        active: true,
+        createdAt: new Date(now),
+        updatedAt: new Date(now),
+      },
+      {
+        slug: publicSlug,
+        source: "file",
+        originalName: "new.png",
+        originalSize: 1,
+        originalKey: "originals/public-new",
+        publicKey: "derivatives/public-new",
+        publicMime: "image/png",
+        publicSize: 1,
+        state: "ready",
+        receiptHash: `new-${now}`,
+        rateIdentity: `public-${now}`,
+        ipHash: `public-ip-${now}`,
+        rawIp: "192.0.2.1",
+        publicExpiresAt: new Date(now + 60_000),
+        retainedUntil: new Date(now + 60_000),
+        active: true,
+        createdAt: new Date(now + 1),
+        updatedAt: new Date(now + 1),
+      },
+      {
+        slug: publicSlug,
+        source: "file",
+        originalName: "newest.png",
+        originalSize: 1,
+        originalKey: "originals/public-newest",
+        publicKey: "derivatives/public-newest",
+        publicMime: "image/png",
+        publicSize: 1,
+        state: "ready",
+        receiptHash: `newest-${now}`,
+        rateIdentity: `public-${now}`,
+        ipHash: `public-ip-${now}`,
+        rawIp: "192.0.2.1",
+        publicExpiresAt: new Date(now + 60_000),
+        retainedUntil: new Date(now + 60_000),
+        active: true,
+        createdAt: new Date(now + 2),
+        updatedAt: new Date(now + 2),
+      },
+    ]);
+    const firstRead = await handleQuickShareOperation(
+      db,
+      "public",
+      { slug: publicSlug },
+      anonymous,
+      now + 2,
+    );
+    expect(firstRead.status).toBe(404);
+    const collectionRead = await handleQuickShareOperation(
+      db,
+      "publicCollection",
+      { slug: publicSlug },
+      anonymous,
+      now + 2,
+    );
+    expect(collectionRead.body).toEqual([
+      expect.objectContaining({ key: "derivatives/public-newest" }),
+      expect.objectContaining({ key: "derivatives/public-new" }),
+    ]);
+
+    await db.delete(quickShareUploads).where(eq(quickShareUploads.slug, slug));
+    await db
+      .delete(quickShareUploads)
+      .where(eq(quickShareUploads.slug, publicSlug));
+  });
+
+  it("returns COLLECTION_LIMIT after one hundred active retained items", async () => {
+    const now = Date.now();
+    const slug = `L${String(now).slice(-7)}`;
+    const owner = `https://clerk.quick-share.test|limit-${now}`;
+    await db.insert(quickShareUploads).values(
+      Array.from({ length: 100 }, (_, index) => ({
+        slug,
+        source: "file" as const,
+        originalName: `limit-${index}.png`,
+        originalSize: 1,
+        originalKey: `originals/limit-${now}-${index}`,
+        state: "ready" as const,
+        receiptHash:
+          index === 0 ? `limit-receipt-${now}` : `limit-other-${now}-${index}`,
+        ownerTokenIdentifier: owner,
+        rateIdentity: `acct:${owner}`,
+        ipHash: "limit-ip",
+        rawIp: "192.0.2.2",
+        publicExpiresAt: new Date(now + 60_000),
+        retainedUntil: new Date(now + 60_000),
+        active: true,
+        createdAt: new Date(now + index),
+        updatedAt: new Date(now + index),
+      })),
+    );
+    const result = await outcome(() =>
+      handleQuickShareOperation(
+        db,
+        "create",
+        input(slug, `limit-new-${now}`, {
+          collectionReceiptHash: `limit-receipt-${now}`,
+          ipHash: "limit-ip",
+        }),
+        { tokenIdentifier: owner },
+        now + 1_000,
+      ),
+    );
+    if (!("error" in result)) throw new Error("expected collection limit");
+    expect(result.error).toBeInstanceOf(Error);
+    expect((result.error as Error).message).toBe("COLLECTION_LIMIT");
+    await db.delete(quickShareUploads).where(eq(quickShareUploads.slug, slug));
   });
 });

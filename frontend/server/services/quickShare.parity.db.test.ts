@@ -35,6 +35,22 @@ describe("Quick Share Convex/PostgreSQL parity", () => {
       { tokenIdentifier: null },
     );
     expect(postgresPolicy).toEqual({ status: 200, body: convexPolicy });
+    const convexSignedInPolicy = await convex.query(
+      internal.quickShare.policy,
+      {
+        tier: "signedIn",
+      },
+    );
+    const postgresSignedInPolicy = await handleQuickShareOperation(
+      db,
+      "policy",
+      { op: "policy" },
+      { tokenIdentifier: "https://clerk.quick-share.test|policy-owner" },
+    );
+    expect(postgresSignedInPolicy).toEqual({
+      status: 200,
+      body: convexSignedInPolicy,
+    });
 
     await expect(
       convex.mutation(internal.quickShare.createUpload, {

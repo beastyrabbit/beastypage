@@ -54,7 +54,3 @@ opaque UUID strings at the media boundary.
 5. Drain old Convex/media workers, take the final backup, then lift the
    maintenance gate. PostgreSQL is the write source after this point; Convex
    is not written again.
-
-Collection admission follows the imported schema's `quick_share_uploads.slug`
-constraint. If production data requires multiple rows with the same slug, the
-schema must be revised in a separate migration before cutover.

@@ -59,6 +59,63 @@ export async function findUploadsBySlug(
   return query;
 }
 
+export async function findActiveRetainedUploadsBySlug(
+  tx: Transaction,
+  slug: string,
+  now: Date,
+  limit = 101,
+  lock = false,
+): Promise<UploadRow[]> {
+  let query = tx
+    .select()
+    .from(quickShareUploads)
+    .where(
+      and(
+        eq(quickShareUploads.slug, slug),
+        eq(quickShareUploads.active, true),
+        gt(quickShareUploads.retainedUntil, now),
+      ),
+    )
+    .orderBy(asc(quickShareUploads.retainedUntil), asc(quickShareUploads.id))
+    .limit(limit);
+  if (lock) query = query.for("update") as typeof query;
+  return query;
+}
+
+export async function findFirstUploadBySlug(
+  tx: Transaction,
+  slug: string,
+): Promise<UploadRow | null> {
+  const [row] = await tx
+    .select()
+    .from(quickShareUploads)
+    .where(eq(quickShareUploads.slug, slug))
+    .orderBy(asc(quickShareUploads.createdAt), asc(quickShareUploads.id))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function findPublicCollectionUploads(
+  tx: Transaction,
+  slug: string,
+  now: Date,
+  limit = 100,
+): Promise<UploadRow[]> {
+  return tx
+    .select()
+    .from(quickShareUploads)
+    .where(
+      and(
+        eq(quickShareUploads.slug, slug),
+        eq(quickShareUploads.active, true),
+        eq(quickShareUploads.state, "ready"),
+        gt(quickShareUploads.publicExpiresAt, now),
+      ),
+    )
+    .orderBy(desc(quickShareUploads.createdAt), desc(quickShareUploads.id))
+    .limit(limit);
+}
+
 export async function findUploadsByReceipt(
   tx: Transaction,
   receiptHash: string,
@@ -430,14 +487,32 @@ export async function listAdminUploads(
   tx: Transaction,
   slug?: string,
   ipHash?: string,
+  now = new Date(),
 ): Promise<UploadRow[]> {
   if (slug) {
-    return tx
+    const active = await tx
+      .select()
+      .from(quickShareUploads)
+      .where(
+        and(
+          eq(quickShareUploads.slug, slug),
+          eq(quickShareUploads.active, true),
+          gt(quickShareUploads.retainedUntil, now),
+        ),
+      )
+      .orderBy(asc(quickShareUploads.retainedUntil), asc(quickShareUploads.id))
+      .limit(100);
+    const historical = await tx
       .select()
       .from(quickShareUploads)
       .where(eq(quickShareUploads.slug, slug))
-      .orderBy(desc(quickShareUploads.createdAt))
+      .orderBy(asc(quickShareUploads.createdAt), asc(quickShareUploads.id))
       .limit(100);
+    const seen = new Set(active.map((row) => row.id));
+    return [...active, ...historical.filter((row) => !seen.has(row.id))].slice(
+      0,
+      100,
+    );
   }
   if (ipHash) return listUploadsByIp(tx, ipHash, 100);
   return tx
