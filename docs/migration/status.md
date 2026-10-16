@@ -6,7 +6,7 @@ change, homelab change, release tag or cutover has happened. One
 test export of production was taken on 2026-10-16 by the maintainer and is
 kept outside the repository.
 
-Status as of 2026-10-16 (evening), branch `t3code/convex-postgres-migration`.
+Status as of 2026-10-17, branch `t3code/convex-postgres-migration`.
 Every area now has a PostgreSQL implementation behind `DATA_BACKEND=postgres`;
 Convex stays the default until the cutover.
 
@@ -25,24 +25,46 @@ Convex stays the default until the cutover.
 | 8. Cutover | #116 | **Runbook and tools done** | `MAINTENANCE_MODE` gate (proxy 503 for writes, jobs paused, banner), `verify:import` (passes on the real archive: 35 tables, 336 files), `smoke:cutover`, [`cutover.md`](cutover.md) | Staging rehearsal, restore drill, approvals, the window itself |
 | 9. Decommission | #117 | Not started | — | After cutover: remove Convex code, `DATA_BACKEND`, the Convex provider (its websocket still connects in PostgreSQL mode), the dual-path hooks |
 
+## Independent review (2026-10-17)
+
+Four read-only reviewers (security, Convex parity, concurrency, cutover)
+checked the whole branch. Security found nothing. The other three found 29
+issues, all confirmed against the code and fixed with tests; the ones that
+would have broken the cutover:
+
+- the app role was never granted access to the tables (the migration runner
+  now applies the grants; the test migrates as a non-superuser owner);
+- client auth state still came from Convex, so the stream control and host
+  pages would hang once Convex was paused (`useBackendAuth`, Clerk in
+  PostgreSQL mode);
+- the importer could truncate an unintended database (explicit import URL,
+  `--expected-database`, `--confirm-remote-replace`, mandatory issuer).
+
+The rest: Quick Share collection order and null items, wheel `forcedCount`,
+exact-case usernames and derived usernames for new users, upload-limit and
+default-row races, the job worker's lost wake and missing LISTEN reconnect,
+bounded live replay, SSE backpressure, worker shutdown, the thumbnail job's
+lock scope, and runbook command errors.
+
 ## Validation run for this state
 
-All commands run from `frontend/` on 2026-10-16.
+All commands run from `frontend/` on 2026-10-17.
 
 | Check | Command | Result |
 | --- | --- | --- |
 | Type check | `tsc --noEmit` | pass |
-| Lint and format | `biome check` on every file changed by the migration | no errors; 8 warnings in older component code |
-| Unit tests | `vitest run --project unit` | 117 files, 820 tests pass |
-| Database tests (real PostgreSQL 18) | `pnpm run test:db` | 42 files, 194 tests pass (three consecutive clean runs) |
+| Lint and format | `biome check` on every file changed by the review fixes | no errors; 2 warnings in older component code |
+| Unit tests | `vitest run --project unit` | 123 files, 838 tests pass |
+| Database tests (real PostgreSQL 18) | `pnpm run test:db` | 42 files, 200 tests pass (two consecutive clean runs) |
 | Schema drift | `pnpm run db:drift` | no drift |
 | Inventory up to date | `migration:inventory --check` | pass |
 | Production build | `next build` (CI placeholders) | pass, no warnings |
-| Media service | `tsc`, `biome check`, `vitest run` in `backend/media_service` | pass, 59 tests |
-| Real archive | `import:convex` then `verify:import` | OK |
-| Running app on PostgreSQL | `next dev` with `DATA_BACKEND=postgres`, the imported archive and Infisical dev secrets, checked in a browser | Catdex, collection, perfect cats, coinflip, wheel, history, cat view (by slug and by old Convex ID), adoption batch and profile render from PostgreSQL with no runtime errors, broken images or Convex requests. A Perfect Cat vote and a signed-in username change were written through the UI. The overlay topic received a control write over SSE; a wrong API key got 403. |
+| Media service | `tsc`, `vitest run` in `backend/media_service` | pass, 59 tests |
+| Real archive | `import:convex --expected-database … --expected-issuer …` then `verify:import` | OK: 35 tables, 336 files, nothing quarantined |
+| Running app on PostgreSQL, Convex unreachable | `next dev` with `DATA_BACKEND=postgres`, `NEXT_PUBLIC_CONVEX_URL` pointed at a closed port, the imported archive and Infisical dev secrets, checked in a browser signed in | Stream control and profile render signed in with no loading hang; saved variants sync through `/api/user-variants`; every API call 200, no server errors; wheel stats return `forcedCount` on the real data |
 
-Two bugs were found only by the running-app check and fixed: route handlers
-could not read the Clerk session (the proxy now mounts `clerkMiddleware()`
-for PostgreSQL), and `useDataMutation` returned a new function after every
-call, which looped pages that list it in effect dependencies.
+Earlier running-app checks (2026-10-16) found two bugs that tests missed:
+route handlers could not read the Clerk session (the proxy now mounts
+`clerkMiddleware()` for PostgreSQL), and `useDataMutation` returned a new
+function after every call, which looped pages that list it in effect
+dependencies.
