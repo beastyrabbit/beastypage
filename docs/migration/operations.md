@@ -81,6 +81,9 @@ password is a throwaway value for an ephemeral container.
 | Isolation | Clerk development instance. No Discord bot token. Its own Quick Share bucket. Egress to production hosts blocked by NetworkPolicy. |
 | Owner | The maintainer, who also deletes the scrubbed archive copies when staging is torn down. |
 
+Follow the exact [staging scrub procedure](staging.md) before restoring any
+archive into this namespace.
+
 Templates: `deploy/postgres/staging/`. Production templates are in
 `deploy/postgres/production/`. Both go into kub-homelab through a reviewed
 pull request. **Applying them is an infrastructure change that needs

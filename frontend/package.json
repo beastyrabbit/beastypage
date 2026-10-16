@@ -26,6 +26,7 @@
     "verify:import": "tsx scripts/migration/verify-import.ts",
     "smoke:cutover": "tsx scripts/migration/smoke.ts",
     "import:fixture": "tsx scripts/migration/import/fixture.ts",
+    "scrub:staging": "tsx scripts/migration/scrub-staging.ts",
     "import:verify-quick-share": "tsx scripts/migration/verify-quick-share.ts",
     "convex:dev": "convex dev",
     "deploy": "pnpm exec convex deploy",
