@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { Toaster } from "sonner";
+import { MaintenanceBanner } from "@/components/common/MaintenanceBanner";
 import { AppProviders } from "@/components/providers";
 import { getRuntimeEnvScript } from "@/components/runtime-env-script";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { dataBackend } from "@/server/backend";
+import { isMaintenanceMode } from "@/server/maintenance";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,6 +38,7 @@ export default function RootLayout({
 }>) {
   const runtimeEnvScript = getRuntimeEnvScript();
   const backend = dataBackend();
+  const maintenanceMode = isMaintenanceMode();
 
   return (
     <html lang="en" suppressHydrationWarning className="dark">
@@ -49,6 +52,7 @@ export default function RootLayout({
         )}
         <AppProviders backend={backend}>
           <div className="relative flex min-h-screen flex-col">
+            <MaintenanceBanner enabled={maintenanceMode} />
             <SiteHeader />
             <div className="flex-1">{children}</div>
             <SiteFooter />

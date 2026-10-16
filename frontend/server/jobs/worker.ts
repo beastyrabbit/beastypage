@@ -7,6 +7,7 @@ import { getDb, getPool } from "../db/client";
 import type { Database } from "../db/pool";
 import { jobRuns } from "../db/schema";
 import { withTransaction } from "../db/transaction";
+import { isMaintenanceMode } from "../maintenance";
 import { enqueueJob } from "./enqueue";
 import { getJobKind, jobKinds } from "./kinds";
 import type { AnyJobKind, JobCounts } from "./types";
@@ -15,6 +16,12 @@ const RECOVERY_INTERVAL_MS = 10 * 60_000;
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 30_000;
 const MAX_BACKOFF_MS = 60 * 60_000;
+
+export function shouldClaimJobs(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return !isMaintenanceMode(env);
+}
 
 export interface JobWorkerOptions {
   db?: Database;
@@ -209,6 +216,7 @@ class Worker implements JobWorker {
   }
 
   private async ensureRecurringJobs(): Promise<void> {
+    if (!shouldClaimJobs()) return;
     await withTransaction(this.db, async (tx) => {
       for (const definition of jobKinds) {
         if (!definition.recurringIntervalMs) continue;
@@ -222,6 +230,7 @@ class Worker implements JobWorker {
   }
 
   private async claim(): Promise<ClaimedJob | null> {
+    if (!shouldClaimJobs()) return null;
     return withTransaction(this.db, async (tx) => {
       const result = await tx.execute<{
         id: string;

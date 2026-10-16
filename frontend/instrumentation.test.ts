@@ -25,4 +25,14 @@ describe("job instrumentation startup guard", () => {
       shouldStartJobs({ NEXT_RUNTIME: "nodejs", DATA_BACKEND: "postgres" }),
     ).toBe(true);
   });
+
+  it("does not start a worker in maintenance mode", () => {
+    expect(
+      shouldStartJobs({
+        NEXT_RUNTIME: "nodejs",
+        DATA_BACKEND: "postgres",
+        MAINTENANCE_MODE: "1",
+      }),
+    ).toBe(false);
+  });
 });

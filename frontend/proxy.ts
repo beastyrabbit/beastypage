@@ -2,6 +2,30 @@ import { type NextRequest, NextResponse } from "next/server";
 
 const DEFAULT_REDIRECT = normalizeRoute(process.env.NEXT_ENTRY_REDIRECT);
 const HOST_ROUTE_MAP = parseHostMap(process.env.NEXT_ENTRY_HOST_MAP);
+const RETRY_AFTER_SECONDS = "60";
+
+const isMaintenanceWrite = (request: NextRequest): boolean => {
+  if (process.env.MAINTENANCE_MODE !== "1") return false;
+  if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return false;
+  const { pathname } = request.nextUrl;
+  if (!(pathname.startsWith("/api/") || pathname.startsWith("/i/api/"))) {
+    return false;
+  }
+  // Health endpoints remain usable while the application is gated.
+  const healthRoute =
+    pathname === "/api/health" ||
+    pathname.startsWith("/api/health/") ||
+    pathname === "/i/api/health" ||
+    pathname.startsWith("/i/api/health/");
+  return !healthRoute;
+};
+
+export function maintenanceResponse(): NextResponse {
+  return NextResponse.json(
+    { error: "Service is in maintenance mode", code: "unavailable" },
+    { status: 503, headers: { "Retry-After": RETRY_AFTER_SECONDS } },
+  );
+}
 
 function parseHostMap(raw: string | undefined) {
   if (!raw) return {} as Record<string, string>;
@@ -26,6 +50,7 @@ function normalizeRoute(route: string | undefined) {
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (isMaintenanceWrite(request)) return maintenanceResponse();
   if (pathname === "/quick-share" || pathname.startsWith("/quick-share/")) {
     const response = NextResponse.next();
     response.headers.set(
@@ -53,5 +78,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/quick-share/:path*"],
+  matcher: ["/", "/quick-share/:path*", "/api/:path*", "/i/api/:path*"],
 };

@@ -23,6 +23,8 @@
     "test:db": "vitest run --project database",
     "migration:inventory": "tsx scripts/migration/convex-inventory.ts",
     "import:convex": "tsx scripts/migration/import-convex.ts",
+    "verify:import": "tsx scripts/migration/verify-import.ts",
+    "smoke:cutover": "tsx scripts/migration/smoke.ts",
     "import:fixture": "tsx scripts/migration/import/fixture.ts",
     "import:verify-quick-share": "tsx scripts/migration/verify-quick-share.ts",
     "convex:dev": "convex dev",

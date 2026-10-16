@@ -1,6 +1,7 @@
 import "server-only";
 
 import { dataBackend } from "./server/backend";
+import { isMaintenanceMode } from "./server/maintenance";
 
 function shouldStartJobs(
   env: Readonly<Record<string, string | undefined>> = process.env,
@@ -8,6 +9,7 @@ function shouldStartJobs(
   if (env.NEXT_RUNTIME !== "nodejs") return false;
   if (env.NEXT_PHASE === "phase-production-build") return false;
   if (env.JOBS_ENABLED === "0") return false;
+  if (isMaintenanceMode(env)) return false;
   return dataBackend(env) === "postgres";
 }
 

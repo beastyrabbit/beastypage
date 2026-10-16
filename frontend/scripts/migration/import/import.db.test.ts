@@ -8,6 +8,7 @@ import { readDatabaseConfig } from "../../../server/db/config";
 import { runMigrations } from "../../../server/db/migrator";
 import { createPool } from "../../../server/db/pool";
 import { disableNetwork } from "../import-convex";
+import { verifyImport } from "../verify-import";
 import {
   buildFixture,
   FIXTURE_FREEZE,
@@ -299,5 +300,31 @@ describe("Convex importer", () => {
       "select id, sha256 from files",
     );
     for (const row of ids.rows) expect(row.id).toBe(importedFileId(row.sha256));
+  });
+
+  it("verifies the fixture and catches a corrupted row", async () => {
+    const verified = await withClient((client) =>
+      verifyImport(client, archivePath, first),
+    );
+    expect(verified.ok).toBe(true);
+
+    await pool.query(
+      "update users set username = 'Corrupted' where username = 'Ann_1'",
+    );
+    try {
+      const corrupted = await withClient((client) =>
+        verifyImport(client, archivePath, first),
+      );
+      expect(corrupted.ok).toBe(false);
+      expect(
+        corrupted.mismatches.some(
+          (item) => item.check === "fingerprint" || item.check === "sample",
+        ),
+      ).toBe(true);
+    } finally {
+      await pool.query(
+        "update users set username = 'Ann_1' where username = 'Corrupted'",
+      );
+    }
   });
 });
