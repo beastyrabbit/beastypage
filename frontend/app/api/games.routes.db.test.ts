@@ -123,4 +123,44 @@ describe("games API routes", () => {
     expect(response.status).toBe(404);
     process.env.DATA_BACKEND = "postgres";
   });
+
+  it("returns invalid-input responses for every games route", async () => {
+    const cases = [
+      perfectRegister.POST(
+        json("http://localhost/api/perfect-cats/register", { cats: [] }),
+      ),
+      perfectMatchup.POST(
+        json("http://localhost/api/perfect-cats/matchup", {
+          clientId: "x".repeat(129),
+        }),
+      ),
+      perfectVote.POST(
+        json("http://localhost/api/perfect-cats/vote", { clientId: "x" }),
+      ),
+      perfectLeaderboard.GET(
+        new Request("http://localhost/api/perfect-cats/leaderboard?limit=0"),
+      ),
+      coinflipLeaderboard.GET(
+        new Request("http://localhost/api/coinflip/leaderboard?limit=0"),
+      ),
+      coinflipScores.GET(
+        new Request("http://localhost/api/coinflip/scores?limit=0"),
+      ),
+      coinflipScore.POST(
+        json("http://localhost/api/coinflip/score", { name: "x" }),
+      ),
+      wheelSpin.POST(
+        json("http://localhost/api/wheel/spin", {
+          prizeName: "Moondust",
+          forced: false,
+          randomBucket: 100,
+        }),
+      ),
+      wheelStats.GET(new Request("http://localhost/api/wheel/stats?limit=0")),
+    ];
+    for (const response of await Promise.all(cases)) {
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "invalid_input" });
+    }
+  });
 });
