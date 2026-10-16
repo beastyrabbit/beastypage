@@ -783,7 +783,7 @@ type ThumbnailSource = {
   bytes: Buffer | null;
 };
 
-type ThumbnailResult = {
+export type CatdexThumbnailResult = {
   variant: "default" | "custom";
   name: string;
   width: number;
@@ -792,6 +792,48 @@ type ThumbnailResult = {
   sourceHeight: number;
   buffer: Buffer;
 };
+
+export type CatdexThumbnailProcessor = (source: {
+  variant: "default" | "custom";
+  name: string | null;
+  bytes: Buffer;
+}) => Promise<CatdexThumbnailResult | null>;
+
+async function processCatdexThumbnail(
+  source: Parameters<CatdexThumbnailProcessor>[0],
+): Promise<CatdexThumbnailResult | null> {
+  try {
+    assertImageSourceWithinLimits(source.bytes);
+    const metadata = await sharp(source.bytes, {
+      failOn: "error",
+    }).metadata();
+    const sourceWidth = metadata.width ?? 0;
+    const sourceHeight = metadata.height ?? 0;
+    if (!sourceWidth || !sourceHeight) return null;
+    const buffer = await sharp(source.bytes)
+      .resize({
+        width: 256,
+        height: 256,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    const thumbnail = await sharp(buffer).metadata();
+    return {
+      variant: source.variant,
+      name: `${source.name ?? source.variant}-card-thumb.jpg`,
+      width: thumbnail.width ?? 0,
+      height: thumbnail.height ?? 0,
+      sourceWidth,
+      sourceHeight,
+      buffer,
+    };
+  } catch {
+    // Invalid or undecodable source images are permanent failures.
+    return null;
+  }
+}
 
 export async function listCollectionLegacy(db: Database, limit = 200) {
   const bounded = Math.max(1, Math.min(limit, 200));
@@ -827,6 +869,7 @@ export async function generateCatdexThumbnail(
   db: Database,
   id: string,
   attempt: number,
+  processor: CatdexThumbnailProcessor = processCatdexThumbnail,
 ) {
   const snapshot = await withTransaction(db, async (tx) => {
     const [cat] = await tx
@@ -881,39 +924,15 @@ export async function generateCatdexThumbnail(
   if (!snapshot.sources.length)
     return { success: true, generated: [] as string[] };
 
-  const generated: ThumbnailResult[] = [];
+  const generated: CatdexThumbnailResult[] = [];
   for (const source of snapshot.sources) {
     if (!source.bytes) continue;
-    try {
-      assertImageSourceWithinLimits(source.bytes);
-      const metadata = await sharp(source.bytes, {
-        failOn: "error",
-      }).metadata();
-      const sourceWidth = metadata.width ?? 0;
-      const sourceHeight = metadata.height ?? 0;
-      if (!sourceWidth || !sourceHeight) continue;
-      const buffer = await sharp(source.bytes)
-        .resize({
-          width: 256,
-          height: 256,
-          fit: "inside",
-          withoutEnlargement: true,
-        })
-        .jpeg({ quality: 85 })
-        .toBuffer();
-      const thumbnail = await sharp(buffer).metadata();
-      generated.push({
-        variant: source.variant,
-        name: `${source.name ?? source.variant}-card-thumb.jpg`,
-        width: thumbnail.width ?? 0,
-        height: thumbnail.height ?? 0,
-        sourceWidth,
-        sourceHeight,
-        buffer,
-      });
-    } catch {
-      // Invalid or undecodable source images are permanent failures.
-    }
+    const result = await processor({
+      variant: source.variant,
+      name: source.name,
+      bytes: source.bytes,
+    });
+    if (result) generated.push(result);
   }
 
   return withTransaction(db, async (tx) => {

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { currentUser } from "@clerk/nextjs/server";
 import { sql } from "drizzle-orm";
 import type { Identity } from "../auth/identity";
 import type { Database } from "../db/pool";
@@ -25,6 +26,18 @@ import {
 
 const MAX_RESOLVE_IDS = 100;
 const MAX_ID_LENGTH = 128;
+
+/** The profile fields exposed by Clerk's Convex JWT template. */
+export interface ClerkProfile {
+  username?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  primaryEmail?: string | null;
+}
+
+export type UserProfileLoader = (
+  identity: Identity,
+) => Promise<ClerkProfile | null | undefined>;
 
 export type UserRecord = ReturnType<typeof toUserRecord>;
 
@@ -80,11 +93,17 @@ function sanitizeUsername(raw: string): string {
   return filtered.slice(start, end).slice(0, 30);
 }
 
-async function deriveUsername(tx: Transaction, identity: Identity) {
+async function deriveUsername(
+  tx: Transaction,
+  profile: ClerkProfile | null | undefined,
+) {
+  const fullName = [profile?.firstName, profile?.lastName]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(" ");
   const raw =
-    identity.nickname ??
-    identity.name ??
-    (identity.email ? identity.email.split("@")[0] : undefined);
+    profile?.username ??
+    (fullName || undefined) ??
+    (profile?.primaryEmail ? profile.primaryEmail.split("@", 1)[0] : undefined);
   if (!raw) return undefined;
   const sanitized = sanitizeUsername(raw);
   if (!sanitized) return undefined;
@@ -96,12 +115,13 @@ async function deriveUsername(tx: Transaction, identity: Identity) {
   return undefined;
 }
 
-async function ensureUser(tx: Transaction, identity: Identity) {
+async function ensureUser(
+  tx: Transaction,
+  identity: Identity,
+  profile: ClerkProfile | null | undefined,
+) {
   if (!identity.tokenIdentifier)
     throw new ServiceError("forbidden", "Not authenticated");
-  await tx.execute(
-    sql`select pg_advisory_xact_lock(hashtextextended('beastypage:users:ensure', 0))`,
-  );
   const existing = await getUserByTokenIdentifier(tx, identity.tokenIdentifier);
   if (existing) {
     if (!existing.apiKey) {
@@ -110,15 +130,38 @@ async function ensureUser(tx: Transaction, identity: Identity) {
     }
     return existing;
   }
+  const tokenLockKey = `beastypage:users:ensure:${identity.tokenIdentifier}`;
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${tokenLockKey}, 0))`,
+  );
+  const raced = await getUserByTokenIdentifier(tx, identity.tokenIdentifier);
+  if (raced) return raced;
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended('beastypage:users:username', 0))`,
+  );
+  const username = await deriveUsername(tx, profile);
   const created = await createUser(tx, {
     tokenIdentifier: identity.tokenIdentifier,
     apiKey: randomUUID(),
-    username: await deriveUsername(tx, identity),
+    username,
   });
   if (created) return created;
-  const raced = await getUserByTokenIdentifier(tx, identity.tokenIdentifier);
-  if (!raced) throw new ServiceError("unavailable", "Failed to create user");
-  return raced;
+  const inserted = await getUserByTokenIdentifier(tx, identity.tokenIdentifier);
+  if (!inserted) throw new ServiceError("unavailable", "Failed to create user");
+  return inserted;
+}
+
+async function loadClerkProfile(
+  _identity: Identity,
+): Promise<ClerkProfile | null> {
+  const user = await currentUser();
+  if (!user) return null;
+  return {
+    username: user.username,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    primaryEmail: user.primaryEmailAddress?.emailAddress ?? null,
+  };
 }
 
 async function requireExistingUser(tx: Transaction, identity: Identity) {
@@ -144,9 +187,36 @@ export async function viewer(db: Database, identity: Identity) {
   });
 }
 
-export async function getOrCreateUser(db: Database, identity: Identity) {
+export async function getOrCreateUser(
+  db: Database,
+  identity: Identity,
+  profileLoader: UserProfileLoader = loadClerkProfile,
+) {
+  if (!identity.tokenIdentifier)
+    throw new ServiceError("forbidden", "Not authenticated");
+  const existing = await withTransaction(db, (tx) =>
+    getUserByTokenIdentifier(tx, identity.tokenIdentifier as string),
+  );
+  if (existing) {
+    if (!existing.apiKey) {
+      const updated = await withTransaction(db, (tx) =>
+        setUserApiKey(tx, existing.id, randomUUID()),
+      );
+      return toUserRecord(updated ?? existing);
+    }
+    return toUserRecord(existing);
+  }
+  let profile: ClerkProfile | null | undefined;
+  try {
+    profile = await profileLoader(identity);
+  } catch (error) {
+    console.warn(
+      "[users] Clerk profile lookup failed; creating user without username",
+      error instanceof Error ? error.message : error,
+    );
+  }
   return withTransaction(db, async (tx) =>
-    toUserRecord(await ensureUser(tx, identity)),
+    toUserRecord(await ensureUser(tx, identity, profile)),
   );
 }
 

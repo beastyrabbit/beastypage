@@ -10,9 +10,6 @@ import { ServiceError } from "@/server/errors";
  */
 export interface Identity {
   tokenIdentifier: string | null;
-  nickname?: string;
-  name?: string;
-  email?: string;
 }
 
 export const ANONYMOUS: Identity = { tokenIdentifier: null };
@@ -26,20 +23,7 @@ export async function getRequestIdentity(): Promise<Identity> {
   const { userId, sessionClaims } = await auth();
   const issuer = sessionClaims?.iss;
   if (!userId || typeof issuer !== "string" || issuer === "") return ANONYMOUS;
-  const claims = sessionClaims as Record<string, unknown>;
-  const stringClaim = (...keys: string[]) => {
-    for (const key of keys) {
-      const value = claims[key];
-      if (typeof value === "string" && value.trim()) return value;
-    }
-    return undefined;
-  };
-  return {
-    tokenIdentifier: tokenIdentifierFor(issuer, userId),
-    nickname: stringClaim("nickname"),
-    name: stringClaim("name"),
-    email: stringClaim("email", "email_address"),
-  };
+  return { tokenIdentifier: tokenIdentifierFor(issuer, userId) };
 }
 
 /** Require a Clerk identity for a route or service operation. */

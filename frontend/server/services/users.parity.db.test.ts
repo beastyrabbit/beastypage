@@ -178,18 +178,18 @@ describe("users Convex/PostgreSQL parity", () => {
   });
 
   it("derives sanitized unique usernames and compares username claims exactly", async () => {
-    const claimed = {
-      ...identity(),
-      nickname: "--Mira Example__",
-      name: "Fallback Name",
-      email: "mira@example.test",
-    };
-    const first = await getOrCreateUser(db, claimed);
-    expect(first.username).toBe("MiraExample");
-    const collision = await getOrCreateUser(db, {
-      ...identity(),
-      nickname: "Mira Example",
+    const profileLoader = async () => ({
+      username: "--Mira Example__",
+      firstName: "Fallback",
+      lastName: "Name",
+      primaryEmail: "mira@example.test",
     });
+    const claimed = identity();
+    const first = await getOrCreateUser(db, claimed, profileLoader);
+    expect(first.username).toBe("MiraExample");
+    const collision = await getOrCreateUser(db, identity(), async () => ({
+      username: "Mira Example",
+    }));
     expect(collision.username).toMatch(/^MiraExample-[a-f0-9]{4}$/);
 
     const exactA = identity();

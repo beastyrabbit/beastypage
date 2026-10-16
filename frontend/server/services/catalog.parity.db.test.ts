@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type pg from "pg";
 import sharp from "sharp";
@@ -5,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 import { isAdminIdentity } from "../auth/identity";
 import { readDatabaseConfig } from "../db/config";
 import { createDatabase, createPool, type Database } from "../db/pool";
-import { cardSeason, collection, rarity } from "../db/schema";
+import { cardSeason, catdex, collection, files, rarity } from "../db/schema";
 import { jobKindRegistry } from "../jobs/kinds";
 import {
   approveCatdex,
@@ -103,6 +104,19 @@ describe("catalog PostgreSQL service", () => {
     await expect(
       generateCatdexThumbnail(db, created.id, 1),
     ).resolves.toMatchObject({ success: true, generated: ["default"] });
+    const [completed] = await db
+      .select({
+        thumbnailStatus: catdex.thumbnailStatus,
+        thumbnailAttemptCount: catdex.thumbnailAttemptCount,
+        thumbnailId: catdex.defaultCardThumbFileId,
+      })
+      .from(catdex)
+      .where(eq(catdex.id, created.id));
+    expect(completed).toMatchObject({
+      thumbnailStatus: "complete",
+      thumbnailAttemptCount: 1,
+    });
+    expect(completed?.thumbnailId).toBeTruthy();
     expect(
       (await listCatdex(db)).page.some((entry) => entry.id === created.id),
     ).toBe(false);
@@ -129,6 +143,91 @@ describe("catalog PostgreSQL service", () => {
         },
       }),
     ).rejects.toMatchObject({ code: "invalid_input" });
+
+    await db
+      .update(catdex)
+      .set({
+        defaultCardThumbFileId: null,
+        defaultCardThumbName: null,
+        defaultCardThumbWidth: null,
+        defaultCardThumbHeight: null,
+        thumbnailStatus: "processing",
+        thumbnailAttemptCount: 1,
+      })
+      .where(eq(catdex.id, created.id));
+    let releaseProcessor!: () => void;
+    const processorRelease = new Promise<void>((resolve) => {
+      releaseProcessor = resolve;
+    });
+    let processorStarted!: () => void;
+    const processorStartedPromise = new Promise<void>((resolve) => {
+      processorStarted = resolve;
+    });
+    const stalePromise = generateCatdexThumbnail(
+      db,
+      created.id,
+      1,
+      async (source) => {
+        expect(source).not.toHaveProperty("tx");
+        processorStarted();
+        await processorRelease;
+        return null;
+      },
+    );
+    await processorStartedPromise;
+    await db
+      .update(catdex)
+      .set({ thumbnailAttemptCount: 2 })
+      .where(eq(catdex.id, created.id));
+    releaseProcessor();
+    await expect(stalePromise).resolves.toEqual({
+      success: false,
+      reason: "stale_attempt",
+    });
+    const [staleRow] = await db
+      .select({
+        thumbnailStatus: catdex.thumbnailStatus,
+        thumbnailAttemptCount: catdex.thumbnailAttemptCount,
+        thumbnailId: catdex.defaultCardThumbFileId,
+      })
+      .from(catdex)
+      .where(eq(catdex.id, created.id));
+    expect(staleRow).toMatchObject({
+      thumbnailStatus: "processing",
+      thumbnailAttemptCount: 2,
+      thumbnailId: null,
+    });
+
+    const invalid = Buffer.from("not an image");
+    await db
+      .update(files)
+      .set({
+        bytes: invalid,
+        byteSize: invalid.length,
+        sha256: createHash("sha256").update(invalid).digest("hex"),
+        width: null,
+        height: null,
+      })
+      .where(eq(files.id, fileId));
+    await db
+      .update(catdex)
+      .set({ thumbnailStatus: "processing", thumbnailAttemptCount: 3 })
+      .where(eq(catdex.id, created.id));
+    await expect(generateCatdexThumbnail(db, created.id, 3)).resolves.toEqual({
+      success: true,
+      generated: [],
+    });
+    const [failed] = await db
+      .select({
+        thumbnailStatus: catdex.thumbnailStatus,
+        thumbnailAttemptCount: catdex.thumbnailAttemptCount,
+      })
+      .from(catdex)
+      .where(eq(catdex.id, created.id));
+    expect(failed).toEqual({
+      thumbnailStatus: "failed",
+      thumbnailAttemptCount: 3,
+    });
   });
 
   it("uses the admin allowlist for collection focus", async () => {

@@ -1,6 +1,8 @@
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import { closeDatabase, getDb } from "@/server/db/client";
 import type { Database } from "@/server/db/pool";
+import { users } from "@/server/db/schema";
 import {
   findUserByApiKey,
   getOrCreateUser,
@@ -54,5 +56,60 @@ describe("users PostgreSQL service", () => {
     await expect(updateProfile(db, other, "Casey_User")).rejects.toMatchObject({
       code: "conflict",
     });
+  });
+
+  it("serializes concurrent first sign-ins without locking existing users", async () => {
+    const concurrentIdentity = {
+      tokenIdentifier: `https://users.test|${crypto.randomUUID()}`,
+    };
+    const profileLoader = async () => ({ username: "Concurrent_User" });
+    const [first, second] = await Promise.all([
+      getOrCreateUser(db, concurrentIdentity, profileLoader),
+      getOrCreateUser(db, concurrentIdentity, profileLoader),
+    ]);
+    expect(first._id).toBe(second._id);
+    const rows = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.tokenIdentifier, concurrentIdentity.tokenIdentifier));
+    expect(rows).toHaveLength(1);
+
+    let releaseLock!: () => void;
+    const lockRelease = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    let lockReady!: () => void;
+    const lockReadyPromise = new Promise<void>((resolve) => {
+      lockReady = resolve;
+    });
+    const tokenLockKey = `beastypage:users:ensure:${concurrentIdentity.tokenIdentifier}`;
+    const heldLock = db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${tokenLockKey}, 0))`,
+      );
+      lockReady();
+      await lockRelease;
+    });
+    await lockReadyPromise;
+    const ensured = await Promise.race([
+      getOrCreateUser(db, concurrentIdentity, async () => {
+        throw new Error("profile loader must not run for an existing user");
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("existing ensure blocked")), 200),
+      ),
+    ]);
+    expect(ensured._id).toBe(first._id);
+    releaseLock();
+    await heldLock;
+
+    const profileFailureIdentity = {
+      tokenIdentifier: `https://users.test|${crypto.randomUUID()}`,
+    };
+    await expect(
+      getOrCreateUser(db, profileFailureIdentity, async () => {
+        throw new Error("Clerk unavailable");
+      }),
+    ).resolves.toMatchObject({ username: undefined });
   });
 });
