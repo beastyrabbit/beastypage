@@ -124,7 +124,7 @@ Unless noted, created/updated timestamps are `NOT NULL DEFAULT now()`.
 | `user_search_migrations` | B | — | — | — | **not imported**; `username_search` is a generated column |
 | `cat_stream_sessions` | D + S | `user_id` | `user_id → users` (cascade) | — | — |
 | `user_variants` | D | `(user_id, tool_key, variant_id)` | `user_id → users` (cascade) | — | — |
-| `quick_share_uploads` | D | `slug` | — | — | `raw_ip`, `ip_hash`, `receipt_hash`, `rate_identity`, `owner_token_identifier` |
+| `quick_share_uploads` | D | — (collection items share one `slug`) | — | — | `raw_ip`, `ip_hash`, `receipt_hash`, `rate_identity`, `owner_token_identifier` |
 | `quick_share_parts` | Q | `(upload_id, part_number)` | `upload_id → quick_share_uploads` (cascade) | — | — |
 | `quick_share_jobs` | Q | `(upload_id, kind)` | `upload_id` (cascade) | job IDs in media URLs | `lease_id` |
 | `quick_share_usage` | W | `(identity, kind, window_start)` | — | — | `identity` |

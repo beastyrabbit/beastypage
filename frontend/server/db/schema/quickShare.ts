@@ -58,7 +58,7 @@ export const quickShareUploads = pgTable(
     ...createdUpdated(),
   },
   (t) => [
-    uniqueIndex("quick_share_uploads_slug_key").on(t.slug),
+    // Not unique: every item of a collection shares the collection's slug.
     index("quick_share_uploads_slug_active_retained_idx").on(
       t.slug,
       t.active,
