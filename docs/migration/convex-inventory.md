@@ -18,16 +18,16 @@ run `pnpm --dir frontend run migration:inventory` and commit the result.
 | crons | 5 |
 | httpRoutes | 5 |
 | scheduledCallSites | 22 |
-| useQuery | 40 |
-| useMutation | 72 |
+| useQuery | 0 |
+| useMutation | 0 |
 | useAction | 0 |
-| usePaginatedQuery | 3 |
-| clientHookFiles | 37 |
-| serverCallSites | 17 |
-| serverCallerFiles | 11 |
+| usePaginatedQuery | 0 |
+| clientHookFiles | 0 |
+| serverCallSites | 32 |
+| serverCallerFiles | 18 |
 | authHookCalls | 8 |
 | nestedStorageReferences | 71 |
-| externalCallerLines | 37 |
+| externalCallerLines | 47 |
 | deploymentReferenceLines | 66 |
 
 ## Tables
@@ -291,153 +291,53 @@ Shared validators with `v.any()`: evolutionCommandValidator.cats[].additions, ev
 
 | Hook | Function | Context | Source |
 | --- | --- | --- | --- |
-| useQuery | `api.ancestryTree.getBySlug` | client | `frontend/app/ancestry-tree/[slug]/AncestryTreeViewClient.tsx:82` |
-| usePaginatedQuery | `api.catdex.page` | client | `frontend/app/catdex/CatdexPageClient.tsx:91` |
-| useQuery | `api.seasons.list` | client | `frontend/app/catdex/CatdexPageClient.tsx:96` |
-| useQuery | `api.rarities.list` | client | `frontend/app/catdex/CatdexPageClient.tsx:97` |
-| useQuery | `api.catdex.hasPending` | client | `frontend/app/catdex/CatdexPageClient.tsx:98` |
-| useMutation | `api.catdex.generateUploadUrl` | client | `frontend/app/catdex/CatdexPageClient.tsx:99` |
-| useMutation | `api.catdex.create` | client | `frontend/app/catdex/CatdexPageClient.tsx:100` |
-| useQuery | `api.coinflipper.listScores` | client | `frontend/app/coinflip/highscores/page.tsx:13` |
-| useQuery | `api.coinflipper.leaderboard` | client | `frontend/app/coinflip/page.tsx:30` |
-| useMutation | `api.coinflipper.submitScore` | client | `frontend/app/coinflip/page.tsx:31` |
-| usePaginatedQuery | `api.collection.page` | client | `frontend/app/collection/CollectionPageClient.tsx:20` |
-| useMutation | `api.perfectCats.requestMatchup` | client | `frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx:287` |
-| useMutation | `api.perfectCats.registerCats` | client | `frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx:288` |
-| useMutation | `api.perfectCats.submitVote` | client | `frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx:289` |
-| useQuery | `api.perfectCats.leaderboard` | client | `frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx:290` |
-| useQuery | `api.users.viewer` | client | `frontend/app/profile/page.tsx:30` |
-| useMutation | `api.users.updateProfile` | client | `frontend/app/profile/page.tsx:31` |
-| useMutation | `api.users.resetSavedVariants` | client | `frontend/app/profile/page.tsx:32` |
-| useMutation | `api.users.regenerateApiKey` | client | `frontend/app/profile/page.tsx:33` |
-| useQuery | `api.userVariants.listAll` | client | `frontend/app/profile/page.tsx:34` |
-| useMutation | `api.userVariants.remove` | client | `frontend/app/profile/page.tsx:38` |
-| useMutation | `api.userVariants.importBatch` | client | `frontend/app/profile/page.tsx:39` |
-| usePaginatedQuery | `api.collection.page` | client | `frontend/app/tests/collection-focus/page.tsx:16` |
-| useMutation | `api.collection.setFocus` | client | `frontend/app/tests/collection-focus/page.tsx:17` |
-| useQuery | `api.adoptionV2.getBySlug` | client | `frontend/components/adoption/AdoptionBatchClient.tsx:89` |
-| useMutation | `api.adoptionV2.createBatch` | client | `frontend/components/adoption/AdoptionGeneratorClient.tsx:77` |
-| useMutation | `api.mapper.create` | client | `frontend/components/adoption/AdoptionGeneratorClient.tsx:78` |
-| useMutation | `api.adoptionV2.updateBatchMeta` | client | `frontend/components/adoption/AdoptionGeneratorClient.tsx:79` |
-| useMutation | `api.ancestryTree.save` | client | `frontend/components/ancestry-tree/AncestryTreeClient.tsx:236` |
-| useMutation | `api.ancestryTree.saveAsNew` | client | `frontend/components/ancestry-tree/AncestryTreeClient.tsx:237` |
-| useQuery | `api.mapper.listHistory` | client | `frontend/components/ancestry-tree/FoundingCoupleSelector.tsx:105` |
-| useQuery | `api.ancestryTree.checkSlug` | client | `frontend/components/ancestry-tree/SaveTreeDialog.tsx:110` |
-| useMutation | `api.users.getOrCreateUser` | client | `frontend/components/auth/UserAuthButton.tsx:17` |
-| useQuery | `api.users.viewer` | client | `frontend/components/auth/UserAuthButton.tsx:18` |
-| useQuery | `api.mapper.getBySlug` | client | `frontend/components/color-palette/ColorPaletteContent.tsx:162` |
-| useQuery | `api.paletteGeneratorSettings.get` | client | `frontend/components/color-palette/ColorPaletteContent.tsx:168` |
-| useQuery | `api.paletteGeneratorSettings.getImageUrl` | client | `frontend/components/color-palette/ColorPaletteContent.tsx:175` |
-| useMutation | `api.discord.issueChallenge` | client | `frontend/components/common/DiscordInviteButton.tsx:197` |
-| useMutation | `api.discord.redeemChallenge` | client | `frontend/components/common/DiscordInviteButton.tsx:198` |
-| useQuery | `api.userVariants.list` | client | `frontend/components/dash/DashClient.tsx:32` |
-| useMutation | `api.userVariants.upsert` | client | `frontend/components/dash/DashClient.tsx:36` |
-| useQuery | `api.adoptionV2.getBySlug` | client | `frontend/components/evolution/EvolutionBatchClient.tsx:85` |
-| useMutation | `api.adoptionV2.createBatch` | client | `frontend/components/evolution/EvolutionGeneratorClient.tsx:157` |
-| useMutation | `api.mapper.create` | client | `frontend/components/evolution/EvolutionGeneratorClient.tsx:158` |
-| useMutation | `api.adoptionV2.updateBatchMeta` | client | `frontend/components/evolution/EvolutionGeneratorClient.tsx:159` |
-| useMutation | `api.mapper.updateMeta` | client | `frontend/components/evolution/EvolutionGeneratorClient.tsx:160` |
-| useQuery | `api.mapper.getBySlug` | client | `frontend/components/evolution/EvolutionGeneratorClient.tsx:201` |
-| useMutation | `api.mapper.create` | client | `frontend/components/guided-builder/GuidedBuilderClient.tsx:475` |
-| useQuery | `api.mapper.getBySlug` | client | `frontend/components/guided-builder/GuidedTimelineViewer.tsx:79` |
-| useMutation | `api.mapper.updateMeta` | client | `frontend/components/guided-builder/GuidedTimelineViewer.tsx:105` |
-| useQuery | `api.mapper.listHistory` | client | `frontend/components/single-cat/HistoryClient.tsx:151` |
-| useQuery | `api.adoptionV2.listBatches` | client | `frontend/components/single-cat/HistoryClient.tsx:152` |
-| useQuery | `api.ancestryTree.list` | client | `frontend/components/single-cat/HistoryClient.tsx:153` |
-| useMutation | `api.mapper.create` | client | `frontend/components/single-cat/SingleCatPlusClient.tsx:990` |
-| useMutation | `api.mapper.updateMeta` | client | `frontend/components/single-cat/SingleCatPlusClient.tsx:991` |
-| useQuery | `api.mapper.getBySlug` | client | `frontend/components/single-cat/ViewerClient.tsx:363` |
-| useMutation | `api.catStream.markBatchCat` | client | `frontend/components/stream-control/control/BatchCullBoard.tsx:305` |
-| useMutation | `api.catStream.cullBatchCat` | client | `frontend/components/stream-control/control/BatchCullBoard.tsx:306` |
-| useMutation | `api.catStream.cancelBatchCull` | client | `frontend/components/stream-control/control/BatchCullBoard.tsx:307` |
-| useMutation | `api.catStream.setBatchHighlight` | client | `frontend/components/stream-control/control/BatchCullBoard.tsx:308` |
-| useMutation | `api.adoptionV2.createBatch` | client | `frontend/components/stream-control/control/BatchPanel.tsx:51` |
-| useMutation | `api.mapper.create` | client | `frontend/components/stream-control/control/BatchPanel.tsx:52` |
-| useMutation | `api.catStream.triggerBatch` | client | `frontend/components/stream-control/control/BatchPanel.tsx:53` |
-| useMutation | `api.catStream.attachBatchSlug` | client | `frontend/components/stream-control/control/BatchPanel.tsx:54` |
-| useQuery | `api.users.viewer` | client | `frontend/components/stream-control/control/ControlShell.tsx:131` |
-| useQuery | `api.catStream.getSession` | client | `frontend/components/stream-control/control/ControlShell.tsx:132` |
-| useMutation | `api.catStream.ensureSession` | client | `frontend/components/stream-control/control/ControlShell.tsx:137` |
-| useMutation | `api.catStream.updateSettings` | client | `frontend/components/stream-control/control/ControlShell.tsx:138` |
-| useMutation | `api.catStream.mergeSettings` | client | `frontend/components/stream-control/control/ControlShell.tsx:139` |
-| useMutation | `api.catStream.triggerSpin` | client | `frontend/components/stream-control/control/ControlShell.tsx:140` |
-| useMutation | `api.catStream.attachViewSlug` | client | `frontend/components/stream-control/control/ControlShell.tsx:141` |
-| useMutation | `api.catStream.triggerWheel` | client | `frontend/components/stream-control/control/ControlShell.tsx:142` |
-| useMutation | `api.catStream.showLobby` | client | `frontend/components/stream-control/control/ControlShell.tsx:143` |
-| useMutation | `api.catStream.showBrb` | client | `frontend/components/stream-control/control/ControlShell.tsx:144` |
-| useMutation | `api.catStream.clearOverlay` | client | `frontend/components/stream-control/control/ControlShell.tsx:145` |
-| useMutation | `api.catStream.toggleTestMode` | client | `frontend/components/stream-control/control/ControlShell.tsx:146` |
-| useMutation | `api.mapper.create` | client | `frontend/components/stream-control/control/ControlShell.tsx:147` |
-| useMutation | `api.mapper.updateMeta` | client | `frontend/components/stream-control/control/ControlShell.tsx:148` |
-| useMutation | `api.catStream.holdEvolution` | client | `frontend/components/stream-control/control/EvolutionPanel.tsx:206` |
-| useMutation | `api.catStream.releaseEvolution` | client | `frontend/components/stream-control/control/EvolutionPanel.tsx:207` |
-| useMutation | `api.catStream.revealEvolutionAt` | client | `frontend/components/stream-control/control/EvolutionPanel.tsx:208` |
-| useMutation | `api.catStream.skipEvolutionToBoard` | client | `frontend/components/stream-control/control/EvolutionPanel.tsx:209` |
-| useMutation | `api.adoptionV2.createBatch` | client | `frontend/components/stream-control/control/EvolutionPanel.tsx:372` |
-| useMutation | `api.mapper.create` | client | `frontend/components/stream-control/control/EvolutionPanel.tsx:373` |
-| useMutation | `api.catStream.triggerEvolution` | client | `frontend/components/stream-control/control/EvolutionPanel.tsx:374` |
-| useQuery | `api.mapper.getBySlug` | client | `frontend/components/stream-control/control/EvolutionPanel.tsx:393` |
-| useMutation | `api.catStream.reportBatchStage` | client | `frontend/components/stream-control/obs/scenes/batch/useBatchShow.ts:537` |
-| useQuery | `api.catStream.getSessionByApiKey` | client | `frontend/components/stream-control/obs/useObsSession.ts:49` |
-| useQuery | `api.streamSessionsV2.getForHost` | client | `frontend/components/streamer/HostClient.tsx:345` |
-| useQuery | `api.streamSessionsV2.list` | client | `frontend/components/streamer/HostClient.tsx:347` |
-| useQuery | `api.streamVotesV2.list` | client | `frontend/components/streamer/HostClient.tsx:381` |
-| useQuery | `api.streamParticipantsV2.list` | client | `frontend/components/streamer/HostClient.tsx:392` |
-| useMutation | `api.streamSessionsV2.create` | client | `frontend/components/streamer/HostClient.tsx:398` |
-| useMutation | `api.streamSessionsV2.update` | client | `frontend/components/streamer/HostClient.tsx:399` |
-| useMutation | `api.streamSessionsV2.update` | client | `frontend/components/streamer/HostClient.tsx:400` |
-| useMutation | `api.streamVotesV2.create` | client | `frontend/components/streamer/HostClient.tsx:401` |
-| useMutation | `api.streamParticipantsV2.update` | client | `frontend/components/streamer/HostClient.tsx:402` |
-| useMutation | `api.mapper.create` | client | `frontend/components/streamer/HostClient.tsx:403` |
-| useQuery | `api.streamSessionsV2.list` | client | `frontend/components/streamer/ViewerClient.tsx:164` |
-| useQuery | `api.streamSessionsV2.get` | client | `frontend/components/streamer/ViewerClient.tsx:172` |
-| useQuery | `api.streamVotesV2.list` | client | `frontend/components/streamer/ViewerClient.tsx:186` |
-| useQuery | `api.streamParticipantsV2.list` | client | `frontend/components/streamer/ViewerClient.tsx:198` |
-| useMutation | `api.streamParticipantsV2.create` | client | `frontend/components/streamer/ViewerClient.tsx:217` |
-| useMutation | `api.streamVotesV2.create` | client | `frontend/components/streamer/ViewerClient.tsx:218` |
-| useMutation | `api.mapper.create` | client | `frontend/components/visual-builder/VisualBuilderClient.tsx:429` |
-| useQuery | `api.mapper.getBySlug` | client | `frontend/components/visual-builder/VisualBuilderLoader.tsx:255` |
-| useMutation | `api.wheel.logSpin` | client | `frontend/components/wheel/ClassicWheelClient.tsx:56` |
-| useQuery | `api.wheel.stats` | client | `frontend/components/wheel/ClassicWheelClient.tsx:57` |
-| useQuery | `api.users.viewer` | client | `frontend/lib/useDefaultCreatorName.ts:11` |
-| useQuery | `api.userVariants.list` | server | `frontend/utils/variants.ts:117` |
-| useMutation | `api.userVariants.upsert` | server | `frontend/utils/variants.ts:121` |
-| useMutation | `api.userVariants.remove` | server | `frontend/utils/variants.ts:122` |
-| useMutation | `api.userVariants.rename` | server | `frontend/utils/variants.ts:123` |
-| useMutation | `api.userVariants.setActive` | server | `frontend/utils/variants.ts:124` |
-| useMutation | `api.userVariants.importBatch` | server | `frontend/utils/variants.ts:125` |
 
 ## Auth hook calls
 
-- useConvexAuth at `frontend/app/profile/page.tsx:29`
+- useConvexAuth at `frontend/app/profile/page.tsx:37`
 - useConvexAuth at `frontend/components/auth/UserAuthButton.tsx:14`
 - useConvexAuth at `frontend/components/common/VariantBar.tsx:24`
 - useConvexAuth at `frontend/components/dash/DashClient.tsx:29`
 - useConvexAuth at `frontend/components/site-header.tsx:16`
-- useConvexAuth at `frontend/components/stream-control/control/ControlShell.tsx:130`
-- useConvexAuth at `frontend/components/streamer/HostClient.tsx:280`
-- useConvexAuth at `frontend/utils/variants.ts:114`
+- useConvexAuth at `frontend/components/stream-control/control/ControlShell.tsx:144`
+- useConvexAuth at `frontend/components/streamer/HostClient.tsx:291`
+- useConvexAuth at `frontend/utils/variants.ts:121`
 
 ## Server-side calls
 
 | Method | Function | Context | Source |
 | --- | --- | --- | --- |
-| query | `api.catShares.get` | server | `frontend/app/api/cat-share/route.ts:26` |
-| mutation | `api.catShares.create` | server | `frontend/app/api/cat-share/route.ts:86` |
+| query | `api.adoptionV2.getBySlug` | server | `frontend/app/api/adoption/batch/route.ts:51` |
+| mutation | `api.adoptionV2.createBatch` | server | `frontend/app/api/adoption/batch/route.ts:88` |
+| mutation | `api.adoptionV2.updateBatchMeta` | server | `frontend/app/api/adoption/batch/route.ts:126` |
+| query | `api.adoptionV2.listBatches` | server | `frontend/app/api/adoption/batches/route.ts:48` |
+| query | `api.ancestryTree.checkSlug` | server | `frontend/app/api/ancestry/check-slug/route.ts:27` |
+| query | `api.ancestryTree.getBySlug` | server | `frontend/app/api/ancestry/tree/route.ts:51` |
+| mutation | `api.ancestryTree.remove` | server | `frontend/app/api/ancestry/tree/route.ts:101` |
+| mutation | `api.ancestryTree.update` | server | `frontend/app/api/ancestry/tree/route.ts:105` |
+| mutation | `api.ancestryTree.saveAsNew` | server | `frontend/app/api/ancestry/tree/route.ts:109` |
+| mutation | `api.ancestryTree.save` | server | `frontend/app/api/ancestry/tree/route.ts:112` |
+| query | `api.ancestryTree.list` | server | `frontend/app/api/ancestry/trees/route.ts:48` |
+| query | `api.catShares.get` | server | `frontend/app/api/cat-share/route.ts:54` |
+| mutation | `api.catShares.create` | server | `frontend/app/api/cat-share/route.ts:95` |
+| query | `api.mapper.getBySlug` | server | `frontend/app/api/cats/profile/route.ts:51` |
+| mutation | `api.mapper.create` | server | `frontend/app/api/cats/profile/route.ts:85` |
+| mutation | `api.mapper.updateMeta` | server | `frontend/app/api/cats/profile/route.ts:123` |
 | query | `api.dashSettings.get` | server | `frontend/app/api/dash-settings/route.ts:7` |
 | mutation | `api.dashSettings.save` | server | `frontend/app/api/dash-settings/route.ts:8` |
-| action | `api.paletteGeneratorSettingsActions.storeDiscordImage` | server | `frontend/app/api/discord/palette/route.ts:167` |
-| mutation | `api.mapper.create` | server | `frontend/app/api/discord/random-cat/route.ts:285` |
+| action | `api.paletteGeneratorSettingsActions.storeDiscordImage` | server | `frontend/app/api/discord/palette/route.ts:139` |
+| mutation | `api.mapper.create` | server | `frontend/app/api/discord/random-cat/route.ts:265` |
+| query | `api.paletteGeneratorSettings.getImageUrl` | server | `frontend/app/api/palette-generator-settings/image/route.ts:26` |
 | query | `api.paletteGeneratorSettings.get` | server | `frontend/app/api/palette-generator-settings/route.ts:10` |
 | mutation | `api.paletteGeneratorSettings.save` | server | `frontend/app/api/palette-generator-settings/route.ts:12` |
 | query | `api.pixelatorSettings.get` | server | `frontend/app/api/pixelator-settings/route.ts:9` |
 | mutation | `api.pixelatorSettings.save` | server | `frontend/app/api/pixelator-settings/route.ts:10` |
-| query | `api.mapper.getBySlug` | server | `frontend/app/api/preview/[id]/route.ts:257` |
+| query | `api.mapper.getBySlug` | server | `frontend/app/api/preview/[id]/route.ts:298` |
 | query | `api.singleCatSettings.get` | server | `frontend/app/api/single-cat-settings/route.ts:7` |
 | mutation | `api.singleCatSettings.save` | server | `frontend/app/api/single-cat-settings/route.ts:8` |
 | query | `api.dashSettings.get` | server | `frontend/app/dash/page.tsx:42` |
-| query | `api.ancestryTree.getBySlug` | server | `frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx:34` |
-| query | `api.ancestryTree.getBySlug` | server | `frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx:70` |
+| query | `api.ancestryTree.getBySlug` | server | `frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx:50` |
+| query | `api.ancestryTree.getBySlug` | server | `frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx:136` |
 | query | `api.singleCatSettings.get` | server | `frontend/app/single-cat-plus/page.tsx:85` |
 
 ## Storage identifiers outside the schema
@@ -461,24 +361,34 @@ Identifiers ending in `StorageId`. Entries outside schema-level `_storage` field
 | Service | Detail | Source |
 | --- | --- | --- |
 | frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/_lib/settings-route.ts:1` |
+| frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/adoption/batch/route.ts:1` |
+| frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/adoption/batches/route.ts:1` |
+| frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/ancestry/check-slug/route.ts:1` |
+| frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/ancestry/tree/route.ts:1` |
+| frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/ancestry/trees/route.ts:1` |
 | frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/cat-share/route.ts:1` |
+| frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/cats/profile/route.ts:1` |
 | frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/discord/palette/route.ts:1` |
 | frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/discord/random-cat/route.ts:2` |
+| frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/palette-generator-settings/image/route.ts:1` |
 | frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/api/preview/[id]/route.ts:1` |
-| Convex HTTP site URL | CONVEX_SITE_URL; | `frontend/app/catdex/CatdexPageClient.tsx:860` |
+| Convex HTTP site URL | CONVEX_SITE_URL; | `frontend/app/catdex/CatdexPageClient.tsx:863` |
 | frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/dash/page.tsx:1` |
 | frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx:1` |
 | frontend ConvexHttpClient | ConvexHttpClient } from "convex/browser"; | `frontend/app/single-cat-plus/page.tsx:1` |
-| Convex HTTP site URL | CONVEX_SITE_URL ?? process.env.NEXT_PUBLIC_CONVEX_SITE_URL; | `frontend/lib/discord-service.ts:11` |
+| Convex HTTP site URL | CONVEX_SITE_URL ?? process.env.NEXT_PUBLIC_CONVEX_SITE_URL; | `frontend/lib/discord-service.ts:29` |
 | discord-bot | const url = `${config.frontendApiUrl}/api/discord/user-config?discordUserId=${encodeURIComponent(discordUserId)}`; | `backend/discord-bot/src/utils/api-client.ts:147` |
 | discord-bot | const url = `${config.frontendApiUrl}/api/discord/user-config`; | `backend/discord-bot/src/utils/api-client.ts:161` |
 | media_service | import { bearerFromHeader, ConvexControlPlane } from "./convex.ts"; | `backend/media_service/src/app.ts:10` |
 | media_service | CONVEX_SITE_URL: z.url(), | `backend/media_service/src/config.ts:11` |
-| media_service | convexSiteUrl: string; | `backend/media_service/src/config.ts:33` |
-| media_service | convexSiteUrl: trimTrailingSlashes(parsed.CONVEX_SITE_URL), | `backend/media_service/src/config.ts:53` |
-| media_service | `${this.config.convexSiteUrl}/quick-share/internal`, | `backend/media_service/src/convex.ts:16` |
+| media_service | convexSiteUrl: string; | `backend/media_service/src/config.ts:34` |
+| media_service | convexSiteUrl: trimTrailingSlashes(parsed.CONVEX_SITE_URL), | `backend/media_service/src/config.ts:55` |
+| media_service | `${trimTrailingSlashes(parsed.CONVEX_SITE_URL)}/quick-share/internal`, | `backend/media_service/src/config.ts:58` |
 | media_service | import type { ConvexControlPlane } from "./convex.ts"; | `backend/media_service/src/processor.ts:8` |
 | media_service | convexSiteUrl: "https://control.example", | `backend/media_service/test/app.test.ts:9` |
+| media_service | controlPlaneUrl: "https://control.example/quick-share/internal", | `backend/media_service/test/app.test.ts:10` |
+| media_service | CONVEX_SITE_URL: "https://control.example/", | `backend/media_service/test/config.test.ts:5` |
+| media_service | "https://control.example/quick-share/internal", | `backend/media_service/test/config.test.ts:16` |
 | media_service | import type { ConvexControlPlane } from "../src/convex.ts"; | `backend/media_service/test/processor.test.ts:3` |
 | convex runtime | const jwtIssuerDomain = process.env.CLERK_JWT_ISSUER_DOMAIN; | `frontend/convex/auth.config.ts:3` |
 | convex runtime | process.env.CONVEX_SITE_URL ?? process.env.NEXT_PUBLIC_CONVEX_SITE_URL; | `frontend/convex/catdex.ts:289` |
@@ -554,11 +464,11 @@ Identifiers ending in `StorageId`. Entries outside schema-level `_storage` field
 | echo " - WARNING: NEXT_PUBLIC_CONVEX_URL not set (database connection may fail)" | `frontend/docker-entrypoint.sh:50` |
 | "migration:inventory": "tsx scripts/migration/convex-inventory.ts", | `frontend/package.json:24` |
 | "import:convex": "tsx scripts/migration/import-convex.ts", | `frontend/package.json:25` |
-| "convex:dev": "convex dev", | `frontend/package.json:28` |
-| "deploy": "pnpm exec convex deploy", | `frontend/package.json:29` |
-| "prepare": "pnpm exec convex codegen" | `frontend/package.json:30` |
-| "convex": "^1.45.0", | `frontend/package.json:46` |
-| "convex-test": "^0.0.54", | `frontend/package.json:88` |
+| "convex:dev": "convex dev", | `frontend/package.json:31` |
+| "deploy": "pnpm exec convex deploy", | `frontend/package.json:32` |
+| "prepare": "pnpm exec convex codegen" | `frontend/package.json:33` |
+| "convex": "^1.45.0", | `frontend/package.json:49` |
+| "convex-test": "^0.0.54", | `frontend/package.json:91` |
 | "cat-system:build": "pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run && sh frontend/scripts/write-version.sh | `package.json:12` |
 | "dev:convex": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/ | `package.json:17` |
 | "env:check:frontend": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev  | `package.json:23` |

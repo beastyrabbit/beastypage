@@ -14,6 +14,9 @@ function shouldStartJobs(
 }
 
 export async function register() {
+  // The literal NEXT_RUNTIME check lets Next drop the worker from the Edge
+  // instrumentation bundle; shouldStartJobs repeats it for tests.
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (!shouldStartJobs()) return;
   const globals = globalThis as typeof globalThis & {
     __beastypageJobWorker?: Promise<{ stop(): Promise<void> }>;

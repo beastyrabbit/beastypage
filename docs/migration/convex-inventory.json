@@ -12,16 +12,16 @@
     "crons": 5,
     "httpRoutes": 5,
     "scheduledCallSites": 22,
-    "useQuery": 40,
-    "useMutation": 72,
+    "useQuery": 0,
+    "useMutation": 0,
     "useAction": 0,
-    "usePaginatedQuery": 3,
-    "clientHookFiles": 37,
-    "serverCallSites": 17,
-    "serverCallerFiles": 11,
+    "usePaginatedQuery": 0,
+    "clientHookFiles": 0,
+    "serverCallSites": 32,
+    "serverCallerFiles": 18,
     "authHookCalls": 8,
     "nestedStorageReferences": 71,
-    "externalCallerLines": 37,
+    "externalCallerLines": 47,
     "deploymentReferenceLines": 66
   },
   "tables": [
@@ -3995,826 +3995,118 @@
       "delay": "0"
     }
   ],
-  "clientCalls": [
-    {
-      "file": "frontend/app/ancestry-tree/[slug]/AncestryTreeViewClient.tsx",
-      "line": 82,
-      "kind": "useQuery",
-      "target": "api.ancestryTree.getBySlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/catdex/CatdexPageClient.tsx",
-      "line": 91,
-      "kind": "usePaginatedQuery",
-      "target": "api.catdex.page",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/catdex/CatdexPageClient.tsx",
-      "line": 96,
-      "kind": "useQuery",
-      "target": "api.seasons.list",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/catdex/CatdexPageClient.tsx",
-      "line": 97,
-      "kind": "useQuery",
-      "target": "api.rarities.list",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/catdex/CatdexPageClient.tsx",
-      "line": 98,
-      "kind": "useQuery",
-      "target": "api.catdex.hasPending",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/catdex/CatdexPageClient.tsx",
-      "line": 99,
-      "kind": "useMutation",
-      "target": "api.catdex.generateUploadUrl",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/catdex/CatdexPageClient.tsx",
-      "line": 100,
-      "kind": "useMutation",
-      "target": "api.catdex.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/coinflip/highscores/page.tsx",
-      "line": 13,
-      "kind": "useQuery",
-      "target": "api.coinflipper.listScores",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/coinflip/page.tsx",
-      "line": 30,
-      "kind": "useQuery",
-      "target": "api.coinflipper.leaderboard",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/coinflip/page.tsx",
-      "line": 31,
-      "kind": "useMutation",
-      "target": "api.coinflipper.submitScore",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/collection/CollectionPageClient.tsx",
-      "line": 20,
-      "kind": "usePaginatedQuery",
-      "target": "api.collection.page",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx",
-      "line": 287,
-      "kind": "useMutation",
-      "target": "api.perfectCats.requestMatchup",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx",
-      "line": 288,
-      "kind": "useMutation",
-      "target": "api.perfectCats.registerCats",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx",
-      "line": 289,
-      "kind": "useMutation",
-      "target": "api.perfectCats.submitVote",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/perfect-cat-finder/PerfectCatFinderPageClient.tsx",
-      "line": 290,
-      "kind": "useQuery",
-      "target": "api.perfectCats.leaderboard",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/profile/page.tsx",
-      "line": 30,
-      "kind": "useQuery",
-      "target": "api.users.viewer",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/profile/page.tsx",
-      "line": 31,
-      "kind": "useMutation",
-      "target": "api.users.updateProfile",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/profile/page.tsx",
-      "line": 32,
-      "kind": "useMutation",
-      "target": "api.users.resetSavedVariants",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/profile/page.tsx",
-      "line": 33,
-      "kind": "useMutation",
-      "target": "api.users.regenerateApiKey",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/profile/page.tsx",
-      "line": 34,
-      "kind": "useQuery",
-      "target": "api.userVariants.listAll",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/profile/page.tsx",
-      "line": 38,
-      "kind": "useMutation",
-      "target": "api.userVariants.remove",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/profile/page.tsx",
-      "line": 39,
-      "kind": "useMutation",
-      "target": "api.userVariants.importBatch",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/tests/collection-focus/page.tsx",
-      "line": 16,
-      "kind": "usePaginatedQuery",
-      "target": "api.collection.page",
-      "context": "client"
-    },
-    {
-      "file": "frontend/app/tests/collection-focus/page.tsx",
-      "line": 17,
-      "kind": "useMutation",
-      "target": "api.collection.setFocus",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/adoption/AdoptionBatchClient.tsx",
-      "line": 89,
-      "kind": "useQuery",
-      "target": "api.adoptionV2.getBySlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/adoption/AdoptionGeneratorClient.tsx",
-      "line": 77,
-      "kind": "useMutation",
-      "target": "api.adoptionV2.createBatch",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/adoption/AdoptionGeneratorClient.tsx",
-      "line": 78,
-      "kind": "useMutation",
-      "target": "api.mapper.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/adoption/AdoptionGeneratorClient.tsx",
-      "line": 79,
-      "kind": "useMutation",
-      "target": "api.adoptionV2.updateBatchMeta",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/ancestry-tree/AncestryTreeClient.tsx",
-      "line": 236,
-      "kind": "useMutation",
-      "target": "api.ancestryTree.save",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/ancestry-tree/AncestryTreeClient.tsx",
-      "line": 237,
-      "kind": "useMutation",
-      "target": "api.ancestryTree.saveAsNew",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/ancestry-tree/FoundingCoupleSelector.tsx",
-      "line": 105,
-      "kind": "useQuery",
-      "target": "api.mapper.listHistory",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/ancestry-tree/SaveTreeDialog.tsx",
-      "line": 110,
-      "kind": "useQuery",
-      "target": "api.ancestryTree.checkSlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/auth/UserAuthButton.tsx",
-      "line": 17,
-      "kind": "useMutation",
-      "target": "api.users.getOrCreateUser",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/auth/UserAuthButton.tsx",
-      "line": 18,
-      "kind": "useQuery",
-      "target": "api.users.viewer",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/color-palette/ColorPaletteContent.tsx",
-      "line": 162,
-      "kind": "useQuery",
-      "target": "api.mapper.getBySlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/color-palette/ColorPaletteContent.tsx",
-      "line": 168,
-      "kind": "useQuery",
-      "target": "api.paletteGeneratorSettings.get",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/color-palette/ColorPaletteContent.tsx",
-      "line": 175,
-      "kind": "useQuery",
-      "target": "api.paletteGeneratorSettings.getImageUrl",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/common/DiscordInviteButton.tsx",
-      "line": 197,
-      "kind": "useMutation",
-      "target": "api.discord.issueChallenge",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/common/DiscordInviteButton.tsx",
-      "line": 198,
-      "kind": "useMutation",
-      "target": "api.discord.redeemChallenge",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/dash/DashClient.tsx",
-      "line": 32,
-      "kind": "useQuery",
-      "target": "api.userVariants.list",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/dash/DashClient.tsx",
-      "line": 36,
-      "kind": "useMutation",
-      "target": "api.userVariants.upsert",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/evolution/EvolutionBatchClient.tsx",
-      "line": 85,
-      "kind": "useQuery",
-      "target": "api.adoptionV2.getBySlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/evolution/EvolutionGeneratorClient.tsx",
-      "line": 157,
-      "kind": "useMutation",
-      "target": "api.adoptionV2.createBatch",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/evolution/EvolutionGeneratorClient.tsx",
-      "line": 158,
-      "kind": "useMutation",
-      "target": "api.mapper.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/evolution/EvolutionGeneratorClient.tsx",
-      "line": 159,
-      "kind": "useMutation",
-      "target": "api.adoptionV2.updateBatchMeta",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/evolution/EvolutionGeneratorClient.tsx",
-      "line": 160,
-      "kind": "useMutation",
-      "target": "api.mapper.updateMeta",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/evolution/EvolutionGeneratorClient.tsx",
-      "line": 201,
-      "kind": "useQuery",
-      "target": "api.mapper.getBySlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/guided-builder/GuidedBuilderClient.tsx",
-      "line": 475,
-      "kind": "useMutation",
-      "target": "api.mapper.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/guided-builder/GuidedTimelineViewer.tsx",
-      "line": 79,
-      "kind": "useQuery",
-      "target": "api.mapper.getBySlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/guided-builder/GuidedTimelineViewer.tsx",
-      "line": 105,
-      "kind": "useMutation",
-      "target": "api.mapper.updateMeta",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/single-cat/HistoryClient.tsx",
-      "line": 151,
-      "kind": "useQuery",
-      "target": "api.mapper.listHistory",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/single-cat/HistoryClient.tsx",
-      "line": 152,
-      "kind": "useQuery",
-      "target": "api.adoptionV2.listBatches",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/single-cat/HistoryClient.tsx",
-      "line": 153,
-      "kind": "useQuery",
-      "target": "api.ancestryTree.list",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/single-cat/SingleCatPlusClient.tsx",
-      "line": 990,
-      "kind": "useMutation",
-      "target": "api.mapper.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/single-cat/SingleCatPlusClient.tsx",
-      "line": 991,
-      "kind": "useMutation",
-      "target": "api.mapper.updateMeta",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/single-cat/ViewerClient.tsx",
-      "line": 363,
-      "kind": "useQuery",
-      "target": "api.mapper.getBySlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/BatchCullBoard.tsx",
-      "line": 305,
-      "kind": "useMutation",
-      "target": "api.catStream.markBatchCat",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/BatchCullBoard.tsx",
-      "line": 306,
-      "kind": "useMutation",
-      "target": "api.catStream.cullBatchCat",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/BatchCullBoard.tsx",
-      "line": 307,
-      "kind": "useMutation",
-      "target": "api.catStream.cancelBatchCull",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/BatchCullBoard.tsx",
-      "line": 308,
-      "kind": "useMutation",
-      "target": "api.catStream.setBatchHighlight",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/BatchPanel.tsx",
-      "line": 51,
-      "kind": "useMutation",
-      "target": "api.adoptionV2.createBatch",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/BatchPanel.tsx",
-      "line": 52,
-      "kind": "useMutation",
-      "target": "api.mapper.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/BatchPanel.tsx",
-      "line": 53,
-      "kind": "useMutation",
-      "target": "api.catStream.triggerBatch",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/BatchPanel.tsx",
-      "line": 54,
-      "kind": "useMutation",
-      "target": "api.catStream.attachBatchSlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 131,
-      "kind": "useQuery",
-      "target": "api.users.viewer",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 132,
-      "kind": "useQuery",
-      "target": "api.catStream.getSession",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 137,
-      "kind": "useMutation",
-      "target": "api.catStream.ensureSession",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 138,
-      "kind": "useMutation",
-      "target": "api.catStream.updateSettings",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 139,
-      "kind": "useMutation",
-      "target": "api.catStream.mergeSettings",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 140,
-      "kind": "useMutation",
-      "target": "api.catStream.triggerSpin",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 141,
-      "kind": "useMutation",
-      "target": "api.catStream.attachViewSlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 142,
-      "kind": "useMutation",
-      "target": "api.catStream.triggerWheel",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 143,
-      "kind": "useMutation",
-      "target": "api.catStream.showLobby",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 144,
-      "kind": "useMutation",
-      "target": "api.catStream.showBrb",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 145,
-      "kind": "useMutation",
-      "target": "api.catStream.clearOverlay",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 146,
-      "kind": "useMutation",
-      "target": "api.catStream.toggleTestMode",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 147,
-      "kind": "useMutation",
-      "target": "api.mapper.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 148,
-      "kind": "useMutation",
-      "target": "api.mapper.updateMeta",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
-      "line": 206,
-      "kind": "useMutation",
-      "target": "api.catStream.holdEvolution",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
-      "line": 207,
-      "kind": "useMutation",
-      "target": "api.catStream.releaseEvolution",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
-      "line": 208,
-      "kind": "useMutation",
-      "target": "api.catStream.revealEvolutionAt",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
-      "line": 209,
-      "kind": "useMutation",
-      "target": "api.catStream.skipEvolutionToBoard",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
-      "line": 372,
-      "kind": "useMutation",
-      "target": "api.adoptionV2.createBatch",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
-      "line": 373,
-      "kind": "useMutation",
-      "target": "api.mapper.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
-      "line": 374,
-      "kind": "useMutation",
-      "target": "api.catStream.triggerEvolution",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/EvolutionPanel.tsx",
-      "line": 393,
-      "kind": "useQuery",
-      "target": "api.mapper.getBySlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/obs/scenes/batch/useBatchShow.ts",
-      "line": 537,
-      "kind": "useMutation",
-      "target": "api.catStream.reportBatchStage",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/obs/useObsSession.ts",
-      "line": 49,
-      "kind": "useQuery",
-      "target": "api.catStream.getSessionByApiKey",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 345,
-      "kind": "useQuery",
-      "target": "api.streamSessionsV2.getForHost",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 347,
-      "kind": "useQuery",
-      "target": "api.streamSessionsV2.list",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 381,
-      "kind": "useQuery",
-      "target": "api.streamVotesV2.list",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 392,
-      "kind": "useQuery",
-      "target": "api.streamParticipantsV2.list",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 398,
-      "kind": "useMutation",
-      "target": "api.streamSessionsV2.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 399,
-      "kind": "useMutation",
-      "target": "api.streamSessionsV2.update",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 400,
-      "kind": "useMutation",
-      "target": "api.streamSessionsV2.update",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 401,
-      "kind": "useMutation",
-      "target": "api.streamVotesV2.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 402,
-      "kind": "useMutation",
-      "target": "api.streamParticipantsV2.update",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 403,
-      "kind": "useMutation",
-      "target": "api.mapper.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/ViewerClient.tsx",
-      "line": 164,
-      "kind": "useQuery",
-      "target": "api.streamSessionsV2.list",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/ViewerClient.tsx",
-      "line": 172,
-      "kind": "useQuery",
-      "target": "api.streamSessionsV2.get",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/ViewerClient.tsx",
-      "line": 186,
-      "kind": "useQuery",
-      "target": "api.streamVotesV2.list",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/ViewerClient.tsx",
-      "line": 198,
-      "kind": "useQuery",
-      "target": "api.streamParticipantsV2.list",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/ViewerClient.tsx",
-      "line": 217,
-      "kind": "useMutation",
-      "target": "api.streamParticipantsV2.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/ViewerClient.tsx",
-      "line": 218,
-      "kind": "useMutation",
-      "target": "api.streamVotesV2.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/visual-builder/VisualBuilderClient.tsx",
-      "line": 429,
-      "kind": "useMutation",
-      "target": "api.mapper.create",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/visual-builder/VisualBuilderLoader.tsx",
-      "line": 255,
-      "kind": "useQuery",
-      "target": "api.mapper.getBySlug",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/wheel/ClassicWheelClient.tsx",
-      "line": 56,
-      "kind": "useMutation",
-      "target": "api.wheel.logSpin",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/wheel/ClassicWheelClient.tsx",
-      "line": 57,
-      "kind": "useQuery",
-      "target": "api.wheel.stats",
-      "context": "client"
-    },
-    {
-      "file": "frontend/lib/useDefaultCreatorName.ts",
-      "line": 11,
-      "kind": "useQuery",
-      "target": "api.users.viewer",
-      "context": "client"
-    },
-    {
-      "file": "frontend/utils/variants.ts",
-      "line": 117,
-      "kind": "useQuery",
-      "target": "api.userVariants.list",
-      "context": "server"
-    },
-    {
-      "file": "frontend/utils/variants.ts",
-      "line": 121,
-      "kind": "useMutation",
-      "target": "api.userVariants.upsert",
-      "context": "server"
-    },
-    {
-      "file": "frontend/utils/variants.ts",
-      "line": 122,
-      "kind": "useMutation",
-      "target": "api.userVariants.remove",
-      "context": "server"
-    },
-    {
-      "file": "frontend/utils/variants.ts",
-      "line": 123,
-      "kind": "useMutation",
-      "target": "api.userVariants.rename",
-      "context": "server"
-    },
-    {
-      "file": "frontend/utils/variants.ts",
-      "line": 124,
-      "kind": "useMutation",
-      "target": "api.userVariants.setActive",
-      "context": "server"
-    },
-    {
-      "file": "frontend/utils/variants.ts",
-      "line": 125,
-      "kind": "useMutation",
-      "target": "api.userVariants.importBatch",
-      "context": "server"
-    }
-  ],
+  "clientCalls": [],
   "serverCalls": [
     {
+      "file": "frontend/app/api/adoption/batch/route.ts",
+      "line": 51,
+      "kind": "query",
+      "target": "api.adoptionV2.getBySlug",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/adoption/batch/route.ts",
+      "line": 88,
+      "kind": "mutation",
+      "target": "api.adoptionV2.createBatch",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/adoption/batch/route.ts",
+      "line": 126,
+      "kind": "mutation",
+      "target": "api.adoptionV2.updateBatchMeta",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/adoption/batches/route.ts",
+      "line": 48,
+      "kind": "query",
+      "target": "api.adoptionV2.listBatches",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/ancestry/check-slug/route.ts",
+      "line": 27,
+      "kind": "query",
+      "target": "api.ancestryTree.checkSlug",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/ancestry/tree/route.ts",
+      "line": 51,
+      "kind": "query",
+      "target": "api.ancestryTree.getBySlug",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/ancestry/tree/route.ts",
+      "line": 101,
+      "kind": "mutation",
+      "target": "api.ancestryTree.remove",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/ancestry/tree/route.ts",
+      "line": 105,
+      "kind": "mutation",
+      "target": "api.ancestryTree.update",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/ancestry/tree/route.ts",
+      "line": 109,
+      "kind": "mutation",
+      "target": "api.ancestryTree.saveAsNew",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/ancestry/tree/route.ts",
+      "line": 112,
+      "kind": "mutation",
+      "target": "api.ancestryTree.save",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/ancestry/trees/route.ts",
+      "line": 48,
+      "kind": "query",
+      "target": "api.ancestryTree.list",
+      "context": "server"
+    },
+    {
       "file": "frontend/app/api/cat-share/route.ts",
-      "line": 26,
+      "line": 54,
       "kind": "query",
       "target": "api.catShares.get",
       "context": "server"
     },
     {
       "file": "frontend/app/api/cat-share/route.ts",
-      "line": 86,
+      "line": 95,
       "kind": "mutation",
       "target": "api.catShares.create",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/cats/profile/route.ts",
+      "line": 51,
+      "kind": "query",
+      "target": "api.mapper.getBySlug",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/cats/profile/route.ts",
+      "line": 85,
+      "kind": "mutation",
+      "target": "api.mapper.create",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/cats/profile/route.ts",
+      "line": 123,
+      "kind": "mutation",
+      "target": "api.mapper.updateMeta",
       "context": "server"
     },
     {
@@ -4833,16 +4125,23 @@
     },
     {
       "file": "frontend/app/api/discord/palette/route.ts",
-      "line": 167,
+      "line": 139,
       "kind": "action",
       "target": "api.paletteGeneratorSettingsActions.storeDiscordImage",
       "context": "server"
     },
     {
       "file": "frontend/app/api/discord/random-cat/route.ts",
-      "line": 285,
+      "line": 265,
       "kind": "mutation",
       "target": "api.mapper.create",
+      "context": "server"
+    },
+    {
+      "file": "frontend/app/api/palette-generator-settings/image/route.ts",
+      "line": 26,
+      "kind": "query",
+      "target": "api.paletteGeneratorSettings.getImageUrl",
       "context": "server"
     },
     {
@@ -4875,7 +4174,7 @@
     },
     {
       "file": "frontend/app/api/preview/[id]/route.ts",
-      "line": 257,
+      "line": 298,
       "kind": "query",
       "target": "api.mapper.getBySlug",
       "context": "server"
@@ -4903,14 +4202,14 @@
     },
     {
       "file": "frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx",
-      "line": 34,
+      "line": 50,
       "kind": "query",
       "target": "api.ancestryTree.getBySlug",
       "context": "server"
     },
     {
       "file": "frontend/app/projects/warrior-cats/ancestry-tree/[slug]/page.tsx",
-      "line": 70,
+      "line": 136,
       "kind": "query",
       "target": "api.ancestryTree.getBySlug",
       "context": "server"
@@ -4926,7 +4225,7 @@
   "authHookCalls": [
     {
       "file": "frontend/app/profile/page.tsx",
-      "line": 29,
+      "line": 37,
       "kind": "useConvexAuth",
       "target": "",
       "context": "client"
@@ -4961,21 +4260,21 @@
     },
     {
       "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 130,
+      "line": 144,
       "kind": "useConvexAuth",
       "target": "",
       "context": "client"
     },
     {
       "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 280,
+      "line": 291,
       "kind": "useConvexAuth",
       "target": "",
       "context": "client"
     },
     {
       "file": "frontend/utils/variants.ts",
-      "line": 114,
+      "line": 121,
       "kind": "useConvexAuth",
       "target": "",
       "context": "server"
@@ -5346,7 +4645,43 @@
       "detail": "ConvexHttpClient } from \"convex/browser\";"
     },
     {
+      "file": "frontend/app/api/adoption/batch/route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/api/adoption/batches/route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/api/ancestry/check-slug/route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/api/ancestry/tree/route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/api/ancestry/trees/route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
       "file": "frontend/app/api/cat-share/route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
+      "file": "frontend/app/api/cats/profile/route.ts",
       "line": 1,
       "service": "frontend ConvexHttpClient",
       "detail": "ConvexHttpClient } from \"convex/browser\";"
@@ -5364,6 +4699,12 @@
       "detail": "ConvexHttpClient } from \"convex/browser\";"
     },
     {
+      "file": "frontend/app/api/palette-generator-settings/image/route.ts",
+      "line": 1,
+      "service": "frontend ConvexHttpClient",
+      "detail": "ConvexHttpClient } from \"convex/browser\";"
+    },
+    {
       "file": "frontend/app/api/preview/[id]/route.ts",
       "line": 1,
       "service": "frontend ConvexHttpClient",
@@ -5371,7 +4712,7 @@
     },
     {
       "file": "frontend/app/catdex/CatdexPageClient.tsx",
-      "line": 860,
+      "line": 863,
       "service": "Convex HTTP site URL",
       "detail": "CONVEX_SITE_URL;"
     },
@@ -5395,7 +4736,7 @@
     },
     {
       "file": "frontend/lib/discord-service.ts",
-      "line": 11,
+      "line": 29,
       "service": "Convex HTTP site URL",
       "detail": "CONVEX_SITE_URL ?? process.env.NEXT_PUBLIC_CONVEX_SITE_URL;"
     },
@@ -5425,21 +4766,21 @@
     },
     {
       "file": "backend/media_service/src/config.ts",
-      "line": 33,
+      "line": 34,
       "service": "media_service",
       "detail": "convexSiteUrl: string;"
     },
     {
       "file": "backend/media_service/src/config.ts",
-      "line": 53,
+      "line": 55,
       "service": "media_service",
       "detail": "convexSiteUrl: trimTrailingSlashes(parsed.CONVEX_SITE_URL),"
     },
     {
-      "file": "backend/media_service/src/convex.ts",
-      "line": 16,
+      "file": "backend/media_service/src/config.ts",
+      "line": 58,
       "service": "media_service",
-      "detail": "`${this.config.convexSiteUrl}/quick-share/internal`,"
+      "detail": "`${trimTrailingSlashes(parsed.CONVEX_SITE_URL)}/quick-share/internal`,"
     },
     {
       "file": "backend/media_service/src/processor.ts",
@@ -5452,6 +4793,24 @@
       "line": 9,
       "service": "media_service",
       "detail": "convexSiteUrl: \"https://control.example\","
+    },
+    {
+      "file": "backend/media_service/test/app.test.ts",
+      "line": 10,
+      "service": "media_service",
+      "detail": "controlPlaneUrl: \"https://control.example/quick-share/internal\","
+    },
+    {
+      "file": "backend/media_service/test/config.test.ts",
+      "line": 5,
+      "service": "media_service",
+      "detail": "CONVEX_SITE_URL: \"https://control.example/\","
+    },
+    {
+      "file": "backend/media_service/test/config.test.ts",
+      "line": 16,
+      "service": "media_service",
+      "detail": "\"https://control.example/quick-share/internal\","
     },
     {
       "file": "backend/media_service/test/processor.test.ts",
@@ -5825,27 +5184,27 @@
     },
     {
       "file": "frontend/package.json",
-      "line": 28,
+      "line": 31,
       "detail": "\"convex:dev\": \"convex dev\","
     },
     {
       "file": "frontend/package.json",
-      "line": 29,
+      "line": 32,
       "detail": "\"deploy\": \"pnpm exec convex deploy\","
     },
     {
       "file": "frontend/package.json",
-      "line": 30,
+      "line": 33,
       "detail": "\"prepare\": \"pnpm exec convex codegen\""
     },
     {
       "file": "frontend/package.json",
-      "line": 46,
+      "line": 49,
       "detail": "\"convex\": \"^1.45.0\","
     },
     {
       "file": "frontend/package.json",
-      "line": 88,
+      "line": 91,
       "detail": "\"convex-test\": \"^0.0.54\","
     },
     {

@@ -328,17 +328,15 @@ describe("cat routes on PostgreSQL", () => {
       { params: Promise.resolve({ id: "missing" }) },
     );
     expect(missingProfilePreview.status).toBe(404);
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            sheet:
-              "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        ),
-      );
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          sheet:
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
     const renderedPreview = await previewRoute.GET(
       new NextRequest(`http://localhost/api/preview/${profile.slug}`),
       { params: Promise.resolve({ id: profile.slug }) },
