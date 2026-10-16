@@ -1,13 +1,19 @@
+import { desc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 import { afterAll, beforeAll, describe, expect, inject, it, vi } from "vitest";
 import { closeDatabase, getDb } from "@/server/db/client";
 import type { Database } from "@/server/db/pool";
+import { liveEvents } from "@/server/db/schema/system";
 import { stopLiveListener } from "@/server/live/listener";
 import {
   ensureCatStreamSession,
   getCatStreamSession,
   updateCatStreamSettings,
 } from "@/server/services/catStream";
+import {
+  createStreamSession,
+  updateStreamSession,
+} from "@/server/services/stream";
 import { getOrCreateUser } from "@/server/services/users";
 
 const { getRequestIdentity } = vi.hoisted(() => ({
@@ -76,6 +82,13 @@ describe("cat stream live topic", () => {
       /"revision":(\d+)/.exec(initial)?.[1] ?? "0",
     );
     expect(initialRevision).toBeGreaterThan(0);
+    const initialEvent = await db
+      .select({ revision: liveEvents.revision })
+      .from(liveEvents)
+      .where(eq(liveEvents.topic, `cat-stream/${session.id}`))
+      .orderBy(desc(liveEvents.id))
+      .limit(1);
+    expect(initialEvent[0]?.revision).toBe(initialRevision);
 
     const wrongKey = await route.GET(
       new NextRequest(
@@ -92,7 +105,72 @@ describe("cat stream live topic", () => {
     const update = await readChunk(reader);
     const updateRevision = Number(/"revision":(\d+)/.exec(update)?.[1] ?? "0");
     expect(updateRevision).toBeGreaterThan(initialRevision);
+    const updateEvent = await db
+      .select({ revision: liveEvents.revision })
+      .from(liveEvents)
+      .where(eq(liveEvents.topic, `cat-stream/${session.id}`))
+      .orderBy(desc(liveEvents.id))
+      .limit(1);
+    expect(updateEvent[0]?.revision).toBe(updateRevision);
 
+    controller.abort();
+    await reader.cancel();
+  });
+
+  it("authorizes the stream topic with its viewer key and publishes revisions", async () => {
+    const owner = {
+      tokenIdentifier: `https://stream-live.test|${crypto.randomUUID()}`,
+    };
+    const session = await createStreamSession(
+      db,
+      {
+        viewerKey: `stream-live-viewer-${crypto.randomUUID()}`,
+        status: "live",
+        currentStep: "colour",
+        allowedOptions: ["classic"],
+      },
+      owner,
+    );
+    const controller = new AbortController();
+    const response = await route.GET(
+      new NextRequest(
+        `http://localhost/api/live/stream/${session?.id}?viewerKey=${encodeURIComponent(session?.viewer_key ?? "")}`,
+        { signal: controller.signal },
+      ),
+      {
+        params: Promise.resolve({ topic: ["stream", session?.id ?? ""] }),
+      },
+    );
+    expect(response.status).toBe(200);
+    const reader = response.body?.getReader();
+    if (!reader || !session) throw new Error("stream SSE response missing");
+    const initial = await readChunk(reader);
+    const initialRevision = Number(
+      /"revision":(\d+)/.exec(initial)?.[1] ?? "0",
+    );
+    expect(initialRevision).toBe(1);
+    const wrongKey = await route.GET(
+      new NextRequest(
+        `http://localhost/api/live/stream/${session.id}?viewerKey=wrong-viewer-key`,
+      ),
+      { params: Promise.resolve({ topic: ["stream", session.id] }) },
+    );
+    expect(wrongKey.status).toBe(403);
+    await updateStreamSession(
+      db,
+      { id: session.id, currentStep: "coat" },
+      owner,
+    );
+    const update = await readChunk(reader);
+    const updateRevision = Number(/"revision":(\d+)/.exec(update)?.[1] ?? "0");
+    expect(updateRevision).toBeGreaterThan(initialRevision);
+    const event = await db
+      .select({ revision: liveEvents.revision })
+      .from(liveEvents)
+      .where(eq(liveEvents.topic, `stream/${session.id}`))
+      .orderBy(desc(liveEvents.id))
+      .limit(1);
+    expect(event[0]?.revision).toBe(updateRevision);
     controller.abort();
     await reader.cancel();
   });
