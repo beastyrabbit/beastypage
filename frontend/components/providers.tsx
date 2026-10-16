@@ -5,8 +5,30 @@ import { shadcn } from "@clerk/ui/themes";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { DataBackend } from "@/server/backend";
+import { DataBackendProvider } from "@/lib/data/backend";
 import { PosthogProvider } from "@/components/posthog-provider";
 import convex from "@/lib/convexClient";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        const status =
+          error && typeof error === "object" && "status" in error
+            ? error.status
+            : undefined;
+        if (typeof status === "number" && status >= 400 && status < 500) {
+          return false;
+        }
+        return failureCount < 2;
+      },
+    },
+  },
+});
 
 const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 if (!clerkPublishableKey) {
@@ -15,17 +37,24 @@ if (!clerkPublishableKey) {
   );
 }
 
-export function AppProviders({ children }: Readonly<{ children: ReactNode }>) {
+export function AppProviders({
+  children,
+  backend,
+}: Readonly<{ children: ReactNode; backend: DataBackend }>) {
   return (
     <ClerkProvider
       publishableKey={clerkPublishableKey}
       appearance={{ theme: shadcn }}
     >
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <MotionConfig reducedMotion="user">
-          <PosthogProvider>{children}</PosthogProvider>
-        </MotionConfig>
-      </ConvexProviderWithClerk>
+      <QueryClientProvider client={queryClient}>
+        <DataBackendProvider backend={backend}>
+          <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+            <MotionConfig reducedMotion="user">
+              <PosthogProvider>{children}</PosthogProvider>
+            </MotionConfig>
+          </ConvexProviderWithClerk>
+        </DataBackendProvider>
+      </QueryClientProvider>
     </ClerkProvider>
   );
 }

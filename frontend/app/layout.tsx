@@ -6,6 +6,7 @@ import { AppProviders } from "@/components/providers";
 import { getRuntimeEnvScript } from "@/components/runtime-env-script";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { dataBackend } from "@/server/backend";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,6 +35,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const runtimeEnvScript = getRuntimeEnvScript();
+  const backend = dataBackend();
 
   return (
     <html lang="en" suppressHydrationWarning className="dark">
@@ -45,7 +47,7 @@ export default function RootLayout({
             {runtimeEnvScript}
           </Script>
         )}
-        <AppProviders>
+        <AppProviders backend={backend}>
           <div className="relative flex min-h-screen flex-col">
             <SiteHeader />
             <div className="flex-1">{children}</div>

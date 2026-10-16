@@ -1,5 +1,7 @@
 import "server-only";
 import { auth } from "@clerk/nextjs/server";
+import { timingSafeEqual } from "node:crypto";
+import { ServiceError } from "@/server/errors";
 
 /**
  * Who is calling. `tokenIdentifier` uses Convex's format, `<iss>|<sub>`, so
@@ -23,3 +25,46 @@ export async function getRequestIdentity(): Promise<Identity> {
   if (!userId || typeof issuer !== "string" || issuer === "") return ANONYMOUS;
   return { tokenIdentifier: tokenIdentifierFor(issuer, userId) };
 }
+
+/** Require a Clerk identity for a route or service operation. */
+export async function requireIdentity(): Promise<Identity> {
+  const identity = await getRequestIdentity();
+  if (!identity.tokenIdentifier) {
+    throw new ServiceError("forbidden", "Authentication required");
+  }
+  return identity;
+}
+
+function constantTimeEqual(left: string, right: string): boolean {
+  const leftBytes = Buffer.from(left, "utf8");
+  const rightBytes = Buffer.from(right, "utf8");
+  return (
+    leftBytes.length === rightBytes.length &&
+    timingSafeEqual(leftBytes, rightBytes)
+  );
+}
+
+export function isAdminIdentity(
+  identity: Identity,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  if (!identity.tokenIdentifier) return false;
+  const allowlist = (env.QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return allowlist.some((entry) =>
+    constantTimeEqual(identity.tokenIdentifier as string, entry),
+  );
+}
+
+export async function requireAdmin(identity?: Identity): Promise<Identity> {
+  const resolved = identity ?? (await requireIdentity());
+  if (!isAdminIdentity(resolved)) {
+    throw new ServiceError("forbidden", "Administrator access required");
+  }
+  return resolved;
+}
+
+export const isAdmin = isAdminIdentity;
+export const requireAdminIdentity = requireAdmin;
