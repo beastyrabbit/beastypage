@@ -325,6 +325,36 @@ describe("cats PostgreSQL services", () => {
         ANON,
       ),
     ).rejects.toMatchObject({ code: "invalid_input" });
+    const copied = await saveTree(
+      db,
+      {
+        slug: `copy-${Date.now()}`,
+        name: "Copy",
+        foundingMotherId: "m",
+        foundingFatherId: "f",
+        cats: [],
+        config: treeConfig,
+      },
+      ANON,
+      true,
+    );
+    expect(copied).toMatchObject({ success: true, isNew: true });
+    if (!copied.success) throw new Error("copy fixture was not created");
+    await expect(
+      saveTree(
+        db,
+        {
+          slug: copied.slug,
+          name: "Collision",
+          foundingMotherId: "m",
+          foundingFatherId: "f",
+          cats: [],
+          config: treeConfig,
+        },
+        ANON,
+        true,
+      ),
+    ).resolves.toEqual({ success: false, error: "slug_taken" });
   });
 
   it("denies preview refreshes without the exact admin token and palette writes without Discord auth", async () => {
@@ -350,6 +380,18 @@ describe("cats PostgreSQL services", () => {
         tiny: { dataUrl: "bad" },
       }),
     ).rejects.toMatchObject({ code: "invalid_input" });
+    const preview = await upsertMapperPreviews(db, {
+      id: profile.id,
+      adminToken: "preview-fixture-token",
+      tiny: {
+        dataUrl: "data:image/png;base64,aGVsbG8=",
+        filename: "tiny.png",
+      },
+    });
+    expect(preview).toMatchObject({
+      id: profile.id,
+      previews: { tiny: { name: "tiny.png" } },
+    });
     await expect(
       storeDiscordImage(db, {
         dataUrl: "bad",
@@ -360,6 +402,19 @@ describe("cats PostgreSQL services", () => {
     await expect(
       storeDiscordImage(db, { dataUrl: "bad", colors: [], serviceToken: "" }),
     ).rejects.toMatchObject({ code: "forbidden" });
+    vi.stubEnv(
+      "DISCORD_API_TOKEN",
+      "discord-fixture-token-012345678901234567890",
+    );
+    const palette = await storeDiscordImage(db, {
+      dataUrl: "data:image/png;base64,aGVsbG8=",
+      colors: [{ hex: "#ffffff", rgb: [255, 255, 255], prevalence: 1 }],
+      serviceToken: "discord-fixture-token-012345678901234567890",
+    });
+    expect(palette).toMatchObject({
+      slug: expect.any(String),
+      storageId: expect.any(String),
+    });
     vi.unstubAllEnvs();
   });
 });

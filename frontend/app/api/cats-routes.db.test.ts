@@ -108,6 +108,16 @@ describe("cat routes on PostgreSQL", () => {
     );
     expect(shareResponse.status).toBe(200);
     expect(await shareResponse.json()).toMatchObject({ slug: share.slug });
+    const invalidShare = await shareRoute.POST(
+      new NextRequest("http://localhost/api/cat-share", {
+        method: "POST",
+        body: JSON.stringify({
+          data: { v: 2, document: { schemaVersion: 1, traits: {} } },
+          slug: "bad slug",
+        }),
+      }),
+    );
+    expect(invalidShare.status).toBe(400);
   });
 
   it("returns the route error contract for missing records", async () => {
@@ -292,6 +302,21 @@ describe("cat routes on PostgreSQL", () => {
       }),
     );
     expect(denied.status).toBe(403);
+    process.env.PREVIEW_REFRESH_TOKEN = "route-preview-token";
+    const updatedPreview = await catsPreviewsRoute.POST(
+      new NextRequest("http://localhost/api/cats/previews", {
+        method: "POST",
+        body: JSON.stringify({
+          id: profile.id,
+          adminToken: "route-preview-token",
+          tiny: {
+            dataUrl: "data:image/png;base64,aGVsbG8=",
+            filename: "tiny.png",
+          },
+        }),
+      }),
+    );
+    expect(updatedPreview.status).toBe(200);
     const invalidPreview = await previewRoute.GET(
       new NextRequest("http://localhost/api/preview/x?cat=%%%"),
       { params: Promise.resolve({ id: "x" }) },
