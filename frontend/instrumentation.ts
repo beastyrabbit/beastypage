@@ -3,8 +3,6 @@ import "server-only";
 import { dataBackend } from "./server/backend";
 import { isMaintenanceMode } from "./server/maintenance";
 
-const JOB_SHUTDOWN_TIMEOUT_MS = 30_000;
-
 function shouldStartJobs(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
@@ -29,10 +27,6 @@ export async function register() {
     ({ startJobWorker }) => startJobWorker(),
   );
   globals.__beastypageJobWorker = workerPromise;
-  registerJobShutdown(workerPromise, async () => {
-    const { stopLiveListener } = await import("./server/live/listener");
-    await stopLiveListener();
-  });
   workerPromise.catch((error) => {
     console.error(
       "[jobs] worker failed to start",
@@ -40,67 +34,11 @@ export async function register() {
     );
     globals.__beastypageJobWorker = undefined;
   });
-}
-
-export function registerJobShutdown(
-  workerPromise: Promise<{ stop(): Promise<void> }>,
-  stopLive: () => Promise<void>,
-): void {
-  const globals = globalThis as typeof globalThis & {
-    __beastypageJobShutdownRegistered?: boolean;
-  };
-  if (globals.__beastypageJobShutdownRegistered) return;
-  globals.__beastypageJobShutdownRegistered = true;
-
-  let worker: { stop(): Promise<void> } | undefined;
-  const workerReady = workerPromise.then(
-    (ready) => {
-      worker = ready;
-      return ready;
-    },
-    () => undefined,
-  );
-  const shutdown = async () => {
-    // Next may exit immediately after its own signal cleanup. Calling stop()
-    // synchronously when the worker is ready flips its stopping guard first;
-    // in-flight jobs then drain on a best-effort basis and remain lease-safe.
-    let workerStop: Promise<void>;
-    if (worker) {
-      try {
-        workerStop = worker.stop();
-      } catch (error) {
-        workerStop = Promise.reject(error);
-      }
-    } else {
-      workerStop = workerReady
-        .then((ready) => ready?.stop())
-        .then(() => undefined);
-    }
-    await Promise.allSettled([
-      withTimeout(workerStop, JOB_SHUTDOWN_TIMEOUT_MS),
-      Promise.resolve().then(stopLive),
-    ]);
-  };
-  process.once("SIGTERM", () => void shutdown());
-  process.once("SIGINT", () => void shutdown());
-}
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-): Promise<T | undefined> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<undefined>((resolve) => {
-        timer = setTimeout(() => resolve(undefined), timeoutMs);
-        timer.unref?.();
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  const { registerJobShutdown } = await import("./server/jobs/shutdown");
+  registerJobShutdown(workerPromise, async () => {
+    const { stopLiveListener } = await import("./server/live/listener");
+    await stopLiveListener();
+  });
 }
 
 export { shouldStartJobs };
