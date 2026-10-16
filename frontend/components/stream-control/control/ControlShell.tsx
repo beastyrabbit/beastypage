@@ -8,13 +8,12 @@
  */
 
 import { useClerk } from "@clerk/nextjs";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import { Cat, Dna, Loader2, Palette, Play, Settings2 } from "lucide-react";
 import { MotionConfig, motion, type Variants } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
-import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import type { BatchStreamCommand } from "@/lib/adoption/streamBatch";
 import {
@@ -23,6 +22,21 @@ import {
 } from "@/lib/cat-system";
 import { syncChangedRegistryTraitsFromLegacy } from "@/lib/cat-system/document";
 import type { SlotSelections } from "@/lib/cat-v3/types";
+import { useCatCreate, useCatUpdateMeta } from "@/lib/data/cats";
+import {
+  useAttachCatStreamViewSlug,
+  useCatStreamSession,
+  useClearOverlay,
+  useEnsureCatStreamSession,
+  useMergeCatStreamSettings,
+  useShowBrb,
+  useShowLobby,
+  useToggleTestMode,
+  useTriggerCatStreamSpin,
+  useTriggerCatStreamWheel,
+  useUpdateCatStreamSettings,
+} from "@/lib/data/stream";
+import { useUserViewer } from "@/lib/data/users";
 import type { EvolutionStreamCommand } from "@/lib/evolution/streamEvolution";
 import { normalizePortableSettingsCode } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
@@ -128,24 +142,21 @@ const NON_MODE_TABS: ReadonlySet<ControlTabId> = new Set(["look", "settings"]);
 export function ControlShell() {
   const clerk = useClerk();
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
-  const viewer = useQuery(api.users.viewer);
-  const session = useQuery(
-    api.catStream.getSession,
-    isAuthenticated ? {} : "skip",
-  );
+  const viewer = useUserViewer();
+  const session = useCatStreamSession(isAuthenticated);
 
-  const ensureSession = useMutation(api.catStream.ensureSession);
-  const updateSettingsMut = useMutation(api.catStream.updateSettings);
-  const mergeSettingsMut = useMutation(api.catStream.mergeSettings);
-  const triggerSpinMut = useMutation(api.catStream.triggerSpin);
-  const attachViewSlugMut = useMutation(api.catStream.attachViewSlug);
-  const triggerWheelMut = useMutation(api.catStream.triggerWheel);
-  const showLobbyMut = useMutation(api.catStream.showLobby);
-  const showBrbMut = useMutation(api.catStream.showBrb);
-  const clearOverlayMut = useMutation(api.catStream.clearOverlay);
-  const toggleTestModeMut = useMutation(api.catStream.toggleTestMode);
-  const createMapper = useMutation(api.mapper.create);
-  const updateMapperMeta = useMutation(api.mapper.updateMeta);
+  const ensureSession = useEnsureCatStreamSession();
+  const updateSettingsMut = useUpdateCatStreamSettings();
+  const mergeSettingsMut = useMergeCatStreamSettings();
+  const triggerSpinMut = useTriggerCatStreamSpin();
+  const attachViewSlugMut = useAttachCatStreamViewSlug();
+  const triggerWheelMut = useTriggerCatStreamWheel();
+  const showLobbyMut = useShowLobby();
+  const showBrbMut = useShowBrb();
+  const clearOverlayMut = useClearOverlay();
+  const toggleTestModeMut = useToggleTestMode();
+  const createMapper = useCatCreate();
+  const updateMapperMeta = useCatUpdateMeta();
 
   const { generator, ready: generatorReady } = useCatGenerator();
 
@@ -915,7 +926,7 @@ export function ControlShell() {
     const showLive = isShowLive(session, now);
     const endShow = async () => {
       if (!window.confirm("End the show and return to the lobby?")) return;
-      await runSceneCommand("Lobby", () => showLobbyMut());
+      await runSceneCommand("Lobby", () => showLobbyMut({}));
     };
 
     return {
@@ -943,12 +954,13 @@ export function ControlShell() {
       setResultAutoClearEnabled,
       resultAutoClearSeconds,
       setResultAutoClearSeconds,
-      runLobbyScene: () => void runSceneCommand("Lobby", () => showLobbyMut()),
-      runBrbScene: () => void runSceneCommand("BRB", () => showBrbMut()),
+      runLobbyScene: () =>
+        void runSceneCommand("Lobby", () => showLobbyMut({})),
+      runBrbScene: () => void runSceneCommand("BRB", () => showBrbMut({})),
       runTestScene: () =>
-        void runSceneCommand("Test", () => toggleTestModeMut()),
+        void runSceneCommand("Test", () => toggleTestModeMut({})),
       runClearScene: () =>
-        void runSceneCommand("Clear", () => clearOverlayMut()),
+        void runSceneCommand("Clear", () => clearOverlayMut({})),
       lobbyMode,
       setLobbyMode,
       lobbyCatCount,

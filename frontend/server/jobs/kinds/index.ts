@@ -1,6 +1,8 @@
 import "server-only";
 
 import type { AnyJobKind } from "../types";
+import catStreamAutoReleaseEvolution from "./cat-stream-auto-release-evolution";
+import catStreamFinalizeBatchCull from "./cat-stream-finalize-batch-cull";
 import catdexThumbnail from "./catdex-thumbnail";
 import catdexThumbnailBackfill from "./catdex-thumbnail-backfill";
 import catdexUploadRetention from "./catdex-upload-retention";
@@ -32,6 +34,8 @@ export const jobKinds = [
   quickShareQueueRetention,
   quickShareRedispatch,
   quickShareRetention,
+  catStreamFinalizeBatchCull,
+  catStreamAutoReleaseEvolution,
 ] as const;
 
 export const jobKindRegistry = new Map<string, AnyJobKind>(

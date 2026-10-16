@@ -1,7 +1,7 @@
 "use client";
 
 import { SignInButton } from "@clerk/nextjs";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import {
   ClipboardCopy,
   Loader2,
@@ -28,10 +28,21 @@ import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import UsersIcon from "@/components/ui/users-icon";
-import { api } from "@/convex/_generated/api";
+import type { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
 import { track } from "@/lib/analytics";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
+import { useCatCreate } from "@/lib/data/cats";
+import {
+  useCreateStreamSession,
+  useCreateStreamVote,
+  useStreamParticipants,
+  useStreamSessionForHost,
+  useStreamSessions,
+  useStreamVotes,
+  useUpdateStreamParticipant,
+  useUpdateStreamSession,
+} from "@/lib/data/stream";
 import { buildStreamerSharePayload } from "@/lib/streamer/share";
 import type { StreamerParams, StreamStep } from "@/lib/streamer/steps";
 import {
@@ -342,9 +353,9 @@ function AuthenticatedHostClient() {
     return { id: toId("stream_sessions", activeSessionId) } as const;
   }, [activeSessionId]);
 
-  const session = useQuery(api.streamSessionsV2.getForHost, sessionArgs);
+  const session = useStreamSessionForHost(sessionArgs);
 
-  const sessionList = useQuery(api.streamSessionsV2.list, {
+  const sessionList = useStreamSessions({
     status: "live",
     limit: 20,
   });
@@ -378,7 +389,7 @@ function AuthenticatedHostClient() {
     } as const;
   }, [activeSessionId, currentStepId, session]);
 
-  const rawVotes = useQuery(api.streamVotesV2.list, votesArgs);
+  const rawVotes = useStreamVotes(votesArgs);
   const votes = useMemo(() => rawVotes ?? [], [rawVotes]);
 
   const participantsArgs = useMemo(() => {
@@ -389,18 +400,15 @@ function AuthenticatedHostClient() {
     } as const;
   }, [activeSessionId, session]);
 
-  const rawParticipants = useQuery(
-    api.streamParticipantsV2.list,
-    participantsArgs,
-  );
+  const rawParticipants = useStreamParticipants(participantsArgs);
   const participants = useMemo(() => rawParticipants ?? [], [rawParticipants]);
 
-  const createSession = useMutation(api.streamSessionsV2.create);
-  const updateSession = useMutation(api.streamSessionsV2.update);
-  const completeSession = useMutation(api.streamSessionsV2.update);
-  const createVote = useMutation(api.streamVotesV2.create);
-  const updateParticipant = useMutation(api.streamParticipantsV2.update);
-  const createMapperRecord = useMutation(api.mapper.create);
+  const createSession = useCreateStreamSession();
+  const updateSession = useUpdateStreamSession();
+  const completeSession = useUpdateStreamSession();
+  const createVote = useCreateStreamVote();
+  const updateParticipant = useUpdateStreamParticipant();
+  const createMapperRecord = useCatCreate();
 
   useEffect(() => {
     (async () => {

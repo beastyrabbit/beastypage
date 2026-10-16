@@ -1,8 +1,7 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import { useMemo } from "react";
-import { api } from "@/convex/_generated/api";
+import { useCatStreamSessionByApiKey } from "@/lib/data/stream";
 import {
   DEFAULT_SINGLE_CAT_SETTINGS,
   type SingleCatSettings,
@@ -46,7 +45,7 @@ function resolveAutoClearEnabled(
  * result auto-clear configuration.
  */
 export function useObsSession(apiKey: string) {
-  const session = useQuery(api.catStream.getSessionByApiKey, { apiKey });
+  const session = useCatStreamSessionByApiKey(apiKey);
   const sessionSettingsRecord = session?.settings as
     | Record<string, unknown>
     | undefined;

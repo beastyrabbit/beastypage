@@ -1,11 +1,13 @@
 import "server-only";
 
+import { catStreamTopic, streamTopic } from "@/server/live/topics/stream";
 import { testLiveTopic } from "@/server/live/topics/test";
 import type { LiveTopicDefinition } from "@/server/live/topics/types";
 
 // Future topic families add one descriptor to this list.
 export const liveTopics: LiveTopicDefinition[] = [
-  // Add real stream, cat-stream, vote, and wheel descriptors here.
+  streamTopic,
+  catStreamTopic,
   ...(process.env.NODE_ENV === "production" ? [] : [testLiveTopic]),
 ];
 
