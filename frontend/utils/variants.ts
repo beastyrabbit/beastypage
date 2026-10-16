@@ -1,5 +1,5 @@
-import { useConvexAuth } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useBackendAuth } from "@/lib/data/auth";
 import {
   useImportUserVariants,
   useRemoveUserVariant,
@@ -118,7 +118,7 @@ export function useVariants<T>(
   options: UseVariantsOptions<T>,
 ): UseVariantsReturn<T> {
   const { storageKey, toolKey, migrate } = options;
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated } = useBackendAuth();
 
   // Convex queries/mutations — only active when toolKey is provided and authenticated
   const convexVariants = useUserVariants(

@@ -25,7 +25,7 @@ run `pnpm --dir frontend run migration:inventory` and commit the result.
 | clientHookFiles | 0 |
 | serverCallSites | 32 |
 | serverCallerFiles | 18 |
-| authHookCalls | 8 |
+| authHookCalls | 1 |
 | nestedStorageReferences | 71 |
 | externalCallerLines | 47 |
 | deploymentReferenceLines | 66 |
@@ -294,14 +294,7 @@ Shared validators with `v.any()`: evolutionCommandValidator.cats[].additions, ev
 
 ## Auth hook calls
 
-- useConvexAuth at `frontend/app/profile/page.tsx:37`
-- useConvexAuth at `frontend/components/auth/UserAuthButton.tsx:14`
-- useConvexAuth at `frontend/components/common/VariantBar.tsx:24`
-- useConvexAuth at `frontend/components/dash/DashClient.tsx:29`
-- useConvexAuth at `frontend/components/site-header.tsx:16`
-- useConvexAuth at `frontend/components/stream-control/control/ControlShell.tsx:144`
-- useConvexAuth at `frontend/components/streamer/HostClient.tsx:291`
-- useConvexAuth at `frontend/utils/variants.ts:121`
+- useConvexAuth at `frontend/lib/data/auth.tsx:18`
 
 ## Server-side calls
 
@@ -446,7 +439,7 @@ Identifiers ending in `StorageId`. Entries outside schema-level `_storage` field
 | : "${CONVEX_DEPLOYMENT:?Missing CONVEX_DEPLOYMENT from Infisical prod /ci}" | `.github/workflows/build-images.yml:222` |
 | CONVEX_DEPLOYMENT=${{ env.CONVEX_DEPLOYMENT }} | `.github/workflows/build-images.yml:260` |
 | # Ephemeral database; nothing here touches Convex or production data. | `.github/workflows/validate.yml:42` |
-| - name: Convex inventory is current | `.github/workflows/validate.yml:70` |
+| - name: Convex inventory is current | `.github/workflows/validate.yml:72` |
 | ARG CONVEX_DEPLOYMENT | `frontend/Dockerfile:18` |
 | ARG NEXT_PUBLIC_CONVEX_URL=https://placeholder.convex.cloud | `frontend/Dockerfile:21` |
 | ENV CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT} | `frontend/Dockerfile:28` |

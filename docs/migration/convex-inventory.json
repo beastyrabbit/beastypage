@@ -19,7 +19,7 @@
     "clientHookFiles": 0,
     "serverCallSites": 32,
     "serverCallerFiles": 18,
-    "authHookCalls": 8,
+    "authHookCalls": 1,
     "nestedStorageReferences": 71,
     "externalCallerLines": 47,
     "deploymentReferenceLines": 66
@@ -4224,60 +4224,11 @@
   ],
   "authHookCalls": [
     {
-      "file": "frontend/app/profile/page.tsx",
-      "line": 37,
+      "file": "frontend/lib/data/auth.tsx",
+      "line": 18,
       "kind": "useConvexAuth",
       "target": "",
       "context": "client"
-    },
-    {
-      "file": "frontend/components/auth/UserAuthButton.tsx",
-      "line": 14,
-      "kind": "useConvexAuth",
-      "target": "",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/common/VariantBar.tsx",
-      "line": 24,
-      "kind": "useConvexAuth",
-      "target": "",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/dash/DashClient.tsx",
-      "line": 29,
-      "kind": "useConvexAuth",
-      "target": "",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/site-header.tsx",
-      "line": 16,
-      "kind": "useConvexAuth",
-      "target": "",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/stream-control/control/ControlShell.tsx",
-      "line": 144,
-      "kind": "useConvexAuth",
-      "target": "",
-      "context": "client"
-    },
-    {
-      "file": "frontend/components/streamer/HostClient.tsx",
-      "line": 291,
-      "kind": "useConvexAuth",
-      "target": "",
-      "context": "client"
-    },
-    {
-      "file": "frontend/utils/variants.ts",
-      "line": 121,
-      "kind": "useConvexAuth",
-      "target": "",
-      "context": "server"
     }
   ],
   "nestedStorageReferences": [
@@ -5094,7 +5045,7 @@
     },
     {
       "file": ".github/workflows/validate.yml",
-      "line": 70,
+      "line": 72,
       "detail": "- name: Convex inventory is current"
     },
     {
