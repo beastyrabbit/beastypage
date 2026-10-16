@@ -4,6 +4,9 @@ import { api } from "@/convex/_generated/api";
 import { getServerConvexUrl } from "@/lib/convexUrl";
 import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
+import { errorResponse } from "@/server/http";
+import { parseSearchParams } from "@/server/request";
+import { encodedPreviewQuerySchema } from "@/server/services/cat-validation";
 import { findProfile } from "@/server/services/cats";
 
 function normalizeRendererBase(url: string) {
@@ -207,8 +210,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id: profileId } = await params;
-  const searchParams = request.nextUrl.searchParams;
-  const encodedCatData = searchParams.get("cat");
+  let encodedCatData: string | undefined;
+  try {
+    encodedCatData = parseSearchParams(
+      request.nextUrl.searchParams,
+      encodedPreviewQuerySchema,
+    ).cat;
+  } catch (error) {
+    return errorResponse(
+      error,
+      "Invalid query parameters",
+      "Invalid query parameters",
+    );
+  }
 
   // Mode 2: Direct cat data provided via query param
   if (encodedCatData) {

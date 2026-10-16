@@ -1,18 +1,25 @@
 import "server-only";
+
 import {
   pbkdf2Sync,
   randomBytes,
   randomUUID,
   timingSafeEqual,
 } from "node:crypto";
-import { and, desc, eq, lt, or } from "drizzle-orm";
 import type { Identity } from "../auth/identity";
 import { ancestryCats, ancestryTreeConfig } from "../db/contracts";
 import type { Database } from "../db/pool";
-import { ancestryTree } from "../db/schema";
 import { withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
-import { decodeCursor, encodeCursor } from "../pagination";
+import {
+  deleteTree,
+  findTree,
+  insertTree,
+  listTreePageRows,
+  listTrees as listTreeRows,
+  lockTree,
+  updateTree as updateTreeRow,
+} from "../repositories/ancestry";
 
 const MAX_CATS = 500;
 const MAX_TREE_BYTES = 900 * 1024;
@@ -33,12 +40,7 @@ export interface TreeSaveInput {
 }
 
 function validateTree(
-  args: {
-    slug: string;
-    name: string;
-    cats: unknown[];
-    config: unknown;
-  },
+  args: { slug: string; name: string; cats: unknown[]; config: unknown },
   strictSlug = false,
 ) {
   if (
@@ -122,8 +124,10 @@ function tokenMatches(given: string | undefined, stored: string | null) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+type TreeRow = NonNullable<Awaited<ReturnType<typeof findTree>>>;
+
 async function editError(
-  row: typeof ancestryTree.$inferSelect,
+  row: TreeRow,
   identity: Identity,
   args: { editToken?: string; password?: string },
 ) {
@@ -140,7 +144,7 @@ async function editError(
     : ("invalid_password" as const);
 }
 
-function publicTree(row: typeof ancestryTree.$inferSelect) {
+function publicTree(row: TreeRow) {
   return {
     _id: row.id,
     id: row.id,
@@ -157,15 +161,6 @@ function publicTree(row: typeof ancestryTree.$inferSelect) {
   };
 }
 
-async function findTree(db: Database, slug: string) {
-  const [row] = await db
-    .select()
-    .from(ancestryTree)
-    .where(eq(ancestryTree.slug, slug))
-    .limit(1);
-  return row ?? null;
-}
-
 export async function getBySlug(db: Database, slug: string) {
   const row = await findTree(db, slug);
   return row ? publicTree(row) : null;
@@ -176,13 +171,8 @@ export async function checkSlug(db: Database, slug: string) {
   return { exists: Boolean(row), hasPassword: Boolean(row?.passwordHash) };
 }
 
-export async function listTrees(db: Database, limit = 20) {
-  const rows = await db
-    .select()
-    .from(ancestryTree)
-    .orderBy(desc(ancestryTree.createdAt))
-    .limit(Math.max(1, Math.min(limit, 100)));
-  return rows.map((tree) => ({
+function treeListItem(tree: TreeRow) {
+  return {
     id: tree.id,
     slug: tree.slug,
     name: tree.name,
@@ -195,7 +185,12 @@ export async function listTrees(db: Database, limit = 20) {
     previewCats: tree.cats
       .slice(0, 6)
       .map((cat) => ({ id: cat.id, name: cat.name.full, params: cat.params })),
-  }));
+  };
+}
+
+export async function listTrees(db: Database, limit = 20) {
+  const rows = await listTreeRows(db, Math.max(1, Math.min(limit, 100)));
+  return rows.map(treeListItem);
 }
 
 export async function listTreesPage(
@@ -203,65 +198,31 @@ export async function listTreesPage(
   args: { limit?: number; cursor?: string | null },
 ) {
   const limit = Math.min(Math.max(args.limit ?? 20, 1), 100);
-  const cursor = decodeCursor(args.cursor);
-  const where = cursor
-    ? or(
-        lt(ancestryTree.createdAt, new Date(cursor.createdAt)),
-        and(
-          eq(ancestryTree.createdAt, new Date(cursor.createdAt)),
-          lt(ancestryTree.id, cursor.id),
-        ),
-      )
-    : undefined;
-  const rows = await db
-    .select()
-    .from(ancestryTree)
-    .where(where)
-    .orderBy(desc(ancestryTree.createdAt), desc(ancestryTree.id))
-    .limit(limit + 1);
-  const page = rows.slice(0, limit);
+  const page = await listTreePageRows(db, { limit, cursor: args.cursor });
   return {
-    results: page.map((tree) => ({
-      id: tree.id,
-      slug: tree.slug,
-      name: tree.name,
-      catCount: tree.cats.length,
-      config: tree.config,
-      creatorName: tree.creatorName,
-      hasPassword: Boolean(tree.passwordHash),
-      createdAt: tree.createdAt.getTime(),
-      updatedAt: tree.updatedAt.getTime(),
-      previewCats: tree.cats.slice(0, 6).map((cat) => ({
-        id: cat.id,
-        name: cat.name.full,
-        params: cat.params,
-      })),
-    })),
-    nextCursor: rows.length > limit ? encodeCursor(rows[limit - 1]) : null,
+    results: page.rows.slice(0, limit).map(treeListItem),
+    nextCursor: page.nextCursor,
   };
 }
 
-async function insertTree(
+async function insertNewTree(
   tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
   args: TreeSaveInput,
   identity: Identity,
 ) {
   const token = randomUUID();
-  const [row] = await tx
-    .insert(ancestryTree)
-    .values({
-      slug: args.slug,
-      name: args.name,
-      foundingMotherId: args.foundingMotherId,
-      foundingFatherId: args.foundingFatherId,
-      cats: args.cats as typeof ancestryTree.$inferInsert.cats,
-      config: args.config as typeof ancestryTree.$inferInsert.config,
-      creatorName: args.creatorName ?? null,
-      passwordHash: args.password ? hashPassword(args.password) : null,
-      editToken: token,
-      ownerTokenIdentifier: identity.tokenIdentifier,
-    })
-    .returning({ id: ancestryTree.id });
+  const row = await insertTree(tx, {
+    slug: args.slug,
+    name: args.name,
+    foundingMotherId: args.foundingMotherId,
+    foundingFatherId: args.foundingFatherId,
+    cats: args.cats as Parameters<typeof insertTree>[1]["cats"],
+    config: args.config as Parameters<typeof insertTree>[1]["config"],
+    creatorName: args.creatorName ?? null,
+    passwordHash: args.password ? hashPassword(args.password) : null,
+    editToken: token,
+    ownerTokenIdentifier: identity.tokenIdentifier,
+  });
   if (!row)
     throw new ServiceError("unavailable", "Failed to save ancestry tree");
   return { id: row.id, slug: args.slug, isNew: true, editToken: token };
@@ -276,32 +237,24 @@ export async function saveTree(
   const validated = validateTree(args);
   if (asNew) validateTree(args, true);
   return withTransaction(db, async (tx) => {
-    const [existing] = await tx
-      .select()
-      .from(ancestryTree)
-      .where(eq(ancestryTree.slug, args.slug))
-      .for("update")
-      .limit(1);
+    const existing = await lockTree(tx, args.slug);
     if (existing) {
       if (asNew) return { success: false, error: "slug_taken" } as const;
       const error = await editError(existing, identity, args);
       if (error) return { success: false, error } as const;
-      await tx
-        .update(ancestryTree)
-        .set({
-          name: args.name,
-          foundingMotherId: args.foundingMotherId,
-          foundingFatherId: args.foundingFatherId,
-          cats: validated.cats,
-          config: validated.config,
-          creatorName: args.creatorName ?? existing.creatorName,
-          passwordHash:
-            args.password && !existing.passwordHash
-              ? hashPassword(args.password)
-              : existing.passwordHash,
-          updatedAt: new Date(),
-        })
-        .where(eq(ancestryTree.id, existing.id));
+      await updateTreeRow(tx, existing.id, {
+        name: args.name,
+        foundingMotherId: args.foundingMotherId,
+        foundingFatherId: args.foundingFatherId,
+        cats: validated.cats,
+        config: validated.config,
+        creatorName: args.creatorName ?? existing.creatorName,
+        passwordHash:
+          args.password && !existing.passwordHash
+            ? hashPassword(args.password)
+            : existing.passwordHash,
+        updatedAt: new Date(),
+      });
       return {
         success: true,
         id: existing.id,
@@ -311,7 +264,7 @@ export async function saveTree(
       } as const;
     }
     validateTree(args, true);
-    const created = await insertTree(tx, args, identity);
+    const created = await insertNewTree(tx, args, identity);
     return { success: true, ...created } as const;
   });
 }
@@ -330,12 +283,7 @@ export async function updateTree(
   identity: Identity,
 ) {
   return withTransaction(db, async (tx) => {
-    const [existing] = await tx
-      .select()
-      .from(ancestryTree)
-      .where(eq(ancestryTree.slug, args.slug))
-      .for("update")
-      .limit(1);
+    const existing = await lockTree(tx, args.slug);
     if (!existing) return { success: false, error: "not_found" } as const;
     const error = await editError(existing, identity, args);
     if (error) return { success: false, error } as const;
@@ -346,16 +294,13 @@ export async function updateTree(
       config: args.config ?? existing.config,
     };
     const validated = validateTree(next);
-    await tx
-      .update(ancestryTree)
-      .set({
-        name: next.name,
-        cats: validated.cats,
-        config: validated.config,
-        creatorName: args.creatorName ?? existing.creatorName,
-        updatedAt: new Date(),
-      })
-      .where(eq(ancestryTree.id, existing.id));
+    await updateTreeRow(tx, existing.id, {
+      name: next.name,
+      cats: validated.cats,
+      config: validated.config,
+      creatorName: args.creatorName ?? existing.creatorName,
+      updatedAt: new Date(),
+    });
     return {
       success: true,
       id: existing.id,
@@ -371,16 +316,11 @@ export async function removeTree(
   identity: Identity,
 ) {
   return withTransaction(db, async (tx) => {
-    const [existing] = await tx
-      .select()
-      .from(ancestryTree)
-      .where(eq(ancestryTree.slug, args.slug))
-      .for("update")
-      .limit(1);
+    const existing = await lockTree(tx, args.slug);
     if (!existing) return { success: false, error: "not_found" } as const;
     const error = await editError(existing, identity, args);
     if (error) return { success: false, error } as const;
-    await tx.delete(ancestryTree).where(eq(ancestryTree.id, existing.id));
+    await deleteTree(tx, existing.id);
     return { success: true } as const;
   });
 }

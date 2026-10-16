@@ -1,6 +1,6 @@
 import "server-only";
+
 import { randomInt, randomUUID, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, lt, or } from "drizzle-orm";
 import type { Identity } from "../auth/identity";
 import {
   ADOPTION_BATCH_MAX_BYTES,
@@ -10,17 +10,22 @@ import {
   jsonByteLength,
 } from "../db/contracts";
 import type { Database } from "../db/pool";
-import {
-  adoptionBatch,
-  adoptionBatchCats,
-  catImages,
-  catProfile,
-} from "../db/schema";
 import { withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
-import { decodeCursor, encodeCursor } from "../pagination";
-import { isUuid } from "../repositories/legacyLinks";
-import { findProfile } from "./cats";
+import {
+  findBatch,
+  findProfileForCat,
+  findUniqueSlug,
+  insertBatch,
+  insertBatchCats,
+  listBatchCats,
+  listBatchPageRows,
+  listBatches as listBatchRows,
+  lockBatch,
+  updateBatch,
+  updateProfileBatch,
+} from "../repositories/adoption";
+import { listImageRows } from "../repositories/cats";
 
 const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
@@ -36,7 +41,7 @@ function clean(value: unknown) {
   return result ? result.slice(0, 80) : null;
 }
 
-function tokenMatches(given: string | undefined, stored: string | null) {
+function tokenMatches(given: string | null | undefined, stored: string | null) {
   if (!given || !stored) return false;
   const a = Buffer.from(given);
   const b = Buffer.from(stored);
@@ -46,12 +51,12 @@ function tokenMatches(given: string | undefined, stored: string | null) {
 export type AdoptionCatInput = {
   label: string;
   catData: unknown;
-  profileId?: string;
-  encoded?: string;
-  shareToken?: string;
-  editToken?: string;
-  catName?: string;
-  creatorName?: string;
+  profileId?: string | null;
+  encoded?: string | null;
+  shareToken?: string | null;
+  editToken?: string | null;
+  catName?: string | null;
+  creatorName?: string | null;
 };
 
 function validateCats(cats: AdoptionCatInput[], settings: unknown) {
@@ -84,12 +89,10 @@ function validateCats(cats: AdoptionCatInput[], settings: unknown) {
   return parsedSettings?.success ? parsedSettings.data : undefined;
 }
 
-async function toClient(db: Database, row: typeof adoptionBatch.$inferSelect) {
-  const cats = await db
-    .select()
-    .from(adoptionBatchCats)
-    .where(eq(adoptionBatchCats.batchId, row.id))
-    .orderBy(adoptionBatchCats.position);
+type BatchRow = NonNullable<Awaited<ReturnType<typeof findBatch>>>;
+
+async function toClient(db: Database, row: BatchRow) {
+  const cats = await listBatchCats(db, row.id);
   return {
     id: row.id,
     slug: row.slug ?? row.id,
@@ -99,19 +102,9 @@ async function toClient(db: Database, row: typeof adoptionBatch.$inferSelect) {
     cats: await Promise.all(
       cats.map(async (cat) => {
         const profile = cat.profileId
-          ? await findProfile(db, cat.profileId)
+          ? await findProfileForCat(db, cat.profileId)
           : null;
-        const images = profile
-          ? await db
-              .select({
-                kind: catImages.kind,
-                fileId: catImages.fileId,
-                filename: catImages.filename,
-                meta: catImages.meta,
-              })
-              .from(catImages)
-              .where(eq(catImages.catProfileId, profile.id))
-          : [];
+        const images = profile ? await listImageRows(db, profile.id) : [];
         const image = (kind: string) =>
           images.find((item) => item.kind === kind);
         const make = (kind: "tiny" | "preview" | "full" | "spriteSheet") => {
@@ -149,39 +142,13 @@ async function toClient(db: Database, row: typeof adoptionBatch.$inferSelect) {
   };
 }
 
-async function findBatch(db: Database, slugOrId: string) {
-  const [bySlug] = await db
-    .select()
-    .from(adoptionBatch)
-    .where(eq(adoptionBatch.slug, slugOrId))
-    .limit(1);
-  if (bySlug) return bySlug;
-  const [legacy] = await db
-    .select()
-    .from(adoptionBatch)
-    .where(eq(adoptionBatch.legacyId, slugOrId))
-    .limit(1);
-  if (legacy) return legacy;
-  if (!isUuid(slugOrId)) return null;
-  const [byId] = await db
-    .select()
-    .from(adoptionBatch)
-    .where(eq(adoptionBatch.id, slugOrId))
-    .limit(1);
-  return byId ?? null;
-}
-
 export async function getBatch(db: Database, slugOrId: string) {
   const row = await findBatch(db, slugOrId);
   return row ? toClient(db, row) : null;
 }
 
 export async function listBatches(db: Database, limit = 50) {
-  const rows = await db
-    .select()
-    .from(adoptionBatch)
-    .orderBy(desc(adoptionBatch.createdAt))
-    .limit(Math.min(Math.max(limit, 1), 200));
+  const rows = await listBatchRows(db, Math.min(Math.max(limit, 1), 200));
   return Promise.all(rows.map((row) => toClient(db, row)));
 }
 
@@ -190,26 +157,12 @@ export async function listBatchesPage(
   args: { limit?: number; cursor?: string | null },
 ) {
   const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
-  const cursor = decodeCursor(args.cursor);
-  const where = cursor
-    ? or(
-        lt(adoptionBatch.createdAt, new Date(cursor.createdAt)),
-        and(
-          eq(adoptionBatch.createdAt, new Date(cursor.createdAt)),
-          lt(adoptionBatch.id, cursor.id),
-        ),
-      )
-    : undefined;
-  const rows = await db
-    .select()
-    .from(adoptionBatch)
-    .where(where)
-    .orderBy(desc(adoptionBatch.createdAt), desc(adoptionBatch.id))
-    .limit(limit + 1);
-  const page = rows.slice(0, limit);
+  const page = await listBatchPageRows(db, { limit, cursor: args.cursor });
   return {
-    results: await Promise.all(page.map((row) => toClient(db, row))),
-    nextCursor: rows.length > limit ? encodeCursor(rows[limit - 1]) : null,
+    results: await Promise.all(
+      page.rows.slice(0, limit).map((row) => toClient(db, row)),
+    ),
+    nextCursor: page.nextCursor,
   };
 }
 
@@ -228,12 +181,7 @@ export async function createBatch(
     let batchSlug = "";
     for (let attempt = 0; attempt < 6; attempt++) {
       const candidate = slug();
-      const [existing] = await tx
-        .select({ id: adoptionBatch.id })
-        .from(adoptionBatch)
-        .where(eq(adoptionBatch.slug, candidate))
-        .limit(1);
-      if (!existing) {
+      if (!(await findUniqueSlug(tx, candidate))) {
         batchSlug = candidate;
         break;
       }
@@ -245,13 +193,15 @@ export async function createBatch(
       );
     const now = new Date();
     const batchEditToken = randomUUID();
-    const profileRows: Array<typeof catProfile.$inferSelect | null> = [];
+    const profileRows: Array<Awaited<
+      ReturnType<typeof findProfileForCat>
+    > | null> = [];
     for (const cat of args.cats) {
       if (!cat.profileId) {
         profileRows.push(null);
         continue;
       }
-      const profile = await findProfile(db, cat.profileId);
+      const profile = await findProfileForCat(tx, cat.profileId);
       if (!profile) throw new ServiceError("not_found", "Profile not found");
       if (
         !(
@@ -266,27 +216,27 @@ export async function createBatch(
         );
       profileRows.push(profile);
     }
-    const [batch] = await tx
-      .insert(adoptionBatch)
-      .values({
-        slug: batchSlug,
-        editToken: batchEditToken,
-        ownerTokenIdentifier: identity.tokenIdentifier,
-        title: clean(args.title),
-        creatorName: clean(args.creatorName),
-        settings,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning({ id: adoptionBatch.id });
+    const batch = await insertBatch(tx, {
+      slug: batchSlug,
+      editToken: batchEditToken,
+      ownerTokenIdentifier: identity.tokenIdentifier,
+      title: clean(args.title),
+      creatorName: clean(args.creatorName),
+      settings,
+      createdAt: now,
+      updatedAt: now,
+    });
     if (!batch)
       throw new ServiceError("unavailable", "Failed to create adoption batch");
-    await tx.insert(adoptionBatchCats).values(
+    await insertBatchCats(
+      tx,
       args.cats.map((cat, position) => ({
         batchId: batch.id,
         position,
         label: cat.label,
-        catData: cat.catData as typeof adoptionBatchCats.$inferInsert.catData,
+        catData: cat.catData as Parameters<
+          typeof insertBatchCats
+        >[1][number]["catData"],
         profileId: profileRows[position]?.id ?? null,
         encoded: clean(cat.encoded),
         shareToken: clean(cat.shareToken),
@@ -296,11 +246,7 @@ export async function createBatch(
       })),
     );
     for (const profile of profileRows)
-      if (profile)
-        await tx
-          .update(catProfile)
-          .set({ adoptionBatchId: batch.id, updatedAt: now })
-          .where(eq(catProfile.id, profile.id));
+      if (profile) await updateProfileBatch(tx, profile.id, batch.id, now);
     return {
       id: batch.id,
       slug: batchSlug,
@@ -324,12 +270,7 @@ export async function updateBatchMeta(
   if (!resolved)
     throw new ServiceError("not_found", "Adoption batch not found");
   return withTransaction(db, async (tx) => {
-    const [row] = await tx
-      .select()
-      .from(adoptionBatch)
-      .where(eq(adoptionBatch.id, resolved.id))
-      .for("update")
-      .limit(1);
+    const row = await lockBatch(tx, resolved.id);
     if (!row) throw new ServiceError("not_found", "Adoption batch not found");
     if (
       !(
@@ -339,19 +280,11 @@ export async function updateBatchMeta(
       !tokenMatches(args.editToken, row.editToken)
     )
       throw new ServiceError("forbidden", "Not authorized to edit this batch");
-    await tx
-      .update(adoptionBatch)
-      .set({
-        title: clean(args.title),
-        creatorName: clean(args.creatorName),
-        updatedAt: new Date(),
-      })
-      .where(eq(adoptionBatch.id, row.id));
-    const [updated] = await tx
-      .select()
-      .from(adoptionBatch)
-      .where(eq(adoptionBatch.id, row.id))
-      .limit(1);
+    const updated = await updateBatch(tx, row.id, {
+      title: clean(args.title),
+      creatorName: clean(args.creatorName),
+      updatedAt: new Date(),
+    });
     return updated ? toClient(db, updated) : null;
   });
 }

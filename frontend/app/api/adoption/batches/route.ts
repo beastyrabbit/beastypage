@@ -5,18 +5,29 @@ import { getServerConvexUrl } from "@/lib/convexUrl";
 import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
+import { parseSearchParams } from "@/server/request";
 import { listBatches, listBatchesPage } from "@/server/services/adoption";
+import { listQuerySchema } from "@/server/services/cat-validation";
 export async function GET(request: NextRequest) {
+  let p: { limit?: number; pageSize?: number; cursor?: string };
+  try {
+    p = parseSearchParams(request.nextUrl.searchParams, listQuerySchema);
+  } catch (error) {
+    return errorResponse(
+      error,
+      "Invalid query parameters",
+      "Invalid query parameters",
+    );
+  }
   if (dataBackend() === "postgres") {
     try {
-      const p = request.nextUrl.searchParams;
       const result =
-        p.has("cursor") || p.has("pageSize")
+        p.cursor || p.pageSize
           ? await listBatchesPage(getDb(), {
-              limit: Number(p.get("pageSize") ?? p.get("limit") ?? 50),
-              cursor: p.get("cursor"),
+              limit: p.pageSize ?? p.limit ?? 50,
+              cursor: p.cursor,
             })
-          : await listBatches(getDb(), Number(p.get("limit") ?? 50));
+          : await listBatches(getDb(), p.limit ?? 50);
       return NextResponse.json(result);
     } catch (error) {
       return errorResponse(
@@ -35,13 +46,14 @@ export async function GET(request: NextRequest) {
   try {
     return NextResponse.json(
       await new ConvexHttpClient(url).query(api.adoptionV2.listBatches, {
-        limit: Number(request.nextUrl.searchParams.get("limit") ?? 50),
+        limit: p.limit ?? 50,
       }),
     );
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to load adoption history" },
-      { status: 500 },
+  } catch (error) {
+    return errorResponse(
+      error,
+      "Failed to load adoption history",
+      "Failed to load adoption history",
     );
   }
 }

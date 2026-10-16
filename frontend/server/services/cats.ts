@@ -1,14 +1,27 @@
 import "server-only";
+
 import { randomInt, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, lt, or } from "drizzle-orm";
 import type { Identity } from "../auth/identity";
 import { catImageMeta, catProfileData } from "../db/contracts";
 import type { Database } from "../db/pool";
-import { catImages, catProfile } from "../db/schema";
 import { withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
-import { decodeCursor, encodeCursor } from "../pagination";
-import { isUuid } from "../repositories/legacyLinks";
+import type { CatsDb } from "../repositories/cats";
+import {
+  findImage,
+  findProfile,
+  findUniqueProfileSlug,
+  insertImage,
+  insertProfile,
+  listImageRows,
+  listPreviewRows,
+  listProfilePageRows,
+  listProfileRows,
+  lockProfile,
+  updateImage,
+  updatePreviewTimestamp,
+  updateProfile,
+} from "../repositories/cats";
 
 const SLUG_ALPHABET =
   "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -22,6 +35,10 @@ export type PreviewPayload = {
   spriteSheet: { url: string; name: string | null; meta: unknown } | null;
   updatedAt: number | null;
 };
+
+type ProfileRow = NonNullable<Awaited<ReturnType<typeof findProfile>>>;
+type ProfileInsert = Parameters<typeof insertProfile>[1];
+type ImageInsert = Parameters<typeof insertImage>[1];
 
 function randomSlug(length: number) {
   let result = "";
@@ -86,12 +103,7 @@ async function uniqueSlug(
 ) {
   for (let i = 0; i < MAX_SLUG_ATTEMPTS; i++) {
     const slug = randomSlug(CAT_SLUG_LENGTH);
-    const [row] = await tx
-      .select({ id: catProfile.id })
-      .from(catProfile)
-      .where(eq(catProfile.slug, slug))
-      .limit(1);
-    if (!row) return slug;
+    if (!(await findUniqueProfileSlug(tx, slug))) return slug;
   }
   throw new ServiceError(
     "conflict",
@@ -99,16 +111,8 @@ async function uniqueSlug(
   );
 }
 
-async function imageRefs(db: Database, profileId: string) {
-  const rows = await db
-    .select({
-      kind: catImages.kind,
-      fileId: catImages.fileId,
-      filename: catImages.filename,
-      meta: catImages.meta,
-    })
-    .from(catImages)
-    .where(eq(catImages.catProfileId, profileId));
+async function imageRefs(db: CatsDb, profileId: string) {
+  const rows = await listImageRows(db, profileId);
   const byKind = new Map(rows.map((row) => [row.kind, row]));
   const build = (kind: "tiny" | "preview" | "full" | "spriteSheet") => {
     const row = byKind.get(kind);
@@ -127,7 +131,7 @@ async function imageRefs(db: Database, profileId: string) {
   };
 }
 
-async function toClient(db: Database, row: typeof catProfile.$inferSelect) {
+async function toClient(db: CatsDb, row: ProfileRow) {
   const refs = await imageRefs(db, row.id);
   const hasImages = Object.values(refs).some(Boolean);
   return {
@@ -148,27 +152,7 @@ async function toClient(db: Database, row: typeof catProfile.$inferSelect) {
   };
 }
 
-export async function findProfile(db: Database, slugOrId: string) {
-  const [bySlug] = await db
-    .select()
-    .from(catProfile)
-    .where(eq(catProfile.slug, slugOrId))
-    .limit(1);
-  if (bySlug) return bySlug;
-  const [byLegacy] = await db
-    .select()
-    .from(catProfile)
-    .where(eq(catProfile.legacyId, slugOrId))
-    .limit(1);
-  if (byLegacy) return byLegacy;
-  if (!isUuid(slugOrId)) return null;
-  const [byId] = await db
-    .select()
-    .from(catProfile)
-    .where(eq(catProfile.id, slugOrId))
-    .limit(1);
-  return byId ?? null;
-}
+export { findProfile };
 
 export async function getProfile(db: Database, slugOrId: string) {
   const row = await findProfile(db, slugOrId);
@@ -184,17 +168,14 @@ export async function createProfile(
   return withTransaction(db, async (tx) => {
     const slug = await uniqueSlug(tx);
     const token = editToken();
-    const [row] = await tx
-      .insert(catProfile)
-      .values({
-        slug,
-        catData,
-        catName: cleanString(args.catName),
-        creatorName: cleanString(args.creatorName),
-        editToken: token,
-        ownerTokenIdentifier: identity.tokenIdentifier,
-      } as typeof catProfile.$inferInsert)
-      .returning({ id: catProfile.id });
+    const row = await insertProfile(tx, {
+      slug,
+      catData,
+      catName: cleanString(args.catName),
+      creatorName: cleanString(args.creatorName),
+      editToken: token,
+      ownerTokenIdentifier: identity.tokenIdentifier,
+    } as ProfileInsert);
     if (!row)
       throw new ServiceError("unavailable", "Failed to create cat profile");
     return { id: row.id, shareToken: slug, slug, editToken: token };
@@ -202,7 +183,7 @@ export async function createProfile(
 }
 
 async function requireEditor(
-  row: typeof catProfile.$inferSelect,
+  row: ProfileRow,
   identity: Identity,
   supplied?: string,
 ) {
@@ -228,42 +209,29 @@ export async function updateProfileMeta(
   const resolved = await findProfile(db, args.id);
   if (!resolved) throw new ServiceError("not_found", "Profile not found");
   return withTransaction(db, async (tx) => {
-    const [row] = await tx
-      .select()
-      .from(catProfile)
-      .where(eq(catProfile.id, resolved.id))
-      .for("update")
-      .limit(1);
+    const row = await lockProfile(tx, resolved.id);
     if (!row) throw new ServiceError("not_found", "Profile not found");
     await requireEditor(row, identity, args.editToken);
     const data = {
       ...(row.catData as Record<string, unknown>),
       metaLocked: true,
     };
-    const patch: Partial<typeof catProfile.$inferInsert> = {
+    const updated = await updateProfile(tx, row.id, {
       catData: data,
       updatedAt: new Date(),
-    };
-    if (Object.hasOwn(args, "catName"))
-      patch.catName = cleanString(args.catName);
-    if (Object.hasOwn(args, "creatorName"))
-      patch.creatorName = cleanString(args.creatorName);
-    await tx.update(catProfile).set(patch).where(eq(catProfile.id, row.id));
-    const [updated] = await tx
-      .select()
-      .from(catProfile)
-      .where(eq(catProfile.id, row.id))
-      .limit(1);
-    return updated ? toClient(db, updated) : null;
+      ...(Object.hasOwn(args, "catName")
+        ? { catName: cleanString(args.catName) }
+        : {}),
+      ...(Object.hasOwn(args, "creatorName")
+        ? { creatorName: cleanString(args.creatorName) }
+        : {}),
+    });
+    return updated ? toClient(tx, updated) : null;
   });
 }
 
 export async function listHistory(db: Database, limit = 200) {
-  const rows = await db
-    .select()
-    .from(catProfile)
-    .orderBy(desc(catProfile.createdAt))
-    .limit(Math.min(Math.max(limit, 1), 500));
+  const rows = await listProfileRows(db, Math.min(Math.max(limit, 1), 500));
   return Promise.all(rows.map((row) => toClient(db, row)));
 }
 
@@ -272,26 +240,12 @@ export async function listHistoryPage(
   args: { limit?: number; cursor?: string | null },
 ) {
   const limit = Math.min(Math.max(args.limit ?? 50, 1), 200);
-  const cursor = decodeCursor(args.cursor);
-  const where = cursor
-    ? or(
-        lt(catProfile.createdAt, new Date(cursor.createdAt)),
-        and(
-          eq(catProfile.createdAt, new Date(cursor.createdAt)),
-          lt(catProfile.id, cursor.id),
-        ),
-      )
-    : undefined;
-  const rows = await db
-    .select()
-    .from(catProfile)
-    .where(where)
-    .orderBy(desc(catProfile.createdAt), desc(catProfile.id))
-    .limit(limit + 1);
-  const page = rows.slice(0, limit);
+  const page = await listProfilePageRows(db, { limit, cursor: args.cursor });
   return {
-    results: await Promise.all(page.map((row) => toClient(db, row))),
-    nextCursor: rows.length > limit ? encodeCursor(rows[limit - 1]) : null,
+    results: await Promise.all(
+      page.rows.slice(0, limit).map((row) => toClient(db, row)),
+    ),
+    nextCursor: page.nextCursor,
   };
 }
 
@@ -303,16 +257,7 @@ export async function listForPreview(
   const threshold = new Date(
     args.staleBefore ?? Date.now() - 7 * 24 * 60 * 60 * 1000,
   );
-  const rows = await db
-    .select({
-      id: catProfile.id,
-      catData: catProfile.catData,
-      previewsUpdatedAt: catProfile.previewsUpdatedAt,
-      createdAt: catProfile.createdAt,
-    })
-    .from(catProfile)
-    .orderBy(desc(catProfile.createdAt))
-    .limit(1000);
+  const rows = await listPreviewRows(db);
   return rows
     .filter(
       (row) =>
@@ -332,15 +277,7 @@ export async function listForPreview(
 export async function getPreviewRefs(db: Database, id: string) {
   const row = await findProfile(db, id);
   if (!row) return null;
-  const rows = await db
-    .select({
-      kind: catImages.kind,
-      fileId: catImages.fileId,
-      filename: catImages.filename,
-      meta: catImages.meta,
-    })
-    .from(catImages)
-    .where(eq(catImages.catProfileId, row.id));
+  const rows = await listImageRows(db, row.id);
   return Object.fromEntries(
     ["tiny", "preview", "full", "spriteSheet"].map((kind) => [
       kind,
@@ -365,12 +302,7 @@ export async function applyPreviewUpdates(
   const resolved = await findProfile(db, args.id);
   if (!resolved) throw new ServiceError("not_found", "Profile not found");
   return withTransaction(db, async (tx) => {
-    const [row] = await tx
-      .select()
-      .from(catProfile)
-      .where(eq(catProfile.id, resolved.id))
-      .for("update")
-      .limit(1);
+    const row = await lockProfile(tx, resolved.id);
     if (!row) throw new ServiceError("not_found", "Profile not found");
     for (const [kind, payload] of Object.entries(args.images) as [
       "tiny" | "preview" | "full" | "spriteSheet",
@@ -380,45 +312,28 @@ export async function applyPreviewUpdates(
       const checked = catImageMeta.safeParse(payload.meta ?? null);
       if (!checked.success)
         throw new ServiceError("invalid_input", "Invalid image metadata");
-      const [existing] = await tx
-        .select({ id: catImages.id })
-        .from(catImages)
-        .where(
-          and(eq(catImages.catProfileId, row.id), eq(catImages.kind, kind)),
-        )
-        .limit(1);
+      const existing = await findImage(tx, row.id, kind);
       if (existing) {
-        const patch: Partial<typeof catImages.$inferInsert> = {
+        await updateImage(tx, existing.id, {
           fileId: payload.fileId,
           updatedAt: new Date(),
-        };
-        if (payload.filename !== undefined) patch.filename = payload.filename;
-        if (payload.meta !== undefined) patch.meta = checked.data;
-        await tx
-          .update(catImages)
-          .set(patch)
-          .where(eq(catImages.id, existing.id));
-      } else
-        await tx.insert(catImages).values({
+          ...(payload.filename !== undefined
+            ? { filename: payload.filename }
+            : {}),
+          ...(payload.meta !== undefined ? { meta: checked.data } : {}),
+        });
+      } else {
+        await insertImage(tx, {
           catProfileId: row.id,
           kind,
           fileId: payload.fileId,
           filename: payload.filename ?? null,
           meta: checked.data,
-        });
+        } as ImageInsert);
+      }
     }
-    await tx
-      .update(catProfile)
-      .set({
-        previewsUpdatedAt: new Date(args.previewsUpdatedAt),
-        updatedAt: new Date(),
-      })
-      .where(eq(catProfile.id, row.id));
-    const [updated] = await tx
-      .select()
-      .from(catProfile)
-      .where(eq(catProfile.id, row.id))
-      .limit(1);
-    return updated ? toClient(db, updated) : null;
+    await updatePreviewTimestamp(tx, row.id, new Date(args.previewsUpdatedAt));
+    const updated = await lockProfile(tx, row.id);
+    return updated ? toClient(tx, updated) : null;
   });
 }

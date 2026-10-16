@@ -6,19 +6,17 @@ import { ANONYMOUS, getRequestIdentity } from "@/server/auth/identity";
 import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
+import { parseJsonBody, parseSearchParams } from "@/server/request";
 import {
   createBatch,
   getBatch,
   updateBatchMeta,
 } from "@/server/services/adoption";
-
-async function payload(request: NextRequest) {
-  try {
-    return (await request.json()) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
+import {
+  adoptionCreateSchema,
+  adoptionUpdateSchema,
+  slugOrIdQuerySchema,
+} from "@/server/services/cat-validation";
 
 async function requestIdentity() {
   try {
@@ -29,14 +27,12 @@ async function requestIdentity() {
 }
 
 export async function GET(request: NextRequest) {
-  const slugOrId = request.nextUrl.searchParams.get("slugOrId");
-  if (!slugOrId)
-    return NextResponse.json(
-      { error: "Missing slug", code: "invalid_input" },
-      { status: 400 },
+  try {
+    const { slugOrId } = parseSearchParams(
+      request.nextUrl.searchParams,
+      slugOrIdQuerySchema,
     );
-  if (dataBackend() === "postgres") {
-    try {
+    if (dataBackend() === "postgres") {
       const result = await getBatch(getDb(), slugOrId);
       return result
         ? NextResponse.json(result)
@@ -44,137 +40,99 @@ export async function GET(request: NextRequest) {
             { error: "Not found", code: "not_found" },
             { status: 404 },
           );
-    } catch (error) {
-      return errorResponse(
-        error,
-        "Failed to load adoption batch",
-        "Failed to load adoption batch",
-      );
     }
-  }
-  const url = getServerConvexUrl();
-  if (!url)
-    return NextResponse.json(
-      { error: "Convex URL not configured" },
-      { status: 500 },
-    );
-  try {
+    const url = getServerConvexUrl();
+    if (!url)
+      return NextResponse.json(
+        { error: "Convex URL not configured" },
+        { status: 500 },
+      );
     return NextResponse.json(
       await new ConvexHttpClient(url).query(api.adoptionV2.getBySlug, {
         slugOrId,
       }),
     );
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to load adoption batch" },
-      { status: 500 },
+  } catch (error) {
+    return errorResponse(
+      error,
+      "Failed to load adoption batch",
+      "Failed to load adoption batch",
     );
   }
 }
 
 export async function POST(request: NextRequest) {
-  const body = await payload(request);
-  if (!body || !Array.isArray(body.cats))
-    return NextResponse.json(
-      { error: "Invalid JSON body", code: "invalid_input" },
-      { status: 400 },
-    );
-  if (dataBackend() === "postgres") {
-    try {
+  try {
+    const body = await parseJsonBody(request, adoptionCreateSchema);
+    if (dataBackend() === "postgres") {
       return NextResponse.json(
         await createBatch(
           getDb(),
           {
             cats: body.cats as never,
-            title: typeof body.title === "string" ? body.title : undefined,
-            creatorName:
-              typeof body.creatorName === "string"
-                ? body.creatorName
-                : undefined,
+            title: body.title,
+            creatorName: body.creatorName,
             settings: body.settings,
           },
           await requestIdentity(),
         ),
       );
-    } catch (error) {
-      return errorResponse(
-        error,
-        "Failed to create adoption batch",
-        "Failed to create adoption batch",
-      );
     }
-  }
-  const url = getServerConvexUrl();
-  if (!url)
-    return NextResponse.json(
-      { error: "Convex URL not configured" },
-      { status: 500 },
-    );
-  try {
+    const url = getServerConvexUrl();
+    if (!url)
+      return NextResponse.json(
+        { error: "Convex URL not configured" },
+        { status: 500 },
+      );
     return NextResponse.json(
       await new ConvexHttpClient(url).mutation(
         api.adoptionV2.createBatch,
         body as never,
       ),
     );
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to create adoption batch" },
-      { status: 500 },
+  } catch (error) {
+    return errorResponse(
+      error,
+      "Failed to create adoption batch",
+      "Failed to create adoption batch",
     );
   }
 }
 
 export async function PATCH(request: NextRequest) {
-  const body = await payload(request);
-  if (!body || typeof body.id !== "string")
-    return NextResponse.json(
-      { error: "Invalid JSON body", code: "invalid_input" },
-      { status: 400 },
-    );
-  if (dataBackend() === "postgres") {
-    try {
+  try {
+    const body = await parseJsonBody(request, adoptionUpdateSchema);
+    if (dataBackend() === "postgres") {
       return NextResponse.json(
         await updateBatchMeta(
           getDb(),
           {
             id: body.id,
-            editToken:
-              typeof body.editToken === "string" ? body.editToken : undefined,
-            title: typeof body.title === "string" ? body.title : undefined,
-            creatorName:
-              typeof body.creatorName === "string"
-                ? body.creatorName
-                : undefined,
+            editToken: body.editToken,
+            title: body.title,
+            creatorName: body.creatorName,
           },
           await requestIdentity(),
         ),
       );
-    } catch (error) {
-      return errorResponse(
-        error,
-        "Failed to update adoption batch",
-        "Failed to update adoption batch",
-      );
     }
-  }
-  const url = getServerConvexUrl();
-  if (!url)
-    return NextResponse.json(
-      { error: "Convex URL not configured" },
-      { status: 500 },
-    );
-  try {
+    const url = getServerConvexUrl();
+    if (!url)
+      return NextResponse.json(
+        { error: "Convex URL not configured" },
+        { status: 500 },
+      );
     return NextResponse.json(
       await new ConvexHttpClient(url).mutation(
         api.adoptionV2.updateBatchMeta,
         body as never,
       ),
     );
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to update adoption batch" },
-      { status: 500 },
+  } catch (error) {
+    return errorResponse(
+      error,
+      "Failed to update adoption batch",
+      "Failed to update adoption batch",
     );
   }
 }
