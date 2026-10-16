@@ -22,6 +22,85 @@ export interface MigrationResult {
   after: DatabaseSchemaState;
 }
 
+export interface MigrationOptions {
+  /** Role used by the frontend. Defaults to the documented app role. */
+  appRole?: string;
+  /** Role used for imports. Defaults to the documented import role. */
+  importRole?: string;
+  log?: (line: string) => void;
+}
+
+function quoteIdentifier(identifier: string): string {
+  return `"${identifier.replaceAll('"', '""')}"`;
+}
+
+async function grantRole(
+  client: pg.PoolClient,
+  role: string,
+  options: { truncate: boolean; appTimeouts: boolean },
+  log: (line: string) => void,
+): Promise<void> {
+  const present = await client.query<{ present: boolean }>(
+    "select exists(select 1 from pg_roles where rolname = $1) as present",
+    [role],
+  );
+  if (!present.rows[0]?.present) {
+    log(`[db:migrate] role ${role} does not exist; skipping grants`);
+    return;
+  }
+
+  const target = quoteIdentifier(role);
+  const owner = quoteIdentifier(
+    (await client.query<{ role: string }>("select current_user as role"))
+      .rows[0]?.role ?? "",
+  );
+  await client.query(`grant usage on schema public to ${target}`);
+  await client.query(
+    `grant select, insert, update, delete${options.truncate ? ", truncate" : ""} on all tables in schema public to ${target}`,
+  );
+  await client.query(
+    `grant usage, select on all sequences in schema public to ${target}`,
+  );
+  await client.query(
+    `alter default privileges for role ${owner} in schema public grant select, insert, update, delete${options.truncate ? ", truncate" : ""} on tables to ${target}`,
+  );
+  await client.query(
+    `alter default privileges for role ${owner} in schema public grant usage, select on sequences to ${target}`,
+  );
+  if (options.appTimeouts) {
+    await client.query(`alter role ${target} set statement_timeout = '5s'`);
+    await client.query(`alter role ${target} set lock_timeout = '2s'`);
+    await client.query(
+      `alter role ${target} set idle_in_transaction_session_timeout = '10s'`,
+    );
+  }
+  log(
+    `[db:migrate] grants applied for ${role}${options.truncate ? " (including truncate for imports)" : ""}`,
+  );
+}
+
+/** Apply the owner-run privileges required by the app and import roles. */
+export async function applyRoleGrants(
+  client: pg.PoolClient,
+  options: MigrationOptions = {},
+): Promise<void> {
+  const log = options.log ?? ((line: string) => console.log(line));
+  await grantRole(
+    client,
+    options.appRole ?? process.env.DATABASE_APP_ROLE ?? "beastypage_app",
+    { truncate: false, appTimeouts: true },
+    log,
+  );
+  await grantRole(
+    client,
+    options.importRole ??
+      process.env.DATABASE_IMPORT_ROLE ??
+      "beastypage_import",
+    { truncate: true, appTimeouts: false },
+    log,
+  );
+}
+
 /**
  * Applies pending migrations under a session advisory lock and records the
  * schema version. Never downgrades: a database newer than this build fails.
@@ -29,6 +108,7 @@ export interface MigrationResult {
 export async function runMigrations(
   client: pg.PoolClient,
   appVersion: string,
+  options: MigrationOptions = {},
 ): Promise<MigrationResult> {
   await client.query("select pg_advisory_lock($1)", [MIGRATION_LOCK_KEY]);
   try {
@@ -74,6 +154,7 @@ export async function runMigrations(
         compatibility.ok ? "schema version row missing" : compatibility.reason,
       );
     }
+    await applyRoleGrants(client, options);
     return { before, after };
   } finally {
     await client.query("select pg_advisory_unlock($1)", [MIGRATION_LOCK_KEY]);

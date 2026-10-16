@@ -30,6 +30,7 @@ export interface ImportOptions {
   reportDir: string;
   freezeAt: Date;
   expectedIssuer: string | null;
+  issuerMode?: "expected" | "any";
   /** Empty every imported table first (staging refills with a new archive). */
   replace: boolean;
   /** Repository root that the archive and report must stay outside of. */
@@ -43,6 +44,10 @@ export interface ImportReport {
   steps: Record<string, ImportStepStats>;
   verification: Record<string, { expected: number; actual: number }>;
   fingerprints: Record<string, string>;
+  issuer: {
+    mode: "expected" | "any";
+    expectedIssuer: string | null;
+  };
   ok: boolean;
 }
 
@@ -140,6 +145,12 @@ export async function runImport(
   options: ImportOptions,
 ): Promise<ImportReport> {
   const log = options.log ?? ((line: string) => console.log(line));
+  const issuerMode =
+    options.issuerMode ??
+    (options.expectedIssuer === null ? "any" : "expected");
+  if (issuerMode === "expected" && !options.expectedIssuer) {
+    throw new Error("An expected issuer is required in expected issuer mode");
+  }
   assertOutsideRepository(options.archivePath, options.repoRoot, "The archive");
   assertOutsideRepository(
     options.reportDir,
@@ -259,6 +270,10 @@ export async function runImport(
       steps,
       verification,
       fingerprints,
+      issuer: {
+        mode: issuerMode,
+        expectedIssuer: options.expectedIssuer,
+      },
       ok,
     };
     writeReport(options.reportDir, report);
@@ -684,6 +699,7 @@ function writeReport(dir: string, report: ImportReport) {
     "",
     `- Archive: ${report.manifest.archive} (${report.manifest.archiveBytes} bytes, sha256 ${report.archiveSha256})`,
     `- Freeze: ${report.manifest.freezeAt}`,
+    `- Issuer check: ${report.issuer.mode}${report.issuer.expectedIssuer ? ` (${report.issuer.expectedIssuer})` : ""}`,
     `- Contract version: ${report.manifest.contractVersion}`,
     `- Result: ${report.ok ? "OK" : "FAILED (database counts do not match)"}`,
     "",

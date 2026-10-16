@@ -25,6 +25,10 @@ report directory on encrypted storage outside the repository.
    - the staging cluster is `beastypage-staging-postgres` in
      `beastypage-staging`, and only scrubbed data is present; staging secrets
      are at `/kubernetes/beastypage-staging/*`;
+   - the `beastypage_import` role is login-enabled only for the rehearsal or
+     cutover window through the kub-homelab Flux flow, and the approved
+     `DATABASE_IMPORT_URL` is available to the operator without putting its
+     value in this repository;
    - the staging restore drill is complete and its measured time is at most
      one hour, with the backup name and verification output attached;
    - the staging rehearsal has a maintainer sign-off;
@@ -50,21 +54,24 @@ report directory on encrypted storage outside the repository.
 2. **Rehearse the complete cutover in staging** — *data owner and maintainer,
    45–90 minutes; [APPROVAL REQUIRED]*
 
-   Use the scrubbed archive produced by the staging scrubber. Never use the raw
-   production export in staging. From `FRONTEND`, with staging's import URL
-   injected by the approved Infisical workflow, run:
+   Use the scrubbed PostgreSQL dump produced by the staging scrubber. Never use
+   the raw production export in staging. Restore the dump as the staging owner
+   through the approved staging secret, then inject staging's import URL and
+   run:
 
    ```sh
-   pnpm run db:migrate -- --status
-   pnpm run import:convex \
-     --archive /private/beastypage-staging/scrubbed.zip \
-     --report-dir /private/beastypage-staging/import-report \
-     --expected-issuer https://<clerk-development-issuer> \
-     --replace
-   pnpm run verify:import \
-     --archive /private/beastypage-staging/scrubbed.zip \
-     --import-report /private/beastypage-staging/import-report/report.json \
-     --report-dir /private/beastypage-staging/verify-report
+   : "${STAGING_OWNER_URL:?Inject the staging owner URL through the approved secret workflow}"
+   : "${DATABASE_IMPORT_URL:?Inject DATABASE_IMPORT_URL through the approved staging secret workflow}"
+   : "${STAGING_SCRUB_KEY:?Set STAGING_SCRUB_KEY in the operator environment}"
+   pg_restore --clean --if-exists --no-owner \
+     --dbname "$STAGING_OWNER_URL" /private/beastypage-staging/scrubbed.dump
+   DATABASE_MIGRATION_URL="$STAGING_OWNER_URL" pnpm run db:migrate
+   DATABASE_MIGRATION_URL="$STAGING_OWNER_URL" pnpm run db:migrate --status
+   pnpm run scrub:staging --verify \
+     --staging-issuer https://<clerk-development-issuer> \
+     --staging-password-file /private/beastypage-staging/password \
+     --report-dir /private/beastypage-staging/verify-report \
+     --i-know-this-is-staging --expected-database beastypage
    pnpm run smoke:cutover \
      --base-url https://<staging-host> \
      --fixtures /private/beastypage-staging/smoke-fixtures.json \
@@ -73,12 +80,18 @@ report directory on encrypted storage outside the repository.
      --report-dir /private/beastypage-staging/smoke-report
    ```
 
-   **Expected output:** `import` reports `complete`, `verify:import` prints
-   `OK`, and `smoke:cutover` prints `OK` with all checks passed. The fixture
+   **Expected output:** `scrub:staging --verify` and `smoke:cutover` print `OK`
+   with all checks passed. The fixture
    file contains one read path for each migrated area, a migrated `fileId`, a
    live topic and a write path; the auth file is never passed as a header
    value. Turn the staging gate off after the rehearsal and repeat a read
    smoke check.
+
+   `DATABASE_IMPORT_URL` is injected from the staging secret before
+   `scrub:staging`; its value is never placed in a command argument or report.
+   The raw temporary import and scrub that produce `scrubbed.dump` are the
+   workstation steps in [staging.md](staging.md), not a second import of the
+   scrubbed dump.
 
    **Failure action:** stay in staging maintenance, inspect the private
    reports, and apply a forward fix. Do not copy a failing database or data
@@ -111,13 +124,19 @@ report directory on encrypted storage outside the repository.
 
    ```sh
    kubectl -n webpage rollout status deployment/beastypage-frontend --timeout=10m
-   curl -sS -X POST "https://<public-host>/api/cat-share" \
-     -H 'content-type: application/json' -d '{}' -i | rg -e '^HTTP/' -e 'Retry-After' -e '"code"'
-   curl -fsS "https://<public-host>/api/health/database"
+   status="$(curl -sS -D /tmp/beastypage-maintenance.headers -o /tmp/beastypage-maintenance.json -w '%{http_code}' -X POST "https://<public-host>/api/cat-share" \
+     -H 'content-type: application/json' -d '{}')"
+   test "$status" = 503
+   test "$(jq -r .code /tmp/beastypage-maintenance.json)" = unavailable
+   rg -qi '^Retry-After: 60\r?$' /tmp/beastypage-maintenance.headers
+   health_status="$(curl -sS -o /tmp/beastypage-health.json -w '%{http_code}' "https://<public-host>/api/health/database")"
+   test "$health_status" = 503
+   test "$(jq -r .reason /tmp/beastypage-health.json)" = 'postgres backend not selected'
    ```
 
    **Expected output:** the write is HTTP 503 with `code: "unavailable"` and a
-   `Retry-After` header; the database health read remains available. The
+   `Retry-After` header. The database health route intentionally returns 503
+   while Convex is selected; check it after step 8, once PostgreSQL is active. The
    site-wide banner is visible. Existing reads are still served. This gate
    also covers `/i/api/**`, so media uploads stop.
 
@@ -180,15 +199,21 @@ report directory on encrypted storage outside the repository.
    ```sh
    ARCHIVE=/private/beastypage-cutover/snapshot_<deployment>_<ns>.zip
    REPORT=/private/beastypage-cutover/import-report
+   # DATABASE_IMPORT_URL is injected from the approved, temporarily
+   # login-enabled beastypage_import role; never paste its value in Git or a log.
+   : "${DATABASE_IMPORT_URL:?Inject DATABASE_IMPORT_URL through the approved secret workflow}"
    pnpm run import:convex \
      --archive "$ARCHIVE" \
      --report-dir "$REPORT" \
+     --expected-database beastypage \
      --freeze-at "$(cat /private/beastypage-cutover/freeze-at.txt)" \
      --expected-issuer https://<clerk-production-issuer> \
-     --replace
+     --replace --confirm-remote-replace
    pnpm run verify:import \
      --archive "$ARCHIVE" \
      --import-report "$REPORT/report.json" \
+     --expected-database beastypage \
+     --expected-issuer https://<clerk-production-issuer> \
      --report-dir /private/beastypage-cutover/verify-report
    ```
 
@@ -197,6 +222,13 @@ report directory on encrypted storage outside the repository.
    imported legacy links resolve, sampled converted rows match, and every
    referenced file's bytes hash to its stored SHA-256. Keep the archive and
    reports private with mode 0700/0600.
+
+   Before this command, the platform owner applies the normal kub-homelab Flux
+   change enabling `beastypage_import` login and injects
+   `DATABASE_IMPORT_URL` from the synchronized production secret. The role's
+   owner-applied DML, sequence and `TRUNCATE` grants are required by
+   `--replace`. After verification, disable that login again through Flux and
+   wait for reconciliation.
 
    **Failure action:** stay in maintenance. For an importer defect, apply a
    forward fix and rerun with the same archive; for database damage, restore
@@ -219,7 +251,13 @@ report directory on encrypted storage outside the repository.
 
    ```sh
    kubectl -n webpage rollout status deployment/beastypage-frontend --timeout=10m
-   kubectl -n webpage rollout status deployment/beastypage-media --timeout=10m
+   kubectl -n media rollout status deployment/beastypage-media --timeout=10m
+   curl -fsS "https://<media-host>/health"
+   : "${MEDIA_INTERNAL_TOKEN:?Inject the media internal token through the approved secret workflow}"
+   dispatch_status="$(curl -sS -o /tmp/beastypage-media-dispatch.json -w '%{http_code}' \
+     -X POST "https://<media-host>/i/api/internal/jobs/<known-fixture-job-id>" \
+     -H "Authorization: Bearer $MEDIA_INTERNAL_TOKEN")"
+   test "$dispatch_status" = 202 || test "$dispatch_status" = 204
    ```
 
    Media switches its control plane here, inside the window, because the
@@ -228,8 +266,10 @@ report directory on encrypted storage outside the repository.
    stopped by the frontend gate alone; pausing Convex in step 5 is mandatory.
 
    **Expected output:** every replica reports `DATA_BACKEND=postgres`, the
-   database readiness endpoint is HTTP 200, and the jobs worker is running
-   with `JOBS_ENABLED=1`.
+   database readiness endpoint is HTTP 200, and media health plus the dispatch
+   probe succeed. `MAINTENANCE_MODE=1` deliberately keeps the jobs worker
+   stopped even though `JOBS_ENABLED=1`; verify the worker only after the gate
+   is lifted in step 10.
 
    **Failure action:** keep maintenance enabled. Fix configuration forward or
    restore PostgreSQL from the pre-cutover backup; do not point the app back at
@@ -266,12 +306,16 @@ report directory on encrypted storage outside the repository.
 
     ```sh
     kubectl -n webpage rollout status deployment/beastypage-frontend --timeout=10m
-    curl -fsS -X POST "https://<public-host>/api/<safe-write-route>" \
-      -H 'content-type: application/json' -d '<operator-approved-body>' -i | rg '^HTTP/'
+    write_status="$(curl -sS -o /tmp/beastypage-write.json -w '%{http_code}' -X POST "https://<public-host>/api/<safe-write-route>" \
+      -H 'content-type: application/json' -d '<operator-approved-body>')"
+    case "$write_status" in 2??|4??) ;; *) echo "unexpected write status: $write_status" >&2; exit 1 ;; esac
+    curl -fsS -H "$(cat /private/beastypage-cutover/operator-auth-header.txt)" \
+      https://<public-host>/api/internal/jobs/status
     ```
 
     **Expected output:** the banner disappears, a safe PostgreSQL write returns
-    its normal success or validation response, and Convex remains paused. The
+    an explicitly accepted 2xx success or 4xx validation response, the jobs
+    status route reports a running worker with no dead rows, and Convex remains paused. The
     operator must explicitly approve this step after step 9 is green.
 
     **Failure action:** set `MAINTENANCE_MODE=1` again and keep the PostgreSQL
@@ -310,9 +354,12 @@ report directory on encrypted storage outside the repository.
   are recorded.
 - [ ] Final import used `--expected-issuer`; `verify:import` is `OK`.
 - [ ] `DATA_BACKEND=postgres` and `JOBS_ENABLED=1` are live on every frontend
-  replica, and media uses the PostgreSQL `CONTROL_PLANE_URL`.
+  replica, media health and dispatch checks pass, and media uses the
+  PostgreSQL `CONTROL_PLANE_URL`.
 - [ ] `smoke:cutover` is `OK` with the maintenance write assertion.
 - [ ] **[APPROVAL REQUIRED]** Maintainer approved lifting the gate.
+- [ ] After lifting the gate, `/api/internal/jobs/status` reports the jobs
+  worker running with no dead rows.
 - [ ] The post-cutover watch has no dead jobs, abnormal latency or error rates.
 
 ## Evidence to retain

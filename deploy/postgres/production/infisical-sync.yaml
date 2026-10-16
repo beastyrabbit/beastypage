@@ -63,5 +63,6 @@ spec:
         data:
           DATABASE_URL: "postgresql://beastypage_app:{{ .BEASTYPAGE_DB_APP_PASSWORD.Value | urlquery }}@beastypage-postgres-rw.webpage.svc:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt"
           DATABASE_MIGRATION_URL: "postgresql://{{ .BEASTYPAGE_DB_OWNER_USERNAME.Value }}:{{ .BEASTYPAGE_DB_OWNER_PASSWORD.Value | urlquery }}@beastypage-postgres-rw.webpage.svc:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt"
+          DATABASE_IMPORT_URL: "postgresql://beastypage_import:{{ .BEASTYPAGE_DB_IMPORT_PASSWORD.Value | urlquery }}@beastypage-postgres-rw.webpage.svc:5432/beastypage?sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt"
   syncOptions:
     refreshInterval: 5m

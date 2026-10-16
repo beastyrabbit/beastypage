@@ -22,6 +22,12 @@ spec:
       wal_compression: "zstd"
   managed:
     roles:
+      - name: beastypage_import
+        ensure: present
+        login: true
+        connectionLimit: 4
+        passwordSecret:
+          name: beastypage-staging-postgres-import-role
       - name: beastypage_app
         ensure: present
         login: true

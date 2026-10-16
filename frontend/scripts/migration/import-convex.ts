@@ -3,14 +3,20 @@
 // Run (from frontend/):
 //   pnpm run import:convex --archive /private/snapshot_<ns>.zip \
 //     --report-dir /private/import-report [--freeze-at 2026-10-15T18:00:00Z] \
-//     [--expected-issuer https://clerk.example.com] [--replace]
+//     --expected-database beastypage --expected-issuer https://clerk.example.com \
+//     [--replace] [--confirm-remote-replace]
 //
 // The archive and the report directory must live outside the repository:
 // both contain personal data. See docs/migration/importer.md.
 
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { readDatabaseConfig } from "../../server/db/config";
+import type pg from "pg";
+import {
+  databaseTarget,
+  isLoopbackDatabaseUrl,
+  readDatabaseConfig,
+} from "../../server/db/config";
 import { createPool } from "../../server/db/pool";
 import {
   checkCompatibility,
@@ -18,6 +24,57 @@ import {
 } from "../../server/db/schema-version";
 import { loadLocalDatabaseEnv } from "../db/env";
 import { runImport } from "./import/run";
+
+export type IssuerMode = "expected" | "any";
+
+export function issuerModeFor(
+  expectedIssuer: string | undefined,
+  allowAnyIssuer: boolean,
+  loopback: boolean,
+): { mode: IssuerMode; expectedIssuer: string | null } {
+  if (allowAnyIssuer && !loopback) {
+    throw new Error(
+      "--allow-any-issuer is allowed only for loopback databases",
+    );
+  }
+  if (allowAnyIssuer && expectedIssuer) {
+    throw new Error(
+      "Use either --expected-issuer or --allow-any-issuer, not both",
+    );
+  }
+  if (allowAnyIssuer) return { mode: "any", expectedIssuer: null };
+  if (!expectedIssuer?.trim()) {
+    throw new Error(
+      "--expected-issuer is required (use --allow-any-issuer only for loopback tests)",
+    );
+  }
+  if (expectedIssuer.includes("|"))
+    throw new Error("--expected-issuer must not contain '|'");
+  return { mode: "expected", expectedIssuer: expectedIssuer.trim() };
+}
+
+export async function assertDatabaseTarget(
+  client: pg.PoolClient,
+  url: string,
+  expectedDatabase: string | undefined,
+  label: string,
+): Promise<void> {
+  if (!expectedDatabase?.trim())
+    throw new Error("--expected-database is required");
+  const target = databaseTarget(url);
+  const current = await client.query<{ name: string }>(
+    "select current_database() as name",
+  );
+  const database = current.rows[0]?.name;
+  console.log(
+    `[${label}] target host=${target.host} database=${database ?? "unknown"}`,
+  );
+  if (!database || database !== expectedDatabase.trim()) {
+    throw new Error(
+      `Refusing database target: expected ${expectedDatabase}, current database is ${database ?? "unknown"}`,
+    );
+  }
+}
 
 /**
  * Convex names exports `snapshot_<unix ns>.zip` or, from the dashboard,
@@ -44,11 +101,20 @@ async function main(): Promise<void> {
       "report-dir": { type: "string" },
       "freeze-at": { type: "string" },
       "expected-issuer": { type: "string" },
+      "allow-any-issuer": { type: "boolean", default: false },
+      "expected-database": { type: "string" },
       replace: { type: "boolean", default: false },
+      "confirm-remote-replace": { type: "boolean", default: false },
     },
   });
-  if (!values.archive || !values["report-dir"]) {
-    throw new Error("--archive and --report-dir are required");
+  if (
+    !values.archive ||
+    !values["report-dir"] ||
+    !values["expected-database"]
+  ) {
+    throw new Error(
+      "--archive, --report-dir and --expected-database are required",
+    );
   }
   const freezeAt = values["freeze-at"]
     ? new Date(values["freeze-at"])
@@ -58,17 +124,33 @@ async function main(): Promise<void> {
       "--freeze-at is required when the archive name has no snapshot timestamp",
     );
   }
-  if (!values["expected-issuer"]) {
-    console.warn(
-      "[import] --expected-issuer not set: token identifiers are not checked against the Clerk issuer",
-    );
-  }
-
   disableNetwork();
   loadLocalDatabaseEnv();
-  const pool = createPool(readDatabaseConfig("import"));
+  const config = readDatabaseConfig("import");
+  const loopback = isLoopbackDatabaseUrl(config.url);
+  const issuer = issuerModeFor(
+    values["expected-issuer"],
+    values["allow-any-issuer"] ?? false,
+    loopback,
+  );
+  if (
+    values.replace &&
+    !loopback &&
+    !(values["confirm-remote-replace"] ?? false)
+  ) {
+    throw new Error(
+      "Refusing --replace against a non-loopback database; pass --confirm-remote-replace explicitly",
+    );
+  }
+  const pool = createPool(config);
   const client = await pool.connect();
   try {
+    await assertDatabaseTarget(
+      client,
+      config.url,
+      values["expected-database"],
+      "import",
+    );
     const compatibility = checkCompatibility(await readSchemaState(client));
     if (!compatibility.ok)
       throw new Error(`Database not ready: ${compatibility.reason}`);
@@ -76,7 +158,8 @@ async function main(): Promise<void> {
       archivePath: values.archive,
       reportDir: values["report-dir"],
       freezeAt,
-      expectedIssuer: values["expected-issuer"] ?? null,
+      expectedIssuer: issuer.expectedIssuer,
+      issuerMode: issuer.mode,
       replace: values.replace,
       repoRoot: resolve(import.meta.dirname, "../../.."),
     });

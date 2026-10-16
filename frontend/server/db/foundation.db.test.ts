@@ -49,6 +49,48 @@ describe("migration runner", () => {
     }
   });
 
+  it("applies idempotent app-role grants for DML and sequences", async () => {
+    const role = `beastypage_grant_${randomBytes(4).toString("hex")}`;
+    const password = randomBytes(12).toString("hex");
+    await pool.query(`create role "${role}" login password '${password}'`);
+    const appUrl = new URL(databaseUrl);
+    appUrl.username = role;
+    appUrl.password = password;
+    const appPool = createPool(
+      readDatabaseConfig("app", { DATABASE_URL: appUrl.toString() }),
+    );
+    try {
+      const owner = await pool.connect();
+      try {
+        await runMigrations(owner, "grant-test", {
+          appRole: role,
+          importRole: `missing_import_${role}`,
+        });
+      } finally {
+        owner.release();
+      }
+      const inserted = await appPool.query<{ id: number }>(
+        "insert into live_events (topic, revision) values ('grant-test', 1) returning id",
+      );
+      const id = inserted.rows[0]?.id;
+      expect(id).toBeTruthy();
+      await appPool.query("select nextval('live_events_id_seq')");
+      await appPool.query("select id from live_events where id = $1", [id]);
+      await appPool.query("update live_events set revision = 2 where id = $1", [
+        id,
+      ]);
+      await appPool.query("delete from live_events where id = $1", [id]);
+      const timeout = await appPool.query<{ value: string }>(
+        "select current_setting('statement_timeout') as value",
+      );
+      expect(timeout.rows[0]?.value).toBe("5s");
+    } finally {
+      await appPool.end();
+      await pool.query(`drop owned by "${role}"`);
+      await pool.query(`drop role "${role}"`);
+    }
+  });
+
   it("serializes concurrent runners on the advisory lock", async () => {
     await withScratchDatabase(async (url) => {
       const scratch = createPool(

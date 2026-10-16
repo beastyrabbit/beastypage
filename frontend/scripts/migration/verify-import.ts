@@ -7,7 +7,10 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { getTableColumns, getTableName } from "drizzle-orm";
 import type pg from "pg";
-import { readDatabaseConfig } from "../../server/db/config";
+import {
+  isLoopbackDatabaseUrl,
+  readDatabaseConfig,
+} from "../../server/db/config";
 import { createPool } from "../../server/db/pool";
 import {
   checkCompatibility,
@@ -27,7 +30,12 @@ import {
   tableFingerprints,
 } from "./import/run";
 import { STEPS } from "./import/tables";
-import { disableNetwork } from "./import-convex";
+import {
+  assertDatabaseTarget,
+  disableNetwork,
+  type IssuerMode,
+  issuerModeFor,
+} from "./import-convex";
 
 const SAMPLE_SIZE = 3;
 const REPO_ROOT = resolve(import.meta.dirname, "../../..");
@@ -46,7 +54,20 @@ export interface VerificationReport {
     files: number;
   };
   mismatches: VerificationMismatch[];
+  issuer: { mode: IssuerMode; expectedIssuer: string | null };
   ok: boolean;
+}
+
+export function issuerModeMatches(
+  report: ImportReport["issuer"] | undefined,
+  requested: { mode: IssuerMode; expectedIssuer: string | null },
+): boolean {
+  return Boolean(
+    report &&
+      report.mode === requested.mode &&
+      (requested.mode !== "expected" ||
+        report.expectedIssuer === requested.expectedIssuer),
+  );
 }
 
 function stable(value: unknown): string {
@@ -91,6 +112,7 @@ async function mapContext(
   client: pg.PoolClient,
   archiveSha256: string,
   freezeAt: Date,
+  expectedIssuer: string | null,
 ): Promise<MapContext> {
   const imported = new Map<string, Set<string>>();
   for (const step of STEPS) {
@@ -112,7 +134,7 @@ async function mapContext(
   const facts = new Map<string, string>();
   return {
     freezeAt,
-    expectedIssuer: null,
+    expectedIssuer,
     imported: (table, id) => imported.get(table)?.has(id) ?? false,
     fileFor: (storageId) => fileMap.get(storageId) ?? null,
     repair: () => undefined,
@@ -231,9 +253,15 @@ async function checkMappedSamples(
   archive: ConvexArchive,
   report: ImportReport,
   mismatches: VerificationMismatch[],
+  expectedIssuer: string | null,
 ): Promise<number> {
   const freezeAt = new Date(report.manifest.freezeAt);
-  const contexts = await mapContext(client, report.archiveSha256, freezeAt);
+  const contexts = await mapContext(
+    client,
+    report.archiveSha256,
+    freezeAt,
+    expectedIssuer,
+  );
   for await (const item of archive.documents("quick_share_uploads")) {
     if (
       !("document" in item) ||
@@ -338,8 +366,18 @@ export async function verifyImport(
   client: pg.PoolClient,
   archivePath: string,
   importerReport: ImportReport,
+  issuerOptions?: { mode: IssuerMode; expectedIssuer: string | null },
 ): Promise<VerificationReport> {
   const mismatches: VerificationMismatch[] = [];
+  const reportIssuer = importerReport.issuer;
+  const requestedIssuer = issuerOptions ?? reportIssuer;
+  if (!requestedIssuer || !issuerModeMatches(reportIssuer, requestedIssuer)) {
+    mismatches.push({
+      check: "issuer-mode",
+      detail:
+        "import report issuer mode does not match verify:import arguments",
+    });
+  }
   const archiveSha256 = await sha256File(archivePath);
   if (archiveSha256 !== importerReport.archiveSha256) {
     mismatches.push({
@@ -360,6 +398,7 @@ export async function verifyImport(
       archive,
       importerReport,
       mismatches,
+      requestedIssuer?.expectedIssuer ?? null,
     );
     const files = await checkFiles(
       client,
@@ -370,6 +409,7 @@ export async function verifyImport(
       archiveSha256,
       checked: { tables, documents, links, files },
       mismatches,
+      issuer: requestedIssuer ?? { mode: "expected", expectedIssuer: null },
       ok: mismatches.length === 0,
     };
   } finally {
@@ -383,11 +423,21 @@ async function main(): Promise<void> {
       archive: { type: "string" },
       "import-report": { type: "string" },
       "report-dir": { type: "string" },
+      "expected-database": { type: "string" },
+      "expected-issuer": { type: "string" },
+      "allow-any-issuer": { type: "boolean", default: false },
       "counts-only": { type: "boolean", default: false },
     },
   });
-  if (!values.archive || !values["import-report"] || !values["report-dir"]) {
-    throw new Error("--archive, --import-report and --report-dir are required");
+  if (
+    !values.archive ||
+    !values["import-report"] ||
+    !values["report-dir"] ||
+    !values["expected-database"]
+  ) {
+    throw new Error(
+      "--archive, --import-report, --report-dir and --expected-database are required",
+    );
   }
   assertOutsideRepository(values.archive, REPO_ROOT, "The archive");
   assertOutsideRepository(
@@ -404,13 +454,25 @@ async function main(): Promise<void> {
   disableNetwork();
   const report = importReport(values["import-report"]);
   loadLocalDatabaseEnv();
-  const pool = createPool(readDatabaseConfig("import"));
+  const config = readDatabaseConfig("import");
+  const issuer = issuerModeFor(
+    values["expected-issuer"],
+    values["allow-any-issuer"] ?? false,
+    isLoopbackDatabaseUrl(config.url),
+  );
+  const pool = createPool(config);
   const client = await pool.connect();
   try {
+    await assertDatabaseTarget(
+      client,
+      config.url,
+      values["expected-database"],
+      "verify:import",
+    );
     const compatibility = checkCompatibility(await readSchemaState(client));
     if (!compatibility.ok)
       throw new Error(`Database not ready: ${compatibility.reason}`);
-    const result = await verifyImport(client, values.archive, report);
+    const result = await verifyImport(client, values.archive, report, issuer);
     writeFileSync(
       join(values["report-dir"], "verify-import.json"),
       `${JSON.stringify(result, null, 2)}\n`,

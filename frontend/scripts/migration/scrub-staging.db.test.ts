@@ -40,6 +40,7 @@ const options = () => ({
   stagingPassword: password,
   scrubKey: key,
   reportDir: work,
+  expectedDatabase: new URL(databaseUrl).pathname.slice(1),
 });
 
 beforeAll(async () => {

@@ -30,6 +30,7 @@ pnpm run import:fixture /tmp/fixture/snapshot_1760529600000000000.zip
 pnpm run import:convex \
   --archive /private/convex/snapshot_<deployment>_<ns>.zip \
   --report-dir /private/convex/import-<date> \
+  --expected-database beastypage \
   --expected-issuer https://<clerk issuer> \
   [--freeze-at 2026-10-15T18:00:00Z] [--replace]
 ```
@@ -38,13 +39,23 @@ pnpm run import:convex \
 | --- | --- |
 | `--archive` | Path to the Convex export ZIP. The archive is streamed one entry at a time. |
 | `--report-dir` | Private output: `report.md`, `report.json` and `quarantine/<step>.jsonl`. |
+| `--expected-database` | Required target identity check. The importer prints the target host and verifies `current_database()` before any write. |
 | `--freeze-at` | The write-freeze time. Defaults to the timestamp in `snapshot_[<deployment>_]<ns>.zip`. Short-lived rows that expired before it are skipped. |
-| `--expected-issuer` | The Clerk issuer. Every `tokenIdentifier` and owner column must start with `<issuer>\|`; anything else is quarantined. |
+| `--expected-issuer` | Required issuer check. Every `tokenIdentifier` and owner column must start with `<issuer>\|`; anything else is quarantined. |
+| `--allow-any-issuer` | Explicit local/loopback test mode only. The report records `issuer.mode: any`; it is rejected for remote targets. |
 | `--replace` | Empty every imported table before importing. Needed when the database already holds a different archive or rows created by the app (staging refills). |
+| `--confirm-remote-replace` | Required in addition to `--replace` for a non-loopback target. |
 
-The database connection comes from `DATABASE_IMPORT_URL` or `DATABASE_URL`,
-or from the local worktree database. The importer refuses to start unless
-the schema version is compatible.
+The database connection comes from `DATABASE_IMPORT_URL`. A `DATABASE_URL`
+fallback is accepted only when it points to a loopback database for local
+synthetic fixtures. Remote imports fail closed without the dedicated URL. The
+schema version and `current_database()` must be compatible with the supplied
+`--expected-database` before the importer writes.
+
+`verify:import` takes the same `--expected-database` and issuer arguments. It
+fails if the import report's issuer mode or expected issuer differs from the
+arguments supplied to verification. The report records whether issuer
+validation used `expected` or explicit loopback-only `any` mode.
 
 ## What it does
 

@@ -17,6 +17,8 @@ controllers:
               name: beastypage-postgres-urls
         env:
           NODE_ENV: production
+          DATABASE_APP_ROLE: beastypage_app
+          DATABASE_IMPORT_ROLE: beastypage_import
         resources:
           requests: { cpu: 10m, memory: 96Mi }
           limits: { memory: 256Mi }
@@ -27,6 +29,7 @@ controllers:
               name: beastypage-postgres-urls
         env:
           DATABASE_POOL_MAX: "6"
+          DATABASE_APP_ROLE: beastypage_app
         probes:
           readiness:
             custom: true

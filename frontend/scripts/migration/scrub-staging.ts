@@ -13,7 +13,7 @@ import {
 import { isAbsolute, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import type pg from "pg";
-import { readDatabaseConfig } from "../../server/db/config";
+import { databaseTarget, readDatabaseConfig } from "../../server/db/config";
 import { createPool } from "../../server/db/pool";
 import { loadLocalDatabaseEnv } from "../db/env";
 
@@ -160,6 +160,8 @@ function validateOptions(options: ScrubOptions): void {
     );
   if (!options.stagingPassword)
     throw new Error("--staging-password-file is empty");
+  if (!options.expectedDatabase?.trim())
+    throw new Error("--expected-database is required");
   assertReportDirOutsideRepository(options.reportDir);
 }
 
@@ -172,12 +174,17 @@ async function assertSafeTarget(
     await client.query<{ name: string }>("select current_database() as name")
   ).rows[0]?.name;
   if (!database) throw new Error("Could not determine current database");
+  const target = databaseTarget(options.databaseUrl);
+  console.log(
+    `[scrub:staging] target host=${target.host} database=${database}`,
+  );
+  if (database !== options.expectedDatabase?.trim()) {
+    throw new Error(
+      `Refusing database target: expected ${options.expectedDatabase}, current database is ${database}`,
+    );
+  }
   if (!LOOPBACK_HOSTS.has(parsed.hostname)) {
-    if (
-      !options.knowStaging ||
-      !options.expectedDatabase ||
-      options.expectedDatabase !== database
-    )
+    if (!options.knowStaging || !options.expectedDatabase)
       throw new Error(
         "Refusing non-loopback database; pass --i-know-this-is-staging --expected-database <name>",
       );
@@ -479,7 +486,7 @@ function parseCli(): ScrubOptions & { verify: boolean } {
     !values["report-dir"]
   )
     throw new Error(
-      "--staging-issuer, --staging-password-file, and --report-dir are required",
+      "--staging-issuer, --staging-password-file, --report-dir, and --expected-database are required",
     );
   const passwordPath = resolve(values["staging-password-file"]);
   if (!existsSync(passwordPath) || !statSync(passwordPath).isFile())

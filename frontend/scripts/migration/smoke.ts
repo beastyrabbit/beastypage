@@ -244,9 +244,18 @@ export async function runSmokeChecks(
           },
           body: JSON.stringify(fixtures.writeBody ?? {}),
         });
+        const body: unknown = await response.json().catch(() => null);
+        const maintenanceBody =
+          typeof body === "object" &&
+          body !== null &&
+          (body as { error?: unknown }).error ===
+            "Service is in maintenance mode" &&
+          (body as { code?: unknown }).code === "unavailable";
         check(
           "maintenance write",
-          response.status === 503,
+          response.status === 503 &&
+            response.headers.get("retry-after") === "60" &&
+            maintenanceBody,
           `HTTP ${response.status}`,
         );
       } catch (error) {

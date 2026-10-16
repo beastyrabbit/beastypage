@@ -42,10 +42,45 @@ const ROLE_DEFAULTS: Record<
 const URL_VARIABLE: Record<DatabaseRole, string[]> = {
   app: ["DATABASE_URL"],
   migrate: ["DATABASE_MIGRATION_URL", "DATABASE_URL"],
-  import: ["DATABASE_IMPORT_URL", "DATABASE_URL"],
+  import: ["DATABASE_IMPORT_URL"],
 };
 
-const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+export const LOOPBACK_HOSTS = new Set([
+  "localhost",
+  "127.0.0.1",
+  "::1",
+  "[::1]",
+]);
+
+export interface DatabaseTarget {
+  host: string;
+  database: string;
+  loopback: boolean;
+}
+
+export function databaseTarget(url: string): DatabaseTarget {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Database URL is not a valid URL");
+  }
+  const database = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+  if (!database) throw new Error("Database URL must include a database name");
+  return {
+    host: parsed.hostname,
+    database,
+    loopback: LOOPBACK_HOSTS.has(parsed.hostname),
+  };
+}
+
+export function isLoopbackDatabaseUrl(url: string): boolean {
+  try {
+    return databaseTarget(url).loopback;
+  } catch {
+    return false;
+  }
+}
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -89,11 +124,23 @@ export function readDatabaseConfig(
   role: DatabaseRole = "app",
   env: Environment = process.env,
 ): DatabaseConfig {
-  const variable = URL_VARIABLE[role].find((name) => env[name]?.trim());
-  const url = variable ? env[variable]?.trim() : undefined;
+  let url: string | undefined;
+  if (role === "import") {
+    const explicit = env.DATABASE_IMPORT_URL?.trim();
+    const local = env.DATABASE_URL?.trim();
+    // A local worktree only has DATABASE_URL. Never silently aim an import at
+    // a remote application database when the dedicated import URL is absent.
+    url =
+      explicit ?? (local && isLoopbackDatabaseUrl(local) ? local : undefined);
+  } else {
+    const variable = URL_VARIABLE[role].find((name) => env[name]?.trim());
+    url = variable ? env[variable]?.trim() : undefined;
+  }
   if (!url) {
     throw new Error(
-      `${URL_VARIABLE[role].join(" or ")} is not set. Run \`pnpm --dir frontend run db:local up\` for a local database.`,
+      role === "import"
+        ? "DATABASE_IMPORT_URL is required for import targets (DATABASE_URL is accepted only for loopback local databases)"
+        : `${URL_VARIABLE[role].join(" or ")} is not set. Run \`pnpm --dir frontend run db:local up\` for a local database.`,
     );
   }
   assertSecureConnection(url, env);

@@ -68,8 +68,20 @@ password is a throwaway value for an ephemeral container.
   `app_version` in `beastypage_schema_version`.
 - The application checks the same row at startup
   (`server/db/schema-version.ts`). The readiness probe
-  `/api/health/database` fails, and pods stay out of rotation, when
+  `/api/health/database` is gated on `DATA_BACKEND=postgres`; it returns a
+  clear 503 without opening a pool while Convex is selected. Once PostgreSQL
+  is selected it fails, and pods stay out of rotation, when
   `db.version < SCHEMA_VERSION` or `SCHEMA_VERSION < db.compatible_from`.
+- After migrations, the same owner-held run applies idempotent grants. It
+  grants `beastypage_app` schema/table/sequence DML, default privileges and
+  the documented 5s/2s/10s role timeouts. The role name is configurable with
+  `DATABASE_APP_ROLE` and a missing local role is logged and skipped. When
+  present, `beastypage_import` receives the same DML and `TRUNCATE` plus
+  sequence privileges so `import:convex --replace` can empty its tables.
+  Verify as the app role with `\dp public.*`, `\ddp`, `\du+ beastypage_app`,
+  `show statement_timeout`, and a harmless insert/update/delete using a
+  sequence. The migration runner repeats these statements safely on every
+  non-status run.
 
 ## Staging
 
@@ -99,8 +111,8 @@ explicit approval.** Nothing in this repository applies them.
   - `beastypage_app`: DML only, connection limit 30.
   - `beastypage_import`: `login: false` except during a rehearsal or the
     cutover.
-- Grants for `beastypage_app` (run once as the owner, after the first
-  migration):
+- The migration runner applies these grants as the owner after every schema
+  migration (the SQL is shown here for operator verification):
 
   ```sql
   grant usage on schema public to beastypage_app;
@@ -114,6 +126,27 @@ explicit approval.** Nothing in this repository applies them.
   alter role beastypage_app set lock_timeout = '2s';
   alter role beastypage_app set idle_in_transaction_session_timeout = '10s';
   ```
+
+  The import role needs the additional truncate privilege while its login is
+  enabled for a rehearsal or cutover:
+
+  ```sql
+  grant usage on schema public to beastypage_import;
+  grant select, insert, update, delete, truncate on all tables in schema public to beastypage_import;
+  grant usage, select on all sequences in schema public to beastypage_import;
+  ```
+
+  PostgreSQL permits `TRUNCATE` only to a table owner or a role with that
+  explicit table privilege; the importer role is therefore never assumed to
+  inherit it from DML grants.
+
+- `beastypage_import` is `login: false` in the CNPG template. For a rehearsal
+  or the cutover window, submit the normal kub-homelab Flux change that sets
+  its managed role to `login: true`, wait for the secret sync, and inject the
+  generated `DATABASE_IMPORT_URL` into the operator environment. After the
+  import and verification, submit the corresponding Flux change back to
+  `login: false` and wait for reconciliation. Do not toggle the role with a
+  direct `kubectl` command; kub-homelab owns that state.
 
 - TLS: CNPG issues the server certificate. Clients use
   `sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt`, with the
