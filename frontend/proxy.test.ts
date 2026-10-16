@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it } from "vitest";
-import { proxy } from "./proxy";
+import { routeRequest } from "./proxy";
 
 const originalMaintenance = process.env.MAINTENANCE_MODE;
 
@@ -17,7 +17,7 @@ describe("maintenance proxy gate", () => {
   it("blocks API and media writes with the unavailable contract", async () => {
     process.env.MAINTENANCE_MODE = "1";
     for (const path of ["/api/cats/profile", "/i/api/internal/jobs/1"]) {
-      const response = proxy(request("POST", path));
+      const response = routeRequest(request("POST", path));
       expect(response.status).toBe(503);
       expect(response.headers.get("retry-after")).toBe("60");
       await expect(response.json()).resolves.toEqual({
@@ -29,12 +29,14 @@ describe("maintenance proxy gate", () => {
 
   it("leaves reads and database health available", () => {
     process.env.MAINTENANCE_MODE = "1";
-    expect(proxy(request("GET", "/api/cats/profile")).status).toBe(200);
-    expect(proxy(request("POST", "/api/health/database")).status).toBe(200);
+    expect(routeRequest(request("GET", "/api/cats/profile")).status).toBe(200);
+    expect(routeRequest(request("POST", "/api/health/database")).status).toBe(
+      200,
+    );
   });
 
   it("keeps the existing proxy behavior when the gate is off", () => {
     delete process.env.MAINTENANCE_MODE;
-    expect(proxy(request("POST", "/api/cats/profile")).status).toBe(200);
+    expect(routeRequest(request("POST", "/api/cats/profile")).status).toBe(200);
   });
 });

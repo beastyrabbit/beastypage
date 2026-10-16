@@ -74,7 +74,9 @@ export function useDataMutation<
   const backend = useDataBackend();
   const client = useQueryClient();
   const convexMutation = useConvexMutation(mutation);
-  const postgresMutation = useTanStackMutation({
+  // `mutateAsync` is stable; the mutation result object is not, and callers
+  // put this function in effect dependencies like Convex's stable mutation.
+  const { mutateAsync } = useTanStackMutation({
     mutationFn: ({
       args,
       signal,
@@ -99,9 +101,9 @@ export function useDataMutation<
       if (backend === "convex") {
         return (await convexMutation(args as never)) as TResult;
       }
-      return postgresMutation.mutateAsync({ args });
+      return mutateAsync({ args });
     },
-    [backend, convexMutation, postgresMutation],
+    [backend, convexMutation, mutateAsync],
   );
 }
 

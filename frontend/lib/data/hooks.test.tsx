@@ -115,4 +115,35 @@ describe("dual-path data hooks", () => {
     expect(convexMocks.mutation).toHaveBeenCalled();
     root.unmount();
   });
+
+  it("keeps the mutation function stable across calls, like Convex", async () => {
+    // Pages list the mutation in effect dependencies; a new identity after
+    // each call re-runs the effect forever.
+    const convexMutation = vi.fn(async () => ({ from: "convex" }));
+    convexMocks.mutation.mockReturnValue(convexMutation);
+    const seen = new Set<unknown>();
+    let mutate: ((args: { id: string }) => Promise<unknown>) | undefined;
+    function Probe() {
+      mutate = useDataMutation(mutationRef, {
+        mutationFn: async () => ({ ok: true }),
+      });
+      seen.add(mutate);
+      return null;
+    }
+    const host = document.createElement("div");
+    const root = createRoot(host);
+    act(() =>
+      root.render(
+        <Providers>
+          <Probe />
+        </Providers>,
+      ),
+    );
+    await act(async () => {
+      await mutate?.({ id: "cat-1" });
+    });
+    await settle();
+    expect(seen.size).toBe(1);
+    root.unmount();
+  });
 });
