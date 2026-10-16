@@ -132,6 +132,6 @@ Cleanup rules adopted for what real data contained:
 | --- | --- |
 | JPEG bytes labelled `image/png` | repaired: the decoded raster type is stored. A non-image declared type is still quarantined. |
 | `perfect_cats.lastShownAt = 0` | repaired: Convex inserts `0` for "never shown"; it becomes `NULL`. |
-| Rows whose required `userId` points at a deleted user | quarantined (left out of PostgreSQL). |
+| Rows whose required `userId` points at a deleted user (2 `user_variants`, 1 `cat_stream_sessions`, one user removed by hand on 2026-04-03) | quarantined and dropped: the maintainer decided on 2026-10-16 not to keep them. These 3 quarantined rows are expected at cutover. |
 
 - [ ] Attach counts only (no content) to #107 and #111.
