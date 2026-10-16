@@ -9,6 +9,12 @@ import filesOrphanCleanup from "./files-orphan-cleanup";
 import jobsPrune from "./jobs-prune";
 import livePrune from "./live-prune";
 import perfectMatchupRetention from "./perfect-matchup-retention";
+import quickShareDispatch from "./quick-share-dispatch";
+import quickShareQueueRetention from "./quick-share-queue-retention";
+import quickShareRecoverLease from "./quick-share-recover-lease";
+import quickShareRedispatch from "./quick-share-redispatch";
+import quickShareRetention from "./quick-share-retention";
+import quickShareRevokeIp from "./quick-share-revoke-ip";
 
 /** Add one entry here when registering a concrete application job kind. */
 export const jobKinds = [
@@ -20,6 +26,12 @@ export const jobKinds = [
   catdexUploadRetention,
   filesOrphanCleanup,
   perfectMatchupRetention,
+  quickShareDispatch,
+  quickShareRecoverLease,
+  quickShareRevokeIp,
+  quickShareQueueRetention,
+  quickShareRedispatch,
+  quickShareRetention,
 ] as const;
 
 export const jobKindRegistry = new Map<string, AnyJobKind>(
