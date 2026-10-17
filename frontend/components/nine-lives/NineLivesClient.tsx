@@ -540,6 +540,7 @@ export function NineLivesClient() {
                     <button
                       type="button"
                       ref={presentationInlineOpenerRef}
+                      aria-label="Fullscreen"
                       onClick={() => openPresentation("handheld")}
                       className="inline-flex items-center gap-1.5 rounded-full border border-[#4b5d78]/60 bg-[#b6c8dc]/55 px-2.5 py-1.5 font-mono text-[0.52rem] font-bold uppercase tracking-[0.12em] text-[#263449] transition hover:bg-[#d3e0ed]"
                     >
@@ -548,6 +549,7 @@ export function NineLivesClient() {
                     </button>
                     <button
                       type="button"
+                      aria-label="Game only"
                       onClick={() => openPresentation("game")}
                       className="inline-flex items-center gap-1.5 rounded-full border border-[#4b5d78]/60 bg-[#b6c8dc]/55 px-2.5 py-1.5 font-mono text-[0.52rem] font-bold uppercase tracking-[0.12em] text-[#263449] transition hover:bg-[#d3e0ed]"
                     >
