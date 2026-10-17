@@ -57,8 +57,9 @@ spec:
 ---
 # Staging must not reach production services (Convex, Discord, production
 # S3 bucket, production media/renderer). Allow DNS, the cluster's own
-# database, and in-namespace traffic only; add explicit egress for the
-# Clerk development instance.
+# database, and in-namespace traffic only; the Cilium policy below adds the
+# Clerk development instance. Add the staging Quick Share bucket's endpoint
+# the same way once it exists.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -77,3 +78,33 @@ spec:
         - { protocol: TCP, port: 53 }
     - to:
         - podSelector: {}
+---
+# Clerk has no fixed addresses, so its egress is an FQDN rule (the cluster
+# runs Cilium; Kubernetes NetworkPolicy cannot match hostnames). toFQDNs only
+# learns addresses from DNS answers Cilium's proxy sees, hence the DNS rule.
+# Server-side Clerk calls (`currentUser()`, session verification) use the
+# Backend API; the development instance's Frontend API is *.clerk.accounts.dev.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: beastypage-staging-clerk-egress
+  namespace: beastypage-staging
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - { port: "53", protocol: ANY }
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toFQDNs:
+        - matchName: api.clerk.com
+        - matchPattern: "*.clerk.accounts.dev"
+      toPorts:
+        - ports:
+            - { port: "443", protocol: TCP }

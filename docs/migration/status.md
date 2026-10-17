@@ -117,6 +117,13 @@ verified against the files and CNPG/Flux documentation, then fixed:
   bundle test), and the archive guard let every path through inside the
   image (it now protects the Git checkout or `/app`).
 
+The pre-PR delivery review found two more: per-user TanStack queries are
+keyed without the Clerk user, so after a client-side account switch the next
+user could see the previous user's viewer and saved variants (the cache now
+resets when the Clerk user changes); and the staging egress policy promised
+but lacked Clerk access (a Cilium FQDN rule now allows the Clerk Backend and
+development Frontend APIs).
+
 Not verifiable without a cluster, left for the staging rehearsal and the
 #108 restore drill: Flux prune timing, CNPG owner references on Backups and
 VolumeSnapshots, the runtime's `imageID` format, and the measured restore
@@ -130,7 +137,7 @@ All commands run from `frontend/` on 2026-10-17.
 | --- | --- | --- |
 | Type check | `tsc --noEmit` | pass |
 | Lint and format | `biome check` on every file changed by the review and live-parity fixes | no errors; 2 warnings in older component code |
-| Unit tests | `vitest run --project unit` | 126 files, 851 tests pass |
+| Unit tests | `vitest run --project unit` | 126 files, 852 tests pass |
 | Database tests (real PostgreSQL 18) | `pnpm run test:db` | 42 files, 208 tests pass (two consecutive clean runs) |
 | Schema drift | `pnpm run db:drift` | no drift |
 | Inventory up to date | `migration:inventory --check` | pass |
