@@ -278,8 +278,8 @@ function DeviceButton({
   );
 }
 
-// NOSONAR -- this client intentionally coordinates the device, iframe, and input bridge.
-export function NineLivesClient() {
+// This client intentionally coordinates the device, iframe, and input bridge.
+export function NineLivesClient() /* NOSONAR */ {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const presentationRef = useRef<HTMLDialogElement>(null);
   const presentationCloseRef = useRef<HTMLButtonElement>(null);
