@@ -125,6 +125,13 @@ beastypage/
 
 See [review remediation and rollout notes](docs/review-remediation.md) for the new service credential, compatibility requirements, limits, and verification commands.
 
+Additional operational notes:
+
+- [Stream overlay architecture and timing](docs/stream-overlays.md)
+- [Local development notes](docs/local-development.md)
+- [Runtime TypeScript constraints](docs/runtime-typescript.md)
+- [Release verification](docs/release-verification.md)
+
 ## Container Images
 
 GitHub Actions builds GHCR images on `main` and version-tag pushes. The Forgejo workflow and registry path are retained for the migration; repository files alone do not establish whether that runner is active. Both paths gate publication on validation. Convex deploys through version tags or explicit manual deployment on `main`, so merging preparatory code does not change the live backend. A pull request runs validation only.
