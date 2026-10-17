@@ -268,6 +268,7 @@ function DeviceButton({
 
 export function NineLivesClient() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const presentationCloseRef = useRef<HTMLButtonElement>(null);
   const pointerButtons = useRef(new Map<number, ButtonName>());
   const [started, setStarted] = useState(false);
   const [ready, setReady] = useState(false);
@@ -294,6 +295,17 @@ export function NineLivesClient() {
     setPresentationMode("inline");
     requestAnimationFrame(() => iframeRef.current?.focus());
   }, []);
+
+  const openPresentation = useCallback(
+    (mode: Exclude<PresentationMode, "inline">) => {
+      setPresentationMode(mode);
+      requestAnimationFrame(() => {
+        if (started) iframeRef.current?.focus();
+        else presentationCloseRef.current?.focus();
+      });
+    },
+    [started],
+  );
 
   useEffect(() => {
     if (presentationMode === "inline") return;
@@ -401,7 +413,7 @@ export function NineLivesClient() {
               {presentationMode === "handheld" ? (
                 <button
                   type="button"
-                  onClick={() => setPresentationMode("game")}
+                  onClick={() => openPresentation("game")}
                   className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#172943]/80 px-3 py-2 font-mono text-[0.58rem] font-bold uppercase tracking-[0.14em] text-[#dcecf1] backdrop-blur transition hover:bg-[#203858]"
                 >
                   <MonitorPlay className="size-3.5" />
@@ -410,7 +422,7 @@ export function NineLivesClient() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setPresentationMode("handheld")}
+                  onClick={() => openPresentation("handheld")}
                   className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#172943]/80 px-3 py-2 font-mono text-[0.58rem] font-bold uppercase tracking-[0.14em] text-[#dcecf1] backdrop-blur transition hover:bg-[#203858]"
                 >
                   <ExpandIcon className="size-3.5" />
@@ -421,6 +433,7 @@ export function NineLivesClient() {
                 type="button"
                 onClick={closePresentation}
                 aria-label="Close full-screen view"
+                ref={presentationCloseRef}
                 className="inline-flex size-9 items-center justify-center rounded-full border border-white/15 bg-[#172943]/80 text-[#dcecf1] backdrop-blur transition hover:bg-[#203858]"
               >
                 <XIcon className="size-4" />
@@ -489,7 +502,7 @@ export function NineLivesClient() {
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setPresentationMode("handheld")}
+                      onClick={() => openPresentation("handheld")}
                       className="inline-flex items-center gap-1.5 rounded-full border border-[#4b5d78]/60 bg-[#b6c8dc]/55 px-2.5 py-1.5 font-mono text-[0.52rem] font-bold uppercase tracking-[0.12em] text-[#263449] transition hover:bg-[#d3e0ed]"
                     >
                       <ExpandIcon className="size-3" />
@@ -497,7 +510,7 @@ export function NineLivesClient() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPresentationMode("game")}
+                      onClick={() => openPresentation("game")}
                       className="inline-flex items-center gap-1.5 rounded-full border border-[#4b5d78]/60 bg-[#b6c8dc]/55 px-2.5 py-1.5 font-mono text-[0.52rem] font-bold uppercase tracking-[0.12em] text-[#263449] transition hover:bg-[#d3e0ed]"
                     >
                       <MonitorPlay className="size-3" />
