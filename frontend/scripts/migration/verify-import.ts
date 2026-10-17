@@ -25,17 +25,17 @@ import {
   Reject,
 } from "./import/convert";
 import {
+  assertDatabaseTarget,
+  disableNetwork,
+  type IssuerMode,
+  issuerModeFor,
+} from "./import/guards";
+import {
   assertOutsideRepository,
   type ImportReport,
   tableFingerprints,
 } from "./import/run";
 import { STEPS } from "./import/tables";
-import {
-  assertDatabaseTarget,
-  disableNetwork,
-  type IssuerMode,
-  issuerModeFor,
-} from "./import-convex";
 
 const SAMPLE_SIZE = 3;
 const REPO_ROOT = resolve(import.meta.dirname, "../../..");

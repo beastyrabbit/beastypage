@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { assertDatabaseTarget, issuerModeFor } from "./import-convex";
+import { assertDatabaseTarget, issuerModeFor } from "./import/guards";
 
 describe("import target and issuer guards", () => {
   it("requires an issuer unless loopback any-issuer mode is explicit", () => {

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { freezeFromArchiveName } from "../import-convex";
+import { freezeFromArchiveName } from "./guards";
 import { importedId, uuidv5 } from "./ids";
 
 describe("import ids", () => {

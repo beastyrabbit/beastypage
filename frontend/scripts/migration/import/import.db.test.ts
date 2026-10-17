@@ -7,7 +7,6 @@ import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import { readDatabaseConfig } from "../../../server/db/config";
 import { runMigrations } from "../../../server/db/migrator";
 import { createPool } from "../../../server/db/pool";
-import { disableNetwork } from "../import-convex";
 import { verifyImport } from "../verify-import";
 import {
   buildFixture,
@@ -16,6 +15,7 @@ import {
   fixtureId,
   writeFixtureArchive,
 } from "./fixture";
+import { disableNetwork } from "./guards";
 import { importedFileId, importedId } from "./ids";
 import {
   assertOutsideRepository,
