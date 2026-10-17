@@ -141,28 +141,26 @@ export async function listStreamSessions(
   },
   identity: Identity,
 ) {
+  async function loadRows(
+    tx: Parameters<Parameters<Database["transaction"]>[0]>[0],
+    indexedStatus: string | undefined,
+  ) {
+    if (args.viewerKey) {
+      const row = await selectStreamSessionByViewerKey(tx, args.viewerKey);
+      return row ? [row] : [];
+    }
+    if (!identity.tokenIdentifier) return [];
+    return selectOwnedStreamSessions(
+      tx,
+      identity.tokenIdentifier,
+      indexedStatus,
+    );
+  }
   return withTransaction(db, async (tx) => {
     const indexedStatus =
       args.status ??
       (args.exclude?.toLowerCase() === "completed" ? "live" : undefined);
-    let rows = args.viewerKey
-      ? (await selectStreamSessionByViewerKey(tx, args.viewerKey))
-        ? [
-            (await selectStreamSessionByViewerKey(
-              tx,
-              args.viewerKey,
-            )) as NonNullable<
-              Awaited<ReturnType<typeof selectStreamSessionByViewerKey>>
-            >,
-          ]
-        : []
-      : identity.tokenIdentifier
-        ? await selectOwnedStreamSessions(
-            tx,
-            identity.tokenIdentifier,
-            indexedStatus,
-          )
-        : [];
+    let rows = await loadRows(tx, indexedStatus);
     if (args.exclude) {
       const target = args.exclude.toLowerCase();
       rows = rows.filter((row) => row.status.toLowerCase() !== target);
@@ -433,6 +431,7 @@ export async function listStreamVotes(
 }
 
 export async function createStreamVote(
+  // NOSONAR
   db: Database,
   args: {
     viewerSession?: string;

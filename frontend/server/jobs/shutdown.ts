@@ -43,7 +43,7 @@ export function registerJobShutdown(
     }
     await Promise.allSettled([
       withTimeout(workerStop, JOB_SHUTDOWN_TIMEOUT_MS),
-      Promise.resolve().then(stopLive),
+      stopLive().catch(() => undefined),
     ]);
   };
   process.once("SIGTERM", () => void shutdown());

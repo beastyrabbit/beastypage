@@ -32,8 +32,15 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-export async function POST(request: NextRequest) {
-  if (dataBackend() !== "postgres") return json({ error: "NOT_FOUND" }, 404);
+function uploadStatus(message: string): number {
+  if (message === "FILE_TOO_LARGE") return 413;
+  if (message === "UNSUPPORTED_MEDIA_TYPE") return 415;
+  return 400;
+}
+
+function validateUploadRequest(
+  request: NextRequest,
+): { token: string; contentType: string } | NextResponse {
   const token = request.nextUrl.searchParams.get("token");
   if (!token || token.length > 100)
     return json({ error: "INVALID_TOKEN" }, 400);
@@ -52,6 +59,34 @@ export async function POST(request: NextRequest) {
   ) {
     return json({ error: "FILE_TOO_LARGE" }, 413);
   }
+  return { token, contentType };
+}
+
+function knownUploadError(error: unknown): NextResponse | null {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "not_found"
+  ) {
+    return json({ error: "UPLOAD_EXPIRED" }, 410);
+  }
+  if (!(error instanceof Error)) return null;
+  const known = [
+    "FILE_TOO_LARGE",
+    "UNSUPPORTED_MEDIA_TYPE",
+    "EMPTY_UPLOAD",
+    "INVALID_IMAGE",
+  ];
+  return known.includes(error.message)
+    ? json({ error: error.message }, uploadStatus(error.message))
+    : null;
+}
+
+export async function POST(request: NextRequest) {
+  if (dataBackend() !== "postgres") return json({ error: "NOT_FOUND" }, 404);
+  const validated = validateUploadRequest(request);
+  if (validated instanceof NextResponse) return validated;
   try {
     const bytes = Buffer.from(await request.arrayBuffer());
     if (!bytes.length) return json({ error: "EMPTY_UPLOAD" }, 400);
@@ -59,41 +94,14 @@ export async function POST(request: NextRequest) {
       return json({ error: "FILE_TOO_LARGE" }, 413);
     const storageId = await storeAndAttachCatdexUpload(
       getDb(),
-      token,
+      validated.token,
       bytes,
-      contentType,
+      validated.contentType,
     );
     return json({ storageId, fileId: storageId });
   } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "not_found"
-    ) {
-      return json({ error: "UPLOAD_EXPIRED" }, 410);
-    }
-    if (error instanceof Error) {
-      const status =
-        error.message === "FILE_TOO_LARGE"
-          ? 413
-          : error.message === "UNSUPPORTED_MEDIA_TYPE"
-            ? 415
-            : error.message === "EMPTY_UPLOAD"
-              ? 400
-              : error.message === "INVALID_IMAGE"
-                ? 400
-                : 400;
-      if (
-        [
-          "FILE_TOO_LARGE",
-          "UNSUPPORTED_MEDIA_TYPE",
-          "EMPTY_UPLOAD",
-          "INVALID_IMAGE",
-        ].includes(error.message)
-      )
-        return json({ error: error.message }, status);
-    }
+    const known = knownUploadError(error);
+    if (known) return known;
     const response = errorResponse(
       error,
       "Upload failed",

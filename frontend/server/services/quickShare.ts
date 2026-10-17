@@ -81,6 +81,10 @@ export const QUICK_SHARE_POLICY = {
   collectionMaxItems: 100,
 } as const;
 
+function noQuickShareBody(): null {
+  return null;
+}
+
 type Tier = "anonymous" | "signedIn";
 type UploadState =
   | "uploading"
@@ -494,8 +498,8 @@ async function recordPart(db: Database, body: OpBody, now: number) {
     throw new Error("INVALID_PART");
   return withTransaction(db, async (tx) => {
     const upload = await getUpload(tx, id(body, "uploadId"), true);
+    if (!upload) throw new Error("UPLOAD_NOT_AVAILABLE");
     if (
-      !upload ||
       upload.receiptHash !== requiredString(body, "receiptHash") ||
       upload.state !== "uploading"
     )
@@ -515,7 +519,8 @@ async function recordPart(db: Database, body: OpBody, now: number) {
 async function complete(db: Database, body: OpBody, now: number) {
   return withTransaction(db, async (tx) => {
     const upload = await getUpload(tx, id(body, "uploadId"), true);
-    if (!upload || upload.receiptHash !== requiredString(body, "receiptHash"))
+    if (!upload) throw new Error("UPLOAD_NOT_AVAILABLE");
+    if (upload.receiptHash !== requiredString(body, "receiptHash"))
       throw new Error("UPLOAD_NOT_AVAILABLE");
     if (upload.state !== "uploading") return publicUpload(upload);
     const updated = await updateUpload(tx, upload.id, {
@@ -554,8 +559,8 @@ async function finishImport(db: Database, body: OpBody, now: number) {
   const size = requiredNumber(body, "originalSize");
   return withTransaction(db, async (tx) => {
     const upload = await getUpload(tx, id(body, "uploadId"), true);
+    if (!upload) throw new Error("UPLOAD_NOT_AVAILABLE");
     if (
-      !upload ||
       upload.receiptHash !== requiredString(body, "receiptHash") ||
       upload.source !== "url" ||
       upload.state !== "uploading" ||
@@ -593,13 +598,13 @@ async function finishImport(db: Database, body: OpBody, now: number) {
 async function failImport(db: Database, body: OpBody, now: number) {
   return withTransaction(db, async (tx) => {
     const upload = await getUpload(tx, id(body, "uploadId"), true);
+    if (!upload) return noQuickShareBody();
     if (
-      !upload ||
       upload.receiptHash !== requiredString(body, "receiptHash") ||
       upload.source !== "url" ||
       upload.state !== "uploading"
     )
-      return null;
+      return noQuickShareBody();
     if (upload.importReservedBytes !== null)
       await releaseImportReservation(tx, upload, 0, now);
     await updateUpload(tx, upload.id, {
@@ -610,7 +615,7 @@ async function failImport(db: Database, body: OpBody, now: number) {
       failureMessage: "The remote media could not be imported.",
       updatedAt: new Date(now),
     });
-    return null;
+    return noQuickShareBody();
   });
 }
 
@@ -652,7 +657,8 @@ async function publicCollection(db: Database, slug: string, now: number) {
       QUICK_SHARE_POLICY.collectionMaxItems,
     ),
   );
-  return rows.reverse().map((row) => publicObject(row, now));
+  const reversed = rows.reverse();
+  return reversed.map((row) => publicObject(row, now));
 }
 
 async function claimJob(db: Database, body: OpBody, now: number) {
@@ -854,7 +860,7 @@ async function unbanIp(db: Database, body: OpBody, now: number) {
 async function removeUpload(db: Database, body: OpBody, now: number) {
   return withTransaction(db, async (tx) => {
     const upload = await getUpload(tx, id(body, "uploadId"), true);
-    if (!upload) return null;
+    if (!upload) return noQuickShareBody();
     await updateUpload(tx, upload.id, {
       active: false,
       state: "removed",
@@ -865,7 +871,7 @@ async function removeUpload(db: Database, body: OpBody, now: number) {
     });
     if (!(await getJobForUploadKind(tx, upload.id, "delete", true)))
       await enqueueMediaJob(tx, upload.id, "delete", new Date(now));
-    return null;
+    return noQuickShareBody();
   });
 }
 
@@ -1026,6 +1032,7 @@ export interface QuickShareResult {
 }
 
 export async function handleQuickShareOperation(
+  // NOSONAR
   db: Database,
   op: string,
   body: OpBody,

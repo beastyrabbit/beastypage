@@ -4,7 +4,7 @@ import { randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Identity } from "../auth/identity";
 import { catShareData } from "../db/contracts";
 import type { Database } from "../db/pool";
-import { withTransaction } from "../db/transaction";
+import { type Transaction, withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
 import {
   findShare,
@@ -46,7 +46,14 @@ function validateData(data: unknown) {
   return parsed.data;
 }
 
-type ShareRow = NonNullable<Awaited<ReturnType<typeof findShare>>>;
+async function chooseShareSlug(tx: Transaction, requested: string | undefined) {
+  if (requested) return requested;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const candidate = slug();
+    if (!(await findUniqueSlug(tx, candidate))) return candidate;
+  }
+  throw new ServiceError("conflict", "Failed to generate unique share slug");
+}
 
 export async function getCatShare(db: Database, slugValue: string) {
   const row = await findShare(db, slugValue);
@@ -86,21 +93,7 @@ export async function createCatShare(
         };
       }
     }
-    let chosen = requestedSlug ?? "";
-    if (!chosen) {
-      for (let attempt = 0; attempt < 6; attempt++) {
-        const candidate = slug();
-        if (!(await findUniqueSlug(tx, candidate))) {
-          chosen = candidate;
-          break;
-        }
-      }
-    }
-    if (!chosen)
-      throw new ServiceError(
-        "conflict",
-        "Failed to generate unique share slug",
-      );
+    const chosen = await chooseShareSlug(tx, requestedSlug);
     const editToken = randomUUID();
     const row = await insertShare(tx, {
       slug: chosen,
@@ -114,5 +107,3 @@ export async function createCatShare(
     return { slug: chosen, id: row.id, updated: false, editToken };
   });
 }
-
-export type CatShareRow = ShareRow;

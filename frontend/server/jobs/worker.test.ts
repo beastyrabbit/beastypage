@@ -86,6 +86,7 @@ describe("job worker wake and LISTEN lifecycle", () => {
     releaseSchedule?.();
 
     await waitFor(() => scheduleCalls >= 2);
+    expect(scheduleCalls).toBeGreaterThanOrEqual(2);
     await worker.stop();
   });
 

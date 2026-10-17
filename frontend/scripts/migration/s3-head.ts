@@ -13,6 +13,7 @@ const sha256 = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 const hmac = (key: Buffer | string, value: string) =>
   createHmac("sha256", key).update(value).digest();
+const compareCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 /** RFC 3986 encoding per S3 path segment, keeping `/`. */
 export function encodeS3Path(path: string): string {
@@ -21,7 +22,7 @@ export function encodeS3Path(path: string): string {
     .map((segment) =>
       encodeURIComponent(segment).replace(
         /[!'()*]/g,
-        (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+        (c) => `%${c.codePointAt(0)?.toString(16).toUpperCase()}`,
       ),
     )
     .join("/");
@@ -40,13 +41,13 @@ export function signV4(
   const lowered = Object.fromEntries(
     Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v.trim()]),
   );
-  const signedHeaders = Object.keys(lowered).sort();
+  const signedHeaders = Object.keys(lowered).sort(compareCodeUnits);
   const canonicalRequest = [
     method,
     url.pathname,
     [...url.searchParams.entries()]
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .sort()
+      .sort((a, b) => compareCodeUnits(`${a[0]},${a[1]}`, `${b[0]},${b[1]}`))
       .join("&"),
     ...signedHeaders.map((name) => `${name}:${lowered[name]}`),
     "",
@@ -89,7 +90,8 @@ export async function headObject(
   key: string,
   credentials: S3Credentials,
 ): Promise<HeadResult> {
-  const url = new URL(`${encodeS3Path(`/${bucket}/${key}`)}`, endpoint);
+  const objectPath = encodeS3Path(`/${bucket}/${key}`);
+  const url = new URL(objectPath, endpoint);
   const now = new Date();
   const headers: Record<string, string> = {
     host: url.host,

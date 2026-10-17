@@ -98,7 +98,7 @@ describe("cats PostgreSQL services", () => {
     expect(
       (await convex.query(api.mapper.listHistory, { limit: 1 })).length,
     ).toBeGreaterThan(0);
-    expect((await (await import("./cats")).listHistory(db, 1)).length).toBe(1);
+    expect(await (await import("./cats")).listHistory(db, 1)).toHaveLength(1);
     expect(
       (await (await import("./cats")).listForPreview(db, { limit: 1 }))[0],
     ).toHaveProperty("id");

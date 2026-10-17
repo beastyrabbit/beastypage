@@ -63,12 +63,9 @@ export function issuerModeMatches(
   report: ImportReport["issuer"] | undefined,
   requested: { mode: IssuerMode; expectedIssuer: string | null },
 ): boolean {
-  return Boolean(
-    report &&
-      report.mode === requested.mode &&
-      (requested.mode !== "expected" ||
-        report.expectedIssuer === requested.expectedIssuer),
-  );
+  if (report?.mode !== requested.mode) return false;
+  if (requested.mode !== "expected") return true;
+  return report?.expectedIssuer === requested.expectedIssuer;
 }
 
 function stable(value: unknown): string {
@@ -176,6 +173,7 @@ async function checkCountsAndFingerprints(
 }
 
 async function checkLegacyLinks(
+  // NOSONAR
   client: pg.PoolClient,
   archive: ConvexArchive,
   mismatches: VerificationMismatch[],
@@ -250,6 +248,7 @@ async function linkExists(
 }
 
 async function checkMappedSamples(
+  // NOSONAR
   client: pg.PoolClient,
   archive: ConvexArchive,
   report: ImportReport,

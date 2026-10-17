@@ -166,13 +166,11 @@ export function useDataPaginatedQuery<
   const results = pages.flatMap((page) => page.results);
   const isLoading =
     postgresResult.isPending || postgresResult.isFetchingNextPage;
-  const status = postgresResult.isPending
-    ? "LoadingFirstPage"
-    : postgresResult.isFetchingNextPage
-      ? "LoadingMore"
-      : postgresResult.hasNextPage
-        ? "CanLoadMore"
-        : "Exhausted";
+  let status: "LoadingFirstPage" | "LoadingMore" | "CanLoadMore" | "Exhausted";
+  if (postgresResult.isPending) status = "LoadingFirstPage";
+  else if (postgresResult.isFetchingNextPage) status = "LoadingMore";
+  else if (postgresResult.hasNextPage) status = "CanLoadMore";
+  else status = "Exhausted";
   return {
     results,
     status,

@@ -12,7 +12,7 @@ import {
 import type { Transaction } from "../db/transaction";
 import { creationTimestamp } from "../pagination";
 
-export type GamesDb = Database | Transaction;
+export type GamesDb = Database;
 
 export function selectCatByIdOrLegacy(db: GamesDb, id: string) {
   return db

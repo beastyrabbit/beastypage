@@ -163,7 +163,7 @@ class Worker implements JobWorker {
     while (this.active.size > 0 && Date.now() < deadline) {
       const remaining = deadline - Date.now();
       await Promise.race([
-        Promise.allSettled([...this.active]),
+        Promise.allSettled(this.active),
         new Promise<void>((resolve) => setTimeout(resolve, remaining)),
       ]);
     }

@@ -64,10 +64,11 @@ const filesOrphanCleanup: JobKindDefinition<z.infer<typeof payloadSchema>> = {
     // attaches its reservation. Staged uploads remain references until their
     // retention job removes them.
     const refs = sql.join(
-      FILE_REFERENCE_COLUMNS.map(
-        ([table, column]) =>
-          sql`select ${sql.raw(`"${column}"`)} as file_id from ${sql.raw(`"${table}"`)}`,
-      ),
+      FILE_REFERENCE_COLUMNS.map(([table, column]) => {
+        const quotedColumn = sql.raw(`"${column}"`);
+        const quotedTable = sql.raw(`"${table}"`);
+        return sql`select ${quotedColumn} as file_id from ${quotedTable}`;
+      }),
       sql` union all `,
     );
     const result = await db.execute(sql`

@@ -5,7 +5,7 @@ import type { Database } from "../db/pool";
 import { catStreamSessions, wheelSpins } from "../db/schema";
 import type { Transaction } from "../db/transaction";
 
-type Db = Database | Transaction;
+type Db = Database;
 
 export async function selectCatStreamSession(db: Db, id: string) {
   const [row] = await db

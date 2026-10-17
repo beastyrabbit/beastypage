@@ -19,10 +19,7 @@ import {
   setUsername,
   touchUser,
 } from "../repositories/users";
-import {
-  deleteFirstByUser,
-  listByUser as listUserVariants,
-} from "../repositories/userVariants";
+import { deleteFirstByUser } from "../repositories/userVariants";
 
 const MAX_RESOLVE_IDS = 100;
 const MAX_ID_LENGTH = 128;
@@ -298,9 +295,9 @@ export async function searchByUsername(
   const value = prefix.trim().toLowerCase();
   if (!value) return [];
   const escaped = value
-    .replaceAll("\\", "\\\\")
-    .replaceAll("%", "\\%")
-    .replaceAll("_", "\\_");
+    .replaceAll("\\", String.raw`\\`)
+    .replaceAll("%", String.raw`\%`)
+    .replaceAll("_", String.raw`\_`);
   return withTransaction(db, async (tx) => {
     const rows = await searchUsersByUsernamePrefix(tx, escaped);
     return rows.map((row) => ({
@@ -320,4 +317,5 @@ export async function findUserByApiKey(db: Database, apiKey: string) {
   });
 }
 
-export { listUserVariants, toUserRecord };
+export { listByUser as listUserVariants } from "../repositories/userVariants";
+export { toUserRecord };

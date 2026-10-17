@@ -66,6 +66,28 @@ function normalizeMime(value: string): string {
   return mime === "image/jpg" ? "image/jpeg" : mime;
 }
 
+async function decodeImage(bytes: Buffer): Promise<{
+  mimeType?: string;
+  width: number;
+  height: number;
+  error?: string;
+}> {
+  try {
+    const metadata = await sharp(bytes, { failOn: "error" }).metadata();
+    return {
+      mimeType: metadata.format ? MIME_BY_FORMAT[metadata.format] : undefined,
+      width: metadata.width ?? 0,
+      height: metadata.height ?? 0,
+    };
+  } catch (error) {
+    return {
+      width: 0,
+      height: 0,
+      error: `not a decodable image (${error instanceof Error ? error.message : "unknown"})`,
+    };
+  }
+}
+
 /**
  * Hashes and decodes the image header; returns problems instead of throwing.
  * A declared raster type that differs from the decoded one is corrected to the
@@ -88,19 +110,9 @@ export async function inspectFile(
     );
   }
 
-  let mimeType: string | undefined;
-  let width = 0;
-  let height = 0;
-  try {
-    const metadata = await sharp(bytes, { failOn: "error" }).metadata();
-    mimeType = metadata.format ? MIME_BY_FORMAT[metadata.format] : undefined;
-    width = metadata.width ?? 0;
-    height = metadata.height ?? 0;
-  } catch (error) {
-    problems.push(
-      `not a decodable image (${error instanceof Error ? error.message : "unknown"})`,
-    );
-  }
+  const decoded = await decodeImage(bytes);
+  const { mimeType, width, height } = decoded;
+  if (decoded.error) problems.push(decoded.error);
   if (!mimeType) {
     problems.push("unsupported image format");
   } else if (meta.contentType && normalizeMime(meta.contentType) !== mimeType) {

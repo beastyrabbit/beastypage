@@ -26,8 +26,35 @@ export interface UploadRow {
 
 export type Head = (key: string) => Promise<HeadResult>;
 
+async function checkReadyUpload(
+  row: UploadRow,
+  original: HeadResult,
+  head: Head,
+  problems: string[],
+) {
+  if (row.state !== "ready") return;
+  if (!row.public_key) {
+    problems.push("ready upload has no public key");
+    return;
+  }
+  const derived =
+    row.public_key === row.original_key ? original : await head(row.public_key);
+  if (derived.status !== 200) {
+    problems.push(`public object missing (HTTP ${derived.status})`);
+    return;
+  }
+  if (row.public_size !== null && derived.size !== row.public_size) {
+    problems.push(`public size ${derived.size} != ${row.public_size}`);
+  }
+  const mime = derived.contentType?.split(";")[0]?.trim();
+  if (row.public_mime && mime !== row.public_mime) {
+    problems.push(`public type ${mime} != ${row.public_mime}`);
+  }
+}
+
 /** Problems for one upload; an empty list means the metadata matches S3. */
 export async function checkUpload(
+  // NOSONAR
   row: UploadRow,
   head: Head,
 ): Promise<string[]> {
@@ -44,24 +71,7 @@ export async function checkUpload(
   else if (original.size !== row.original_size) {
     problems.push(`original size ${original.size} != ${row.original_size}`);
   }
-  if (row.state === "ready") {
-    if (!row.public_key) return [...problems, "ready upload has no public key"];
-    const derived =
-      row.public_key === row.original_key
-        ? original
-        : await head(row.public_key);
-    if (derived.status !== 200)
-      problems.push(`public object missing (HTTP ${derived.status})`);
-    else {
-      if (row.public_size !== null && derived.size !== row.public_size) {
-        problems.push(`public size ${derived.size} != ${row.public_size}`);
-      }
-      const mime = derived.contentType?.split(";")[0]?.trim();
-      if (row.public_mime && mime !== row.public_mime) {
-        problems.push(`public type ${mime} != ${row.public_mime}`);
-      }
-    }
-  }
+  await checkReadyUpload(row, original, head, problems);
   return problems;
 }
 

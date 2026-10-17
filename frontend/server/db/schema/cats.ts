@@ -14,8 +14,8 @@ import type {
   AncestryCat,
   AncestryTreeConfig,
   CatData,
-  CatImageMeta,
   CatShareData,
+  JsonValue,
 } from "../contracts";
 import { createdUpdated, legacyColumns, primaryId, tstz } from "./columns";
 import { files } from "./system";
@@ -112,7 +112,7 @@ export const catImages = pgTable(
       .notNull()
       .references(() => files.id, { onDelete: "restrict" }),
     filename: text("filename"),
-    meta: jsonb("meta").$type<CatImageMeta>(),
+    meta: jsonb("meta").$type<JsonValue>(),
     width: integer("width"),
     height: integer("height"),
     ...createdUpdated(),

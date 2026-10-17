@@ -4174,7 +4174,7 @@
     },
     {
       "file": "frontend/app/api/preview/[id]/route.ts",
-      "line": 298,
+      "line": 274,
       "kind": "query",
       "target": "api.mapper.getBySlug",
       "context": "server"
@@ -4225,7 +4225,7 @@
   "authHookCalls": [
     {
       "file": "frontend/lib/data/auth.tsx",
-      "line": 25,
+      "line": 26,
       "kind": "useConvexAuth",
       "target": "",
       "context": "client"

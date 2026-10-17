@@ -205,117 +205,117 @@ async function renderCatData(
  * 1. /api/preview/{id} - fetch cat data from Convex by ID/slug
  * 2. /api/preview/{id}?cat={encoded} - use encoded cat data directly (for adoption batch cats)
  */
-export async function GET(
+async function renderEncodedPreview(
+  encoded: string,
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id: profileId } = await params;
-  let encodedCatData: string | undefined;
+): Promise<NextResponse> {
+  if (encoded.length > MAX_ENCODED_CAT_DATA_CHARS)
+    return NextResponse.json(
+      { error: "Encoded cat data is too large" },
+      { status: 413 },
+    );
   try {
-    encodedCatData = parseSearchParams(
-      request.nextUrl.searchParams,
-      encodedPreviewQuerySchema,
-    ).cat;
+    const decoded = decodeEncodedCatData(encoded);
+    if (!("data" in decoded)) {
+      const status = decoded.error === "too-large" ? 413 : 400;
+      const error =
+        status === 413
+          ? "Decoded cat data is too large"
+          : "Invalid encoded cat data";
+      return NextResponse.json({ error }, { status });
+    }
+    return await renderCatData(decoded.data, request.signal);
   } catch (error) {
-    return errorResponse(
-      error,
-      "Invalid query parameters",
-      "Invalid query parameters",
+    console.error("Failed to render from encoded data", error);
+    return NextResponse.json(
+      { error: "Failed to render preview" },
+      { status: 500 },
     );
   }
+}
 
-  // Mode 2: Direct cat data provided via query param
-  if (encodedCatData) {
-    if (encodedCatData.length > MAX_ENCODED_CAT_DATA_CHARS) {
+async function renderPostgresPreview(
+  profileId: string,
+  request: NextRequest,
+): Promise<NextResponse> {
+  try {
+    const profile = await findProfile(getDb(), profileId);
+    if (!profile)
       return NextResponse.json(
-        { error: "Encoded cat data is too large" },
-        { status: 413 },
+        { error: "Profile not found", code: "not_found" },
+        { status: 404 },
       );
-    }
-    try {
-      const decoded = decodeEncodedCatData(encodedCatData);
-      if (!("data" in decoded)) {
-        return decoded.error === "too-large"
-          ? NextResponse.json(
-              { error: "Decoded cat data is too large" },
-              { status: 413 },
-            )
-          : NextResponse.json(
-              { error: "Invalid encoded cat data" },
-              { status: 400 },
-            );
-      }
-      return await renderCatData(decoded.data, request.signal);
-    } catch (error) {
-      console.error("Failed to render from encoded data", error);
+    if (!isPlainRecord(profile.catData))
       return NextResponse.json(
-        { error: "Failed to render preview" },
-        { status: 500 },
+        { error: "Cat data not found", code: "not_found" },
+        { status: 404 },
       );
-    }
+    return await renderCatData(profile.catData, request.signal);
+  } catch (error) {
+    console.error("Failed to generate PostgreSQL preview", error);
+    return NextResponse.json(
+      { error: "Failed to generate preview" },
+      { status: 500 },
+    );
   }
+}
 
-  // Mode 1: Look up profile from Convex
-  if (!profileId) {
-    return NextResponse.json({ error: "Missing profile ID" }, { status: 400 });
-  }
-
-  if (dataBackend() === "postgres") {
-    try {
-      const profile = await findProfile(getDb(), profileId);
-      if (!profile)
-        return NextResponse.json(
-          { error: "Profile not found", code: "not_found" },
-          { status: 404 },
-        );
-      const catData = profile.catData;
-      if (!isPlainRecord(catData))
-        return NextResponse.json(
-          { error: "Cat data not found", code: "not_found" },
-          { status: 404 },
-        );
-      return await renderCatData(catData, request.signal);
-    } catch (error) {
-      console.error("Failed to generate PostgreSQL preview", error);
-      return NextResponse.json(
-        { error: "Failed to generate preview" },
-        { status: 500 },
-      );
-    }
-  }
-
+async function renderConvexPreview(
+  profileId: string,
+  request: NextRequest,
+): Promise<NextResponse> {
   const convexUrl = getServerConvexUrl();
-  if (!convexUrl) {
+  if (!convexUrl)
     return NextResponse.json(
       { error: "Convex URL not configured" },
       { status: 500 },
     );
-  }
-
   try {
-    const convex = new ConvexHttpClient(convexUrl);
-
-    const profile = await convex.query(api.mapper.getBySlug, {
-      slugOrId: profileId,
-    });
-    if (!profile) {
+    const profile = await new ConvexHttpClient(convexUrl).query(
+      api.mapper.getBySlug,
+      { slugOrId: profileId },
+    );
+    if (!profile)
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-    }
-
-    const catData = profile.cat_data;
-    if (!isPlainRecord(catData)) {
+    if (!isPlainRecord(profile.cat_data))
       return NextResponse.json(
         { error: "Cat data not found" },
         { status: 400 },
       );
-    }
-
-    return await renderCatData(catData, request.signal);
+    return await renderCatData(profile.cat_data, request.signal);
   } catch (error) {
     console.error("Failed to generate preview", error);
     return NextResponse.json(
       { error: "Failed to generate preview" },
       { status: 500 },
+    );
+  }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id: profileId } = await params;
+  try {
+    const { cat } = parseSearchParams(
+      request.nextUrl.searchParams,
+      encodedPreviewQuerySchema,
+    );
+    if (cat) return renderEncodedPreview(cat, request);
+    if (!profileId)
+      return NextResponse.json(
+        { error: "Missing profile ID" },
+        { status: 400 },
+      );
+    return dataBackend() === "postgres"
+      ? renderPostgresPreview(profileId, request)
+      : renderConvexPreview(profileId, request);
+  } catch (error) {
+    return errorResponse(
+      error,
+      "Invalid query parameters",
+      "Invalid query parameters",
     );
   }
 }

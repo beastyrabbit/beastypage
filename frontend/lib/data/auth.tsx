@@ -8,6 +8,7 @@ import {
   type ReactNode,
   useContext,
   useLayoutEffect,
+  useMemo,
   useRef,
 } from "react";
 import { useDataBackend } from "./backend";
@@ -23,8 +24,12 @@ function ConvexBackendAuthProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
   const { isLoading, isAuthenticated } = useConvexAuth();
+  const value = useMemo(
+    () => ({ isLoading, isAuthenticated }),
+    [isLoading, isAuthenticated],
+  );
   return (
-    <BackendAuthContext.Provider value={{ isLoading, isAuthenticated }}>
+    <BackendAuthContext.Provider value={value}>
       {children}
     </BackendAuthContext.Provider>
   );
@@ -53,13 +58,12 @@ function ClerkBackendAuthProvider({
 }: Readonly<{ children: ReactNode }>) {
   const { isLoaded, isSignedIn, userId } = useAuth();
   useResetQueriesOnUserChange(userId);
+  const value = useMemo(
+    () => ({ isLoading: !isLoaded, isAuthenticated: isSignedIn === true }),
+    [isLoaded, isSignedIn],
+  );
   return (
-    <BackendAuthContext.Provider
-      value={{
-        isLoading: !isLoaded,
-        isAuthenticated: isSignedIn === true,
-      }}
-    >
+    <BackendAuthContext.Provider value={value}>
       {children}
     </BackendAuthContext.Provider>
   );

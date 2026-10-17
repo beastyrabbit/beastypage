@@ -25,6 +25,25 @@ export type JsonFetchInit = Omit<RequestInit, "body"> & {
   nullable?: boolean;
 };
 
+async function parseResponsePayload(response: Response): Promise<unknown> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    try {
+      return await response.json();
+    } catch {
+      return undefined;
+    }
+  }
+  return response.text().catch(() => undefined);
+}
+
+function payloadField(payload: unknown, field: string): string | undefined {
+  if (!payload || typeof payload !== "object" || !(field in payload))
+    return undefined;
+  const value = (payload as Record<string, unknown>)[field];
+  return typeof value === "string" ? value : undefined;
+}
+
 /** Fetch a same-origin JSON API and turn the server error contract into ApiError. */
 export async function fetchJson<T>(
   input: RequestInfo | URL,
@@ -46,29 +65,14 @@ export async function fetchJson<T>(
         : JSON.stringify(requestInit.body),
   });
 
-  const contentType = response.headers.get("content-type") ?? "";
-  let payload: unknown;
-  if (contentType.includes("application/json")) {
-    try {
-      payload = await response.json();
-    } catch {
-      payload = undefined;
-    }
-  } else {
-    payload = await response.text().catch(() => undefined);
-  }
+  const payload = await parseResponsePayload(response);
 
   if (!response.ok) {
     if (nullable && response.status === 404) return null as T;
-    const body = payload && typeof payload === "object" ? payload : null;
     const message =
-      body && "error" in body && typeof body.error === "string"
-        ? body.error
-        : `Request failed with status ${response.status}`;
-    const code =
-      body && "code" in body && typeof body.code === "string"
-        ? body.code
-        : "unknown_error";
+      payloadField(payload, "error") ??
+      `Request failed with status ${response.status}`;
+    const code = payloadField(payload, "code") ?? "unknown_error";
     throw new ApiError(response.status, code, message);
   }
 

@@ -51,11 +51,8 @@ export function useCatStreamSession(enabled = true) {
       enabled,
     },
   );
-  const sessionId = query
-    ? "id" in query
-      ? query.id
-      : String(query._id)
-    : null;
+  let sessionId: string | null = null;
+  if (query) sessionId = "id" in query ? String(query.id) : String(query._id);
   const live = useLive<FunctionReturnType<typeof api.catStream.getSession>>(
     sessionId ? `cat-stream/${sessionId}` : null,
     { enabled: backend === "postgres" && enabled },
@@ -79,11 +76,8 @@ export function useCatStreamSessionByApiKey(apiKey: string, enabled = true) {
       enabled: enabled && Boolean(apiKey),
     },
   );
-  const sessionId = query
-    ? "id" in query
-      ? query.id
-      : String(query._id)
-    : null;
+  let sessionId: string | null = null;
+  if (query) sessionId = "id" in query ? String(query.id) : String(query._id);
   const eventSource = useMemo(
     () => (url: string) =>
       new EventSource(`${url}?key=${encodeURIComponent(apiKey)}`),
@@ -362,11 +356,15 @@ export function useStreamParticipants(
       "stream.participants",
       args === "skip" ? {} : args,
     ),
-    queryFn: (input, signal) =>
-      get<FunctionReturnType<typeof api.streamParticipantsV2.list>>(
-        `/api/stream/participants?session=${String(input.session)}&${input.viewerSession ? `viewerSession=${encodeURIComponent(input.viewerSession)}&` : ""}limit=${input.limit}`,
+    queryFn: (input, signal) => {
+      const viewerParam = input.viewerSession
+        ? `viewerSession=${encodeURIComponent(input.viewerSession)}&`
+        : "";
+      return get<FunctionReturnType<typeof api.streamParticipantsV2.list>>(
+        `/api/stream/participants?session=${String(input.session)}&${viewerParam}limit=${input.limit}`,
         signal,
-      ),
+      );
+    },
   });
   const id = args === "skip" ? null : String(args.session);
   const viewerSession = args === "skip" ? undefined : args.viewerSession;
@@ -394,11 +392,15 @@ export function useStreamVotes(
   const backend = useDataBackend();
   const query = useDataQuery(api.streamVotesV2.list, args, {
     queryKey: dataQueryKeys.list("stream.votes", args === "skip" ? {} : args),
-    queryFn: (input, signal) =>
-      get<FunctionReturnType<typeof api.streamVotesV2.list>>(
-        `/api/stream/votes?session=${String(input.session)}&${input.stepId ? `stepId=${encodeURIComponent(input.stepId)}&` : ""}limit=${input.limit}`,
+    queryFn: (input, signal) => {
+      const stepParam = input.stepId
+        ? `stepId=${encodeURIComponent(input.stepId)}&`
+        : "";
+      return get<FunctionReturnType<typeof api.streamVotesV2.list>>(
+        `/api/stream/votes?session=${String(input.session)}&${stepParam}limit=${input.limit}`,
         signal,
-      ),
+      );
+    },
   });
   const id = args === "skip" ? null : String(args.session);
   const stepId = args === "skip" ? undefined : args.stepId;

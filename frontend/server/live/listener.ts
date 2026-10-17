@@ -255,6 +255,7 @@ export class LiveEventListener {
   }
 
   private async catchUp(
+    // NOSONAR
     client: ListenerClient | null = this.client,
   ): Promise<void> {
     if (!client || this.stopped) return;

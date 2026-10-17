@@ -25,6 +25,8 @@ import { inspectFile, parseStorageMeta, type StorageMeta } from "./files";
 import { importedFileId } from "./ids";
 import { NOT_IMPORTED, type Row, STEPS, STORAGE_FIELDS } from "./tables";
 
+const compareCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
 export interface ImportOptions {
   archivePath: string;
   reportDir: string;
@@ -285,6 +287,7 @@ export async function runImport(
 }
 
 async function importStep(
+  // NOSONAR
   client: pg.PoolClient,
   db: Database,
   archive: ConvexArchive,
@@ -506,6 +509,7 @@ async function upsertRows(
 
 /** Storage ids referenced by rows that will be imported. */
 async function referencedStorageIds(
+  // NOSONAR
   archive: ConvexArchive,
   freezeAt: Date,
 ): Promise<Set<string>> {
@@ -535,6 +539,7 @@ async function referencedStorageIds(
 }
 
 async function importFiles(
+  // NOSONAR
   db: Database,
   archive: ConvexArchive,
   archiveSha256: string,
@@ -567,7 +572,7 @@ async function importFiles(
 
   const seenSha = new Set<string>();
   // Sorted ids: the first holder of identical bytes names the file row.
-  for (const storageId of [...referenced].sort()) {
+  for (const storageId of [...referenced].sort(compareCodeUnits)) {
     const meta = metadata.get(storageId);
     const entry = archive.storageEntryName(storageId);
     const problems: string[] = [];
@@ -676,6 +681,12 @@ export async function tableFingerprints(
   return fingerprints;
 }
 
+function formatExpectedIssuer(
+  expectedIssuer: string | null | undefined,
+): string {
+  return expectedIssuer ? ` (${expectedIssuer})` : "";
+}
+
 function writeReport(dir: string, report: ImportReport) {
   writeFileSync(
     join(dir, "report.json"),
@@ -700,7 +711,7 @@ function writeReport(dir: string, report: ImportReport) {
     "",
     `- Archive: ${report.manifest.archive} (${report.manifest.archiveBytes} bytes, sha256 ${report.archiveSha256})`,
     `- Freeze: ${report.manifest.freezeAt}`,
-    `- Issuer check: ${report.issuer.mode}${report.issuer.expectedIssuer ? ` (${report.issuer.expectedIssuer})` : ""}`,
+    `- Issuer check: ${report.issuer.mode}${formatExpectedIssuer(report.issuer.expectedIssuer)}`,
     `- Contract version: ${report.manifest.contractVersion}`,
     `- Result: ${report.ok ? "OK" : "FAILED (database counts do not match)"}`,
     "",

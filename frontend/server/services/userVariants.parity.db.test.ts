@@ -104,7 +104,7 @@ describe("user variants Convex/PostgreSQL parity", () => {
         variants: batch,
       }),
     ).toMatchObject({ imported: 2, total: 2 });
-    expect((await list(db, owner)).length).toBe(
+    expect(await list(db, owner)).toHaveLength(
       (await convexOwner.query(api.userVariants.listAll, {})).length,
     );
 

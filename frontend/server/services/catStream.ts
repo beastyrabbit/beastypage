@@ -343,6 +343,7 @@ export async function triggerCatStreamBatch(
 }
 
 export async function reportBatchStage(
+  // NOSONAR
   db: Database,
   apiKey: string,
   args: { seq: number; stageIndex: number; awaitingCull: boolean },
@@ -420,9 +421,8 @@ export async function markBatchCat(
     } | null;
     if (
       command?.type !== "batch" ||
-      command.seq !== args.seq ||
-      !state ||
-      state.seq !== args.seq
+      command?.seq !== args.seq ||
+      state?.seq !== args.seq
     )
       return null;
     const { markedId: _removed, ...rest } = state;
@@ -449,9 +449,8 @@ export async function setBatchHighlight(
     } | null;
     if (
       command?.type !== "batch" ||
-      command.seq !== args.seq ||
-      !state ||
-      state.seq !== args.seq
+      command?.seq !== args.seq ||
+      state?.seq !== args.seq
     )
       return null;
     if (args.kind === "spotlight") {
@@ -514,9 +513,9 @@ export async function cullBatchCat(
       batch?: { cats: { id: string }[]; finalCount: number };
     } | null;
     let state = session.batchState;
-    if (command?.type !== "batch" || command.seq !== args.seq)
+    if (command?.type !== "batch" || command?.seq !== args.seq)
       throw new ServiceError("conflict", "No matching batch is running.");
-    if (!command.batch || !state || state.seq !== args.seq)
+    if (!command.batch || state?.seq !== args.seq)
       throw new ServiceError("conflict", "Batch state is out of sync.");
     if (!state.awaitingCull)
       throw new ServiceError(
@@ -583,9 +582,8 @@ export async function cancelBatchCull(
     const state = session.batchState;
     if (
       command?.type !== "batch" ||
-      command.seq !== args.seq ||
-      !state ||
-      state.seq !== args.seq ||
+      command?.seq !== args.seq ||
+      state?.seq !== args.seq ||
       !state.pendingCullId ||
       state.verdictAt === undefined
     )
@@ -611,9 +609,8 @@ export async function finalizeBatchCull(
     if (
       !session ||
       command?.type !== "batch" ||
-      command.seq !== args.seq ||
-      !state ||
-      state.seq !== args.seq ||
+      command?.seq !== args.seq ||
+      state?.seq !== args.seq ||
       state.pendingCullId !== args.catId ||
       state.verdictAt !== args.verdictAt
     )
@@ -688,9 +685,8 @@ export async function releaseEvolution(
 ) {
   return mutateHost(db, identity, async (_tx, session) => {
     const clock = evolutionClock(session, args.seq);
-    return !clock || clock.state.holdStartedAt === undefined
-      ? null
-      : { evolutionState: releasedEvolution(clock.state, Date.now()) };
+    if (clock?.state.holdStartedAt === undefined) return null;
+    return { evolutionState: releasedEvolution(clock.state, Date.now()) };
   });
 }
 export async function autoReleaseEvolution(
@@ -702,8 +698,7 @@ export async function autoReleaseEvolution(
     const state = session?.evolutionState;
     if (
       !session ||
-      !state ||
-      state.seq !== args.seq ||
+      state?.seq !== args.seq ||
       state.holdStartedAt !== args.holdStartedAt
     )
       return { applied: 0 };

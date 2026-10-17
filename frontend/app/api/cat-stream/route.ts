@@ -106,6 +106,7 @@ const bodySchema = z
         require("awaitingCull", "Awaiting-cull flag is required");
         break;
       case "markBatchCat":
+      case "cullBatchCat":
         require("seq", "Sequence is required");
         require("catId", "Cat id is required");
         break;
@@ -113,10 +114,6 @@ const bodySchema = z
         require("seq", "Sequence is required");
         require("catId", "Cat id is required");
         require("kind", "Highlight kind is required");
-        break;
-      case "cullBatchCat":
-        require("seq", "Sequence is required");
-        require("catId", "Cat id is required");
         break;
       case "cancelBatchCull":
       case "holdEvolution":

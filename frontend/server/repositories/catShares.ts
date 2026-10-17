@@ -5,7 +5,7 @@ import type { Database } from "../db/pool";
 import { catShares } from "../db/schema";
 
 export type CatSharesTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
-export type CatSharesDb = Database | CatSharesTx;
+export type CatSharesDb = Database;
 
 export async function findShare(db: CatSharesDb, slug: string) {
   const [row] = await db

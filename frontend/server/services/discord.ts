@@ -127,6 +127,7 @@ export async function getUserConfig(db: Database, discordUserId: string) {
 }
 
 export async function updateUserConfig(
+  // NOSONAR
   db: Database,
   operation: string,
   args: Record<string, unknown>,

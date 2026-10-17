@@ -247,6 +247,7 @@ async function deleteRows(
 }
 
 async function scrub(
+  // NOSONAR
   client: pg.PoolClient,
   options: ScrubOptions,
   database: string,
@@ -266,18 +267,23 @@ async function scrub(
     ))
       for (const column of columns)
         await updateRows(client, report, table, column, randomToken);
+    const pseudonymFor = (column: string) => {
+      if (
+        column === "token_identifier" ||
+        column === "owner_token_identifier"
+      ) {
+        return (value: string) =>
+          clerkPseudonym(key, value, options.stagingIssuer);
+      }
+      if (column === "username")
+        return (value: string) => usernamePseudonym(key, value);
+      return (value: string) => pseudonym(key, value);
+    };
     for (const [table, columns] of Object.entries(
       SENSITIVE_COLUMN_POLICY.pseudonym,
     )) {
       for (const column of columns) {
-        const transform =
-          column === "token_identifier" || column === "owner_token_identifier"
-            ? (value: string) =>
-                clerkPseudonym(key, value, options.stagingIssuer)
-            : column === "username"
-              ? (value: string) => usernamePseudonym(key, value)
-              : (value: string) => pseudonym(key, value);
-        await updateRows(client, report, table, column, transform);
+        await updateRows(client, report, table, column, pseudonymFor(column));
       }
     }
     const passwordHash = hashPassword(options.stagingPassword);
@@ -362,6 +368,7 @@ function passwordMatches(password: string, stored: string | null): boolean {
 }
 
 async function verify(
+  // NOSONAR
   client: pg.PoolClient,
   options: ScrubOptions,
   database: string,

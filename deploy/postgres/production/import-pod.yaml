@@ -51,10 +51,11 @@ spec:
         requests:
           cpu: 100m
           memory: 256Mi
+          ephemeral-storage: 2Gi
         limits:
           cpu: "2"
           memory: 2Gi
-          ephemeral-storage: 2Gi
+          ephemeral-storage: 4Gi
       volumeMounts:
         - name: archive
           mountPath: /work/archive

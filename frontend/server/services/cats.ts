@@ -6,7 +6,7 @@ import { catImageMeta, catProfileData } from "../db/contracts";
 import type { Database } from "../db/pool";
 import { withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
-import type { CatsDb } from "../repositories/cats";
+import type { CatsDb, CatsTx } from "../repositories/cats";
 import {
   findImage,
   findProfile,
@@ -26,6 +26,12 @@ import {
 const SLUG_ALPHABET =
   "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const CAT_SLUG_LENGTH = 8;
+
+type ImageReference = {
+  url: string;
+  name: string | null;
+  meta?: unknown;
+};
 const MAX_SLUG_ATTEMPTS = 6;
 
 export type PreviewPayload = {
@@ -114,7 +120,9 @@ async function uniqueSlug(
 async function imageRefs(db: CatsDb, profileId: string) {
   const rows = await listImageRows(db, profileId);
   const byKind = new Map(rows.map((row) => [row.kind, row]));
-  const build = (kind: "tiny" | "preview" | "full" | "spriteSheet") => {
+  const build = (
+    kind: "tiny" | "preview" | "full" | "spriteSheet",
+  ): ImageReference | null => {
     const row = byKind.get(kind);
     if (!row) return null;
     const base = {
@@ -129,6 +137,34 @@ async function imageRefs(db: CatsDb, profileId: string) {
     full: build("full"),
     spriteSheet: build("spriteSheet"),
   };
+}
+
+async function applyImageUpdate(
+  tx: CatsTx,
+  profileId: string,
+  kind: "tiny" | "preview" | "full" | "spriteSheet",
+  payload: { fileId: string; filename?: string; meta?: unknown },
+) {
+  const checked = catImageMeta.safeParse(payload.meta ?? null);
+  if (!checked.success)
+    throw new ServiceError("invalid_input", "Invalid image metadata");
+  const existing = await findImage(tx, profileId, kind);
+  if (existing) {
+    await updateImage(tx, existing.id, {
+      fileId: payload.fileId,
+      updatedAt: new Date(),
+      ...(payload.filename !== undefined ? { filename: payload.filename } : {}),
+      ...(payload.meta !== undefined ? { meta: checked.data } : {}),
+    });
+    return;
+  }
+  await insertImage(tx, {
+    catProfileId: profileId,
+    kind,
+    fileId: payload.fileId,
+    filename: payload.filename ?? null,
+    meta: checked.data,
+  } as ImageInsert);
 }
 
 async function toClient(db: CatsDb, row: ProfileRow) {
@@ -309,28 +345,7 @@ export async function applyPreviewUpdates(
       { fileId: string; filename?: string; meta?: unknown } | undefined,
     ][]) {
       if (!payload) continue;
-      const checked = catImageMeta.safeParse(payload.meta ?? null);
-      if (!checked.success)
-        throw new ServiceError("invalid_input", "Invalid image metadata");
-      const existing = await findImage(tx, row.id, kind);
-      if (existing) {
-        await updateImage(tx, existing.id, {
-          fileId: payload.fileId,
-          updatedAt: new Date(),
-          ...(payload.filename !== undefined
-            ? { filename: payload.filename }
-            : {}),
-          ...(payload.meta !== undefined ? { meta: checked.data } : {}),
-        });
-      } else {
-        await insertImage(tx, {
-          catProfileId: row.id,
-          kind,
-          fileId: payload.fileId,
-          filename: payload.filename ?? null,
-          meta: checked.data,
-        } as ImageInsert);
-      }
+      await applyImageUpdate(tx, row.id, kind, payload);
     }
     await updatePreviewTimestamp(tx, row.id, new Date(args.previewsUpdatedAt));
     const updated = await lockProfile(tx, row.id);

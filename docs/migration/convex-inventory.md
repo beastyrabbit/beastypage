@@ -294,7 +294,7 @@ Shared validators with `v.any()`: evolutionCommandValidator.cats[].additions, ev
 
 ## Auth hook calls
 
-- useConvexAuth at `frontend/lib/data/auth.tsx:25`
+- useConvexAuth at `frontend/lib/data/auth.tsx:26`
 
 ## Server-side calls
 
@@ -325,7 +325,7 @@ Shared validators with `v.any()`: evolutionCommandValidator.cats[].additions, ev
 | mutation | `api.paletteGeneratorSettings.save` | server | `frontend/app/api/palette-generator-settings/route.ts:12` |
 | query | `api.pixelatorSettings.get` | server | `frontend/app/api/pixelator-settings/route.ts:9` |
 | mutation | `api.pixelatorSettings.save` | server | `frontend/app/api/pixelator-settings/route.ts:10` |
-| query | `api.mapper.getBySlug` | server | `frontend/app/api/preview/[id]/route.ts:298` |
+| query | `api.mapper.getBySlug` | server | `frontend/app/api/preview/[id]/route.ts:274` |
 | query | `api.singleCatSettings.get` | server | `frontend/app/api/single-cat-settings/route.ts:7` |
 | mutation | `api.singleCatSettings.save` | server | `frontend/app/api/single-cat-settings/route.ts:8` |
 | query | `api.dashSettings.get` | server | `frontend/app/dash/page.tsx:42` |

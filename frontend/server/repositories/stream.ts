@@ -6,7 +6,7 @@ import { streamParticipants, streamSessions, streamVotes } from "../db/schema";
 import type { Transaction } from "../db/transaction";
 import { creationTimestamp } from "../pagination";
 
-type Db = Database | Transaction;
+type Db = Database;
 
 export async function selectStreamSession(db: Db, id: string) {
   const [row] = await db

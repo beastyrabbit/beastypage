@@ -5,7 +5,7 @@ import type { Database } from "../db/pool";
 import { paletteGeneratorSettings } from "../db/schema";
 
 export type PaletteTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
-export type PaletteDb = Database | PaletteTx;
+export type PaletteDb = Database;
 
 export async function findPalette(db: PaletteDb, slug: string) {
   const [row] = await db

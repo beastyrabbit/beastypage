@@ -171,9 +171,8 @@ async function main(): Promise<void> {
       return;
     case "status": {
       const settings = readSettings();
-      console.log(
-        `${container}: ${containerState()}${settings ? ` (127.0.0.1:${settings.port})` : ""}`,
-      );
+      const address = settings ? ` (127.0.0.1:${settings.port})` : "";
+      console.log(`${container}: ${containerState()}${address}`);
       return;
     }
     case "url": {

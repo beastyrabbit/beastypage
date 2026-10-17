@@ -236,9 +236,7 @@ export async function countSeasons(db: Database): Promise<number> {
   return Number(row?.count ?? 0);
 }
 
-export async function listRarities(
-  db: Database | import("../db/transaction").Transaction,
-): Promise<RarityPayload[]> {
+export async function listRarities(db: Database): Promise<RarityPayload[]> {
   const rows = await selectRarities(db);
   return rows
     .sort((a, b) => (a.stars ?? 0) - (b.stars ?? 0))

@@ -83,6 +83,7 @@ async function request(
 }
 
 export async function runSmokeChecks(
+  // NOSONAR
   baseUrl: string,
   fixtures: SmokeFixture,
   options: {

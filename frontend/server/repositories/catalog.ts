@@ -19,7 +19,7 @@ import {
 
 export { selectCatdexByOwner } from "./catalog-owner";
 
-type Db = Database | Transaction;
+type Db = Database;
 
 export async function selectSeasons(db: Db) {
   return db

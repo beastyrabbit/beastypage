@@ -13,7 +13,7 @@ import {
 import { isUuid } from "./legacyLinks";
 
 export type CatsTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
-export type CatsDb = Database | CatsTx;
+export type CatsDb = Database;
 
 export async function findProfile(db: CatsDb, slugOrId: string) {
   const [bySlug] = await db

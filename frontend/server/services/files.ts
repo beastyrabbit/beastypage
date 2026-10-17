@@ -49,7 +49,7 @@ export interface StoreFileOptions {
  * UNSUPPORTED_MEDIA_TYPE or INVALID_IMAGE as the message.
  */
 export async function storeFile(
-  db: Database | Transaction,
+  db: Database,
   bytes: Buffer,
   declaredType: string,
   options: StoreFileOptions,

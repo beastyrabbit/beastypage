@@ -13,7 +13,7 @@ import {
 import { isUuid } from "./legacyLinks";
 
 export type AdoptionTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
-export type AdoptionDb = Database | AdoptionTx;
+export type AdoptionDb = Database;
 
 export async function findBatch(db: AdoptionDb, slugOrId: string) {
   const [bySlug] = await db

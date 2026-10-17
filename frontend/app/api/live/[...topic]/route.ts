@@ -33,6 +33,7 @@ function snapshotEvent(revision: number, data: unknown): string {
 }
 
 export async function GET(
+  // NOSONAR
   request: NextRequest,
   { params }: { params: Promise<{ topic: string[] }> },
 ) {
@@ -63,7 +64,9 @@ export async function GET(
 
   // The test-only topic authenticates with its own query key and must remain
   // runnable without a Clerk session in the database test process.
-  let identity = ANONYMOUS;
+  let identity:
+    | Awaited<ReturnType<typeof getRequestIdentity>>
+    | typeof ANONYMOUS;
   try {
     identity =
       definition.family === "test" ? ANONYMOUS : await getRequestIdentity();

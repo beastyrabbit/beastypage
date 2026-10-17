@@ -82,11 +82,15 @@ export function useUserVariants(toolKey?: string, enabled = true) {
     (toolKey ? args : "skip") as never,
     {
       queryKey: dataQueryKeys.list("userVariants", args),
-      queryFn: (_, signal) =>
-        get<FunctionReturnType<typeof api.userVariants.list>>(
-          `/api/user-variants${toolKey ? `?toolKey=${encodeURIComponent(toolKey)}` : ""}`,
+      queryFn: (_, signal) => {
+        const toolParam = toolKey
+          ? `?toolKey=${encodeURIComponent(toolKey)}`
+          : "";
+        return get<FunctionReturnType<typeof api.userVariants.list>>(
+          `/api/user-variants${toolParam}`,
           signal,
-        ),
+        );
+      },
       enabled,
     },
   );

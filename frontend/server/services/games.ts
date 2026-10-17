@@ -53,18 +53,29 @@ function stableStringify(value: unknown): string {
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
     return `{${Object.keys(record)
-      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+      .sort(compareCodeUnits)
       .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
       .join(",")}}`;
   }
   return JSON.stringify(value);
 }
 
+function compareCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function codeUnitAt(value: string, index: number): number {
+  const codePoint = value.codePointAt(index) ?? 0;
+  return codePoint <= 0xffff
+    ? codePoint
+    : 0xd800 + ((codePoint - 0x10000) >> 10);
+}
+
 function hashCatParams(params: unknown): string {
   const input = stableStringify(params);
   let hash = 5381;
   for (let index = 0; index < input.length; index += 1) {
-    hash = (hash * 33) ^ input.charCodeAt(index);
+    hash = (hash * 33) ^ codeUnitAt(input, index);
     hash >>>= 0;
   }
   return hash.toString(16);
@@ -89,7 +100,7 @@ function sanitizeCat(cat: typeof perfectCats.$inferSelect) {
 }
 
 function pairKey(left: string, right: string) {
-  return [left, right].sort().join("__");
+  return [left, right].sort(compareCodeUnits).join("__");
 }
 
 function chooseRandom<T>(values: T[]): T | null {

@@ -44,7 +44,7 @@ export async function publishLive(
 
 /** Deletes events older than the caller's retention cutoff. */
 export async function pruneLiveEvents(
-  db: Database | Transaction,
+  db: Database,
   olderThan: Date,
 ): Promise<number> {
   const result = await db

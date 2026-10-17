@@ -19,11 +19,10 @@ export async function GET(request: Request) {
       new URL(request.url).searchParams,
       querySchema,
     );
-    const ids = parsed.userId
-      ? Array.isArray(parsed.userId)
-        ? parsed.userId
-        : [parsed.userId]
-      : [];
+    let ids: string[] = [];
+    if (parsed.userId) {
+      ids = Array.isArray(parsed.userId) ? parsed.userId : [parsed.userId];
+    }
     return NextResponse.json(
       await resolveUsernames(getDb(), await getRequestIdentity(), ids),
     );

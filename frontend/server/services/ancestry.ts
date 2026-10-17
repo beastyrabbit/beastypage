@@ -80,13 +80,21 @@ function hashPassword(password: string) {
 }
 
 function legacyHash(value: string) {
+  const codeUnitAt = (index: number) => {
+    const codePoint = value.codePointAt(index) ?? 0;
+    return codePoint <= 0xffff
+      ? codePoint
+      : 0xd800 + ((codePoint - 0x10000) >> 10);
+  };
+  const toInt32 = (number: number) => {
+    const unsigned = ((Math.trunc(number) % 2 ** 32) + 2 ** 32) % 2 ** 32;
+    return unsigned >= 2 ** 31 ? unsigned - 2 ** 32 : unsigned;
+  };
   let hash = 0;
   for (let i = 0; i < value.length; i++)
-    hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
+    hash = toInt32(hash * 32 - hash + codeUnitAt(i));
   const salt =
-    value.length +
-    (value.charCodeAt(0) || 0) +
-    (value.charCodeAt(value.length - 1) || 0);
+    value.length + (codeUnitAt(0) || 0) + (codeUnitAt(value.length - 1) || 0);
   return `${hash.toString(36)}-${salt.toString(36)}`;
 }
 

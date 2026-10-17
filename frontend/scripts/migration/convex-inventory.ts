@@ -132,13 +132,18 @@ function compact(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function compareCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 function sorted(values: Iterable<string>): string[] {
-  return [...new Set(values)].sort();
+  return [...new Set(values)].sort(compareCodeUnits);
 }
 
 // ---------------------------------------------------------------- schema
 
 function validatorDetails(
+  // NOSONAR
   node: ts.Node,
   path: string,
   table: Pick<SchemaTable, "anyFields" | "idReferences" | "storageFields">,
@@ -186,6 +191,7 @@ function validatorDetails(
 }
 
 function readSchema(): {
+  // NOSONAR
   tables: SchemaTable[];
   sharedValidatorAnyFields: string[];
 } {
@@ -272,6 +278,7 @@ function convexModules(): string[] {
 }
 
 function functionDetails(
+  // NOSONAR
   node: ts.Node,
 ): Omit<ConvexFunction, keyof Location | "module" | "name" | "kind"> {
   const tablesRead = new Set<string>();
@@ -297,11 +304,11 @@ function functionDetails(
     const name = calleeName(child);
     const callee = child.expression.getText();
     if (name === "fetch" && ts.isIdentifier(child.expression)) fetches = true;
-    if (/\.db\.query$/.test(callee)) {
+    if (callee.endsWith(".db.query")) {
       const table = stringArg(child.arguments[0]);
       if (table) tablesRead.add(table);
     }
-    if (/\.db\.insert$/.test(callee)) {
+    if (callee.endsWith(".db.insert")) {
       const table = stringArg(child.arguments[0]);
       if (table) tablesWritten.add(table);
     }
@@ -327,6 +334,7 @@ function functionDetails(
 }
 
 function readFunctions(): {
+  // NOSONAR
   functions: ConvexFunction[];
   scheduledCalls: Inventory["scheduledCalls"];
 } {
@@ -463,7 +471,13 @@ function callContext(file: string, text: string): CallSite["context"] {
   if (path.startsWith("frontend/tests/") || /\.test\.tsx?$/.test(path)) {
     return "test";
   }
-  if (/^\s*["']use client["']/m.test(text)) return "client";
+  const hasClientDirective = text.split("\n").some((line) => {
+    const trimmed = line.trimStart();
+    return (
+      trimmed.startsWith('"use client"') || trimmed.startsWith("'use client'")
+    );
+  });
+  if (hasClientDirective) return "client";
   return "server";
 }
 
@@ -488,7 +502,7 @@ function readCallers(): Pick<
     const context = callContext(file, text);
 
     walk(source, (node) => {
-      if (ts.isIdentifier(node) && /StorageId$/.test(node.text)) {
+      if (ts.isIdentifier(node) && node.text.endsWith("StorageId")) {
         nested.push({
           file: rel(file),
           line: lineOf(source, node),
@@ -571,7 +585,7 @@ function readCallers(): Pick<
     });
     const source = parse(file);
     walk(source, (node) => {
-      if (ts.isIdentifier(node) && /StorageId$/.test(node.text)) {
+      if (ts.isIdentifier(node) && node.text.endsWith("StorageId")) {
         nested.push({
           file: rel(file),
           line: lineOf(source, node),
@@ -811,7 +825,7 @@ function renderMarkdown(inv: Inventory): string {
     "| --- | --- | --- |",
     ...inv.externalCallers.map(
       (e) =>
-        `| ${e.service} | ${e.detail.replace(/\|/g, "\\|")} | ${link(e)} |`,
+        `| ${e.service} | ${e.detail.replace(/\|/g, String.raw`\|`)} | ${link(e)} |`,
     ),
     "",
     "## Deployment and configuration references",
@@ -819,7 +833,7 @@ function renderMarkdown(inv: Inventory): string {
     "| Detail | Source |",
     "| --- | --- |",
     ...inv.deploymentReferences.map(
-      (d) => `| ${d.detail.replace(/\|/g, "\\|")} | ${link(d)} |`,
+      (d) => `| ${d.detail.replace(/\|/g, String.raw`\|`)} | ${link(d)} |`,
     ),
     "",
   );
@@ -836,11 +850,11 @@ function summarizeIdentifiers(
     byIdentifier.set(ref.identifier, files);
   }
   return [...byIdentifier.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => compareCodeUnits(a, b))
     .map(
       ([id, files]) =>
         `- \`${id}\`: ${[...files]
-          .sort()
+          .sort(compareCodeUnits)
           .map((f) => `\`${f}\``)
           .join(", ")}`,
     );

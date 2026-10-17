@@ -178,7 +178,6 @@ export const catProfileData = capped(catData, 900 * KIB, "cat_profile.catData");
 
 /** No reader uses `cat_images.meta`; it is kept as bounded JSON. */
 export const catImageMeta = capped(jsonValue, 64 * KIB, "cat_images.meta");
-export type CatImageMeta = JsonValue;
 
 /** `CatShareStoredPayloadV1` (v: 1) and the canonical-only v: 2. */
 export const catShareData = capped(

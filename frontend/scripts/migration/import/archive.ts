@@ -4,6 +4,8 @@ import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
 import yauzl from "yauzl";
 
+const compareCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
 /**
  * Read-only view of a Convex export ZIP:
  *   <table>/documents.jsonl, _storage/documents.jsonl, _storage/<id>[.<ext>],
@@ -51,7 +53,7 @@ export class ConvexArchive {
     return [...this.entries.keys()]
       .map((name) => /^([^/_][^/]*)\/documents\.jsonl$/.exec(name)?.[1])
       .filter((name): name is string => Boolean(name))
-      .sort();
+      .sort(compareCodeUnits);
   }
 
   has(name: string): boolean {

@@ -76,10 +76,11 @@ export async function searchUsersByUsernamePrefix(
   tx: Transaction,
   prefix: string,
 ) {
+  const escapedPrefix = `${prefix}%`;
   return tx
     .select()
     .from(users)
-    .where(sql`${users.usernameSearch} like ${`${prefix}%`} escape '\\'`)
+    .where(sql`${users.usernameSearch} like ${escapedPrefix} escape '\\'`)
     .orderBy(asc(users.usernameSearch), asc(users.id))
     .limit(10);
 }

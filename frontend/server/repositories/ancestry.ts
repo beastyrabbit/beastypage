@@ -12,7 +12,7 @@ import {
 } from "../pagination";
 
 export type AncestryTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
-export type AncestryDb = Database | AncestryTx;
+export type AncestryDb = Database;
 
 export async function findTree(db: AncestryDb, slug: string) {
   const [row] = await db

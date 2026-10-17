@@ -13,6 +13,7 @@ import type { Database } from "../db/pool";
 import { withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
 import {
+  type AdoptionTx,
   findBatch,
   findProfileForCat,
   findUniqueSlug,
@@ -142,6 +143,47 @@ async function toClient(db: Database, row: BatchRow) {
   };
 }
 
+async function uniqueBatchSlug(tx: AdoptionTx): Promise<string> {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const candidate = slug();
+    if (!(await findUniqueSlug(tx, candidate))) return candidate;
+  }
+  throw new ServiceError(
+    "conflict",
+    "Failed to generate unique slug after several attempts",
+  );
+}
+
+async function profileRowsForBatch(
+  tx: AdoptionTx,
+  cats: AdoptionCatInput[],
+  identity: Identity,
+) {
+  const profileRows: Array<Awaited<
+    ReturnType<typeof findProfileForCat>
+  > | null> = [];
+  for (const cat of cats) {
+    if (!cat.profileId) {
+      profileRows.push(null);
+      continue;
+    }
+    const profile = await findProfileForCat(tx, cat.profileId);
+    if (!profile) throw new ServiceError("not_found", "Profile not found");
+    const owned = profile.ownerTokenIdentifier === identity.tokenIdentifier;
+    if (
+      !(profile.ownerTokenIdentifier && owned) &&
+      !tokenMatches(cat.editToken, profile.editToken)
+    ) {
+      throw new ServiceError(
+        "forbidden",
+        "Not authorized to edit this profile",
+      );
+    }
+    profileRows.push(profile);
+  }
+  return profileRows;
+}
+
 export async function getBatch(db: Database, slugOrId: string) {
   const row = await findBatch(db, slugOrId);
   return row ? toClient(db, row) : null;
@@ -178,44 +220,10 @@ export async function createBatch(
 ) {
   const settings = validateCats(args.cats, args.settings);
   return withTransaction(db, async (tx) => {
-    let batchSlug = "";
-    for (let attempt = 0; attempt < 6; attempt++) {
-      const candidate = slug();
-      if (!(await findUniqueSlug(tx, candidate))) {
-        batchSlug = candidate;
-        break;
-      }
-    }
-    if (!batchSlug)
-      throw new ServiceError(
-        "conflict",
-        "Failed to generate unique slug after several attempts",
-      );
+    const batchSlug = await uniqueBatchSlug(tx);
     const now = new Date();
     const batchEditToken = randomUUID();
-    const profileRows: Array<Awaited<
-      ReturnType<typeof findProfileForCat>
-    > | null> = [];
-    for (const cat of args.cats) {
-      if (!cat.profileId) {
-        profileRows.push(null);
-        continue;
-      }
-      const profile = await findProfileForCat(tx, cat.profileId);
-      if (!profile) throw new ServiceError("not_found", "Profile not found");
-      if (
-        !(
-          profile.ownerTokenIdentifier &&
-          profile.ownerTokenIdentifier === identity.tokenIdentifier
-        ) &&
-        !tokenMatches(cat.editToken, profile.editToken)
-      )
-        throw new ServiceError(
-          "forbidden",
-          "Not authorized to edit this profile",
-        );
-      profileRows.push(profile);
-    }
+    const profileRows = await profileRowsForBatch(tx, args.cats, identity);
     const batch = await insertBatch(tx, {
       slug: batchSlug,
       editToken: batchEditToken,
