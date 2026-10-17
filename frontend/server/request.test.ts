@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { parseJsonBody, parseSearchParams } from "./request";
+import {
+  DEFAULT_JSON_BODY_BYTES,
+  parseJsonBody,
+  parseSearchParams,
+} from "./request";
 
 describe("request parsing", () => {
   const schema = z.object({ name: z.string().min(1) });
@@ -57,5 +61,14 @@ describe("request parsing", () => {
         optional,
       ),
     ).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(
+      parseJsonBody(
+        new Request("http://localhost", {
+          method: "POST",
+          body: JSON.stringify({ name: "x".repeat(DEFAULT_JSON_BODY_BYTES) }),
+        }),
+        optional,
+      ),
+    ).rejects.toMatchObject({ code: "payload_too_large" });
   });
 });

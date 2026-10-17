@@ -8,10 +8,16 @@ import {
   type PreviewUpdateInput,
   upsertMapperPreviews,
 } from "@/server/services/previews";
+
+// Up to four image data URLs of at most 24 MiB each (previewUpdateSchema).
+const PREVIEW_BODY_BYTES = 4 * 24 * 1024 * 1024 + 64 * 1024;
+
 export async function POST(request: NextRequest) {
   let payload: PreviewUpdateInput;
   try {
-    payload = await parseJsonBody(request, previewUpdateSchema);
+    payload = await parseJsonBody(request, previewUpdateSchema, {
+      maxBytes: PREVIEW_BODY_BYTES,
+    });
   } catch (error) {
     return errorResponse(error, "Invalid request body", "Invalid request body");
   }
