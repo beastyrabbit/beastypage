@@ -238,9 +238,12 @@ throughout. Then:
 4. Restart the frontend so its `/etc/postgres-ca/ca.crt` projected volume and
    TLS connection use the replacement cluster. Do not edit the Infisical URL
    targets: they already point at the original service and are Flux-owned.
-5. Record the measured restore time against the 1-hour RTO, commit the normal
-   production Cluster template back through kub-homelab Flux, and wait for
-   reconciliation before lifting maintenance.
+5. Record the measured restore time against the 1-hour RTO and lift
+   maintenance. Leave the `bootstrap.recovery` stanza in the committed
+   Cluster manifest: CNPG only uses `bootstrap` when it creates a cluster,
+   and if the cluster is ever recreated from Git, a recovery stanza fails
+   loudly on a missing backup where `initdb` would silently start an empty
+   database.
 
 Restore test status:
 

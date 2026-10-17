@@ -199,7 +199,11 @@ report directory on encrypted storage outside the repository.
    contains only the bundled `db:migrate` runner: it does not contain the
    source `import:convex` or `verify:import` scripts, `tsx`, or their optional
    Sharp binaries. Build a small, release-pinned tool bundle from this same
-   checkout and for the image architecture, then copy it into the pod:
+   checkout and for the image architecture, then copy it into the pod. Build
+   and run this bundle in the staging rehearsal first (#112/#116) and reuse
+   the rehearsal-tested bundle, built from the release commit, in the window.
+   The build calls esbuild from `node_modules/.bin` directly because
+   `pnpm exec` would run the Convex codegen hook:
 
    ```sh
    set -Eeuo pipefail
@@ -244,16 +248,16 @@ report directory on encrypted storage outside the repository.
    trap cleanup EXIT
    mkdir -p -m 700 "$TOOLS_DIR/frontend/scripts/migration" "$TOOLS_DIR/node_modules/@img"
    pnpm --dir "$FRONTEND" install --frozen-lockfile --ignore-scripts
-   pnpm --dir "$FRONTEND" exec esbuild scripts/migration/import-convex.ts \
+   (cd "$FRONTEND" && ./node_modules/.bin/esbuild scripts/migration/import-convex.ts \
      --bundle --platform=node --format=esm --target=node24 \
      --external:pg-native --external:sharp \
      --banner:js="import{createRequire}from'node:module';const require=createRequire(import.meta.url);" \
-     --outfile="$TOOLS_DIR/frontend/scripts/migration/import-convex.mjs"
-   pnpm --dir "$FRONTEND" exec esbuild scripts/migration/verify-import.ts \
+     --outfile="$TOOLS_DIR/frontend/scripts/migration/import-convex.mjs")
+   (cd "$FRONTEND" && ./node_modules/.bin/esbuild scripts/migration/verify-import.ts \
      --bundle --platform=node --format=esm --target=node24 \
      --external:pg-native --external:sharp \
      --banner:js="import{createRequire}from'node:module';const require=createRequire(import.meta.url);" \
-     --outfile="$TOOLS_DIR/frontend/scripts/migration/verify-import.mjs"
+     --outfile="$TOOLS_DIR/frontend/scripts/migration/verify-import.mjs")
    SHARP_ROOT="$(readlink -f "$FRONTEND/node_modules/sharp")"
    cp -aL "$SHARP_ROOT" "$TOOLS_DIR/node_modules/sharp"
    cp -aL "$SHARP_ROOT/../detect-libc" "$TOOLS_DIR/node_modules/detect-libc"
