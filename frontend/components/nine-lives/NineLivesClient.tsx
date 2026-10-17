@@ -169,18 +169,31 @@ function MorrowmewMark() {
   );
 }
 
-function FaceButton({
+type ControlButtonVariant = "face" | "device";
+
+function getControlButtonClassName(
+  variant: ControlButtonVariant,
+  pressed: boolean,
+) {
+  if (variant === "face")
+    return `size-13 shrink-0 touch-none select-none rounded-full border-4 border-[#6d2245] bg-gradient-to-br from-[#ff8a9b] to-[#d34972] font-mono text-xl font-black text-[#fff4f1] shadow-[inset_-5px_-7px_0_rgba(99,17,53,0.3),0_7px_0_#47223d] transition-transform active:translate-y-1 active:shadow-[inset_-3px_-4px_0_rgba(99,17,53,0.3),0_3px_0_#47223d] sm:size-12 ${pressed ? "translate-y-1 shadow-[inset_-3px_-4px_0_rgba(99,17,53,0.3),0_3px_0_#47223d]" : ""}`;
+  return `touch-none select-none rounded-full border border-[#4b5870] bg-[#7788a5] px-4 py-2 font-mono text-[0.62rem] font-bold uppercase tracking-[0.18em] text-[#edf6ff] shadow-[inset_0_2px_2px_rgba(255,255,255,0.2),0_3px_0_#35445c] transition-transform active:translate-y-0.5 active:shadow-[inset_0_2px_2px_rgba(255,255,255,0.2),0_1px_0_#35445c] ${pressed ? "translate-y-0.5 shadow-[inset_0_2px_2px_rgba(255,255,255,0.2),0_1px_0_#35445c]" : ""}`;
+}
+
+function ControlButton({
   name,
   label,
   onPress,
   onRelease,
   pressed,
+  variant,
 }: Readonly<{
   name: ButtonName;
   label: string;
   onPress: (name: ButtonName, pointerId: number) => void;
   onRelease: (pointerId: number) => void;
   pressed: boolean;
+  variant: ControlButtonVariant;
 }>) {
   const controlHandlers = getControlHandlers(name, onPress, onRelease);
   return (
@@ -188,7 +201,7 @@ function FaceButton({
       type="button"
       aria-label={label}
       data-button={name}
-      className={`size-13 shrink-0 touch-none select-none rounded-full border-4 border-[#6d2245] bg-gradient-to-br from-[#ff8a9b] to-[#d34972] font-mono text-xl font-black text-[#fff4f1] shadow-[inset_-5px_-7px_0_rgba(99,17,53,0.3),0_7px_0_#47223d] transition-transform active:translate-y-1 active:shadow-[inset_-3px_-4px_0_rgba(99,17,53,0.3),0_3px_0_#47223d] sm:size-12 ${pressed ? "translate-y-1 shadow-[inset_-3px_-4px_0_rgba(99,17,53,0.3),0_3px_0_#47223d]" : ""}`}
+      className={getControlButtonClassName(variant, pressed)}
       {...controlHandlers}
     >
       {label}
@@ -248,33 +261,6 @@ function SpeakerGrille() {
         />
       ))}
     </div>
-  );
-}
-
-function DeviceButton({
-  name,
-  label,
-  onPress,
-  onRelease,
-  pressed,
-}: Readonly<{
-  name: ButtonName;
-  label: string;
-  onPress: (name: ButtonName, pointerId: number) => void;
-  onRelease: (pointerId: number) => void;
-  pressed: boolean;
-}>) {
-  const controlHandlers = getControlHandlers(name, onPress, onRelease);
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      data-button={name}
-      className={`touch-none select-none rounded-full border border-[#4b5870] bg-[#7788a5] px-4 py-2 font-mono text-[0.62rem] font-bold uppercase tracking-[0.18em] text-[#edf6ff] shadow-[inset_0_2px_2px_rgba(255,255,255,0.2),0_3px_0_#35445c] transition-transform active:translate-y-0.5 active:shadow-[inset_0_2px_2px_rgba(255,255,255,0.2),0_1px_0_#35445c] ${pressed ? "translate-y-0.5 shadow-[inset_0_2px_2px_rgba(255,255,255,0.2),0_1px_0_#35445c]" : ""}`}
-      {...controlHandlers}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -629,19 +615,21 @@ export function NineLivesClient() /* NOSONAR */ {
               <DPad onPress={press} onRelease={release} pressed={pressed} />
               <div className="col-span-2 row-start-2 flex flex-col items-center gap-2 self-end pb-1 @xl:col-span-1 @xl:row-start-auto">
                 <div className="flex gap-2">
-                  <DeviceButton
+                  <ControlButton
                     name="select"
                     label="Select"
                     onPress={press}
                     onRelease={release}
                     pressed={pressed.has("select")}
+                    variant="device"
                   />
-                  <DeviceButton
+                  <ControlButton
                     name="start"
                     label="Start"
                     onPress={press}
                     onRelease={release}
                     pressed={pressed.has("start")}
+                    variant="device"
                   />
                 </div>
                 <button
@@ -662,21 +650,23 @@ export function NineLivesClient() /* NOSONAR */ {
                     <SpeakerGrille />
                   </div>
                   <div className="absolute right-8 top-0">
-                    <FaceButton
+                    <ControlButton
                       name="b"
                       label="B"
                       onPress={press}
                       onRelease={release}
                       pressed={pressed.has("b")}
+                      variant="face"
                     />
                   </div>
                   <div className="absolute bottom-0 right-0">
-                    <FaceButton
+                    <ControlButton
                       name="a"
                       label="A"
                       onPress={press}
                       onRelease={release}
                       pressed={pressed.has("a")}
+                      variant="face"
                     />
                   </div>
                 </div>
