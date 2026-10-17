@@ -71,7 +71,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const payload = await parseJsonBody(request, catShareCreateSchema);
+    const payload = await parseJsonBody(request, catShareCreateSchema, {
+      maxBytes: 256 * 1024,
+    });
     if (dataBackend() === "postgres") {
       const result = await createPostgresCatShare(
         getDb(),

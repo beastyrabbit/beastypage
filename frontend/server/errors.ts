@@ -7,7 +7,9 @@ export const SERVICE_ERROR_STATUS = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  payload_too_large: 413,
   rate_limited: 429,
+  aborted: 499,
   unavailable: 503,
 } as const;
 

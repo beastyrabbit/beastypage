@@ -312,7 +312,7 @@ Shared validators with `v.any()`: evolutionCommandValidator.cats[].additions, ev
 | mutation | `api.ancestryTree.save` | server | `frontend/app/api/ancestry/tree/route.ts:112` |
 | query | `api.ancestryTree.list` | server | `frontend/app/api/ancestry/trees/route.ts:48` |
 | query | `api.catShares.get` | server | `frontend/app/api/cat-share/route.ts:54` |
-| mutation | `api.catShares.create` | server | `frontend/app/api/cat-share/route.ts:95` |
+| mutation | `api.catShares.create` | server | `frontend/app/api/cat-share/route.ts:97` |
 | query | `api.mapper.getBySlug` | server | `frontend/app/api/cats/profile/route.ts:51` |
 | mutation | `api.mapper.create` | server | `frontend/app/api/cats/profile/route.ts:85` |
 | mutation | `api.mapper.updateMeta` | server | `frontend/app/api/cats/profile/route.ts:123` |

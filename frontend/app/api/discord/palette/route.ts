@@ -165,7 +165,9 @@ export async function POST(request: NextRequest) {
 
   let body: { imageUrl: string; colors?: number };
   try {
-    body = await parseJsonBody(request, discordPaletteSchema);
+    body = await parseJsonBody(request, discordPaletteSchema, {
+      maxBytes: 64 * 1024,
+    });
   } catch (error) {
     return errorResponse(error, "Invalid request body", "Invalid request body");
   }

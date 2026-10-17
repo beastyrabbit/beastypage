@@ -31,4 +31,31 @@ describe("request parsing", () => {
       parseSearchParams(new URLSearchParams("name="), schema),
     ).toThrowError(expect.objectContaining({ code: "invalid_input" }));
   });
+
+  it("limits the body and reads an empty body as the given default", async () => {
+    const optional = z.object({ name: z.string().optional() });
+    await expect(
+      parseJsonBody(
+        new Request("http://localhost", { method: "POST" }),
+        optional,
+        { maxBytes: 64, emptyBody: {} },
+      ),
+    ).resolves.toEqual({});
+    await expect(
+      parseJsonBody(
+        new Request("http://localhost", {
+          method: "POST",
+          body: JSON.stringify({ name: "x".repeat(100) }),
+        }),
+        optional,
+        { maxBytes: 64 },
+      ),
+    ).rejects.toMatchObject({ code: "payload_too_large", status: 413 });
+    await expect(
+      parseJsonBody(
+        new Request("http://localhost", { method: "POST" }),
+        optional,
+      ),
+    ).rejects.toMatchObject({ code: "invalid_input" });
+  });
 });

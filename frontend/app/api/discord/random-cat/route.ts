@@ -282,7 +282,10 @@ export async function POST(request: NextRequest) {
 
   let body: Record<string, unknown>;
   try {
-    body = await parseJsonBody(request, discordRandomCatSchema);
+    body = await parseJsonBody(request, discordRandomCatSchema, {
+      maxBytes: 32 * 1024,
+      emptyBody: {},
+    });
   } catch (error) {
     return errorResponse(error, "Invalid request body", "Invalid request body");
   }
