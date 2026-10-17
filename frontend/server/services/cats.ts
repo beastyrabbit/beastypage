@@ -117,12 +117,12 @@ async function uniqueSlug(
   );
 }
 
+type ImageKind = "tiny" | "preview" | "full" | "spriteSheet";
+
 async function imageRefs(db: CatsDb, profileId: string) {
   const rows = await listImageRows(db, profileId);
   const byKind = new Map(rows.map((row) => [row.kind, row]));
-  const build = (
-    kind: "tiny" | "preview" | "full" | "spriteSheet",
-  ): ImageReference | null => {
+  const build = (kind: ImageKind): ImageReference | null => {
     const row = byKind.get(kind);
     if (!row) return null;
     const base = {
@@ -142,7 +142,7 @@ async function imageRefs(db: CatsDb, profileId: string) {
 async function applyImageUpdate(
   tx: CatsTx,
   profileId: string,
-  kind: "tiny" | "preview" | "full" | "spriteSheet",
+  kind: ImageKind,
   payload: { fileId: string; filename?: string; meta?: unknown },
 ) {
   const checked = catImageMeta.safeParse(payload.meta ?? null);
@@ -328,10 +328,7 @@ export async function applyPreviewUpdates(
     id: string;
     previewsUpdatedAt: number;
     images: Partial<
-      Record<
-        "tiny" | "preview" | "full" | "spriteSheet",
-        { fileId: string; filename?: string; meta?: unknown }
-      >
+      Record<ImageKind, { fileId: string; filename?: string; meta?: unknown }>
     >;
   },
 ) {
@@ -341,7 +338,7 @@ export async function applyPreviewUpdates(
     const row = await lockProfile(tx, resolved.id);
     if (!row) throw new ServiceError("not_found", "Profile not found");
     for (const [kind, payload] of Object.entries(args.images) as [
-      "tiny" | "preview" | "full" | "spriteSheet",
+      ImageKind,
       { fileId: string; filename?: string; meta?: unknown } | undefined,
     ][]) {
       if (!payload) continue;

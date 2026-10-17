@@ -653,8 +653,7 @@ async function publicCollection(db: Database, slug: string, now: number) {
       QUICK_SHARE_POLICY.collectionMaxItems,
     ),
   );
-  const reversed = rows.reverse();
-  return reversed.map((row) => publicObject(row, now));
+  return rows.toReversed().map((row) => publicObject(row, now));
 }
 
 async function claimJob(db: Database, body: OpBody, now: number) {
@@ -773,8 +772,7 @@ async function extend(
   return withTransaction(db, async (tx) => {
     const upload = await getUpload(tx, id(body, "uploadId"), true);
     if (
-      !upload ||
-      upload.ownerTokenIdentifier !== owner ||
+      upload?.ownerTokenIdentifier !== owner ||
       !upload.active ||
       upload.publicExpiresAt.getTime() <= now
     )

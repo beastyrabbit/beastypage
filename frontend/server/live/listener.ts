@@ -82,7 +82,7 @@ export class LiveEventListener {
   private stopped = true;
   private connectedOnce = false;
   private lastEventId = 0;
-  private readyWaiters: Array<() => void> = [];
+  private readonly readyWaiters: Array<() => void> = [];
 
   constructor(options: LiveListenerOptions = {}) {
     this.createClient = options.createClient ?? createListenerClient;

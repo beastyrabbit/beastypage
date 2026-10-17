@@ -1,7 +1,6 @@
 import "server-only";
 
-import type { AnyColumn } from "drizzle-orm";
-import { and, or, type SQL, sql } from "drizzle-orm";
+import { type AnyColumn, and, or, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ServiceError } from "./errors";
 

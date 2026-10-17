@@ -132,6 +132,10 @@ function compact(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function escapeCell(value: string): string {
+  return value.replaceAll("|", String.raw`\|`);
+}
+
 function compareCodeUnits(a: string, b: string): number {
   if (a < b) return -1;
   if (a > b) return 1;
@@ -822,8 +826,7 @@ function renderMarkdown(inv: Inventory): string {
     "| Service | Detail | Source |",
     "| --- | --- | --- |",
     ...inv.externalCallers.map(
-      (e) =>
-        `| ${e.service} | ${e.detail.replace(/\|/g, String.raw`\|`)} | ${link(e)} |`,
+      (e) => `| ${e.service} | ${escapeCell(e.detail)} | ${link(e)} |`,
     ),
     "",
     "## Deployment and configuration references",
@@ -831,7 +834,7 @@ function renderMarkdown(inv: Inventory): string {
     "| Detail | Source |",
     "| --- | --- |",
     ...inv.deploymentReferences.map(
-      (d) => `| ${d.detail.replace(/\|/g, String.raw`\|`)} | ${link(d)} |`,
+      (d) => `| ${escapeCell(d.detail)} | ${link(d)} |`,
     ),
     "",
   );
