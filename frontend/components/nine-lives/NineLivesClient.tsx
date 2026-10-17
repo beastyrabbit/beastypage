@@ -170,7 +170,7 @@ function DPad({
 function SpeakerGrille() {
   return (
     <div
-      className="flex h-9 w-14 rotate-[-8deg] flex-col justify-center gap-1.5 sm:h-12 sm:w-20"
+      className="flex h-8 w-14 rotate-[-8deg] flex-col justify-center gap-1.5 sm:h-9 sm:w-16"
       aria-hidden="true"
     >
       {[0, 1, 2, 3, 4].map((line) => (
@@ -340,7 +340,7 @@ export function NineLivesClient() {
         className={`border border-[#89d8e0]/30 bg-[#101d36] shadow-[0_32px_90px_rgba(29,126,151,0.2)] ${
           presentationMode === "inline"
             ? "relative overflow-hidden rounded-[2.5rem] px-4 py-5 sm:px-10 sm:py-12"
-            : "fixed inset-0 z-[100] flex min-h-dvh max-w-none flex-col items-center justify-center overflow-y-auto rounded-none px-3 py-16 sm:px-8 sm:py-14"
+            : "fixed inset-0 z-[100] flex min-h-dvh max-w-none flex-col items-center justify-[safe_center] overflow-y-auto rounded-none px-3 py-16 sm:px-8 sm:py-14"
         }`}
       >
         <div className="pointer-events-none absolute -right-28 -top-32 h-80 w-80 rounded-full bg-[#f3a263]/20 blur-3xl" />
@@ -401,20 +401,20 @@ export function NineLivesClient() {
         </div>
 
         <div
-          style={
-            presentationMode === "handheld"
-              ? {
-                  width: "min(100%, 820px, calc((100dvh - 8rem) * .84))",
-                }
-              : undefined
-          }
           className={`relative z-10 touch-none ${
             presentationMode === "inline"
               ? "mt-6 lg:ml-auto lg:mt-0 lg:w-[48%] lg:max-w-[780px] sm:mt-12"
               : presentationMode === "handheld"
-                ? "w-full max-w-[820px]"
+                ? "w-full max-w-[820px] sm:w-[min(100%,820px,calc((100dvh-8rem)*.84))] max-[900px]:landscape:w-full"
                 : "w-full max-w-[min(1120px,94vw)]"
           }`}
+          style={
+            presentationMode === "game"
+              ? {
+                  width: "min(100%, 1120px, calc((100dvh - 8rem) * 1.5))",
+                }
+              : undefined
+          }
         >
           <div
             className={`mx-auto w-full ${
@@ -535,7 +535,7 @@ export function NineLivesClient() {
                 <button
                   type="button"
                   aria-label={
-                    started ? "Restart Nine Lives" : "Power on Nine Lives"
+                    started ? "Focus Nine Lives" : "Power on Nine Lives"
                   }
                   onClick={startGame}
                   className="group flex items-center gap-2 rounded-full px-3 py-2 font-mono text-[0.58rem] font-bold uppercase tracking-[0.18em] text-[#34455e] transition hover:text-[#17243a]"
@@ -545,27 +545,27 @@ export function NineLivesClient() {
                 </button>
               </div>
               <div className="col-start-2 row-start-1 flex min-w-0 justify-end sm:col-start-auto sm:row-start-auto">
-                <div className="flex flex-col items-end gap-3 sm:flex-row sm:items-center sm:gap-4">
-                  <SpeakerGrille />
-                  <div className="relative h-28 w-32">
-                    <div className="absolute right-8 top-0">
-                      <FaceButton
-                        name="b"
-                        label="B"
-                        onPress={press}
-                        onRelease={release}
-                        pressed={pressed.has("b")}
-                      />
-                    </div>
-                    <div className="absolute bottom-0 right-0">
-                      <FaceButton
-                        name="a"
-                        label="A"
-                        onPress={press}
-                        onRelease={release}
-                        pressed={pressed.has("a")}
-                      />
-                    </div>
+                <div className="relative h-28 w-32">
+                  <div className="absolute left-0 top-1">
+                    <SpeakerGrille />
+                  </div>
+                  <div className="absolute right-8 top-0">
+                    <FaceButton
+                      name="b"
+                      label="B"
+                      onPress={press}
+                      onRelease={release}
+                      pressed={pressed.has("b")}
+                    />
+                  </div>
+                  <div className="absolute bottom-0 right-0">
+                    <FaceButton
+                      name="a"
+                      label="A"
+                      onPress={press}
+                      onRelease={release}
+                      pressed={pressed.has("a")}
+                    />
                   </div>
                 </div>
               </div>
