@@ -259,18 +259,22 @@ describe("catalog operation parity", () => {
       approved: true,
       paginationOpts: { numItems: 2, cursor: convexFirst.continueCursor },
     });
-    const postgresFirst = await listCatdex(db, { pageSize: 2 });
-    const postgresSecond = await listCatdex(db, {
-      pageSize: 2,
-      cursor: postgresFirst.nextCursor,
-    });
+    // Other test files share this database, so walk every page and keep only
+    // this test's rows; the cursor still has to carry across page boundaries.
+    const postgresRows = [];
+    let cursor: string | null | undefined;
+    do {
+      const page = await listCatdex(db, { pageSize: 2, cursor });
+      postgresRows.push(...page.page);
+      cursor = page.nextCursor;
+    } while (cursor);
 
     const convexNames = [...convexFirst.page, ...convexSecond.page].map(
       (row) => row.cat_name,
     );
-    const postgresNames = [...postgresFirst.page, ...postgresSecond.page].map(
-      (row) => row.cat_name,
-    );
+    const postgresNames = postgresRows
+      .map((row) => row.cat_name)
+      .filter((name) => name.startsWith(`${prefix} `));
     expect(postgresNames).toEqual(convexNames);
     expect(convexNames).not.toEqual([
       `${prefix} card 1`,
