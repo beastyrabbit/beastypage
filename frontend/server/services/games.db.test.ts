@@ -57,6 +57,21 @@ describe("games PostgreSQL concurrency", () => {
       loserId: loser.id,
       matchupToken: matchup.matchupToken,
     };
+    // The matchup draws from the shared pool, so the cats may already carry
+    // results from other test files; compare totals before and after.
+    const recordedResults = async () => {
+      const ratings = await db
+        .select({ wins: perfectCats.wins, losses: perfectCats.losses })
+        .from(perfectCats)
+        .where(
+          (await import("drizzle-orm")).inArray(perfectCats.id, [
+            winner.id,
+            loser.id,
+          ]),
+        );
+      return ratings.reduce((sum, row) => sum + row.wins + row.losses, 0);
+    };
+    const resultsBefore = await recordedResults();
     const outcomes = await Promise.allSettled([
       submitPerfectVote(db, args),
       submitPerfectVote(db, args),
@@ -77,22 +92,7 @@ describe("games PostgreSQL concurrency", () => {
         ),
       );
     expect(rows).toHaveLength(1);
-    const ratings = await db
-      .select({
-        id: perfectCats.id,
-        wins: perfectCats.wins,
-        losses: perfectCats.losses,
-      })
-      .from(perfectCats)
-      .where(
-        (await import("drizzle-orm")).inArray(perfectCats.id, [
-          winner.id,
-          loser.id,
-        ]),
-      );
-    expect(ratings.reduce((sum, row) => sum + row.wins + row.losses, 0)).toBe(
-      2,
-    );
+    expect(await recordedResults()).toBe(resultsBefore + 2);
   });
 
   it("serializes anonymous wheel rate limits under concurrent requests", async () => {
