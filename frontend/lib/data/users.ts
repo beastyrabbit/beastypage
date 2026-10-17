@@ -38,6 +38,8 @@ export function useEnsureUser() {
       post<FunctionReturnType<typeof api.users.getOrCreateUser>>(
         "/api/users/ensure",
       ),
+    // The viewer may have cached `null` before the user row existed.
+    invalidate: [dataQueryKeys.query("users.viewer")],
   });
 }
 
