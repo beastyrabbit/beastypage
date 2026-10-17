@@ -88,6 +88,40 @@ Local check note: open the dev server as `http://localhost:<port>`. Next 16
 dev blocks its scripts for `127.0.0.1` unless `allowedDevOrigins` lists it,
 and the page then never hydrates.
 
+## Cutover and restore runbook review (2026-10-17)
+
+Four review rounds on the deploy templates and runbooks, each finding
+verified against the files and CNPG/Flux documentation, then fixed:
+
+- Each container gets only its own database URL; the import URL reaches only
+  a one-off operator pod. CA mounts select `ca.crt` only (CNPG's CA secret
+  also holds `ca.key`).
+- The importer and verifier are bundled into the frontend image
+  (`db:bundle-import`), next to the migration runner, so the import pod uses
+  the exact running frontend image by digest and needs no separately built
+  tools. Built locally, the image imported and verified the real archive.
+- `deploy/postgres/production/import-pod.yaml` (no service-account token,
+  non-root, read-only root, archive in an `emptyDir` only) and
+  `import-cleanup.sh`, which deletes the pod, reconciles the Flux change that
+  disables the import login, checks `rolcanlogin`, and can be rerun.
+- Backups are cold volume snapshots taken from a standby (CNPG recommends
+  cold snapshots for recovery; there is no WAL archive). Take a manual backup
+  only with both standbys healthy, or primary commits pause under
+  `dataDurability: required`.
+- Restore recreates `beastypage-postgres` under its own name in two Flux
+  phases (remove the Cluster, confirm the Backup and VolumeSnapshot survive,
+  then add the full Cluster with `bootstrap.recovery`), so the
+  Infisical-owned URLs and the CA mount stay valid.
+- Bugs found along the way: the verify bundle also ran the importer's CLI
+  (shared helpers moved to `scripts/migration/import/guards.ts`, guarded by a
+  bundle test), and the archive guard let every path through inside the
+  image (it now protects the Git checkout or `/app`).
+
+Not verifiable without a cluster, left for the staging rehearsal and the
+#108 restore drill: Flux prune timing, CNPG owner references on Backups and
+VolumeSnapshots, the runtime's `imageID` format, and the measured restore
+time.
+
 ## Validation run for this state
 
 All commands run from `frontend/` on 2026-10-17.
@@ -96,7 +130,7 @@ All commands run from `frontend/` on 2026-10-17.
 | --- | --- | --- |
 | Type check | `tsc --noEmit` | pass |
 | Lint and format | `biome check` on every file changed by the review and live-parity fixes | no errors; 2 warnings in older component code |
-| Unit tests | `vitest run --project unit` | 125 files, 846 tests pass |
+| Unit tests | `vitest run --project unit` | 126 files, 851 tests pass |
 | Database tests (real PostgreSQL 18) | `pnpm run test:db` | 42 files, 208 tests pass (two consecutive clean runs) |
 | Schema drift | `pnpm run db:drift` | no drift |
 | Inventory up to date | `migration:inventory --check` | pass |
