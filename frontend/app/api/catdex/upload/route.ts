@@ -1,4 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
+import {
+  RequestBodyTooLargeError,
+  readRequestBytes,
+} from "@/app/api/_lib/request-body";
 import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
@@ -88,10 +92,10 @@ export async function POST(request: NextRequest) {
   const validated = validateUploadRequest(request);
   if (validated instanceof NextResponse) return validated;
   try {
-    const bytes = Buffer.from(await request.arrayBuffer());
+    const bytes = Buffer.from(
+      await readRequestBytes(request, MAX_CARD_UPLOAD_BYTES),
+    );
     if (!bytes.length) return json({ error: "EMPTY_UPLOAD" }, 400);
-    if (bytes.length > MAX_CARD_UPLOAD_BYTES)
-      return json({ error: "FILE_TOO_LARGE" }, 413);
     const storageId = await storeAndAttachCatdexUpload(
       getDb(),
       validated.token,
@@ -100,6 +104,10 @@ export async function POST(request: NextRequest) {
     );
     return json({ storageId, fileId: storageId });
   } catch (error) {
+    if (error instanceof RequestBodyTooLargeError)
+      return json({ error: "FILE_TOO_LARGE" }, 413);
+    if (error instanceof DOMException && error.name === "AbortError")
+      return json({ error: "Request aborted" }, 499);
     const known = knownUploadError(error);
     if (known) return known;
     const response = errorResponse(

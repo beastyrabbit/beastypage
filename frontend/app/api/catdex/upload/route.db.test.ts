@@ -146,6 +146,28 @@ describe("Catdex PostgreSQL upload routes", () => {
     );
     expect(body.status).toBe(413);
     expect(await body.json()).toEqual({ error: "FILE_TOO_LARGE" });
+
+    // A streamed body without Content-Length must stop at the limit instead
+    // of being buffered; this one never ends.
+    const streamToken = await issueToken("upload-stream-case-1234");
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(64 * 1024));
+      },
+    });
+    const streamed = await uploadRoute.POST(
+      new NextRequest(
+        `http://localhost/api/catdex/upload?token=${encodeURIComponent(streamToken)}`,
+        {
+          method: "POST",
+          headers: { "content-type": "image/png" },
+          body: endless,
+          duplex: "half",
+        } as ConstructorParameters<typeof NextRequest>[1],
+      ),
+    );
+    expect(streamed.status).toBe(413);
+    expect(await streamed.json()).toEqual({ error: "FILE_TOO_LARGE" });
   });
 
   it("rejects undecodable raster bytes and serves a successful upload through files", async () => {

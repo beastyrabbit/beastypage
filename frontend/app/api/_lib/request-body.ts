@@ -77,7 +77,7 @@ async function readChunks(
   return chunks;
 }
 
-function decodeChunks(chunks: Uint8Array[]): string {
+function concatChunks(chunks: Uint8Array[]): Uint8Array {
   const totalBytes = chunks.reduce(
     (total, chunk) => total + chunk.byteLength,
     0,
@@ -88,17 +88,25 @@ function decodeChunks(chunks: Uint8Array[]): string {
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder().decode(bytes);
+  return bytes;
+}
+
+/** Read a binary request body, failing once it exceeds `maxBytes`. */
+export async function readRequestBytes(
+  request: Request,
+  maxBytes: number,
+): Promise<Uint8Array> {
+  validateDeclaredLength(request, maxBytes);
+  throwIfAborted(request);
+  if (!request.body) return new Uint8Array();
+
+  const chunks = await readChunks(request, request.body.getReader(), maxBytes);
+  return concatChunks(chunks);
 }
 
 export async function readRequestBody(
   request: Request,
   maxBytes: number,
 ): Promise<string> {
-  validateDeclaredLength(request, maxBytes);
-  throwIfAborted(request);
-  if (!request.body) return "";
-
-  const chunks = await readChunks(request, request.body.getReader(), maxBytes);
-  return decodeChunks(chunks);
+  return new TextDecoder().decode(await readRequestBytes(request, maxBytes));
 }
