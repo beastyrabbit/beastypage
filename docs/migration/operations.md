@@ -101,6 +101,10 @@ password is a throwaway value for an ephemeral container.
 Follow the exact [staging scrub procedure](staging.md) before restoring any
 archive into this namespace.
 
+Staging has one CNPG instance. Its cold volume-snapshot procedure therefore
+fences the only instance for the duration of a snapshot; use it for the timed
+restore drill only and schedule the interruption during the rehearsal window.
+
 Templates: `deploy/postgres/staging/`. Production templates are in
 `deploy/postgres/production/`. Both go into kub-homelab through a reviewed
 pull request. **Applying them is an infrastructure change that needs
@@ -171,7 +175,7 @@ explicit approval.** Nothing in this repository applies them.
 
 | Item | Target / setting |
 | --- | --- |
-| Backup method | CNPG `ScheduledBackup`, `method: volumeSnapshot`, class `longhorn-cnpg-backup` (copied to Garage) |
+| Backup method | CNPG `ScheduledBackup`, `method: volumeSnapshot`, class `longhorn-cnpg-backup`, cold (`online: false`), target `prefer-standby` (copied to Garage) |
 | Frequency | Every 6 hours, plus a manual backup before every contract migration and before the cutover |
 | Retention | 7 days of scheduled backups (homelab `cnpg-backup-prune`); manual backups are kept until deleted by hand |
 | RPO | ≤ 6 hours (no WAL archiving, so no point-in-time recovery) |
@@ -181,15 +185,20 @@ explicit approval.** Nothing in this repository applies them.
 Manual backup (for example before cutover):
 
 ```bash
+BACKUP_NAME="beastypage-postgres-pre-cutover-$(date -u +%Y%m%dT%H%MZ)"
 kubectl -n webpage cnpg backup beastypage-postgres --method volumeSnapshot \
-  --backup-name beastypage-postgres-pre-cutover-$(date -u +%Y%m%dT%H%MZ)
-kubectl -n webpage get backup -w
+  --online=false --backup-target prefer-standby \
+  --backup-name "$BACKUP_NAME"
+kubectl -n webpage wait --for=condition=Completed \
+  "backup/$BACKUP_NAME" --timeout=30m
 ```
 
 Restore. CloudNativePG recovery bootstraps a new `Cluster`; it does not
-recover in place. See the [CNPG recovery documentation](https://cloudnative-pg.io/documentation/current/recovery/),
-the [recovery-from-a-Backup example](https://cloudnative-pg.io/docs/devel/recovery#recovery-from-a-backup-object),
-and the [CNPG certificate documentation](https://cloudnative-pg.io/documentation/current/certificates/).
+recover in place. The [CNPG 1.30 recovery documentation](https://cloudnative-pg.io/docs/1.30/recovery/#recovery-from-a-backup-object)
+supports `bootstrap.recovery.backup.name` for an existing Backup; the
+[volume-snapshot backup documentation](https://cloudnative-pg.io/docs/1.30/appendixes/backup_volumesnapshot/#hot-and-cold-backups)
+recommends cold snapshots for snapshot recovery. See also the [CNPG
+certificate documentation](https://cloudnative-pg.io/documentation/current/certificates/).
 For this service, restore **under the original cluster name** after the
 damaged resource is removed. That keeps the Flux-owned service
 `beastypage-postgres-rw`, Infisical URLs and `beastypage-postgres-ca` mount
@@ -201,28 +210,26 @@ would overwrite every five minutes and avoids a TLS `verify-full` mismatch.
 
 The CNPG certificate secret contains `ca.crt` and the private signing key
 `ca.key`; consumers select only `ca.crt` as shown in the production
-HelmRelease patch. Protect the completed Backup object and its snapshot before
-deleting the old Cluster. On-demand Backup resources normally have no cluster
-owner reference; if this one does, preserve the snapshot and Backup object
-through the platform's reviewed orphaning procedure before proceeding.
+HelmRelease patch. The replacement is the complete production `Cluster`
+document from `deploy/postgres/production/cnpg-cluster.yaml`, including
+`managed.roles`, backup settings, PostgreSQL parameters, affinity, storage and
+resources. Change only its `spec.bootstrap` block to:
 
 ```yaml
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: beastypage-postgres
-  namespace: webpage
-spec:
-  instances: 3
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.6
-  storage: { size: 20Gi, storageClass: longhorn-single-replica }
   bootstrap:
     recovery:
       backup:
-        name: <backup name from `kubectl -n webpage get backup`>
+        name: <named Backup from `kubectl -n webpage get backup`>
 ```
 
-Submit this manifest as the emergency kub-homelab Flux change, together with
+Keep the `ScheduledBackup` document declared in that manifest unchanged.
+Before deleting the damaged Cluster, confirm that the chosen Backup and its
+VolumeSnapshot have no owner reference that deletion would cascade (the
+`backupOwnerReference: self` -> Backup -> `snapshotOwnerReference: backup`
+chain would otherwise remove them). Preserve either object through the
+platform's reviewed orphaning procedure before proceeding.
+
+Submit this full manifest as the emergency kub-homelab Flux change, together with
 the deletion of the damaged `beastypage-postgres` Cluster; do not apply it
 with `kubectl` while the normal Flux manifest still declares the old
 `bootstrap.initdb`. Keep the frontend in maintenance and leave Convex paused

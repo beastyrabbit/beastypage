@@ -56,12 +56,12 @@ spec:
     storageClass: longhorn-single-replica
 
   backup:
+    # Cold snapshots are the supported snapshot-recovery path. Prefer a
+    # standby so the primary is not fenced during the snapshot.
+    target: prefer-standby
     volumeSnapshot:
       className: longhorn-cnpg-backup
-      online: true
-      onlineConfiguration:
-        immediateCheckpoint: false
-        waitForArchive: true
+      online: false
       snapshotOwnerReference: backup
       labels:
         backup.heerlabs.com/provider: cnpg-volume-snapshot

@@ -104,7 +104,8 @@ report directory on encrypted storage outside the repository.
    ```sh
    BACKUP_NAME="beastypage-postgres-pre-cutover-$(date -u +%Y%m%dT%H%MZ)"
    kubectl -n webpage cnpg backup beastypage-postgres \
-     --method volumeSnapshot --backup-name "$BACKUP_NAME"
+     --method volumeSnapshot --online=false --backup-target prefer-standby \
+     --backup-name "$BACKUP_NAME"
    kubectl -n webpage wait --for=condition=Completed \
      "backup/$BACKUP_NAME" --timeout=30m
    kubectl -n webpage get backup "$BACKUP_NAME" -o wide
@@ -205,17 +206,23 @@ report directory on encrypted storage outside the repository.
    The build calls esbuild from `node_modules/.bin` directly because
    `pnpm exec` would run the Convex codegen hook:
 
+   `NODE_RUNNER_IMAGE` below is the exact Alpine x86_64 runner base from
+   `frontend/Dockerfile`; the deployed frontend image must be built from that
+   same digest so the Sharp native module has the matching libc and architecture.
+
    ```sh
    set -Eeuo pipefail
    ARCHIVE="/private/beastypage-cutover/snapshot_<deployment>_<ns>.zip"
    TOOLS_DIR=/private/beastypage-cutover/import-tools
    TOOL_ARCHIVE=/private/beastypage-cutover/import-tools.tgz
+   NODE_RUNNER_IMAGE='node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1'
    NS=webpage
    IMPORT_POD=beastypage-postgres-import
    REPORT=/private/beastypage-cutover/import-report
    VERIFY_REPORT=/private/beastypage-cutover/verify-report
    LOGIN_FLUX_NAMESPACE=flux-system
    LOGIN_FLUX_KUSTOMIZATION="<webpage-kustomization>"
+   IMPORT_POD_RENDERED=
    IMPORT_ARCHIVE="/work/archive/$(basename "$ARCHIVE")"
    FREEZE_AT="$(cat /private/beastypage-cutover/freeze-at.txt)"
    copy_reports() {
@@ -229,6 +236,7 @@ report directory on encrypted storage outside the repository.
      rc=$?
      cleanup_failed=0
      set +e
+     rm -f "${IMPORT_POD_RENDERED:-}"
      kubectl -n "$NS" exec "$IMPORT_POD" -- sh -c \
        'find /work/reports -mindepth 1 -delete; find /work/archive /work/tools -mindepth 1 -delete' \
        >/dev/null 2>&1
@@ -237,16 +245,21 @@ report directory on encrypted storage outside the repository.
      test -z "$(kubectl -n "$NS" get pod "$IMPORT_POD" --ignore-not-found -o name)" || cleanup_failed=1
      # The reviewed kub-homelab Flux change sets beastypage_import login:false.
      # Reconcile it on every exit, including importer failure and Ctrl-C.
-     flux -n "$LOGIN_FLUX_NAMESPACE" reconcile kustomization "$LOGIN_FLUX_KUSTOMIZATION" --with-source || cleanup_failed=1
-     flux -n "$LOGIN_FLUX_NAMESPACE" wait kustomization "$LOGIN_FLUX_KUSTOMIZATION" --timeout=10m || cleanup_failed=1
-     kubectl -n "$NS" cnpg psql beastypage-postgres -- -Atqc \
-       "select rolcanlogin from pg_roles where rolname = 'beastypage_import'" | grep -qx f || cleanup_failed=1
+     # The reviewed disable-login change must already be merged. Reconcile
+     # waits for it; Flux 2.9.6 has no separate wait subcommand.
+     flux -n "$LOGIN_FLUX_NAMESPACE" reconcile kustomization "$LOGIN_FLUX_KUSTOMIZATION" \
+       --with-source --timeout=10m || cleanup_failed=1
+     if ! kubectl -n "$NS" cnpg psql beastypage-postgres -- -Atqc \
+       "select rolcanlogin from pg_roles where rolname = 'beastypage_import'" | grep -qx f; then
+       echo "cleanup failed: merge the reviewed beastypage_import login:false change, then rerun cleanup" >&2
+       cleanup_failed=1
+     fi
      if [ "$cleanup_failed" -ne 0 ] && [ "$rc" -eq 0 ]; then rc=1; fi
      return "$rc"
    }
    trap 'exit 130' INT TERM
    trap cleanup EXIT
-   mkdir -p -m 700 "$TOOLS_DIR/frontend/scripts/migration" "$TOOLS_DIR/node_modules/@img"
+   mkdir -p -m 700 "$TOOLS_DIR/frontend/scripts/migration"
    pnpm --dir "$FRONTEND" install --frozen-lockfile --ignore-scripts
    (cd "$FRONTEND" && ./node_modules/.bin/esbuild scripts/migration/import-convex.ts \
      --bundle --platform=node --format=esm --target=node24 \
@@ -258,27 +271,41 @@ report directory on encrypted storage outside the repository.
      --external:pg-native --external:sharp \
      --banner:js="import{createRequire}from'node:module';const require=createRequire(import.meta.url);" \
      --outfile="$TOOLS_DIR/frontend/scripts/migration/verify-import.mjs")
-   SHARP_ROOT="$(readlink -f "$FRONTEND/node_modules/sharp")"
-   cp -aL "$SHARP_ROOT" "$TOOLS_DIR/node_modules/sharp"
-   cp -aL "$SHARP_ROOT/../detect-libc" "$TOOLS_DIR/node_modules/detect-libc"
-   cp -aL "$SHARP_ROOT/../semver" "$TOOLS_DIR/node_modules/semver"
-   cp -aL "$SHARP_ROOT/../@img/colour" "$TOOLS_DIR/node_modules/@img/colour"
-   cp -aL "$SHARP_ROOT/../@img/sharp-linux-x64" \
-     "$TOOLS_DIR/node_modules/@img/sharp-linux-x64"
-   cp -aL "$SHARP_ROOT/../@img/sharp-libvips-linux-x64" \
-     "$TOOLS_DIR/node_modules/@img/sharp-libvips-linux-x64"
+   SHARP_VERSION="$(cd "$FRONTEND" && node -p \
+     "const v=require('./package.json').dependencies.sharp; if (!/^\\d+\\.\\d+\\.\\d+$/.test(v)) throw new Error('sharp must be pinned'); v")"
+   docker run --rm -v "$TOOLS_DIR:/tools" -w /tools "$NODE_RUNNER_IMAGE" \
+     npm install --no-save --no-package-lock --omit=dev "sharp@$SHARP_VERSION"
+   docker run --rm -v "$TOOLS_DIR:/tools" -w /tools "$NODE_RUNNER_IMAGE" \
+     node -e 'require("sharp")'
    tar -C "$TOOLS_DIR" -czf "$TOOL_ARCHIVE" .
    chmod 0600 "$TOOL_ARCHIVE"
    # Apply the reviewed ephemeral template in
-   # deploy/postgres/production/import-pod.yaml with the same frontend image
-   # tag as the rollout. It has no service-account token, runs as UID 1001
+   # deploy/postgres/production/import-pod.yaml with the exact frontend image
+   # (including digest) used by the rollout. It has no service-account token, runs as UID 1001
    # with a read-only root filesystem, and mounts only
    # beastypage-postgres-import-url through envFrom. Its disk-backed emptyDir
    # is the only archive copy in Kubernetes; never use a PVC. The CA volume
    # selects ca.crt only because CNPG's generated beastypage-postgres-ca
    # secret also contains ca.key.
 
-   kubectl apply -f deploy/postgres/production/import-pod.yaml
+   IMPORT_POD_RENDERED="$(mktemp "$TOOLS_DIR/import-pod.XXXXXX.yaml")"
+   chmod 600 "$IMPORT_POD_RENDERED"
+   FRONTEND_IMAGE="$(kubectl -n "$NS" get deploy beastypage-frontend \
+     -o jsonpath='{.spec.template.spec.containers[?(@.name=="main")].image}')"
+   : "${FRONTEND_IMAGE:?frontend Deployment image is empty}"
+   python3 - "$FRONTEND_IMAGE" >"$IMPORT_POD_RENDERED" <<'PY'
+   from pathlib import Path
+   import sys
+
+   template = Path("deploy/postgres/production/import-pod.yaml").read_text()
+   marker = "__FRONTEND_IMAGE__"
+   image = sys.argv[1]
+   if marker not in template:
+       raise SystemExit("import-pod image marker is missing")
+   print(template.replace(marker, image), end="")
+   PY
+   cat "$IMPORT_POD_RENDERED" | kubectl apply -f -
+   rm -f "$IMPORT_POD_RENDERED"
    kubectl -n "$NS" wait --for=condition=Ready "pod/$IMPORT_POD" --timeout=5m
    kubectl cp --no-preserve "$ARCHIVE" \
      "$NS/$IMPORT_POD:/work/archive/$(basename "$ARCHIVE")"
@@ -313,9 +340,10 @@ report directory on encrypted storage outside the repository.
    ```
 
    `LOGIN_FLUX_KUSTOMIZATION` names the kub-homelab Flux object containing the
-   paired change that sets `beastypage_import` back to `login: false`. The
-   platform owner must apply that change on every exit path before allowing
-   the reconciliation and `rolcanlogin=false` checks in the trap to pass.
+   paired change that sets `beastypage_import` back to `login: false`. Prepare
+   and merge the enable and disable changes together before the window. If the
+   disable change is not merged when cleanup starts, cleanup must fail loudly;
+   the operator merges it and reruns the cleanup function before any rerun.
 
    **Expected output:** the importer says `complete`; `verify:import` says
    `OK`. Counts include only documented skips/quarantines, fingerprints match,
@@ -340,10 +368,11 @@ report directory on encrypted storage outside the repository.
    not required for cutover.
 
    Before applying the pod, the platform owner applies the normal kub-homelab
-   Flux change enabling `beastypage_import` login. The cleanup trap above is
-   the required path for success, importer failure, verifier failure and
-   abort. The frontend Deployment never mounts the import URL (it gets only
-   `beastypage-postgres-app-url`, and its init container only
+   Flux change enabling `beastypage_import` login, with the reviewed matching
+   disable-login change prepared and already merged for cleanup. The cleanup
+   trap above is the required path for success, importer failure, verifier
+   failure and abort. The frontend Deployment never mounts the import URL (it
+   gets only `beastypage-postgres-app-url`, and its init container only
    `beastypage-postgres-migration-url`). The role's owner-applied DML, sequence
    and `TRUNCATE` grants are required by `--replace`.
 

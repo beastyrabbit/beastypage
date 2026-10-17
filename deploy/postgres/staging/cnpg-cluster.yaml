@@ -38,9 +38,12 @@ spec:
     size: 20Gi
     storageClass: longhorn-single-replica
   backup:
+    # Staging has one instance, so prefer-standby falls back to that primary
+    # and a cold drill fences it for the duration of the snapshot.
+    target: prefer-standby
     volumeSnapshot:
       className: longhorn-snapshot
-      online: true
+      online: false
       snapshotOwnerReference: backup
   bootstrap:
     initdb:
