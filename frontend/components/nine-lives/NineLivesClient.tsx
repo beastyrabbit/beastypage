@@ -608,8 +608,14 @@ export function NineLivesClient() {
                     allow="autoplay; fullscreen; gamepad"
                     title="Nine Lives"
                     className="h-full w-full border-0 bg-[#172238] [image-rendering:pixelated]"
-                    onLoad={() => setFrameError(false)}
-                    onError={() => setFrameError(true)}
+                    onLoad={() => {
+                      setReady(false);
+                      setFrameError(false);
+                    }}
+                    onError={() => {
+                      setReady(false);
+                      setFrameError(true);
+                    }}
                   />
                 )}
               </div>
