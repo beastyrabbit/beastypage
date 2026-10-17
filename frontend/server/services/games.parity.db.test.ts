@@ -83,7 +83,7 @@ describe("games Convex/PostgreSQL parity", () => {
       ] as const) {
         await ctx.db.insert("coinflipper_scores", {
           playerName: `${prefix} ${name}`,
-          score: 42,
+          score: 2_000_000_000,
           createdAt,
         });
       }
@@ -91,19 +91,19 @@ describe("games Convex/PostgreSQL parity", () => {
     await db.insert(coinflipperScores).values([
       {
         playerName: `${prefix} first`,
-        score: 42,
+        score: 2_000_000_000,
         createdAt: new Date(100),
         legacyCreatedAt: new Date(300),
       },
       {
         playerName: `${prefix} second`,
-        score: 42,
+        score: 2_000_000_000,
         createdAt: new Date(300),
         legacyCreatedAt: new Date(100),
       },
       {
         playerName: `${prefix} third`,
-        score: 42,
+        score: 2_000_000_000,
         createdAt: new Date(200),
         legacyCreatedAt: new Date(200),
       },

@@ -15,6 +15,13 @@
       "when": 1792177068281,
       "tag": "0001_quick_share_collection_slugs",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792221983534,
+      "tag": "0002_timestamp_precision",
+      "breakpoints": true
     }
   ]
 }

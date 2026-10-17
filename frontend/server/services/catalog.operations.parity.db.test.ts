@@ -459,6 +459,12 @@ describe("catalog operation parity", () => {
         createdAt: 500,
         updatedAt: 500,
       });
+      await ctx.db.insert("rarity", {
+        rarityName: `${prefix} rarity unset`,
+        chancePercent: 50,
+        createdAt: 500,
+        updatedAt: 500,
+      });
     });
     await db.insert(cardSeason).values([
       {
@@ -492,6 +498,14 @@ describe("catalog operation parity", () => {
         createdAt: new Date(900),
         updatedAt: new Date(900),
         legacyCreatedAt: new Date(200),
+      },
+      {
+        rarityName: `${prefix} rarity unset`,
+        stars: null,
+        chancePercent: 50,
+        createdAt: new Date(900),
+        updatedAt: new Date(900),
+        legacyCreatedAt: new Date(300),
       },
     ]);
 

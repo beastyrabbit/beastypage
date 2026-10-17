@@ -2,7 +2,7 @@ import { text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 /** `timestamptz` read and written as a JS Date. */
 export const tstz = (name: string) =>
-  timestamp(name, { withTimezone: true, mode: "date" });
+  timestamp(name, { withTimezone: true, mode: "date", precision: 3 });
 
 /** Random v4 primary key; imported rows use a deterministic v5 instead. */
 export const primaryId = () => uuid("id").primaryKey().defaultRandom();

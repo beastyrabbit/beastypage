@@ -98,11 +98,7 @@ export async function lockMatchupForClient(tx: Transaction, clientId: string) {
     .select()
     .from(perfectMatchups)
     .where(eq(perfectMatchups.clientId, clientId))
-    .orderBy(
-      asc(perfectMatchups.createdAt),
-      asc(creationTimestamp(perfectMatchups)),
-      asc(perfectMatchups.id),
-    )
+    .orderBy(asc(creationTimestamp(perfectMatchups)), asc(perfectMatchups.id))
     .for("update")
     .limit(1);
   return row ?? null;

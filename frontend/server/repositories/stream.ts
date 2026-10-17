@@ -136,16 +136,19 @@ export async function selectParticipants(
         eq(streamParticipants.viewerSession, viewerSession),
       )
     : eq(streamParticipants.sessionId, sessionId);
-  return db
+  const rows = await db
     .select()
     .from(streamParticipants)
     .where(where)
     .orderBy(
-      asc(streamParticipants.createdAt),
       asc(creationTimestamp(streamParticipants)),
       asc(streamParticipants.id),
     )
     .limit(Math.max(1, Math.min(500, Math.floor(limit))));
+  rows.sort(
+    (a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0),
+  );
+  return rows;
 }
 
 export async function selectParticipantByViewerSession(
@@ -229,26 +232,21 @@ export async function selectVotes(
   stepId?: string,
   limit = 500,
 ) {
-  const where = stepId
-    ? and(
-        eq(streamVotes.sessionId, sessionId),
-        eq(streamVotes.voteRound, round),
-        eq(streamVotes.stepId, stepId),
-      )
-    : and(
-        eq(streamVotes.sessionId, sessionId),
-        eq(streamVotes.voteRound, round),
-      );
-  return db
+  const where = and(
+    eq(streamVotes.sessionId, sessionId),
+    eq(streamVotes.voteRound, round),
+  );
+  const rows = await db
     .select()
     .from(streamVotes)
     .where(where)
-    .orderBy(
-      asc(streamVotes.createdAt),
-      asc(creationTimestamp(streamVotes)),
-      asc(streamVotes.id),
-    )
+    .orderBy(asc(creationTimestamp(streamVotes)), asc(streamVotes.id))
     .limit(Math.max(1, Math.min(500, Math.floor(limit))));
+  const filtered = stepId ? rows.filter((row) => row.stepId === stepId) : rows;
+  filtered.sort(
+    (a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0),
+  );
+  return filtered.slice(0, Math.max(1, Math.min(500, Math.floor(limit))));
 }
 
 export async function selectVoteByParticipant(

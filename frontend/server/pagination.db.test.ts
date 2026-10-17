@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { desc } from "drizzle-orm";
+import { and, desc, inArray, sql } from "drizzle-orm";
 import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, inject, it } from "vitest";
 import { readDatabaseConfig } from "./db/config";
@@ -45,5 +45,44 @@ describe("keyset pagination SQL", () => {
       )
       .orderBy(desc(dashSettings.createdAt), desc(dashSettings.id));
     expect(page.some((row) => row.id === firstId)).toBe(true);
+  });
+
+  it("keeps sub-millisecond timestamps on the same cursor millisecond", async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const firstId = randomUUID();
+    const secondId = randomUUID();
+    await db.execute(sql`
+      INSERT INTO dash_settings (id, slug, config, created_at, updated_at)
+      VALUES
+        (${firstId}, ${`precision-a-${suffix}`}, '{}'::jsonb,
+          '2026-01-01T00:00:00.123001Z'::timestamptz,
+          '2026-01-01T00:00:00.123001Z'::timestamptz),
+        (${secondId}, ${`precision-b-${suffix}`}, '{}'::jsonb,
+          '2026-01-01T00:00:00.123499Z'::timestamptz,
+          '2026-01-01T00:00:00.123499Z'::timestamptz)
+    `);
+    const rows = await db
+      .select({ id: dashSettings.id, createdAt: dashSettings.createdAt })
+      .from(dashSettings)
+      .where(sql`${dashSettings.id} IN (${firstId}, ${secondId})`)
+      .orderBy(desc(dashSettings.createdAt), desc(dashSettings.id));
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.createdAt.getTime()).toBe(rows[1]?.createdAt.getTime());
+    const firstPage = rows[0];
+    if (!firstPage) throw new Error("precision fixture missing");
+    const nextPage = await db
+      .select({ id: dashSettings.id })
+      .from(dashSettings)
+      .where(
+        and(
+          inArray(dashSettings.id, [firstId, secondId]),
+          createdAtIdBefore(dashSettings, {
+            createdAt: firstPage.createdAt.toISOString(),
+            id: firstPage.id,
+          }),
+        ),
+      )
+      .orderBy(desc(dashSettings.createdAt), desc(dashSettings.id));
+    expect(nextPage.map((row) => row.id)).toEqual([rows[1]?.id]);
   });
 });

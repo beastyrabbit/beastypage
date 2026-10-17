@@ -44,7 +44,11 @@ export async function selectRarities(db: Db) {
   return db
     .select()
     .from(rarity)
-    .orderBy(asc(rarity.stars), asc(creationTimestamp(rarity)), asc(rarity.id))
+    .orderBy(
+      asc(sql`coalesce(${rarity.stars}, 0)`),
+      asc(creationTimestamp(rarity)),
+      asc(rarity.id),
+    )
     .limit(200);
 }
 

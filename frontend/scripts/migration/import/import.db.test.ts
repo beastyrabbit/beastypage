@@ -223,11 +223,11 @@ describe("Convex importer", () => {
     expect(user.rows[0]?.created_at).toEqual(
       new Date("2026-01-02T03:04:05.000Z"),
     );
-    // _creationTime keeps its sub-millisecond part (microsecond precision).
+    // Timestamp columns align with Convex/JS Date millisecond precision.
     const micros = await pool.query<{ us: string }>(
       "select extract(microseconds from legacy_created_at)::text as us from users where username = 'Ann_1'",
     );
-    expect(micros.rows[0]?.us).toBe("5000250");
+    expect(micros.rows[0]?.us).toBe("5000000");
   });
 
   it("resets live OBS state but keeps the streamer settings", async () => {

@@ -6,6 +6,7 @@ import schema from "../../convex/schema";
 import { ANONYMOUS } from "../auth/identity";
 import { closeDatabase, getDb } from "../db/client";
 import type { Database } from "../db/pool";
+import { streamParticipants, streamVotes } from "../db/schema";
 import {
   createStreamParticipant,
   createStreamSession,
@@ -345,6 +346,112 @@ describe("stream Convex/PostgreSQL parity", () => {
         viewerSession: "short",
       }),
     ).rejects.toMatchObject({ code: "invalid_input" });
+  });
+
+  it("applies the Convex index limit before its createdAt sort", async () => {
+    const owner = identity(`limited-order-owner-${crypto.randomUUID()}`);
+    const prefix = `limited-order-${crypto.randomUUID()}`;
+    const convex = convexTest(schema, modules);
+    const convexOwner = convex.withIdentity(owner);
+    const sessionArgs = {
+      viewerKey: `${prefix}-viewer`,
+      status: "live" as const,
+      currentStep: "colour",
+      allowedOptions: ["classic"],
+      params: { _signupsOpen: true, _votesOpen: true },
+    };
+    const convexSession = present(
+      await convexOwner.mutation(api.streamSessionsV2.create, sessionArgs),
+      "Convex limited-order session",
+    );
+    const postgresSession = present(
+      await createStreamSession(db, sessionArgs, owner),
+      "PostgreSQL limited-order session",
+    );
+    const values = [
+      ["first", 300],
+      ["second", 100],
+      ["third", 200],
+    ] as const;
+    await convex.run(async (ctx) => {
+      for (const [name, createdAt] of values) {
+        await ctx.db.insert("stream_participants", {
+          sessionId: convexSession.id as never,
+          displayName: `${prefix}-${name}`,
+          status: "active",
+          createdAt,
+          updatedAt: createdAt,
+        });
+        await ctx.db.insert("stream_votes", {
+          sessionId: convexSession.id as never,
+          voteRound: 0,
+          stepId: name === "second" ? "target" : "other",
+          optionKey: name,
+          createdAt,
+          updatedAt: createdAt,
+        });
+      }
+    });
+    await db.insert(streamParticipants).values(
+      values.map(([name, createdAt], index) => ({
+        sessionId: postgresSession.id,
+        displayName: `${prefix}-${name}`,
+        status: "active",
+        createdAt: new Date(createdAt),
+        updatedAt: new Date(createdAt),
+        legacyCreatedAt: new Date(index + 1),
+      })),
+    );
+    await db.insert(streamVotes).values(
+      values.map(([name, createdAt], index) => ({
+        sessionId: postgresSession.id,
+        voteRound: 0,
+        stepId: name === "second" ? "target" : "other",
+        optionKey: name,
+        createdAt: new Date(createdAt),
+        updatedAt: new Date(createdAt),
+        legacyCreatedAt: new Date(index + 1),
+      })),
+    );
+
+    const convexParticipants = await convexOwner.query(
+      api.streamParticipantsV2.list,
+      { session: convexSession.id as never, limit: 2 },
+    );
+    const postgresParticipants = await listStreamParticipants(
+      db,
+      { session: postgresSession.id, limit: 2 },
+      owner,
+    );
+    expect(postgresParticipants.map((row) => row.display_name)).toEqual(
+      convexParticipants.map((row) => row.display_name),
+    );
+
+    const convexVotes = await convex.query(api.streamVotesV2.list, {
+      session: convexSession.id as never,
+      limit: 2,
+    });
+    const postgresVotes = await listStreamVotes(db, {
+      session: postgresSession.id,
+      limit: 2,
+    });
+    expect(postgresVotes.map((row) => row.option_key)).toEqual(
+      convexVotes.map((row) => row.option_key),
+    );
+
+    const convexTargetVotes = await convex.query(api.streamVotesV2.list, {
+      session: convexSession.id as never,
+      stepId: "target",
+      limit: 2,
+    });
+    const postgresTargetVotes = await listStreamVotes(db, {
+      session: postgresSession.id,
+      stepId: "target",
+      limit: 2,
+    });
+    expect(postgresTargetVotes.map((row) => row.option_key)).toEqual(
+      convexTargetVotes.map((row) => row.option_key),
+    );
   });
 
   it("matches vote rounds, host metadata, viewer keys and one-vote rules", async () => {
