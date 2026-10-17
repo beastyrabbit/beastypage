@@ -4,7 +4,9 @@ import { MonitorPlay, Power } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -79,6 +81,53 @@ function handleKeyboardUp(
 
 type PresentationMode = "inline" | "handheld" | "game";
 
+type ControlHandlers = {
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerLeave: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => void;
+  onKeyUp: (event: ReactKeyboardEvent<HTMLButtonElement>) => void;
+  onBlur: (event: ReactFocusEvent<HTMLButtonElement>) => void;
+};
+
+function getControlHandlers(
+  name: ButtonName,
+  onPress: (name: ButtonName, pointerId: number) => void,
+  onRelease: (pointerId: number) => void,
+): ControlHandlers {
+  return {
+    onPointerDown: (event) => {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      onPress(name, event.pointerId);
+    },
+    onPointerUp: (event) => {
+      event.preventDefault();
+      onRelease(event.pointerId);
+    },
+    onPointerCancel: (event) => onRelease(event.pointerId),
+    onPointerLeave: (event) => onRelease(event.pointerId),
+    onKeyDown: (event) => handleKeyboardDown(event, name, onPress),
+    onKeyUp: (event) => handleKeyboardUp(event, name, onRelease),
+    onBlur: () => onRelease(KEYBOARD_POINTER_IDS[name]),
+  };
+}
+
+function getPresentationDeviceClass(mode: PresentationMode) {
+  if (mode === "inline")
+    return "mt-6 lg:ml-auto lg:mt-0 lg:w-[48%] lg:max-w-[780px] sm:mt-12";
+  if (mode === "handheld")
+    return "w-full max-w-[820px] sm:w-[min(100%,820px,calc((100dvh-8rem)*.84))] max-[900px]:landscape:w-full";
+  return "w-full max-w-[min(1120px,94vw)]";
+}
+
+function getStatusLabel(ready: boolean, started: boolean) {
+  if (ready) return "connected";
+  if (started) return "loading";
+  return "standby";
+}
+
 const KEYMAP = [
   ["Move", "↑/W · ↓/S · ←/A · →/D"],
   ["A", "Z / Space"],
@@ -126,33 +175,21 @@ function FaceButton({
   onPress,
   onRelease,
   pressed,
-}: {
+}: Readonly<{
   name: ButtonName;
   label: string;
   onPress: (name: ButtonName, pointerId: number) => void;
   onRelease: (pointerId: number) => void;
   pressed: boolean;
-}) {
+}>) {
+  const controlHandlers = getControlHandlers(name, onPress, onRelease);
   return (
     <button
       type="button"
       aria-label={label}
       data-button={name}
       className={`size-13 shrink-0 touch-none select-none rounded-full border-4 border-[#6d2245] bg-gradient-to-br from-[#ff8a9b] to-[#d34972] font-mono text-xl font-black text-[#fff4f1] shadow-[inset_-5px_-7px_0_rgba(99,17,53,0.3),0_7px_0_#47223d] transition-transform active:translate-y-1 active:shadow-[inset_-3px_-4px_0_rgba(99,17,53,0.3),0_3px_0_#47223d] sm:size-12 ${pressed ? "translate-y-1 shadow-[inset_-3px_-4px_0_rgba(99,17,53,0.3),0_3px_0_#47223d]" : ""}`}
-      onPointerDown={(event) => {
-        event.preventDefault();
-        event.currentTarget.setPointerCapture(event.pointerId);
-        onPress(name, event.pointerId);
-      }}
-      onPointerUp={(event) => {
-        event.preventDefault();
-        onRelease(event.pointerId);
-      }}
-      onPointerCancel={(event) => onRelease(event.pointerId)}
-      onPointerLeave={(event) => onRelease(event.pointerId)}
-      onKeyDown={(event) => handleKeyboardDown(event, name, onPress)}
-      onKeyUp={(event) => handleKeyboardUp(event, name, onRelease)}
-      onBlur={() => onRelease(KEYBOARD_POINTER_IDS[name])}
+      {...controlHandlers}
     >
       {label}
     </button>
@@ -163,11 +200,11 @@ function DPad({
   onPress,
   onRelease,
   pressed,
-}: {
+}: Readonly<{
   onPress: (name: ButtonName, pointerId: number) => void;
   onRelease: (pointerId: number) => void;
   pressed: ReadonlySet<ButtonName>;
-}) {
+}>) {
   return (
     <fieldset
       className="relative h-28 w-28 touch-none border-0 p-0 sm:h-32 sm:w-32"
@@ -189,20 +226,7 @@ function DPad({
           aria-label={name}
           data-button={name}
           className={`absolute ${position} z-10 flex h-9 w-9 touch-none select-none items-center justify-center rounded-md font-mono text-lg font-bold text-[#9eb0cf] transition-colors hover:text-[#d4e4ff] sm:h-10 sm:w-10 ${pressed.has(name) ? "bg-[#30415f] text-[#f4fdff]" : ""}`}
-          onPointerDown={(event) => {
-            event.preventDefault();
-            event.currentTarget.setPointerCapture(event.pointerId);
-            onPress(name, event.pointerId);
-          }}
-          onPointerUp={(event) => {
-            event.preventDefault();
-            onRelease(event.pointerId);
-          }}
-          onPointerCancel={(event) => onRelease(event.pointerId)}
-          onPointerLeave={(event) => onRelease(event.pointerId)}
-          onKeyDown={(event) => handleKeyboardDown(event, name, onPress)}
-          onKeyUp={(event) => handleKeyboardUp(event, name, onRelease)}
-          onBlur={() => onRelease(KEYBOARD_POINTER_IDS[name])}
+          {...getControlHandlers(name, onPress, onRelease)}
         >
           {label}
         </button>
@@ -233,42 +257,31 @@ function DeviceButton({
   onPress,
   onRelease,
   pressed,
-}: {
+}: Readonly<{
   name: ButtonName;
   label: string;
   onPress: (name: ButtonName, pointerId: number) => void;
   onRelease: (pointerId: number) => void;
   pressed: boolean;
-}) {
+}>) {
+  const controlHandlers = getControlHandlers(name, onPress, onRelease);
   return (
     <button
       type="button"
       aria-label={label}
       data-button={name}
       className={`touch-none select-none rounded-full border border-[#4b5870] bg-[#7788a5] px-4 py-2 font-mono text-[0.62rem] font-bold uppercase tracking-[0.18em] text-[#edf6ff] shadow-[inset_0_2px_2px_rgba(255,255,255,0.2),0_3px_0_#35445c] transition-transform active:translate-y-0.5 active:shadow-[inset_0_2px_2px_rgba(255,255,255,0.2),0_1px_0_#35445c] ${pressed ? "translate-y-0.5 shadow-[inset_0_2px_2px_rgba(255,255,255,0.2),0_1px_0_#35445c]" : ""}`}
-      onPointerDown={(event) => {
-        event.preventDefault();
-        event.currentTarget.setPointerCapture(event.pointerId);
-        onPress(name, event.pointerId);
-      }}
-      onPointerUp={(event) => {
-        event.preventDefault();
-        onRelease(event.pointerId);
-      }}
-      onPointerCancel={(event) => onRelease(event.pointerId)}
-      onPointerLeave={(event) => onRelease(event.pointerId)}
-      onKeyDown={(event) => handleKeyboardDown(event, name, onPress)}
-      onKeyUp={(event) => handleKeyboardUp(event, name, onRelease)}
-      onBlur={() => onRelease(KEYBOARD_POINTER_IDS[name])}
+      {...controlHandlers}
     >
       {label}
     </button>
   );
 }
 
+// NOSONAR -- this client intentionally coordinates the device, iframe, and input bridge.
 export function NineLivesClient() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const presentationRef = useRef<HTMLElement>(null);
+  const presentationRef = useRef<HTMLDialogElement>(null);
   const presentationCloseRef = useRef<HTMLButtonElement>(null);
   const presentationInlineOpenerRef = useRef<HTMLButtonElement>(null);
   const presentationOpenerRef = useRef<HTMLElement>(null);
@@ -425,15 +438,14 @@ export function NineLivesClient() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1400px] flex-col gap-10 px-3 py-5 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
-      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: role is dialog whenever this is set. */}
-      <section
+      <dialog
+        open
         ref={presentationRef}
-        role={presentationMode === "inline" ? undefined : "dialog"}
         aria-modal={presentationMode === "inline" ? undefined : true}
         aria-label={
           presentationMode === "inline" ? undefined : "Nine Lives player"
         }
-        className={`border border-[#89d8e0]/30 bg-[#101d36] shadow-[0_32px_90px_rgba(29,126,151,0.2)] ${
+        className={`m-0 w-full max-w-none border border-[#89d8e0]/30 bg-[#101d36] shadow-[0_32px_90px_rgba(29,126,151,0.2)] ${
           presentationMode === "inline"
             ? "relative overflow-hidden rounded-[2.5rem] px-4 py-5 sm:px-10 sm:py-12"
             : "fixed inset-0 z-[100] flex min-h-dvh max-w-none flex-col items-center justify-[safe_center] overflow-y-auto rounded-none px-3 py-16 sm:px-8 sm:py-14"
@@ -498,13 +510,7 @@ export function NineLivesClient() {
         </div>
 
         <div
-          className={`relative z-10 touch-none ${
-            presentationMode === "inline"
-              ? "mt-6 lg:ml-auto lg:mt-0 lg:w-[48%] lg:max-w-[780px] sm:mt-12"
-              : presentationMode === "handheld"
-                ? "w-full max-w-[820px] sm:w-[min(100%,820px,calc((100dvh-8rem)*.84))] max-[900px]:landscape:w-full"
-                : "w-full max-w-[min(1120px,94vw)]"
-          }`}
+          className={`relative z-10 touch-none ${getPresentationDeviceClass(presentationMode)}`}
           style={
             presentationMode === "game"
               ? {
@@ -532,7 +538,7 @@ export function NineLivesClient() {
                     className={`h-2.5 w-2.5 rounded-full border border-[#27354b] ${ready ? "bg-[#74e6b0] shadow-[0_0_12px_#74e6b0]" : "bg-[#f3a263]"}`}
                   />
                   <span className="hidden sm:inline">
-                    {ready ? "connected" : started ? "loading" : "standby"}
+                    {getStatusLabel(ready, started)}
                   </span>
                 </div>
                 {presentationMode === "inline" ? (
@@ -727,7 +733,7 @@ export function NineLivesClient() {
             Open Nine Lives in a new tab <ExternalLinkIcon className="size-4" />
           </Link>
         </div>
-      </section>
+      </dialog>
 
       <section className="grid gap-5 md:grid-cols-2">
         <article className="glass-card p-6 sm:p-8">
@@ -813,7 +819,7 @@ export function NineLivesClient() {
   );
 }
 
-function CreditRow({ credit }: { credit: NineLivesCredit }) {
+function CreditRow({ credit }: Readonly<{ credit: NineLivesCredit }>) {
   return (
     <details className="group rounded-2xl border border-border/60 bg-background/40 p-4 open:bg-background/70">
       <summary className="flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden">
