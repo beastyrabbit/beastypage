@@ -4225,7 +4225,7 @@
   "authHookCalls": [
     {
       "file": "frontend/lib/data/auth.tsx",
-      "line": 18,
+      "line": 25,
       "kind": "useConvexAuth",
       "target": "",
       "context": "client"
@@ -5171,7 +5171,7 @@
     {
       "file": "package.json",
       "line": 12,
-      "detail": "\"cat-system:build\": \"pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run && sh frontend/scripts/write-version.sh"
+      "detail": "\"cat-system:build\": \"pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run --project unit --project renderer && sh"
     },
     {
       "file": "package.json",

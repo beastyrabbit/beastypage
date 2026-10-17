@@ -294,7 +294,7 @@ Shared validators with `v.any()`: evolutionCommandValidator.cats[].additions, ev
 
 ## Auth hook calls
 
-- useConvexAuth at `frontend/lib/data/auth.tsx:18`
+- useConvexAuth at `frontend/lib/data/auth.tsx:25`
 
 ## Server-side calls
 
@@ -464,7 +464,7 @@ Identifiers ending in `StorageId`. Entries outside schema-level `_storage` field
 | "prepare": "pnpm exec convex codegen" | `frontend/package.json:34` |
 | "convex": "^1.45.0", | `frontend/package.json:50` |
 | "convex-test": "^0.0.54", | `frontend/package.json:92` |
-| "cat-system:build": "pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run && sh frontend/scripts/write-version.sh | `package.json:12` |
+| "cat-system:build": "pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run --project unit --project renderer && sh | `package.json:12` |
 | "dev:convex": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/ | `package.json:17` |
 | "env:check:frontend": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev  | `package.json:23` |
 | "env:check:media": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --p | `package.json:24` |
