@@ -270,6 +270,7 @@ export function NineLivesClient() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const presentationRef = useRef<HTMLElement>(null);
   const presentationCloseRef = useRef<HTMLButtonElement>(null);
+  const presentationInlineOpenerRef = useRef<HTMLButtonElement>(null);
   const presentationOpenerRef = useRef<HTMLElement>(null);
   const pointerButtons = useRef(new Map<number, ButtonName>());
   const [started, setStarted] = useState(false);
@@ -297,7 +298,9 @@ export function NineLivesClient() {
     setPresentationMode("inline");
     requestAnimationFrame(() => {
       if (started) iframeRef.current?.focus();
-      else presentationOpenerRef.current?.focus();
+      else if (presentationOpenerRef.current?.isConnected)
+        presentationOpenerRef.current.focus();
+      else presentationInlineOpenerRef.current?.focus();
     });
   }, [started]);
 
@@ -422,9 +425,11 @@ export function NineLivesClient() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1400px] flex-col gap-10 px-3 py-5 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+      {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: role is dialog whenever this is set. */}
       <section
         ref={presentationRef}
         role={presentationMode === "inline" ? undefined : "dialog"}
+        aria-modal={presentationMode === "inline" ? undefined : true}
         aria-label={
           presentationMode === "inline" ? undefined : "Nine Lives player"
         }
@@ -534,6 +539,7 @@ export function NineLivesClient() {
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
+                      ref={presentationInlineOpenerRef}
                       onClick={() => openPresentation("handheld")}
                       className="inline-flex items-center gap-1.5 rounded-full border border-[#4b5d78]/60 bg-[#b6c8dc]/55 px-2.5 py-1.5 font-mono text-[0.52rem] font-bold uppercase tracking-[0.12em] text-[#263449] transition hover:bg-[#d3e0ed]"
                     >
