@@ -1,17 +1,20 @@
 "use client";
 
-import {
-  ExternalLink,
-  Github,
-  Maximize2,
-  MonitorPlay,
-  Power,
-  X,
-} from "lucide-react";
+import { MonitorPlay, Power } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import ExpandIcon from "@/components/ui/expand-icon";
+import ExternalLinkIcon from "@/components/ui/external-link-icon";
+import GithubIcon from "@/components/ui/github-icon";
+import XIcon from "@/components/ui/x-icon";
 import {
   NINE_LIVES_CREDITS,
   type NineLivesCredit,
@@ -38,6 +41,41 @@ type InputMessage = {
   button: ButtonName;
   state: "down" | "up";
 };
+
+const KEYBOARD_POINTER_IDS: Record<ButtonName, number> = {
+  up: -1,
+  down: -2,
+  left: -3,
+  right: -4,
+  a: -5,
+  b: -6,
+  start: -7,
+  select: -8,
+};
+
+function isActivationKey(key: string) {
+  return key === "Enter" || key === " ";
+}
+
+function handleKeyboardDown(
+  event: ReactKeyboardEvent<HTMLButtonElement>,
+  name: ButtonName,
+  onPress: (name: ButtonName, pointerId: number) => void,
+) {
+  if (!isActivationKey(event.key) || event.repeat) return;
+  event.preventDefault();
+  onPress(name, KEYBOARD_POINTER_IDS[name]);
+}
+
+function handleKeyboardUp(
+  event: ReactKeyboardEvent<HTMLButtonElement>,
+  name: ButtonName,
+  onRelease: (pointerId: number) => void,
+) {
+  if (!isActivationKey(event.key)) return;
+  event.preventDefault();
+  onRelease(KEYBOARD_POINTER_IDS[name]);
+}
 
 type PresentationMode = "inline" | "handheld" | "game";
 
@@ -112,6 +150,9 @@ function FaceButton({
       }}
       onPointerCancel={(event) => onRelease(event.pointerId)}
       onPointerLeave={(event) => onRelease(event.pointerId)}
+      onKeyDown={(event) => handleKeyboardDown(event, name, onPress)}
+      onKeyUp={(event) => handleKeyboardUp(event, name, onRelease)}
+      onBlur={() => onRelease(KEYBOARD_POINTER_IDS[name])}
     >
       {label}
     </button>
@@ -159,6 +200,9 @@ function DPad({
           }}
           onPointerCancel={(event) => onRelease(event.pointerId)}
           onPointerLeave={(event) => onRelease(event.pointerId)}
+          onKeyDown={(event) => handleKeyboardDown(event, name, onPress)}
+          onKeyUp={(event) => handleKeyboardUp(event, name, onRelease)}
+          onBlur={() => onRelease(KEYBOARD_POINTER_IDS[name])}
         >
           {label}
         </button>
@@ -213,6 +257,9 @@ function DeviceButton({
       }}
       onPointerCancel={(event) => onRelease(event.pointerId)}
       onPointerLeave={(event) => onRelease(event.pointerId)}
+      onKeyDown={(event) => handleKeyboardDown(event, name, onPress)}
+      onKeyUp={(event) => handleKeyboardUp(event, name, onRelease)}
+      onBlur={() => onRelease(KEYBOARD_POINTER_IDS[name])}
     >
       {label}
     </button>
@@ -366,7 +413,7 @@ export function NineLivesClient() {
                   onClick={() => setPresentationMode("handheld")}
                   className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#172943]/80 px-3 py-2 font-mono text-[0.58rem] font-bold uppercase tracking-[0.14em] text-[#dcecf1] backdrop-blur transition hover:bg-[#203858]"
                 >
-                  <Maximize2 className="size-3.5" />
+                  <ExpandIcon className="size-3.5" />
                   Show handheld
                 </button>
               )}
@@ -376,7 +423,7 @@ export function NineLivesClient() {
                 aria-label="Close full-screen view"
                 className="inline-flex size-9 items-center justify-center rounded-full border border-white/15 bg-[#172943]/80 text-[#dcecf1] backdrop-blur transition hover:bg-[#203858]"
               >
-                <X className="size-4" />
+                <XIcon className="size-4" />
               </button>
             </div>
           </div>
@@ -445,7 +492,7 @@ export function NineLivesClient() {
                       onClick={() => setPresentationMode("handheld")}
                       className="inline-flex items-center gap-1.5 rounded-full border border-[#4b5d78]/60 bg-[#b6c8dc]/55 px-2.5 py-1.5 font-mono text-[0.52rem] font-bold uppercase tracking-[0.12em] text-[#263449] transition hover:bg-[#d3e0ed]"
                     >
-                      <Maximize2 className="size-3" />
+                      <ExpandIcon className="size-3" />
                       <span className="hidden sm:inline">Fullscreen</span>
                     </button>
                     <button
@@ -624,7 +671,7 @@ export function NineLivesClient() {
             rel="noreferrer"
             className="inline-flex shrink-0 items-center gap-2 font-semibold text-[#fff4b8] underline-offset-4 hover:underline"
           >
-            Open Nine Lives in a new tab <ExternalLink className="size-4" />
+            Open Nine Lives in a new tab <ExternalLinkIcon className="size-4" />
           </Link>
         </div>
       </section>
@@ -679,7 +726,7 @@ export function NineLivesClient() {
             rel="noreferrer"
             className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
           >
-            <Github className="size-4" /> Nine Lives on GitHub
+            <GithubIcon className="size-4" /> Nine Lives on GitHub
           </Link>
         </div>
         <p className="mt-4 max-w-3xl text-sm leading-relaxed text-muted-foreground">
