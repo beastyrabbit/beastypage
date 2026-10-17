@@ -26,6 +26,7 @@ import {
   disableNetwork,
   freezeFromArchiveName,
   issuerModeFor,
+  protectedRoot,
 } from "./import/guards";
 import { runImport } from "./import/run";
 
@@ -96,7 +97,7 @@ async function main(): Promise<void> {
       expectedIssuer: issuer.expectedIssuer,
       issuerMode: issuer.mode,
       replace: values.replace,
-      repoRoot: resolve(import.meta.dirname, "../../.."),
+      repoRoot: protectedRoot(import.meta.dirname),
     });
     console.log(
       `[import] ${report.ok ? "complete" : "FAILED"}; report in ${values["report-dir"]}`,

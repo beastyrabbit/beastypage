@@ -103,7 +103,8 @@ export function assertOutsideRepository(
   } catch {
     target = join(realpathSync(dirname(target)), basename(target));
   }
-  if (target === root || target.startsWith(`${root}${sep}`)) {
+  const prefix = root.endsWith(sep) ? root : `${root}${sep}`;
+  if (target === root || target.startsWith(prefix)) {
     throw new Error(`${what} must be outside the repository (${root})`);
   }
 }

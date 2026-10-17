@@ -29,6 +29,7 @@ import {
   disableNetwork,
   type IssuerMode,
   issuerModeFor,
+  protectedRoot,
 } from "./import/guards";
 import {
   assertOutsideRepository,
@@ -38,7 +39,7 @@ import {
 import { STEPS } from "./import/tables";
 
 const SAMPLE_SIZE = 3;
-const REPO_ROOT = resolve(import.meta.dirname, "../../..");
+const REPO_ROOT = protectedRoot(import.meta.dirname);
 
 export interface VerificationMismatch {
   check: string;

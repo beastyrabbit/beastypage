@@ -1,8 +1,23 @@
 // Target and issuer guards shared by the importer and verify:import. They live
 // outside both entry scripts so a bundle of one never runs the other's CLI.
 
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import type pg from "pg";
 import { databaseTarget } from "../../../server/db/config";
+
+/**
+ * The directory that archives and reports must stay outside of: the Git
+ * checkout the script runs from, or, for the bundles in the frontend image
+ * (`/app/scripts/migration`), the application directory `/app`.
+ */
+export function protectedRoot(scriptDir: string): string {
+  for (let dir = resolve(scriptDir); ; dir = dirname(dir)) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    if (dirname(dir) === dir) break;
+  }
+  return resolve(scriptDir, "../..");
+}
 
 export type IssuerMode = "expected" | "any";
 
