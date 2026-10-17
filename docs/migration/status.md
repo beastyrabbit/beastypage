@@ -76,9 +76,13 @@ site. The exception is Perfect Cat, whose matchup is random. No server errors.
 Two independent review rounds on the fixes: the first found six real issues
 (fixed above) and one rejected (old cursor formats; nothing is deployed),
 the second two minor ones (rarity window, a test that passed without the
-fix), both fixed. Signed-in pages were not compared with live (that needs the
-maintainer's production login); they are covered by the local signed-in
-check below.
+fix), both fixed. Signed-in pages were not compared with live: that needs the
+maintainer's production login. Instead, the local development login was
+pointed at an imported user who owns data (local database only, re-imported
+afterwards). Profile, personal, dashboard, stream control and its overlay,
+Single Cat Plus, visual builder, Catdex and stream rendered signed in with no
+errors, and showed that user's imported username, API key and saved
+variants, matching the archive.
 
 Local check note: open the dev server as `http://localhost:<port>`. Next 16
 dev blocks its scripts for `127.0.0.1` unless `allowedDevOrigins` lists it,
