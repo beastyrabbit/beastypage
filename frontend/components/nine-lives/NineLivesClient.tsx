@@ -417,7 +417,7 @@ export function NineLivesClient() {
           }
         >
           <div
-            className={`mx-auto w-full ${
+            className={`@container mx-auto w-full ${
               presentationMode === "game"
                 ? "rounded-[1.35rem] border border-[#3d5273] bg-[#0a1426] p-2 shadow-[0_30px_90px_rgba(0,0,0,0.55)] sm:rounded-[1.8rem] sm:p-4"
                 : "rounded-[2.8rem] border border-[#d6e7f2]/35 bg-gradient-to-br from-[#b4c7dc] via-[#8ea2c1] to-[#647999] p-3 shadow-[0_30px_45px_rgba(3,12,30,0.55),inset_1px_1px_0_rgba(255,255,255,0.55)] sm:p-5"
@@ -510,12 +510,12 @@ export function NineLivesClient() {
             </div>
 
             <div
-              className={`mt-5 grid min-w-0 grid-cols-2 items-center gap-x-3 gap-y-3 px-3 pb-2 sm:mt-7 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-10 sm:px-12 ${
+              className={`@container mt-5 grid min-w-0 grid-cols-2 items-center gap-x-3 gap-y-3 px-3 pb-2 sm:mt-7 @lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] @lg:gap-10 @lg:px-12 ${
                 presentationMode === "game" ? "hidden" : ""
               }`}
             >
               <DPad onPress={press} onRelease={release} pressed={pressed} />
-              <div className="col-span-2 row-start-2 flex flex-col items-center gap-2 self-end pb-1 sm:col-span-1 sm:row-start-auto">
+              <div className="col-span-2 row-start-2 flex flex-col items-center gap-2 self-end pb-1 @lg:col-span-1 @lg:row-start-auto">
                 <div className="flex gap-2">
                   <DeviceButton
                     name="select"
@@ -535,7 +535,7 @@ export function NineLivesClient() {
                 <button
                   type="button"
                   aria-label={
-                    started ? "Focus Nine Lives" : "Power on Nine Lives"
+                    started ? "Power: focus Nine Lives" : "Power on Nine Lives"
                   }
                   onClick={startGame}
                   className="group flex items-center gap-2 rounded-full px-3 py-2 font-mono text-[0.58rem] font-bold uppercase tracking-[0.18em] text-[#34455e] transition hover:text-[#17243a]"
@@ -544,7 +544,7 @@ export function NineLivesClient() {
                   Power
                 </button>
               </div>
-              <div className="col-start-2 row-start-1 flex min-w-0 justify-end sm:col-start-auto sm:row-start-auto">
+              <div className="col-start-2 row-start-1 flex min-w-0 justify-end @lg:col-start-auto @lg:row-start-auto">
                 <div className="relative h-28 w-32">
                   <div className="absolute left-0 top-1">
                     <SpeakerGrille />
