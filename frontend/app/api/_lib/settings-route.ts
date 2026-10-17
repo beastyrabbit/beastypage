@@ -5,6 +5,15 @@ import {
   readRequestBody,
 } from "@/app/api/_lib/request-body";
 import { getServerConvexUrl } from "@/lib/convexUrl";
+import { ANONYMOUS } from "@/server/auth/identity";
+import { dataBackend } from "@/server/backend";
+import { getDb } from "@/server/db/client";
+import { errorResponse } from "@/server/http";
+import {
+  getSettings,
+  type SettingsKind,
+  saveSettings,
+} from "@/server/services/settings";
 
 const MAX_BODY_BYTES = 512 * 1024;
 
@@ -30,6 +39,8 @@ interface SettingsSaveResult {
 
 interface SettingsRouteOptions<TConfig> {
   serviceName: string;
+  /** PostgreSQL service used when DATA_BACKEND=postgres. */
+  kind: SettingsKind;
   parseConfig?: (value: unknown) => TConfig;
   get: (
     convex: ConvexHttpClient,
@@ -69,6 +80,27 @@ export function createSettingsRouteHandlers<TConfig = unknown>(
       return NextResponse.json({ error: "Missing slug" }, { status: 400 });
     }
 
+    if (dataBackend() === "postgres") {
+      try {
+        const record = await getSettings(getDb(), options.kind, slug);
+        if (!record) {
+          return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+        return NextResponse.json({
+          slug: record.slug,
+          config: record.config,
+          createdAt: record.createdAt,
+          updatedAt: record.updatedAt,
+        });
+      } catch (error) {
+        return errorResponse(
+          error,
+          "Failed to load settings",
+          `Failed to fetch ${options.serviceName} settings`,
+        );
+      }
+    }
+
     const convexUrl = getServerConvexUrl();
     if (!convexUrl) {
       return NextResponse.json(
@@ -99,8 +131,9 @@ export function createSettingsRouteHandlers<TConfig = unknown>(
   }
 
   async function POST(request: NextRequest) {
+    const backend = dataBackend();
     const convexUrl = getServerConvexUrl();
-    if (!convexUrl) {
+    if (backend === "convex" && !convexUrl) {
       return NextResponse.json(
         { error: "Convex URL not configured" },
         { status: 500 },
@@ -142,8 +175,32 @@ export function createSettingsRouteHandlers<TConfig = unknown>(
       return NextResponse.json({ error: "Invalid config" }, { status: 400 });
     }
 
+    if (backend === "postgres") {
+      try {
+        // This route never forwarded a Clerk token to Convex, so saves are
+        // authorized by edit token only; keep that until clients move here.
+        const result = await saveSettings(
+          getDb(),
+          options.kind,
+          {
+            config,
+            slug: optionalString(payload.slug),
+            editToken: optionalString(payload.editToken),
+          },
+          ANONYMOUS,
+        );
+        return NextResponse.json(result);
+      } catch (error) {
+        return errorResponse(
+          error,
+          "Failed to save settings",
+          `Failed to save ${options.serviceName} settings`,
+        );
+      }
+    }
+
     try {
-      const convex = new ConvexHttpClient(convexUrl);
+      const convex = new ConvexHttpClient(convexUrl as string);
       const result = await options.save(convex, {
         config,
         slug: optionalString(payload.slug),

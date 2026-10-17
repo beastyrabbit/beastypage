@@ -1,12 +1,10 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   CatGeneratorApi,
   SpriteMapperApi,
 } from "@/components/cat-builder/types";
-import { api } from "@/convex/_generated/api";
 import {
   BATCH_DEPART_MS,
   BATCH_REPACK_MS,
@@ -22,6 +20,7 @@ import {
   formatBatchNumber,
 } from "@/lib/adoption/streamBatch";
 import type { CatParams } from "@/lib/cat-v3/types";
+import { useReportBatchStage } from "@/lib/data/stream";
 import {
   BATCH_BEAT_MS,
   type BatchBeat,
@@ -534,7 +533,7 @@ export function useBatchShow({
   apiKey,
   reducedMotion,
 }: UseBatchShowArgs): BatchShowView {
-  const reportBatchStage = useMutation(api.catStream.reportBatchStage);
+  const reportBatchStage = useReportBatchStage();
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const placeholdersRef = useRef<BatchTortiePlaceholders>(
     BATCH_TORTIE_PLACEHOLDER_FALLBACK,

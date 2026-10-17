@@ -1,13 +1,12 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
 import XIcon from "@/components/ui/x-icon";
-import { api } from "@/convex/_generated/api";
 import type { CatParams } from "@/lib/cat-v3/types";
 import { encodeCatShare } from "@/lib/catShare";
+import { useCatHistory } from "@/lib/data/cats";
 
 interface HistoryCat {
   id: string;
@@ -102,7 +101,7 @@ export function FoundingCoupleSelector({
   const [searchTerm, setSearchTerm] = useState("");
 
   // Query only single cat profiles (not batches or trees)
-  const profilesQuery = useQuery(api.mapper.listHistory, { limit: 200 });
+  const profilesQuery = useCatHistory(200);
 
   // Filter to only single cat profiles
   const allCats = useMemo(() => {

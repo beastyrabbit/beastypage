@@ -1,0 +1,4 @@
+{
+  "$comment": "Contract migrations only: \"<migration number>\": <oldest application schema version that still works after it>. Expand migrations need no entry. See docs/migration/adr-0001-postgresql.md section 4.",
+  "contractMigrations": {}
+}

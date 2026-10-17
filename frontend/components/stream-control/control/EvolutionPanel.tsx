@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
 import {
   ArrowUpRight,
   Dna,
@@ -26,7 +25,18 @@ import {
   getArchetypeTheme,
   withAlpha,
 } from "@/components/evolution/archetypes";
-import { api } from "@/convex/_generated/api";
+import {
+  useAdoptionCreate,
+  useCatCreate,
+  useCatProfile,
+} from "@/lib/data/cats";
+import {
+  useHoldEvolution,
+  useReleaseEvolution,
+  useRevealEvolutionAt,
+  useSkipEvolutionToBoard,
+  useTriggerCatStreamEvolution,
+} from "@/lib/data/stream";
 import {
   estimateCeremonySeconds,
   formatDuration,
@@ -203,10 +213,10 @@ function EvolutionLedgerCard({
   commandBusy: boolean;
   endShow: () => Promise<void>;
 }>) {
-  const holdEvolution = useMutation(api.catStream.holdEvolution);
-  const releaseEvolution = useMutation(api.catStream.releaseEvolution);
-  const revealEvolutionAt = useMutation(api.catStream.revealEvolutionAt);
-  const skipEvolutionToBoard = useMutation(api.catStream.skipEvolutionToBoard);
+  const holdEvolution = useHoldEvolution();
+  const releaseEvolution = useReleaseEvolution();
+  const revealEvolutionAt = useRevealEvolutionAt();
+  const skipEvolutionToBoard = useSkipEvolutionToBoard();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 250);
@@ -369,9 +379,9 @@ export function EvolutionPanel() {
     endShow,
   } = useStreamControl();
   const live = Boolean(currentEvolutionCommand && showLive);
-  const createBatch = useMutation(api.adoptionV2.createBatch);
-  const createMapper = useMutation(api.mapper.create);
-  const triggerEvolution = useMutation(api.catStream.triggerEvolution);
+  const createBatch = useAdoptionCreate();
+  const createMapper = useCatCreate();
+  const triggerEvolution = useTriggerCatStreamEvolution();
 
   const [selectedClans, setSelectedClans] = useState<EvolutionArchetype[]>(() =>
     CONTROLLED_ARCHETYPES.slice(0, 3),
@@ -390,11 +400,8 @@ export function EvolutionPanel() {
   const startTokenRef = useRef(0);
 
   const trimmedHistorySlug = historySlug.trim();
-  const historyRecord = useQuery(
-    api.mapper.getBySlug,
-    starterMode === "history" && trimmedHistorySlug
-      ? { slugOrId: trimmedHistorySlug }
-      : "skip",
+  const historyRecord = useCatProfile(
+    starterMode === "history" && trimmedHistorySlug ? trimmedHistorySlug : null,
   ) as MapperRecord | null | undefined;
 
   const estimateSeconds = useMemo(

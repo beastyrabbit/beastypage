@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import { ArrowUpRight, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,7 +11,6 @@ import DownChevron from "@/components/ui/down-chevron";
 import PaintIcon from "@/components/ui/paint-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
-import { api } from "@/convex/_generated/api";
 import {
   type CanonicalCatViewPayload,
   type CatTraitDisplayRow,
@@ -26,6 +24,7 @@ import {
   getAvailablePoseNames,
 } from "@/lib/cat-v3/poseOptions";
 import { createCatShare, decodeCatShare, encodeCatShare } from "@/lib/catShare";
+import { useCatProfile } from "@/lib/data/cats";
 import { cn } from "@/lib/utils";
 
 type ViewerClientProps = {
@@ -360,10 +359,7 @@ export function ViewerClient({ slug, encoded }: Readonly<ViewerClientProps>) {
   const generatorRef = useRef<CatGeneratorApi | null>(null);
   const router = useRouter();
 
-  const mapperRecord = useQuery(
-    api.mapper.getBySlug,
-    slug ? { slugOrId: slug } : "skip",
-  ) as MapperRecord | null | undefined;
+  const mapperRecord = useCatProfile(slug) as MapperRecord | null | undefined;
 
   // Use cached preview if available, otherwise use on-demand endpoint
   const cachedPreviewUrl =

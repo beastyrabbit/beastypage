@@ -1,18 +1,15 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import { Trophy } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import ArrowBackIcon from "@/components/ui/arrow-back-icon";
-import { api } from "@/convex/_generated/api";
+import { useCoinflipScores } from "@/lib/data/games";
 
 const MAX_RESULTS = 200;
 
 export default function CoinflipHighscoresPage() {
-  const rawScores = useQuery(api.coinflipper.listScores, {
-    limit: MAX_RESULTS,
-  });
+  const rawScores = useCoinflipScores(MAX_RESULTS);
 
   const rows = useMemo(() => {
     const list = rawScores ?? [];

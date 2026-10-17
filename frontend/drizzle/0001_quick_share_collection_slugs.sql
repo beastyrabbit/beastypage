@@ -1,0 +1,1 @@
+DROP INDEX "quick_share_uploads_slug_key";

@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { Expand, Heart, Star } from "lucide-react";
 import {
   type FormEvent,
@@ -17,7 +16,6 @@ import type {
   CatGeneratorApi,
   SpriteMapperApi,
 } from "@/components/cat-builder/types";
-import { api } from "@/convex/_generated/api";
 import {
   BATCH_TORTIE_PLACEHOLDER_FALLBACK,
   BATCH_VERDICT_MS,
@@ -31,6 +29,12 @@ import {
   formatBatchNumber,
   parseBatchNumberInput,
 } from "@/lib/adoption/streamBatch";
+import {
+  useCancelBatchCull,
+  useCullBatchCat,
+  useMarkBatchCat,
+  useSetBatchHighlight,
+} from "@/lib/data/stream";
 import { cn } from "@/lib/utils";
 import {
   type StageSummary,
@@ -302,10 +306,10 @@ function verdictView(
 }
 
 function useCullMutations() {
-  const markBatchCat = useMutation(api.catStream.markBatchCat);
-  const cullBatchCat = useMutation(api.catStream.cullBatchCat);
-  const cancelBatchCull = useMutation(api.catStream.cancelBatchCull);
-  const setBatchHighlight = useMutation(api.catStream.setBatchHighlight);
+  const markBatchCat = useMarkBatchCat();
+  const cullBatchCat = useCullBatchCat();
+  const cancelBatchCull = useCancelBatchCull();
+  const setBatchHighlight = useSetBatchHighlight();
   return { markBatchCat, cullBatchCat, cancelBatchCull, setBatchHighlight };
 }
 type CullMutations = ReturnType<typeof useCullMutations>;

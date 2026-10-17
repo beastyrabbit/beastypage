@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import { ArrowUpRight, Loader2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -8,9 +7,9 @@ import { useMemo, useState } from "react";
 import ArrowBackIcon from "@/components/ui/arrow-back-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import XIcon from "@/components/ui/x-icon";
-import { api } from "@/convex/_generated/api";
 import type { TortieLayer } from "@/lib/cat-v3/types";
 import { encodeCatShare } from "@/lib/catShare";
+import { useAdoptionBatch } from "@/lib/data/cats";
 
 interface CatSharePayload {
   params: Record<string, unknown>;
@@ -86,7 +85,7 @@ function formatTimestamp(created?: number): string | null {
 export function AdoptionBatchClient({
   slug,
 }: Readonly<AdoptionBatchClientProps>) {
-  const record = useQuery(api.adoptionV2.getBySlug, { slugOrId: slug }) as
+  const record = useAdoptionBatch(slug) as
     | AdoptionBatchRecord
     | null
     | undefined;

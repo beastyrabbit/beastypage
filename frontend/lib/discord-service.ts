@@ -1,4 +1,9 @@
+import "server-only";
+
 import type { internal } from "@/convex/_generated/api";
+import { dataBackend } from "@/server/backend";
+import { getDb } from "@/server/db/client";
+import { getUserConfig, updateUserConfig } from "@/server/services/discord";
 
 export type DiscordUserConfig =
   typeof internal.discordUserConfigInternal.get._returnType;
@@ -7,6 +12,19 @@ export async function discordConfig(
   operation: string,
   args: Record<string, unknown>,
 ): Promise<DiscordUserConfig> {
+  if (dataBackend() === "postgres") {
+    if (operation === "get" && typeof args.discordUserId === "string")
+      return getUserConfig(
+        getDb(),
+        args.discordUserId,
+      ) as Promise<DiscordUserConfig>;
+    await updateUserConfig(getDb(), operation, args);
+    return (
+      typeof args.discordUserId === "string"
+        ? getUserConfig(getDb(), args.discordUserId)
+        : null
+    ) as Promise<DiscordUserConfig>;
+  }
   const site =
     process.env.CONVEX_SITE_URL ?? process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
   const token = process.env.DISCORD_API_TOKEN;

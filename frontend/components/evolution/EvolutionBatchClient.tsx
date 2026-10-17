@@ -1,13 +1,12 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import { ArrowUpRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import ArrowBackIcon from "@/components/ui/arrow-back-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
-import { api } from "@/convex/_generated/api";
 import { encodeCatShare } from "@/lib/catShare";
+import { useAdoptionBatch } from "@/lib/data/cats";
 import {
   getEvolutionMeta,
   isEvolutionBatchSettings,
@@ -82,7 +81,7 @@ function formatTimestamp(value?: number | null) {
 export function EvolutionBatchClient({
   slug,
 }: Readonly<EvolutionBatchClientProps>) {
-  const record = useQuery(api.adoptionV2.getBySlug, { slugOrId: slug }) as
+  const record = useAdoptionBatch(slug) as
     | EvolutionBatchRecord
     | null
     | undefined;

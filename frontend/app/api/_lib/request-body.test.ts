@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { RequestBodyTooLargeError, readRequestBody } from "./request-body";
+import {
+  RequestBodyTooLargeError,
+  readRequestBody,
+  readRequestBytes,
+} from "./request-body";
 
 describe("readRequestBody", () => {
   it("reads a body under the byte cap", async () => {
@@ -65,5 +69,17 @@ describe("readRequestBody", () => {
     await expect(readRequestBody(request, 1024)).rejects.toMatchObject({
       name: "AbortError",
     });
+  });
+});
+
+describe("readRequestBytes", () => {
+  it("returns binary bodies byte for byte", async () => {
+    const bytes = new Uint8Array([0, 255, 128, 10, 13]);
+    const request = new Request("http://localhost", {
+      method: "POST",
+      body: bytes,
+    });
+
+    await expect(readRequestBytes(request, 16)).resolves.toEqual(bytes);
   });
 });

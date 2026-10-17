@@ -1,13 +1,11 @@
 "use client";
 
-import { useMutation } from "convex/react";
 import { ArrowUpRight, Cat, Loader2, Square } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
-import { api } from "@/convex/_generated/api";
 import { toId } from "@/convex/utils";
 import {
   BATCH_FINAL_COUNT,
@@ -20,6 +18,11 @@ import {
   syncChangedRegistryTraitsFromLegacy,
 } from "@/lib/cat-system";
 import { encodeCatShare } from "@/lib/catShare";
+import { useAdoptionCreate, useCatCreate } from "@/lib/data/cats";
+import {
+  useAttachBatchSlug,
+  useTriggerCatStreamBatch,
+} from "@/lib/data/stream";
 import type { PaletteId } from "@/lib/palettes";
 import { cn } from "@/lib/utils";
 import { withResolvedAfterlifeParams } from "@/utils/catSettingsHelpers";
@@ -48,10 +51,10 @@ export function BatchPanel() {
     endShow,
   } = useStreamControl();
   const { generator, ready: generatorReady } = useCatGenerator();
-  const createBatch = useMutation(api.adoptionV2.createBatch);
-  const createMapper = useMutation(api.mapper.create);
-  const triggerBatch = useMutation(api.catStream.triggerBatch);
-  const attachBatchSlug = useMutation(api.catStream.attachBatchSlug);
+  const createBatch = useAdoptionCreate();
+  const createMapper = useCatCreate();
+  const triggerBatch = useTriggerCatStreamBatch();
+  const attachBatchSlug = useAttachBatchSlug();
 
   const [accessoryCount, setAccessoryCount] = useState(2);
   const [scarCount, setScarCount] = useState(2);

@@ -1,6 +1,5 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
 import { ClipboardCopy, Loader2, Trophy } from "lucide-react";
 import Image from "next/image";
 import {
@@ -14,8 +13,6 @@ import {
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import XIcon from "@/components/ui/x-icon";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
 import { track } from "@/lib/analytics";
 import {
   catViewPayloadToShareSeed,
@@ -27,6 +24,12 @@ import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { renderCatV3 } from "@/lib/cat-v3/api";
 import type { CatRenderParams } from "@/lib/cat-v3/types";
 import { createCatShare, encodeCatShare } from "@/lib/catShare";
+import {
+  usePerfectCatLeaderboard,
+  usePerfectCatMatchup,
+  usePerfectCatRegister,
+  usePerfectCatVote,
+} from "@/lib/data/games";
 import { createPerfectCatClientId } from "./client-token";
 
 const PALETTE_MODES = [
@@ -57,7 +60,7 @@ function pickPalette(): string {
 }
 
 type MatchupCat = {
-  id: Id<"perfect_cats">;
+  id: string;
   rating: number;
   wins: number;
   losses: number;
@@ -284,10 +287,10 @@ function CatCard({
 
 export default function PerfectCatFinderPage() {
   const clientId = useClientToken();
-  const requestMatchup = useMutation(api.perfectCats.requestMatchup);
-  const registerCats = useMutation(api.perfectCats.registerCats);
-  const submitVote = useMutation(api.perfectCats.submitVote);
-  const leaderboard = useQuery(api.perfectCats.leaderboard, { limit: 10 });
+  const requestMatchup = usePerfectCatMatchup();
+  const registerCats = usePerfectCatRegister();
+  const submitVote = usePerfectCatVote();
+  const leaderboard = usePerfectCatLeaderboard(10);
   const { generator, ready } = useCatGenerator();
   const { ensurePreview, getPreview } = usePreviewCache();
 
@@ -413,8 +416,8 @@ export default function PerfectCatFinderPage() {
       try {
         await submitVote({
           clientId,
-          winnerId: winner.id,
-          loserId: loser.id,
+          winnerId: winner.id as never,
+          loserId: loser.id as never,
           ...(matchupToken ? { matchupToken } : {}),
         });
         voteSucceeded = true;

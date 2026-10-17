@@ -1,6 +1,5 @@
 "use client";
 
-import { useConvexAuth } from "convex/react";
 import { AnimatePresence, motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,11 +8,12 @@ import { useEffect, useRef, useState } from "react";
 import { UserAuthButton } from "@/components/auth/UserAuthButton";
 import { DiscordInviteButton } from "@/components/common/DiscordInviteButton";
 import { NAV_ITEMS } from "@/components/site-nav-config";
+import { useBackendAuth } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const { isAuthenticated } = useConvexAuth();
+  const { isAuthenticated } = useBackendAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
 

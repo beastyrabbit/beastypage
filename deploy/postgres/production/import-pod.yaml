@@ -1,0 +1,90 @@
+# TEMPLATE for kub-homelab: an operator-created pod during the cutover window.
+# Do not put this Pod in the normal Flux kustomization. Delete it after every
+# attempt; its emptyDir volumes contain the archive and reports only briefly.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: beastypage-postgres-import
+  namespace: webpage
+  labels:
+    app.kubernetes.io/name: beastypage-postgres-import
+    app.kubernetes.io/component: migration
+spec:
+  automountServiceAccountToken: false
+  activeDeadlineSeconds: 7200
+  restartPolicy: Never
+  terminationGracePeriodSeconds: 30
+  securityContext:
+    runAsUser: 1001
+    runAsGroup: 1001
+    runAsNonRoot: true
+    fsGroup: 1001
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: importer
+      # Step 7 replaces this marker with the running frontend image before
+      # piping the private rendered manifest to kubectl apply. That image
+      # contains the bundled importer and verifier under /app.
+      image: __FRONTEND_IMAGE__
+      imagePullPolicy: IfNotPresent
+      command: ["sh", "-c"]
+      args:
+        - >-
+          umask 077;
+          mkdir -p /work/archive /work/reports /tmp/node;
+          sleep 7200
+      env:
+        - name: HOME
+          value: /tmp
+      envFrom:
+        - secretRef:
+            name: beastypage-postgres-import-url
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+          ephemeral-storage: 2Gi
+        limits:
+          cpu: "2"
+          memory: 2Gi
+          ephemeral-storage: 4Gi
+      volumeMounts:
+        - name: archive
+          mountPath: /work/archive
+        - name: reports
+          mountPath: /work/reports
+        - name: postgres-ca
+          mountPath: /etc/postgres-ca
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+  volumes:
+    # The export is about 350 MiB. Use node-local disk rather than a PVC and
+    # cap the copy so a failed operator action cannot consume the node.
+    - name: archive
+      emptyDir:
+        sizeLimit: 512Mi
+    - name: reports
+      emptyDir:
+        sizeLimit: 256Mi
+    - name: tmp
+      emptyDir:
+        medium: Memory
+        sizeLimit: 64Mi
+    - name: postgres-ca
+      secret:
+        secretName: beastypage-postgres-ca
+        # CNPG's generated secret also contains ca.key. Mount ca.crt only.
+        # This items syntax is the bjw-s app-template 3.x/4.x convention too.
+        items:
+          - key: ca.crt
+            path: ca.crt
+        defaultMode: 0444

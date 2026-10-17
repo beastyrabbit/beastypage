@@ -8,6 +8,9 @@ import { api } from "@/convex/_generated/api";
 import { getServerConvexUrl } from "@/lib/convexUrl";
 import type { SingleCatPortableSettings } from "@/lib/portable-settings";
 import { decodePortableSettings } from "@/lib/portable-settings";
+import { dataBackend } from "@/server/backend";
+import { getDb } from "@/server/db/client";
+import { getSettings } from "@/server/services/settings";
 import type { SingleCatSettings } from "@/utils/singleCatVariants";
 import { parseSingleCatPayload } from "@/utils/singleCatVariants";
 
@@ -70,14 +73,19 @@ function firstSearchParam(value: string | string[] | undefined): string | null {
 async function loadVariantSettings(
   slug: string,
 ): Promise<{ settings: SingleCatSettings | null; error: string | null }> {
+  const postgres = dataBackend() === "postgres";
   const convexUrl = getServerConvexUrl();
-  if (!convexUrl) {
+  if (!postgres && !convexUrl) {
     return { settings: null, error: "Failed to load settings from URL" };
   }
 
   try {
-    const convex = new ConvexHttpClient(convexUrl);
-    const record = await convex.query(api.singleCatSettings.get, { slug });
+    const record = postgres
+      ? await getSettings(getDb(), "singleCat", slug)
+      : await new ConvexHttpClient(convexUrl as string).query(
+          api.singleCatSettings.get,
+          { slug },
+        );
     if (!record) {
       return { settings: null, error: "No preset found for that slug" };
     }

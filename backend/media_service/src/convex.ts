@@ -12,19 +12,16 @@ export class ConvexControlPlane {
 		payload: Record<string, unknown> = {},
 		bearerToken?: string,
 	): Promise<T> {
-		const response = await fetch(
-			`${this.config.convexSiteUrl}/quick-share/internal`,
-			{
-				method: "POST",
-				headers: {
-					"content-type": "application/json",
-					"x-quick-share-internal-token": this.config.internalToken,
-					...(bearerToken ? { authorization: `Bearer ${bearerToken}` } : {}),
-				},
-				body: JSON.stringify({ op, ...payload }),
-				signal: AbortSignal.timeout(30_000),
+		const response = await fetch(this.config.controlPlaneUrl, {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"x-quick-share-internal-token": this.config.internalToken,
+				...(bearerToken ? { authorization: `Bearer ${bearerToken}` } : {}),
 			},
-		);
+			body: JSON.stringify({ op, ...payload }),
+			signal: AbortSignal.timeout(30_000),
+		});
 		const body = (await response.json().catch(() => ({
 			error: "Invalid control-plane response",
 		}))) as { error?: string };
