@@ -22,7 +22,7 @@
     "authHookCalls": 1,
     "nestedStorageReferences": 71,
     "externalCallerLines": 47,
-    "deploymentReferenceLines": 66
+    "deploymentReferenceLines": 68
   },
   "tables": [
     {
@@ -5074,6 +5074,11 @@
       "detail": "# Generated Convex types are committed; dependency installation skips scripts."
     },
     {
+      "file": "frontend/Dockerfile",
+      "line": 46,
+      "detail": "# Self-contained PostgreSQL migration and Convex import/verification runners."
+    },
+    {
       "file": "frontend/convex.json",
       "line": 2,
       "detail": "\"functions\": \"convex\","
@@ -5125,37 +5130,42 @@
     },
     {
       "file": "frontend/package.json",
-      "line": 24,
-      "detail": "\"migration:inventory\": \"tsx scripts/migration/convex-inventory.ts\","
+      "line": 23,
+      "detail": "\"db:bundle-import\": \"esbuild scripts/migration/import-convex.ts scripts/migration/verify-import.ts --bundle --platform=node --format=esm --t"
     },
     {
       "file": "frontend/package.json",
       "line": 25,
+      "detail": "\"migration:inventory\": \"tsx scripts/migration/convex-inventory.ts\","
+    },
+    {
+      "file": "frontend/package.json",
+      "line": 26,
       "detail": "\"import:convex\": \"tsx scripts/migration/import-convex.ts\","
     },
     {
       "file": "frontend/package.json",
-      "line": 31,
+      "line": 32,
       "detail": "\"convex:dev\": \"convex dev\","
     },
     {
       "file": "frontend/package.json",
-      "line": 32,
+      "line": 33,
       "detail": "\"deploy\": \"pnpm exec convex deploy\","
     },
     {
       "file": "frontend/package.json",
-      "line": 33,
+      "line": 34,
       "detail": "\"prepare\": \"pnpm exec convex codegen\""
     },
     {
       "file": "frontend/package.json",
-      "line": 49,
+      "line": 50,
       "detail": "\"convex\": \"^1.45.0\","
     },
     {
       "file": "frontend/package.json",
-      "line": 91,
+      "line": 92,
       "detail": "\"convex-test\": \"^0.0.54\","
     },
     {

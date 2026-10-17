@@ -28,7 +28,7 @@ run `pnpm --dir frontend run migration:inventory` and commit the result.
 | authHookCalls | 1 |
 | nestedStorageReferences | 71 |
 | externalCallerLines | 47 |
-| deploymentReferenceLines | 66 |
+| deploymentReferenceLines | 68 |
 
 ## Tables
 
@@ -445,6 +445,7 @@ Identifiers ending in `StorageId`. Entries outside schema-level `_storage` field
 | ENV CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT} | `frontend/Dockerfile:28` |
 | ENV NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL} | `frontend/Dockerfile:31` |
 | # Generated Convex types are committed; dependency installation skips scripts. | `frontend/Dockerfile:43` |
+| # Self-contained PostgreSQL migration and Convex import/verification runners. | `frontend/Dockerfile:46` |
 | "functions": "convex", | `frontend/convex.json:2` |
 | CONVEX_PLACEHOLDER_URL="https://placeholder.convex.cloud" | `frontend/docker-entrypoint.sh:9` |
 | CONVEX_PLACEHOLDER_HOST="placeholder.convex.cloud" | `frontend/docker-entrypoint.sh:10` |
@@ -455,13 +456,14 @@ Identifiers ending in `StorageId`. Entries outside schema-level `_storage` field
 | replace_in_files "$CONVEX_PLACEHOLDER_URL" "$NEXT_PUBLIC_CONVEX_URL" | `frontend/docker-entrypoint.sh:47` |
 | replace_in_files "$CONVEX_PLACEHOLDER_HOST" "$NEW_CONVEX_HOST" | `frontend/docker-entrypoint.sh:48` |
 | echo " - WARNING: NEXT_PUBLIC_CONVEX_URL not set (database connection may fail)" | `frontend/docker-entrypoint.sh:50` |
-| "migration:inventory": "tsx scripts/migration/convex-inventory.ts", | `frontend/package.json:24` |
-| "import:convex": "tsx scripts/migration/import-convex.ts", | `frontend/package.json:25` |
-| "convex:dev": "convex dev", | `frontend/package.json:31` |
-| "deploy": "pnpm exec convex deploy", | `frontend/package.json:32` |
-| "prepare": "pnpm exec convex codegen" | `frontend/package.json:33` |
-| "convex": "^1.45.0", | `frontend/package.json:49` |
-| "convex-test": "^0.0.54", | `frontend/package.json:91` |
+| "db:bundle-import": "esbuild scripts/migration/import-convex.ts scripts/migration/verify-import.ts --bundle --platform=node --format=esm --t | `frontend/package.json:23` |
+| "migration:inventory": "tsx scripts/migration/convex-inventory.ts", | `frontend/package.json:25` |
+| "import:convex": "tsx scripts/migration/import-convex.ts", | `frontend/package.json:26` |
+| "convex:dev": "convex dev", | `frontend/package.json:32` |
+| "deploy": "pnpm exec convex deploy", | `frontend/package.json:33` |
+| "prepare": "pnpm exec convex codegen" | `frontend/package.json:34` |
+| "convex": "^1.45.0", | `frontend/package.json:50` |
+| "convex-test": "^0.0.54", | `frontend/package.json:92` |
 | "cat-system:build": "pnpm --dir frontend run cat-system:check && pnpm --dir frontend exec vitest run && sh frontend/scripts/write-version.sh | `package.json:12` |
 | "dev:convex": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev --path=/ | `package.json:17` |
 | "env:check:frontend": "infisical run --silent --domain=http://192.168.60.11:8080 --projectId=a5a2b8fb-b67d-4950-b259-4b887676c042 --env=dev  | `package.json:23` |
