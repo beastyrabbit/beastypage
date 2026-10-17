@@ -7,6 +7,7 @@ import { ServiceError } from "./errors";
 
 const cursorSchema = z.object({
   createdAt: z.string().datetime({ offset: true }),
+  creationAt: z.string().datetime({ offset: true }).optional(),
   id: z.string().uuid(),
 });
 
@@ -36,6 +37,26 @@ export function creationOrderBefore(
   ) as SQL;
 }
 
+/** Descending keyset predicate for indexes led by the app `createdAt` field. */
+export function createdAtOrderBefore(
+  table: CreationOrderedTable,
+  cursor: PageCursor,
+): SQL {
+  const createdAt = new Date(cursor.createdAt);
+  const creationAt = new Date(cursor.creationAt ?? cursor.createdAt);
+  const timestamp = creationTimestamp(table);
+  return or(
+    sql`${table.createdAt} < ${createdAt}`,
+    and(
+      sql`${table.createdAt} = ${createdAt}`,
+      or(
+        sql`${timestamp} < ${creationAt}`,
+        and(sql`${timestamp} = ${creationAt}`, sql`${table.id} < ${cursor.id}`),
+      ),
+    ),
+  ) as SQL;
+}
+
 export function rowCreationTimestamp(row: {
   legacyCreatedAt: Date | null;
   createdAt: Date;
@@ -45,6 +66,7 @@ export function rowCreationTimestamp(row: {
 
 export function encodeCursor(cursor: {
   createdAt: Date | string;
+  creationAt?: Date | string;
   id: string;
 }): string {
   const parsed = cursorSchema.safeParse({
@@ -52,6 +74,10 @@ export function encodeCursor(cursor: {
       cursor.createdAt instanceof Date
         ? cursor.createdAt.toISOString()
         : cursor.createdAt,
+    creationAt:
+      cursor.creationAt instanceof Date
+        ? cursor.creationAt.toISOString()
+        : cursor.creationAt,
     id: cursor.id,
   });
   if (!parsed.success) {

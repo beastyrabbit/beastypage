@@ -4,7 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import type { Database } from "../db/pool";
 import { ancestryTree } from "../db/schema";
 import {
-  creationOrderBefore,
+  createdAtOrderBefore,
   creationTimestamp,
   decodeCursor,
   encodeCursor,
@@ -27,7 +27,11 @@ export async function listTrees(db: AncestryDb, limit: number) {
   return db
     .select()
     .from(ancestryTree)
-    .orderBy(desc(creationTimestamp(ancestryTree)), desc(ancestryTree.id))
+    .orderBy(
+      desc(ancestryTree.createdAt),
+      desc(creationTimestamp(ancestryTree)),
+      desc(ancestryTree.id),
+    )
     .limit(limit);
 }
 
@@ -36,19 +40,24 @@ export async function listTreePageRows(
   args: { limit: number; cursor?: string | null },
 ) {
   const cursor = decodeCursor(args.cursor);
-  const where = cursor ? creationOrderBefore(ancestryTree, cursor) : undefined;
+  const where = cursor ? createdAtOrderBefore(ancestryTree, cursor) : undefined;
   const rows = await db
     .select()
     .from(ancestryTree)
     .where(where)
-    .orderBy(desc(creationTimestamp(ancestryTree)), desc(ancestryTree.id))
+    .orderBy(
+      desc(ancestryTree.createdAt),
+      desc(creationTimestamp(ancestryTree)),
+      desc(ancestryTree.id),
+    )
     .limit(args.limit + 1);
   return {
     rows,
     nextCursor:
       rows.length > args.limit
         ? encodeCursor({
-            createdAt: rowCreationTimestamp(rows[args.limit - 1]),
+            createdAt: rows[args.limit - 1].createdAt,
+            creationAt: rowCreationTimestamp(rows[args.limit - 1]),
             id: rows[args.limit - 1].id,
           })
         : null,

@@ -330,7 +330,11 @@ export async function listPendingJobs(
     .select()
     .from(quickShareJobs)
     .where(eq(quickShareJobs.status, "pending"))
-    .orderBy(asc(creationTimestamp(quickShareJobs)), asc(quickShareJobs.id))
+    .orderBy(
+      asc(quickShareJobs.createdAt),
+      asc(creationTimestamp(quickShareJobs)),
+      asc(quickShareJobs.id),
+    )
     .limit(limit);
 }
 
@@ -441,7 +445,11 @@ export async function listUploadsByIp(
     .select()
     .from(quickShareUploads)
     .where(eq(quickShareUploads.ipHash, ipHash))
-    .orderBy(desc(creationTimestamp(quickShareUploads)))
+    .orderBy(
+      desc(quickShareUploads.createdAt),
+      desc(creationTimestamp(quickShareUploads)),
+      desc(quickShareUploads.id),
+    )
     .limit(limit);
   if (lock) query = query.for("update") as typeof query;
   return query;
@@ -462,7 +470,10 @@ export async function listActiveUploadsByIp(
         eq(quickShareUploads.active, true),
       ),
     )
-    .orderBy(asc(creationTimestamp(quickShareUploads)))
+    .orderBy(
+      asc(creationTimestamp(quickShareUploads)),
+      asc(quickShareUploads.id),
+    )
     .limit(limit);
   if (lock) query = query.for("update") as typeof query;
   return query;
@@ -486,6 +497,7 @@ export async function listUploadsByOwner(
     .orderBy(
       desc(quickShareUploads.publicExpiresAt),
       desc(creationTimestamp(quickShareUploads)),
+      desc(quickShareUploads.id),
     )
     .limit(100);
 }

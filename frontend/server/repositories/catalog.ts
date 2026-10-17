@@ -11,6 +11,7 @@ import {
 } from "../db/schema";
 import type { Transaction } from "../db/transaction";
 import {
+  createdAtOrderBefore,
   creationOrderBefore,
   creationTimestamp,
   type PageCursor,
@@ -224,13 +225,17 @@ export async function selectCollectionPage(
   options: { cursor?: PageCursor | null; pageSize: number },
 ) {
   const cursorWhere = options.cursor
-    ? creationOrderBefore(collection, options.cursor)
+    ? createdAtOrderBefore(collection, options.cursor)
     : undefined;
   return db
     .select()
     .from(collection)
     .where(cursorWhere)
-    .orderBy(desc(creationTimestamp(collection)), desc(collection.id))
+    .orderBy(
+      desc(collection.createdAt),
+      desc(creationTimestamp(collection)),
+      desc(collection.id),
+    )
     .limit(options.pageSize + 1);
 }
 

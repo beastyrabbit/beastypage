@@ -4,7 +4,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Database } from "../db/pool";
 import { catImages, catProfile } from "../db/schema";
 import {
-  creationOrderBefore,
+  createdAtOrderBefore,
   creationTimestamp,
   decodeCursor,
   encodeCursor,
@@ -86,7 +86,11 @@ export async function listProfileRows(db: CatsDb, limit: number) {
   return db
     .select()
     .from(catProfile)
-    .orderBy(desc(creationTimestamp(catProfile)), desc(catProfile.id))
+    .orderBy(
+      desc(catProfile.createdAt),
+      desc(creationTimestamp(catProfile)),
+      desc(catProfile.id),
+    )
     .limit(limit);
 }
 
@@ -95,19 +99,24 @@ export async function listProfilePageRows(
   args: { limit: number; cursor?: string | null },
 ) {
   const cursor = decodeCursor(args.cursor);
-  const where = cursor ? creationOrderBefore(catProfile, cursor) : undefined;
+  const where = cursor ? createdAtOrderBefore(catProfile, cursor) : undefined;
   const rows = await db
     .select()
     .from(catProfile)
     .where(where)
-    .orderBy(desc(creationTimestamp(catProfile)), desc(catProfile.id))
+    .orderBy(
+      desc(catProfile.createdAt),
+      desc(creationTimestamp(catProfile)),
+      desc(catProfile.id),
+    )
     .limit(args.limit + 1);
   return {
     rows,
     nextCursor:
       rows.length > args.limit
         ? encodeCursor({
-            createdAt: rowCreationTimestamp(rows[args.limit - 1]),
+            createdAt: rows[args.limit - 1].createdAt,
+            creationAt: rowCreationTimestamp(rows[args.limit - 1]),
             id: rows[args.limit - 1].id,
           })
         : null,
@@ -123,7 +132,11 @@ export async function listPreviewRows(db: CatsDb) {
       createdAt: catProfile.createdAt,
     })
     .from(catProfile)
-    .orderBy(desc(creationTimestamp(catProfile)), desc(catProfile.id))
+    .orderBy(
+      desc(catProfile.createdAt),
+      desc(creationTimestamp(catProfile)),
+      desc(catProfile.id),
+    )
     .limit(1000);
 }
 

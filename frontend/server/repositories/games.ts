@@ -63,6 +63,7 @@ export async function selectPerfectPool(db: GamesDb) {
     .from(perfectCats)
     .orderBy(
       desc(perfectCats.rating),
+      desc(perfectCats.createdAt),
       desc(creationTimestamp(perfectCats)),
       desc(perfectCats.id),
     )
@@ -84,7 +85,11 @@ export async function selectRecentVotes(db: GamesDb, clientId: string) {
     .select()
     .from(perfectVotes)
     .where(eq(perfectVotes.clientId, clientId))
-    .orderBy(desc(creationTimestamp(perfectVotes)), desc(perfectVotes.id))
+    .orderBy(
+      desc(perfectVotes.createdAt),
+      desc(creationTimestamp(perfectVotes)),
+      desc(perfectVotes.id),
+    )
     .limit(40);
 }
 
@@ -93,7 +98,11 @@ export async function lockMatchupForClient(tx: Transaction, clientId: string) {
     .select()
     .from(perfectMatchups)
     .where(eq(perfectMatchups.clientId, clientId))
-    .orderBy(asc(creationTimestamp(perfectMatchups)), asc(perfectMatchups.id))
+    .orderBy(
+      asc(perfectMatchups.createdAt),
+      asc(creationTimestamp(perfectMatchups)),
+      asc(perfectMatchups.id),
+    )
     .for("update")
     .limit(1);
   return row ?? null;
@@ -201,6 +210,7 @@ export async function listScores(db: GamesDb, limit: number) {
     .from(coinflipperScores)
     .orderBy(
       desc(coinflipperScores.score),
+      desc(coinflipperScores.createdAt),
       desc(creationTimestamp(coinflipperScores)),
       desc(coinflipperScores.id),
     )
@@ -245,6 +255,10 @@ export async function listSpins(db: GamesDb, limit: number) {
   return db
     .select()
     .from(wheelSpins)
-    .orderBy(desc(creationTimestamp(wheelSpins)), desc(wheelSpins.id))
+    .orderBy(
+      desc(wheelSpins.createdAt),
+      desc(creationTimestamp(wheelSpins)),
+      desc(wheelSpins.id),
+    )
     .limit(limit + 1);
 }

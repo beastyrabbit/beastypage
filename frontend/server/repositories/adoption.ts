@@ -4,7 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import type { Database } from "../db/pool";
 import { adoptionBatch, adoptionBatchCats, catProfile } from "../db/schema";
 import {
-  creationOrderBefore,
+  createdAtOrderBefore,
   creationTimestamp,
   decodeCursor,
   encodeCursor,
@@ -50,7 +50,11 @@ export async function listBatches(db: AdoptionDb, limit: number) {
   return db
     .select()
     .from(adoptionBatch)
-    .orderBy(desc(creationTimestamp(adoptionBatch)), desc(adoptionBatch.id))
+    .orderBy(
+      desc(adoptionBatch.createdAt),
+      desc(creationTimestamp(adoptionBatch)),
+      desc(adoptionBatch.id),
+    )
     .limit(limit);
 }
 
@@ -59,19 +63,26 @@ export async function listBatchPageRows(
   args: { limit: number; cursor?: string | null },
 ) {
   const cursor = decodeCursor(args.cursor);
-  const where = cursor ? creationOrderBefore(adoptionBatch, cursor) : undefined;
+  const where = cursor
+    ? createdAtOrderBefore(adoptionBatch, cursor)
+    : undefined;
   const rows = await db
     .select()
     .from(adoptionBatch)
     .where(where)
-    .orderBy(desc(creationTimestamp(adoptionBatch)), desc(adoptionBatch.id))
+    .orderBy(
+      desc(adoptionBatch.createdAt),
+      desc(creationTimestamp(adoptionBatch)),
+      desc(adoptionBatch.id),
+    )
     .limit(args.limit + 1);
   return {
     rows,
     nextCursor:
       rows.length > args.limit
         ? encodeCursor({
-            createdAt: rowCreationTimestamp(rows[args.limit - 1]),
+            createdAt: rows[args.limit - 1].createdAt,
+            creationAt: rowCreationTimestamp(rows[args.limit - 1]),
             id: rows[args.limit - 1].id,
           })
         : null,

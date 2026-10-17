@@ -1,3 +1,4 @@
+import type { FunctionReturnType } from "convex/server";
 import { convexTest } from "convex-test";
 import type pg from "pg";
 import sharp from "sharp";
@@ -6,7 +7,13 @@ import { api } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { readDatabaseConfig } from "../db/config";
 import { createDatabase, createPool, type Database } from "../db/pool";
-import { cardSeason, catdex, collection, rarity } from "../db/schema";
+import {
+  cardSeason,
+  catdex,
+  catProfile,
+  collection,
+  rarity,
+} from "../db/schema";
 import {
   approveCatdex,
   createCatdex,
@@ -22,6 +29,7 @@ import {
   setCollectionFocus,
   storeAndAttachCatdexUpload,
 } from "./catalog";
+import { listHistory } from "./cats";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
 const ADMIN = "https://identity.example|catalog-admin";
@@ -179,6 +187,143 @@ async function seedPostgresCatalog(prefix: string) {
 }
 
 describe("catalog operation parity", () => {
+  it("matches Convex collection index order and cursor pagination", async () => {
+    const prefix = `collection-order-${Date.now()}`;
+    const convex = convexTest(schema, modules);
+    await convex.run(async (ctx) => {
+      for (const [name, createdAt] of [
+        ["first", 100],
+        ["second", 300],
+        ["third", 200],
+      ] as const) {
+        await ctx.db.insert("collection", {
+          artistName: `${prefix} ${name}`,
+          animal: "cat",
+          link: "https://example.test/collection",
+          createdAt,
+          updatedAt: createdAt,
+        });
+      }
+    });
+    await db.insert(collection).values([
+      {
+        artistName: `${prefix} first`,
+        animal: "cat",
+        link: "https://example.test/collection",
+        createdAt: new Date(100),
+        updatedAt: new Date(100),
+        legacyCreatedAt: new Date(300),
+      },
+      {
+        artistName: `${prefix} second`,
+        animal: "cat",
+        link: "https://example.test/collection",
+        createdAt: new Date(300),
+        updatedAt: new Date(300),
+        legacyCreatedAt: new Date(100),
+      },
+      {
+        artistName: `${prefix} third`,
+        animal: "cat",
+        link: "https://example.test/collection",
+        createdAt: new Date(200),
+        updatedAt: new Date(200),
+        legacyCreatedAt: new Date(200),
+      },
+    ]);
+
+    const convexNames: string[] = [];
+    let convexCursor: string | null = null;
+    do {
+      const convexPage: FunctionReturnType<typeof api.collection.page> =
+        await convex.query(api.collection.page, {
+          paginationOpts: { numItems: 2, cursor: convexCursor },
+        });
+      convexNames.push(
+        ...convexPage.page
+          .map((row) => row.artist_name)
+          .filter((name) => name.startsWith(prefix)),
+      );
+      convexCursor = convexPage.isDone ? null : convexPage.continueCursor;
+    } while (convexCursor);
+
+    const postgresNames: string[] = [];
+    let postgresCursor: string | null = null;
+    do {
+      const page = await listCollection(db, {
+        pageSize: 2,
+        cursor: postgresCursor,
+      });
+      postgresNames.push(
+        ...page.page
+          .map((row) => row.artist_name)
+          .filter((name) => name.startsWith(prefix)),
+      );
+      postgresCursor = page.nextCursor;
+    } while (postgresCursor);
+
+    expect(postgresNames).toEqual(convexNames);
+    expect(postgresNames).toEqual([
+      `${prefix} second`,
+      `${prefix} third`,
+      `${prefix} first`,
+    ]);
+  });
+
+  it("matches Convex cat profile byCreated ordering", async () => {
+    const prefix = `profile-order-${Date.now()}`;
+    const convex = convexTest(schema, modules);
+    await convex.run(async (ctx) => {
+      for (const [name, createdAt] of [
+        ["first", 100],
+        ["second", 300],
+        ["third", 200],
+      ] as const) {
+        await ctx.db.insert("cat_profile", {
+          slug: `${prefix}-${name}`,
+          catData: { params: {}, name },
+          createdAt,
+          updatedAt: createdAt,
+        });
+      }
+    });
+    await db.insert(catProfile).values([
+      {
+        slug: `${prefix}-first`,
+        catData: { params: {}, name: "first" },
+        createdAt: new Date(100),
+        updatedAt: new Date(100),
+        legacyCreatedAt: new Date(300),
+      },
+      {
+        slug: `${prefix}-second`,
+        catData: { params: {}, name: "second" },
+        createdAt: new Date(300),
+        updatedAt: new Date(300),
+        legacyCreatedAt: new Date(100),
+      },
+      {
+        slug: `${prefix}-third`,
+        catData: { params: {}, name: "third" },
+        createdAt: new Date(200),
+        updatedAt: new Date(200),
+        legacyCreatedAt: new Date(200),
+      },
+    ]);
+
+    const convexSlugs = (
+      await convex.query(api.mapper.listHistory, {
+        limit: 200,
+      })
+    )
+      .filter((row) => row.slug.startsWith(prefix))
+      .map((row) => row.slug);
+    const postgresSlugs = (await listHistory(db, 200))
+      .filter((row) => row.slug.startsWith(prefix))
+      .map((row) => row.slug);
+    expect(postgresSlugs).toEqual(convexSlugs);
+  });
+
   it("matches Convex creation order and cursor pagination when legacy time differs", async () => {
     const prefix = `creation-order-${Date.now()}`;
     const convex = convexTest(schema, modules);

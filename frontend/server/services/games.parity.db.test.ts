@@ -7,7 +7,12 @@ import { api, internal } from "../../convex/_generated/api";
 import schema from "../../convex/schema";
 import { readDatabaseConfig } from "../db/config";
 import { createDatabase, createPool, type Database } from "../db/pool";
-import { perfectCats, perfectMatchups, wheelSpins } from "../db/schema";
+import {
+  coinflipperScores,
+  perfectCats,
+  perfectMatchups,
+  wheelSpins,
+} from "../db/schema";
 import {
   cleanupPerfectMatchups,
   coinflipLeaderboard,
@@ -65,6 +70,61 @@ describe("games Convex/PostgreSQL parity", () => {
     const postgresRows = await coinflipLeaderboard(db, 1);
     expect(convexRows).toHaveLength(1);
     expect(postgresRows).toHaveLength(1);
+  });
+
+  it("keeps coinflip score ties ordered by the indexed createdAt field", async () => {
+    const prefix = `coinflip-order-${Date.now()}`;
+    const convex = convexTest(schema, modules);
+    await convex.run(async (ctx) => {
+      for (const [name, createdAt] of [
+        ["first", 100],
+        ["second", 300],
+        ["third", 200],
+      ] as const) {
+        await ctx.db.insert("coinflipper_scores", {
+          playerName: `${prefix} ${name}`,
+          score: 42,
+          createdAt,
+        });
+      }
+    });
+    await db.insert(coinflipperScores).values([
+      {
+        playerName: `${prefix} first`,
+        score: 42,
+        createdAt: new Date(100),
+        legacyCreatedAt: new Date(300),
+      },
+      {
+        playerName: `${prefix} second`,
+        score: 42,
+        createdAt: new Date(300),
+        legacyCreatedAt: new Date(100),
+      },
+      {
+        playerName: `${prefix} third`,
+        score: 42,
+        createdAt: new Date(200),
+        legacyCreatedAt: new Date(200),
+      },
+    ]);
+
+    const convexNames = (
+      await convex.query(api.coinflipper.listScores, {
+        limit: 100,
+      })
+    )
+      .filter((row) => row.name.startsWith(prefix))
+      .map((row) => row.name);
+    const postgresNames = (await coinflipScores(db, 100))
+      .filter((row) => row.name.startsWith(prefix))
+      .map((row) => row.name);
+    expect(postgresNames).toEqual(convexNames);
+    expect(postgresNames).toEqual([
+      `${prefix} second`,
+      `${prefix} third`,
+      `${prefix} first`,
+    ]);
   });
 
   it("matches perfect-cat matchup consumption, ratings, stale tokens and limits", async () => {

@@ -752,7 +752,11 @@ export async function listCollection(
     page: payload,
     nextCursor:
       hasMore && last
-        ? encodeCursor({ createdAt: rowCreationTimestamp(last), id: last.id })
+        ? encodeCursor({
+            createdAt: last.createdAt,
+            creationAt: rowCreationTimestamp(last),
+            id: last.id,
+          })
         : null,
     isDone: !hasMore,
   };

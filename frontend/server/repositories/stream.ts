@@ -141,6 +141,7 @@ export async function selectParticipants(
     .from(streamParticipants)
     .where(where)
     .orderBy(
+      asc(streamParticipants.createdAt),
       asc(creationTimestamp(streamParticipants)),
       asc(streamParticipants.id),
     )
@@ -242,7 +243,11 @@ export async function selectVotes(
     .select()
     .from(streamVotes)
     .where(where)
-    .orderBy(asc(creationTimestamp(streamVotes)), asc(streamVotes.id))
+    .orderBy(
+      asc(streamVotes.createdAt),
+      asc(creationTimestamp(streamVotes)),
+      asc(streamVotes.id),
+    )
     .limit(Math.max(1, Math.min(500, Math.floor(limit))));
 }
 
