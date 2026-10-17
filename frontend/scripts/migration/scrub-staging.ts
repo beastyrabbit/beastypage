@@ -382,43 +382,32 @@ async function verify(
   const finding = (table: string, column: string, count: number) => {
     if (count > 0) report.findings?.push({ table, column, count });
   };
-  for (const [table, columns] of Object.entries(
+  await verifyColumns(
+    client,
     SENSITIVE_COLUMN_POLICY.random,
-  )) {
-    for (const column of columns) {
-      const predicate =
-        table === "quick_share_uploads" &&
-        (column === "original_key" || column === "public_key")
-          ? `${quoteIdentifier(column)} is not null and ${quoteIdentifier(column)} not like 'staging/%'`
-          : `${quoteIdentifier(column)} is not null and ${quoteIdentifier(column)} not like 'stg_%'`;
-      const result = await client.query(
-        `select count(*)::int as count from ${quoteIdentifier(table)} where ${predicate}`,
-      );
-      finding(table, column, result.rows[0]?.count ?? 0);
-    }
-  }
-  for (const [table, columns] of Object.entries(
+    (table, column) =>
+      table === "quick_share_uploads" &&
+      (column === "original_key" || column === "public_key")
+        ? `${quoteIdentifier(column)} is not null and ${quoteIdentifier(column)} not like 'staging/%'`
+        : `${quoteIdentifier(column)} is not null and ${quoteIdentifier(column)} not like 'stg_%'`,
+    finding,
+  );
+  await verifyColumns(
+    client,
     SENSITIVE_COLUMN_POLICY.pseudonym,
-  )) {
-    for (const column of columns) {
-      if (column === "token_identifier" || column === "owner_token_identifier")
-        continue;
-      const result = await client.query(
-        `select count(*)::int as count from ${quoteIdentifier(table)} where ${quoteIdentifier(column)} is not null and ${quoteIdentifier(column)} not like 'stg_%'`,
-      );
-      finding(table, column, result.rows[0]?.count ?? 0);
-    }
-  }
-  for (const [table, columns] of Object.entries(
+    (_table, column) =>
+      `${quoteIdentifier(column)} is not null and ${quoteIdentifier(column)} not like 'stg_%'`,
+    finding,
+    (column) =>
+      column === "token_identifier" || column === "owner_token_identifier",
+  );
+  await verifyColumns(
+    client,
     SENSITIVE_COLUMN_POLICY.derived,
-  )) {
-    for (const column of columns) {
-      const result = await client.query(
-        `select count(*)::int as count from ${quoteIdentifier(table)} where ${quoteIdentifier(column)} is not null and ${quoteIdentifier(column)} not like 'stg_%'`,
-      );
-      finding(table, column, result.rows[0]?.count ?? 0);
-    }
-  }
+    (_table, column) =>
+      `${quoteIdentifier(column)} is not null and ${quoteIdentifier(column)} not like 'stg_%'`,
+    finding,
+  );
   const issuerResult = await client.query<{ count: number }>(
     "select count(*)::int as count from users where token_identifier not like $1",
     [`${options.stagingIssuer}|%`],
@@ -429,13 +418,7 @@ async function verify(
       (columns as readonly string[]).includes("owner_token_identifier"),
     )
     .map(([table]) => table);
-  for (const table of ownerTables) {
-    const result = await client.query<{ count: number }>(
-      `select count(*)::int as count from ${quoteIdentifier(table)} where owner_token_identifier is not null and owner_token_identifier not like $1`,
-      [`${options.stagingIssuer}|%`],
-    );
-    finding(table, "owner_token_identifier", result.rows[0]?.count ?? 0);
-  }
+  await verifyOwnerTokens(client, ownerTables, options.stagingIssuer, finding);
   const passwordRows = await client.query<{ password_hash: string | null }>(
     "select password_hash from ancestry_tree where password_hash is not null",
   );
@@ -446,21 +429,52 @@ async function verify(
       (row) => !passwordMatches(options.stagingPassword, row.password_hash),
     ).length,
   );
-  for (const [table, columns] of Object.entries(
+  await verifyColumns(
+    client,
     SENSITIVE_COLUMN_POLICY.clear,
-  )) {
+    (table, column) =>
+      table === "quick_share_uploads" && column === "raw_ip"
+        ? `${quoteIdentifier(column)} <> ''`
+        : `${quoteIdentifier(column)} is not null`,
+    finding,
+  );
+  return report;
+}
+
+type Finding = (table: string, column: string, count: number) => void;
+type ColumnPolicy = Record<string, readonly string[]>;
+
+async function verifyColumns(
+  client: pg.PoolClient,
+  policy: ColumnPolicy,
+  predicate: (table: string, column: string) => string,
+  finding: Finding,
+  skip?: (column: string) => boolean,
+): Promise<void> {
+  for (const [table, columns] of Object.entries(policy)) {
     for (const column of columns) {
-      const predicate =
-        table === "quick_share_uploads" && column === "raw_ip"
-          ? `${quoteIdentifier(column)} <> ''`
-          : `${quoteIdentifier(column)} is not null`;
+      if (skip?.(column)) continue;
       const result = await client.query(
-        `select count(*)::int as count from ${quoteIdentifier(table)} where ${predicate}`,
+        `select count(*)::int as count from ${quoteIdentifier(table)} where ${predicate(table, column)}`,
       );
       finding(table, column, result.rows[0]?.count ?? 0);
     }
   }
-  return report;
+}
+
+async function verifyOwnerTokens(
+  client: pg.PoolClient,
+  tables: string[],
+  stagingIssuer: string,
+  finding: Finding,
+): Promise<void> {
+  for (const table of tables) {
+    const result = await client.query<{ count: number }>(
+      `select count(*)::int as count from ${quoteIdentifier(table)} where owner_token_identifier is not null and owner_token_identifier not like $1`,
+      [`${stagingIssuer}|%`],
+    );
+    finding(table, "owner_token_identifier", result.rows[0]?.count ?? 0);
+  }
 }
 
 export async function runScrub(

@@ -260,13 +260,36 @@ export class LiveEventListener {
     if (!client || this.stopped) return;
 
     if (!this.connectedOnce) {
-      const result = await client.query<{ max_id: number | string | null }>(
-        "select coalesce(max(id), 0) as max_id from live_events",
-      );
-      this.lastEventId = Number(result.rows[0]?.max_id ?? 0);
+      await this.setBaseline(client);
       return;
     }
 
+    const { events, sawRows } = await this.collectCatchupEvents(client);
+
+    if (!sawRows) {
+      // A reconnect can occur after all events in the gap were pruned. There
+      // is then no row from which to infer the gap, so refresh subscriptions
+      // conservatively once a process has already had a connection.
+      if (this.lastEventId > 0) this.refreshSubscribedTopics(this.lastEventId);
+      return;
+    }
+
+    for (const event of events.values()) {
+      this.dispatch(event);
+    }
+  }
+
+  private async setBaseline(client: ListenerClient): Promise<void> {
+    const result = await client.query<{ max_id: number | string | null }>(
+      "select coalesce(max(id), 0) as max_id from live_events",
+    );
+    this.lastEventId = Number(result.rows[0]?.max_id ?? 0);
+  }
+
+  private async collectCatchupEvents(client: ListenerClient): Promise<{
+    events: Map<string, LiveEvent>;
+    sawRows: boolean;
+  }> {
     const events = new Map<string, LiveEvent>();
     let sawRows = false;
     let checkedGap = false;
@@ -280,54 +303,62 @@ export class LiveEventListener {
         .then((result) => result.rows);
       if (rows.length === 0) break;
       sawRows = true;
-
-      if (!checkedGap) {
-        checkedGap = true;
-        const firstEventId = Number(rows[0].id);
-        if (firstEventId > this.lastEventId + 1) {
-          for (const topic of this.subscribers.keys()) {
-            events.set(topic, {
-              id: firstEventId,
-              topic,
-              revision: 0,
-              createdAt: this.now(),
-            });
-          }
-        }
-      }
-
-      for (const row of rows) {
-        const id = Number(row.id);
-        this.lastEventId = Math.max(this.lastEventId, id);
-        const event: LiveEvent = {
-          id,
-          topic: row.topic,
-          revision: Number(row.revision),
-          createdAt: row.created_at,
-        };
-        const previous = events.get(event.topic);
-        if (
-          !previous ||
-          event.revision > previous.revision ||
-          (event.revision === previous.revision && event.id > previous.id)
-        ) {
-          events.set(event.topic, event);
-        }
-      }
-
+      checkedGap = this.recordCatchupRows(rows, events, checkedGap);
       if (rows.length < CATCH_UP_BATCH_SIZE) break;
     }
+    return { events, sawRows };
+  }
 
-    if (!sawRows) {
-      // A reconnect can occur after all events in the gap were pruned. There
-      // is then no row from which to infer the gap, so refresh subscriptions
-      // conservatively once a process has already had a connection.
-      if (this.lastEventId > 0) this.refreshSubscribedTopics(this.lastEventId);
-      return;
+  private recordCatchupRows(
+    rows: EventRow[],
+    events: Map<string, LiveEvent>,
+    checkedGap: boolean,
+  ): boolean {
+    if (!checkedGap) {
+      const firstEventId = Number(rows[0].id);
+      if (firstEventId > this.lastEventId + 1) {
+        this.refreshCatchupTopics(events, firstEventId);
+      }
+      checkedGap = true;
     }
+    for (const row of rows) {
+      const id = Number(row.id);
+      this.lastEventId = Math.max(this.lastEventId, id);
+      this.recordCatchupEvent(events, {
+        id,
+        topic: row.topic,
+        revision: Number(row.revision),
+        createdAt: row.created_at,
+      });
+    }
+    return checkedGap;
+  }
 
-    for (const event of events.values()) {
-      this.dispatch(event);
+  private refreshCatchupTopics(
+    events: Map<string, LiveEvent>,
+    eventId: number,
+  ): void {
+    for (const topic of this.subscribers.keys()) {
+      events.set(topic, {
+        id: eventId,
+        topic,
+        revision: 0,
+        createdAt: this.now(),
+      });
+    }
+  }
+
+  private recordCatchupEvent(
+    events: Map<string, LiveEvent>,
+    event: LiveEvent,
+  ): void {
+    const previous = events.get(event.topic);
+    if (
+      !previous ||
+      event.revision > previous.revision ||
+      (event.revision === previous.revision && event.id > previous.id)
+    ) {
+      events.set(event.topic, event);
     }
   }
 

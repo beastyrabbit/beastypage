@@ -116,6 +116,19 @@ export async function GET(
           backpressureTimer = undefined;
         };
 
+        const scheduleBackpressureClose = () => {
+          backpressureTimer = setTimeout(() => {
+            backpressureTimer = undefined;
+            if (closed) return;
+            if ((controller.desiredSize ?? 0) <= 0) {
+              close();
+            } else if (refreshPending) {
+              refresh();
+            }
+          }, BACKPRESSURE_CLOSE_MS);
+          backpressureTimer.unref?.();
+        };
+
         const checkBackpressure = () => {
           if (closed) return false;
           const desiredSize = controller.desiredSize;
@@ -124,16 +137,7 @@ export async function GET(
             return true;
           }
           if (!backpressureTimer) {
-            backpressureTimer = setTimeout(() => {
-              backpressureTimer = undefined;
-              if (closed) return;
-              if ((controller.desiredSize ?? 0) <= 0) {
-                close();
-              } else if (refreshPending) {
-                refresh();
-              }
-            }, BACKPRESSURE_CLOSE_MS);
-            backpressureTimer.unref?.();
+            scheduleBackpressureClose();
           }
           return false;
         };
@@ -167,6 +171,56 @@ export async function GET(
         };
         closeStream = close;
 
+        const enqueueSnapshot = (snapshot: {
+          revision: number;
+          data: unknown;
+        }) => {
+          if (snapshot.revision <= lastSentRevision) return true;
+          if (
+            !enqueue(
+              encoder.encode(snapshotEvent(snapshot.revision, snapshot.data)),
+            )
+          ) {
+            refreshPending = true;
+            return false;
+          }
+          lastSentRevision = snapshot.revision;
+          return true;
+        };
+
+        const refreshSnapshot = async () => {
+          if (closed) return false;
+          if (!checkBackpressure()) {
+            refreshPending = true;
+            return false;
+          }
+          const snapshot = await definition.loadSnapshot(
+            parsed,
+            authorization,
+            context,
+          );
+          if (closed) return false;
+          return enqueueSnapshot(snapshot);
+        };
+
+        const runRefresh = async () => {
+          try {
+            do {
+              refreshPending = false;
+              if (!(await refreshSnapshot())) return;
+            } while (refreshPending && !closed);
+          } catch (error) {
+            console.error("[live] failed to refresh topic", error);
+          } finally {
+            finishRefresh();
+          }
+        };
+
+        const finishRefresh = () => {
+          refreshRunning = false;
+          if (refreshPending && !closed) refresh();
+        };
+
         const refresh = () => {
           if (closed) return;
           if (refreshRunning) {
@@ -179,42 +233,7 @@ export async function GET(
           }
 
           refreshRunning = true;
-          void (async () => {
-            try {
-              do {
-                refreshPending = false;
-                if (closed) return;
-                if (!checkBackpressure()) {
-                  refreshPending = true;
-                  return;
-                }
-                const snapshot = await definition.loadSnapshot(
-                  parsed,
-                  authorization,
-                  context,
-                );
-                if (closed) return;
-                if (snapshot.revision > lastSentRevision) {
-                  if (
-                    !enqueue(
-                      encoder.encode(
-                        snapshotEvent(snapshot.revision, snapshot.data),
-                      ),
-                    )
-                  ) {
-                    refreshPending = true;
-                    return;
-                  }
-                  lastSentRevision = snapshot.revision;
-                }
-              } while (refreshPending && !closed);
-            } catch (error) {
-              console.error("[live] failed to refresh topic", error);
-            } finally {
-              refreshRunning = false;
-              if (refreshPending && !closed) refresh();
-            }
-          })();
+          void runRefresh();
         };
         pullRefresh = () => {
           if (!refreshRunning && refreshPending) refresh();

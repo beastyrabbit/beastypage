@@ -18,12 +18,7 @@ import {
 } from "../../server/db/schema-version";
 import { loadLocalDatabaseEnv } from "../db/env";
 import { ConvexArchive, sha256File } from "./import/archive";
-import {
-  asDocument,
-  type ConvexDocument,
-  type MapContext,
-  Reject,
-} from "./import/convert";
+import { asDocument, type MapContext, Reject } from "./import/convert";
 import {
   assertDatabaseTarget,
   disableNetwork,
@@ -187,20 +182,10 @@ async function checkLegacyLinks(
   let checked = 0;
   for (const [table, find] of Object.entries(checks)) {
     for await (const item of archive.documents(table)) {
-      if (!("document" in item)) continue;
-      const document = item.document;
-      if (!document || typeof document !== "object") continue;
-      const id = (document as Record<string, unknown>)._id;
-      if (typeof id !== "string") continue;
-      // Quarantined/skipped documents are deliberately absent. Imported rows
-      // must be addressable by the legacy id used by existing public links.
-      const imported = await client.query(
-        `select 1 from "${table}" where legacy_id = $1 limit 1`,
-        [id],
-      );
-      if ((imported.rowCount ?? 0) === 0) continue;
+      const result = await checkLegacyLinkItem(client, table, find, item);
+      if (!result.checked) continue;
       checked++;
-      if (!(await find(id))) {
+      if (!result.resolvable) {
         mismatches.push({
           check: "legacy-link",
           detail: `${table}: imported legacy id is not resolvable`,
@@ -209,6 +194,31 @@ async function checkLegacyLinks(
     }
   }
   return checked;
+}
+
+async function checkLegacyLinkItem(
+  client: pg.PoolClient,
+  table: string,
+  find: (id: string) => Promise<boolean>,
+  item: { line: number; document: unknown } | { line: number; error: string },
+): Promise<{ checked: boolean; resolvable: boolean }> {
+  if (!("document" in item)) return { checked: false, resolvable: false };
+  const document = item.document;
+  if (!document || typeof document !== "object") {
+    return { checked: false, resolvable: false };
+  }
+  const id = (document as Record<string, unknown>)._id;
+  if (typeof id !== "string") return { checked: false, resolvable: false };
+  // Quarantined/skipped documents are deliberately absent. Imported rows
+  // must be addressable by the legacy id used by existing public links.
+  const imported = await client.query(
+    `select 1 from "${table}" where legacy_id = $1 limit 1`,
+    [id],
+  );
+  if ((imported.rowCount ?? 0) === 0) {
+    return { checked: false, resolvable: false };
+  }
+  return { checked: true, resolvable: await find(id) };
 }
 
 async function linkExists(
@@ -260,6 +270,29 @@ async function checkMappedSamples(
     freezeAt,
     expectedIssuer,
   );
+  await loadQuickShareFacts(archive, contexts);
+  let documents = 0;
+  for (const step of STEPS) {
+    // The first adoption_batch pass is intentionally overwritten by the
+    // adoption_batch_refs pass after profiles have been imported.
+    if (step.name === "adoption_batch") continue;
+    const candidates = await mappedCandidates(archive, step, contexts);
+    documents += await verifyMappedCandidates(
+      client,
+      step,
+      candidates,
+      mismatches,
+    );
+  }
+  return documents;
+}
+
+type MappedCandidate = { key: string; rows: Record<string, unknown>[] };
+
+async function loadQuickShareFacts(
+  archive: ConvexArchive,
+  contexts: MapContext,
+): Promise<void> {
   for await (const item of archive.documents("quick_share_uploads")) {
     if (
       !("document" in item) ||
@@ -275,59 +308,78 @@ async function checkMappedSamples(
       contexts.facts.set(document._id, document.state);
     }
   }
-  let documents = 0;
-  for (const step of STEPS) {
-    // The first adoption_batch pass is intentionally overwritten by the
-    // adoption_batch_refs pass after profiles have been imported.
-    if (step.name === "adoption_batch") continue;
-    const candidates: { key: string; rows: Record<string, unknown>[] }[] = [];
-    for await (const item of archive.documents(step.source)) {
-      if (!("document" in item)) continue;
-      let document: ConvexDocument;
-      try {
-        document = asDocument(item.document);
-        const result = step.map(document, contexts);
-        if (!("rows" in result) || result.rows.length === 0) continue;
-        candidates.push({
-          key: createHash("sha256").update(document._id).digest("hex"),
-          rows: result.rows,
-        });
-      } catch (error) {
-        if (error instanceof Reject) continue;
-        throw error;
-      }
+}
+
+async function mappedCandidates(
+  archive: ConvexArchive,
+  step: (typeof STEPS)[number],
+  contexts: MapContext,
+): Promise<MappedCandidate[]> {
+  const candidates: MappedCandidate[] = [];
+  for await (const item of archive.documents(step.source)) {
+    if (!("document" in item)) continue;
+    try {
+      const document = asDocument(item.document);
+      const result = step.map(document, contexts);
+      if (!("rows" in result) || result.rows.length === 0) continue;
+      candidates.push({
+        key: createHash("sha256").update(document._id).digest("hex"),
+        rows: result.rows,
+      });
+    } catch (error) {
+      if (error instanceof Reject) continue;
+      throw error;
     }
-    candidates.sort((left, right) => left.key.localeCompare(right.key));
-    for (const candidate of candidates.slice(0, SAMPLE_SIZE)) {
-      documents++;
-      const columns = getTableColumns(step.target);
-      const tableName = getTableName(step.target);
-      for (const expected of candidate.rows) {
-        const id = expected.id;
-        if (typeof id !== "string") continue;
-        const result = await client.query<Record<string, unknown>>(
-          `select * from "${tableName}" where id = $1`,
-          [id],
-        );
-        const actual = result.rows[0];
-        // A sampled archive document can be a documented quarantine/skip;
-        // count verification above catches an unexpected deletion.
-        if (!actual) continue;
-        for (const [key, column] of Object.entries(columns)) {
-          if (key === "legacyCreatedAt") continue;
-          if (!(key in expected)) continue;
-          const value = actual[column.name];
-          if (!equalValue(expected[key], value)) {
-            mismatches.push({
-              check: "sample",
-              detail: `${step.name}.${key}: mismatch`,
-            });
-          }
-        }
-      }
+  }
+  candidates.sort((left, right) => left.key.localeCompare(right.key));
+  return candidates;
+}
+
+async function verifyMappedCandidates(
+  client: pg.PoolClient,
+  step: (typeof STEPS)[number],
+  candidates: MappedCandidate[],
+  mismatches: VerificationMismatch[],
+): Promise<number> {
+  let documents = 0;
+  const columns = getTableColumns(step.target);
+  const tableName = getTableName(step.target);
+  for (const candidate of candidates.slice(0, SAMPLE_SIZE)) {
+    documents++;
+    for (const expected of candidate.rows) {
+      const id = expected.id;
+      if (typeof id !== "string") continue;
+      const result = await client.query<Record<string, unknown>>(
+        `select * from "${tableName}" where id = $1`,
+        [id],
+      );
+      const actual = result.rows[0];
+      // A sampled archive document can be a documented quarantine/skip;
+      // count verification above catches an unexpected deletion.
+      if (!actual) continue;
+      compareMappedRow(step.name, columns, expected, actual, mismatches);
     }
   }
   return documents;
+}
+
+function compareMappedRow(
+  stepName: string,
+  columns: Record<string, { name: string }>,
+  expected: Record<string, unknown>,
+  actual: Record<string, unknown>,
+  mismatches: VerificationMismatch[],
+): void {
+  for (const [key, column] of Object.entries(columns)) {
+    if (key === "legacyCreatedAt" || !(key in expected)) continue;
+    const value = actual[column.name];
+    if (!equalValue(expected[key], value)) {
+      mismatches.push({
+        check: "sample",
+        detail: `${stepName}.${key}: mismatch`,
+      });
+    }
+  }
 }
 
 async function checkFiles(

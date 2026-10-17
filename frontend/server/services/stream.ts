@@ -3,7 +3,7 @@ import "server-only";
 import type { Identity } from "../auth/identity";
 import type { Database } from "../db/pool";
 import type { streamParticipants, streamSessions } from "../db/schema";
-import { withTransaction } from "../db/transaction";
+import { type Transaction, withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
 import { publishLive } from "../live/publish";
 import { findStreamSessionByLink } from "../repositories/legacyLinks";
@@ -196,6 +196,43 @@ export interface UpdateStreamArgs {
   allowRepeatIps?: boolean;
 }
 
+function streamRoundChanged(
+  row: typeof streamSessions.$inferSelect,
+  args: UpdateStreamArgs,
+) {
+  return (
+    (args.currentStep !== undefined && args.currentStep !== row.currentStep) ||
+    (args.stepIndex !== undefined && args.stepIndex !== row.stepIndex) ||
+    (args.params !== undefined &&
+      ((args.params as { _tieIteration?: number })._tieIteration ?? 0) >
+        (((row.params ?? {}) as { _tieIteration?: number })._tieIteration ?? 0))
+  );
+}
+
+function streamUpdateValues(
+  row: typeof streamSessions.$inferSelect,
+  args: UpdateStreamArgs,
+  roundChanged: boolean,
+) {
+  return {
+    voteRound: (row.voteRound ?? 0) + (roundChanged ? 1 : 0),
+    allowedOptions:
+      args.allowedOptions ?? (roundChanged ? [] : row.allowedOptions),
+    status: args.status ?? row.status,
+    currentStep: args.currentStep ?? row.currentStep,
+    stepIndex: args.stepIndex ?? row.stepIndex,
+    stepHistory:
+      args.stepHistory === undefined
+        ? row.stepHistory
+        : (args.stepHistory as never),
+    params: args.params === undefined ? row.params : (args.params as never),
+    allowRepeatIps:
+      args.allowRepeatIps === undefined
+        ? row.allowRepeatIps
+        : Boolean(args.allowRepeatIps),
+  };
+}
+
 export async function createStreamSession(
   db: Database,
   args: CreateStreamArgs,
@@ -244,31 +281,11 @@ export async function updateStreamSession(
       throw new ServiceError("invalid_input", "Viewer key cannot be changed");
     if ((args.allowedOptions?.length ?? 0) > MAX_OPTIONS)
       throw new ServiceError("invalid_input", "Too many choices");
-    const roundChanged =
-      (args.currentStep !== undefined &&
-        args.currentStep !== row.currentStep) ||
-      (args.stepIndex !== undefined && args.stepIndex !== row.stepIndex) ||
-      (args.params !== undefined &&
-        ((args.params as { _tieIteration?: number })._tieIteration ?? 0) >
-          (((row.params ?? {}) as { _tieIteration?: number })._tieIteration ??
-            0));
-    const updated = await updateStreamSessionRow(tx, args.id, {
-      voteRound: (row.voteRound ?? 0) + (roundChanged ? 1 : 0),
-      allowedOptions:
-        args.allowedOptions ?? (roundChanged ? [] : row.allowedOptions),
-      status: args.status ?? row.status,
-      currentStep: args.currentStep ?? row.currentStep,
-      stepIndex: args.stepIndex ?? row.stepIndex,
-      stepHistory:
-        args.stepHistory === undefined
-          ? row.stepHistory
-          : (args.stepHistory as never),
-      params: args.params === undefined ? row.params : (args.params as never),
-      allowRepeatIps:
-        args.allowRepeatIps === undefined
-          ? row.allowRepeatIps
-          : Boolean(args.allowRepeatIps),
-    });
+    const updated = await updateStreamSessionRow(
+      tx,
+      args.id,
+      streamUpdateValues(row, args, streamRoundChanged(row, args)),
+    );
     if (!updated) return null;
     await publishSession(tx, args.id);
     return sessionRecord(updated);
@@ -448,46 +465,9 @@ export async function createStreamVote(
     async (tx) => {
       const session = await selectStreamSessionForUpdate(tx, args.sessionId);
       availableChoice(session, args);
-      let optionMeta: Record<string, unknown>;
-      if (args.votedBy) {
-        if (
-          (session?.params as { _votesOpen?: boolean } | null)?._votesOpen !==
-          true
-        )
-          throw new ServiceError("forbidden", "Voting is closed");
-        const participant = await selectParticipant(tx, args.votedBy);
-        if (
-          !participant ||
-          participant.sessionId !== session?.id ||
-          participant.status !== "active" ||
-          participant.viewerSession !== args.viewerSession
-        )
-          throw new ServiceError("forbidden", "Not an active participant");
-        if (
-          await selectVoteByParticipant(
-            tx,
-            session.id,
-            session.voteRound ?? 0,
-            participant.id,
-          )
-        )
-          throw new ServiceError(
-            "conflict",
-            "You have already voted in this round",
-          );
-        optionMeta = {
-          participantId: participant.id,
-          participantName: participant.displayName,
-        };
-      } else {
-        if (!session) throw new ServiceError("not_found", "Session not found");
-        hostCheck(session, identity);
-        optionMeta = { streamer: true };
-        for (const key of ["label", "step"] as const)
-          if (typeof args.optionMeta?.[key] === "string")
-            optionMeta[key] = args.optionMeta[key].slice(0, 160);
-        if (args.optionMeta?.via === "coinFlip") optionMeta.via = "coinFlip";
-      }
+      const optionMeta = args.votedBy
+        ? await participantVoteMeta(tx, session, args)
+        : hostVoteMeta(session, args, identity);
       const row = await insertVote(tx, {
         sessionId: args.sessionId,
         voteRound: session?.voteRound ?? 0,
@@ -502,6 +482,52 @@ export async function createStreamVote(
     },
     { isolation: "serializable", retries: 3 },
   );
+}
+
+async function participantVoteMeta(
+  tx: Transaction,
+  session: Awaited<ReturnType<typeof selectStreamSessionForUpdate>>,
+  args: Parameters<typeof createStreamVote>[1],
+) {
+  if ((session?.params as { _votesOpen?: boolean } | null)?._votesOpen !== true)
+    throw new ServiceError("forbidden", "Voting is closed");
+  const participant = await selectParticipant(tx, args.votedBy as string);
+  if (
+    !participant ||
+    participant.sessionId !== session?.id ||
+    participant.status !== "active" ||
+    participant.viewerSession !== args.viewerSession
+  )
+    throw new ServiceError("forbidden", "Not an active participant");
+  if (
+    await selectVoteByParticipant(
+      tx,
+      session.id,
+      session.voteRound ?? 0,
+      participant.id,
+    )
+  )
+    throw new ServiceError("conflict", "You have already voted in this round");
+  return {
+    participantId: participant.id,
+    participantName: participant.displayName,
+  };
+}
+
+function hostVoteMeta(
+  session: Awaited<ReturnType<typeof selectStreamSessionForUpdate>>,
+  args: Parameters<typeof createStreamVote>[1],
+  identity: Identity,
+) {
+  if (!session) throw new ServiceError("not_found", "Session not found");
+  hostCheck(session, identity);
+  const optionMeta: Record<string, unknown> = { streamer: true };
+  for (const key of ["label", "step"] as const) {
+    if (typeof args.optionMeta?.[key] === "string")
+      optionMeta[key] = args.optionMeta[key].slice(0, 160);
+  }
+  if (args.optionMeta?.via === "coinFlip") optionMeta.via = "coinFlip";
+  return optionMeta;
 }
 
 export function streamTopicSnapshot(

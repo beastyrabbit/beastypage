@@ -78,6 +78,47 @@ const IMPORTED_TABLES: PgTable[] = [
   ...new Set([files, ...STEPS.map((s) => s.target)]),
 ];
 
+type ArchiveItem =
+  | { line: number; document: unknown }
+  | { line: number; error: string };
+type FileInspection = Awaited<ReturnType<typeof inspectFile>>;
+type ValidFileInspection = Extract<FileInspection, { file: unknown }>;
+type PendingRow = { row: Row; legacyId: string };
+
+type ImportItemContext = {
+  step: (typeof STEPS)[number];
+  options: ImportOptions;
+  importedIds: Map<string, Set<string>>;
+  storageMap: Map<string, string>;
+  facts: Map<string, string>;
+  stats: ImportStepStats;
+  pending: { rows: PendingRow[] };
+  quarantine: Quarantine;
+};
+
+type StorageFileContext = {
+  db: Database;
+  archive: ConvexArchive;
+  archiveSha256: string;
+  freezeAt: Date;
+  storageId: string;
+  meta: StorageMeta | undefined;
+  seenSha: Set<string>;
+  stats: ImportStepStats;
+  quarantine: Quarantine;
+};
+
+type UniqueFileContext = {
+  db: Database;
+  storageId: string;
+  meta: StorageMeta;
+  bytes: Buffer;
+  file: ValidFileInspection;
+  seenSha: Set<string>;
+  freezeAt: Date;
+  stats: ImportStepStats;
+};
+
 function emptyStats(): ImportStepStats {
   return {
     documents: 0,
@@ -300,29 +341,14 @@ async function importStep(
   quarantine: Quarantine,
 ): Promise<ImportStepStats> {
   const stats = emptyStats();
-  const importedIds = new Map<string, Set<string>>();
-  for (const name of PARENT_TABLES) {
-    const result = await client.query<{ legacy_id: string }>(
-      `select legacy_id from "${name}" where legacy_id is not null`,
-    );
-    importedIds.set(name, new Set(result.rows.map((r) => r.legacy_id)));
-  }
-  const facts = new Map<string, string>();
-  if (step.name === "quick_share_parts") {
-    for await (const item of archive.documents("quick_share_uploads")) {
-      if (!("document" in item)) continue;
-      const doc = item.document as Record<string, unknown>;
-      if (typeof doc._id === "string" && typeof doc.state === "string") {
-        facts.set(doc._id, doc.state);
-      }
-    }
-  }
+  const importedIds = await loadImportedIds(client);
+  const facts = await loadQuickShareFacts(archive, step.name);
 
-  let pending: { row: Row; legacyId: string }[] = [];
+  const pending = { rows: [] as PendingRow[] };
   const flush = async () => {
-    if (pending.length === 0) return;
-    const rows = pending;
-    pending = [];
+    if (pending.rows.length === 0) return;
+    const rows = pending.rows;
+    pending.rows = [];
     stats.imported += await upsertRows(
       client,
       db,
@@ -337,51 +363,107 @@ async function importStep(
 
   for await (const item of archive.documents(step.source)) {
     stats.documents++;
-    if ("error" in item) {
-      bump(stats.quarantined, "invalid JSON");
-      quarantine.add(step.name, {
-        step: step.name,
-        line: item.line,
-        reason: item.error,
-      });
-      continue;
-    }
-    let doc: ConvexDocument | null = null;
-    const repairs: string[] = [];
-    const ctx: MapContext = {
-      freezeAt: options.freezeAt,
-      expectedIssuer: options.expectedIssuer,
-      imported: (table, id) => importedIds.get(table)?.has(id) ?? false,
-      fileFor: (storageId) => storageMap.get(storageId) ?? null,
-      repair: (kind) => repairs.push(kind),
+    await importItem(item, {
+      step,
+      options,
+      importedIds,
+      storageMap,
       facts,
-    };
-    try {
-      doc = asDocument(item.document);
-      const result = step.map(doc, ctx);
-      if ("skip" in result) {
-        bump(stats.skipped, result.skip);
-        continue;
-      }
-      for (const kind of repairs) bump(stats.repaired, kind);
-      for (const row of result.rows) pending.push({ row, legacyId: doc._id });
-      if (pending.length >= BATCH_SIZE) await flush();
-    } catch (error) {
-      if (!(error instanceof Reject)) throw error;
-      bump(stats.quarantined, error.message.replace(/\[\d+\]/g, "[]"));
-      // The full document goes to the private report for review.
-      quarantine.add(step.name, {
-        step: step.name,
-        line: item.line,
-        legacyId: doc?._id ?? null,
-        reason: error.message,
-        document: item.document,
-      });
-    }
+      stats,
+      pending,
+      quarantine,
+    });
+    if (pending.rows.length >= BATCH_SIZE) await flush();
   }
   await flush();
   quarantine.flush(step.name);
   return stats;
+}
+
+async function loadImportedIds(
+  client: pg.PoolClient,
+): Promise<Map<string, Set<string>>> {
+  const importedIds = new Map<string, Set<string>>();
+  for (const name of PARENT_TABLES) {
+    const result = await client.query<{ legacy_id: string }>(
+      `select legacy_id from "${name}" where legacy_id is not null`,
+    );
+    importedIds.set(name, new Set(result.rows.map((row) => row.legacy_id)));
+  }
+  return importedIds;
+}
+
+async function loadQuickShareFacts(
+  archive: ConvexArchive,
+  stepName: string,
+): Promise<Map<string, string>> {
+  const facts = new Map<string, string>();
+  if (stepName !== "quick_share_parts") return facts;
+  for await (const item of archive.documents("quick_share_uploads")) {
+    if (!("document" in item)) continue;
+    const doc = item.document as Record<string, unknown>;
+    if (typeof doc._id === "string" && typeof doc.state === "string") {
+      facts.set(doc._id, doc.state);
+    }
+  }
+  return facts;
+}
+
+async function importItem(
+  item: ArchiveItem,
+  context: ImportItemContext,
+): Promise<void> {
+  const {
+    step,
+    options,
+    importedIds,
+    storageMap,
+    facts,
+    stats,
+    pending,
+    quarantine,
+  } = context;
+  if ("error" in item) {
+    bump(stats.quarantined, "invalid JSON");
+    quarantine.add(step.name, {
+      step: step.name,
+      line: item.line,
+      reason: item.error,
+    });
+    return;
+  }
+  let doc: ConvexDocument | null = null;
+  const repairs: string[] = [];
+  const ctx: MapContext = {
+    freezeAt: options.freezeAt,
+    expectedIssuer: options.expectedIssuer,
+    imported: (table, id) => importedIds.get(table)?.has(id) ?? false,
+    fileFor: (storageId) => storageMap.get(storageId) ?? null,
+    repair: (kind) => repairs.push(kind),
+    facts,
+  };
+  try {
+    doc = asDocument(item.document);
+    const result = step.map(doc, ctx);
+    if ("skip" in result) {
+      bump(stats.skipped, result.skip);
+      return;
+    }
+    for (const kind of repairs) bump(stats.repaired, kind);
+    for (const row of result.rows)
+      pending.rows.push({ row, legacyId: doc._id });
+  } catch (error) {
+    if (!(error instanceof Reject)) throw error;
+    bump(stats.quarantined, error.message.replace(/\[\d+\]/g, "[]"));
+    // The full document goes to the private report for review.
+    quarantine.add(step.name, {
+      step: step.name,
+      line: item.line,
+      legacyId: doc?._id ?? null,
+      reason: error.message,
+      document: item.document,
+    });
+  }
 }
 
 async function prepareRun(
@@ -521,23 +603,39 @@ async function referencedStorageIds(
       if (!("document" in item) || typeof item.document !== "object") continue;
       const doc = item.document as Record<string, unknown> | null;
       if (!doc) continue;
-      const expiredUpload =
-        table === "catdex_uploads" &&
-        (doc.status === "consumed" ||
-          (typeof doc.expiresAt === "number" &&
-            doc.expiresAt <= freezeAt.getTime()));
-      if (expiredUpload) continue;
-      for (const field of fields) {
-        const value = field.startsWith("config.")
-          ? (doc.config as Record<string, unknown> | undefined)?.[
-              field.slice("config.".length)
-            ]
-          : doc[field];
-        if (typeof value === "string") referenced.add(value);
-      }
+      if (isExpiredUpload(table, doc, freezeAt)) continue;
+      addReferencedStorageIds(referenced, doc, fields);
     }
   }
   return referenced;
+}
+
+function isExpiredUpload(
+  table: string,
+  doc: Record<string, unknown>,
+  freezeAt: Date,
+): boolean {
+  return (
+    table === "catdex_uploads" &&
+    (doc.status === "consumed" ||
+      (typeof doc.expiresAt === "number" &&
+        doc.expiresAt <= freezeAt.getTime()))
+  );
+}
+
+function addReferencedStorageIds(
+  referenced: Set<string>,
+  doc: Record<string, unknown>,
+  fields: readonly string[],
+): void {
+  for (const field of fields) {
+    const value = field.startsWith("config.")
+      ? (doc.config as Record<string, unknown> | undefined)?.[
+          field.slice("config.".length)
+        ]
+      : doc[field];
+    if (typeof value === "string") referenced.add(value);
+  }
 }
 
 async function importFiles(
@@ -550,7 +648,47 @@ async function importFiles(
 ): Promise<ImportStepStats> {
   const stats = emptyStats();
   const referenced = await referencedStorageIds(archive, freezeAt);
+  const metadata = await readStorageMetadata(archive, stats);
+  const unreferenced = [...metadata.keys()].filter(
+    (id) => !referenced.has(id),
+  ).length;
+  if (unreferenced > 0) {
+    bump(stats.skipped, "unreferenced storage object", unreferenced);
+  }
 
+  const seenSha = new Set<string>();
+  const fileContext = {
+    db,
+    archive,
+    archiveSha256,
+    freezeAt,
+    seenSha,
+    stats,
+    quarantine,
+  };
+  // Sorted ids: the first holder of identical bytes names the file row.
+  for (const storageId of [...referenced].sort(compareCodeUnits)) {
+    await importStorageFile({
+      ...fileContext,
+      storageId,
+      meta: metadata.get(storageId),
+    });
+  }
+  quarantine.flush("files");
+  await db.insert(importCheckpoints).values({
+    archiveSha256,
+    step: "files",
+    rows: stats.imported,
+    stats,
+    runId,
+  });
+  return stats;
+}
+
+async function readStorageMetadata(
+  archive: ConvexArchive,
+  stats: ImportStepStats,
+): Promise<Map<string, StorageMeta>> {
   const metadata = new Map<string, StorageMeta>();
   for await (const item of archive.documents("_storage")) {
     stats.documents++;
@@ -564,83 +702,118 @@ async function importFiles(
     }
     metadata.set(meta.id, meta);
   }
-  const unreferenced = [...metadata.keys()].filter(
-    (id) => !referenced.has(id),
-  ).length;
-  if (unreferenced > 0) {
-    bump(stats.skipped, "unreferenced storage object", unreferenced);
-  }
+  return metadata;
+}
 
-  const seenSha = new Set<string>();
-  // Sorted ids: the first holder of identical bytes names the file row.
-  for (const storageId of [...referenced].sort(compareCodeUnits)) {
-    const meta = metadata.get(storageId);
-    const entry = archive.storageEntryName(storageId);
-    const problems: string[] = [];
-    if (!meta) problems.push("no storage metadata");
-    if (!entry) problems.push("storage object missing from archive");
-    let bytes: Buffer | null = null;
-    let inspected: Awaited<ReturnType<typeof inspectFile>> | null = null;
-    if (meta && entry) {
-      // One object in memory at a time; bytea needs the whole value.
-      bytes = await archive.readBuffer(entry, MAX_FILE_BYTES);
-      inspected = await inspectFile(bytes, meta);
-      if ("problems" in inspected) problems.push(...inspected.problems);
-    }
-    if (!meta || !bytes || !inspected || !("file" in inspected)) {
-      // One count per file, whatever number of problems it has.
-      bump(stats.quarantined, problems.join("; "));
-      quarantine.add("files", {
-        step: "files",
-        legacyId: storageId,
-        reason: problems.join("; "),
-      });
-      continue;
-    }
-    const file = inspected.file;
-    for (const kind of inspected.repairs) bump(stats.repaired, kind);
-    const fileId = importedFileId(file.sha256Hex);
-    if (seenSha.has(file.sha256Hex)) {
-      bump(stats.repaired, "duplicate bytes share one file");
-    } else {
-      seenSha.add(file.sha256Hex);
-      const createdAt =
-        meta.creationTime === null ? freezeAt : new Date(meta.creationTime);
-      await db
-        .insert(files)
-        .values({
-          id: fileId,
-          legacyId: storageId,
-          legacyCreatedAt:
-            meta.creationTime === null ? null : creationTime(meta.creationTime),
-          sha256: file.sha256Hex,
-          mimeType: file.mimeType,
-          byteSize: file.byteSize,
-          width: file.width,
-          height: file.height,
-          bytes,
-          createdAt,
-        })
-        .onConflictDoUpdate({ target: files.id, set: excludedSet(files) });
-      stats.imported++;
-    }
-    await db
-      .insert(importStorageMap)
-      .values({ archiveSha256, storageId, fileId })
-      .onConflictDoUpdate({
-        target: [importStorageMap.archiveSha256, importStorageMap.storageId],
-        set: { fileId },
-      });
+async function inspectStorageFile(
+  archive: ConvexArchive,
+  storageId: string,
+  meta: StorageMeta | undefined,
+): Promise<{
+  meta: StorageMeta | undefined;
+  bytes: Buffer | null;
+  inspected: FileInspection | null;
+  problems: string[];
+}> {
+  const entry = archive.storageEntryName(storageId);
+  const problems: string[] = [];
+  if (!meta) problems.push("no storage metadata");
+  if (!entry) problems.push("storage object missing from archive");
+  let bytes: Buffer | null = null;
+  let inspected: FileInspection | null = null;
+  if (meta && entry) {
+    // One object in memory at a time; bytea needs the whole value.
+    bytes = await archive.readBuffer(entry, MAX_FILE_BYTES);
+    inspected = await inspectFile(bytes, meta);
+    if ("problems" in inspected) problems.push(...inspected.problems);
   }
-  quarantine.flush("files");
-  await db.insert(importCheckpoints).values({
+  return { meta, bytes, inspected, problems };
+}
+
+function quarantineStorageFile(
+  storageId: string,
+  problems: string[],
+  stats: ImportStepStats,
+  quarantine: Quarantine,
+): void {
+  // One count per file, whatever number of problems it has.
+  const reason = problems.join("; ");
+  bump(stats.quarantined, reason);
+  quarantine.add("files", { step: "files", legacyId: storageId, reason });
+}
+
+async function storeUniqueFile(context: UniqueFileContext): Promise<string> {
+  const { db, storageId, meta, bytes, file, seenSha, freezeAt, stats } =
+    context;
+  const fileId = importedFileId(file.file.sha256Hex);
+  if (seenSha.has(file.file.sha256Hex)) {
+    bump(stats.repaired, "duplicate bytes share one file");
+  } else {
+    seenSha.add(file.file.sha256Hex);
+    const createdAt =
+      meta.creationTime === null ? freezeAt : new Date(meta.creationTime);
+    await db
+      .insert(files)
+      .values({
+        id: fileId,
+        legacyId: storageId,
+        legacyCreatedAt:
+          meta.creationTime === null ? null : creationTime(meta.creationTime),
+        sha256: file.file.sha256Hex,
+        mimeType: file.file.mimeType,
+        byteSize: file.file.byteSize,
+        width: file.file.width,
+        height: file.file.height,
+        bytes,
+        createdAt,
+      })
+      .onConflictDoUpdate({ target: files.id, set: excludedSet(files) });
+    stats.imported++;
+  }
+  return fileId;
+}
+
+async function importStorageFile(context: StorageFileContext): Promise<void> {
+  const {
+    db,
+    archive,
     archiveSha256,
-    step: "files",
-    rows: stats.imported,
+    freezeAt,
+    storageId,
+    meta,
+    seenSha,
     stats,
-    runId,
+    quarantine,
+  } = context;
+  const inspected = await inspectStorageFile(archive, storageId, meta);
+  if (
+    !inspected.meta ||
+    !inspected.bytes ||
+    !inspected.inspected ||
+    !("file" in inspected.inspected)
+  ) {
+    quarantineStorageFile(storageId, inspected.problems, stats, quarantine);
+    return;
+  }
+  const file = inspected.inspected;
+  for (const kind of file.repairs) bump(stats.repaired, kind);
+  const fileId = await storeUniqueFile({
+    db,
+    storageId,
+    meta: inspected.meta,
+    bytes: inspected.bytes,
+    file,
+    seenSha,
+    freezeAt,
+    stats,
   });
-  return stats;
+  await db
+    .insert(importStorageMap)
+    .values({ archiveSha256, storageId, fileId })
+    .onConflictDoUpdate({
+      target: [importStorageMap.archiveSha256, importStorageMap.storageId],
+      set: { fileId },
+    });
 }
 
 /** Every imported row must be in the database; anything else fails the run. */

@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import type { Database } from "../db/pool";
+import type { Transaction } from "../db/transaction";
 import { withTransaction } from "../db/transaction";
 import type { DiscordUserConfigRow } from "../repositories/discord";
 import {
@@ -136,6 +137,83 @@ export async function getUserConfig(db: Database, discordUserId: string) {
   });
 }
 
+function configFields(args: Record<string, unknown>) {
+  return {
+    accessoriesMin:
+      typeof args.accessoriesMin === "number" ? args.accessoriesMin : undefined,
+    accessoriesMax:
+      typeof args.accessoriesMax === "number" ? args.accessoriesMax : undefined,
+    scarsMin: typeof args.scarsMin === "number" ? args.scarsMin : undefined,
+    scarsMax: typeof args.scarsMax === "number" ? args.scarsMax : undefined,
+    tortiesMin:
+      typeof args.tortiesMin === "number" ? args.tortiesMin : undefined,
+    tortiesMax:
+      typeof args.tortiesMax === "number" ? args.tortiesMax : undefined,
+    darkForest:
+      typeof args.darkForest === "boolean" ? args.darkForest : undefined,
+    starclan: typeof args.starclan === "boolean" ? args.starclan : undefined,
+  };
+}
+
+async function updatePalette(
+  tx: Transaction,
+  existing: DiscordUserConfigRow | null,
+  discordUserId: string,
+  operation: string,
+  args: Record<string, unknown>,
+) {
+  const paletteId = typeof args.paletteId === "string" ? args.paletteId : "";
+  const palettes = existing?.palettes ?? [];
+  const next =
+    operation === "addPalette"
+      ? [...new Set([...palettes, paletteId])]
+      : palettes.filter((value) => value !== paletteId);
+  if (existing) {
+    await updateUserConfigRow(tx, existing.id, { palettes: next });
+  } else {
+    await insertUserConfig(tx, { discordUserId, ...DEFAULTS, palettes: next });
+  }
+}
+
+async function updateConfigFields(
+  tx: Transaction,
+  existing: DiscordUserConfigRow | null,
+  discordUserId: string,
+  args: Record<string, unknown>,
+) {
+  const fields = configFields(args);
+  if (existing) {
+    await updateUserConfigRow(tx, existing.id, fields);
+    return;
+  }
+  const values = { discordUserId, ...DEFAULTS };
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) (values as Record<string, unknown>)[key] = value;
+  }
+  await insertUserConfig(tx, values);
+}
+
+async function updateUserConfigInTransaction(
+  tx: Transaction,
+  operation: string,
+  args: Record<string, unknown>,
+) {
+  const discordUserId =
+    typeof args.discordUserId === "string" ? args.discordUserId : "";
+  if (!discordUserId) throw new Error("Invalid config request");
+  const existing = await getUserConfigRow(tx, discordUserId);
+  if (operation === "reset") {
+    if (existing) await deleteUserConfig(tx, existing.id);
+    return null;
+  }
+  if (operation === "addPalette" || operation === "removePalette") {
+    await updatePalette(tx, existing, discordUserId, operation, args);
+    return null;
+  }
+  await updateConfigFields(tx, existing, discordUserId, args);
+  return null;
+}
+
 export async function updateUserConfig(
   db: Database,
   operation: string,
@@ -143,64 +221,7 @@ export async function updateUserConfig(
 ) {
   return withTransaction(
     db,
-    async (tx) => {
-      const discordUserId =
-        typeof args.discordUserId === "string" ? args.discordUserId : "";
-      if (!discordUserId) throw new Error("Invalid config request");
-      const existing = await getUserConfigRow(tx, discordUserId);
-      if (operation === "reset") {
-        if (existing) await deleteUserConfig(tx, existing.id);
-        return null;
-      }
-      if (operation === "addPalette" || operation === "removePalette") {
-        const paletteId =
-          typeof args.paletteId === "string" ? args.paletteId : "";
-        const palettes = existing?.palettes ?? [];
-        const next =
-          operation === "addPalette"
-            ? [...new Set([...palettes, paletteId])]
-            : palettes.filter((value) => value !== paletteId);
-        if (existing)
-          await updateUserConfigRow(tx, existing.id, { palettes: next });
-        else
-          await insertUserConfig(tx, {
-            discordUserId,
-            ...DEFAULTS,
-            palettes: next,
-          });
-        return null;
-      }
-      const fields = {
-        accessoriesMin:
-          typeof args.accessoriesMin === "number"
-            ? args.accessoriesMin
-            : undefined,
-        accessoriesMax:
-          typeof args.accessoriesMax === "number"
-            ? args.accessoriesMax
-            : undefined,
-        scarsMin: typeof args.scarsMin === "number" ? args.scarsMin : undefined,
-        scarsMax: typeof args.scarsMax === "number" ? args.scarsMax : undefined,
-        tortiesMin:
-          typeof args.tortiesMin === "number" ? args.tortiesMin : undefined,
-        tortiesMax:
-          typeof args.tortiesMax === "number" ? args.tortiesMax : undefined,
-        darkForest:
-          typeof args.darkForest === "boolean" ? args.darkForest : undefined,
-        starclan:
-          typeof args.starclan === "boolean" ? args.starclan : undefined,
-      };
-      if (existing) await updateUserConfigRow(tx, existing.id, fields);
-      else {
-        const values = { discordUserId, ...DEFAULTS };
-        for (const [key, value] of Object.entries(fields)) {
-          if (value !== undefined)
-            (values as Record<string, unknown>)[key] = value;
-        }
-        await insertUserConfig(tx, values);
-      }
-      return null;
-    },
+    (tx) => updateUserConfigInTransaction(tx, operation, args),
     SERIALIZABLE,
   );
 }

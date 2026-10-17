@@ -148,51 +148,54 @@ function sorted(values: Iterable<string>): string[] {
 
 // ---------------------------------------------------------------- schema
 
+type ValidatorTable = Pick<
+  SchemaTable,
+  "anyFields" | "idReferences" | "storageFields"
+>;
+
+function handleSimpleValidator(
+  node: ts.CallExpression,
+  path: string,
+  table: ValidatorTable,
+): boolean {
+  const name = calleeName(node);
+  if (name === "any") {
+    table.anyFields.push(path);
+    return true;
+  }
+  if (name !== "id") return false;
+  const target = stringArg(node.arguments[0]) ?? "?";
+  if (target === "_storage") table.storageFields.push(path);
+  else table.idReferences.push({ path, table: target });
+  return true;
+}
+
+function visitObjectValidator(
+  arg: ts.Node | undefined,
+  path: string,
+  table: ValidatorTable,
+): void {
+  if (!arg || !ts.isObjectLiteralExpression(arg)) return;
+  for (const prop of arg.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue;
+    validatorDetails(prop.initializer, `${path}.${prop.name.getText()}`, table);
+  }
+}
+
 function validatorDetails(
   node: ts.Node,
   path: string,
-  table: Pick<SchemaTable, "anyFields" | "idReferences" | "storageFields">,
+  table: ValidatorTable,
 ): void {
-  if (ts.isCallExpression(node)) {
-    const name = calleeName(node);
-    if (name === "any") {
-      table.anyFields.push(path);
-      return;
-    }
-    if (name === "id") {
-      const target = stringArg(node.arguments[0]) ?? "?";
-      if (target === "_storage") table.storageFields.push(path);
-      else table.idReferences.push({ path, table: target });
-      return;
-    }
-    if (name === "object" && node.arguments[0]) {
-      const arg = node.arguments[0];
-      if (ts.isObjectLiteralExpression(arg)) {
-        for (const prop of arg.properties) {
-          if (ts.isPropertyAssignment(prop)) {
-            validatorDetails(
-              prop.initializer,
-              `${path}.${prop.name.getText()}`,
-              table,
-            );
-          }
-        }
-      }
-      return;
-    }
-    if (name === "array") {
-      for (const arg of node.arguments) {
-        validatorDetails(arg, `${path}[]`, table);
-      }
-      return;
-    }
-    for (const arg of node.arguments) validatorDetails(arg, path, table);
+  if (!ts.isCallExpression(node)) return;
+  if (handleSimpleValidator(node, path, table)) return;
+  const name = calleeName(node);
+  if (name === "object") {
+    visitObjectValidator(node.arguments[0], path, table);
     return;
   }
-  if (ts.isIdentifier(node)) {
-    // Shared validator constants are reported separately.
-    return;
-  }
+  const nextPath = name === "array" ? `${path}[]` : path;
+  for (const arg of node.arguments) validatorDetails(arg, nextPath, table);
 }
 
 function readSchema(): {
@@ -218,59 +221,69 @@ function readSchema(): {
     }
   }
 
-  walk(source, (node) => {
-    if (!ts.isCallExpression(node) || calleeName(node) !== "defineSchema") {
-      return;
-    }
-    const arg = node.arguments[0];
-    if (!arg || !ts.isObjectLiteralExpression(arg)) return;
-    for (const prop of arg.properties) {
-      if (!ts.isPropertyAssignment(prop)) continue;
-      const table: SchemaTable = {
-        name: prop.name.getText(),
-        fields: [],
-        anyFields: [],
-        idReferences: [],
-        storageFields: [],
-        indexes: [],
-      };
-      // Unwind `defineTable({...}).index(...).index(...)`.
-      let expr: ts.Expression = prop.initializer;
-      while (ts.isCallExpression(expr)) {
-        const name = calleeName(expr);
-        if (
-          name === "index" &&
-          ts.isPropertyAccessExpression(expr.expression)
-        ) {
-          const fieldsArg = expr.arguments[1];
-          table.indexes.unshift({
-            name: stringArg(expr.arguments[0]) ?? "?",
-            fields:
-              fieldsArg && ts.isArrayLiteralExpression(fieldsArg)
-                ? fieldsArg.elements.map((e) => stringArg(e) ?? "?")
-                : [],
-          });
-          expr = expr.expression.expression;
-          continue;
-        }
-        if (name === "defineTable") {
-          const shape = expr.arguments[0];
-          if (shape && ts.isObjectLiteralExpression(shape)) {
-            for (const field of shape.properties) {
-              if (!ts.isPropertyAssignment(field)) continue;
-              const fieldName = field.name.getText();
-              table.fields.push(fieldName);
-              validatorDetails(field.initializer, fieldName, table);
-            }
-          }
-        }
-        break;
-      }
-      tables.push(table);
-    }
-  });
+  walk(source, (node) => collectSchemaTables(node, tables));
 
   return { tables, sharedValidatorAnyFields: shared };
+}
+
+function newSchemaTable(name: string): SchemaTable {
+  return {
+    name,
+    fields: [],
+    anyFields: [],
+    idReferences: [],
+    storageFields: [],
+    indexes: [],
+  };
+}
+
+function readSchemaTableFields(
+  shape: ts.Node | undefined,
+  table: SchemaTable,
+): void {
+  if (!shape || !ts.isObjectLiteralExpression(shape)) return;
+  for (const field of shape.properties) {
+    if (!ts.isPropertyAssignment(field)) continue;
+    const fieldName = field.name.getText();
+    table.fields.push(fieldName);
+    validatorDetails(field.initializer, fieldName, table);
+  }
+}
+
+function unwindSchemaTable(
+  initializer: ts.Expression,
+  table: SchemaTable,
+): void {
+  let expr = initializer;
+  while (ts.isCallExpression(expr)) {
+    const name = calleeName(expr);
+    if (name === "index" && ts.isPropertyAccessExpression(expr.expression)) {
+      const fieldsArg = expr.arguments[1];
+      table.indexes.unshift({
+        name: stringArg(expr.arguments[0]) ?? "?",
+        fields:
+          fieldsArg && ts.isArrayLiteralExpression(fieldsArg)
+            ? fieldsArg.elements.map((element) => stringArg(element) ?? "?")
+            : [],
+      });
+      expr = expr.expression.expression;
+      continue;
+    }
+    if (name === "defineTable") readSchemaTableFields(expr.arguments[0], table);
+    break;
+  }
+}
+
+function collectSchemaTables(node: ts.Node, tables: SchemaTable[]): void {
+  if (!ts.isCallExpression(node) || calleeName(node) !== "defineSchema") return;
+  const arg = node.arguments[0];
+  if (!arg || !ts.isObjectLiteralExpression(arg)) return;
+  for (const prop of arg.properties) {
+    if (!ts.isPropertyAssignment(prop)) continue;
+    const table = newSchemaTable(prop.name.getText());
+    unwindSchemaTable(prop.initializer, table);
+    tables.push(table);
+  }
 }
 
 // ------------------------------------------------------------- functions
@@ -292,38 +305,16 @@ function functionDetails(
   let usesAuth = false;
   let fetches = false;
 
-  walk(node, (child) => {
-    if (ts.isPropertyAccessExpression(child)) {
-      const text = child.getText();
-      if (/\bctx\.auth\b/.test(text)) usesAuth = true;
-      if (
-        ts.isPropertyAccessExpression(child.expression) &&
-        child.expression.getText() === "process.env"
-      ) {
-        envVars.add(child.name.text);
-      }
-    }
-    if (!ts.isCallExpression(child)) return;
-    const name = calleeName(child);
-    const callee = child.expression.getText();
-    if (name === "fetch" && ts.isIdentifier(child.expression)) fetches = true;
-    if (callee.endsWith(".db.query")) {
-      const table = stringArg(child.arguments[0]);
-      if (table) tablesRead.add(table);
-    }
-    if (callee.endsWith(".db.insert")) {
-      const table = stringArg(child.arguments[0]);
-      if (table) tablesWritten.add(table);
-    }
-    if (/\.storage\.\w+$/.test(callee) && name) storageOps.add(name);
-    if (/\.scheduler\.(runAfter|runAt)$/.test(callee) && child.arguments[1]) {
-      scheduler.add(compact(child.arguments[1].getText()));
-    }
-    // Shared auth helpers (requireIdentity, getIdentity, ...) hide ctx.auth.
-    if (name && /identity|requireUser|currentUser|requireOwner/i.test(name)) {
-      usesAuth = true;
-    }
-  });
+  const state = {
+    tablesRead,
+    tablesWritten,
+    scheduler,
+    storageOps,
+    envVars,
+    usesAuth: () => (usesAuth = true),
+    fetches: () => (fetches = true),
+  };
+  walk(node, (child) => inspectFunctionNode(child, state));
 
   return {
     usesAuth,
@@ -334,6 +325,72 @@ function functionDetails(
     envVars: sorted(envVars),
     fetches,
   };
+}
+
+type FunctionDetailsState = {
+  tablesRead: Set<string>;
+  tablesWritten: Set<string>;
+  scheduler: Set<string>;
+  storageOps: Set<string>;
+  envVars: Set<string>;
+  usesAuth: () => void;
+  fetches: () => void;
+};
+
+function inspectFunctionProperty(
+  child: ts.PropertyAccessExpression,
+  state: FunctionDetailsState,
+): void {
+  const text = child.getText();
+  if (/\bctx\.auth\b/.test(text)) state.usesAuth();
+  if (
+    ts.isPropertyAccessExpression(child.expression) &&
+    child.expression.getText() === "process.env"
+  ) {
+    state.envVars.add(child.name.text);
+  }
+}
+
+function inspectFunctionCall(
+  child: ts.CallExpression,
+  state: FunctionDetailsState,
+): void {
+  const name = calleeName(child);
+  const callee = child.expression.getText();
+  if (name === "fetch" && ts.isIdentifier(child.expression)) state.fetches();
+  inspectDatabaseCall(callee, child, state);
+  if (/\.storage\.\w+$/.test(callee) && name) state.storageOps.add(name);
+  if (/\.scheduler\.(runAfter|runAt)$/.test(callee) && child.arguments[1]) {
+    state.scheduler.add(compact(child.arguments[1].getText()));
+  }
+  // Shared auth helpers (requireIdentity, getIdentity, ...) hide ctx.auth.
+  if (name && /identity|requireUser|currentUser|requireOwner/i.test(name)) {
+    state.usesAuth();
+  }
+}
+
+function inspectDatabaseCall(
+  callee: string,
+  child: ts.CallExpression,
+  state: FunctionDetailsState,
+): void {
+  if (callee.endsWith(".db.query")) {
+    const table = stringArg(child.arguments[0]);
+    if (table) state.tablesRead.add(table);
+  }
+  if (callee.endsWith(".db.insert")) {
+    const table = stringArg(child.arguments[0]);
+    if (table) state.tablesWritten.add(table);
+  }
+}
+
+function inspectFunctionNode(
+  child: ts.Node,
+  state: FunctionDetailsState,
+): void {
+  if (ts.isPropertyAccessExpression(child))
+    inspectFunctionProperty(child, state);
+  if (ts.isCallExpression(child)) inspectFunctionCall(child, state);
 }
 
 function readFunctions(): {
@@ -347,49 +404,74 @@ function readFunctions(): {
     const module = rel(file)
       .replace(/^frontend\/convex\//, "")
       .replace(/\.ts$/, "");
-    for (const statement of source.statements) {
-      if (!ts.isVariableStatement(statement)) continue;
-      const exported = statement.modifiers?.some(
-        (m) => m.kind === ts.SyntaxKind.ExportKeyword,
-      );
-      if (!exported) continue;
-      for (const decl of statement.declarationList.declarations) {
-        const init = decl.initializer;
-        if (
-          !init ||
-          !ts.isCallExpression(init) ||
-          !ts.isIdentifier(decl.name)
-        ) {
-          continue;
-        }
-        const kind = calleeName(init);
-        if (!kind || !FUNCTION_KINDS.has(kind)) continue;
-        functions.push({
-          file: rel(file),
-          line: lineOf(source, decl),
-          module,
-          name: decl.name.text,
-          kind,
-          ...functionDetails(init),
-        });
-      }
-    }
-    walk(source, (node) => {
-      if (
-        ts.isCallExpression(node) &&
-        /\.scheduler\.(runAfter|runAt)$/.test(node.expression.getText()) &&
-        node.arguments[1]
-      ) {
-        scheduledCalls.push({
-          file: rel(file),
-          line: lineOf(source, node),
-          target: compact(node.arguments[1].getText()),
-          delay: compact(node.arguments[0]?.getText() ?? ""),
-        });
-      }
-    });
+    functions.push(...readModuleFunctions(source, file, module));
+    scheduledCalls.push(...readModuleSchedules(source, file));
   }
   return { functions, scheduledCalls };
+}
+
+function readModuleFunctions(
+  source: ts.SourceFile,
+  file: string,
+  module: string,
+): ConvexFunction[] {
+  const functions: ConvexFunction[] = [];
+  for (const statement of source.statements) {
+    functions.push(...readModuleStatement(source, file, module, statement));
+  }
+  return functions;
+}
+
+function readModuleStatement(
+  source: ts.SourceFile,
+  file: string,
+  module: string,
+  statement: ts.Statement,
+): ConvexFunction[] {
+  if (!ts.isVariableStatement(statement)) return [];
+  const exported = statement.modifiers?.some(
+    (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+  );
+  if (!exported) return [];
+  return statement.declarationList.declarations.flatMap((decl) => {
+    const init = decl.initializer;
+    if (!init || !ts.isCallExpression(init) || !ts.isIdentifier(decl.name))
+      return [];
+    const kind = calleeName(init);
+    if (!kind || !FUNCTION_KINDS.has(kind)) return [];
+    return [
+      {
+        file: rel(file),
+        line: lineOf(source, decl),
+        module,
+        name: decl.name.text,
+        kind,
+        ...functionDetails(init),
+      },
+    ];
+  });
+}
+
+function readModuleSchedules(
+  source: ts.SourceFile,
+  file: string,
+): Inventory["scheduledCalls"] {
+  const scheduledCalls: Inventory["scheduledCalls"] = [];
+  walk(source, (node) => {
+    if (
+      !ts.isCallExpression(node) ||
+      !/\.scheduler\.(runAfter|runAt)$/.test(node.expression.getText()) ||
+      !node.arguments[1]
+    )
+      return;
+    scheduledCalls.push({
+      file: rel(file),
+      line: lineOf(source, node),
+      target: compact(node.arguments[1].getText()),
+      delay: compact(node.arguments[0]?.getText() ?? ""),
+    });
+  });
+  return scheduledCalls;
 }
 
 function readCrons(): Inventory["crons"] {
@@ -503,37 +585,18 @@ function readCallers(): Pick<
     const source = parse(file);
     const context = callContext(file, text);
 
-    walk(source, (node) => {
-      if (ts.isIdentifier(node) && node.text.endsWith("StorageId")) {
-        nested.push({
-          file: rel(file),
-          line: lineOf(source, node),
-          identifier: node.text,
-        });
-      }
-      if (!importsConvex || !ts.isCallExpression(node)) return;
-      const name = calleeName(node);
-      if (!name) return;
-      const target = compact(node.arguments[0]?.getText() ?? "");
-      const site: CallSite = {
-        file: rel(file),
-        line: lineOf(source, node),
-        kind: name,
-        target,
+    walk(source, (node) =>
+      inspectCallerNode(node, {
+        file,
+        source,
+        importsConvex,
         context,
-      };
-      if (CLIENT_HOOKS.has(name) && ts.isIdentifier(node.expression)) {
-        clientCalls.push(site);
-      } else if (AUTH_HOOKS.has(name) && ts.isIdentifier(node.expression)) {
-        authHookCalls.push(site);
-      } else if (
-        SERVER_METHODS.has(name) &&
-        ts.isPropertyAccessExpression(node.expression) &&
-        /^(api|internal)\./.test(target)
-      ) {
-        serverCalls.push(site);
-      }
-    });
+        nested,
+        clientCalls,
+        authHookCalls,
+        serverCalls,
+      }),
+    );
 
     for (const [pattern, service] of [
       [/ConvexHttpClient/, "frontend ConvexHttpClient"],
@@ -604,6 +667,53 @@ function readCallers(): Pick<
     nestedStorageReferences: dedupeLocations(nested),
     externalCallers: external,
   };
+}
+
+type CallerNodeState = {
+  file: string;
+  source: ts.SourceFile;
+  importsConvex: boolean;
+  context: CallSite["context"];
+  nested: Inventory["nestedStorageReferences"];
+  clientCalls: CallSite[];
+  authHookCalls: CallSite[];
+  serverCalls: CallSite[];
+};
+
+function inspectCallerNode(node: ts.Node, state: CallerNodeState): void {
+  if (ts.isIdentifier(node) && node.text.endsWith("StorageId")) {
+    state.nested.push({
+      file: rel(state.file),
+      line: lineOf(state.source, node),
+      identifier: node.text,
+    });
+  }
+  if (!state.importsConvex || !ts.isCallExpression(node)) return;
+  const name = calleeName(node);
+  if (!name) return;
+  const target = compact(node.arguments[0]?.getText() ?? "");
+  const site: CallSite = {
+    file: rel(state.file),
+    line: lineOf(state.source, node),
+    kind: name,
+    target,
+    context: state.context,
+  };
+  if (CLIENT_HOOKS.has(name) && ts.isIdentifier(node.expression)) {
+    state.clientCalls.push(site);
+    return;
+  }
+  if (AUTH_HOOKS.has(name) && ts.isIdentifier(node.expression)) {
+    state.authHookCalls.push(site);
+    return;
+  }
+  if (
+    SERVER_METHODS.has(name) &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    /^(api|internal)\./.test(target)
+  ) {
+    state.serverCalls.push(site);
+  }
 }
 
 function importsConvexOnlyForTypes(text: string): boolean {

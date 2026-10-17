@@ -347,64 +347,94 @@ export async function reportBatchStage(
   apiKey: string,
   args: { seq: number; stageIndex: number; awaitingCull: boolean },
 ) {
-  return withTransaction(db, async (tx) => {
-    const user = await getUserByApiKey(tx, apiKey);
-    const valid = user?.apiKey ? Buffer.from(user.apiKey) : Buffer.alloc(0);
-    const provided = Buffer.from(apiKey);
-    if (
-      !user ||
-      valid.length !== provided.length ||
-      !timingSafeEqual(valid, provided)
-    )
-      throw new ServiceError("forbidden", "Unknown API key");
-    const session = await selectCatStreamSessionByUser(tx, user.id);
-    if (!session)
-      throw new ServiceError("not_found", "No stream session found");
-    const command = session.currentCommand as {
-      type?: string;
-      seq?: number;
-      batch?: { cats: { id: string }[]; finalCount: number };
-    } | null;
-    if (command?.type !== "batch" || command.seq !== args.seq) return undefined;
-    const previous =
-      session.batchState?.seq === args.seq
-        ? session.batchState
-        : {
-            seq: args.seq,
-            stageIndex: 0,
-            awaitingCull: false,
-            eliminatedIds: [],
-          };
-    const lastStage = command.batch
-      ? Math.max(0, command.batch.cats.length - command.batch.finalCount)
-      : Number.POSITIVE_INFINITY;
-    if (
-      !Number.isInteger(args.stageIndex) ||
-      args.stageIndex < 0 ||
-      args.stageIndex > lastStage ||
-      args.stageIndex > previous.stageIndex + 1
-    )
-      return undefined;
-    if (args.stageIndex < previous.stageIndex) return undefined;
-    if (args.stageIndex === previous.stageIndex) {
-      if (args.awaitingCull && previous.eliminatedIds.length > args.stageIndex)
-        return undefined;
-      if (!args.awaitingCull && previous.awaitingCull) return undefined;
-    }
-    await updateCatStreamSession(tx, session.id, {
-      batchState: {
-        ...previous,
-        stageIndex: args.stageIndex,
-        awaitingCull: args.awaitingCull,
-        ...(previous.stageStartedAt === undefined ||
-        args.stageIndex > previous.stageIndex
-          ? { stageStartedAt: Date.now() }
-          : {}),
-      },
-    });
-    await publishSession(tx, session.id);
-    return undefined;
+  return withTransaction(db, (tx) =>
+    reportBatchStageInTransaction(tx, apiKey, args),
+  );
+}
+
+type BatchStageArgs = {
+  seq: number;
+  stageIndex: number;
+  awaitingCull: boolean;
+};
+
+function validateApiKey(
+  user: Awaited<ReturnType<typeof getUserByApiKey>>,
+  apiKey: string,
+) {
+  const valid = user?.apiKey ? Buffer.from(user.apiKey) : Buffer.alloc(0);
+  const provided = Buffer.from(apiKey);
+  if (
+    !user ||
+    valid.length !== provided.length ||
+    !timingSafeEqual(valid, provided)
+  )
+    throw new ServiceError("forbidden", "Unknown API key");
+}
+
+function previousBatchState(session: CatSession, args: BatchStageArgs) {
+  return session.batchState?.seq === args.seq
+    ? session.batchState
+    : {
+        seq: args.seq,
+        stageIndex: 0,
+        awaitingCull: false,
+        eliminatedIds: [],
+      };
+}
+
+function validBatchStage(
+  args: BatchStageArgs,
+  previous: NonNullable<CatSession["batchState"]>,
+  lastStage: number,
+) {
+  if (
+    !Number.isInteger(args.stageIndex) ||
+    args.stageIndex < 0 ||
+    args.stageIndex > lastStage ||
+    args.stageIndex > previous.stageIndex + 1
+  )
+    return false;
+  if (args.stageIndex < previous.stageIndex) return false;
+  if (args.stageIndex !== previous.stageIndex) return true;
+  if (args.awaitingCull && previous.eliminatedIds.length > args.stageIndex)
+    return false;
+  return args.awaitingCull || !previous.awaitingCull;
+}
+
+async function reportBatchStageInTransaction(
+  tx: Transaction,
+  apiKey: string,
+  args: BatchStageArgs,
+) {
+  const user = await getUserByApiKey(tx, apiKey);
+  validateApiKey(user, apiKey);
+  const session = await selectCatStreamSessionByUser(tx, user.id);
+  if (!session) throw new ServiceError("not_found", "No stream session found");
+  const command = session.currentCommand as {
+    type?: string;
+    seq?: number;
+    batch?: { cats: { id: string }[]; finalCount: number };
+  } | null;
+  if (command?.type !== "batch" || command.seq !== args.seq) return undefined;
+  const previous = previousBatchState(session, args);
+  const lastStage = command.batch
+    ? Math.max(0, command.batch.cats.length - command.batch.finalCount)
+    : Number.POSITIVE_INFINITY;
+  if (!validBatchStage(args, previous, lastStage)) return undefined;
+  await updateCatStreamSession(tx, session.id, {
+    batchState: {
+      ...previous,
+      stageIndex: args.stageIndex,
+      awaitingCull: args.awaitingCull,
+      ...(previous.stageStartedAt === undefined ||
+      args.stageIndex > previous.stageIndex
+        ? { stageStartedAt: Date.now() }
+        : {}),
+    },
   });
+  await publishSession(tx, session.id);
+  return undefined;
 }
 
 export async function markBatchCat(
@@ -504,68 +534,99 @@ export async function cullBatchCat(
   identity: Identity,
   args: { seq: number; catId: string },
 ) {
-  return withTransaction(db, async (tx) => {
-    const session = await hostSession(tx, identity);
-    const command = session.currentCommand as {
-      type?: string;
-      seq?: number;
-      batch?: { cats: { id: string }[]; finalCount: number };
-    } | null;
-    let state = session.batchState;
-    if (command?.type !== "batch" || command?.seq !== args.seq)
-      throw new ServiceError("conflict", "No matching batch is running.");
-    if (!command.batch || state?.seq !== args.seq)
-      throw new ServiceError("conflict", "Batch state is out of sync.");
-    if (!state.awaitingCull)
-      throw new ServiceError(
-        "conflict",
-        "The overlay is not waiting for a cull right now.",
-      );
-    if (state.eliminatedIds.includes(args.catId))
-      throw new ServiceError("conflict", "That cat was already removed.");
-    if (!command.batch.cats.some((cat) => cat.id === args.catId))
-      throw new ServiceError("invalid_input", "Unknown cat.");
-    if (
-      state.eliminatedIds.length >=
-      command.batch.cats.length - command.batch.finalCount
-    )
-      throw new ServiceError("conflict", "All eliminations are done.");
-    const now = Date.now();
-    if (state.pendingCullId && state.verdictAt !== undefined) {
-      if (now < state.verdictAt + VERDICT_GRACE_MS)
-        throw new ServiceError("conflict", "A verdict is already running.");
-      if (state.pendingCullId === args.catId) {
-        const updated = await updateCatStreamSession(tx, session.id, {
-          batchState: applyBatchCull(state, args.catId, now),
-        });
-        await publishSession(tx, session.id);
-        return updated ? { verdictAt: now } : undefined;
-      }
-      state = withoutArmedCull(state);
-    }
-    const verdictAt = now + VERDICT_MS;
-    await updateCatStreamSession(tx, session.id, {
-      batchState: {
-        ...state,
-        markedId: args.catId,
-        pendingCullId: args.catId,
-        verdictAt,
-      },
-    });
-    await publishSession(tx, session.id);
-    await enqueueJob(tx, {
-      kind: "cat-stream.finalize-batch-cull",
-      dedupeKey: `batch-cull:${session.id}:${args.seq}:${verdictAt}`,
-      payload: {
-        sessionId: session.id,
-        seq: args.seq,
-        catId: args.catId,
-        verdictAt,
-      },
-      runAfter: new Date(verdictAt),
-    });
-    return { verdictAt };
+  return withTransaction(db, (tx) =>
+    cullBatchCatInTransaction(tx, identity, args),
+  );
+}
+
+type BatchCommand = {
+  type?: string;
+  seq?: number;
+  batch?: { cats: { id: string }[]; finalCount: number };
+};
+
+function validateCullRequest(
+  command: BatchCommand | null,
+  state: CatSession["batchState"],
+  args: { seq: number; catId: string },
+) {
+  if (command?.type !== "batch" || command.seq !== args.seq)
+    throw new ServiceError("conflict", "No matching batch is running.");
+  if (!command.batch || state?.seq !== args.seq)
+    throw new ServiceError("conflict", "Batch state is out of sync.");
+  if (!state.awaitingCull)
+    throw new ServiceError(
+      "conflict",
+      "The overlay is not waiting for a cull right now.",
+    );
+  if (state.eliminatedIds.includes(args.catId))
+    throw new ServiceError("conflict", "That cat was already removed.");
+  if (!command.batch.cats.some((cat) => cat.id === args.catId))
+    throw new ServiceError("invalid_input", "Unknown cat.");
+  if (
+    state.eliminatedIds.length >=
+    command.batch.cats.length - command.batch.finalCount
+  )
+    throw new ServiceError("conflict", "All eliminations are done.");
+  return state;
+}
+
+async function resolveArmedCull(
+  tx: Transaction,
+  session: CatSession,
+  state: NonNullable<CatSession["batchState"]>,
+  args: { seq: number; catId: string },
+  now: number,
+) {
+  if (!state.pendingCullId || state.verdictAt === undefined)
+    return { handled: false as const, state };
+  if (now < state.verdictAt + VERDICT_GRACE_MS)
+    throw new ServiceError("conflict", "A verdict is already running.");
+  if (state.pendingCullId !== args.catId)
+    return { handled: false as const, state: withoutArmedCull(state) };
+  const updated = await updateCatStreamSession(tx, session.id, {
+    batchState: applyBatchCull(state, args.catId, now),
   });
+  await publishSession(tx, session.id);
+  return {
+    handled: true as const,
+    result: updated ? { verdictAt: now } : undefined,
+  };
+}
+
+async function cullBatchCatInTransaction(
+  tx: Transaction,
+  identity: Identity,
+  args: { seq: number; catId: string },
+) {
+  const session = await hostSession(tx, identity);
+  const command = session.currentCommand as BatchCommand | null;
+  const state = validateCullRequest(command, session.batchState, args);
+  const now = Date.now();
+  const armed = await resolveArmedCull(tx, session, state, args, now);
+  if (armed.handled) return armed.result;
+  const verdictAt = now + VERDICT_MS;
+  await updateCatStreamSession(tx, session.id, {
+    batchState: {
+      ...armed.state,
+      markedId: args.catId,
+      pendingCullId: args.catId,
+      verdictAt,
+    },
+  });
+  await publishSession(tx, session.id);
+  await enqueueJob(tx, {
+    kind: "cat-stream.finalize-batch-cull",
+    dedupeKey: `batch-cull:${session.id}:${args.seq}:${verdictAt}`,
+    payload: {
+      sessionId: session.id,
+      seq: args.seq,
+      catId: args.catId,
+      verdictAt,
+    },
+    runAfter: new Date(verdictAt),
+  });
+  return { verdictAt };
 }
 
 export async function cancelBatchCull(

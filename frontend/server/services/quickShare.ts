@@ -708,42 +708,49 @@ async function finishProcess(db: Database, body: OpBody, now: number) {
   const state = requiredString(body, "state");
   if (!(["ready", "unsupported", "failed"] as string[]).includes(state))
     throw new Error("INVALID_STATE");
-  return withTransaction(db, async (tx) => {
-    const job = await getJob(tx, id(body, "jobId"), true);
-    const leaseId = requiredString(body, "leaseId");
-    if (job?.status !== "leased" || job.leaseId !== leaseId)
-      return { accepted: false };
-    const upload = await getUpload(tx, job.uploadId, true);
-    if (upload?.state === "processing" && upload.active)
-      await updateUpload(tx, upload.id, {
-        state: state as UploadState,
-        detectedMime: optionalString(body, "detectedMime") ?? null,
-        publicKey: optionalString(body, "publicKey") ?? null,
-        publicMime: optionalString(body, "publicMime") ?? null,
-        publicSize:
-          body.publicSize === undefined
-            ? null
-            : requiredNumber(body, "publicSize"),
-        failureCode: optionalString(body, "failureCode") ?? null,
-        failureMessage:
-          optionalString(body, "failureMessage")?.slice(0, 500) ?? null,
-        compatibilityWarning:
-          optionalString(body, "compatibilityWarning")?.slice(0, 300) ?? null,
-        active: state === "ready",
-        updatedAt: new Date(now),
-      });
-    await updateJob(tx, job.id, {
-      status: "done",
-      leaseId: null,
-      leaseExpiresAt: null,
+  return withTransaction(db, (tx) =>
+    finishProcessInTransaction(tx, body, state as UploadState, now),
+  );
+}
+
+async function finishProcessInTransaction(
+  tx: Transaction,
+  body: OpBody,
+  state: UploadState,
+  now: number,
+) {
+  const job = await getJob(tx, id(body, "jobId"), true);
+  const leaseId = requiredString(body, "leaseId");
+  if (job?.status !== "leased" || job.leaseId !== leaseId)
+    return { accepted: false };
+  const upload = await getUpload(tx, job.uploadId, true);
+  if (upload?.state === "processing" && upload.active)
+    await updateUpload(tx, upload.id, {
+      state,
+      detectedMime: optionalString(body, "detectedMime") ?? null,
+      publicKey: optionalString(body, "publicKey") ?? null,
+      publicMime: optionalString(body, "publicMime") ?? null,
+      publicSize:
+        body.publicSize === undefined
+          ? null
+          : requiredNumber(body, "publicSize"),
+      failureCode: optionalString(body, "failureCode") ?? null,
+      failureMessage:
+        optionalString(body, "failureMessage")?.slice(0, 500) ?? null,
+      compatibilityWarning:
+        optionalString(body, "compatibilityWarning")?.slice(0, 300) ?? null,
+      active: state === "ready",
       updatedAt: new Date(now),
     });
-    const next = (await listPendingJobs(tx, 1))[0];
-    if (next) await notifyDispatch(tx, next.id, new Date(now + 1_000));
-    return {
-      accepted: Boolean(upload?.state === "processing" && upload.active),
-    };
+  await updateJob(tx, job.id, {
+    status: "done",
+    leaseId: null,
+    leaseExpiresAt: null,
+    updatedAt: new Date(now),
   });
+  const next = (await listPendingJobs(tx, 1))[0];
+  if (next) await notifyDispatch(tx, next.id, new Date(now + 1_000));
+  return { accepted: Boolean(upload?.state === "processing" && upload.active) };
 }
 
 async function finishDelete(db: Database, body: OpBody) {
@@ -872,34 +879,11 @@ async function removeUpload(db: Database, body: OpBody, now: number) {
 export async function maintainQuickShare(db: Database, now = Date.now()) {
   return withTransaction(db, async (tx) => {
     const date = new Date(now);
-    const abandoned = await listAbandonedUploads(
-      tx,
-      new Date(now - 60 * 60 * 1000),
-    );
-    for (const upload of abandoned) {
-      if (upload.importReservedBytes !== null)
-        await releaseImportReservation(tx, upload, 0, now);
-      await updateUpload(tx, upload.id, {
-        importReservedBytes: null,
-        active: false,
-        state: "failed",
-        failureCode: "UPLOAD_TIMED_OUT",
-        failureMessage: "The upload was not completed in time.",
-        updatedAt: date,
-      });
-    }
-    const expired = await listExpiredPublicUploads(tx, date);
-    for (const upload of expired)
-      await updateUpload(tx, upload.id, { active: false, updatedAt: date });
-    const retention = await listExpiredUploads(tx, date);
-    for (const upload of retention)
-      if (!(await getJobForUploadKind(tx, upload.id, "delete", true)))
-        await enqueueMediaJob(tx, upload.id, "delete", date);
-    const usage = await listExpiredUsage(tx, date);
-    for (const row of usage) await deleteUsage(tx, row.id);
-    const bans = await listExpiredBanRawIps(tx, date);
-    for (const ban of bans)
-      await updateBan(tx, ban.id, { rawIp: null, rawIpExpiresAt: null });
+    const abandoned = await expireAbandonedUploads(tx, now, date);
+    const expired = await deactivateExpiredPublicUploads(tx, date);
+    const retention = await queueExpiredRetention(tx, date);
+    const usage = await deleteExpiredUsage(tx, date);
+    const bans = await clearExpiredBanIps(tx, date);
     await enqueueJob(tx, {
       kind: "quick-share.queue-retention",
       dedupeKey: `${now}:retention-queue`,
@@ -918,6 +902,59 @@ export async function maintainQuickShare(db: Database, now = Date.now()) {
       bans: bans.length,
     };
   });
+}
+
+async function expireAbandonedUploads(
+  tx: Transaction,
+  now: number,
+  date: Date,
+) {
+  const abandoned = await listAbandonedUploads(
+    tx,
+    new Date(now - 60 * 60 * 1000),
+  );
+  for (const upload of abandoned) {
+    if (upload.importReservedBytes !== null)
+      await releaseImportReservation(tx, upload, 0, now);
+    await updateUpload(tx, upload.id, {
+      importReservedBytes: null,
+      active: false,
+      state: "failed",
+      failureCode: "UPLOAD_TIMED_OUT",
+      failureMessage: "The upload was not completed in time.",
+      updatedAt: date,
+    });
+  }
+  return abandoned;
+}
+
+async function deactivateExpiredPublicUploads(tx: Transaction, date: Date) {
+  const expired = await listExpiredPublicUploads(tx, date);
+  for (const upload of expired)
+    await updateUpload(tx, upload.id, { active: false, updatedAt: date });
+  return expired;
+}
+
+async function queueExpiredRetention(tx: Transaction, date: Date) {
+  const retention = await listExpiredUploads(tx, date);
+  for (const upload of retention) {
+    if (!(await getJobForUploadKind(tx, upload.id, "delete", true)))
+      await enqueueMediaJob(tx, upload.id, "delete", date);
+  }
+  return retention;
+}
+
+async function deleteExpiredUsage(tx: Transaction, date: Date) {
+  const usage = await listExpiredUsage(tx, date);
+  for (const row of usage) await deleteUsage(tx, row.id);
+  return usage;
+}
+
+async function clearExpiredBanIps(tx: Transaction, date: Date) {
+  const bans = await listExpiredBanRawIps(tx, date);
+  for (const ban of bans)
+    await updateBan(tx, ban.id, { rawIp: null, rawIpExpiresAt: null });
+  return bans;
 }
 
 export async function recoverQuickShareLease(
@@ -1034,49 +1071,53 @@ export async function handleQuickShareOperation(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<QuickShareResult> {
   const owner = identity.tokenIdentifier ?? undefined;
-  switch (op) {
-    case "policy":
-      return { status: 200, body: policy(owner ? "signedIn" : "anonymous") };
-    case "create":
-      return { status: 201, body: await createUpload(db, body, owner, now) };
-    case "getUpload": {
-      const result = await getUploadWithAccess(db, body, owner);
-      return {
-        status: result ? 200 : 404,
-        body: result ?? { error: "Not found" },
-      };
-    }
-    case "recordPart":
-      return { status: 200, body: await recordPart(db, body, now) };
-    case "complete":
-      return { status: 200, body: await complete(db, body, now) };
-    case "finishImport":
-      return { status: 200, body: await finishImport(db, body, now) };
-    case "failImport":
-      return { status: 200, body: await failImport(db, body, now) };
-    case "public": {
-      const result = await publicUploadBySlug(
-        db,
-        requiredString(body, "slug"),
-        now,
-      );
-      return {
-        status: result ? 200 : 404,
-        body: result ?? { error: "Not found" },
-      };
-    }
-    case "publicCollection": {
+  const admin = (operation: () => Promise<QuickShareResult>) => async () => {
+    if (!isAdmin(owner, env))
+      return { status: 403, body: { error: "Forbidden" } };
+    return operation();
+  };
+  const operations: Record<string, () => Promise<QuickShareResult>> = {
+    policy: async () => ({
+      status: 200,
+      body: policy(owner ? "signedIn" : "anonymous"),
+    }),
+    create: async () => ({
+      status: 201,
+      body: await createUpload(db, body, owner, now),
+    }),
+    getUpload: async () =>
+      notFoundResult(await getUploadWithAccess(db, body, owner)),
+    recordPart: async () => ({
+      status: 200,
+      body: await recordPart(db, body, now),
+    }),
+    complete: async () => ({
+      status: 200,
+      body: await complete(db, body, now),
+    }),
+    finishImport: async () => ({
+      status: 200,
+      body: await finishImport(db, body, now),
+    }),
+    failImport: async () => ({
+      status: 200,
+      body: await failImport(db, body, now),
+    }),
+    public: async () =>
+      notFoundResult(
+        await publicUploadBySlug(db, requiredString(body, "slug"), now),
+      ),
+    publicCollection: async () => {
       const result = await publicCollection(
         db,
         requiredString(body, "slug"),
         now,
       );
-      return {
-        status: result.length ? 200 : 404,
-        body: result.length ? result : { error: "Not found" },
-      };
-    }
-    case "accountList": {
+      return result.length
+        ? { status: 200, body: result }
+        : { status: 404, body: { error: "Not found" } };
+    },
+    accountList: async () => {
       if (!owner) return { status: 401, body: { error: "Unauthorized" } };
       return {
         status: 200,
@@ -1084,48 +1125,59 @@ export async function handleQuickShareOperation(
           listUploadsByOwner(tx, owner, new Date(now)),
         ).then((rows) => rows.map(publicUpload)),
       };
-    }
-    case "extend": {
+    },
+    extend: async () => {
       const result = await extend(db, body, owner, now);
       return result && typeof result === "object" && "status" in result
         ? result
         : { status: 200, body: result };
-    }
-    case "claimJob":
-      return { status: 200, body: await claimJob(db, body, now) };
-    case "finishProcess":
-      return { status: 200, body: await finishProcess(db, body, now) };
-    case "finishDelete":
-      return { status: 200, body: await finishDelete(db, body) };
-    case "adminList":
-      if (!isAdmin(owner, env))
-        return { status: 403, body: { error: "Forbidden" } };
-      return { status: 200, body: await adminList(db, body, now) };
-    case "adminGet":
-      if (!isAdmin(owner, env))
-        return { status: 403, body: { error: "Forbidden" } };
-      {
-        const result = await adminGet(db, body);
-        return {
-          status: result ? 200 : 404,
-          body: result ?? { error: "Not found" },
-        };
-      }
-    case "adminBan":
+    },
+    claimJob: async () => ({
+      status: 200,
+      body: await claimJob(db, body, now),
+    }),
+    finishProcess: async () => ({
+      status: 200,
+      body: await finishProcess(db, body, now),
+    }),
+    finishDelete: async () => ({
+      status: 200,
+      body: await finishDelete(db, body),
+    }),
+    adminList: admin(async () => ({
+      status: 200,
+      body: await adminList(db, body, now),
+    })),
+    adminGet: admin(async () => notFoundResult(await adminGet(db, body))),
+    adminBan: async () => {
       if (!isAdmin(owner, env) || !owner)
         return { status: 403, body: { error: "Forbidden" } };
       return { status: 200, body: await banIp(db, body, owner, now) };
-    case "adminUnban":
-      if (!isAdmin(owner, env))
-        return { status: 403, body: { error: "Forbidden" } };
-      return { status: 200, body: await unbanIp(db, body, now) };
-    case "adminRemove":
-      if (!isAdmin(owner, env))
-        return { status: 403, body: { error: "Forbidden" } };
-      return { status: 200, body: await removeUpload(db, body, now) };
-    default:
-      return { status: 400, body: { error: "Unknown operation" } };
-  }
+    },
+    adminUnban: admin(async () => ({
+      status: 200,
+      body: await unbanIp(db, body, now),
+    })),
+    adminRemove: admin(async () => ({
+      status: 200,
+      body: await removeUpload(db, body, now),
+    })),
+  };
+  const operation = Object.hasOwn(operations, op) ? operations[op] : undefined;
+  return (
+    operation?.() ?? {
+      status: 400,
+      body: { error: "Unknown operation" },
+    }
+  );
+}
+
+function notFoundBody(result: unknown) {
+  return result ?? { error: "Not found" };
+}
+
+function notFoundResult(result: unknown): QuickShareResult {
+  return { status: result ? 200 : 404, body: notFoundBody(result) };
 }
 
 export function quickShareErrorStatus(message: string) {

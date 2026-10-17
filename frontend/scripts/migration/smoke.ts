@@ -82,21 +82,17 @@ async function request(
   }
 }
 
-export async function runSmokeChecks(
-  baseUrl: string,
-  fixtures: SmokeFixture,
-  options: {
-    expectMaintenance?: boolean;
-    auth?: Headers;
-    fetcher?: Fetcher;
-  } = {},
-): Promise<SmokeReport> {
-  const fetcher = options.fetcher ?? fetch;
-  const checks: SmokeReport["checks"] = [];
-  const check = (name: string, ok: boolean, detail?: string) =>
-    checks.push({ name, ok, ...(detail ? { detail } : {}) });
-  const auth = options.auth ?? new Headers();
+type AddCheck = (name: string, ok: boolean, detail?: string) => void;
 
+function errorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : "request failed";
+}
+
+async function checkDatabaseHealth(
+  fetcher: Fetcher,
+  baseUrl: string,
+  check: AddCheck,
+): Promise<void> {
   try {
     const response = await request(fetcher, baseUrl, "/api/health/database");
     check(
@@ -105,14 +101,17 @@ export async function runSmokeChecks(
       `HTTP ${response.status}`,
     );
   } catch (error) {
-    check(
-      "database health",
-      false,
-      error instanceof Error ? error.message : "request failed",
-    );
+    check("database health", false, errorDetail(error));
   }
+}
 
-  for (const read of fixtures.reads) {
+async function checkReads(
+  fetcher: Fetcher,
+  baseUrl: string,
+  reads: SmokeFixture["reads"],
+  check: AddCheck,
+): Promise<void> {
+  for (const read of reads) {
     try {
       const response = await request(fetcher, baseUrl, read.path);
       const expected = read.status ?? 200;
@@ -122,19 +121,22 @@ export async function runSmokeChecks(
         `HTTP ${response.status}, expected ${expected}`,
       );
     } catch (error) {
-      check(
-        `read ${read.path}`,
-        false,
-        error instanceof Error ? error.message : "request failed",
-      );
+      check(`read ${read.path}`, false, errorDetail(error));
     }
   }
+}
 
+async function checkFileEtag(
+  fetcher: Fetcher,
+  baseUrl: string,
+  fileId: string,
+  check: AddCheck,
+): Promise<void> {
   try {
     const response = await request(
       fetcher,
       baseUrl,
-      `/api/files/${encodeURIComponent(fixtures.fileId)}`,
+      `/api/files/${encodeURIComponent(fileId)}`,
     );
     const contentType =
       response.headers.get("content-type")?.split(";", 1)[0] ?? "";
@@ -146,41 +148,59 @@ export async function runSmokeChecks(
       `HTTP ${response.status}`,
     );
   } catch (error) {
-    check(
-      "file ETag",
-      false,
-      error instanceof Error ? error.message : "request failed",
-    );
+    check("file ETag", false, errorDetail(error));
   }
+}
 
+async function readLiveSnapshot(
+  fetcher: Fetcher,
+  baseUrl: string,
+  livePath: string,
+  auth: Headers,
+): Promise<{ response: Response; first: string }> {
+  const response = await request(fetcher, baseUrl, livePath, {
+    headers: {
+      Accept: "text/event-stream",
+      ...Object.fromEntries(auth.entries()),
+    },
+  });
+  const reader = response.body?.getReader();
+  let first = "";
+  if (!reader) return { response, first };
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    const response = await request(fetcher, baseUrl, fixtures.livePath, {
-      headers: {
-        Accept: "text/event-stream",
-        ...Object.fromEntries(auth.entries()),
-      },
-    });
-    const reader = response.body?.getReader();
-    let first = "";
-    if (reader) {
-      let timeout: ReturnType<typeof setTimeout> | undefined;
-      try {
-        const result = await Promise.race([
-          reader.read(),
-          new Promise<never>(
-            (_, reject) =>
-              (timeout = setTimeout(
-                () => reject(new Error("SSE snapshot timeout")),
-                REQUEST_TIMEOUT_MS,
-              )),
-          ),
-        ]);
-        first = new TextDecoder().decode(result.value);
-      } finally {
-        if (timeout) clearTimeout(timeout);
-        await reader.cancel();
-      }
-    }
+    const result = await Promise.race([
+      reader.read(),
+      new Promise<never>(
+        (_, reject) =>
+          (timeout = setTimeout(
+            () => reject(new Error("SSE snapshot timeout")),
+            REQUEST_TIMEOUT_MS,
+          )),
+      ),
+    ]);
+    first = new TextDecoder().decode(result.value);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+    await reader.cancel();
+  }
+  return { response, first };
+}
+
+async function checkLiveSnapshot(
+  fetcher: Fetcher,
+  baseUrl: string,
+  livePath: string,
+  auth: Headers,
+  check: AddCheck,
+): Promise<void> {
+  try {
+    const { response, first } = await readLiveSnapshot(
+      fetcher,
+      baseUrl,
+      livePath,
+      auth,
+    );
     check(
       "live snapshot",
       response.status === 200 &&
@@ -191,21 +211,23 @@ export async function runSmokeChecks(
       `HTTP ${response.status}`,
     );
   } catch (error) {
-    check(
-      "live snapshot",
-      false,
-      error instanceof Error ? error.message : "request failed",
-    );
+    check("live snapshot", false, errorDetail(error));
   }
+}
 
+async function checkJobs(
+  fetcher: Fetcher,
+  baseUrl: string,
+  jobsPath: string | undefined,
+  auth: Headers,
+  check: AddCheck,
+): Promise<void> {
   try {
     const response = await request(
       fetcher,
       baseUrl,
-      fixtures.jobsPath ?? "/api/internal/jobs/status",
-      {
-        headers: Object.fromEntries(auth.entries()),
-      },
+      jobsPath ?? "/api/internal/jobs/status",
+      { headers: Object.fromEntries(auth.entries()) },
     );
     const body: unknown = await response.json();
     const deadJobs =
@@ -220,53 +242,74 @@ export async function runSmokeChecks(
       `HTTP ${response.status}`,
     );
   } catch (error) {
-    check(
-      "jobs have no dead rows",
-      false,
-      error instanceof Error ? error.message : "request failed",
-    );
+    check("jobs have no dead rows", false, errorDetail(error));
   }
+}
 
-  if (options.expectMaintenance) {
-    if (!fixtures.writePath) {
-      check(
-        "maintenance write",
-        false,
-        "fixtures.writePath is required with --expect-maintenance",
-      );
-    } else {
-      try {
-        const response = await request(fetcher, baseUrl, fixtures.writePath, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            ...Object.fromEntries(auth.entries()),
-          },
-          body: JSON.stringify(fixtures.writeBody ?? {}),
-        });
-        const body: unknown = await response.json().catch(() => null);
-        const maintenanceBody =
-          typeof body === "object" &&
-          body !== null &&
-          (body as { error?: unknown }).error ===
-            "Service is in maintenance mode" &&
-          (body as { code?: unknown }).code === "unavailable";
-        check(
-          "maintenance write",
-          response.status === 503 &&
-            response.headers.get("retry-after") === "60" &&
-            maintenanceBody,
-          `HTTP ${response.status}`,
-        );
-      } catch (error) {
-        check(
-          "maintenance write",
-          false,
-          error instanceof Error ? error.message : "request failed",
-        );
-      }
-    }
+async function checkMaintenance(
+  fetcher: Fetcher,
+  baseUrl: string,
+  fixtures: SmokeFixture,
+  auth: Headers,
+  check: AddCheck,
+): Promise<void> {
+  if (!fixtures.writePath) {
+    check(
+      "maintenance write",
+      false,
+      "fixtures.writePath is required with --expect-maintenance",
+    );
+    return;
   }
+  try {
+    const response = await request(fetcher, baseUrl, fixtures.writePath, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...Object.fromEntries(auth.entries()),
+      },
+      body: JSON.stringify(fixtures.writeBody ?? {}),
+    });
+    const body: unknown = await response.json().catch(() => null);
+    const maintenanceBody =
+      typeof body === "object" &&
+      body !== null &&
+      (body as { error?: unknown }).error ===
+        "Service is in maintenance mode" &&
+      (body as { code?: unknown }).code === "unavailable";
+    check(
+      "maintenance write",
+      response.status === 503 &&
+        response.headers.get("retry-after") === "60" &&
+        maintenanceBody,
+      `HTTP ${response.status}`,
+    );
+  } catch (error) {
+    check("maintenance write", false, errorDetail(error));
+  }
+}
+
+export async function runSmokeChecks(
+  baseUrl: string,
+  fixtures: SmokeFixture,
+  options: {
+    expectMaintenance?: boolean;
+    auth?: Headers;
+    fetcher?: Fetcher;
+  } = {},
+): Promise<SmokeReport> {
+  const fetcher = options.fetcher ?? fetch;
+  const checks: SmokeReport["checks"] = [];
+  const check = (name: string, ok: boolean, detail?: string) =>
+    checks.push({ name, ok, ...(detail ? { detail } : {}) });
+  const auth = options.auth ?? new Headers();
+  await checkDatabaseHealth(fetcher, baseUrl, check);
+  await checkReads(fetcher, baseUrl, fixtures.reads, check);
+  await checkFileEtag(fetcher, baseUrl, fixtures.fileId, check);
+  await checkLiveSnapshot(fetcher, baseUrl, fixtures.livePath, auth, check);
+  await checkJobs(fetcher, baseUrl, fixtures.jobsPath, auth, check);
+  if (options.expectMaintenance)
+    await checkMaintenance(fetcher, baseUrl, fixtures, auth, check);
 
   return { ok: checks.every((item) => item.ok), checks };
 }

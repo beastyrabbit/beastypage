@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   type ChangeEvent,
+  type MutableRefObject,
   useCallback,
   useEffect,
   useMemo,
@@ -158,6 +159,661 @@ function resolveHistoryStarter(
   };
 }
 
+async function loadEvolutionModules(
+  generatorRef: MutableRefObject<CatGeneratorApi | null>,
+  mapperRef: MutableRefObject<SpriteMapperApi | null>,
+  isCancelled: () => boolean,
+) {
+  if (generatorRef.current && mapperRef.current) return;
+  const [{ default: catGenerator }, { default: spriteMapper }] =
+    await Promise.all([
+      import("@/lib/single-cat/catGeneratorV3"),
+      import("@/lib/single-cat/spriteMapper"),
+    ]);
+  if (isCancelled()) return;
+  generatorRef.current = catGenerator as CatGeneratorApi;
+  mapperRef.current = spriteMapper as unknown as SpriteMapperApi;
+  if (!mapperRef.current.loaded) await mapperRef.current.init();
+}
+
+function useEvolutionModules(
+  generatorRef: MutableRefObject<CatGeneratorApi | null>,
+  mapperRef: MutableRefObject<SpriteMapperApi | null>,
+  setModulesReady: (ready: boolean) => void,
+  setError: (error: string | null) => void,
+) {
+  useEffect(() => {
+    let cancelled = false;
+    void loadEvolutionModules(generatorRef, mapperRef, () => cancelled)
+      .then(() => {
+        if (!cancelled) setModulesReady(true);
+      })
+      .catch((loadError) => {
+        console.error("Failed to load evolution generator modules", loadError);
+        if (!cancelled) setError("Unable to load the cat renderer.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [generatorRef, mapperRef, setModulesReady, setError]);
+}
+
+async function renderHistoryStarterPreview(
+  historyRecord: MapperRecord,
+  hairSprite: EvolutionStarterHair,
+  generatorRef: MutableRefObject<CatGeneratorApi | null>,
+) {
+  const starterHair = resolveEvolutionStarterHair(hairSprite);
+  const payload = applyEvolutionStarterHairToPayload(
+    historyRecord.cat_data,
+    starterHair,
+  ) as Record<string, unknown>;
+  const params = (payload.params ?? payload) as CatParams;
+  const rendered = await generatorRef.current?.generateCat(params);
+  if (!rendered) return null;
+  return (
+    rendered.imageDataUrl ??
+    imageDataFromCanvas(rendered.canvas as HTMLCanvasElement | OffscreenCanvas)
+  );
+}
+
+function useHistoryStarterPreview(
+  starterMode: StarterMode,
+  historyRecord: MapperRecord | null | undefined,
+  modulesReady: boolean,
+  hairSprite: EvolutionStarterHair,
+  generatorRef: MutableRefObject<CatGeneratorApi | null>,
+  setStarterPreview: (preview: string | null) => void,
+) {
+  useEffect(() => {
+    setStarterPreview(null);
+    if (starterMode !== "history" || !historyRecord?.cat_data || !modulesReady)
+      return;
+    let cancelled = false;
+    void renderHistoryStarterPreview(historyRecord, hairSprite, generatorRef)
+      .then((preview) => {
+        if (!cancelled) setStarterPreview(preview);
+      })
+      .catch((previewError) => {
+        console.warn("Failed to render starter preview", previewError);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    starterMode,
+    historyRecord,
+    hairSprite,
+    modulesReady,
+    generatorRef,
+    setStarterPreview,
+  ]);
+}
+
+async function ensureEvolutionModules(
+  generatorRef: MutableRefObject<CatGeneratorApi | null>,
+  mapperRef: MutableRefObject<SpriteMapperApi | null>,
+) {
+  const generator = generatorRef.current;
+  const mapper = mapperRef.current;
+  if (!generator || !mapper)
+    throw new Error("Generator modules are still loading");
+  if (!mapper.loaded) await mapper.init();
+  return { generator, mapper };
+}
+
+async function resolveGenerationStarter(
+  starterMode: StarterMode,
+  historyRecord: MapperRecord | null | undefined,
+  trimmedHistorySlug: string,
+  hairChoice: EvolutionStarterHair,
+  starterHair: Parameters<typeof applyEvolutionStarterHairToPayload>[1],
+) {
+  if (starterMode === "history")
+    return resolveHistoryStarter(
+      historyRecord,
+      trimmedHistorySlug,
+      starterHair,
+    );
+  return {
+    payload: await buildRandomEvolutionStarter(hairChoice),
+    source: { type: "random" as const },
+  };
+}
+
+async function renderEvolutionRecords(
+  orderedCats: EvolutionGeneratedCat[],
+  token: number,
+  generationTokenRef: MutableRefObject<number>,
+  renderRecord: (cat: EvolutionGeneratedCat) => Promise<UiEvolutionCat>,
+  setRecords: (records: UiEvolutionCat[]) => void,
+) {
+  const renderedRecords: UiEvolutionCat[] = [];
+  for (const cat of orderedCats) {
+    if (generationTokenRef.current !== token) return null;
+    renderedRecords.push(await renderRecord(cat));
+    setRecords([...renderedRecords]);
+  }
+  return renderedRecords;
+}
+
+function getSaveStatusNode(
+  saveState: SaveState,
+  lastSavedToken: string | null,
+  error: string | null,
+) {
+  if (saveState === "saving") {
+    return (
+      <span className="inline-flex items-center gap-2 text-sm text-amber-200">
+        <Loader2 className="size-4 animate-spin" /> Saving evolution batch…
+      </span>
+    );
+  }
+  if (saveState === "saved") {
+    return (
+      <span className="inline-flex items-center gap-2 text-sm text-emerald-200">
+        <FilledCheckedIcon size={16} />
+        Saved to history
+        {lastSavedToken ? (
+          <Link
+            href={`/evolution/${lastSavedToken}`}
+            className="inline-flex items-center gap-1 underline"
+          >
+            open <ArrowUpRight className="size-3" />
+          </Link>
+        ) : null}
+      </span>
+    );
+  }
+  if (saveState === "error" && error) {
+    return (
+      <span className="inline-flex items-center gap-2 text-sm text-red-200">
+        <TriangleAlertIcon size={16} /> {error}
+      </span>
+    );
+  }
+  return null;
+}
+
+function CeremonyPhase({
+  ceremonyKey,
+  records,
+  expectedCount,
+  onFinish,
+  ceremonyPools,
+  spinSeconds,
+  requestTeaserFrame,
+  saveState,
+  lastSavedToken,
+  error,
+}: Readonly<{
+  ceremonyKey: number;
+  records: UiEvolutionCat[];
+  expectedCount: number;
+  onFinish: () => void;
+  ceremonyPools: EvolutionPools | null;
+  spinSeconds: (typeof SPIN_TIMES)[number];
+  requestTeaserFrame: (index: number) => Promise<string | null>;
+  saveState: SaveState;
+  lastSavedToken: string | null;
+  error: string | null;
+}>) {
+  const saveStatusNode = getSaveStatusNode(saveState, lastSavedToken, error);
+  return (
+    <div className="flex flex-col gap-3">
+      <EvolutionCeremony
+        key={ceremonyKey}
+        cats={records}
+        totalCount={expectedCount}
+        onFinish={onFinish}
+        pools={ceremonyPools}
+        chargeDurationMs={spinSeconds * 1000}
+        requestTeaserFrame={requestTeaserFrame}
+      />
+      {saveStatusNode ? (
+        <div className="flex justify-center">{saveStatusNode}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function TreePhase({
+  treeCats,
+  savedMetadata,
+  saveState,
+  lastSavedToken,
+  error,
+  metadataSaving,
+  metadataMessage,
+  metadataError,
+  lastSavedId,
+  records,
+  handleMetadataSave,
+  handleCatNameSave,
+  handleAutoname,
+  autonaming,
+  onReplay,
+  onReset,
+  isGenerating,
+}: Readonly<{
+  treeCats: EvolutionTreeCat[];
+  savedMetadata: AdoptionMetadata;
+  saveState: SaveState;
+  lastSavedToken: string | null;
+  error: string | null;
+  metadataSaving: boolean;
+  metadataMessage: string | null;
+  metadataError: string | null;
+  lastSavedId: string | null;
+  records: UiEvolutionCat[];
+  handleMetadataSave: (nextMetadata: AdoptionMetadata) => Promise<void>;
+  handleCatNameSave: (record: UiEvolutionCat, catName: string) => Promise<void>;
+  handleAutoname: () => Promise<void>;
+  autonaming: boolean;
+  onReplay: () => void;
+  onReset: () => void;
+  isGenerating: boolean;
+}>) {
+  const saveStatusNode = getSaveStatusNode(saveState, lastSavedToken, error);
+  return (
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col items-center gap-3 text-center">
+        <span className={cn(pixelFontClass, "text-xs text-amber-200")}>
+          ✨ ALL CEREMONIES HELD ✨
+        </span>
+        <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
+          The {savedMetadata.title || "Evolution"} lineage
+        </h1>
+        {saveStatusNode}
+      </header>
+
+      <EvolutionTree cats={treeCats} animateIn />
+
+      <section className="flex flex-col gap-3">
+        <AdoptionMetadataPanel
+          savedValue={savedMetadata}
+          onSave={handleMetadataSave}
+          busy={metadataSaving}
+          message={metadataMessage}
+          error={metadataError}
+          canSave={!!lastSavedId}
+        />
+        {lastSavedId ? (
+          <CatNameEditor
+            records={records}
+            onSave={handleCatNameSave}
+            onAutoname={handleAutoname}
+            autonaming={autonaming}
+          />
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {lastSavedToken ? (
+            <Link
+              href={`/evolution/${lastSavedToken}`}
+              className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
+            >
+              <ArrowUpRight className="size-4" /> Open share page
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            onClick={onReplay}
+            disabled={isGenerating}
+            className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background disabled:opacity-60"
+          >
+            ▶ Replay ceremony
+          </button>
+          <button
+            type="button"
+            onClick={onReset}
+            className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
+          >
+            <RotateCcw className="size-4" /> Evolve another
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function AltarPanel({
+  starterMode,
+  setStarterMode,
+  starterPreview,
+  historySlug,
+  setHistorySlug,
+  trimmedHistorySlug,
+  historyRecord,
+  hairSprite,
+  setHairSprite,
+}: Readonly<{
+  starterMode: StarterMode;
+  setStarterMode: (mode: StarterMode) => void;
+  starterPreview: string | null;
+  historySlug: string;
+  setHistorySlug: (slug: string) => void;
+  trimmedHistorySlug: string;
+  historyRecord: MapperRecord | null | undefined;
+  hairSprite: EvolutionStarterHair;
+  setHairSprite: (hair: EvolutionStarterHair) => void;
+}>) {
+  return (
+    <section className="flex flex-col gap-5 rounded-3xl border border-border/40 bg-slate-950/70 p-5">
+      <span className={cn(pixelFontClass, "text-[10px] text-amber-200/90")}>
+        THE ALTAR
+      </span>
+      <div className="relative mx-auto flex size-48 items-center justify-center">
+        <div
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: `radial-gradient(circle, ${withAlpha("#fbbf24", 0.14)}, transparent 70%)`,
+          }}
+          aria-hidden
+        />
+        <div className="absolute inset-2 animate-pulse-soft rounded-full border border-amber-300/25" />
+        <StarterPreview mode={starterMode} preview={starterPreview} />
+      </div>
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+          Starter
+        </legend>
+        <div className="grid grid-cols-2 gap-2">
+          {(["random", "history"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setStarterMode(mode)}
+              aria-pressed={starterMode === mode}
+              className={cn(
+                "rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                starterMode === mode
+                  ? "border-amber-300/60 bg-amber-400/15 text-foreground"
+                  : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {mode === "random" ? "Mystery egg" : "Saved cat"}
+            </button>
+          ))}
+        </div>
+        {starterMode === "history" ? (
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <span>Slug</span>
+            <input
+              type="text"
+              value={historySlug}
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                setHistorySlug(event.target.value)
+              }
+              placeholder="Saved cat slug"
+              className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
+            />
+            {trimmedHistorySlug && historyRecord === undefined ? (
+              <span className="text-[11px] text-amber-200">Loading cat…</span>
+            ) : null}
+            {trimmedHistorySlug && historyRecord === null ? (
+              <span className="text-[11px] text-red-300">
+                No cat found for that slug
+              </span>
+            ) : null}
+          </label>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">
+            A clean random cat is summoned when the ritual begins.
+          </p>
+        )}
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+          Starting coat
+        </legend>
+        <div className="grid grid-cols-3 gap-2">
+          {HAIR_SPRITES.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setHairSprite(option.id)}
+              aria-pressed={hairSprite === option.id}
+              className={cn(
+                "rounded-lg border px-2 py-2 text-xs font-semibold transition sm:text-sm",
+                hairSprite === option.id
+                  ? "border-amber-300/60 bg-amber-400/15 text-foreground"
+                  : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Shorthair lines can grow out a long coat mid-line — and it stays.
+        </p>
+      </fieldset>
+    </section>
+  );
+}
+
+function RitualPanel({
+  selectedClans,
+  setSelectedClans,
+  controls,
+  setControls,
+  spinSeconds,
+  setSpinSeconds,
+  handleGenerate,
+  canGenerate,
+  modulesReady,
+  error,
+  isGenerating,
+}: Readonly<{
+  selectedClans: EvolutionArchetype[];
+  setSelectedClans: React.Dispatch<React.SetStateAction<EvolutionArchetype[]>>;
+  controls: EvolutionControls;
+  setControls: React.Dispatch<React.SetStateAction<EvolutionControls>>;
+  spinSeconds: (typeof SPIN_TIMES)[number];
+  setSpinSeconds: (seconds: (typeof SPIN_TIMES)[number]) => void;
+  handleGenerate: () => void;
+  canGenerate: boolean;
+  modulesReady: boolean;
+  error: string | null;
+  isGenerating: boolean;
+}>) {
+  return (
+    <section className="flex flex-col gap-5 rounded-3xl border border-border/40 bg-slate-950/70 p-5">
+      <span className={cn(pixelFontClass, "text-[10px] text-violet-300/90")}>
+        THE RITUAL
+      </span>
+
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+          Clans to roll · {selectedClans.length} selected
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {CLAN_ORDER.map((archetype) => (
+            <ClanButton
+              key={archetype}
+              archetype={archetype}
+              selected={selectedClans.includes(archetype)}
+              onToggle={() =>
+                setSelectedClans((current) => toggleClan(current, archetype))
+              }
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+            Final rank
+          </span>
+          <div className="grid grid-cols-3 gap-2">
+            {TARGET_LEVELS.map((level) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() =>
+                  setControls((current) =>
+                    normalizeEvolutionControls({
+                      ...current,
+                      targetLevel: level,
+                    }),
+                  )
+                }
+                aria-pressed={controls.targetLevel === level}
+                className={cn(
+                  "rounded-lg border px-2 py-2.5 text-xs font-semibold transition",
+                  controls.targetLevel === level
+                    ? "border-violet-300/60 bg-violet-500/15 text-foreground"
+                    : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {stageRank(level)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
+            Spin time
+          </span>
+          <div className="grid grid-cols-5 gap-1">
+            {SPIN_TIMES.map((seconds) => (
+              <button
+                key={seconds}
+                type="button"
+                onClick={() => setSpinSeconds(seconds)}
+                aria-pressed={spinSeconds === seconds}
+                className={cn(
+                  "rounded-lg border px-1 py-2.5 text-xs font-semibold transition",
+                  spinSeconds === seconds
+                    ? "border-violet-300/60 bg-violet-500/15 text-foreground"
+                    : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {seconds}s
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <RangeControl
+          label="Torties / stage"
+          range={controls.torties}
+          steps={TORTIE_STEPS}
+          onChange={(range) =>
+            setControls((current) =>
+              normalizeEvolutionControls({ ...current, torties: range }),
+            )
+          }
+        />
+        <RangeControl
+          label="Accessories / stage"
+          range={controls.accessories}
+          onChange={(range) =>
+            setControls((current) =>
+              normalizeEvolutionControls({
+                ...current,
+                accessories: range,
+              }),
+            )
+          }
+        />
+        <RangeControl
+          label="Scars / stage"
+          range={controls.scars}
+          onChange={(range) =>
+            setControls((current) =>
+              normalizeEvolutionControls({ ...current, scars: range }),
+            )
+          }
+          disabled={!controls.scarsEnabled}
+          trailing={
+            <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={controls.scarsEnabled}
+                onChange={(event) =>
+                  setControls((current) => ({
+                    ...current,
+                    scarsEnabled: event.target.checked,
+                  }))
+                }
+                className="size-3.5 accent-primary"
+              />
+              <span>enabled</span>
+            </label>
+          }
+        />
+      </div>
+
+      <div className="mt-auto flex flex-col gap-3 border-t border-border/30 pt-4">
+        <p className="text-xs text-muted-foreground">
+          {selectedClans.length} {selectedClans.length === 1 ? "clan" : "clans"}{" "}
+          · {selectedClans.length * controls.targetLevel + 1} cats · ranks up to{" "}
+          {stageRank(controls.targetLevel)} · ceremony ≈{" "}
+          {formatDuration(
+            estimateCeremonySeconds(
+              selectedClans.length,
+              controls.targetLevel,
+              spinSeconds,
+            ),
+          )}{" "}
+          at 1×
+        </p>
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={!canGenerate}
+          className={cn(
+            pixelFontClass,
+            "group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl border border-amber-300/50 bg-gradient-to-r from-amber-500/25 via-orange-500/25 to-rose-500/25 px-6 py-4 text-xs text-amber-100 transition hover:border-amber-200 hover:from-amber-500/40 hover:via-orange-500/40 hover:to-rose-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm",
+          )}
+        >
+          {isGenerating ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <span aria-hidden>⚡</span>
+          )}
+          BEGIN EVOLUTION
+        </button>
+        {!modulesReady && !error ? (
+          <span className="text-center text-[11px] text-muted-foreground">
+            Warming up the chamber…
+          </span>
+        ) : null}
+        {error ? (
+          <span className="inline-flex items-center justify-center gap-2 text-sm text-red-200">
+            <TriangleAlertIcon size={16} /> {error}
+          </span>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function SetupPhase({
+  altar,
+  ritual,
+}: Readonly<{
+  altar: React.ReactNode;
+  ritual: React.ReactNode;
+}>) {
+  return (
+    <div className="flex flex-col gap-6">
+      <ChamberHero />
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        {altar}
+        {ritual}
+      </div>
+    </div>
+  );
+}
+
 export function EvolutionGeneratorClient() {
   const createBatch = useAdoptionCreate();
   const createMapper = useCatCreate();
@@ -218,72 +874,17 @@ export function EvolutionGeneratorClient() {
     metadataRef.current = savedMetadata;
   }, [savedMetadata]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        if (generatorRef.current && mapperRef.current) return;
-        const [{ default: catGenerator }, { default: spriteMapper }] =
-          await Promise.all([
-            import("@/lib/single-cat/catGeneratorV3"),
-            import("@/lib/single-cat/spriteMapper"),
-          ]);
-        if (cancelled) return;
-        generatorRef.current = catGenerator as CatGeneratorApi;
-        mapperRef.current = spriteMapper as unknown as SpriteMapperApi;
-        if (!mapperRef.current.loaded) {
-          await mapperRef.current.init();
-        }
-        if (!cancelled) setModulesReady(true);
-      } catch (loadError) {
-        console.error("Failed to load evolution generator modules", loadError);
-        if (!cancelled) {
-          setError("Unable to load the cat renderer.");
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  useEvolutionModules(generatorRef, mapperRef, setModulesReady, setError);
 
   // Live altar preview for a history starter (respects the hair choice).
-  useEffect(() => {
-    setStarterPreview(null);
-    if (
-      starterMode !== "history" ||
-      !historyRecord?.cat_data ||
-      !modulesReady
-    ) {
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const starterHair = resolveEvolutionStarterHair(hairSprite);
-        const payload = applyEvolutionStarterHairToPayload(
-          historyRecord.cat_data,
-          starterHair,
-        ) as Record<string, unknown>;
-        const params = (payload.params ?? payload) as CatParams;
-        const rendered = await generatorRef.current?.generateCat(params);
-        if (cancelled || !rendered) return;
-        setStarterPreview(
-          rendered.imageDataUrl ??
-            imageDataFromCanvas(
-              rendered.canvas as HTMLCanvasElement | OffscreenCanvas,
-            ),
-        );
-      } catch (previewError) {
-        console.warn("Failed to render starter preview", previewError);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [starterMode, historyRecord, hairSprite, modulesReady]);
+  useHistoryStarterPreview(
+    starterMode,
+    historyRecord,
+    modulesReady,
+    hairSprite,
+    generatorRef,
+    setStarterPreview,
+  );
 
   const renderRecord = useCallback(async (cat: EvolutionGeneratedCat) => {
     const generator = generatorRef.current;
@@ -392,31 +993,18 @@ export function EvolutionGeneratorClient() {
     setIsGenerating(true);
 
     try {
-      if (!generatorRef.current || !mapperRef.current) {
-        throw new Error("Generator modules are still loading");
-      }
-      if (!mapperRef.current.loaded) {
-        await mapperRef.current.init();
-      }
-
-      let starterPayload: unknown;
-      let starterSource: Parameters<typeof buildEvolutionBatchSettings>[1];
+      const { mapper } = await ensureEvolutionModules(generatorRef, mapperRef);
       const starterHair = resolveEvolutionStarterHair(hairSprite);
-
-      if (starterMode === "history") {
-        const historyStarter = resolveHistoryStarter(
+      const { payload: starterPayload, source: starterSource } =
+        await resolveGenerationStarter(
+          starterMode,
           historyRecord,
           trimmedHistorySlug,
+          hairSprite,
           starterHair,
         );
-        starterPayload = historyStarter.payload;
-        starterSource = historyStarter.source;
-      } else {
-        starterPayload = await buildRandomEvolutionStarter(hairSprite);
-        starterSource = { type: "random" };
-      }
 
-      const pools = buildEvolutionPools(mapperRef.current);
+      const pools = buildEvolutionPools(mapper);
       setCeremonyPools(pools);
       const result = generateEvolutionBatch(starterPayload, controls, pools, {
         archetypes: selectedClans,
@@ -425,16 +1013,14 @@ export function EvolutionGeneratorClient() {
         result.starter,
         ...result.cats.filter((cat) => cat.level !== 0),
       ];
-      const renderedRecords: UiEvolutionCat[] = [];
-
-      for (const cat of orderedCats) {
-        if (generationTokenRef.current !== token) return;
-        const rendered = await renderRecord(cat);
-        renderedRecords.push(rendered);
-        setRecords([...renderedRecords]);
-      }
-
-      if (generationTokenRef.current !== token) return;
+      const renderedRecords = await renderEvolutionRecords(
+        orderedCats,
+        token,
+        generationTokenRef,
+        renderRecord,
+        setRecords,
+      );
+      if (!renderedRecords || generationTokenRef.current !== token) return;
       await persistResult(result, starterSource);
     } catch (generationError) {
       console.error("Failed to generate evolution batch", generationError);
@@ -586,121 +1172,47 @@ export function EvolutionGeneratorClient() {
     [records],
   );
 
-  const saveStatusNode = (() => {
-    if (saveState === "saving") {
-      return (
-        <span className="inline-flex items-center gap-2 text-sm text-amber-200">
-          <Loader2 className="size-4 animate-spin" /> Saving evolution batch…
-        </span>
-      );
-    }
-    if (saveState === "saved") {
-      return (
-        <span className="inline-flex items-center gap-2 text-sm text-emerald-200">
-          <FilledCheckedIcon size={16} />
-          Saved to history
-          {lastSavedToken ? (
-            <Link
-              href={`/evolution/${lastSavedToken}`}
-              className="inline-flex items-center gap-1 underline"
-            >
-              open <ArrowUpRight className="size-3" />
-            </Link>
-          ) : null}
-        </span>
-      );
-    }
-    if (saveState === "error" && error) {
-      return (
-        <span className="inline-flex items-center gap-2 text-sm text-red-200">
-          <TriangleAlertIcon size={16} /> {error}
-        </span>
-      );
-    }
-    return null;
-  })();
-
   if (phase === "ceremony") {
     return (
-      <div className="flex flex-col gap-3">
-        <EvolutionCeremony
-          key={ceremonyKey}
-          cats={records}
-          totalCount={expectedCount}
-          onFinish={() => setPhase("tree")}
-          pools={ceremonyPools}
-          chargeDurationMs={spinSeconds * 1000}
-          requestTeaserFrame={requestTeaserFrame}
-        />
-        {saveStatusNode ? (
-          <div className="flex justify-center">{saveStatusNode}</div>
-        ) : null}
-      </div>
+      <CeremonyPhase
+        ceremonyKey={ceremonyKey}
+        records={records}
+        expectedCount={expectedCount}
+        onFinish={() => setPhase("tree")}
+        ceremonyPools={ceremonyPools}
+        spinSeconds={spinSeconds}
+        requestTeaserFrame={requestTeaserFrame}
+        saveState={saveState}
+        lastSavedToken={lastSavedToken}
+        error={error}
+      />
     );
   }
 
   if (phase === "tree") {
     return (
-      <div className="flex flex-col gap-6">
-        <header className="flex flex-col items-center gap-3 text-center">
-          <span className={cn(pixelFontClass, "text-xs text-amber-200")}>
-            ✨ ALL CEREMONIES HELD ✨
-          </span>
-          <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">
-            The {savedMetadata.title || "Evolution"} lineage
-          </h1>
-          {saveStatusNode}
-        </header>
-
-        <EvolutionTree cats={treeCats} animateIn />
-
-        <section className="flex flex-col gap-3">
-          <AdoptionMetadataPanel
-            savedValue={savedMetadata}
-            onSave={handleMetadataSave}
-            busy={metadataSaving}
-            message={metadataMessage}
-            error={metadataError}
-            canSave={!!lastSavedId}
-          />
-          {lastSavedId ? (
-            <CatNameEditor
-              records={records}
-              onSave={handleCatNameSave}
-              onAutoname={handleAutoname}
-              autonaming={autonaming}
-            />
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            {lastSavedToken ? (
-              <Link
-                href={`/evolution/${lastSavedToken}`}
-                className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-              >
-                <ArrowUpRight className="size-4" /> Open share page
-              </Link>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                setCeremonyKey((value) => value + 1);
-                setPhase("ceremony");
-              }}
-              disabled={isGenerating}
-              className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background disabled:opacity-60"
-            >
-              ▶ Replay ceremony
-            </button>
-            <button
-              type="button"
-              onClick={handleReset}
-              className="inline-flex items-center gap-2 rounded-xl border border-border/60 px-4 py-2 text-sm font-semibold text-muted-foreground transition hover:bg-foreground hover:text-background"
-            >
-              <RotateCcw className="size-4" /> Evolve another
-            </button>
-          </div>
-        </section>
-      </div>
+      <TreePhase
+        treeCats={treeCats}
+        savedMetadata={savedMetadata}
+        saveState={saveState}
+        lastSavedToken={lastSavedToken}
+        error={error}
+        metadataSaving={metadataSaving}
+        metadataMessage={metadataMessage}
+        metadataError={metadataError}
+        lastSavedId={lastSavedId}
+        records={records}
+        handleMetadataSave={handleMetadataSave}
+        handleCatNameSave={handleCatNameSave}
+        handleAutoname={handleAutoname}
+        autonaming={autonaming}
+        onReplay={() => {
+          setCeremonyKey((value) => value + 1);
+          setPhase("ceremony");
+        }}
+        onReset={handleReset}
+        isGenerating={isGenerating}
+      />
     );
   }
 
@@ -712,336 +1224,36 @@ export function EvolutionGeneratorClient() {
       Boolean(trimmedHistorySlug && historyRecord?.cat_data));
 
   return (
-    <div className="flex flex-col gap-6">
-      <ChamberHero />
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
-        {/* The altar */}
-        <section className="flex flex-col gap-5 rounded-3xl border border-border/40 bg-slate-950/70 p-5">
-          <span className={cn(pixelFontClass, "text-[10px] text-amber-200/90")}>
-            THE ALTAR
-          </span>
-          <div className="relative mx-auto flex size-48 items-center justify-center">
-            <div
-              className="absolute inset-0 rounded-full"
-              style={{
-                background: `radial-gradient(circle, ${withAlpha("#fbbf24", 0.14)}, transparent 70%)`,
-              }}
-              aria-hidden
-            />
-            <div className="absolute inset-2 animate-pulse-soft rounded-full border border-amber-300/25" />
-            {starterMode === "history" && starterPreview ? (
-              <Image
-                src={starterPreview}
-                alt="Starter cat preview"
-                width={320}
-                height={320}
-                unoptimized
-                className="image-render-pixel relative size-40 object-contain"
-              />
-            ) : (
-              <span
-                className={cn(
-                  pixelFontClass,
-                  "relative text-4xl text-amber-200/60",
-                )}
-                aria-hidden
-              >
-                ?
-              </span>
-            )}
-          </div>
-
-          <fieldset className="flex flex-col gap-2">
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-              Starter
-            </legend>
-            <div className="grid grid-cols-2 gap-2">
-              {(["random", "history"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setStarterMode(mode)}
-                  aria-pressed={starterMode === mode}
-                  className={cn(
-                    "rounded-lg border px-3 py-2 text-sm font-semibold transition",
-                    starterMode === mode
-                      ? "border-amber-300/60 bg-amber-400/15 text-foreground"
-                      : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {mode === "random" ? "Mystery egg" : "Saved cat"}
-                </button>
-              ))}
-            </div>
-            {starterMode === "history" ? (
-              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                <span>Slug</span>
-                <input
-                  type="text"
-                  value={historySlug}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                    setHistorySlug(event.target.value)
-                  }
-                  placeholder="Saved cat slug"
-                  className="rounded-lg border border-border/50 bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none"
-                />
-                {trimmedHistorySlug && historyRecord === undefined ? (
-                  <span className="text-[11px] text-amber-200">
-                    Loading cat…
-                  </span>
-                ) : null}
-                {trimmedHistorySlug && historyRecord === null ? (
-                  <span className="text-[11px] text-red-300">
-                    No cat found for that slug
-                  </span>
-                ) : null}
-              </label>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                A clean random cat is summoned when the ritual begins.
-              </p>
-            )}
-          </fieldset>
-
-          <fieldset className="flex flex-col gap-2">
-            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-              Starting coat
-            </legend>
-            <div className="grid grid-cols-3 gap-2">
-              {HAIR_SPRITES.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setHairSprite(option.id)}
-                  aria-pressed={hairSprite === option.id}
-                  className={cn(
-                    "rounded-lg border px-2 py-2 text-xs font-semibold transition sm:text-sm",
-                    hairSprite === option.id
-                      ? "border-amber-300/60 bg-amber-400/15 text-foreground"
-                      : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Shorthair lines can grow out a long coat mid-line — and it stays.
-            </p>
-          </fieldset>
-        </section>
-
-        {/* The ritual */}
-        <section className="flex flex-col gap-5 rounded-3xl border border-border/40 bg-slate-950/70 p-5">
-          <span
-            className={cn(pixelFontClass, "text-[10px] text-violet-300/90")}
-          >
-            THE RITUAL
-          </span>
-
-          <div className="flex flex-col gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-              Clans to roll · {selectedClans.length} selected
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {CLAN_ORDER.map((archetype) => {
-                const theme = ARCHETYPE_THEMES[archetype];
-                const selected = selectedClans.includes(archetype);
-                const wild = isWildArchetype(archetype);
-                return (
-                  <button
-                    key={archetype}
-                    type="button"
-                    onClick={() =>
-                      setSelectedClans((current) =>
-                        current.includes(archetype)
-                          ? current.filter((clan) => clan !== archetype)
-                          : CLAN_ORDER.filter(
-                              (clan) =>
-                                current.includes(clan) || clan === archetype,
-                            ),
-                      )
-                    }
-                    title={`${theme.label}Clan — ${theme.blurb}${wild ? " (wild: may roll any palette)" : ""}`}
-                    aria-label={`${theme.label}Clan${wild ? " (wild)" : ""}`}
-                    aria-pressed={selected}
-                    className={cn(
-                      "flex size-9 items-center justify-center rounded-lg border text-base transition",
-                      wild && "border-dashed",
-                      selected
-                        ? "scale-105"
-                        : "border-border/60 bg-background opacity-50 grayscale hover:opacity-100 hover:grayscale-0",
-                    )}
-                    style={
-                      selected
-                        ? {
-                            borderColor: withAlpha(theme.from, 0.7),
-                            background: withAlpha(theme.to, 0.18),
-                          }
-                        : undefined
-                    }
-                  >
-                    <span aria-hidden>{theme.glyph}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                Final rank
-              </span>
-              <div className="grid grid-cols-3 gap-2">
-                {TARGET_LEVELS.map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() =>
-                      setControls((current) =>
-                        normalizeEvolutionControls({
-                          ...current,
-                          targetLevel: level,
-                        }),
-                      )
-                    }
-                    aria-pressed={controls.targetLevel === level}
-                    className={cn(
-                      "rounded-lg border px-2 py-2.5 text-xs font-semibold transition",
-                      controls.targetLevel === level
-                        ? "border-violet-300/60 bg-violet-500/15 text-foreground"
-                        : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {stageRank(level)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">
-                Spin time
-              </span>
-              <div className="grid grid-cols-5 gap-1">
-                {SPIN_TIMES.map((seconds) => (
-                  <button
-                    key={seconds}
-                    type="button"
-                    onClick={() => setSpinSeconds(seconds)}
-                    aria-pressed={spinSeconds === seconds}
-                    className={cn(
-                      "rounded-lg border px-1 py-2.5 text-xs font-semibold transition",
-                      spinSeconds === seconds
-                        ? "border-violet-300/60 bg-violet-500/15 text-foreground"
-                        : "border-border/60 bg-background text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {seconds}s
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <RangeControl
-              label="Torties / stage"
-              range={controls.torties}
-              steps={TORTIE_STEPS}
-              onChange={(range) =>
-                setControls((current) =>
-                  normalizeEvolutionControls({ ...current, torties: range }),
-                )
-              }
-            />
-            <RangeControl
-              label="Accessories / stage"
-              range={controls.accessories}
-              onChange={(range) =>
-                setControls((current) =>
-                  normalizeEvolutionControls({
-                    ...current,
-                    accessories: range,
-                  }),
-                )
-              }
-            />
-            <RangeControl
-              label="Scars / stage"
-              range={controls.scars}
-              onChange={(range) =>
-                setControls((current) =>
-                  normalizeEvolutionControls({ ...current, scars: range }),
-                )
-              }
-              disabled={!controls.scarsEnabled}
-              trailing={
-                <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={controls.scarsEnabled}
-                    onChange={(event) =>
-                      setControls((current) => ({
-                        ...current,
-                        scarsEnabled: event.target.checked,
-                      }))
-                    }
-                    className="size-3.5 accent-primary"
-                  />
-                  <span>enabled</span>
-                </label>
-              }
-            />
-          </div>
-
-          <div className="mt-auto flex flex-col gap-3 border-t border-border/30 pt-4">
-            <p className="text-xs text-muted-foreground">
-              {selectedClans.length}{" "}
-              {selectedClans.length === 1 ? "clan" : "clans"} ·{" "}
-              {selectedClans.length * controls.targetLevel + 1} cats · ranks up
-              to {stageRank(controls.targetLevel)} · ceremony ≈{" "}
-              {formatDuration(
-                estimateCeremonySeconds(
-                  selectedClans.length,
-                  controls.targetLevel,
-                  spinSeconds,
-                ),
-              )}{" "}
-              at 1×
-            </p>
-            <button
-              type="button"
-              onClick={handleGenerate}
-              disabled={!canGenerate}
-              className={cn(
-                pixelFontClass,
-                "group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl border border-amber-300/50 bg-gradient-to-r from-amber-500/25 via-orange-500/25 to-rose-500/25 px-6 py-4 text-xs text-amber-100 transition hover:border-amber-200 hover:from-amber-500/40 hover:via-orange-500/40 hover:to-rose-500/40 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm",
-              )}
-            >
-              {isGenerating ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <span aria-hidden>⚡</span>
-              )}
-              BEGIN EVOLUTION
-            </button>
-            {!modulesReady && !error ? (
-              <span className="text-center text-[11px] text-muted-foreground">
-                Warming up the chamber…
-              </span>
-            ) : null}
-            {error ? (
-              <span className="inline-flex items-center justify-center gap-2 text-sm text-red-200">
-                <TriangleAlertIcon size={16} /> {error}
-              </span>
-            ) : null}
-          </div>
-        </section>
-      </div>
-    </div>
+    <SetupPhase
+      altar={
+        <AltarPanel
+          starterMode={starterMode}
+          setStarterMode={setStarterMode}
+          starterPreview={starterPreview}
+          historySlug={historySlug}
+          setHistorySlug={setHistorySlug}
+          trimmedHistorySlug={trimmedHistorySlug}
+          historyRecord={historyRecord}
+          hairSprite={hairSprite}
+          setHairSprite={setHairSprite}
+        />
+      }
+      ritual={
+        <RitualPanel
+          selectedClans={selectedClans}
+          setSelectedClans={setSelectedClans}
+          controls={controls}
+          setControls={setControls}
+          spinSeconds={spinSeconds}
+          setSpinSeconds={setSpinSeconds}
+          handleGenerate={handleGenerate}
+          canGenerate={canGenerate}
+          modulesReady={modulesReady}
+          error={error}
+          isGenerating={isGenerating}
+        />
+      }
+    />
   );
 }
 
@@ -1078,6 +1290,80 @@ function ChamberHero() {
         </p>
       </div>
     </header>
+  );
+}
+
+function StarterPreview({
+  mode,
+  preview,
+}: Readonly<{ mode: StarterMode; preview: string | null }>) {
+  if (mode === "history" && preview) {
+    return (
+      <Image
+        src={preview}
+        alt="Starter cat preview"
+        width={320}
+        height={320}
+        unoptimized
+        className="image-render-pixel relative size-40 object-contain"
+      />
+    );
+  }
+  return (
+    <span
+      className={cn(pixelFontClass, "relative text-4xl text-amber-200/60")}
+      aria-hidden
+    >
+      ?
+    </span>
+  );
+}
+
+function toggleClan(
+  current: EvolutionArchetype[],
+  archetype: EvolutionArchetype,
+) {
+  return current.includes(archetype)
+    ? current.filter((clan) => clan !== archetype)
+    : CLAN_ORDER.filter((clan) => current.includes(clan) || clan === archetype);
+}
+
+function ClanButton({
+  archetype,
+  selected,
+  onToggle,
+}: Readonly<{
+  archetype: EvolutionArchetype;
+  selected: boolean;
+  onToggle: () => void;
+}>) {
+  const theme = ARCHETYPE_THEMES[archetype];
+  const wild = isWildArchetype(archetype);
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={`${theme.label}Clan — ${theme.blurb}${wild ? " (wild: may roll any palette)" : ""}`}
+      aria-label={`${theme.label}Clan${wild ? " (wild)" : ""}`}
+      aria-pressed={selected}
+      className={cn(
+        "flex size-9 items-center justify-center rounded-lg border text-base transition",
+        wild && "border-dashed",
+        selected
+          ? "scale-105"
+          : "border-border/60 bg-background opacity-50 grayscale hover:opacity-100 hover:grayscale-0",
+      )}
+      style={
+        selected
+          ? {
+              borderColor: withAlpha(theme.from, 0.7),
+              background: withAlpha(theme.to, 0.18),
+            }
+          : undefined
+      }
+    >
+      <span aria-hidden>{theme.glyph}</span>
+    </button>
   );
 }
 
@@ -1163,27 +1449,7 @@ function CatNameEditor({
   const dirtyRecords = editable.filter(isDirty);
 
   const starter = editable.find((record) => Number(record.level) === 0) ?? null;
-  const lines: Array<{
-    branchLabel: string;
-    archetype: string | null;
-    cats: UiEvolutionCat[];
-  }> = [];
-  for (const record of editable) {
-    if (Number(record.level) === 0 || !record.branchLabel) continue;
-    let line = lines.find((entry) => entry.branchLabel === record.branchLabel);
-    if (!line) {
-      line = {
-        branchLabel: record.branchLabel,
-        archetype: record.archetype,
-        cats: [],
-      };
-      lines.push(line);
-    }
-    line.cats.push(record);
-  }
-  for (const line of lines) {
-    line.cats.sort((a, b) => Number(a.level) - Number(b.level));
-  }
+  const lines = buildNameLines(editable);
 
   const saveAll = async () => {
     setNameError(null);
@@ -1321,4 +1587,28 @@ function CatNameEditor({
       </div>
     </section>
   );
+}
+
+function buildNameLines(records: UiEvolutionCat[]) {
+  const lines: Array<{
+    branchLabel: string;
+    archetype: string | null;
+    cats: UiEvolutionCat[];
+  }> = [];
+  for (const record of records) {
+    if (Number(record.level) === 0 || !record.branchLabel) continue;
+    let line = lines.find((entry) => entry.branchLabel === record.branchLabel);
+    if (!line) {
+      line = {
+        branchLabel: record.branchLabel,
+        archetype: record.archetype,
+        cats: [],
+      };
+      lines.push(line);
+    }
+    line.cats.push(record);
+  }
+  for (const line of lines)
+    line.cats.sort((a, b) => Number(a.level) - Number(b.level));
+  return lines;
 }
