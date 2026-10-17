@@ -77,7 +77,7 @@ Roles:
   and is disabled afterwards.
 
 Credentials come from Infisical through the existing `InfisicalStaticSecret`
-pattern (`/kubernetes/webpage/beastypage-postgres-*`). Nothing is committed.
+at `/kubernetes/webpage/beastypage-postgres`. Nothing is committed.
 Rotation: write a new password to Infisical, let CNPG pick up the managed role
 secret, then restart the frontend (Reloader already watches the secrets).
 

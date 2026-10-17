@@ -94,7 +94,7 @@ password is a throwaway value for an ephemeral container.
 | --- | --- |
 | Where | Homelab namespace `beastypage-staging`, CNPG cluster `beastypage-staging-postgres` (1 instance, no synchronous replica) |
 | Data | Only the scrubbed archive from #112. Never the raw production export. |
-| Secrets | Infisical `staging` environment, path `/kubernetes/beastypage-staging/*`. No production values. |
+| Secrets | Infisical `staging` environment, path `/kubernetes/beastypage-staging/postgres`. No production values. |
 | Isolation | Clerk development instance. No Discord bot token. Its own Quick Share bucket. Egress to production hosts blocked by NetworkPolicy. |
 | Owner | The maintainer, who also deletes the scrubbed archive copies when staging is torn down. |
 
@@ -158,8 +158,10 @@ explicit approval.** Nothing in this repository applies them.
 
 - TLS: CNPG issues the server certificate. Clients use
   `sslmode=verify-full&sslrootcert=/etc/postgres-ca/ca.crt`, with the
-  certificate mounted from the `beastypage-postgres-ca` secret. In
-  production the database client refuses non-TLS URLs to non-loopback hosts.
+  certificate mounted from the `beastypage-postgres-ca` secret. CNPG's
+  generated CA secret contains both `ca.crt` and the signing key `ca.key`;
+  app-template consumers select only `ca.crt`. In production the database
+  client refuses non-TLS URLs to non-loopback hosts.
 - Credentials: Infisical `prod` at `/kubernetes/webpage/beastypage-postgres`.
   Rotate by writing a new password in Infisical; the operator syncs it within
   5 minutes, CNPG updates the managed role, and Reloader restarts the
@@ -184,14 +186,31 @@ kubectl -n webpage cnpg backup beastypage-postgres --method volumeSnapshot \
 kubectl -n webpage get backup -w
 ```
 
-Restore. This creates a **new** cluster from a snapshot backup; the
-original cluster is left untouched until you switch to the new one.
+Restore. CloudNativePG recovery bootstraps a new `Cluster`; it does not
+recover in place. See the [CNPG recovery documentation](https://cloudnative-pg.io/documentation/current/recovery/),
+the [recovery-from-a-Backup example](https://cloudnative-pg.io/docs/devel/recovery#recovery-from-a-backup-object),
+and the [CNPG certificate documentation](https://cloudnative-pg.io/documentation/current/certificates/).
+For this service, restore **under the original cluster name** after the
+damaged resource is removed. That keeps the Flux-owned service
+`beastypage-postgres-rw`, Infisical URLs and `beastypage-postgres-ca` mount
+stable. The replacement cluster gets a new generated CA under that same
+secret name, so restart the frontend after the replacement is Ready to pick
+up its `ca.crt`. This costs the old cluster and requires a reviewed Flux
+delete/recreate change, but avoids a temporary host/CA switch that Infisical
+would overwrite every five minutes and avoids a TLS `verify-full` mismatch.
+
+The CNPG certificate secret contains `ca.crt` and the private signing key
+`ca.key`; consumers select only `ca.crt` as shown in the production
+HelmRelease patch. Protect the completed Backup object and its snapshot before
+deleting the old Cluster. On-demand Backup resources normally have no cluster
+owner reference; if this one does, preserve the snapshot and Backup object
+through the platform's reviewed orphaning procedure before proceeding.
 
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: beastypage-postgres-restore
+  name: beastypage-postgres
   namespace: webpage
 spec:
   instances: 3
@@ -203,16 +222,25 @@ spec:
         name: <backup name from `kubectl -n webpage get backup`>
 ```
 
-Then:
+Submit this manifest as the emergency kub-homelab Flux change, together with
+the deletion of the damaged `beastypage-postgres` Cluster; do not apply it
+with `kubectl` while the normal Flux manifest still declares the old
+`bootstrap.initdb`. Keep the frontend in maintenance and leave Convex paused
+throughout. Then:
 
-1. Wait for `Ready`.
-2. Run `db:migrate --status` against the new cluster.
-3. Run the verification queries in the cutover runbook: row counts, file
-   hashes, relationships.
-4. Point the `beastypage-postgres-app-url` and
-   `beastypage-postgres-migration-url` secrets at
-   `beastypage-postgres-restore-rw` and restart the frontend.
-5. Record the measured restore time against the 1-hour RTO.
+1. Confirm the old Cluster is gone and the named Backup object and snapshot
+   still exist; record the deletion and recreation timestamps.
+2. Wait for `beastypage-postgres` to be `Ready` and for the generated
+   `beastypage-postgres-ca` secret to contain `ca.crt`.
+3. Run `db:migrate --status` against the unchanged
+   `beastypage-postgres-rw.webpage.svc` service, then run the verification
+   queries in the cutover runbook: row counts, file hashes and relationships.
+4. Restart the frontend so its `/etc/postgres-ca/ca.crt` projected volume and
+   TLS connection use the replacement cluster. Do not edit the Infisical URL
+   targets: they already point at the original service and are Flux-owned.
+5. Record the measured restore time against the 1-hour RTO, commit the normal
+   production Cluster template back through kub-homelab Flux, and wait for
+   reconciliation before lifting maintenance.
 
 Restore test status:
 

@@ -45,6 +45,11 @@ persistence:
   postgres-ca:
     type: secret
     name: beastypage-postgres-ca
+    # bjw-s app-template 3.x/4.x secret persistence: select only ca.crt.
+    # CNPG's generated CA secret also contains ca.key; never mount that key.
+    items:
+      - key: ca.crt
+        path: ca.crt
     advancedMounts:
       frontend:
         main:
