@@ -11,7 +11,11 @@ import { cardSeason, catdex, files, rarity } from "../db/schema";
 import { withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
 import { enqueueJob } from "../jobs/enqueue";
-import { decodeCursor, encodeCursor } from "../pagination";
+import {
+  decodeCursor,
+  encodeCursor,
+  rowCreationTimestamp,
+} from "../pagination";
 import {
   attachUploadRow,
   consumeUploadRow,
@@ -345,7 +349,7 @@ export async function listCatdex(
     page: page.map((row) => catdexPayload(row)),
     nextCursor:
       hasMore && last
-        ? encodeCursor({ createdAt: last.createdAt, id: last.id })
+        ? encodeCursor({ createdAt: rowCreationTimestamp(last), id: last.id })
         : null,
     isDone: !hasMore,
   };
@@ -377,7 +381,10 @@ export async function listCatdexForOwner(
     page: page.map((row) => catdexPayload(row)),
     nextCursor:
       hasMore && last
-        ? encodeCursor({ createdAt: last.createdAt, id: last.id })
+        ? encodeCursor({
+            createdAt: rowCreationTimestamp(last),
+            id: last.id,
+          })
         : null,
     isDone: !hasMore,
   };
@@ -403,7 +410,7 @@ export async function listCatdexForModeration(
     page: page.map((row) => catdexPayload(row)),
     nextCursor:
       hasMore && last
-        ? encodeCursor({ createdAt: last.createdAt, id: last.id })
+        ? encodeCursor({ createdAt: rowCreationTimestamp(last), id: last.id })
         : null,
     isDone: !hasMore,
   };
@@ -745,7 +752,7 @@ export async function listCollection(
     page: payload,
     nextCursor:
       hasMore && last
-        ? encodeCursor({ createdAt: last.createdAt, id: last.id })
+        ? encodeCursor({ createdAt: rowCreationTimestamp(last), id: last.id })
         : null,
     isDone: !hasMore,
   };

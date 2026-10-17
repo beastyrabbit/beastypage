@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lt, sql } from "drizzle-orm";
 import type { Database } from "../db/pool";
 import {
   cardSeason,
@@ -10,7 +10,11 @@ import {
   rarity,
 } from "../db/schema";
 import type { Transaction } from "../db/transaction";
-import type { PageCursor } from "../pagination";
+import {
+  creationOrderBefore,
+  creationTimestamp,
+  type PageCursor,
+} from "../pagination";
 
 export { selectCatdexByOwner } from "./catalog-owner";
 
@@ -20,7 +24,11 @@ export async function selectSeasons(db: Db) {
   return db
     .select()
     .from(cardSeason)
-    .orderBy(desc(cardSeason.createdAt), desc(cardSeason.id))
+    .orderBy(
+      desc(cardSeason.createdAt),
+      asc(creationTimestamp(cardSeason)),
+      asc(cardSeason.id),
+    )
     .limit(200);
 }
 
@@ -35,7 +43,7 @@ export async function selectRarities(db: Db) {
   return db
     .select()
     .from(rarity)
-    .orderBy(asc(rarity.stars), asc(rarity.id))
+    .orderBy(asc(rarity.stars), asc(creationTimestamp(rarity)), asc(rarity.id))
     .limit(200);
 }
 
@@ -49,13 +57,7 @@ export async function selectCatdexPage(
   options: { cursor?: PageCursor | null; pageSize: number; approved: boolean },
 ) {
   const cursorWhere = options.cursor
-    ? or(
-        lt(catdex.createdAt, new Date(options.cursor.createdAt)),
-        and(
-          eq(catdex.createdAt, new Date(options.cursor.createdAt)),
-          lt(catdex.id, options.cursor.id),
-        ),
-      )
+    ? creationOrderBefore(catdex, options.cursor)
     : undefined;
   const where = cursorWhere
     ? and(eq(catdex.approved, options.approved), cursorWhere)
@@ -70,7 +72,7 @@ export async function selectCatdexPage(
     .leftJoin(cardSeason, eq(catdex.seasonId, cardSeason.id))
     .leftJoin(rarity, eq(catdex.rarityId, rarity.id))
     .where(where)
-    .orderBy(desc(catdex.createdAt), desc(catdex.id))
+    .orderBy(desc(creationTimestamp(catdex)), desc(catdex.id))
     .limit(options.pageSize + 1);
 }
 
@@ -222,19 +224,13 @@ export async function selectCollectionPage(
   options: { cursor?: PageCursor | null; pageSize: number },
 ) {
   const cursorWhere = options.cursor
-    ? or(
-        lt(collection.createdAt, new Date(options.cursor.createdAt)),
-        and(
-          eq(collection.createdAt, new Date(options.cursor.createdAt)),
-          lt(collection.id, options.cursor.id),
-        ),
-      )
+    ? creationOrderBefore(collection, options.cursor)
     : undefined;
   return db
     .select()
     .from(collection)
     .where(cursorWhere)
-    .orderBy(desc(collection.createdAt), desc(collection.id))
+    .orderBy(desc(creationTimestamp(collection)), desc(collection.id))
     .limit(options.pageSize + 1);
 }
 

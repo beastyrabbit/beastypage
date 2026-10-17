@@ -9,6 +9,7 @@ import {
   quickShareUsage,
 } from "../db/schema";
 import type { Transaction } from "../db/transaction";
+import { creationTimestamp } from "../pagination";
 
 export type UploadRow = typeof quickShareUploads.$inferSelect;
 export type PartRow = typeof quickShareParts.$inferSelect;
@@ -90,7 +91,10 @@ export async function findFirstUploadBySlug(
     .select()
     .from(quickShareUploads)
     .where(eq(quickShareUploads.slug, slug))
-    .orderBy(asc(quickShareUploads.createdAt), asc(quickShareUploads.id))
+    .orderBy(
+      asc(creationTimestamp(quickShareUploads)),
+      asc(quickShareUploads.id),
+    )
     .limit(1);
   return row ?? null;
 }
@@ -326,7 +330,7 @@ export async function listPendingJobs(
     .select()
     .from(quickShareJobs)
     .where(eq(quickShareJobs.status, "pending"))
-    .orderBy(asc(quickShareJobs.createdAt), asc(quickShareJobs.id))
+    .orderBy(asc(creationTimestamp(quickShareJobs)), asc(quickShareJobs.id))
     .limit(limit);
 }
 
@@ -437,7 +441,7 @@ export async function listUploadsByIp(
     .select()
     .from(quickShareUploads)
     .where(eq(quickShareUploads.ipHash, ipHash))
-    .orderBy(desc(quickShareUploads.createdAt))
+    .orderBy(desc(creationTimestamp(quickShareUploads)))
     .limit(limit);
   if (lock) query = query.for("update") as typeof query;
   return query;
@@ -458,7 +462,7 @@ export async function listActiveUploadsByIp(
         eq(quickShareUploads.active, true),
       ),
     )
-    .orderBy(asc(quickShareUploads.createdAt))
+    .orderBy(asc(creationTimestamp(quickShareUploads)))
     .limit(limit);
   if (lock) query = query.for("update") as typeof query;
   return query;
@@ -481,7 +485,7 @@ export async function listUploadsByOwner(
     )
     .orderBy(
       desc(quickShareUploads.publicExpiresAt),
-      desc(quickShareUploads.createdAt),
+      desc(creationTimestamp(quickShareUploads)),
     )
     .limit(100);
 }
@@ -509,7 +513,10 @@ export async function listAdminUploads(
       .select()
       .from(quickShareUploads)
       .where(eq(quickShareUploads.slug, slug))
-      .orderBy(asc(quickShareUploads.createdAt), asc(quickShareUploads.id))
+      .orderBy(
+        asc(creationTimestamp(quickShareUploads)),
+        asc(quickShareUploads.id),
+      )
       .limit(100);
     const seen = new Set(active.map((row) => row.id));
     return [...active, ...historical.filter((row) => !seen.has(row.id))].slice(
@@ -521,7 +528,11 @@ export async function listAdminUploads(
   return tx
     .select()
     .from(quickShareUploads)
-    .orderBy(desc(quickShareUploads.retainedUntil))
+    .orderBy(
+      desc(quickShareUploads.retainedUntil),
+      desc(creationTimestamp(quickShareUploads)),
+      desc(quickShareUploads.id),
+    )
     .limit(100);
 }
 

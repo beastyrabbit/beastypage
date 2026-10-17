@@ -47,4 +47,35 @@ describe("fetchJson", () => {
       message: "Nope",
     });
   });
+
+  it("returns null for an opted-in missing record", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 404 })),
+    );
+
+    await expect(
+      fetchJson<{ id: string }>("/api/example", { nullable: true }),
+    ).resolves.toBeNull();
+  });
+
+  it("still throws server errors for an opted-in nullable lookup", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: "Broken", code: "unavailable" }),
+            {
+              status: 500,
+              headers: { "content-type": "application/json" },
+            },
+          ),
+      ),
+    );
+
+    await expect(
+      fetchJson("/api/example", { nullable: true }),
+    ).rejects.toMatchObject({ status: 500, code: "unavailable" });
+  });
 });

@@ -89,6 +89,35 @@ describe("dual-path data hooks", () => {
     root.unmount();
   });
 
+  it("keeps a nullable PostgreSQL lookup as null", async () => {
+    const values: unknown[] = [];
+    function Probe() {
+      values.push(
+        useDataQuery(
+          queryRef,
+          { id: "missing" },
+          {
+            queryKey: ["data", "missing"],
+            queryFn: async () => null,
+          },
+        ),
+      );
+      return null;
+    }
+    const host = document.createElement("div");
+    const root = createRoot(host);
+    act(() =>
+      root.render(
+        <Providers>
+          <Probe />
+        </Providers>,
+      ),
+    );
+    await settle();
+    expect(values.at(-1)).toBeNull();
+    root.unmount();
+  });
+
   it("returns a PostgreSQL mutation function and invalidates its keys", async () => {
     const save = vi.fn(async () => ({ ok: true }));
     let mutate: ((args: { id: string }) => Promise<unknown>) | undefined;

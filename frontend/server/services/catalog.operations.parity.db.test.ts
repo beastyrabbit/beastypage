@@ -179,6 +179,189 @@ async function seedPostgresCatalog(prefix: string) {
 }
 
 describe("catalog operation parity", () => {
+  it("matches Convex creation order and cursor pagination when legacy time differs", async () => {
+    const prefix = `creation-order-${Date.now()}`;
+    const convex = convexTest(schema, modules);
+    const convexIds = await convex.run(async (ctx) => {
+      const seasonId = await ctx.db.insert("card_season", {
+        seasonName: `${prefix} season`,
+        shortName: "CO",
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const rarityId = await ctx.db.insert("rarity", {
+        rarityName: `${prefix} rarity`,
+        stars: 1,
+        chancePercent: 100,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+      const ids = [] as string[];
+      for (let index = 1; index <= 3; index += 1) {
+        ids.push(
+          await ctx.db.insert("catdex", {
+            twitchUserName: `${prefix} owner`,
+            catName: `${prefix} card ${index}`,
+            cardNumber: `${index}`,
+            seasonId,
+            rarityId,
+            approved: true,
+            createdAt: 100 - index,
+            updatedAt: 100 - index,
+          }),
+        );
+      }
+      return ids;
+    });
+
+    const [season] = await db
+      .insert(cardSeason)
+      .values({
+        seasonName: `${prefix} season`,
+        shortName: "CO",
+        createdAt: new Date(300),
+        updatedAt: new Date(300),
+        legacyCreatedAt: new Date(1000),
+      })
+      .returning();
+    const [rarityRow] = await db
+      .insert(rarity)
+      .values({
+        rarityName: `${prefix} rarity`,
+        stars: 1,
+        chancePercent: 100,
+        createdAt: new Date(300),
+        updatedAt: new Date(300),
+        legacyCreatedAt: new Date(1000),
+      })
+      .returning();
+    for (let index = 1; index <= 3; index += 1) {
+      await db.insert(catdex).values({
+        twitchUserName: `${prefix} owner`,
+        catName: `${prefix} card ${index}`,
+        cardNumber: `${index}`,
+        seasonId: season.id,
+        rarityId: rarityRow.id,
+        approved: true,
+        // App createdAt is intentionally reverse ordered; legacyCreatedAt is
+        // the imported Convex _creationTime order.
+        createdAt: new Date(300 - index),
+        updatedAt: new Date(300 - index),
+        legacyCreatedAt: new Date(1000 + index),
+      });
+    }
+
+    const convexFirst = await convex.query(api.catdex.page, {
+      approved: true,
+      paginationOpts: { numItems: 2, cursor: null },
+    });
+    const convexSecond = await convex.query(api.catdex.page, {
+      approved: true,
+      paginationOpts: { numItems: 2, cursor: convexFirst.continueCursor },
+    });
+    const postgresFirst = await listCatdex(db, { pageSize: 2 });
+    const postgresSecond = await listCatdex(db, {
+      pageSize: 2,
+      cursor: postgresFirst.nextCursor,
+    });
+
+    const convexNames = [...convexFirst.page, ...convexSecond.page].map(
+      (row) => row.cat_name,
+    );
+    const postgresNames = [...postgresFirst.page, ...postgresSecond.page].map(
+      (row) => row.cat_name,
+    );
+    expect(postgresNames).toEqual(convexNames);
+    expect(convexNames).not.toEqual([
+      `${prefix} card 1`,
+      `${prefix} card 2`,
+      `${prefix} card 3`,
+    ]);
+    expect(convexIds).toHaveLength(3);
+  });
+
+  it("matches Convex creation-order tie breaks for seasons and rarities", async () => {
+    const prefix = `tie-order-${Date.now()}`;
+    const convex = convexTest(schema, modules);
+    await convex.run(async (ctx) => {
+      await ctx.db.insert("card_season", {
+        seasonName: `${prefix} first`,
+        shortName: "F",
+        createdAt: 500,
+        updatedAt: 500,
+      });
+      await ctx.db.insert("card_season", {
+        seasonName: `${prefix} second`,
+        shortName: "S",
+        createdAt: 500,
+        updatedAt: 500,
+      });
+      await ctx.db.insert("rarity", {
+        rarityName: `${prefix} rarity first`,
+        stars: 4,
+        chancePercent: 50,
+        createdAt: 500,
+        updatedAt: 500,
+      });
+      await ctx.db.insert("rarity", {
+        rarityName: `${prefix} rarity second`,
+        stars: 4,
+        chancePercent: 50,
+        createdAt: 500,
+        updatedAt: 500,
+      });
+    });
+    await db.insert(cardSeason).values([
+      {
+        seasonName: `${prefix} first`,
+        shortName: "F",
+        createdAt: new Date(900),
+        updatedAt: new Date(900),
+        legacyCreatedAt: new Date(100),
+      },
+      {
+        seasonName: `${prefix} second`,
+        shortName: "S",
+        createdAt: new Date(900),
+        updatedAt: new Date(900),
+        legacyCreatedAt: new Date(200),
+      },
+    ]);
+    await db.insert(rarity).values([
+      {
+        rarityName: `${prefix} rarity first`,
+        stars: 4,
+        chancePercent: 50,
+        createdAt: new Date(900),
+        updatedAt: new Date(900),
+        legacyCreatedAt: new Date(100),
+      },
+      {
+        rarityName: `${prefix} rarity second`,
+        stars: 4,
+        chancePercent: 50,
+        createdAt: new Date(900),
+        updatedAt: new Date(900),
+        legacyCreatedAt: new Date(200),
+      },
+    ]);
+
+    const convexSeasons = (await convex.query(api.seasons.list, {}))
+      .map((row) => row.season_name)
+      .filter((name) => name.startsWith(prefix));
+    const postgresSeasons = (await listSeasons(db))
+      .map((row) => row.season_name)
+      .filter((name) => name.startsWith(prefix));
+    const convexRarities = (await convex.query(api.rarities.list, {}))
+      .map((row) => row.rarity_name)
+      .filter((name) => name.startsWith(prefix));
+    const postgresRarities = (await listRarities(db))
+      .map((row) => row.rarity_name)
+      .filter((name) => name.startsWith(prefix));
+    expect(postgresSeasons).toEqual(convexSeasons);
+    expect(postgresRarities).toEqual(convexRarities);
+  });
+
   it("matches seasons, rarities, public/filter pages, owner views, pending, and collection reads", async () => {
     const prefix = `parity-${Date.now()}`;
     const convex = await seedConvexCatalog(`${prefix}-convex`);

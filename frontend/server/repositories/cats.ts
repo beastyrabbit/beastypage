@@ -1,9 +1,15 @@
 import "server-only";
 
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Database } from "../db/pool";
 import { catImages, catProfile } from "../db/schema";
-import { decodeCursor, encodeCursor } from "../pagination";
+import {
+  creationOrderBefore,
+  creationTimestamp,
+  decodeCursor,
+  encodeCursor,
+  rowCreationTimestamp,
+} from "../pagination";
 import { isUuid } from "./legacyLinks";
 
 export type CatsTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -80,7 +86,7 @@ export async function listProfileRows(db: CatsDb, limit: number) {
   return db
     .select()
     .from(catProfile)
-    .orderBy(desc(catProfile.createdAt))
+    .orderBy(desc(creationTimestamp(catProfile)), desc(catProfile.id))
     .limit(limit);
 }
 
@@ -89,25 +95,22 @@ export async function listProfilePageRows(
   args: { limit: number; cursor?: string | null },
 ) {
   const cursor = decodeCursor(args.cursor);
-  const where = cursor
-    ? or(
-        lt(catProfile.createdAt, new Date(cursor.createdAt)),
-        and(
-          eq(catProfile.createdAt, new Date(cursor.createdAt)),
-          lt(catProfile.id, cursor.id),
-        ),
-      )
-    : undefined;
+  const where = cursor ? creationOrderBefore(catProfile, cursor) : undefined;
   const rows = await db
     .select()
     .from(catProfile)
     .where(where)
-    .orderBy(desc(catProfile.createdAt), desc(catProfile.id))
+    .orderBy(desc(creationTimestamp(catProfile)), desc(catProfile.id))
     .limit(args.limit + 1);
   return {
     rows,
     nextCursor:
-      rows.length > args.limit ? encodeCursor(rows[args.limit - 1]) : null,
+      rows.length > args.limit
+        ? encodeCursor({
+            createdAt: rowCreationTimestamp(rows[args.limit - 1]),
+            id: rows[args.limit - 1].id,
+          })
+        : null,
   };
 }
 
@@ -120,7 +123,7 @@ export async function listPreviewRows(db: CatsDb) {
       createdAt: catProfile.createdAt,
     })
     .from(catProfile)
-    .orderBy(desc(catProfile.createdAt))
+    .orderBy(desc(creationTimestamp(catProfile)), desc(catProfile.id))
     .limit(1000);
 }
 

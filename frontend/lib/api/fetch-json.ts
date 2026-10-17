@@ -21,6 +21,8 @@ export class ApiError extends Error {
 
 export type JsonFetchInit = Omit<RequestInit, "body"> & {
   body?: unknown;
+  /** Return null for a missing record instead of throwing ApiError. */
+  nullable?: boolean;
 };
 
 /** Fetch a same-origin JSON API and turn the server error contract into ApiError. */
@@ -28,16 +30,20 @@ export async function fetchJson<T>(
   input: RequestInfo | URL,
   init: JsonFetchInit = {},
 ): Promise<T> {
-  const headers = new Headers(init.headers);
+  const { nullable = false, ...requestInit } = init;
+  const headers = new Headers(requestInit.headers);
   headers.set("Accept", "application/json");
-  if (init.body !== undefined && !headers.has("Content-Type")) {
+  if (requestInit.body !== undefined && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
   const response = await fetch(input, {
-    ...init,
+    ...requestInit,
     headers,
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    body:
+      requestInit.body === undefined
+        ? undefined
+        : JSON.stringify(requestInit.body),
   });
 
   const contentType = response.headers.get("content-type") ?? "";
@@ -53,6 +59,7 @@ export async function fetchJson<T>(
   }
 
   if (!response.ok) {
+    if (nullable && response.status === 404) return null as T;
     const body = payload && typeof payload === "object" ? payload : null;
     const message =
       body && "error" in body && typeof body.error === "string"

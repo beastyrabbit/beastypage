@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { AnyColumn } from "drizzle-orm";
-import { type SQL, sql } from "drizzle-orm";
+import { and, or, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ServiceError } from "./errors";
 
@@ -11,6 +11,37 @@ const cursorSchema = z.object({
 });
 
 export type PageCursor = z.infer<typeof cursorSchema>;
+
+type CreationOrderedTable = {
+  legacyCreatedAt: AnyColumn;
+  createdAt: AnyColumn;
+  id: AnyColumn;
+};
+
+/** The Convex `_creationTime` equivalent for imported and new PostgreSQL rows. */
+export function creationTimestamp(table: CreationOrderedTable) {
+  return sql`coalesce(${table.legacyCreatedAt}, ${table.createdAt})`;
+}
+
+/** Descending keyset predicate for Convex creation-order pagination. */
+export function creationOrderBefore(
+  table: CreationOrderedTable,
+  cursor: PageCursor,
+): SQL {
+  const timestamp = creationTimestamp(table);
+  const createdAt = new Date(cursor.createdAt);
+  return or(
+    sql`${timestamp} < ${createdAt}`,
+    and(sql`${timestamp} = ${createdAt}`, sql`${table.id} < ${cursor.id}`),
+  ) as SQL;
+}
+
+export function rowCreationTimestamp(row: {
+  legacyCreatedAt: Date | null;
+  createdAt: Date;
+}) {
+  return row.legacyCreatedAt ?? row.createdAt;
+}
 
 export function encodeCursor(cursor: {
   createdAt: Date | string;

@@ -1,9 +1,15 @@
 import "server-only";
 
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import type { Database } from "../db/pool";
 import { adoptionBatch, adoptionBatchCats, catProfile } from "../db/schema";
-import { decodeCursor, encodeCursor } from "../pagination";
+import {
+  creationOrderBefore,
+  creationTimestamp,
+  decodeCursor,
+  encodeCursor,
+  rowCreationTimestamp,
+} from "../pagination";
 import { isUuid } from "./legacyLinks";
 
 export type AdoptionTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
@@ -44,7 +50,7 @@ export async function listBatches(db: AdoptionDb, limit: number) {
   return db
     .select()
     .from(adoptionBatch)
-    .orderBy(desc(adoptionBatch.createdAt))
+    .orderBy(desc(creationTimestamp(adoptionBatch)), desc(adoptionBatch.id))
     .limit(limit);
 }
 
@@ -53,25 +59,22 @@ export async function listBatchPageRows(
   args: { limit: number; cursor?: string | null },
 ) {
   const cursor = decodeCursor(args.cursor);
-  const where = cursor
-    ? or(
-        lt(adoptionBatch.createdAt, new Date(cursor.createdAt)),
-        and(
-          eq(adoptionBatch.createdAt, new Date(cursor.createdAt)),
-          lt(adoptionBatch.id, cursor.id),
-        ),
-      )
-    : undefined;
+  const where = cursor ? creationOrderBefore(adoptionBatch, cursor) : undefined;
   const rows = await db
     .select()
     .from(adoptionBatch)
     .where(where)
-    .orderBy(desc(adoptionBatch.createdAt), desc(adoptionBatch.id))
+    .orderBy(desc(creationTimestamp(adoptionBatch)), desc(adoptionBatch.id))
     .limit(args.limit + 1);
   return {
     rows,
     nextCursor:
-      rows.length > args.limit ? encodeCursor(rows[args.limit - 1]) : null,
+      rows.length > args.limit
+        ? encodeCursor({
+            createdAt: rowCreationTimestamp(rows[args.limit - 1]),
+            id: rows[args.limit - 1].id,
+          })
+        : null,
   };
 }
 

@@ -9,8 +9,11 @@ import { useDataBackend } from "./backend";
 import { useDataMutation, useDataQuery } from "./hooks";
 import { dataQueryKeys } from "./keys";
 
-const get = <T>(url: string, signal?: AbortSignal) =>
-  fetchJson<T>(url, { signal });
+const get = <T>(
+  url: string,
+  signal?: AbortSignal,
+  options?: { nullable?: boolean },
+) => fetchJson<T>(url, { signal, ...options });
 const post = <T>(url: string, body: unknown) =>
   fetchJson<T>(url, { method: "POST", body });
 
@@ -43,6 +46,7 @@ export function useCatStreamSession(enabled = true) {
         get<FunctionReturnType<typeof api.catStream.getSession>>(
           "/api/cat-stream",
           signal,
+          { nullable: true },
         ),
       enabled,
     },
@@ -70,6 +74,7 @@ export function useCatStreamSessionByApiKey(apiKey: string, enabled = true) {
         get<FunctionReturnType<typeof api.catStream.getSessionByApiKey>>(
           `/api/cat-stream?key=${encodeURIComponent(args.apiKey)}`,
           signal,
+          { nullable: true },
         ),
       enabled: enabled && Boolean(apiKey),
     },
@@ -305,6 +310,7 @@ export function useStreamSession(
       get<FunctionReturnType<typeof api.streamSessionsV2.get>>(
         `/api/stream/sessions/${String(input.id)}`,
         signal,
+        { nullable: true },
       ),
   });
   const id = args === "skip" ? null : String(args.id);
@@ -333,6 +339,7 @@ export function useStreamSessionForHost(
       get<FunctionReturnType<typeof api.streamSessionsV2.getForHost>>(
         `/api/stream/sessions/${String(input.id)}?host=1`,
         signal,
+        { nullable: true },
       ),
   });
   const id = args === "skip" ? null : String(args.id);

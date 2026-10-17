@@ -4,6 +4,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { Database } from "../db/pool";
 import { streamParticipants, streamSessions, streamVotes } from "../db/schema";
 import type { Transaction } from "../db/transaction";
+import { creationTimestamp } from "../pagination";
 
 type Db = Database | Transaction;
 
@@ -78,7 +79,11 @@ export async function selectOwnedStreamSessions(
     .select()
     .from(streamSessions)
     .where(where)
-    .orderBy(desc(streamSessions.updatedAt), desc(streamSessions.id))
+    .orderBy(
+      desc(streamSessions.updatedAt),
+      desc(creationTimestamp(streamSessions)),
+      desc(streamSessions.id),
+    )
     .limit(500);
 }
 
@@ -135,7 +140,10 @@ export async function selectParticipants(
     .select()
     .from(streamParticipants)
     .where(where)
-    .orderBy(asc(streamParticipants.createdAt), asc(streamParticipants.id))
+    .orderBy(
+      asc(creationTimestamp(streamParticipants)),
+      asc(streamParticipants.id),
+    )
     .limit(Math.max(1, Math.min(500, Math.floor(limit))));
 }
 
@@ -234,7 +242,7 @@ export async function selectVotes(
     .select()
     .from(streamVotes)
     .where(where)
-    .orderBy(asc(streamVotes.createdAt), asc(streamVotes.id))
+    .orderBy(asc(creationTimestamp(streamVotes)), asc(streamVotes.id))
     .limit(Math.max(1, Math.min(500, Math.floor(limit))));
 }
 

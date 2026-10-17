@@ -1,9 +1,13 @@
 import "server-only";
 
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Database } from "../db/pool";
 import { cardSeason, catdex, rarity } from "../db/schema";
-import type { PageCursor } from "../pagination";
+import {
+  creationOrderBefore,
+  creationTimestamp,
+  type PageCursor,
+} from "../pagination";
 
 /** Owner-scoped approved cards used by moderation and owner views. */
 export async function selectCatdexByOwner(
@@ -12,15 +16,7 @@ export async function selectCatdexByOwner(
   cursor: PageCursor | null,
   pageSize: number,
 ) {
-  const cursorWhere = cursor
-    ? or(
-        lt(catdex.createdAt, new Date(cursor.createdAt)),
-        and(
-          eq(catdex.createdAt, new Date(cursor.createdAt)),
-          lt(catdex.id, cursor.id),
-        ),
-      )
-    : undefined;
+  const cursorWhere = cursor ? creationOrderBefore(catdex, cursor) : undefined;
   return db
     .select({ cat: catdex, season: cardSeason, rarity })
     .from(catdex)
@@ -35,6 +31,6 @@ export async function selectCatdexByOwner(
           )
         : and(eq(catdex.twitchUserName, owner), eq(catdex.approved, true)),
     )
-    .orderBy(desc(catdex.createdAt), desc(catdex.id))
+    .orderBy(desc(creationTimestamp(catdex)), desc(catdex.id))
     .limit(pageSize + 1);
 }

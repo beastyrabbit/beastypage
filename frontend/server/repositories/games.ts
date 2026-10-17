@@ -10,6 +10,7 @@ import {
   wheelSpins,
 } from "../db/schema";
 import type { Transaction } from "../db/transaction";
+import { creationTimestamp } from "../pagination";
 
 export type GamesDb = Database | Transaction;
 
@@ -55,21 +56,25 @@ export async function selectPerfectPool(db: GamesDb) {
   const all = await db
     .select()
     .from(perfectCats)
-    .orderBy(asc(perfectCats.createdAt), asc(perfectCats.id))
+    .orderBy(asc(creationTimestamp(perfectCats)), asc(perfectCats.id))
     .limit(257);
   const top = await db
     .select()
     .from(perfectCats)
     .orderBy(
       desc(perfectCats.rating),
-      desc(perfectCats.createdAt),
+      desc(creationTimestamp(perfectCats)),
       desc(perfectCats.id),
     )
     .limit(24);
   const recent = await db
     .select()
     .from(perfectCats)
-    .orderBy(desc(perfectCats.updatedAt), desc(perfectCats.id))
+    .orderBy(
+      desc(perfectCats.updatedAt),
+      desc(creationTimestamp(perfectCats)),
+      desc(perfectCats.id),
+    )
     .limit(24);
   return { all, top, recent };
 }
@@ -79,7 +84,7 @@ export async function selectRecentVotes(db: GamesDb, clientId: string) {
     .select()
     .from(perfectVotes)
     .where(eq(perfectVotes.clientId, clientId))
-    .orderBy(desc(perfectVotes.createdAt), desc(perfectVotes.id))
+    .orderBy(desc(creationTimestamp(perfectVotes)), desc(perfectVotes.id))
     .limit(40);
 }
 
@@ -88,7 +93,7 @@ export async function lockMatchupForClient(tx: Transaction, clientId: string) {
     .select()
     .from(perfectMatchups)
     .where(eq(perfectMatchups.clientId, clientId))
-    .orderBy(desc(perfectMatchups.createdAt), desc(perfectMatchups.id))
+    .orderBy(asc(creationTimestamp(perfectMatchups)), asc(perfectMatchups.id))
     .for("update")
     .limit(1);
   return row ?? null;
@@ -196,7 +201,7 @@ export async function listScores(db: GamesDb, limit: number) {
     .from(coinflipperScores)
     .orderBy(
       desc(coinflipperScores.score),
-      desc(coinflipperScores.createdAt),
+      desc(creationTimestamp(coinflipperScores)),
       desc(coinflipperScores.id),
     )
     .limit(limit);
@@ -240,6 +245,6 @@ export async function listSpins(db: GamesDb, limit: number) {
   return db
     .select()
     .from(wheelSpins)
-    .orderBy(desc(wheelSpins.createdAt), desc(wheelSpins.id))
+    .orderBy(desc(creationTimestamp(wheelSpins)), desc(wheelSpins.id))
     .limit(limit + 1);
 }

@@ -6,8 +6,11 @@ import { fetchJson } from "@/lib/api";
 import { useDataMutation, useDataQuery } from "./hooks";
 import { dataQueryKeys } from "./keys";
 
-const get = <T>(url: string, signal?: AbortSignal) =>
-  fetchJson<T>(url, { signal });
+const get = <T>(
+  url: string,
+  signal?: AbortSignal,
+  options?: { nullable?: boolean },
+) => fetchJson<T>(url, { signal, ...options });
 const post = <T>(url: string, body?: unknown) =>
   fetchJson<T>(url, { method: "POST", body });
 const patch = <T>(url: string, body?: unknown) =>
@@ -23,6 +26,7 @@ export function useUserViewer() {
         get<FunctionReturnType<typeof api.users.viewer>>(
           "/api/users/viewer",
           signal,
+          { nullable: true },
         ),
     },
   );

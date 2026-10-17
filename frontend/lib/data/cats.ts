@@ -18,6 +18,7 @@ export function useCatProfile(
     queryFn: (args) =>
       fetchJson<Profile>(
         `/api/cats/profile?slugOrId=${encodeURIComponent(args.slugOrId)}`,
+        { nullable: true },
       ),
   });
 }
@@ -47,6 +48,7 @@ export function useAdoptionBatch(
       queryFn: (args) =>
         fetchJson<Batch>(
           `/api/adoption/batch?slugOrId=${encodeURIComponent(args.slugOrId)}`,
+          { nullable: true },
         ),
     },
   );
@@ -74,6 +76,7 @@ export function useAncestryTree(
     queryFn: (args) =>
       fetchJson<Tree>(
         `/api/ancestry/tree?slug=${encodeURIComponent(args.slug)}`,
+        { nullable: true },
       ),
   });
 }
@@ -168,6 +171,7 @@ export function usePaletteRecord(slug: string | null | undefined) {
       queryFn: (args) =>
         fetchJson<FunctionReturnType<typeof api.paletteGeneratorSettings.get>>(
           `/api/palette-generator-settings?slug=${encodeURIComponent(args.slug)}`,
+          { nullable: true },
         ),
     },
   );
@@ -181,6 +185,7 @@ export function usePaletteImageUrl(slug: string | null | undefined) {
       queryFn: (args) =>
         fetchJson<string | null>(
           `/api/palette-generator-settings/image?slug=${encodeURIComponent(args.slug ?? "")}`,
+          { nullable: true },
         ),
     },
   );
