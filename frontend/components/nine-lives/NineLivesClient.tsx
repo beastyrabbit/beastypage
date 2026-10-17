@@ -268,7 +268,9 @@ function DeviceButton({
 
 export function NineLivesClient() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const presentationRef = useRef<HTMLElement>(null);
   const presentationCloseRef = useRef<HTMLButtonElement>(null);
+  const presentationOpenerRef = useRef<HTMLElement>(null);
   const pointerButtons = useRef(new Map<number, ButtonName>());
   const [started, setStarted] = useState(false);
   const [ready, setReady] = useState(false);
@@ -293,11 +295,18 @@ export function NineLivesClient() {
 
   const closePresentation = useCallback(() => {
     setPresentationMode("inline");
-    requestAnimationFrame(() => iframeRef.current?.focus());
-  }, []);
+    requestAnimationFrame(() => {
+      if (started) iframeRef.current?.focus();
+      else presentationOpenerRef.current?.focus();
+    });
+  }, [started]);
 
   const openPresentation = useCallback(
     (mode: Exclude<PresentationMode, "inline">) => {
+      presentationOpenerRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
       setPresentationMode(mode);
       requestAnimationFrame(() => {
         if (started) iframeRef.current?.focus();
@@ -313,14 +322,25 @@ export function NineLivesClient() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") closePresentation();
     };
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (target instanceof Node && presentationRef.current?.contains(target))
+        return;
+      requestAnimationFrame(() => {
+        if (started) iframeRef.current?.focus();
+        else presentationCloseRef.current?.focus();
+      });
+    };
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKeyDown);
+    document.addEventListener("focusin", onFocusIn);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("focusin", onFocusIn);
     };
-  }, [closePresentation, presentationMode]);
+  }, [closePresentation, presentationMode, started]);
 
   const press = useCallback(
     (name: ButtonName, pointerId: number) => {
@@ -328,14 +348,16 @@ export function NineLivesClient() {
         if (name === "start") startGame();
         return;
       }
+      const alreadyHeld = [...pointerButtons.current.values()].includes(name);
       pointerButtons.current.set(pointerId, name);
       setPressed((current) => new Set(current).add(name));
-      postMessageToGame(iframeRef.current, {
-        type: "nine-lives:input",
-        v: 1,
-        button: name,
-        state: "down",
-      });
+      if (!alreadyHeld)
+        postMessageToGame(iframeRef.current, {
+          type: "nine-lives:input",
+          v: 1,
+          button: name,
+          state: "down",
+        });
     },
     [startGame, started],
   );
@@ -343,6 +365,10 @@ export function NineLivesClient() {
   const release = useCallback((pointerId: number) => {
     const name = pointerButtons.current.get(pointerId);
     if (!name) return;
+    const hasOtherHolder = [...pointerButtons.current].some(
+      ([otherPointerId, otherName]) =>
+        otherPointerId !== pointerId && otherName === name,
+    );
     pointerButtons.current.delete(pointerId);
     setPressed((current) => {
       const next = new Set(current);
@@ -350,12 +376,13 @@ export function NineLivesClient() {
         next.delete(name);
       return next;
     });
-    postMessageToGame(iframeRef.current, {
-      type: "nine-lives:input",
-      v: 1,
-      button: name,
-      state: "up",
-    });
+    if (!hasOtherHolder)
+      postMessageToGame(iframeRef.current, {
+        type: "nine-lives:input",
+        v: 1,
+        button: name,
+        state: "up",
+      });
   }, []);
 
   useEffect(() => {
@@ -396,6 +423,11 @@ export function NineLivesClient() {
   return (
     <main className="mx-auto flex w-full max-w-[1400px] flex-col gap-10 px-3 py-5 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
       <section
+        ref={presentationRef}
+        role={presentationMode === "inline" ? undefined : "dialog"}
+        aria-label={
+          presentationMode === "inline" ? undefined : "Nine Lives player"
+        }
         className={`border border-[#89d8e0]/30 bg-[#101d36] shadow-[0_32px_90px_rgba(29,126,151,0.2)] ${
           presentationMode === "inline"
             ? "relative overflow-hidden rounded-[2.5rem] px-4 py-5 sm:px-10 sm:py-12"
