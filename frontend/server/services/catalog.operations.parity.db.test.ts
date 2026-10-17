@@ -429,6 +429,55 @@ describe("catalog operation parity", () => {
     expect(convexIds).toHaveLength(3);
   });
 
+  it("limits rarities in creation order before sorting by stars, like Convex", async () => {
+    const prefix = `rarity-window-${Date.now()}`;
+    const count = 201;
+    // The last-created row has the fewest stars: Convex's 200-row window
+    // drops it, while a stars-first SQL order would keep it.
+    const stars = (index: number) => count - index;
+    const convex = convexTest(schema, modules);
+    await convex.run(async (ctx) => {
+      for (let index = 1; index <= count; index += 1) {
+        await ctx.db.insert("rarity", {
+          rarityName: `${prefix} ${index}`,
+          stars: stars(index),
+          chancePercent: 1,
+          createdAt: 500,
+          updatedAt: 500,
+        });
+      }
+    });
+    // Pre-1970 creation times make these the oldest rarities, so the 200-row
+    // window is made of this test's rows. The transaction is rolled back so
+    // other test files sharing the database never see them.
+    let postgresRarities: string[] = [];
+    await expect(
+      db.transaction(async (tx) => {
+        await tx.insert(rarity).values(
+          Array.from({ length: count }, (_, offset) => ({
+            rarityName: `${prefix} ${offset + 1}`,
+            stars: stars(offset + 1),
+            chancePercent: 1,
+            createdAt: new Date(500),
+            updatedAt: new Date(500),
+            legacyCreatedAt: new Date(-1_000_000 + offset),
+          })),
+        );
+        postgresRarities = (await listRarities(tx))
+          .map((row) => row.rarity_name)
+          .filter((name) => name.startsWith(`${prefix} `));
+        throw new Error("rollback");
+      }),
+    ).rejects.toThrow("rollback");
+
+    const convexRarities = (await convex.query(api.rarities.list, {}))
+      .map((row) => row.rarity_name)
+      .filter((name) => name.startsWith(`${prefix} `));
+    expect(convexRarities).toHaveLength(200);
+    expect(convexRarities).not.toContain(`${prefix} ${count}`);
+    expect(postgresRarities).toEqual(convexRarities);
+  });
+
   it("matches Convex creation-order tie breaks for seasons and rarities", async () => {
     const prefix = `tie-order-${Date.now()}`;
     const convex = convexTest(schema, modules);
