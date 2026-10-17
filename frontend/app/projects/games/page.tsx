@@ -16,6 +16,14 @@ export const metadata: Metadata = {
 
 const TOOLS: ToolCard[] = [
   {
+    title: "Nine Lives",
+    icon: "🐈",
+    description:
+      "A cat monster-collecting RPG in alpha. Start in Napton and catalog your way to Hazelwood.",
+    href: "/nine-lives",
+    statusLabel: "Alpha",
+  },
+  {
     title: "Coinflip Challenge",
     icon: "🪙",
     description:
