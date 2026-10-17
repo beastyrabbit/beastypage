@@ -15,7 +15,7 @@ Convex stays the default until the cutover.
 | 1. Inventory and architecture | #105 | **Done** | `frontend/scripts/migration/convex-inventory.ts` (`--check` in CI), [`convex-inventory.md`](convex-inventory.md), [ADR 0001](adr-0001-postgresql.md) | Machine-linked blockers between the issues |
 | Production measurement and export | #106 | **Test export taken** (349 MB archive, SHA-256 recorded privately) | [`importer.md`](importer.md) | Actual export cost from the Convex usage page |
 | 2. PostgreSQL foundation | #108 | **Repository side done** | Drizzle, `db:local`, the CI `database` job, the migration runner with lock, version and fail-closed check, the bundled init-container runner, [`operations.md`](operations.md), `deploy/postgres/*` templates | kub-homelab CNPG cluster, Infisical paths, restore drill (need approval) |
-| 3. Target schema and contracts | #107, #109 | **Done**; validated on the real archive | `server/db/schema/*`, `server/db/contracts.ts`, `drizzle/0000_init.sql`, `drizzle/0001_quick_share_collection_slugs.sql` (Quick Share collection items share one slug; expand-only), [`data-contract.md`](data-contract.md) | Counts on #107 |
+| 3. Target schema and contracts | #107, #109 | **Done**; validated on the real archive | `server/db/schema/*`, `server/db/contracts.ts`, `drizzle/0000_init.sql`, `drizzle/0001_quick_share_collection_slugs.sql` (Quick Share collection items share one slug; expand-only), `drizzle/0002_timestamp_precision.sql` (every timestamp column at millisecond precision, matching JS `Date` and Convex; expand-safe), [`data-contract.md`](data-contract.md) | Counts on #107 |
 | Image storage | #110 | **Done** | `files` table (`bytea`; 333 referenced images, 167 MB), `/api/files/[id]`, one decoding write path `storeFile` for uploads and generated images, `files.orphan-cleanup` job that fails closed when a new file reference column appears | — |
 | 4. Importer | #111 | **Done**; runs cleanly on the real archive | `scripts/migration/import*`, [`importer.md`](importer.md) | Counts on #111 (3 expected quarantined rows owned by a deleted user are dropped by decision) |
 | Staging data | #112 | **Tooling done** | `scrub:staging` (HMAC pseudonyms, regenerated tokens, staging password, `--verify`, loopback/explicit-database guard), [`staging.md`](staging.md) | Staging namespace and scrubbed archive (approval) |
@@ -46,6 +46,44 @@ default-row races, the job worker's lost wake and missing LISTEN reconnect,
 bounded live replay, SSE backpressure, worker shutdown, the thumbnail job's
 lock scope, and runbook command errors.
 
+## Comparison with the live site (2026-10-17)
+
+A headless browser loaded 42 routes, signed out, on beastyrabbit.com (Convex)
+and on the local PostgreSQL build (real archive imported, Convex unreachable,
+media service running), and compared page text, loaded images, console
+errors and failed requests. This found bugs that every test suite had missed:
+
+- Missing share links crashed the page ("This page couldn't load") instead
+  of showing the not-found message, on `/view`, `/adoption`, `/evolution`,
+  `/ancestry-tree` and `/visual-builder/view`. Convex returns `null`; the API
+  answers 404 and the data hook rethrew it. Nullable lookups now pass
+  `fetchJson(…, { nullable: true })`, which maps only a 404 to `null`.
+- Catdex showed a different first page, and seasons and rarities a
+  different order. Convex orders an index by its fields and then by
+  `_creationTime`; the importer keeps `_creationTime` in `legacy_created_at`
+  and the document's own `createdAt` in `created_at`. Every list now orders
+  by the mirrored index fields, then `coalesce(legacy_created_at,
+  created_at)`, then id, and limits before sorting where Convex sorts in
+  JavaScript after `.take()` (rarities, stream participants and votes).
+  Keyset cursors carry both timestamps.
+- Cursors held milliseconds while `timestamptz` stored microseconds, so rows
+  inside one millisecond could be skipped or repeated (migration 0002). Only
+  four same-millisecond groups exist in the real archive (`perfect_cats`,
+  `user_variants`, neither paginated); after rounding they tie-break by id.
+
+Result after the fixes: 41 of 42 routes have identical text to the live
+site. The exception is Perfect Cat, whose matchup is random. No server errors.
+Two independent review rounds on the fixes: the first found six real issues
+(fixed above) and one rejected (old cursor formats; nothing is deployed),
+the second two minor ones (rarity window, a test that passed without the
+fix), both fixed. Signed-in pages were not compared with live (that needs the
+maintainer's production login); they are covered by the local signed-in
+check below.
+
+Local check note: open the dev server as `http://localhost:<port>`. Next 16
+dev blocks its scripts for `127.0.0.1` unless `allowedDevOrigins` lists it,
+and the page then never hydrates.
+
 ## Validation run for this state
 
 All commands run from `frontend/` on 2026-10-17.
@@ -53,15 +91,15 @@ All commands run from `frontend/` on 2026-10-17.
 | Check | Command | Result |
 | --- | --- | --- |
 | Type check | `tsc --noEmit` | pass |
-| Lint and format | `biome check` on every file changed by the review fixes | no errors; 2 warnings in older component code |
-| Unit tests | `vitest run --project unit` | 123 files, 838 tests pass |
-| Database tests (real PostgreSQL 18) | `pnpm run test:db` | 42 files, 200 tests pass (two consecutive clean runs) |
+| Lint and format | `biome check` on every file changed by the review and live-parity fixes | no errors; 2 warnings in older component code |
+| Unit tests | `vitest run --project unit` | 125 files, 846 tests pass |
+| Database tests (real PostgreSQL 18) | `pnpm run test:db` | 42 files, 208 tests pass (two consecutive clean runs) |
 | Schema drift | `pnpm run db:drift` | no drift |
 | Inventory up to date | `migration:inventory --check` | pass |
 | Production build | `next build` (CI placeholders) | pass, no warnings |
 | Media service | `tsc`, `vitest run` in `backend/media_service` | pass, 59 tests |
-| Real archive | `import:convex --expected-database … --expected-issuer …` then `verify:import` | OK: 35 tables, 336 files, nothing quarantined |
-| Running app on PostgreSQL, Convex unreachable | `next dev` with `DATA_BACKEND=postgres`, `NEXT_PUBLIC_CONVEX_URL` pointed at a closed port, the imported archive and Infisical dev secrets, checked in a browser signed in | Stream control and profile render signed in with no loading hang; saved variants sync through `/api/user-variants`; every API call 200, no server errors; wheel stats return `forcedCount` on the real data |
+| Real archive | `import:convex --expected-database … --expected-issuer …` then `verify:import` | OK on schema version 3: 35 tables, 336 files; only the 3 expected quarantined rows owned by a deleted user |
+| Running app on PostgreSQL, Convex unreachable | `next dev` with `DATA_BACKEND=postgres`, `NEXT_PUBLIC_CONVEX_URL` pointed at a closed port, the imported archive and Infisical dev secrets, checked in a browser signed in | Stream control and profile render signed in with no loading hang (2026-10-17, before the live comparison above); saved variants sync through `/api/user-variants`; every API call 200, no server errors; wheel stats return `forcedCount` on the real data |
 
 Earlier running-app checks (2026-10-16) found two bugs that tests missed:
 route handlers could not read the Clerk session (the proxy now mounts
