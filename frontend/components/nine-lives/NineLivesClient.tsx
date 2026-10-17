@@ -510,12 +510,12 @@ export function NineLivesClient() {
             </div>
 
             <div
-              className={`@container mt-5 grid min-w-0 grid-cols-2 items-center gap-x-3 gap-y-3 px-3 pb-2 sm:mt-7 @lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] @lg:gap-10 @lg:px-12 ${
+              className={`mt-5 grid min-w-0 grid-cols-2 items-center gap-x-3 gap-y-3 px-3 pb-2 sm:mt-7 @xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] @xl:gap-10 @xl:px-12 ${
                 presentationMode === "game" ? "hidden" : ""
               }`}
             >
               <DPad onPress={press} onRelease={release} pressed={pressed} />
-              <div className="col-span-2 row-start-2 flex flex-col items-center gap-2 self-end pb-1 @lg:col-span-1 @lg:row-start-auto">
+              <div className="col-span-2 row-start-2 flex flex-col items-center gap-2 self-end pb-1 @xl:col-span-1 @xl:row-start-auto">
                 <div className="flex gap-2">
                   <DeviceButton
                     name="select"
@@ -544,7 +544,7 @@ export function NineLivesClient() {
                   Power
                 </button>
               </div>
-              <div className="col-start-2 row-start-1 flex min-w-0 justify-end @lg:col-start-auto @lg:row-start-auto">
+              <div className="col-start-2 row-start-1 flex min-w-0 justify-end @xl:col-start-auto @xl:row-start-auto">
                 <div className="relative h-28 w-32">
                   <div className="absolute left-0 top-1">
                     <SpeakerGrille />
