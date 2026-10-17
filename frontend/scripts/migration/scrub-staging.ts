@@ -247,7 +247,6 @@ async function deleteRows(
 }
 
 async function scrub(
-  // NOSONAR
   client: pg.PoolClient,
   options: ScrubOptions,
   database: string,
@@ -368,7 +367,6 @@ function passwordMatches(password: string, stored: string | null): boolean {
 }
 
 async function verify(
-  // NOSONAR
   client: pg.PoolClient,
   options: ScrubOptions,
   database: string,

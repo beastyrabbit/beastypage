@@ -343,7 +343,6 @@ export async function triggerCatStreamBatch(
 }
 
 export async function reportBatchStage(
-  // NOSONAR
   db: Database,
   apiKey: string,
   args: { seq: number; stageIndex: number; awaitingCull: boolean },

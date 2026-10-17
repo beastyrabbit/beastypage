@@ -54,7 +54,6 @@ async function checkReadyUpload(
 
 /** Problems for one upload; an empty list means the metadata matches S3. */
 export async function checkUpload(
-  // NOSONAR
   row: UploadRow,
   head: Head,
 ): Promise<string[]> {

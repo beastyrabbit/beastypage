@@ -159,7 +159,6 @@ function resolveHistoryStarter(
 }
 
 export function EvolutionGeneratorClient() {
-  // NOSONAR
   const createBatch = useAdoptionCreate();
   const createMapper = useCatCreate();
   const updateBatchMeta = useAdoptionUpdateMeta();

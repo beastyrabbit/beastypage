@@ -33,7 +33,6 @@ function snapshotEvent(revision: number, data: unknown): string {
 }
 
 export async function GET(
-  // NOSONAR
   request: NextRequest,
   { params }: { params: Promise<{ topic: string[] }> },
 ) {

@@ -61,21 +61,16 @@ function stableStringify(value: unknown): string {
 }
 
 function compareCodeUnits(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
-function codeUnitAt(value: string, index: number): number {
-  const codePoint = value.codePointAt(index) ?? 0;
-  return codePoint <= 0xffff
-    ? codePoint
-    : 0xd800 + ((codePoint - 0x10000) >> 10);
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
 }
 
 function hashCatParams(params: unknown): string {
   const input = stableStringify(params);
   let hash = 5381;
   for (let index = 0; index < input.length; index += 1) {
-    hash = (hash * 33) ^ codeUnitAt(input, index);
+    hash = (hash * 33) ^ input.charCodeAt(index);
     hash >>>= 0;
   }
   return hash.toString(16);

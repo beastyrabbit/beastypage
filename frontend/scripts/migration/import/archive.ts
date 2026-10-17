@@ -4,7 +4,11 @@ import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
 import yauzl from "yauzl";
 
-const compareCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+function compareCodeUnits(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
 
 /**
  * Read-only view of a Convex export ZIP:

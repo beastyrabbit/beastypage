@@ -13,7 +13,11 @@ const sha256 = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 const hmac = (key: Buffer | string, value: string) =>
   createHmac("sha256", key).update(value).digest();
-const compareCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+function compareCodeUnits(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
 
 /** RFC 3986 encoding per S3 path segment, keeping `/`. */
 export function encodeS3Path(path: string): string {

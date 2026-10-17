@@ -81,10 +81,6 @@ export const QUICK_SHARE_POLICY = {
   collectionMaxItems: 100,
 } as const;
 
-function noQuickShareBody(): null {
-  return null;
-}
-
 type Tier = "anonymous" | "signedIn";
 type UploadState =
   | "uploading"
@@ -598,13 +594,13 @@ async function finishImport(db: Database, body: OpBody, now: number) {
 async function failImport(db: Database, body: OpBody, now: number) {
   return withTransaction(db, async (tx) => {
     const upload = await getUpload(tx, id(body, "uploadId"), true);
-    if (!upload) return noQuickShareBody();
+    if (!upload) return null;
     if (
       upload.receiptHash !== requiredString(body, "receiptHash") ||
       upload.source !== "url" ||
       upload.state !== "uploading"
     )
-      return noQuickShareBody();
+      return null;
     if (upload.importReservedBytes !== null)
       await releaseImportReservation(tx, upload, 0, now);
     await updateUpload(tx, upload.id, {
@@ -615,7 +611,7 @@ async function failImport(db: Database, body: OpBody, now: number) {
       failureMessage: "The remote media could not be imported.",
       updatedAt: new Date(now),
     });
-    return noQuickShareBody();
+    return null;
   });
 }
 
@@ -860,7 +856,7 @@ async function unbanIp(db: Database, body: OpBody, now: number) {
 async function removeUpload(db: Database, body: OpBody, now: number) {
   return withTransaction(db, async (tx) => {
     const upload = await getUpload(tx, id(body, "uploadId"), true);
-    if (!upload) return noQuickShareBody();
+    if (!upload) return null;
     await updateUpload(tx, upload.id, {
       active: false,
       state: "removed",
@@ -871,7 +867,7 @@ async function removeUpload(db: Database, body: OpBody, now: number) {
     });
     if (!(await getJobForUploadKind(tx, upload.id, "delete", true)))
       await enqueueMediaJob(tx, upload.id, "delete", new Date(now));
-    return noQuickShareBody();
+    return null;
   });
 }
 
@@ -1032,7 +1028,6 @@ export interface QuickShareResult {
 }
 
 export async function handleQuickShareOperation(
-  // NOSONAR
   db: Database,
   op: string,
   body: OpBody,

@@ -133,7 +133,9 @@ function compact(text: string): string {
 }
 
 function compareCodeUnits(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
 }
 
 function sorted(values: Iterable<string>): string[] {
@@ -143,7 +145,6 @@ function sorted(values: Iterable<string>): string[] {
 // ---------------------------------------------------------------- schema
 
 function validatorDetails(
-  // NOSONAR
   node: ts.Node,
   path: string,
   table: Pick<SchemaTable, "anyFields" | "idReferences" | "storageFields">,
@@ -191,7 +192,6 @@ function validatorDetails(
 }
 
 function readSchema(): {
-  // NOSONAR
   tables: SchemaTable[];
   sharedValidatorAnyFields: string[];
 } {
@@ -278,7 +278,6 @@ function convexModules(): string[] {
 }
 
 function functionDetails(
-  // NOSONAR
   node: ts.Node,
 ): Omit<ConvexFunction, keyof Location | "module" | "name" | "kind"> {
   const tablesRead = new Set<string>();
@@ -334,7 +333,6 @@ function functionDetails(
 }
 
 function readFunctions(): {
-  // NOSONAR
   functions: ConvexFunction[];
   scheduledCalls: Inventory["scheduledCalls"];
 } {

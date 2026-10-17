@@ -173,7 +173,6 @@ async function checkCountsAndFingerprints(
 }
 
 async function checkLegacyLinks(
-  // NOSONAR
   client: pg.PoolClient,
   archive: ConvexArchive,
   mismatches: VerificationMismatch[],
@@ -248,7 +247,6 @@ async function linkExists(
 }
 
 async function checkMappedSamples(
-  // NOSONAR
   client: pg.PoolClient,
   archive: ConvexArchive,
   report: ImportReport,

@@ -431,7 +431,6 @@ export async function listStreamVotes(
 }
 
 export async function createStreamVote(
-  // NOSONAR
   db: Database,
   args: {
     viewerSession?: string;

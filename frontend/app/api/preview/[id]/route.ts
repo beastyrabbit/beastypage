@@ -297,20 +297,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id: profileId } = await params;
+  let cat: string | undefined;
   try {
-    const { cat } = parseSearchParams(
+    ({ cat } = parseSearchParams(
       request.nextUrl.searchParams,
       encodedPreviewQuerySchema,
-    );
-    if (cat) return renderEncodedPreview(cat, request);
-    if (!profileId)
-      return NextResponse.json(
-        { error: "Missing profile ID" },
-        { status: 400 },
-      );
-    return dataBackend() === "postgres"
-      ? renderPostgresPreview(profileId, request)
-      : renderConvexPreview(profileId, request);
+    ));
   } catch (error) {
     return errorResponse(
       error,
@@ -318,4 +310,10 @@ export async function GET(
       "Invalid query parameters",
     );
   }
+  if (cat) return renderEncodedPreview(cat, request);
+  if (!profileId)
+    return NextResponse.json({ error: "Missing profile ID" }, { status: 400 });
+  return dataBackend() === "postgres"
+    ? renderPostgresPreview(profileId, request)
+    : renderConvexPreview(profileId, request);
 }

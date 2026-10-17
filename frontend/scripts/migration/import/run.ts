@@ -25,7 +25,11 @@ import { inspectFile, parseStorageMeta, type StorageMeta } from "./files";
 import { importedFileId } from "./ids";
 import { NOT_IMPORTED, type Row, STEPS, STORAGE_FIELDS } from "./tables";
 
-const compareCodeUnits = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+function compareCodeUnits(a: string, b: string): number {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
 
 export interface ImportOptions {
   archivePath: string;
@@ -287,7 +291,6 @@ export async function runImport(
 }
 
 async function importStep(
-  // NOSONAR
   client: pg.PoolClient,
   db: Database,
   archive: ConvexArchive,
@@ -509,7 +512,6 @@ async function upsertRows(
 
 /** Storage ids referenced by rows that will be imported. */
 async function referencedStorageIds(
-  // NOSONAR
   archive: ConvexArchive,
   freezeAt: Date,
 ): Promise<Set<string>> {
@@ -539,7 +541,6 @@ async function referencedStorageIds(
 }
 
 async function importFiles(
-  // NOSONAR
   db: Database,
   archive: ConvexArchive,
   archiveSha256: string,
