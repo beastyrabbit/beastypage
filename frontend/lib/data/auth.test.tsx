@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -6,7 +7,12 @@ import { DataBackendProvider } from "./backend";
 
 const authMocks = vi.hoisted(() => ({
   convex: vi.fn(() => ({ isLoading: true, isAuthenticated: false })),
-  clerk: vi.fn(() => ({ isLoaded: false, isSignedIn: false })),
+  clerk: vi.fn(
+    (): { isLoaded: boolean; isSignedIn: boolean; userId?: string | null } => ({
+      isLoaded: false,
+      isSignedIn: false,
+    }),
+  ),
 }));
 
 vi.mock("convex/react", () => ({ useConvexAuth: authMocks.convex }));
@@ -20,19 +26,24 @@ function Probe({ onValue }: Readonly<{ onValue: (value: unknown) => void }>) {
 function renderProbe(
   backend: "convex" | "postgres",
   onValue: (value: unknown) => void,
+  queryClient = new QueryClient(),
 ) {
   const host = document.createElement("div");
   const root = createRoot(host);
-  act(() => {
-    root.render(
-      <DataBackendProvider backend={backend}>
-        <BackendAuthProvider>
-          <Probe onValue={onValue} />
-        </BackendAuthProvider>
-      </DataBackendProvider>,
-    );
-  });
-  return root;
+  const render = () =>
+    act(() => {
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <DataBackendProvider backend={backend}>
+            <BackendAuthProvider>
+              <Probe onValue={onValue} />
+            </BackendAuthProvider>
+          </DataBackendProvider>
+        </QueryClientProvider>,
+      );
+    });
+  render();
+  return Object.assign(root, { rerender: render });
 }
 
 describe("useBackendAuth", () => {
@@ -84,6 +95,39 @@ describe("useBackendAuth", () => {
       isLoading: true,
       isAuthenticated: false,
     });
+    root.unmount();
+  });
+
+  it("drops cached per-user data when the Clerk user changes", () => {
+    const queryClient = new QueryClient();
+    const viewerKey = ["users.viewer"];
+    authMocks.clerk.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: "user_a",
+    });
+    const root = renderProbe("postgres", () => {}, queryClient);
+    queryClient.setQueryData(viewerKey, { username: "a" });
+
+    root.rerender();
+    expect(queryClient.getQueryData(viewerKey)).toEqual({ username: "a" });
+
+    authMocks.clerk.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: "user_b",
+    });
+    root.rerender();
+    expect(queryClient.getQueryData(viewerKey)).toBeUndefined();
+
+    queryClient.setQueryData(viewerKey, { username: "b" });
+    authMocks.clerk.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+      userId: null,
+    });
+    root.rerender();
+    expect(queryClient.getQueryData(viewerKey)).toBeUndefined();
     root.unmount();
   });
 });

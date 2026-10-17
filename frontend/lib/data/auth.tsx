@@ -1,8 +1,15 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
+import { useQueryClient } from "@tanstack/react-query";
 import { useConvexAuth } from "convex/react";
-import { createContext, type ReactNode, useContext } from "react";
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { useDataBackend } from "./backend";
 
 export type BackendAuth = {
@@ -23,10 +30,29 @@ function ConvexBackendAuthProvider({
   );
 }
 
+/**
+ * Per-user queries (viewer, saved variants, stream sessions) are keyed
+ * without the Clerk user, so a sign-in, sign-out or account switch resets the
+ * query cache before the next paint instead of showing the previous user's
+ * data. Resetting also cancels fetches still running with the old session.
+ */
+function useResetQueriesOnUserChange(userId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  const previous = useRef(userId);
+  useLayoutEffect(() => {
+    if (userId === undefined) return;
+    if (previous.current !== undefined && previous.current !== userId) {
+      void queryClient.resetQueries();
+    }
+    previous.current = userId;
+  }, [queryClient, userId]);
+}
+
 function ClerkBackendAuthProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  useResetQueriesOnUserChange(userId);
   return (
     <BackendAuthContext.Provider
       value={{
