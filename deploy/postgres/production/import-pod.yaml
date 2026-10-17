@@ -25,19 +25,20 @@ spec:
       type: RuntimeDefault
   containers:
     - name: importer
-      # Keep this image identical to the frontend main container. The
-      # runner is Node-based, but it does not include the source import/verify
-      # scripts; the release-pinned tool bundle is copied into /work/tools.
       # Step 7 replaces this marker with the running frontend image before
-      # piping the private rendered manifest to kubectl apply.
+      # piping the private rendered manifest to kubectl apply. That image
+      # contains the bundled importer and verifier under /app.
       image: __FRONTEND_IMAGE__
       imagePullPolicy: IfNotPresent
       command: ["sh", "-c"]
       args:
         - >-
           umask 077;
-          mkdir -p /work/archive /work/reports /work/tools /tmp/node;
+          mkdir -p /work/archive /work/reports /tmp/node;
           sleep 7200
+      env:
+        - name: HOME
+          value: /tmp
       envFrom:
         - secretRef:
             name: beastypage-postgres-import-url
@@ -59,8 +60,6 @@ spec:
           mountPath: /work/archive
         - name: reports
           mountPath: /work/reports
-        - name: tools
-          mountPath: /work/tools
         - name: postgres-ca
           mountPath: /etc/postgres-ca
           readOnly: true
@@ -75,9 +74,6 @@ spec:
     - name: reports
       emptyDir:
         sizeLimit: 256Mi
-    - name: tools
-      emptyDir:
-        sizeLimit: 1Gi
     - name: tmp
       emptyDir:
         medium: Memory

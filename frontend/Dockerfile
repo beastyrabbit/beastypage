@@ -43,9 +43,9 @@ RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
 # Generated Convex types are committed; dependency installation skips scripts.
 RUN pnpm run build
 
-# Self-contained PostgreSQL migration runner (run as an init container).
-# It resolves ../../drizzle from its own path, so it keeps the source layout.
-RUN pnpm run db:bundle
+# Self-contained PostgreSQL migration and Convex import/verification runners.
+# Archive and report paths remain outside the image under /work.
+RUN pnpm run db:bundle && pnpm run db:bundle-import
 
 # Stage 3: Production image (Node-based for standalone compatibility)
 FROM node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS runner
@@ -69,6 +69,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/dist-db/scripts/db/migrate.mjs ./scripts/db/migrate.mjs
+COPY --from=builder /app/dist-db/scripts/migration ./scripts/migration
 COPY --from=builder /app/drizzle ./drizzle
 
 # Ensure directories are writable for runtime placeholder replacement

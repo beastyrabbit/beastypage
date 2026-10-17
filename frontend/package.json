@@ -20,6 +20,7 @@
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:drift": "sh scripts/db/check-drift.sh",
     "db:bundle": "esbuild scripts/db/migrate.ts --bundle --platform=node --format=esm --target=node24 --external:pg-native --banner:js=\"import{createRequire}from'node:module';const require=createRequire(import.meta.url);\" --outfile=dist-db/scripts/db/migrate.mjs",
+    "db:bundle-import": "esbuild scripts/migration/import-convex.ts scripts/migration/verify-import.ts --bundle --platform=node --format=esm --target=node24 --external:pg-native --external:sharp --banner:js=\"import{createRequire}from'node:module';const require=createRequire(import.meta.url);\" --outdir=dist-db/scripts/migration --out-extension:.js=.mjs",
     "test:db": "vitest run --project database",
     "migration:inventory": "tsx scripts/migration/convex-inventory.ts",
     "import:convex": "tsx scripts/migration/import-convex.ts",

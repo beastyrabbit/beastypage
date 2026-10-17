@@ -185,6 +185,10 @@ explicit approval.** Nothing in this repository applies them.
 Manual backup (for example before cutover):
 
 ```bash
+# A cold snapshot fences the chosen standby. With synchronous `ANY 1` and
+# `dataDurability: required`, both standbys must be healthy first; otherwise a
+# cold backup can pause primary commits while the snapshot runs.
+kubectl -n webpage cnpg status beastypage-postgres
 BACKUP_NAME="beastypage-postgres-pre-cutover-$(date -u +%Y%m%dT%H%MZ)"
 kubectl -n webpage cnpg backup beastypage-postgres --method volumeSnapshot \
   --online=false --backup-target prefer-standby \
@@ -192,6 +196,12 @@ kubectl -n webpage cnpg backup beastypage-postgres --method volumeSnapshot \
 kubectl -n webpage wait --for=condition=Completed \
   "backup/$BACKUP_NAME" --timeout=30m
 ```
+
+If either standby is already down, defer the manual cold backup until it is
+healthy or accept the documented write pause as an incident decision. A
+scheduled cold backup has the same fencing risk in a degraded three-instance
+cluster; suspend the `ScheduledBackup` while degraded and resume it after both
+standbys are healthy. See [CNPG data durability and synchronous replication](https://cloudnative-pg.io/docs/1.30/replication/#data-durability-and-synchronous-replication).
 
 Restore. CloudNativePG recovery bootstraps a new `Cluster`; it does not
 recover in place. The [CNPG 1.30 recovery documentation](https://cloudnative-pg.io/docs/1.30/recovery/#recovery-from-a-backup-object)
@@ -229,16 +239,23 @@ VolumeSnapshot have no owner reference that deletion would cascade (the
 chain would otherwise remove them). Preserve either object through the
 platform's reviewed orphaning procedure before proceeding.
 
-Submit this full manifest as the emergency kub-homelab Flux change, together with
-the deletion of the damaged `beastypage-postgres` Cluster; do not apply it
-with `kubectl` while the normal Flux manifest still declares the old
-`bootstrap.initdb`. Keep the frontend in maintenance and leave Convex paused
-throughout. Then:
+Restore is two reviewed Flux phases because CNPG evaluates `bootstrap` only
+when a Cluster is created, and one Flux change cannot delete and recreate the
+same Cluster name. Keep the frontend in maintenance and leave Convex paused
+throughout.
 
-1. Confirm the old Cluster is gone and the named Backup object and snapshot
-   still exist; record the deletion and recreation timestamps.
-2. Wait for `beastypage-postgres` to be `Ready` and for the generated
-   `beastypage-postgres-ca` secret to contain `ca.crt`.
+1. **Phase 1 — remove only the Cluster.** Submit a reviewed kub-homelab Flux
+   change that removes the `beastypage-postgres` `Cluster` from the desired
+   state. Leave `ScheduledBackup` and every `Backup` declaration untouched.
+   The production template keeps `Cluster` and `ScheduledBackup` as separate
+   YAML documents, so removing the former does not prune the latter. Reconcile
+   Flux, then confirm the Cluster and its PVCs are gone and the chosen Backup
+   and its VolumeSnapshot still exist. Preserve either object through the
+   platform's reviewed orphaning procedure if owner references would cascade.
+2. **Phase 2 — add the recovery Cluster.** Submit the complete production
+   `Cluster` manifest with `bootstrap.recovery.backup.name` set to the chosen
+   Backup, reconcile Flux, and wait for `beastypage-postgres` to be `Ready`.
+   Confirm the generated `beastypage-postgres-ca` secret contains `ca.crt`.
 3. Run `db:migrate --status` against the unchanged
    `beastypage-postgres-rw.webpage.svc` service, then run the verification
    queries in the cutover runbook: row counts, file hashes and relationships.

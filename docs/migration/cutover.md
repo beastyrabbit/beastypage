@@ -102,6 +102,11 @@ report directory on encrypted storage outside the repository.
    minutes; [APPROVAL REQUIRED]*
 
    ```sh
+   # Check both standbys are healthy before this cold snapshot. With three
+   # instances, synchronous ANY 1 and dataDurability: required, the snapshot
+   # fences the chosen standby; if the other standby is down, primary commits
+   # can pause for the snapshot duration.
+   kubectl -n webpage cnpg status beastypage-postgres
    BACKUP_NAME="beastypage-postgres-pre-cutover-$(date -u +%Y%m%dT%H%MZ)"
    kubectl -n webpage cnpg backup beastypage-postgres \
      --method volumeSnapshot --online=false --backup-target prefer-standby \
@@ -117,6 +122,11 @@ report directory on encrypted storage outside the repository.
 
    **Failure action:** stay on Convex and reschedule. If a backup exists but
    cannot be verified, take another one; do not start the gate.
+
+   A scheduled cold backup has the same fencing risk while the cluster is
+   degraded. Suspend the `ScheduledBackup` until both standbys are healthy if
+   the status check shows a degraded cluster. See [CNPG data durability and
+   synchronous replication](https://cloudnative-pg.io/docs/1.30/replication/#data-durability-and-synchronous-replication).
 
 4. **Enable the maintenance gate and stop new jobs** — *platform owner,
    2–5 minutes; [APPROVAL REQUIRED]*
@@ -196,37 +206,29 @@ report directory on encrypted storage outside the repository.
    [APPROVAL REQUIRED]*
 
    Download the final export from the paused Convex deployment into encrypted
-   storage. Set `ARCHIVE` to its private path. The frontend runner image
-   contains only the bundled `db:migrate` runner: it does not contain the
-   source `import:convex` or `verify:import` scripts, `tsx`, or their optional
-   Sharp binaries. Build a small, release-pinned tool bundle from this same
-   checkout and for the image architecture, then copy it into the pod. Build
-   and run this bundle in the staging rehearsal first (#112/#116) and reuse
-   the rehearsal-tested bundle, built from the release commit, in the window.
-   The build calls esbuild from `node_modules/.bin` directly because
-   `pnpm exec` would run the Convex codegen hook:
-
-   `NODE_RUNNER_IMAGE` below is the exact Alpine x86_64 runner base from
-   `frontend/Dockerfile`; the deployed frontend image must be built from that
-   same digest so the Sharp native module has the matching libc and architecture.
+   storage. Set `ARCHIVE` to its private path. The deployed frontend image
+   contains the bundled `import-convex.mjs` and `verify-import.mjs` runners
+   under `/app/scripts/migration`, including the matching musl Sharp binary.
+   Build and run this image in the staging rehearsal first (#112/#116), then
+   use the exact bytes already running in the production frontend pod.
 
    ```sh
+   # shellcheck shell=bash
    set -Eeuo pipefail
    ARCHIVE="/private/beastypage-cutover/snapshot_<deployment>_<ns>.zip"
-   TOOLS_DIR=/private/beastypage-cutover/import-tools
-   TOOL_ARCHIVE=/private/beastypage-cutover/import-tools.tgz
-   NODE_RUNNER_IMAGE='node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1'
    NS=webpage
    IMPORT_POD=beastypage-postgres-import
    REPORT=/private/beastypage-cutover/import-report
    VERIFY_REPORT=/private/beastypage-cutover/verify-report
    LOGIN_FLUX_NAMESPACE=flux-system
    LOGIN_FLUX_KUSTOMIZATION="<webpage-kustomization>"
+   CLEANUP_SCRIPT=deploy/postgres/production/import-cleanup.sh
    IMPORT_POD_RENDERED=
    IMPORT_ARCHIVE="/work/archive/$(basename "$ARCHIVE")"
    FREEZE_AT="$(cat /private/beastypage-cutover/freeze-at.txt)"
    copy_reports() {
-     mkdir -p -m 700 "$REPORT" "$VERIFY_REPORT"
+     mkdir -p "$REPORT" "$VERIFY_REPORT"
+     chmod 700 "$REPORT" "$VERIFY_REPORT"
      kubectl cp --no-preserve "$NS/$IMPORT_POD:/work/reports/import/." "$REPORT/" || true
      kubectl cp --no-preserve "$NS/$IMPORT_POD:/work/reports/verify/." "$VERIFY_REPORT/" || true
      find "$REPORT" "$VERIFY_REPORT" -type d -exec chmod 700 {} +
@@ -237,21 +239,11 @@ report directory on encrypted storage outside the repository.
      cleanup_failed=0
      set +e
      rm -f "${IMPORT_POD_RENDERED:-}"
-     kubectl -n "$NS" exec "$IMPORT_POD" -- sh -c \
-       'find /work/reports -mindepth 1 -delete; find /work/archive /work/tools -mindepth 1 -delete' \
-       >/dev/null 2>&1
-     kubectl -n "$NS" delete pod "$IMPORT_POD" --ignore-not-found --wait=true || cleanup_failed=1
-     kubectl -n "$NS" wait --for=delete "pod/$IMPORT_POD" --timeout=2m || cleanup_failed=1
-     test -z "$(kubectl -n "$NS" get pod "$IMPORT_POD" --ignore-not-found -o name)" || cleanup_failed=1
-     # The reviewed kub-homelab Flux change sets beastypage_import login:false.
-     # Reconcile it on every exit, including importer failure and Ctrl-C.
-     # The reviewed disable-login change must already be merged. Reconcile
-     # waits for it; Flux 2.9.6 has no separate wait subcommand.
-     flux -n "$LOGIN_FLUX_NAMESPACE" reconcile kustomization "$LOGIN_FLUX_KUSTOMIZATION" \
-       --with-source --timeout=10m || cleanup_failed=1
-     if ! kubectl -n "$NS" cnpg psql beastypage-postgres -- -Atqc \
-       "select rolcanlogin from pg_roles where rolname = 'beastypage_import'" | grep -qx f; then
-       echo "cleanup failed: merge the reviewed beastypage_import login:false change, then rerun cleanup" >&2
+     if ! IMPORT_CLEANUP_NAMESPACE="$NS" IMPORT_CLEANUP_POD="$IMPORT_POD" \
+       LOGIN_FLUX_NAMESPACE="$LOGIN_FLUX_NAMESPACE" \
+       LOGIN_FLUX_KUSTOMIZATION="$LOGIN_FLUX_KUSTOMIZATION" \
+       "$CLEANUP_SCRIPT"; then
+       echo "cleanup failed: merge the reviewed beastypage_import login:false change and rerun $CLEANUP_SCRIPT" >&2
        cleanup_failed=1
      fi
      if [ "$cleanup_failed" -ne 0 ] && [ "$rc" -eq 0 ]; then rc=1; fi
@@ -259,41 +251,36 @@ report directory on encrypted storage outside the repository.
    }
    trap 'exit 130' INT TERM
    trap cleanup EXIT
-   mkdir -p -m 700 "$TOOLS_DIR/frontend/scripts/migration"
-   pnpm --dir "$FRONTEND" install --frozen-lockfile --ignore-scripts
-   (cd "$FRONTEND" && ./node_modules/.bin/esbuild scripts/migration/import-convex.ts \
-     --bundle --platform=node --format=esm --target=node24 \
-     --external:pg-native --external:sharp \
-     --banner:js="import{createRequire}from'node:module';const require=createRequire(import.meta.url);" \
-     --outfile="$TOOLS_DIR/frontend/scripts/migration/import-convex.mjs")
-   (cd "$FRONTEND" && ./node_modules/.bin/esbuild scripts/migration/verify-import.ts \
-     --bundle --platform=node --format=esm --target=node24 \
-     --external:pg-native --external:sharp \
-     --banner:js="import{createRequire}from'node:module';const require=createRequire(import.meta.url);" \
-     --outfile="$TOOLS_DIR/frontend/scripts/migration/verify-import.mjs")
-   SHARP_VERSION="$(cd "$FRONTEND" && node -p \
-     "const v=require('./package.json').dependencies.sharp; if (!/^\\d+\\.\\d+\\.\\d+$/.test(v)) throw new Error('sharp must be pinned'); v")"
-   docker run --rm -v "$TOOLS_DIR:/tools" -w /tools "$NODE_RUNNER_IMAGE" \
-     npm install --no-save --no-package-lock --omit=dev "sharp@$SHARP_VERSION"
-   docker run --rm -v "$TOOLS_DIR:/tools" -w /tools "$NODE_RUNNER_IMAGE" \
-     node -e 'require("sharp")'
-   tar -C "$TOOLS_DIR" -czf "$TOOL_ARCHIVE" .
-   chmod 0600 "$TOOL_ARCHIVE"
    # Apply the reviewed ephemeral template in
    # deploy/postgres/production/import-pod.yaml with the exact frontend image
-   # (including digest) used by the rollout. It has no service-account token, runs as UID 1001
+   # digest used by a Ready frontend pod. It has no service-account token, runs as UID 1001
    # with a read-only root filesystem, and mounts only
    # beastypage-postgres-import-url through envFrom. Its disk-backed emptyDir
-   # is the only archive copy in Kubernetes; never use a PVC. The CA volume
+   # is the only archive copy in Kubernetes; never use a PVC. HOME is /tmp for
+   # Node/Sharp caches. The CA volume
    # selects ca.crt only because CNPG's generated beastypage-postgres-ca
    # secret also contains ca.key.
 
-   IMPORT_POD_RENDERED="$(mktemp "$TOOLS_DIR/import-pod.XXXXXX.yaml")"
+   FRONTEND_SELECTOR="$(kubectl -n "$NS" get deploy beastypage-frontend -o json \
+     | jq -r '.spec.selector.matchLabels | to_entries | map("\(.key)=\(.value)") | join(",")')"
+   : "${FRONTEND_SELECTOR:?frontend Deployment selector is empty}"
+   FRONTEND_IMAGE="$(kubectl -n "$NS" get pods -l "$FRONTEND_SELECTOR" -o json \
+     | jq -r '[.items[]
+       | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))
+       | .status.containerStatuses[]?
+       | select(.name == "main")
+       | .imageID
+       | select(type == "string")
+       | sub("^docker-pullable://"; "")
+       | select(test("@sha256:[0-9a-f]{64}$"))] | first // empty')"
+   if [ -z "$FRONTEND_IMAGE" ]; then
+     echo "no Ready frontend pod has a digest imageID for container main" >&2
+     exit 1
+   fi
+
+   IMPORT_POD_RENDERED="$(mktemp "${TMPDIR:-/tmp}/import-pod.XXXXXX.yaml")"
    chmod 600 "$IMPORT_POD_RENDERED"
-   FRONTEND_IMAGE="$(kubectl -n "$NS" get deploy beastypage-frontend \
-     -o jsonpath='{.spec.template.spec.containers[?(@.name=="main")].image}')"
-   : "${FRONTEND_IMAGE:?frontend Deployment image is empty}"
-   python3 - "$FRONTEND_IMAGE" >"$IMPORT_POD_RENDERED" <<'PY'
+   python3 -c '
    from pathlib import Path
    import sys
 
@@ -303,33 +290,27 @@ report directory on encrypted storage outside the repository.
    if marker not in template:
        raise SystemExit("import-pod image marker is missing")
    print(template.replace(marker, image), end="")
-   PY
+   ' "$FRONTEND_IMAGE" >"$IMPORT_POD_RENDERED"
    cat "$IMPORT_POD_RENDERED" | kubectl apply -f -
    rm -f "$IMPORT_POD_RENDERED"
    kubectl -n "$NS" wait --for=condition=Ready "pod/$IMPORT_POD" --timeout=5m
    kubectl cp --no-preserve "$ARCHIVE" \
      "$NS/$IMPORT_POD:/work/archive/$(basename "$ARCHIVE")"
-   kubectl cp --no-preserve "$TOOL_ARCHIVE" \
-     "$NS/$IMPORT_POD:/work/tools/import-tools.tgz"
-   kubectl -n "$NS" exec "$IMPORT_POD" -- \
-     tar -xzf /work/tools/import-tools.tgz -C /work/tools
 
    # Keep the import URL value out of command arguments and output. Run the
    # importer and verifier from inside the pod; the archive and reports are
    # outside the checkout, and the import role is temporarily enabled only by
    # the kub-homelab Flux change.
 
-   # Equivalent to pnpm run import:convex from the release checkout.
    kubectl -n "$NS" exec "$IMPORT_POD" -- sh -c \
-     "cd /work/tools/frontend && node scripts/migration/import-convex.mjs \
+     "cd /app && node scripts/migration/import-convex.mjs \
        --archive '$IMPORT_ARCHIVE' --report-dir /work/reports/import \
        --expected-database beastypage \
        --freeze-at '$FREEZE_AT' \
        --expected-issuer https://<clerk-production-issuer> \
        --replace --confirm-remote-replace" || { copy_reports; exit 1; }
-   # Equivalent to pnpm run verify:import from the release checkout.
    kubectl -n "$NS" exec "$IMPORT_POD" -- sh -c \
-     "cd /work/tools/frontend && node scripts/migration/verify-import.mjs \
+     "cd /app && node scripts/migration/verify-import.mjs \
        --archive '$IMPORT_ARCHIVE' --import-report /work/reports/import/report.json \
        --expected-database beastypage \
        --expected-issuer https://<clerk-production-issuer> \
@@ -343,19 +324,20 @@ report directory on encrypted storage outside the repository.
    paired change that sets `beastypage_import` back to `login: false`. Prepare
    and merge the enable and disable changes together before the window. If the
    disable change is not merged when cleanup starts, cleanup must fail loudly;
-   the operator merges it and reruns the cleanup function before any rerun.
+   the operator merges it and reruns `deploy/postgres/production/import-cleanup.sh`
+   before any rerun.
 
    **Expected output:** the importer says `complete`; `verify:import` says
    `OK`. Counts include only documented skips/quarantines, fingerprints match,
    imported legacy links resolve, sampled converted rows match, and every
    referenced file's bytes hash to its stored SHA-256. The `EXIT` trap always
-   deletes report files in the pod, deletes the pod and confirms it is gone,
-   then reconciles the Flux change that disables `beastypage_import`. The
+   deletes the pod and confirms it is gone, then reconciles the Flux change
+   that disables `beastypage_import`. The
    operator's original archive remains at its encrypted private path
    (`/private/beastypage-cutover/...`) until the retention decision is
    recorded, following the handling rule in [importer.md](importer.md) and
-   this runbook's evidence policy; then delete the archive, tool bundle and
-   private reports, retaining only count and fingerprint evidence.
+   this runbook's evidence policy; then delete the archive and private
+   reports, retaining only count and fingerprint evidence.
 
    The migration init container runs `db:migrate` as
    `beastypage_owner`. After Drizzle migrations and the schema-version write,
