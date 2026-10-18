@@ -9,7 +9,7 @@ Thank you for your interest in contributing! This document provides guidelines f
 - [Node.js](https://nodejs.org/) v24 or higher (required by Portless)
 - [pnpm](https://pnpm.io/) v10 or higher
 - [Git](https://git-scm.com/)
-- A [Convex](https://convex.dev) account (for database features)
+- Access to the development PostgreSQL configuration in Infisical
 
 ### Development Setup
 
@@ -29,9 +29,9 @@ Thank you for your interest in contributing! This document provides guidelines f
    pnpm run dev
    ```
 
-   The frontend `prepare` hook runs Convex code generation. After configuring
-   `CONVEX_DEPLOYMENT`, refresh generated types explicitly with
-   `pnpm exec convex codegen`.
+   The frontend uses PostgreSQL through Drizzle. Database migrations are applied
+   by the frontend init container; local development reads database and runtime
+   settings from Infisical.
 
 ## How to Contribute
 

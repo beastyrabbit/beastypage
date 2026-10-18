@@ -3,7 +3,7 @@ import { ThemePreviewClient } from "./ThemePreviewClient";
 
 /**
  * DEV HARNESS — renders any overlay theme's spin scene with mock data so it
- * can be designed without Convex, the renderer, or a live stream session.
+ * can be designed without PostgreSQL, the renderer, or a live stream session.
  *
  *   /dev/obs-theme-preview?theme=plate&state=rolling&pose=adult_short2&wheel=1
  *

@@ -15,7 +15,7 @@ export function SiteFooter() {
     <footer className="border-t border-border/60 bg-background/80">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-10 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>
-          &copy; {new Date().getFullYear()} Cat Gacha. Crafted with Convex,
+          &copy; {new Date().getFullYear()} Cat Gacha. Crafted with PostgreSQL,
           Next.js, and{" "}
           <span className="peek-host">
             <span className="peek-wrap" aria-hidden>

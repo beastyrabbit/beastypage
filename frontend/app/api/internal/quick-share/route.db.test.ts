@@ -23,7 +23,6 @@ describe("POST /api/internal/quick-share", () => {
   });
 
   it("requires the internal token with a constant-time comparison", async () => {
-    vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
     const { POST } = await import("./route");
     const response = await POST(
@@ -35,26 +34,7 @@ describe("POST /api/internal/quick-share", () => {
     expect(response.status).toBe(401);
   });
 
-  it("is unavailable while Convex remains the selected backend", async () => {
-    vi.stubEnv("DATA_BACKEND", "convex");
-    vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
-    const { POST } = await import("./route");
-    const response = await POST(
-      new NextRequest("http://localhost/api/internal/quick-share", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-quick-share-internal-token": "internal-token",
-        },
-        body: JSON.stringify({ op: "policy" }),
-      }),
-    );
-    expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ error: "Not found" });
-  });
-
   it("returns the policy through the PostgreSQL route", async () => {
-    vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
     handleQuickShareOperation.mockResolvedValue({
       status: 200,
@@ -79,7 +59,6 @@ describe("POST /api/internal/quick-share", () => {
   });
 
   it("accepts the internal token as a bearer credential", async () => {
-    vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
     handleQuickShareOperation.mockResolvedValue({
       status: 200,
@@ -101,7 +80,6 @@ describe("POST /api/internal/quick-share", () => {
   });
 
   it("never treats the internal bearer credential as a user token", async () => {
-    vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
     handleQuickShareOperation.mockResolvedValue({ status: 200, body: {} });
     const { POST } = await import("./route");
@@ -125,7 +103,6 @@ describe("POST /api/internal/quick-share", () => {
   });
 
   it("rejects an invalid forwarded user token", async () => {
-    vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
     identityFromForwardedToken.mockRejectedValue(new Error("expired"));
     const { POST } = await import("./route");
@@ -169,7 +146,6 @@ describe("POST /api/internal/quick-share", () => {
   it.each(operations)(
     "dispatches %s through the PostgreSQL route",
     async (op) => {
-      vi.stubEnv("DATA_BACKEND", "postgres");
       vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
       identityFromForwardedToken.mockResolvedValue({
         tokenIdentifier: "iss|owner",
@@ -203,7 +179,6 @@ describe("POST /api/internal/quick-share", () => {
   );
 
   it.each(operations)("preserves a denial from %s", async (op) => {
-    vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
     handleQuickShareOperation.mockResolvedValue({
       status: 403,
@@ -225,7 +200,6 @@ describe("POST /api/internal/quick-share", () => {
   });
 
   it("rejects malformed JSON before dispatching an operation", async () => {
-    vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
     const { POST } = await import("./route");
     const response = await POST(
@@ -242,8 +216,7 @@ describe("POST /api/internal/quick-share", () => {
     expect(await response.json()).toEqual({ error: "Invalid JSON" });
   });
 
-  it("keeps the Convex missing-operation response", async () => {
-    vi.stubEnv("DATA_BACKEND", "postgres");
+  it("keeps the PostgreSQL missing-operation response", async () => {
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
     const { POST } = await import("./route");
     const response = await POST(

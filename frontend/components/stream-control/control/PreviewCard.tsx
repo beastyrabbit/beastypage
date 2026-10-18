@@ -16,7 +16,7 @@ const ENLARGED_WIDTH = 1152;
 /**
  * OBS overlay live preview — stays visible next to whichever tab is active
  * so settings changes give instant feedback. The iframe never reloads on a
- * theme change (Convex pushes it); a quick shimmer marks the switch.
+ * theme change (PostgreSQL pushes it); a quick shimmer marks the switch.
  */
 export function PreviewCard() {
   const { obsUrl, previewContainerRef, overlayTheme } = useStreamControl();

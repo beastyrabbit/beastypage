@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseSearchParams } from "@/server/request";
@@ -12,11 +11,6 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (dataBackend() !== "postgres")
-    return NextResponse.json(
-      { error: "Not found", code: "not_found" },
-      { status: 404 },
-    );
   try {
     const { id } = await params;
     const { key } = parseSearchParams(

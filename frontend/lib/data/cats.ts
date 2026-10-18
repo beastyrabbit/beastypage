@@ -1,19 +1,50 @@
 "use client";
 
-import type { FunctionArgs, FunctionReturnType } from "convex/server";
-import { api } from "@/convex/_generated/api";
 import { fetchJson } from "@/lib/api";
+import type {
+  createBatch,
+  getBatch,
+  listBatches,
+  updateBatchMeta,
+} from "@/server/services/adoption";
+import type {
+  getBySlug,
+  listTrees,
+  saveTree,
+} from "@/server/services/ancestry";
+import type {
+  createProfile,
+  getProfile,
+  listHistory,
+  updateProfileMeta,
+} from "@/server/services/cats";
 import { useDataMutation, useDataQuery } from "./hooks";
 import { dataQueryKeys } from "./keys";
 
-type Profile = FunctionReturnType<typeof api.mapper.getBySlug>;
-type Batch = FunctionReturnType<typeof api.adoptionV2.getBySlug>;
-type Tree = FunctionReturnType<typeof api.ancestryTree.getBySlug>;
+type Profile = NonNullable<Awaited<ReturnType<typeof getProfile>>>;
+type Batch = NonNullable<Awaited<ReturnType<typeof getBatch>>>;
+type Tree = NonNullable<Awaited<ReturnType<typeof getBySlug>>>;
+type CatHistory = Awaited<ReturnType<typeof listHistory>>;
+type AdoptionHistory = Awaited<ReturnType<typeof listBatches>>;
+type AncestryHistory = Awaited<ReturnType<typeof listTrees>>;
+type CatCreateArgs = Parameters<typeof createProfile>[1];
+type CatCreateResult = Awaited<ReturnType<typeof createProfile>>;
+type AdoptionCreateArgs = Parameters<typeof createBatch>[1];
+type AdoptionCreateResult = Awaited<ReturnType<typeof createBatch>>;
+type TreeSaveArgs = Parameters<typeof saveTree>[1];
+type TreeSaveResult = Awaited<ReturnType<typeof saveTree>>;
+type SlugCheck = { exists: boolean; hasPassword: boolean };
+type PaletteRecord = {
+  slug: string;
+  config: unknown;
+  createdAt: number;
+  updatedAt: number;
+};
 
 export function useCatProfile(
   slugOrId: string | null | undefined,
 ): Profile | undefined {
-  return useDataQuery(api.mapper.getBySlug, slugOrId ? { slugOrId } : "skip", {
+  return useDataQuery(slugOrId ? { slugOrId } : "skip", {
     queryKey: dataQueryKeys.detail("cat-profile", slugOrId ?? "none"),
     queryFn: (args) =>
       fetchJson<Profile>(
@@ -25,14 +56,11 @@ export function useCatProfile(
 
 export function useCatHistory(limit = 200) {
   return useDataQuery(
-    api.mapper.listHistory,
     { limit },
     {
       queryKey: dataQueryKeys.list("cat-history", { limit }),
       queryFn: (args) =>
-        fetchJson<
-          NonNullable<FunctionReturnType<typeof api.mapper.listHistory>>
-        >(`/api/cats/history?limit=${args.limit}`),
+        fetchJson<CatHistory>(`/api/cats/history?limit=${args.limit}`),
     },
   );
 }
@@ -40,30 +68,23 @@ export function useCatHistory(limit = 200) {
 export function useAdoptionBatch(
   slugOrId: string | null | undefined,
 ): Batch | undefined {
-  return useDataQuery(
-    api.adoptionV2.getBySlug,
-    slugOrId ? { slugOrId } : "skip",
-    {
-      queryKey: dataQueryKeys.detail("adoption-batch", slugOrId ?? "none"),
-      queryFn: (args) =>
-        fetchJson<Batch>(
-          `/api/adoption/batch?slugOrId=${encodeURIComponent(args.slugOrId)}`,
-          { nullable: true },
-        ),
-    },
-  );
+  return useDataQuery(slugOrId ? { slugOrId } : "skip", {
+    queryKey: dataQueryKeys.detail("adoption-batch", slugOrId ?? "none"),
+    queryFn: (args) =>
+      fetchJson<Batch>(
+        `/api/adoption/batch?slugOrId=${encodeURIComponent(args.slugOrId)}`,
+        { nullable: true },
+      ),
+  });
 }
 
 export function useAdoptionHistory(limit = 50) {
   return useDataQuery(
-    api.adoptionV2.listBatches,
     { limit },
     {
       queryKey: dataQueryKeys.list("adoption-history", { limit }),
       queryFn: (args) =>
-        fetchJson<
-          NonNullable<FunctionReturnType<typeof api.adoptionV2.listBatches>>
-        >(`/api/adoption/batches?limit=${args.limit}`),
+        fetchJson<AdoptionHistory>(`/api/adoption/batches?limit=${args.limit}`),
     },
   );
 }
@@ -71,7 +92,7 @@ export function useAdoptionHistory(limit = 50) {
 export function useAncestryTree(
   slug: string | null | undefined,
 ): Tree | undefined {
-  return useDataQuery(api.ancestryTree.getBySlug, slug ? { slug } : "skip", {
+  return useDataQuery(slug ? { slug } : "skip", {
     queryKey: dataQueryKeys.detail("ancestry-tree", slug ?? "none"),
     queryFn: (args) =>
       fetchJson<Tree>(
@@ -83,110 +104,92 @@ export function useAncestryTree(
 
 export function useAncestryHistory(limit = 20) {
   return useDataQuery(
-    api.ancestryTree.list,
     { limit },
     {
       queryKey: dataQueryKeys.list("ancestry-history", { limit }),
       queryFn: (args) =>
-        fetchJson<
-          NonNullable<FunctionReturnType<typeof api.ancestryTree.list>>
-        >(`/api/ancestry/trees?limit=${args.limit}`),
+        fetchJson<AncestryHistory>(`/api/ancestry/trees?limit=${args.limit}`),
     },
   );
 }
 
 export function useAncestrySlugCheck(slug: string | null | undefined) {
-  return useDataQuery(api.ancestryTree.checkSlug, slug ? { slug } : "skip", {
+  return useDataQuery(slug ? { slug } : "skip", {
     queryKey: dataQueryKeys.query("ancestry-slug", slug ?? "none"),
     queryFn: (args) =>
-      fetchJson<FunctionReturnType<typeof api.ancestryTree.checkSlug>>(
+      fetchJson<SlugCheck>(
         `/api/ancestry/check-slug?slug=${encodeURIComponent(args.slug)}`,
       ),
   });
 }
 
 export function useCatCreate() {
-  return useDataMutation(api.mapper.create, {
+  return useDataMutation<CatCreateArgs, CatCreateResult>({
     mutationFn: (args) =>
-      fetchJson<FunctionReturnType<typeof api.mapper.create>>(
-        "/api/cats/profile",
-        { method: "POST", body: args },
-      ),
+      fetchJson<CatCreateResult>("/api/cats/profile", {
+        method: "POST",
+        body: args,
+      }),
   });
 }
 export function useCatUpdateMeta() {
-  return useDataMutation(api.mapper.updateMeta, {
+  return useDataMutation<Parameters<typeof updateProfileMeta>[1], Profile>({
     mutationFn: (args) =>
-      fetchJson<FunctionReturnType<typeof api.mapper.updateMeta>>(
-        "/api/cats/profile",
-        { method: "PATCH", body: args },
-      ),
+      fetchJson<Profile>("/api/cats/profile", { method: "PATCH", body: args }),
   });
 }
 export function useAdoptionCreate() {
-  return useDataMutation(api.adoptionV2.createBatch, {
+  return useDataMutation<AdoptionCreateArgs, AdoptionCreateResult>({
     mutationFn: (args) =>
-      fetchJson<FunctionReturnType<typeof api.adoptionV2.createBatch>>(
-        "/api/adoption/batch",
-        { method: "POST", body: args },
-      ),
+      fetchJson<AdoptionCreateResult>("/api/adoption/batch", {
+        method: "POST",
+        body: args,
+      }),
   });
 }
 export function useAdoptionUpdateMeta() {
-  return useDataMutation(api.adoptionV2.updateBatchMeta, {
+  return useDataMutation<Parameters<typeof updateBatchMeta>[1], Batch>({
     mutationFn: (args) =>
-      fetchJson<FunctionReturnType<typeof api.adoptionV2.updateBatchMeta>>(
-        "/api/adoption/batch",
-        { method: "PATCH", body: args },
-      ),
+      fetchJson<Batch>("/api/adoption/batch", { method: "PATCH", body: args }),
   });
 }
 
-type TreeSaveArgs = FunctionArgs<typeof api.ancestryTree.save>;
 export function useAncestrySave() {
-  return useDataMutation(api.ancestryTree.save, {
+  return useDataMutation<TreeSaveArgs, TreeSaveResult>({
     mutationFn: (args) =>
-      fetchJson<FunctionReturnType<typeof api.ancestryTree.save>>(
-        "/api/ancestry/tree",
-        { method: "POST", body: { ...args, operation: "save" } },
-      ),
+      fetchJson<TreeSaveResult>("/api/ancestry/tree", {
+        method: "POST",
+        body: { ...args, operation: "save" },
+      }),
   });
 }
 export function useAncestrySaveAsNew() {
-  return useDataMutation(api.ancestryTree.saveAsNew, {
+  return useDataMutation<TreeSaveArgs, TreeSaveResult>({
     mutationFn: (args: TreeSaveArgs) =>
-      fetchJson<FunctionReturnType<typeof api.ancestryTree.saveAsNew>>(
-        "/api/ancestry/tree",
-        { method: "POST", body: { ...args, operation: "saveAsNew" } },
-      ),
+      fetchJson<TreeSaveResult>("/api/ancestry/tree", {
+        method: "POST",
+        body: { ...args, operation: "saveAsNew" },
+      }),
   });
 }
 
 export function usePaletteRecord(slug: string | null | undefined) {
-  return useDataQuery(
-    api.paletteGeneratorSettings.get,
-    slug ? { slug } : "skip",
-    {
-      queryKey: dataQueryKeys.detail("palette-settings", slug ?? "none"),
-      queryFn: (args) =>
-        fetchJson<FunctionReturnType<typeof api.paletteGeneratorSettings.get>>(
-          `/api/palette-generator-settings?slug=${encodeURIComponent(args.slug)}`,
-          { nullable: true },
-        ),
-    },
-  );
+  return useDataQuery(slug ? { slug } : "skip", {
+    queryKey: dataQueryKeys.detail("palette-settings", slug ?? "none"),
+    queryFn: (args) =>
+      fetchJson<PaletteRecord>(
+        `/api/palette-generator-settings?slug=${encodeURIComponent(args.slug)}`,
+        { nullable: true },
+      ),
+  });
 }
 export function usePaletteImageUrl(slug: string | null | undefined) {
-  return useDataQuery(
-    api.paletteGeneratorSettings.getImageUrl,
-    slug ? { slug } : "skip",
-    {
-      queryKey: dataQueryKeys.detail("palette-image", slug ?? "none"),
-      queryFn: (args) =>
-        fetchJson<string | null>(
-          `/api/palette-generator-settings/image?slug=${encodeURIComponent(args.slug ?? "")}`,
-          { nullable: true },
-        ),
-    },
-  );
+  return useDataQuery(slug ? { slug } : "skip", {
+    queryKey: dataQueryKeys.detail("palette-image", slug ?? "none"),
+    queryFn: (args) =>
+      fetchJson<string | null>(
+        `/api/palette-generator-settings/image?slug=${encodeURIComponent(args.slug ?? "")}`,
+        { nullable: true },
+      ),
+  });
 }

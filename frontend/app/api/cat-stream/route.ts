@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestIdentity } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody, parseSearchParams } from "@/server/request";
@@ -129,17 +128,10 @@ const bodySchema = z
   });
 const querySchema = z.object({ key: z.string().optional() });
 
-function unavailable() {
-  return NextResponse.json(
-    { error: "Not found", code: "not_found" },
-    { status: 404 },
-  );
-}
 function resultResponse(value: unknown) {
   return NextResponse.json(value === undefined ? null : value);
 }
 export async function GET(request: NextRequest) {
-  if (dataBackend() !== "postgres") return unavailable();
   try {
     const { key } = parseSearchParams(
       request.nextUrl.searchParams,
@@ -158,7 +150,6 @@ export async function GET(request: NextRequest) {
   }
 }
 export async function POST(request: NextRequest) {
-  if (dataBackend() !== "postgres") return unavailable();
   try {
     const input = await parseJsonBody(request, bodySchema);
     const db = getDb();

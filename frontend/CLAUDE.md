@@ -1,6 +1,6 @@
 # BeastyPage Frontend - Development Context
 
-This is a Next.js 16 application with React 19, using Convex as the backend database.
+This is a Next.js 16 application with React 19, using PostgreSQL (Drizzle) as the database.
 
 ## Project Overview
 
@@ -14,7 +14,9 @@ A pixel cat gacha platform featuring:
 
 - **Framework**: Next.js 16 (App Router)
 - **UI**: React 19, TailwindCSS, Radix UI primitives
-- **Database**: Convex (serverless)
+- **Database**: PostgreSQL via Drizzle (CNPG cluster `beastypage-postgres` in production)
+- **Auth**: Clerk
+- **Data fetching**: TanStack Query hooks in `lib/data/`, live updates over SSE
 - **Package Manager**: pnpm
 - **Linter/Formatter**: Biome
 - **Analytics**: PostHog (optional)
@@ -23,7 +25,7 @@ A pixel cat gacha platform featuring:
 
 ```
 frontend/
-├── app/                    # Next.js App Router pages
+├── app/                    # Next.js App Router pages and API routes (app/api)
 │   ├── projects/           # Category hubs (gacha, games, tools, artist, warrior-cats)
 │   ├── single-cat-plus/    # Cat generator
 │   ├── catdex/             # Cat collection browser
@@ -35,11 +37,14 @@ frontend/
 │   ├── common/             # Shared UI components
 │   ├── ui/                 # Radix-based primitives
 │   └── ...                 # Feature-specific components
-├── convex/                 # Convex backend functions
-│   ├── schema.ts           # Database schema
-│   ├── cats.ts             # Cat-related queries/mutations
-│   └── ...
-├── lib/                    # Utilities and helpers
+├── server/                 # Server-only code
+│   ├── db/                 # Pool, Drizzle schema, migrator, transactions
+│   ├── repositories/       # Table access
+│   ├── services/           # Business logic called by API routes
+│   ├── jobs/               # PostgreSQL job worker and job kinds
+│   └── live/               # LISTEN/NOTIFY live updates
+├── drizzle/                # SQL migrations
+├── lib/                    # Utilities and helpers (lib/data = client data hooks)
 └── public/                 # Static assets (sprites, images)
 ```
 
@@ -52,9 +57,11 @@ pnpm run build           # Production build
 pnpm run lint            # Lint check
 pnpm run typecheck       # TypeScript check
 
-# Convex
-pnpm exec convex dev     # Start Convex dev server
-pnpm exec convex deploy  # Deploy to production
+# Database
+pnpm run db:local up     # Start the worktree's local PostgreSQL (writes .env.database.local)
+pnpm run db:migrate      # Apply migrations
+pnpm run db:generate     # Generate a migration after a schema change
+pnpm run test:db         # Database tests (wipes the local worktree database)
 ```
 
 ## Key Conventions
@@ -73,20 +80,17 @@ pnpm exec convex deploy  # Deploy to production
 - Use TailwindCSS for styling
 - Radix primitives wrapped in `components/ui/`
 
-### Convex Patterns
+### Data Patterns
 
-- Schema defined in `convex/schema.ts`
-- Queries are read-only, use `query()`
-- Mutations modify data, use `mutation()`
-- Actions for external API calls, use `action()`
-- Use `useQuery()` and `useMutation()` hooks in components
-- Relative imports inside `convex/` need explicit `.js` extensions (node16 module resolution)
-- Temporary `convex/*.ts` test helpers leak into `convex/_generated/api.d.ts` — delete the file and run `pnpm exec convex dev --once` before committing generated files
-- Inspect dev data from the CLI: `pnpm exec convex data <table>`; run internal mutations: `pnpm exec convex run file:fn '{...json args}'`
+- Browsers never talk to PostgreSQL: components use the hooks in `lib/data/`, which call `app/api` routes
+- API routes validate input and call `server/services/*`; services use `server/repositories/*`
+- Schema changes go through Drizzle migrations in `drizzle/`; the frontend init container runs them before each rollout
+- The app role has DML only and owns no tables — catalog queries must use `pg_catalog`, not `information_schema`
+- Public links resolve by slug, legacy imported Convex ID, or UUID through the legacy-link repository
 
 ### Stream Overlay (single-cat-stream)
 
-- `cat_stream_sessions.currentCommand` payloads must be params-only (slug + cat params, never rendered images) — the session document is capped at Convex's 1 MiB limit; the overlay re-renders sprites locally
+- `cat_stream_sessions.currentCommand` payloads must be params-only (slug + cat params, never rendered images) — the overlay re-renders sprites locally
 - Generation + persistence happen on the control page (authed); the overlay (`?key=<apiKey>`) only renders
 - `attachViewSlug`-style patches that don't bump `seq` are ignored by the overlay's dispatch guard (`components/stream-control/obs/commandPolicy.ts`)
 
@@ -99,19 +103,22 @@ pnpm exec convex deploy  # Deploy to production
 ## Environment Variables
 
 Required for development:
-- `CONVEX_DEPLOYMENT` - Convex deployment ID
-- `NEXT_PUBLIC_CONVEX_URL` - Convex cloud URL
+- `DATABASE_URL` - from `pnpm run db:local up` (`.env.database.local`)
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` - Clerk
 
 Optional:
 - `NEXT_PUBLIC_POSTHOG_KEY` - Analytics
 - `NEXT_PUBLIC_POSTHOG_HOST` - Analytics host
 - `RENDERER_INTERNAL_URL` - Cat card renderer service
+- `MAINTENANCE_MODE=1` - Reject writes with 503 during maintenance
+- `JOBS_ENABLED=0` - Do not start the job worker in this process
 
 ## Testing
 
 ```bash
 pnpm run test            # Run tests (vitest)
 pnpm run test -- --watch # Watch mode
+pnpm run test:db         # PostgreSQL tests
 ```
 
 ### Palette System
@@ -127,22 +134,14 @@ Ports are managed by portless — check dev server output or `/home/beasty/proje
 
 ## Important Files
 
-- `app/layout.tsx` - Root layout with providers
-- `convex/schema.ts` - Database schema definition
+- `app/layout.tsx` - Root layout with providers (rendered per request so runtime env such as `MAINTENANCE_MODE` is read live)
+- `server/db/schema/` - Database schema definition
 - `components/common/PageHero.tsx` - Standard page header
-- `middleware.ts` - Entry point routing for multi-subdomain setup
+- `proxy.ts` - Clerk middleware, maintenance gate and entry point routing for the multi-subdomain setup
 
 ## Server-Side Patterns
 
 - **Server-side canvas**: Use `@napi-rs/canvas` (already a dependency) for image generation in API routes
 - **SSRF protection**: For user-provided image URLs, use `downloadPublicImage` in `lib/public-image-download.ts`. It validates all resolved addresses with `assertPublicAddresses`, pins the connection, and revalidates redirects.
-- **Convex HTTP client in API routes**: Use `ConvexHttpClient` with `getServerConvexUrl()` — see `app/api/discord/random-cat/route.ts` or `app/api/cat-share/route.ts`
 - **Standalone Docker path resolution**: `process.cwd()` may not point to the Next.js dir in standalone builds — use `NEXT_PUBLIC_DIR` env var as fallback
-
-<!-- convex-ai-start -->
-This project uses [Convex](https://convex.dev) as its backend.
-
-When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
-
-Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
-<!-- convex-ai-end -->
+- **Clerk JWT template**: the Quick Share clients request `getToken({ template: "convex" })` and the control plane verifies `aud: "convex"`. The name is historical; renaming it needs a Clerk dashboard change.

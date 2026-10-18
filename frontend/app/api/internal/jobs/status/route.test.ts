@@ -11,7 +11,6 @@ describe("GET /api/internal/jobs/status", () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
-    process.env.DATA_BACKEND = "postgres";
     process.env.QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS = "iss|admin";
     getRequestIdentity.mockResolvedValue({ tokenIdentifier: null });
   });

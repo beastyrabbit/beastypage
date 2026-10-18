@@ -1,10 +1,6 @@
-import { ConvexHttpClient } from "convex/browser";
 import type { Metadata } from "next";
 import { DashClient } from "@/components/dash/DashClient";
-import { api } from "@/convex/_generated/api";
-import { getServerConvexUrl } from "@/lib/convexUrl";
 import type { DashSettings } from "@/lib/dash/types";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { getSettings } from "@/server/services/settings";
 import { parseDashPayload } from "@/utils/dashVariants";
@@ -30,19 +26,8 @@ function firstSearchParam(value: string | string[] | undefined): string | null {
 async function loadDashFromSlug(
   slug: string,
 ): Promise<{ settings: DashSettings | null; error: string | null }> {
-  const postgres = dataBackend() === "postgres";
-  const convexUrl = getServerConvexUrl();
-  if (!postgres && !convexUrl) {
-    return { settings: null, error: "Failed to load shared dashboard" };
-  }
-
   try {
-    const record = postgres
-      ? await getSettings(getDb(), "dash", slug)
-      : await new ConvexHttpClient(convexUrl as string).query(
-          api.dashSettings.get,
-          { slug },
-        );
+    const record = await getSettings(getDb(), "dash", slug);
     if (!record) {
       return { settings: null, error: "Shared dashboard not found" };
     }

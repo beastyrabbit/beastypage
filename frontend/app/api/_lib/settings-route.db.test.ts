@@ -6,7 +6,6 @@ const env = { ...process.env };
 let route: typeof import("@/app/api/dash-settings/route");
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   route = await import("@/app/api/dash-settings/route");
 });

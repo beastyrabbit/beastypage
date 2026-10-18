@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { getActiveStreamScene } from "./sceneState";
 
 describe("getActiveStreamScene", () => {
-  it.each([
-    null,
-    undefined,
-  ])("returns null when the session is %s", (session) => {
-    expect(getActiveStreamScene(session)).toBeNull();
-  });
+  it.each([null, undefined])(
+    "returns null when the session is %s",
+    (session) => {
+      expect(getActiveStreamScene(session)).toBeNull();
+    },
+  );
 
   it("returns lobby for an active lobby command", () => {
     expect(
@@ -39,31 +39,31 @@ describe("getActiveStreamScene", () => {
     ).toBe("test");
   });
 
-  it.each([
-    "idle",
-    null,
-  ])("returns test for %s sessions when test mode is enabled", (status) => {
-    expect(
-      getActiveStreamScene({
-        status,
-        currentCommand: { type: "clear" },
-        testMode: true,
-      }),
-    ).toBe("test");
-  });
+  it.each(["idle", null])(
+    "returns test for %s sessions when test mode is enabled",
+    (status) => {
+      expect(
+        getActiveStreamScene({
+          status,
+          currentCommand: { type: "clear" },
+          testMode: true,
+        }),
+      ).toBe("test");
+    },
+  );
 
-  it.each([
-    "lobby",
-    "brb",
-  ] as const)("does not mark %s active for idle sessions", (type) => {
-    expect(
-      getActiveStreamScene({
-        status: "idle",
-        currentCommand: { type },
-        testMode: false,
-      }),
-    ).toBeNull();
-  });
+  it.each(["lobby", "brb"] as const)(
+    "does not mark %s active for idle sessions",
+    (type) => {
+      expect(
+        getActiveStreamScene({
+          status: "idle",
+          currentCommand: { type },
+          testMode: false,
+        }),
+      ).toBeNull();
+    },
+  );
 
   it("clears scene state for idle or clear sessions", () => {
     expect(
@@ -83,17 +83,16 @@ describe("getActiveStreamScene", () => {
     ).toBeNull();
   });
 
-  it.each([
-    "spin",
-    "wheel",
-    "countdown",
-  ])("does not mark lobby or BRB active for %s commands", (type) => {
-    expect(
-      getActiveStreamScene({
-        status: "active",
-        currentCommand: { type },
-        testMode: false,
-      }),
-    ).toBeNull();
-  });
+  it.each(["spin", "wheel", "countdown"])(
+    "does not mark lobby or BRB active for %s commands",
+    (type) => {
+      expect(
+        getActiveStreamScene({
+          status: "active",
+          currentCommand: { type },
+          testMode: false,
+        }),
+      ).toBeNull();
+    },
+  );
 });

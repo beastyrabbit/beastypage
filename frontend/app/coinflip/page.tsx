@@ -5,7 +5,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
-import type { ScoreRecord } from "@/convex/coinflipper";
+
+type ScoreRecord = {
+  id: string;
+  name: string;
+  score: number;
+  createdAt: number;
+};
+
 import { track } from "@/lib/analytics";
 import {
   useCoinflipLeaderboard,

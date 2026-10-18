@@ -1,23 +1,20 @@
 import "server-only";
 
-import { dataBackend } from "./server/backend";
 import { isMaintenanceMode } from "./server/maintenance";
 
-// The runtime is checked in register() with the literal process.env.NEXT_RUNTIME,
-// which Next replaces at build time. The running server has no NEXT_RUNTIME
-// environment variable, so checking it here kept the worker from ever starting.
 function shouldStartJobs(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
   if (env.NEXT_PHASE === "phase-production-build") return false;
   if (env.JOBS_ENABLED === "0") return false;
   if (isMaintenanceMode(env)) return false;
-  return dataBackend(env) === "postgres";
+  return true;
 }
 
 export async function register() {
-  // The literal NEXT_RUNTIME check lets Next drop the worker from the Edge
-  // instrumentation bundle.
+  // Next replaces this literal at build time, which drops the worker from the
+  // Edge instrumentation bundle. Do not move it into shouldStartJobs: the
+  // running server has no NEXT_RUNTIME environment variable.
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (!shouldStartJobs()) return;
   const globals = globalThis as typeof globalThis & {

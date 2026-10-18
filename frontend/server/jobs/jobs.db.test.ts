@@ -37,7 +37,6 @@ async function waitFor(
 
 beforeAll(() => {
   process.env.DATABASE_URL = databaseUrl;
-  process.env.DATA_BACKEND = "postgres";
   listenerPool = createPool(
     readDatabaseConfig("app", { DATABASE_URL: databaseUrl }),
   );

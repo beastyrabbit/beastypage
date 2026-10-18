@@ -1,6 +1,6 @@
 import type { Config } from "./config.ts";
 
-export class ConvexControlPlane {
+export class ControlPlane {
 	private readonly config: Config;
 
 	constructor(config: Config) {

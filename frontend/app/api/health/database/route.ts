@@ -13,12 +13,6 @@ export const dynamic = "force-dynamic";
  * any probe until the cutover (docs/migration/operations.md).
  */
 export async function GET() {
-  if (process.env.DATA_BACKEND !== "postgres") {
-    return NextResponse.json(
-      { ok: false, reason: "postgres backend not selected" },
-      { status: 503, headers: { "Cache-Control": "no-store" } },
-    );
-  }
   if (!process.env.DATABASE_URL) {
     return NextResponse.json(
       { ok: false, reason: "database not configured" },

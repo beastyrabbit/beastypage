@@ -15,20 +15,15 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build-time env vars for Next.js (passed via --build-arg)
-ARG CONVEX_DEPLOYMENT
 # Use placeholders - replaced at runtime by entrypoint script
-# Must be valid formats for Next.js parsing at build time
-ARG NEXT_PUBLIC_CONVEX_URL=https://placeholder.convex.cloud
 ARG NEXT_PUBLIC_POSTHOG_KEY=phc_PLACEHOLDER_KEY
 ARG NEXT_PUBLIC_POSTHOG_HOST=https://placeholder.posthog.com
 ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_placeholder_CLERK_KEY
 ARG APP_VERSION=dev
 ARG CAT_SYSTEM_CATALOG_HASH=unknown
 
-ENV CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
 ENV APP_VERSION=${APP_VERSION}
 ENV CAT_SYSTEM_CATALOG_HASH=${CAT_SYSTEM_CATALOG_HASH}
-ENV NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}
 ENV NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
 ENV NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
 ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
@@ -40,10 +35,9 @@ RUN test "$CAT_SYSTEM_CATALOG_HASH" = "unknown" \
     || test "$(cat public/cat-system/catalog-hash.txt)" = "$CAT_SYSTEM_CATALOG_HASH"
 
 # Build Next.js with standalone output
-# Generated Convex types are committed; dependency installation skips scripts.
 RUN pnpm run build
 
-# Self-contained PostgreSQL migration and Convex import/verification runners.
+# Self-contained PostgreSQL migration and import/verification runners.
 # Archive and report paths remain outside the image under /work.
 RUN pnpm run db:bundle && pnpm run db:bundle-import
 

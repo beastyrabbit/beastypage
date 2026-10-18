@@ -6,7 +6,7 @@
  * become a saved adoption batch.
  *
  * The command payload carries params-only cat data (never rendered images —
- * the session document is capped at Convex's 1 MiB limit); both the overlay
+ * the session document is capped at PostgreSQL's 1 MiB limit); both the overlay
  * and the control page re-render partially revealed cats locally with
  * `buildPartialBatchParams`. Stage order mirrors
  * lib/adoption/adoptionGenerator.js (`buildStagePlan`).
@@ -23,9 +23,9 @@ import { applyCoatChoice, getCoatChoiceValue } from "@/lib/cat-v3/coatPatterns";
 import { DEFAULT_POSE_NAME, formatPoseName } from "@/lib/cat-v3/poseOptions";
 import type { CatParams } from "@/lib/cat-v3/types";
 
-/** Verdict window armed by cullBatchCat; convex/catStream.ts keeps its own VERDICT_MS = 3000 in sync. */
+/** Verdict window armed by cullBatchCat; postgresql/catStream.ts keeps its own VERDICT_MS = 3000 in sync. */
 export const BATCH_VERDICT_MS = 3000;
-/** Depart + repack after a finalised cull; the next stage is reported at lastCullAt + this. convex has no copy. */
+/** Depart + repack after a finalised cull; the next stage is reported at lastCullAt + this. postgresql has no copy. */
 export const BATCH_DEPART_MS = 1600;
 export const BATCH_REPACK_MS = 400;
 
@@ -403,7 +403,7 @@ export function trimBatchPoolToStageCount(
   }
 }
 
-/** Light runtime guard for command payloads coming out of Convex. */
+/** Light runtime guard for command payloads coming out of PostgreSQL. */
 export function parseBatchStreamCommand(
   value: unknown,
 ): BatchStreamCommand | null {

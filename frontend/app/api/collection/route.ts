@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestIdentity } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody, parseSearchParams } from "@/server/request";
@@ -13,15 +12,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function notFound() {
-  return NextResponse.json(
-    { error: "Not found", code: "not_found" },
-    { status: 404 },
-  );
-}
-
 export async function GET(request: NextRequest) {
-  if (dataBackend() !== "postgres") return notFound();
   try {
     const params = parseSearchParams(
       request.nextUrl.searchParams,
@@ -57,7 +48,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  if (dataBackend() !== "postgres") return notFound();
   try {
     const body = await parseJsonBody(
       request,

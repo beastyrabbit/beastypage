@@ -2,11 +2,9 @@
  * Persistence for a generated evolution batch: saves every cat to
  * cat_profile, then the batch itself (adoption_batch) with evolution
  * settings. Shared by the evolution generator page and the stream control
- * panel — both pass in their Convex mutation handles.
+ * panel — both pass in their PostgreSQL mutation handles.
  */
 
-import type { Id } from "@/convex/_generated/dataModel";
-import { toId } from "@/convex/utils";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { encodeCatShare } from "@/lib/catShare";
 import {
@@ -41,7 +39,7 @@ type CreateBatchFn = (args: {
   cats: Array<{
     label: string;
     catData: EvolutionCatData;
-    profileId: Id<"cat_profile">;
+    profileId: string;
     encoded: string;
     shareToken: string;
     editToken?: string;
@@ -91,7 +89,7 @@ export async function persistEvolutionBatch(options: {
         catData: catDataToLegacyPersistence(
           cat.catData as unknown as Record<string, unknown>,
         ) as unknown as EvolutionCatData,
-        profileId: toId("cat_profile", profileId),
+        profileId: profileId,
         encoded,
         shareToken,
         editToken: mapperResult.editToken ?? undefined,

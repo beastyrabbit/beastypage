@@ -13,7 +13,7 @@ function invalidInput(message = "Invalid request input"): ServiceError {
 
 /**
  * Largest JSON body a route accepts unless it passes its own `maxBytes`.
- * Convex capped every stored document at 1 MiB, so no request that writes one
+ * PostgreSQL capped every stored document at 1 MiB, so no request that writes one
  * legitimately comes close; the largest stored JSON value is about 10 KB.
  */
 export const DEFAULT_JSON_BODY_BYTES = 2 * 1024 * 1024;

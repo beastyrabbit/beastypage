@@ -10,15 +10,7 @@ export default defineConfig({
         find: "next/navigation",
         replacement: resolve(import.meta.dirname, "services.ts"),
       },
-      {
-        find: "@/lib/convexClient",
-        replacement: resolve(import.meta.dirname, "services.ts"),
-      },
       { find: "@", replacement: root },
-      {
-        find: "convex/react",
-        replacement: resolve(import.meta.dirname, "services.ts"),
-      },
       {
         find: "@clerk/nextjs",
         replacement: resolve(import.meta.dirname, "services.ts"),
@@ -33,12 +25,7 @@ export default defineConfig({
       },
     ],
   },
-  define: {
-    "process.env.NEXT_PUBLIC_CONVEX_URL": JSON.stringify(
-      "http://127.0.0.1:3210",
-    ),
-    "process.env.NEXT_PUBLIC_POSTHOG_KEY": "undefined",
-  },
+  define: { "process.env.NEXT_PUBLIC_POSTHOG_KEY": "undefined" },
   server: {
     host: "127.0.0.1",
     port: 0,

@@ -10,7 +10,6 @@ let catdexRoute: typeof import("./catdex/route");
 let collectionRoute: typeof import("./collection/route");
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   seasonsRoute = await import("./seasons/route");
   raritiesRoute = await import("./rarities/route");

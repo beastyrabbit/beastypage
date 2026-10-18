@@ -104,7 +104,7 @@ export const streamVotes = pgTable(
     stepId: text("step_id").notNull(),
     optionKey: text("option_key").notNull(),
     optionMeta: jsonb("option_meta").$type<StreamVoteOptionMeta>(),
-    // A removed participant keeps their vote in the tally, as in Convex.
+    // A removed participant keeps their vote in the tally, as in PostgreSQL.
     votedBy: uuid("voted_by").references(() => streamParticipants.id, {
       onDelete: "set null",
     }),
@@ -140,7 +140,7 @@ export const wheelSpins = pgTable(
   ],
 );
 
-/** One OBS stream session per user (Convex `byUserId` + `.unique()`). */
+/** One OBS stream session per user (PostgreSQL `byUserId` + `.unique()`). */
 export const catStreamSessions = pgTable(
   "cat_stream_sessions",
   {
@@ -162,7 +162,7 @@ export const catStreamSessions = pgTable(
   (t) => [
     uniqueIndex("cat_stream_sessions_user_key").on(t.userId),
     // Overlay payloads stay params-only (no rendered images); keep the
-    // ceiling Convex's 1 MiB document limit used to enforce.
+    // ceiling PostgreSQL's 1 MiB document limit used to enforce.
     check(
       "cat_stream_sessions_command_size",
       sql`octet_length(${t.currentCommand}::text) <= 1000000`,

@@ -46,7 +46,7 @@ export interface BatchBeat {
   /**
    * "server" when `startedAt` is the session's stamp; "local" when this
    * instance anchored the stage on its own clock because the stamp never
-   * echoed (degraded Convex connection).
+   * echoed (degraded PostgreSQL connection).
    */
   anchor: "server" | "local";
   /** Deal order: unchanged cats first (they all land at t=windup), then groups largest first. */

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ControlShell — owns all stream-control state, Convex wiring, and command
+ * ControlShell — owns all stream-control state, PostgreSQL wiring, and command
  * handlers (moved verbatim from StreamControlClient.tsx), and renders the
  * tabbed control layout: a persistent StatusBar + OBS preview alongside
  * per-feature tab panels. Panels consume the state via StreamControlContext.
@@ -13,8 +13,7 @@ import { MotionConfig, motion, type Variants } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
-import type { Id } from "@/convex/_generated/dataModel";
-import type { BatchStreamCommand } from "@/lib/adoption/streamBatch";
+import { parseBatchStreamCommand } from "@/lib/adoption/streamBatch";
 import {
   catDataToLegacyPersistence,
   catParamsToLegacyPersistence,
@@ -37,7 +36,7 @@ import {
   useUpdateCatStreamSettings,
 } from "@/lib/data/stream";
 import { useUserViewer } from "@/lib/data/users";
-import type { EvolutionStreamCommand } from "@/lib/evolution/streamEvolution";
+import { parseEvolutionStreamCommand } from "@/lib/evolution/streamEvolution";
 import { normalizePortableSettingsCode } from "@/lib/portable-settings";
 import { cn } from "@/lib/utils";
 import { withResolvedAfterlifeParams } from "@/utils/catSettingsHelpers";
@@ -166,7 +165,7 @@ export function ControlShell() {
     toolKey: "singleCatPlus",
   });
 
-  // Local settings state — synced to Convex on change
+  // Local settings state — synced to PostgreSQL on change
   const [settings, setSettings] = useState<SingleCatSettings>(
     DEFAULT_SINGLE_CAT_SETTINGS,
   );
@@ -224,12 +223,12 @@ export function ControlShell() {
   const syncTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const sessionRef = useRef(session);
   sessionRef.current = session;
-  // Per-field syncs not yet echoed by Convex. Race: a theme pick merges
+  // Per-field syncs not yet echoed by PostgreSQL. Race: a theme pick merges
   // `overlayTheme` asynchronously; a scene command fired before the echo
   // writes the full settings from the stale session snapshot and would
   // overwrite the pick. buildSessionSettings re-applies these until they land.
   const pendingSyncRef = useRef<Record<string, unknown>>({});
-  // Writes whose mutation resolved: Convex resolves only once the local query
+  // Writes whose mutation resolved: PostgreSQL resolves only once the local query
   // results include the write, so this render's session already reflects them
   // (covers object values, which never compare equal to their echo).
   const landedSyncRef = useRef<Map<string, unknown>>(new Map());
@@ -333,7 +332,7 @@ export function ControlShell() {
           (err) => {
             settle(false);
             console.error(
-              "[StreamControl] Failed to sync settings to Convex",
+              "[StreamControl] Failed to sync settings to PostgreSQL",
               err,
             );
             toast.error("Failed to save stream settings");
@@ -346,7 +345,7 @@ export function ControlShell() {
         (err) => {
           settle(false);
           console.error(
-            "[StreamControl] Failed to sync settings to Convex",
+            "[StreamControl] Failed to sync settings to PostgreSQL",
             err,
           );
           toast.error("Failed to save stream settings");
@@ -506,7 +505,7 @@ export function ControlShell() {
           const full = buildSessionSettings(merged);
           void saveSessionSettings(full).catch((err) => {
             console.error(
-              "[StreamControl] Failed to sync settings to Convex",
+              "[StreamControl] Failed to sync settings to PostgreSQL",
               err,
             );
             toast.error("Failed to save stream settings");
@@ -551,7 +550,7 @@ export function ControlShell() {
         params: resolvedParams,
         slots: result.slotSelections,
       };
-      // Flush settings (including creatorName) to Convex so OBS has them before spinning
+      // Flush settings (including creatorName) to PostgreSQL so OBS has them before spinning
       clearTimeout(syncTimer.current);
       const settingsWithCreator = buildSessionSettings(settings, {
         creatorName: creatorNameDraft,
@@ -686,7 +685,7 @@ export function ControlShell() {
     setMetaSaving(true);
     try {
       await updateMapperMeta({
-        id: currentProfileId as Id<"cat_profile">,
+        id: currentProfileId as string,
         catName: catNameDraft.trim() || undefined,
         creatorName: creatorNameDraft.trim() || undefined,
         editToken: currentEditToken ?? undefined,
@@ -905,23 +904,29 @@ export function ControlShell() {
       spinning || wheelSpinning || sceneCommandPending !== null;
     const activeScene = getActiveStreamScene(session);
     const sessionCommand = session?.currentCommand;
-    const currentBatchCommand =
-      sessionCommand?.type === "batch" && sessionCommand.batch
-        ? {
-            ...(sessionCommand.batch as BatchStreamCommand),
-            seq: sessionCommand.seq,
-            timestamp: sessionCommand.timestamp,
-          }
+    const parsedBatchCommand =
+      sessionCommand?.type === "batch"
+        ? parseBatchStreamCommand(sessionCommand.batch)
         : null;
+    const currentBatchCommand = parsedBatchCommand
+      ? {
+          ...parsedBatchCommand,
+          seq: sessionCommand?.seq ?? 0,
+          timestamp: sessionCommand?.timestamp ?? 0,
+        }
+      : null;
     const batchLiveState = session?.batchState ?? null;
-    const currentEvolutionCommand =
-      sessionCommand?.type === "evolution" && sessionCommand.evolution
-        ? {
-            ...(sessionCommand.evolution as EvolutionStreamCommand),
-            seq: sessionCommand.seq,
-            timestamp: sessionCommand.timestamp,
-          }
+    const parsedEvolutionCommand =
+      sessionCommand?.type === "evolution"
+        ? parseEvolutionStreamCommand(sessionCommand.evolution)
         : null;
+    const currentEvolutionCommand = parsedEvolutionCommand
+      ? {
+          ...parsedEvolutionCommand,
+          seq: sessionCommand?.seq ?? 0,
+          timestamp: sessionCommand?.timestamp ?? 0,
+        }
+      : null;
     const evolutionLiveState = session?.evolutionState ?? null;
     const showLive = isShowLive(session, now);
     const endShow = async () => {

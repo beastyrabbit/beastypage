@@ -6,12 +6,7 @@ import ProgressiveImage from "@/components/common/ProgressiveImage";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
-import type { Id } from "@/convex/_generated/dataModel";
-import type { CatdexPayload } from "@/convex/catdex";
-import type { RarityPayload } from "@/convex/rarities";
-import type { SeasonPayload } from "@/convex/seasons";
 import { track } from "@/lib/analytics";
-import { CONVEX_HTTP_URL } from "@/lib/convexClient";
 import {
   useCatalogCatdexPage,
   useCatalogCreateCatdex,
@@ -21,6 +16,11 @@ import {
   useCatalogSeasons,
 } from "@/lib/data/catalog";
 import { cn } from "@/lib/utils";
+import type {
+  CatdexPayload,
+  RarityPayload,
+  SeasonPayload,
+} from "@/server/services/catalog";
 
 type SortKey =
   | "number-asc"
@@ -244,22 +244,22 @@ export default function CatdexPage() {
       await createCatMutation({
         twitchUserName: trimmedOwner.toLowerCase(),
         catName: trimmedName.toLowerCase(),
-        seasonId: seasonId as Id<"card_season">,
-        rarityId: rarityId as Id<"rarity">,
+        seasonId: seasonId as string,
+        rarityId: rarityId as string,
         ...(cardNumber?.trim()
           ? {
               cardNumber: cardNumber.trim(),
             }
           : {}),
         defaultCard: {
-          storageId: defaultUpload.storageId as Id<"_storage">,
+          storageId: defaultUpload.storageId as string,
           fileName: defaultUpload.fileName,
           uploadToken: defaultUpload.uploadToken,
         },
         ...(customUpload
           ? {
               customCard: {
-                storageId: customUpload.storageId as Id<"_storage">,
+                storageId: customUpload.storageId as string,
                 fileName: customUpload.fileName,
                 uploadToken: customUpload.uploadToken,
               },
@@ -829,7 +829,7 @@ function absoluteUrl(url?: string | null): string | null {
   if (/^https?:\/\//i.test(url)) {
     try {
       const parsed = new URL(url);
-      const preferred = new URL(CONVEX_HTTP_URL);
+      const preferred = new URL(window.location.origin);
       if (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") {
         parsed.protocol = preferred.protocol;
         parsed.host = preferred.host;
@@ -840,7 +840,7 @@ function absoluteUrl(url?: string | null): string | null {
     }
   }
   if (url.startsWith("/api/files/")) return url;
-  const base = CONVEX_HTTP_URL.replace(/\/$/, "");
+  const base = window.location.origin.replace(/\/$/, "");
   if (url.startsWith("/")) return `${base}${url}`;
   return `${base}/${url}`;
 }
@@ -860,7 +860,7 @@ async function uploadToStorage(
   clientKey?: string,
 ): Promise<{ storageId: string; fileName: string; uploadToken: string }> {
   const uploadUrl = await generateUploadUrl({ clientKey });
-  const configuredSiteOrigin = process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
+  const configuredSiteOrigin = window.location.origin;
   const uploadTarget = new URL(
     uploadUrl,
     uploadUrl.startsWith("/api/")

@@ -7,20 +7,13 @@ import {
   useMutation as useTanStackMutation,
   useQuery as useTanStackQuery,
 } from "@tanstack/react-query";
-import {
-  type PaginatedQueryReference,
-  type UsePaginatedQueryResult,
-  useMutation as useConvexMutation,
-  usePaginatedQuery as useConvexPaginatedQuery,
-  useQuery as useConvexQuery,
-} from "convex/react";
-import type {
-  FunctionArgs,
-  FunctionReference,
-  FunctionReturnType,
-} from "convex/server";
 import { useCallback } from "react";
-import { useDataBackend } from "./backend";
+export type UsePaginatedQueryResult<T> = {
+  results: T[];
+  status: "LoadingFirstPage" | "LoadingMore" | "CanLoadMore" | "Exhausted";
+  isLoading: boolean;
+  loadMore: (_count?: number) => void;
+};
 
 export type DataQueryOptions<TArgs, TData> = {
   queryKey: QueryKey;
@@ -28,35 +21,23 @@ export type DataQueryOptions<TArgs, TData> = {
   enabled?: boolean;
 };
 
-export function useDataQuery<
-  Query extends FunctionReference<"query">,
-  TData = FunctionReturnType<Query>,
->(
-  query: Query,
-  args: FunctionArgs<Query> | "skip",
-  options: DataQueryOptions<FunctionArgs<Query>, TData>,
+export function useDataQuery<TArgs = unknown, TData = unknown>(
+  args: TArgs | "skip",
+  options: DataQueryOptions<TArgs, TData>,
 ): TData | undefined {
-  const backend = useDataBackend();
-  const convexResult = useConvexQuery(
-    query as never,
-    (backend === "convex" ? args : "skip") as never,
-  ) as TData | undefined;
   const postgresResult = useTanStackQuery({
     queryKey: options.queryKey,
     queryFn: ({ signal }) => {
       if (!options.queryFn) {
         throw new Error("A PostgreSQL queryFn is required for useDataQuery");
       }
-      return options.queryFn(args as FunctionArgs<Query>, signal);
+      return options.queryFn(args as TArgs, signal);
     },
-    enabled:
-      backend === "postgres" && args !== "skip" && options.enabled !== false,
+    enabled: args !== "skip" && options.enabled !== false,
   });
 
-  if (backend === "postgres" && postgresResult.error) {
-    throw postgresResult.error;
-  }
-  return backend === "convex" ? convexResult : postgresResult.data;
+  if (postgresResult.error) throw postgresResult.error;
+  return postgresResult.data;
 }
 
 export type DataMutationOptions<TArgs, TResult> = {
@@ -64,26 +45,14 @@ export type DataMutationOptions<TArgs, TResult> = {
   invalidate?: QueryKey[];
 };
 
-export function useDataMutation<
-  Mutation extends FunctionReference<"mutation">,
-  TResult = FunctionReturnType<Mutation>,
->(
-  mutation: Mutation,
-  options: DataMutationOptions<FunctionArgs<Mutation>, TResult> = {},
-): (args: FunctionArgs<Mutation>) => Promise<TResult> {
-  const backend = useDataBackend();
+export function useDataMutation<TArgs = unknown, TResult = unknown>(
+  options: DataMutationOptions<TArgs, TResult> = {},
+): (args: TArgs) => Promise<TResult> {
   const client = useQueryClient();
-  const convexMutation = useConvexMutation(mutation);
   // `mutateAsync` is stable; the mutation result object is not, and callers
-  // put this function in effect dependencies like Convex's stable mutation.
+  // put this function in effect dependencies like PostgreSQL's stable mutation.
   const { mutateAsync } = useTanStackMutation({
-    mutationFn: ({
-      args,
-      signal,
-    }: {
-      args: FunctionArgs<Mutation>;
-      signal?: AbortSignal;
-    }) => {
+    mutationFn: ({ args, signal }: { args: TArgs; signal?: AbortSignal }) => {
       if (!options.mutationFn) {
         throw new Error(
           "A PostgreSQL mutationFn is required for useDataMutation",
@@ -97,13 +66,8 @@ export function useDataMutation<
   });
 
   return useCallback(
-    async (args: FunctionArgs<Mutation>) => {
-      if (backend === "convex") {
-        return (await convexMutation(args as never)) as TResult;
-      }
-      return mutateAsync({ args });
-    },
-    [backend, convexMutation, mutateAsync],
+    async (args: TArgs) => mutateAsync({ args }),
+    [mutateAsync],
   );
 }
 
@@ -123,23 +87,10 @@ export type DataPaginatedOptions<TArgs, TItem> = {
   enabled?: boolean;
 };
 
-export function useDataPaginatedQuery<
-  Query extends PaginatedQueryReference,
-  TItem = FunctionReturnType<Query>["page"][number],
->(
-  query: Query,
-  args: Omit<FunctionArgs<Query>, "paginationOpts"> | "skip",
-  options: DataPaginatedOptions<
-    Omit<FunctionArgs<Query>, "paginationOpts">,
-    TItem
-  >,
+export function useDataPaginatedQuery<TArgs = unknown, TItem = unknown>(
+  args: TArgs | "skip",
+  options: DataPaginatedOptions<TArgs, TItem>,
 ): UsePaginatedQueryResult<TItem> {
-  const backend = useDataBackend();
-  const convexResult = useConvexPaginatedQuery(
-    query,
-    backend === "convex" ? (args as never) : "skip",
-    { initialNumItems: options.initialNumItems },
-  ) as UsePaginatedQueryResult<TItem>;
   const postgresResult = useInfiniteQuery({
     queryKey: options.queryKey,
     initialPageParam: null as string | null,
@@ -149,18 +100,12 @@ export function useDataPaginatedQuery<
           "A PostgreSQL queryFn is required for useDataPaginatedQuery",
         );
       }
-      return options.queryFn(
-        args as Omit<FunctionArgs<Query>, "paginationOpts">,
-        pageParam,
-        signal,
-      );
+      return options.queryFn(args as TArgs, pageParam, signal);
     },
     getNextPageParam: (page) => page.nextCursor ?? undefined,
-    enabled:
-      backend === "postgres" && args !== "skip" && options.enabled !== false,
+    enabled: args !== "skip" && options.enabled !== false,
   });
 
-  if (backend === "convex") return convexResult;
   if (postgresResult.error) throw postgresResult.error;
   const pages = postgresResult.data?.pages ?? [];
   const results = pages.flatMap((page) => page.results);
@@ -180,7 +125,7 @@ export function useDataPaginatedQuery<
         void postgresResult.fetchNextPage();
       }
     },
-  } as UsePaginatedQueryResult<TItem>;
+  };
 }
 
 export async function invalidateDataQueries(

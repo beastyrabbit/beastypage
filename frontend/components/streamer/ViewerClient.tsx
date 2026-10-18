@@ -7,9 +7,12 @@ import { useCatGenerator } from "@/components/cat-builder/hooks";
 import OptionPreview from "@/components/streamer/OptionPreview";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
 import UsersIcon from "@/components/ui/users-icon";
-import type { api } from "@/convex/_generated/api";
-import { toId } from "@/convex/utils";
 import { track } from "@/lib/analytics";
+import type {
+  StreamParticipant,
+  StreamSession,
+  StreamVote,
+} from "@/lib/data/stream";
 import {
   useCreateStreamParticipant,
   useCreateStreamVote,
@@ -28,9 +31,8 @@ import {
 import { useDefaultCreatorName } from "@/lib/useDefaultCreatorName";
 import { cn } from "@/lib/utils";
 
-type SessionRecord = typeof api.streamSessionsV2.get._returnType;
-type ParticipantRecord =
-  (typeof api.streamParticipantsV2.list._returnType)[number];
+type SessionRecord = StreamSession;
+type ParticipantRecord = StreamParticipant;
 
 type StreamParams = StreamerParams;
 type StepOption = ReturnType<StreamStep["getOptions"]>[number];
@@ -172,7 +174,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
 
   const sessionArgs = useMemo(() => {
     if (!sessionId) return "skip" as const;
-    return { id: toId("stream_sessions", sessionId) } as const;
+    return { id: sessionId } as const;
   }, [sessionId]);
 
   const session = useStreamSession(sessionArgs, viewerKey) as SessionRecord;
@@ -180,7 +182,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   const votesArgs = useMemo(() => {
     if (!sessionId) return "skip" as const;
     return {
-      session: toId("stream_sessions", sessionId),
+      session: sessionId,
       stepId: session?.current_step ?? undefined,
       limit: 500,
     } as const;
@@ -192,7 +194,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
   const participantArgs = useMemo(() => {
     if (!sessionId || !viewerSession) return "skip" as const;
     return {
-      session: toId("stream_sessions", sessionId),
+      session: sessionId,
       viewerSession,
       limit: 1,
     } as const;
@@ -251,7 +253,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
 
   const voteCounts = useMemo(() => {
     const map = new Map<string, number>();
-    votes.forEach((vote) => {
+    votes.forEach((vote: StreamVote) => {
       map.set(vote.option_key, (map.get(vote.option_key) ?? 0) + 1);
     });
     return map;
@@ -286,7 +288,11 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
     if (!participant) return null;
     return (
       votes.find(
-        (vote) => vote.option_meta?.participantId === participant.id,
+        (vote: StreamVote) =>
+          typeof vote.option_meta === "object" &&
+          vote.option_meta !== null &&
+          "participantId" in vote.option_meta &&
+          vote.option_meta.participantId === participant.id,
       ) ?? null
     );
   }, [votes, participant]);
@@ -348,7 +354,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
       try {
         setNameError(null);
         await registerParticipant({
-          sessionId: toId("stream_sessions", sessionId),
+          sessionId: sessionId,
           viewerSession: sessionToken,
           displayName: cleaned,
           status: "active",
@@ -383,7 +389,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
         return;
       try {
         await createVote({
-          sessionId: toId("stream_sessions", sessionId),
+          sessionId: sessionId,
           stepId: currentStep.id,
           optionKey: option.key,
           viewerSession: viewerSession ?? undefined,
@@ -392,7 +398,7 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
             participantId: participant.id,
             participantName: participant.display_name,
           },
-          votedBy: toId("stream_participants", participant.id),
+          votedBy: participant.id,
         });
         setStatusMessage("Vote recorded!");
         track("stream_vote_cast", { is_streamer: false });
@@ -722,22 +728,30 @@ export function ViewerClient({ viewerKey = null }: ViewerClientProps = {}) {
         <div className="grid gap-2 text-sm">
           {Array.isArray(session?.step_history) &&
           session.step_history.length > 0 ? (
-            session.step_history.map((entry, index) => (
-              <div
-                key={`${entry.step_id ?? "step"}-${entry.option_key ?? "option"}-${entry.title ?? "untitled"}-${entry.label ?? "choice"}`}
-                className="rounded-xl border border-border/50 bg-background/70 px-3 py-2"
-              >
-                <div className="text-xs text-muted-foreground">
-                  Step {index + 1}
+            session.step_history.map((entry, index: number) => {
+              const historyEntry = entry as {
+                step_id?: string;
+                option_key?: string;
+                title?: string;
+                label?: string;
+              };
+              return (
+                <div
+                  key={`${historyEntry.step_id ?? "step"}-${historyEntry.option_key ?? "option"}-${historyEntry.title ?? "untitled"}-${historyEntry.label ?? "choice"}`}
+                  className="rounded-xl border border-border/50 bg-background/70 px-3 py-2"
+                >
+                  <div className="text-xs text-muted-foreground">
+                    Step {index + 1}
+                  </div>
+                  <div className="font-semibold text-foreground">
+                    {historyEntry.title}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {historyEntry.label}
+                  </div>
                 </div>
-                <div className="font-semibold text-foreground">
-                  {entry.title}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {entry.label}
-                </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <p className="text-muted-foreground">
               The streamer hasn&apos;t locked any steps yet.

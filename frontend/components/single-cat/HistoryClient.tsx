@@ -129,7 +129,8 @@ function trapDialogFocus(event: KeyboardEvent, container: HTMLElement | null) {
   );
   if (focusable.length === 0) return;
   const first = focusable[0];
-  const last = focusable.at(-1)!;
+  const last = focusable.at(-1);
+  if (!last) return;
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault();
     last.focus();
@@ -249,34 +250,36 @@ export function HistoryClient() {
       (isEvolution ? "Evolution Batch" : "Adoption Batch");
     const baseCreator = cleanDisplay(batch.creatorName) || null;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const cats: AdoptionHistoryCat[] = (batch.cats ?? []).map((cat, index) => {
-      let encoded = cat.encoded ?? null;
-      if ((!encoded || encoded.length === 0) && cat.catData) {
-        try {
-          const canonical = normalizeCatViewPayload(cat.catData);
-          encoded = encodeCatShare(catViewPayloadToShareSeed(canonical));
-        } catch (error) {
-          console.warn("Failed to encode adoption cat payload", error);
-          encoded = null;
+    const cats: AdoptionHistoryCat[] = (batch.cats ?? []).map(
+      (cat, index: number) => {
+        let encoded = cat.encoded ?? null;
+        if ((!encoded || encoded.length === 0) && cat.catData) {
+          try {
+            const canonical = normalizeCatViewPayload(cat.catData);
+            encoded = encodeCatShare(catViewPayloadToShareSeed(canonical));
+          } catch (error) {
+            console.warn("Failed to encode adoption cat payload", error);
+            encoded = null;
+          }
         }
-      }
-      const viewerUrl = buildViewerUrl(origin, cat.shareToken, encoded);
-      const previewUrl = getPreviewUrl(
-        cat.profileId ?? null,
-        encoded,
-        cat.previews ?? undefined,
-      );
-      const fullUrl = previewUrl;
-      return {
-        index,
-        label: cat.label ?? "",
-        catName: cat.catName ?? null,
-        creatorName: cat.creatorName ?? null,
-        previewUrl,
-        fullUrl,
-        viewerUrl,
-      };
-    });
+        const viewerUrl = buildViewerUrl(origin, cat.shareToken, encoded);
+        const previewUrl = getPreviewUrl(
+          cat.profileId ?? null,
+          encoded,
+          cat.previews ?? undefined,
+        );
+        const fullUrl = previewUrl;
+        return {
+          index,
+          label: cat.label ?? "",
+          catName: cat.catName ?? null,
+          creatorName: cat.creatorName ?? null,
+          previewUrl,
+          fullUrl,
+          viewerUrl,
+        };
+      },
+    );
     const firstCat = cats[0] ?? null;
     const previewUrl = firstCat?.previewUrl ?? null;
     const fullUrl = firstCat?.fullUrl ?? previewUrl;

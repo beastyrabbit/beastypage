@@ -199,8 +199,7 @@ export function packPayload(
     baseBit * POW20 +
     paletteLow * POW21;
 
-  const upper =
-    paletteHigh + includeNewSpritesBit + reservedModeBit * 2 ** 47;
+  const upper = paletteHigh + includeNewSpritesBit + reservedModeBit * 2 ** 47;
 
   return [
     lower % W,

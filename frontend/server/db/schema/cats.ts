@@ -142,7 +142,7 @@ export const catShares = pgTable(
 
 /**
  * Ancestry trees are read and written as one document; `cats[]` holds
- * tree-local string ids (not Convex ids), so it stays typed JSONB.
+ * tree-local string ids (not PostgreSQL ids), so it stays typed JSONB.
  */
 export const ancestryTree = pgTable(
   "ancestry_tree",

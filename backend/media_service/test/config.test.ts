@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadConfig } from "../src/config.ts";
 
 const base = {
-	CONVEX_SITE_URL: "https://control.example/",
+	CONTROL_PLANE_URL: "https://frontend.example/api/internal/quick-share/",
 	QUICK_SHARE_INTERNAL_TOKEN: "i".repeat(32),
 	QUICK_SHARE_HMAC_KEY: "h".repeat(32),
 	S3_ENDPOINT: "https://s3.example",
@@ -11,17 +11,18 @@ const base = {
 };
 
 describe("media control plane configuration", () => {
-	it("defaults to the Convex Quick Share endpoint", () => {
+	it("requires the Quick Share control-plane endpoint", () => {
 		expect(loadConfig(base).controlPlaneUrl).toBe(
-			"https://control.example/quick-share/internal",
+			"https://frontend.example/api/internal/quick-share",
 		);
 	});
 
-	it("uses the configured PostgreSQL-compatible endpoint", () => {
+	it("trims the configured endpoint", () => {
 		expect(
 			loadConfig({
 				...base,
-				CONTROL_PLANE_URL: "https://frontend.example/api/internal/quick-share/",
+				CONTROL_PLANE_URL:
+					"https://frontend.example/api/internal/quick-share///",
 			}).controlPlaneUrl,
 		).toBe("https://frontend.example/api/internal/quick-share");
 	});

@@ -8,9 +8,6 @@ const mocks = vi.hoisted(() => ({
   loadSnapshot: vi.fn(),
 }));
 
-vi.mock("@/server/backend", () => ({
-  dataBackend: () => "postgres",
-}));
 vi.mock("@/server/auth/identity", () => ({
   ANONYMOUS: {},
   getRequestIdentity: vi.fn(),

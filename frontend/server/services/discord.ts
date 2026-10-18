@@ -31,7 +31,7 @@ const DEFAULTS = {
 
 export const discordDefaults = DEFAULTS;
 
-// Redemption and config updates read a row and then write it; like Convex
+// Redemption and config updates read a row and then write it; like PostgreSQL
 // mutations they run serializably, so concurrent requests cannot both redeem
 // one challenge or overwrite each other's palette change.
 const SERIALIZABLE = { isolation: "serializable", retries: 3 } as const;

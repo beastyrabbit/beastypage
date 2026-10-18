@@ -23,7 +23,6 @@ let searchRoute: typeof import("./search/route");
 let viewerRoute: typeof import("./viewer/route");
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   getRequestIdentity.mockResolvedValue(owner);
   [

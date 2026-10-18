@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from "vitest";
+import { imageToDataUrl } from "@/lib/color-extraction/image-processing";
 import { processImage } from "@/lib/pixelator/api";
 import { repairPipeline } from "@/lib/pixelator/pipeline";
 import type { PipelineStep } from "@/lib/pixelator/types";
-import { imageToDataUrl } from "@/lib/color-extraction/image-processing";
 
 const step = (id: string, inputSource = "original"): PipelineStep => ({
   id,

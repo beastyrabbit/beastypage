@@ -75,7 +75,7 @@ describe("Quick Share jobs", () => {
     }
   });
 
-  it("uses the Convex retry schedule and stops after the final attempt", async () => {
+  it("uses the PostgreSQL retry schedule and stops after the final attempt", async () => {
     const server = createServer((_request, response) => {
       response.writeHead(503).end();
     });

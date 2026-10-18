@@ -1,5 +1,5 @@
 /**
- * Runtime contracts for every JSON column that replaces a Convex `v.any()`
+ * Runtime contracts for every JSON column that replaces a PostgreSQL `v.any()`
  * field (#107). The importer validates archived documents with these schemas,
  * and the server data layer validates writes with the same ones.
  *
@@ -10,8 +10,8 @@
  *   `pose_name` or `autoClearSeconds`, so dropping keys would change behavior.
  *   NaN, Infinity, undefined, functions and class instances are rejected.
  * - Optional keys inside formerly untyped payloads also accept `null`:
- *   Convex stored nulls there and readers use `??`.
- * - Size caps match what Convex enforced (or its 1 MiB document limit).
+ *   PostgreSQL stored nulls there and readers use `??`.
+ * - Size caps match what PostgreSQL enforced (or its 1 MiB document limit).
  * - Records that fail are quarantined by the importer, never coerced.
  */
 import { z } from "zod";
@@ -171,7 +171,7 @@ export const catData = z
   .catchall(jsonValue);
 export type CatData = z.infer<typeof catData>;
 
-/** Profiles had no Convex cap; 900 KiB matches the batch and tree caps. */
+/** Profiles had no PostgreSQL cap; 900 KiB matches the batch and tree caps. */
 export const catProfileData = capped(catData, 900 * KIB, "cat_profile.catData");
 
 // -------------------------------------------------------- simple fields
@@ -420,7 +420,7 @@ export const adoptionBatchCat = z.object({
   creatorName: opt(str),
 });
 
-/** Convex `createBatch` limits: 200 cats, 900 KiB of JSON. */
+/** PostgreSQL `createBatch` limits: 200 cats, 900 KiB of JSON. */
 export const ADOPTION_BATCH_MAX_CATS = 200;
 export const ADOPTION_BATCH_MAX_BYTES = 900 * KIB;
 
@@ -453,7 +453,7 @@ export const catGenetics = z
   })
   .catchall(jsonValue);
 
-/** Mirrors the Convex validator; ids are tree-local strings. */
+/** Mirrors the PostgreSQL validator; ids are tree-local strings. */
 export const ancestryCat = z.object({
   id: str,
   name: z.object({ prefix: str, suffix: str, full: str }),
@@ -471,7 +471,7 @@ export const ancestryCat = z.object({
 });
 export type AncestryCat = z.infer<typeof ancestryCat>;
 
-/** Convex `assertTreeSize`: at most 500 cats and 900 KiB. */
+/** PostgreSQL `assertTreeSize`: at most 500 cats and 900 KiB. */
 export const ancestryCats = capped(
   z.array(ancestryCat).max(500),
   900 * KIB,
@@ -537,7 +537,7 @@ export const streamParams = capped(
 export type StreamParams = z.infer<typeof streamParamsShape>;
 
 /**
- * Rebuilt by the server in Convex: a participant vote or a host vote.
+ * Rebuilt by the server in PostgreSQL: a participant vote or a host vote.
  * `participantId` is a stream_participants id and is rewritten on import.
  */
 export const streamVoteOptionMeta = z.union([

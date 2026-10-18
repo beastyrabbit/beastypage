@@ -308,7 +308,7 @@
       </header>
 
       <section class="decision" aria-label="Ergebnis der Architekturentscheidung">
-        <strong>Der Big Bang ist im Arbeitsstand umgesetzt. Python bleibt, Convex bleibt draußen.</strong>
+        <strong>Der Big Bang ist im Arbeitsstand umgesetzt. Python bleibt, PostgreSQL bleibt außerhalb dieser Kette.</strong>
         Ein neuer Trait mit vorhandenen Strategien wird einmal in der Registry beschrieben. Derselbe Eintrag speist Schema,
         Renderer, Gacha, Builder, Stream-Abläufe, Evolution, Vererbung, Share-Formate und Discord. Die vorhandenen
         Gacha-Einstellungen bleiben davon getrennt. Neue technische Semantik braucht weiterhin genau eine zentrale Strategie.
@@ -420,7 +420,7 @@
       <h2>So verteilt sich eine Definition</h2>
 
       <div class="architecture">
-        <svg viewBox="0 0 1040 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Die TypeScript-Registry erzeugt Verträge für alle Consumer, ohne Convex-Laufzeit">
+        <svg viewBox="0 0 1040 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Die TypeScript-Registry erzeugt Verträge für alle Consumer, ohne PostgreSQL-Laufzeit">
           <defs>
             <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
               <path d="M0,0 L8,4 L0,8 Z" fill="#8a4823"></path>
@@ -462,7 +462,7 @@
           <text x="748" y="351" font-size="13" fill="#365c49">öffentlicher Katalog und gleicher Hash</text>
 
           <rect x="25" y="345" width="610" height="55" rx="10" fill="#f4e9ca" stroke="#795914"></rect>
-          <text x="47" y="368" font-size="15" font-weight="700" fill="#59420f">Convex ist nicht Teil dieser Kette</text>
+          <text x="47" y="368" font-size="15" font-weight="700" fill="#59420f">PostgreSQL ist nicht Teil dieser Kette</text>
           <text x="47" y="389" font-size="12" fill="#6b5525">Keine Registry, Generierung, Gacha-, Render- oder Verteilungsarbeit in der Datenbank</text>
         </svg>
       </div>
@@ -470,8 +470,8 @@
       <h2>Was ein erfolgreicher System-Build jetzt beweist</h2>
 
       <p>
-        Der Befehl <code>pnpm cat-system:build</code> ist das Big-Bang-Gate. Er läuft ohne echte Convex- oder Clerk-Zugänge.
-        Der Befehl setzt dafür lokal gültige Platzhalter und benötigt weder einen Convex-Deploy-Key noch eine
+        Der Befehl <code>pnpm cat-system:build</code> ist das Big-Bang-Gate. Er läuft ohne echte PostgreSQL- oder Clerk-Zugänge.
+        Der Befehl setzt dafür lokal gültige Platzhalter und benötigt weder einen PostgreSQL-Deploy-Key noch eine
         Datenbankänderung. Er prüft den Source- und Laufzeitvertrag. Die Docker-Builds sind eigene, nachgelagerte Gates.
       </p>
 
@@ -698,7 +698,7 @@
         <strong>Discord-Persistenz bleibt spezialisiert.</strong> Die alte Optionsmaske von <code>/config set</code> schreibt
         weiterhin ihre vorhandenen Felder. Neue Traits erscheinen automatisch in den Overrides eines einzelnen
         <code>/gen-discord-kitten</code>-Aufrufs, aber nicht automatisch als dauerhaft gespeicherte Discord-Einstellung. Eine
-        generische persistente Maske hätte neue Datenbankfelder oder einen neuen Convex-Speichervertrag verlangt. Genau das
+        generische persistente Maske hätte neue Datenbankfelder oder einen neuen PostgreSQL-Speichervertrag verlangt. Genau das
         sollte dieser Umbau nicht einführen.
       </div>
 
@@ -736,16 +736,16 @@
         <p>
           Ein neuer Trait mit vorhandenen Wert-, Gacha-, Consumer- und Renderstrategien läuft durch den implementierten
           Verteilungspfad. Fehlt ein Artefakt oder passt eine Strategie nicht, wird der Build rot. Das ist die gewünschte
-          Convex-TypeScript-Idee als Repository-Vertrag und ohne Datenbankarbeit.
+          TypeScript-Idee als Repository-Vertrag und ohne Datenbankarbeit.
         </p>
       </div>
 
-      <h2>Convex bleibt unverändert</h2>
+      <h2>PostgreSQL bleibt unverändert</h2>
 
       <p>
-        Keine Datei im Convex-Verzeichnis wurde für diesen Umbau geändert. Die Registry, Kataloggenerierung, Gacha-Logik,
+        Keine Datei im PostgreSQL-Verzeichnis wurde für diesen Umbau geändert. Die Registry, Kataloggenerierung, Gacha-Logik,
         Renderpläne, Assetprüfung, Probe und Image-Hashes laufen im Build oder im jeweiligen Prozess. Es gibt keine neue
-        Convex-Funktion, keinen Index, Cronjob, Poller, zusätzlichen Read oder Trait-spezifische Spalte.
+        PostgreSQL-Funktion, keinen Index, Cronjob, Poller, zusätzlichen Read oder Trait-spezifische Spalte.
       </p>
 
       <div class="cards">
@@ -759,7 +759,7 @@
         <article class="card">
           <h3>Was bewusst nicht gemacht wurde</h3>
           <p>
-            Der Umbau migriert keine Convex-Tabellen und baut keinen neuen Convex-Adapter. Bestehende Persistenz bleibt, wo
+            Der Umbau migriert keine PostgreSQL-Tabellen und baut keinen neuen PostgreSQL-Adapter. Bestehende Persistenz bleibt, wo
             sie ist. Ein späterer Datenbankwechsel kann hinter der Schnittstelle stattfinden und ändert den Trait-Vertrag
             nicht.
           </p>
@@ -781,7 +781,7 @@
           <tbody>
             <tr>
               <td><code>pnpm cat-system:build</code></td>
-              <td>Exit 0 ohne echte Convex- oder Clerk-Zugänge</td>
+              <td>Exit 0 ohne echte PostgreSQL- oder Clerk-Zugänge</td>
             </tr>
             <tr>
               <td>Frontend</td>
@@ -813,7 +813,7 @@
             </tr>
             <tr>
               <td>Repository-Hygiene</td>
-              <td><code>git diff --check</code> grün; keine Convex-Datei im Diff</td>
+              <td><code>git diff --check</code> grün; keine PostgreSQL-Datei im Diff</td>
             </tr>
             <tr>
               <td>Zusätzlicher Lint-Lauf</td>
@@ -924,7 +924,7 @@
         Die gewünschte Regel ist als prüfbarer Repository-Vertrag umgesetzt. Der System-Build ist das Ergebnis, nicht der
         Renderer allein. Python führt einen generierten Vertrag aus. Gacha interpretiert feste, typisierte Strategien mit
         variablen Katalogdaten. Builder und Reveal-Abläufe erhalten generische Fallbacks. Die Settings-Seite bleibt beim alten
-        Vertrag. Discord und Images tragen denselben Hash. Convex trägt keine zusätzliche Last.
+        Vertrag. Discord und Images tragen denselben Hash. PostgreSQL trägt keine zusätzliche Last.
       </p>
 
       <p>

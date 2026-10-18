@@ -73,14 +73,14 @@ describe("classicWheel", () => {
     { bucket: 96, expectedIndex: 5 },
     { bucket: 98, expectedIndex: 5 },
     { bucket: 99, expectedIndex: 6 },
-  ])("maps random bucket $bucket to prize index $expectedIndex", ({
-    bucket,
-    expectedIndex,
-  }) => {
-    setCryptoBucket(bucket);
-    const selection = pickClassicWheelPrize();
-    expect(selection.index).toBe(expectedIndex);
-    expect(selection.prize).toEqual(CLASSIC_WHEEL_PRIZES[expectedIndex]);
-    expect(selection.random).toBe(bucket);
-  });
+  ])(
+    "maps random bucket $bucket to prize index $expectedIndex",
+    ({ bucket, expectedIndex }) => {
+      setCryptoBucket(bucket);
+      const selection = pickClassicWheelPrize();
+      expect(selection.index).toBe(expectedIndex);
+      expect(selection.prize).toEqual(CLASSIC_WHEEL_PRIZES[expectedIndex]);
+      expect(selection.random).toBe(bucket);
+    },
+  );
 });

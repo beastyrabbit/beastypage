@@ -8,8 +8,7 @@ const booleanFromEnv = z
 const schema = z.object({
 	PORT: z.coerce.number().int().min(1).max(65535).default(8003),
 	PUBLIC_BASE_URL: z.url().default("https://beastyrabbit.com"),
-	CONVEX_SITE_URL: z.url(),
-	CONTROL_PLANE_URL: z.url().optional(),
+	CONTROL_PLANE_URL: z.url(),
 	QUICK_SHARE_INTERNAL_TOKEN: z.string().min(24),
 	QUICK_SHARE_HMAC_KEY: z.string().min(32),
 	S3_ENDPOINT: z.url(),
@@ -31,7 +30,6 @@ const schema = z.object({
 export type Config = {
 	port: number;
 	publicBaseUrl: string;
-	convexSiteUrl: string;
 	controlPlaneUrl: string;
 	internalToken: string;
 	hmacKey: string;
@@ -52,11 +50,7 @@ export function loadConfig(environment = process.env): Config {
 	return {
 		port: parsed.PORT,
 		publicBaseUrl: trimTrailingSlashes(parsed.PUBLIC_BASE_URL),
-		convexSiteUrl: trimTrailingSlashes(parsed.CONVEX_SITE_URL),
-		controlPlaneUrl: trimTrailingSlashes(
-			parsed.CONTROL_PLANE_URL ??
-				`${trimTrailingSlashes(parsed.CONVEX_SITE_URL)}/quick-share/internal`,
-		),
+		controlPlaneUrl: trimTrailingSlashes(parsed.CONTROL_PLANE_URL),
 		internalToken: parsed.QUICK_SHARE_INTERNAL_TOKEN,
 		hmacKey: parsed.QUICK_SHARE_HMAC_KEY,
 		s3Endpoint: parsed.S3_ENDPOINT,

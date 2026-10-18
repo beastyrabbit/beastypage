@@ -6,7 +6,6 @@ const env = { ...process.env };
 let route: typeof import("./route");
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   process.env.DISCORD_API_TOKEN = "fixture-discord-service-token-1234567890";
   route = await import("./route");
@@ -31,7 +30,7 @@ describe("Discord user config route", () => {
     expect(response.status).toBe(401);
   });
 
-  it("rejects a configured service token shorter than Convex's minimum", async () => {
+  it("rejects a configured service token shorter than PostgreSQL's minimum", async () => {
     process.env.DISCORD_API_TOKEN = "short-token";
     const response = await route.GET(
       new NextRequest(

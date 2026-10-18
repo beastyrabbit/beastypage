@@ -47,6 +47,7 @@ export function QuickShareModerationClient() {
 
   const request = useCallback(
     async <T,>(path: string, init: RequestInit = {}) => {
+      // Historical Clerk JWT template name retained for media token forwarding.
       const token = await getToken({ template: "convex" });
       if (!token) throw new Error("Sign in is required");
       const headers = new Headers(init.headers);

@@ -11,8 +11,6 @@ import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
 import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
-import type { Id } from "@/convex/_generated/dataModel";
-import { toId } from "@/convex/utils";
 import { track } from "@/lib/analytics";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import {
@@ -45,7 +43,7 @@ type AdoptionCatPayload = {
   editToken?: string;
   label: string;
   catData: unknown;
-  profileId?: Id<"cat_profile">;
+  profileId?: string;
   encoded?: string;
   shareToken?: string;
   catName?: string;
@@ -195,9 +193,7 @@ export function AdoptionGeneratorClient() {
                   catData: catDataToLegacyPersistence(
                     cat.catData as Record<string, unknown>,
                   ),
-                  profileId: profileIdStr
-                    ? toId("cat_profile", profileIdStr)
-                    : undefined,
+                  profileId: profileIdStr ?? undefined,
                   encoded,
                   shareToken,
                   editToken,
@@ -307,7 +303,7 @@ export function AdoptionGeneratorClient() {
         setMetadataMessage(null);
         setMetadataError(null);
         await updateBatchMeta({
-          id: lastSavedId as Id<"adoption_batch">,
+          id: lastSavedId as string,
           editToken: batchEditToken,
           title: nextMetadata.title,
           creatorName: nextMetadata.creator,

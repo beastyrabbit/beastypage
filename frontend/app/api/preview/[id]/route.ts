@@ -1,8 +1,4 @@
-import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
-import { api } from "@/convex/_generated/api";
-import { getServerConvexUrl } from "@/lib/convexUrl";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseSearchParams } from "@/server/request";
@@ -202,7 +198,7 @@ async function renderCatData(
  * On-demand preview generation.
  *
  * Supports two modes:
- * 1. /api/preview/{id} - fetch cat data from Convex by ID/slug
+ * 1. /api/preview/{id} - fetch cat data from PostgreSQL by ID/slug
  * 2. /api/preview/{id}?cat={encoded} - use encoded cat data directly (for adoption batch cats)
  */
 async function renderEncodedPreview(
@@ -260,38 +256,6 @@ async function renderPostgresPreview(
   }
 }
 
-async function renderConvexPreview(
-  profileId: string,
-  request: NextRequest,
-): Promise<NextResponse> {
-  const convexUrl = getServerConvexUrl();
-  if (!convexUrl)
-    return NextResponse.json(
-      { error: "Convex URL not configured" },
-      { status: 500 },
-    );
-  try {
-    const profile = await new ConvexHttpClient(convexUrl).query(
-      api.mapper.getBySlug,
-      { slugOrId: profileId },
-    );
-    if (!profile)
-      return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-    if (!isPlainRecord(profile.cat_data))
-      return NextResponse.json(
-        { error: "Cat data not found" },
-        { status: 400 },
-      );
-    return await renderCatData(profile.cat_data, request.signal);
-  } catch (error) {
-    console.error("Failed to generate preview", error);
-    return NextResponse.json(
-      { error: "Failed to generate preview" },
-      { status: 500 },
-    );
-  }
-}
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -313,7 +277,5 @@ export async function GET(
   if (cat) return renderEncodedPreview(cat, request);
   if (!profileId)
     return NextResponse.json({ error: "Missing profile ID" }, { status: 400 });
-  return dataBackend() === "postgres"
-    ? renderPostgresPreview(profileId, request)
-    : renderConvexPreview(profileId, request);
+  return renderPostgresPreview(profileId, request);
 }

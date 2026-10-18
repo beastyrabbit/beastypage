@@ -204,7 +204,7 @@ describe("CatDocument", () => {
     );
   });
 
-  it("restores compact Convex payloads without losing flattened future traits", () => {
+  it("restores compact PostgreSQL payloads without losing flattened future traits", () => {
     const futureValue = { slots: ["EAR-FERN"] };
     const document = decodeCatDocumentLegacy({
       ...legacyCat,

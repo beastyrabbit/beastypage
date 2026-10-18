@@ -1,14 +1,21 @@
 "use client";
 
-import type { FunctionReturnType } from "convex/server";
-import { api } from "@/convex/_generated/api";
 import { fetchJson } from "@/lib/api";
 import { dataQueryKeys, useDataMutation, useDataQuery } from "@/lib/data";
+import type {
+  perfectLeaderboard,
+  requestPerfectMatchup,
+  submitPerfectVote,
+  wheelStats,
+} from "@/server/services/games";
 
-type Matchup = FunctionReturnType<typeof api.perfectCats.requestMatchup>;
+type Matchup = Awaited<ReturnType<typeof requestPerfectMatchup>>;
+type PerfectVote = Awaited<ReturnType<typeof submitPerfectVote>>;
+type Leaderboard = Awaited<ReturnType<typeof perfectLeaderboard>>;
+type WheelStats = Awaited<ReturnType<typeof wheelStats>>;
 
 export function usePerfectCatRegister() {
-  return useDataMutation(api.perfectCats.registerCats, {
+  return useDataMutation({
     mutationFn: (args, signal) =>
       fetchJson<unknown>("/api/perfect-cats/register", {
         method: "POST",
@@ -19,7 +26,7 @@ export function usePerfectCatRegister() {
 }
 
 export function usePerfectCatMatchup() {
-  return useDataMutation(api.perfectCats.requestMatchup, {
+  return useDataMutation({
     mutationFn: (value, signal) =>
       fetchJson<Matchup>("/api/perfect-cats/matchup", {
         method: "POST",
@@ -30,33 +37,31 @@ export function usePerfectCatMatchup() {
 }
 
 export function usePerfectCatVote() {
-  return useDataMutation(api.perfectCats.submitVote, {
+  return useDataMutation({
     mutationFn: (args, signal) =>
-      fetchJson<FunctionReturnType<typeof api.perfectCats.submitVote>>(
-        "/api/perfect-cats/vote",
-        { method: "POST", body: args, signal },
-      ),
+      fetchJson<PerfectVote>("/api/perfect-cats/vote", {
+        method: "POST",
+        body: args,
+        signal,
+      }),
   });
 }
 
 export function usePerfectCatLeaderboard(limit = 10) {
   return useDataQuery(
-    api.perfectCats.leaderboard,
     { limit },
     {
       queryKey: dataQueryKeys.list("perfect-cats-leaderboard", limit),
       queryFn: (_args, signal) =>
-        fetchJson<Matchup["cats"]>(
-          `/api/perfect-cats/leaderboard?limit=${limit}`,
-          { signal },
-        ),
+        fetchJson<Leaderboard>(`/api/perfect-cats/leaderboard?limit=${limit}`, {
+          signal,
+        }),
     },
   );
 }
 
 export function useCoinflipLeaderboard(limit = 10) {
   return useDataQuery(
-    api.coinflipper.leaderboard,
     { limit },
     {
       queryKey: dataQueryKeys.list("coinflip-leaderboard", limit),
@@ -70,7 +75,6 @@ export function useCoinflipLeaderboard(limit = 10) {
 
 export function useCoinflipScores(limit = 200) {
   return useDataQuery(
-    api.coinflipper.listScores,
     { limit },
     {
       queryKey: dataQueryKeys.list("coinflip-scores", limit),
@@ -83,7 +87,7 @@ export function useCoinflipScores(limit = 200) {
 }
 
 export function useSubmitCoinflipScore() {
-  return useDataMutation(api.coinflipper.submitScore, {
+  return useDataMutation({
     mutationFn: (args, signal) =>
       fetchJson<{ id: string; name: string; score: number; createdAt: number }>(
         "/api/coinflip/score",
@@ -98,21 +102,17 @@ export function useSubmitCoinflipScore() {
 
 export function useWheelStats() {
   return useDataQuery(
-    api.wheel.stats,
     {},
     {
       queryKey: dataQueryKeys.query("wheel-stats"),
       queryFn: (_args, signal) =>
-        fetchJson<FunctionReturnType<typeof api.wheel.stats>>(
-          "/api/wheel/stats",
-          { signal },
-        ),
+        fetchJson<WheelStats>("/api/wheel/stats", { signal }),
     },
   );
 }
 
 export function useLogWheelSpin() {
-  return useDataMutation(api.wheel.logSpin, {
+  return useDataMutation({
     mutationFn: (args, signal) =>
       fetchJson<null>("/api/wheel/spin", {
         method: "POST",

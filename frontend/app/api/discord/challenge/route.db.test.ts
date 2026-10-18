@@ -6,7 +6,6 @@ const env = { ...process.env };
 let route: typeof import("./route");
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   process.env.DISCORD_INVITE_SECRET = "https://discord.gg/routes";
   route = await import("./route");

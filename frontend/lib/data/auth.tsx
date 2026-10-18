@@ -2,7 +2,6 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useQueryClient } from "@tanstack/react-query";
-import { useConvexAuth } from "convex/react";
 import {
   createContext,
   type ReactNode,
@@ -11,7 +10,6 @@ import {
   useMemo,
   useRef,
 } from "react";
-import { useDataBackend } from "./backend";
 
 export type BackendAuth = {
   isLoading: boolean;
@@ -19,21 +17,6 @@ export type BackendAuth = {
 };
 
 const BackendAuthContext = createContext<BackendAuth | undefined>(undefined);
-
-function ConvexBackendAuthProvider({
-  children,
-}: Readonly<{ children: ReactNode }>) {
-  const { isLoading, isAuthenticated } = useConvexAuth();
-  const value = useMemo(
-    () => ({ isLoading, isAuthenticated }),
-    [isLoading, isAuthenticated],
-  );
-  return (
-    <BackendAuthContext.Provider value={value}>
-      {children}
-    </BackendAuthContext.Provider>
-  );
-}
 
 /**
  * Per-user queries (viewer, saved variants, stream sessions) are keyed
@@ -72,20 +55,13 @@ function ClerkBackendAuthProvider({
 export function BackendAuthProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const backend = useDataBackend();
-  return backend === "convex" ? (
-    <ConvexBackendAuthProvider>{children}</ConvexBackendAuthProvider>
-  ) : (
-    <ClerkBackendAuthProvider>{children}</ClerkBackendAuthProvider>
-  );
+  return <ClerkBackendAuthProvider>{children}</ClerkBackendAuthProvider>;
 }
 
 /**
  * Read authentication from the active data backend.
  *
- * PostgreSQL mode uses Clerk state, while Convex mode preserves the existing
- * Convex auth state. The provider boundary keeps the unselected auth hook out
- * of the render tree, so PostgreSQL can use a plain ConvexProvider.
+ * Authentication is provided by Clerk for all frontend data requests.
  */
 export function useBackendAuth(): BackendAuth {
   const auth = useContext(BackendAuthContext);

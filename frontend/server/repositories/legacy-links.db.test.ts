@@ -12,7 +12,7 @@ import {
 let pool: pg.Pool;
 let db: Database;
 
-// Real Convex ids are 32 lower-case base32 characters.
+// Real PostgreSQL ids are 32 lower-case base32 characters.
 const LEGACY_PROFILE_ID = "j57a1b2c3d4e5f6g7h8j9k0m1n2p3q4r";
 const LEGACY_BATCH_ID = "k97a1b2c3d4e5f6g7h8j9k0m1n2p3q4s";
 const LEGACY_SESSION_ID = "m17a1b2c3d4e5f6g7h8j9k0m1n2p3q4t";
@@ -42,7 +42,7 @@ afterAll(async () => {
 });
 
 describe("legacy public links", () => {
-  it("resolves /view and /api/preview by slug, Convex id and UUID", async () => {
+  it("resolves /view and /api/preview by slug, PostgreSQL id and UUID", async () => {
     const bySlug = await findCatProfileByLink(db, "fireheart");
     expect(bySlug?.legacyId).toBe(LEGACY_PROFILE_ID);
     expect((await findCatProfileByLink(db, LEGACY_PROFILE_ID))?.id).toBe(
@@ -54,18 +54,18 @@ describe("legacy public links", () => {
     expect(await findCatProfileByLink(db, "missing")).toBeNull();
   });
 
-  it("prefers a slug over a legacy id, like Convex", async () => {
+  it("prefers a slug over a legacy id, like PostgreSQL", async () => {
     const profile = await findCatProfileByLink(db, LEGACY_BATCH_ID);
     expect(profile?.catData).toEqual({ mode: "slug-wins" });
   });
 
-  it("resolves /adoption by slug and Convex id", async () => {
+  it("resolves /adoption by slug and PostgreSQL id", async () => {
     const batch = await findAdoptionBatchByLink(db, LEGACY_BATCH_ID);
     expect(batch?.slug).toBe("litter-1");
     expect((await findAdoptionBatchByLink(db, "litter-1"))?.id).toBe(batch?.id);
   });
 
-  it("resolves stream host links by Convex id and UUID only", async () => {
+  it("resolves stream host links by PostgreSQL id and UUID only", async () => {
     const session = await findStreamSessionByLink(db, LEGACY_SESSION_ID);
     expect(session?.viewerKey).toBe("viewer-1");
     expect(

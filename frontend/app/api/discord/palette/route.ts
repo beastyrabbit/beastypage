@@ -1,15 +1,11 @@
-import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
-import { api } from "@/convex/_generated/api";
-import { isDiscordServiceRequest } from "@/convex/discordAuth";
 import {
   extractPaletteColorsServer,
   generatePaletteGridImage,
 } from "@/lib/color-extraction/server-extraction";
 import type { ExtractedColor } from "@/lib/color-extraction/types";
-import { getServerConvexUrl } from "@/lib/convexUrl";
+import { isDiscordServiceRequest } from "@/lib/discord-service";
 import { downloadPublicImage } from "@/lib/public-image-download";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody } from "@/server/request";
@@ -122,38 +118,15 @@ async function persistPalette(
 
   try {
     if (signal.aborted) return { response: abortedResponse() };
-    if (dataBackend() === "postgres") {
-      const result = await storePostgresDiscordImage(getDb(), {
-        dataUrl: `data:image/png;base64,${imageBuffer.toString("base64")}`,
-        colors: colorsPayload,
-        serviceToken: (process.env.DISCORD_API_TOKEN ?? "").trim(),
-      });
-      slug = result.slug;
-      customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?paletteSlug=${slug}`;
-      return { value: { slug, customizeUrl } };
-    }
-    const convexUrl = getServerConvexUrl();
-    if (convexUrl) {
-      const convex = new ConvexHttpClient(convexUrl);
-      const base64 = imageBuffer.toString("base64");
-      const result = await convex.action(
-        api.paletteGeneratorSettingsActions.storeDiscordImage,
-        {
-          dataUrl: `data:image/png;base64,${base64}`,
-          colors: colorsPayload,
-          serviceToken: (process.env.DISCORD_API_TOKEN ?? "").trim(),
-        },
-      );
-      if (signal.aborted) return { response: abortedResponse() };
-      slug = result.slug;
-      customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?paletteSlug=${slug}`;
-    } else {
-      console.warn(
-        "[discord/palette] No Convex URL configured — skipping persistence",
-      );
-    }
+    const result = await storePostgresDiscordImage(getDb(), {
+      dataUrl: `data:image/png;base64,${imageBuffer.toString("base64")}`,
+      colors: colorsPayload,
+      serviceToken: (process.env.DISCORD_API_TOKEN ?? "").trim(),
+    });
+    slug = result.slug;
+    customizeUrl = `${PUBLIC_BASE_URL}/color-palette-creator?paletteSlug=${slug}`;
   } catch (error) {
-    console.error("[discord/palette] Failed to store in Convex", error);
+    console.error("[discord/palette] Failed to store palette", error);
   }
   return { value: { slug, customizeUrl } };
 }

@@ -32,7 +32,7 @@ export const schemaVersion = pgTable(
 );
 
 /**
- * Image bytes formerly in Convex file storage. Deduplicated by SHA-256;
+ * Image bytes formerly in PostgreSQL file storage. Deduplicated by SHA-256;
  * normal queries never select `bytes`.
  */
 export const files = pgTable(
@@ -76,7 +76,7 @@ export const liveEvents = pgTable(
   ],
 );
 
-/** Replaces Convex `ctx.scheduler` calls and cron jobs. */
+/** Replaces PostgreSQL `ctx.scheduler` calls and cron jobs. */
 export const jobs = pgTable(
   "jobs",
   {

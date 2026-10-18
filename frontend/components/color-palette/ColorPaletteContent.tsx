@@ -161,10 +161,10 @@ export function ColorPaletteContent({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Load cat data from Convex if slug is provided
+  // Load cat data from PostgreSQL if slug is provided
   const mapperRecord = useCatProfile(slug);
 
-  // Load palette config from Convex if paletteSlug is provided
+  // Load palette config from PostgreSQL if paletteSlug is provided
   const paletteRecord = usePaletteRecord(paletteSlug);
 
   // Get image download URL from the palette record; do not expose raw storage
@@ -339,7 +339,7 @@ export function ColorPaletteContent({
     }
   }, [imageUrl, slug, paletteSlug]);
 
-  // Handle palette slug — load image from Convex storage
+  // Handle palette slug — load image from PostgreSQL storage
   useEffect(() => {
     if (paletteSlug && paletteImageUrl) {
       setInitialImage(paletteImageUrl);

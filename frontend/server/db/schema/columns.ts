@@ -8,7 +8,7 @@ export const tstz = (name: string) =>
 export const primaryId = () => uuid("id").primaryKey().defaultRandom();
 
 /**
- * Convex bookkeeping kept on every imported table: the original `_id` for
+ * PostgreSQL bookkeeping kept on every imported table: the original `_id` for
  * legacy links and idempotent imports, and `_creationTime`.
  */
 export const legacyColumns = () => ({

@@ -11,8 +11,8 @@ export function isUuid(value: string): boolean {
 }
 
 /**
- * Public links contain a slug, an old Convex `_id`, or a new UUID. Lookup
- * order matches the Convex `slugOrId` queries: slug first, then id.
+ * Public links contain a slug, an old PostgreSQL `_id`, or a new UUID. Lookup
+ * order matches the PostgreSQL `slugOrId` queries: slug first, then id.
  */
 export async function findCatProfileByLink(db: Database, slugOrId: string) {
   const [bySlug] = await db

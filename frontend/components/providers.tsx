@@ -1,16 +1,12 @@
 "use client";
 
-import { ClerkProvider, useAuth } from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
 import { shadcn } from "@clerk/ui/themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ConvexProvider } from "convex/react";
-import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { MotionConfig } from "motion/react";
 import { type ReactNode, useState } from "react";
 import { PosthogProvider } from "@/components/posthog-provider";
-import convex from "@/lib/convexClient";
-import { BackendAuthProvider, DataBackendProvider } from "@/lib/data";
-import type { DataBackend } from "@/server/backend";
+import { BackendAuthProvider } from "@/lib/data";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -40,10 +36,7 @@ if (!clerkPublishableKey) {
   );
 }
 
-export function AppProviders({
-  children,
-  backend,
-}: Readonly<{ children: ReactNode; backend: DataBackend }>) {
+export function AppProviders({ children }: Readonly<{ children: ReactNode }>) {
   // One cache per browser session, and per request during SSR, so cached
   // data never crosses users on the server.
   const [queryClient] = useState(makeQueryClient);
@@ -60,15 +53,7 @@ export function AppProviders({
       appearance={{ theme: shadcn }}
     >
       <QueryClientProvider client={queryClient}>
-        <DataBackendProvider backend={backend}>
-          {backend === "convex" ? (
-            <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-              {appContent}
-            </ConvexProviderWithClerk>
-          ) : (
-            <ConvexProvider client={convex}>{appContent}</ConvexProvider>
-          )}
-        </DataBackendProvider>
+        {appContent}
       </QueryClientProvider>
     </ClerkProvider>
   );

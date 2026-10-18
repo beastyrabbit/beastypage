@@ -22,7 +22,6 @@ import type {
 } from "@/components/cat-builder/types";
 import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
 import TriangleAlertIcon from "@/components/ui/triangle-alert-icon";
-import { toId } from "@/convex/utils";
 import type { CatParams } from "@/lib/cat-v3/types";
 import {
   useAdoptionCreate,
@@ -1078,7 +1077,7 @@ export function EvolutionGeneratorClient() {
         setMetadataMessage(null);
         setMetadataError(null);
         await updateBatchMeta({
-          id: toId("adoption_batch", lastSavedId),
+          id: lastSavedId,
           editToken: batchEditToken,
           title: nextMetadata.title,
           creatorName: nextMetadata.creator,
@@ -1102,7 +1101,7 @@ export function EvolutionGeneratorClient() {
         throw new Error("This cat has not been saved yet.");
       }
       await updateProfileMeta({
-        id: toId("cat_profile", record.profileId),
+        id: record.profileId,
         catName,
         editToken: record.editToken ?? undefined,
       });
@@ -1134,7 +1133,7 @@ export function EvolutionGeneratorClient() {
           throw new Error("One or more cats have not been saved yet.");
         }
         await updateProfileMeta({
-          id: toId("cat_profile", record.profileId),
+          id: record.profileId,
           catName: name,
           editToken: record.editToken ?? undefined,
         });

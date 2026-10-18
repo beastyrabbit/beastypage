@@ -288,10 +288,7 @@ async function run() {
 		throw new Error("The generated render-strategy manifest hash is invalid");
 	}
 
-	console.log("[dev] Starting services with the configured Convex deployment.");
-	console.log(
-		"[dev] Run `pnpm dev:convex` separately only to sync Convex code.",
-	);
+	console.log("[dev] Starting services with the configured PostgreSQL backend.");
 
 	const { commands, result } = concurrently(
 		[

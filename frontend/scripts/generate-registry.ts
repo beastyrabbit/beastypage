@@ -52,7 +52,12 @@ async function main() {
     if (Array.isArray(mod.extras)) {
       for (const extra of mod.extras) {
         if (!extra?.id) continue;
-        addUniqueEntry(extra, `${relative(ROOT, abs)} extras`, entries, seenIds);
+        addUniqueEntry(
+          extra,
+          `${relative(ROOT, abs)} extras`,
+          entries,
+          seenIds,
+        );
       }
     }
   }

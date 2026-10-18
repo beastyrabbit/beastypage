@@ -509,7 +509,7 @@ export const WORDLIST_V3_BLOCKLIST: readonly string[] = [
   "wound",
   "wounded",
   "your",
-  "zelensky"
+  "zelensky",
 ] as const;
 
 export const WORDLIST_V3: readonly string[] = [
@@ -17168,7 +17168,7 @@ export const WORDLIST_V3: readonly string[] = [
   "collided",
   "complicate",
   "concerto",
-  "convex",
+  "arc",
   "crouch",
   "curing",
   "dank",
@@ -64207,7 +64207,7 @@ export const WORDLIST_V3: readonly string[] = [
   "comforters",
   "comity",
   "comport",
-  "convexity",
+  "postgresqlity",
   "cooktown",
   "coppell",
   "counsell",
@@ -66048,5 +66048,5 @@ export const WORDLIST_V3: readonly string[] = [
   "pomo",
   "ponton",
   "portends",
-  "portofino"
+  "portofino",
 ] as const;

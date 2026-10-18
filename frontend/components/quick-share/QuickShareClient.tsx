@@ -434,6 +434,7 @@ export function QuickShareClient() {
       init: RequestInit = {},
       uploadReceipt?: string,
     ): Promise<T> => {
+      // Historical Clerk JWT template name retained for media token forwarding.
       const token = isSignedIn ? await getToken({ template: "convex" }) : null;
       const headers = new Headers(init.headers);
       if (token) headers.set("authorization", `Bearer ${token}`);
@@ -468,6 +469,7 @@ export function QuickShareClient() {
       uploadReceipt: string,
       onProgress: (loaded: number) => void,
     ) => {
+      // Historical Clerk JWT template name retained for media token forwarding.
       const token = isSignedIn ? await getToken({ template: "convex" }) : null;
       const headers = new Headers({ "x-upload-receipt": uploadReceipt });
       if (token) headers.set("authorization", `Bearer ${token}`);

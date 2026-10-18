@@ -42,6 +42,3 @@ yarn-error.log*
 !README.md
 LICENSE
 Makefile
-
-# Convex local files
-.convex

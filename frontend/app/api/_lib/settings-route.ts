@@ -1,12 +1,9 @@
-import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
 import {
   RequestBodyTooLargeError,
   readRequestBody,
 } from "@/app/api/_lib/request-body";
-import { getServerConvexUrl } from "@/lib/convexUrl";
 import { ANONYMOUS } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import {
@@ -23,37 +20,10 @@ interface SettingsPayload {
   editToken?: unknown;
 }
 
-interface SettingsRecord {
-  slug: string;
-  config: unknown;
-  createdAt: number;
-  updatedAt: number;
-}
-
-interface SettingsSaveResult {
-  slug: string;
-  id: unknown;
-  updated: boolean;
-  editToken?: string;
-}
-
 interface SettingsRouteOptions<TConfig> {
   serviceName: string;
-  /** PostgreSQL service used when DATA_BACKEND=postgres. */
   kind: SettingsKind;
   parseConfig?: (value: unknown) => TConfig;
-  get: (
-    convex: ConvexHttpClient,
-    slug: string,
-  ) => Promise<SettingsRecord | null>;
-  save: (
-    convex: ConvexHttpClient,
-    args: {
-      config: TConfig;
-      slug?: string;
-      editToken?: string;
-    },
-  ) => Promise<SettingsSaveResult>;
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -80,38 +50,8 @@ export function createSettingsRouteHandlers<TConfig = unknown>(
       return NextResponse.json({ error: "Missing slug" }, { status: 400 });
     }
 
-    if (dataBackend() === "postgres") {
-      try {
-        const record = await getSettings(getDb(), options.kind, slug);
-        if (!record) {
-          return NextResponse.json({ error: "Not found" }, { status: 404 });
-        }
-        return NextResponse.json({
-          slug: record.slug,
-          config: record.config,
-          createdAt: record.createdAt,
-          updatedAt: record.updatedAt,
-        });
-      } catch (error) {
-        return errorResponse(
-          error,
-          "Failed to load settings",
-          `Failed to fetch ${options.serviceName} settings`,
-        );
-      }
-    }
-
-    const convexUrl = getServerConvexUrl();
-    if (!convexUrl) {
-      return NextResponse.json(
-        { error: "Convex URL not configured" },
-        { status: 500 },
-      );
-    }
-
     try {
-      const convex = new ConvexHttpClient(convexUrl);
-      const record = await options.get(convex, slug);
+      const record = await getSettings(getDb(), options.kind, slug);
       if (!record) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
@@ -122,24 +62,15 @@ export function createSettingsRouteHandlers<TConfig = unknown>(
         updatedAt: record.updatedAt,
       });
     } catch (error) {
-      console.error(`Failed to fetch ${options.serviceName} settings`, error);
-      return NextResponse.json(
-        { error: "Failed to load settings" },
-        { status: 500 },
+      return errorResponse(
+        error,
+        "Failed to load settings",
+        `Failed to fetch ${options.serviceName} settings`,
       );
     }
   }
 
   async function POST(request: NextRequest) {
-    const backend = dataBackend();
-    const convexUrl = getServerConvexUrl();
-    if (backend === "convex" && !convexUrl) {
-      return NextResponse.json(
-        { error: "Convex URL not configured" },
-        { status: 500 },
-      );
-    }
-
     let body: unknown;
     try {
       body = JSON.parse(await readRequestBody(request, MAX_BODY_BYTES));
@@ -175,48 +106,23 @@ export function createSettingsRouteHandlers<TConfig = unknown>(
       return NextResponse.json({ error: "Invalid config" }, { status: 400 });
     }
 
-    if (backend === "postgres") {
-      try {
-        // This route never forwarded a Clerk token to Convex, so saves are
-        // authorized by edit token only; keep that until clients move here.
-        const result = await saveSettings(
-          getDb(),
-          options.kind,
-          {
-            config,
-            slug: optionalString(payload.slug),
-            editToken: optionalString(payload.editToken),
-          },
-          ANONYMOUS,
-        );
-        return NextResponse.json(result);
-      } catch (error) {
-        return errorResponse(
-          error,
-          "Failed to save settings",
-          `Failed to save ${options.serviceName} settings`,
-        );
-      }
-    }
-
     try {
-      const convex = new ConvexHttpClient(convexUrl as string);
-      const result = await options.save(convex, {
-        config,
-        slug: optionalString(payload.slug),
-        editToken: optionalString(payload.editToken),
-      });
-      return NextResponse.json({
-        slug: result.slug,
-        id: result.id,
-        updated: result.updated,
-        editToken: result.editToken,
-      });
+      const result = await saveSettings(
+        getDb(),
+        options.kind,
+        {
+          config,
+          slug: optionalString(payload.slug),
+          editToken: optionalString(payload.editToken),
+        },
+        ANONYMOUS,
+      );
+      return NextResponse.json(result);
     } catch (error) {
-      console.error(`Failed to save ${options.serviceName} settings`, error);
-      return NextResponse.json(
-        { error: "Failed to save settings" },
-        { status: 500 },
+      return errorResponse(
+        error,
+        "Failed to save settings",
+        `Failed to save ${options.serviceName} settings`,
       );
     }
   }

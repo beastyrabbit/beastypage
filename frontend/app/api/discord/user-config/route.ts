@@ -1,8 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { isDiscordServiceRequest } from "@/convex/discordAuth";
-import { discordConfig } from "@/lib/discord-service";
-import { dataBackend } from "@/server/backend";
+import { isDiscordServiceRequest } from "@/lib/discord-service";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody, parseSearchParams } from "@/server/request";
@@ -35,9 +33,7 @@ export async function GET(request: NextRequest) {
       request.nextUrl.searchParams,
       querySchema,
     );
-    if (dataBackend() === "postgres")
-      return NextResponse.json(await getPostgresConfig(getDb(), discordUserId));
-    return NextResponse.json(await discordConfig("get", { discordUserId }));
+    return NextResponse.json(await getPostgresConfig(getDb(), discordUserId));
   } catch (error) {
     return errorResponse(
       error,
@@ -85,11 +81,7 @@ export async function PATCH(request: NextRequest) {
     const body = await parseJsonBody(request, bodySchema);
     const bodyRecord = body as Record<string, unknown>;
     const { operation, fields } = resolveConfigUpdate(bodyRecord);
-    if (dataBackend() === "postgres") {
-      await updatePostgresConfig(getDb(), operation, fields);
-      return NextResponse.json({ ok: true, action: operation });
-    }
-    await discordConfig(operation, fields);
+    await updatePostgresConfig(getDb(), operation, fields);
     return NextResponse.json({ ok: true, action: operation });
   } catch (error) {
     return errorResponse(

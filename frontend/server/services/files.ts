@@ -132,7 +132,7 @@ export async function storeUploadedFile(
 }
 
 /**
- * Public rows that publish a file. Convex storage URLs were public
+ * Public rows that publish a file. PostgreSQL storage URLs were public
  * capabilities for exactly these images; staged catdex uploads and orphaned
  * files are never served (ADR §7).
  */

@@ -34,7 +34,6 @@ function json(url: string, body: unknown, method = "POST") {
 }
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   db = getDb();
   [catStream, catStreamById, sessionsById, streamVotesAlias, streamWheel] =

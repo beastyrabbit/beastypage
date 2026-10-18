@@ -36,7 +36,7 @@ export const importCheckpoints = pgTable(
 );
 
 /**
- * Convex `_storage` id → imported file. Several storage ids can share one
+ * PostgreSQL `_storage` id → imported file. Several storage ids can share one
  * content-addressed file, so this survives a resumed import.
  */
 export const importStorageMap = pgTable(

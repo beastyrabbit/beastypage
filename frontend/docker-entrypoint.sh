@@ -6,8 +6,6 @@ set -e
 # Required because Next.js NEXT_PUBLIC_* vars are embedded at build time
 
 # Placeholders must match the ARG defaults in Dockerfile
-CONVEX_PLACEHOLDER_URL="https://placeholder.convex.cloud"
-CONVEX_PLACEHOLDER_HOST="placeholder.convex.cloud"
 POSTHOG_PLACEHOLDER_KEY="phc_PLACEHOLDER_KEY"
 POSTHOG_PLACEHOLDER_HOST="https://placeholder.posthog.com"
 CLERK_PLACEHOLDER_KEY="pk_placeholder_CLERK_KEY"
@@ -39,16 +37,6 @@ replace_in_files() {
 }
 
 echo "Injecting runtime environment variables..."
-
-# Convex URL injection
-if [ -n "$NEXT_PUBLIC_CONVEX_URL" ]; then
-  echo "  - NEXT_PUBLIC_CONVEX_URL"
-  NEW_CONVEX_HOST=$(echo "$NEXT_PUBLIC_CONVEX_URL" | sed 's|https://||' | sed 's|/.*||')
-  replace_in_files "$CONVEX_PLACEHOLDER_URL" "$NEXT_PUBLIC_CONVEX_URL"
-  replace_in_files "$CONVEX_PLACEHOLDER_HOST" "$NEW_CONVEX_HOST"
-else
-  echo "  - WARNING: NEXT_PUBLIC_CONVEX_URL not set (database connection may fail)"
-fi
 
 # PostHog injection
 if [ -n "$NEXT_PUBLIC_POSTHOG_KEY" ]; then

@@ -1,19 +1,14 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import { Toaster } from "sonner";
 import { MaintenanceBanner } from "@/components/common/MaintenanceBanner";
 import { AppProviders } from "@/components/providers";
-import { getRuntimeEnvScript } from "@/components/runtime-env-script";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { dataBackend } from "@/server/backend";
 import { isMaintenanceMode } from "@/server/maintenance";
 import "./globals.css";
 
-// The data backend and maintenance gate are read from the runtime environment.
-// A prerendered layout would bake in the build's values (no DATA_BACKEND, so
-// Convex) and send every static page's browser to Convex after the switch.
+// Maintenance mode is read from the runtime environment.
 export const dynamic = "force-dynamic";
 
 const geistSans = Geist({
@@ -41,8 +36,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const runtimeEnvScript = getRuntimeEnvScript();
-  const backend = dataBackend();
   const maintenanceMode = isMaintenanceMode();
 
   return (
@@ -50,12 +43,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background font-sans text-foreground antialiased`}
       >
-        {runtimeEnvScript && (
-          <Script id="runtime-env" strategy="beforeInteractive">
-            {runtimeEnvScript}
-          </Script>
-        )}
-        <AppProviders backend={backend}>
+        <AppProviders>
           <div className="relative flex min-h-screen flex-col">
             <MaintenanceBanner enabled={maintenanceMode} />
             <SiteHeader />

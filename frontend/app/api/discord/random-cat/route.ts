@@ -1,9 +1,6 @@
 import { createCanvas, loadImage } from "@napi-rs/canvas";
-import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
 import { RENDERER_BASE } from "@/app/api/renderer/_lib/proxy";
-import { api } from "@/convex/_generated/api";
-import { isDiscordServiceRequest } from "@/convex/discordAuth";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { CAT_CATALOG_HASH } from "@/lib/cat-system/generated/cat-schema.generated";
 import {
@@ -11,10 +8,8 @@ import {
   generateRandomParamsServerDetailed,
   parseDiscordTraitOverride,
 } from "@/lib/cat-v3/random-cat-server";
-import { getServerConvexUrl } from "@/lib/convexUrl";
-import { discordConfig } from "@/lib/discord-service";
+import { discordConfig, isDiscordServiceRequest } from "@/lib/discord-service";
 import { ANONYMOUS } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody } from "@/server/request";
@@ -82,6 +77,7 @@ async function applyUserConfig(
 
   try {
     const cfg = await discordConfig("get", { discordUserId });
+    if (!cfg) return;
     overrides.accessoriesMin = cfg.accessoriesMin;
     overrides.accessoriesMax = cfg.accessoriesMax;
     overrides.scarsMin = cfg.scarsMin;
@@ -236,41 +232,22 @@ async function saveCat(
         tortie: (params.tortie ?? []).length,
       },
     };
-    if (dataBackend() === "postgres") {
-      const discordUsername =
-        typeof body.discord_username === "string"
-          ? body.discord_username
-          : undefined;
-      const result = await createProfile(
-        getDb(),
-        {
-          catData: catDataToLegacyPersistence(catData),
-          creatorName: discordUsername || "Discord",
-        },
-        ANONYMOUS,
-      );
-      return result.slug;
-    }
-    const convexUrl = getServerConvexUrl();
-    if (!convexUrl) {
-      console.warn(
-        "[discord/random-cat] No Convex URL configured — skipping persistence",
-      );
-    } else {
-      const convex = new ConvexHttpClient(convexUrl);
-      const discordUsername =
-        typeof body.discord_username === "string"
-          ? body.discord_username
-          : undefined;
-      const result = await convex.mutation(api.mapper.create, {
+    const discordUsername =
+      typeof body.discord_username === "string"
+        ? body.discord_username
+        : undefined;
+    const result = await createProfile(
+      getDb(),
+      {
         catData: catDataToLegacyPersistence(catData),
         creatorName: discordUsername || "Discord",
-      });
-      slug = result.slug;
-    }
+      },
+      ANONYMOUS,
+    );
+    slug = result.slug;
   } catch (error) {
     // Non-fatal — we still return the image even if saving fails
-    console.error("[discord/random-cat] Failed to save to Convex", error);
+    console.error("[discord/random-cat] Failed to save cat", error);
   }
   return slug;
 }
