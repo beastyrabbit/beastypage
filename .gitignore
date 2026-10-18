@@ -86,15 +86,5 @@ frontend/.pi/
 # Planning artifacts
 plans/
 
-# Convex generated files
-convex/_generated/*
-!convex/_generated/
-!convex/_generated/ai/
-!convex/_generated/ai/**
-
-# Stale tsc output in frontend/convex (real codegen lives in _generated/)
-frontend/convex/*.d.ts
-frontend/convex/*.d.ts.map
-
 # Skills lock
 skills-lock.json

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileTypeFromFile } from "file-type";
 import sharp from "sharp";
 import type { Config } from "./config.ts";
-import type { ConvexControlPlane } from "./convex.ts";
+import type { ControlPlane } from "./control-plane.ts";
 import type { ObjectStore } from "./objectStore.ts";
 import type { ClaimedJob } from "./types.ts";
 
@@ -373,10 +373,10 @@ export class MediaWorker {
 			await new Promise<void>((resolve) => this.idleWaiters.push(resolve));
 	}
 	private readonly config: Config;
-	private readonly control: ConvexControlPlane;
+	private readonly control: ControlPlane;
 	private readonly store: ObjectStore;
 
-	constructor(config: Config, control: ConvexControlPlane, store: ObjectStore) {
+	constructor(config: Config, control: ControlPlane, store: ObjectStore) {
 		this.config = config;
 		this.control = control;
 		this.store = store;

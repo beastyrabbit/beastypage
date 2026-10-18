@@ -16,7 +16,7 @@ Batch and evolution playback are clocked schedules rather than independent anima
 - Evolution timing is defined by `lib/evolution/rollSchedule.ts` and exposed to looks by `looks/ceremony.ts`. The schedule uses the command timestamp, server offset, hold state, and reveal/skip controls. Candidate frames must remain visible during a roll; the landed frame is not shown before its scheduled landing.
 - Reduced motion must shorten or remove the same timeline beats in the engine and the look. CSS-only suppression leaves the control and overlay out of sync.
 
-Batch culls are a server state machine: nominate, arm a verdict, show the countdown, then depart and repack. `cullBatchCat`, `cancelBatchCull`, and the scheduled finalizer in `frontend/convex/catStream.ts` own that state. Keep the control board's keyboard actions and the overlay's verdict labels aligned with those states.
+Batch culls are a server state machine: nominate, arm a verdict, show the countdown, then depart and repack. `cullBatchCat`, `cancelBatchCull`, and the scheduled finalizer in the frontend PostgreSQL job worker own that state. Keep the control board's keyboard actions and the overlay's verdict labels aligned with those states.
 
 Useful local harnesses:
 

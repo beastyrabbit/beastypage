@@ -7,7 +7,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import type { Config } from "./config.ts";
-import { bearerFromHeader, ConvexControlPlane } from "./convex.ts";
+import { bearerFromHeader, ControlPlane } from "./control-plane.ts";
 import { hmac, randomReceipt, randomSlug, safeEqual } from "./crypto.ts";
 import { downloadRemote } from "./importer.ts";
 import { clientIp, normalizeIp } from "./ip.ts";
@@ -185,7 +185,7 @@ export function createApp(
 	workerOverride?: WorkerDispatcher,
 ) {
 	const app = new Hono();
-	const control = new ConvexControlPlane(config);
+	const control = new ControlPlane(config);
 	const worker = workerOverride ?? new MediaWorker(config, control, store);
 
 	app.use(
@@ -487,7 +487,7 @@ export function createApp(
 			// Completing a multipart upload is not inherently retryable: the
 			// object may exist even though the client lost the success response.
 			// Treat an object with the exact declared size as completed so a
-			// later request can still advance the Convex state machine.
+			// later request can still advance the upload state machine.
 			const stored = await store.head(upload.originalKey).catch(() => null);
 			if (stored?.contentLength !== upload.originalSize) throw error;
 		}
@@ -822,7 +822,7 @@ export function createApp(
 		try {
 			result = await control.call<PublicUpload[]>("publicCollection", { slug });
 		} catch (error) {
-			// Older Convex deployments reject the new operation explicitly. Only
+			// Older control-plane deployments reject the new operation explicitly. Only
 			// that compatibility response may fall back; auth and data errors must
 			// remain visible to the caller.
 			const isUnknownOperation =

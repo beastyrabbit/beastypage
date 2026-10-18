@@ -6,8 +6,7 @@ import type { ObjectStore } from "../src/objectStore.ts";
 const config: Config = {
 	port: 8003,
 	publicBaseUrl: "https://beastyrabbit.com",
-	convexSiteUrl: "https://control.example",
-	controlPlaneUrl: "https://control.example/quick-share/internal",
+	controlPlaneUrl: "https://frontend.example/api/internal/quick-share",
 	internalToken: "i".repeat(32),
 	hmacKey: "h".repeat(32),
 	s3Endpoint: "https://s3.example",
@@ -284,7 +283,7 @@ describe("event-driven worker dispatch", () => {
 		expect(dispatch).toHaveBeenCalledWith("job-id");
 	});
 
-	it("asks Convex to retry when this replica is busy", async () => {
+	it("asks the control plane to retry when this replica is busy", async () => {
 		const worker = {
 			dispatch: vi.fn(async () => "busy" as const),
 			stop: vi.fn(),

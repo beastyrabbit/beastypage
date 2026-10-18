@@ -9,7 +9,11 @@ Use the [root setup guide](../README.md) for the development stack and delivery 
 | [media_service](media_service/README.md) | Quick Share imports, validation, S3 storage, and event-driven processing. |
 | [discord-bot](discord-bot/README.md) | Discord commands and authenticated frontend API calls. |
 
-Convex functions live in `frontend/convex`. Catdex thumbnails use Jimp in a Convex Node action.
+The frontend API uses PostgreSQL through Drizzle. Production runs the
+`beastypage-postgres` CNPG cluster in the `webpage` namespace, with migrations
+applied by the frontend init container. Database credentials are managed in
+Infisical at `/kubernetes/webpage/beastypage-postgres`; frontend runtime values
+are managed at `/kubernetes/webpage/beastypage-frontend-runtime-config`.
 The renderer prefers `frontend/public/sprites` and `frontend/public/sprite-data` in a checkout.
 Its container copies those same canonical assets. `CG3_SPRITE_ROOT` and `CG3_DATA_ROOT` override discovery.
 

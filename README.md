@@ -19,7 +19,7 @@ A pixel cat gacha platform featuring generators, wheels, and collection tools bu
 ## Tech Stack
 
 - **Frontend**: Next.js 16, React 19, TailwindCSS
-- **Backend**: Convex (serverless database), FastAPI renderer service
+- **Backend**: PostgreSQL with Drizzle migrations, FastAPI renderer service
 - **Package Manager**: pnpm
 - **Deployment**: Kubernetes via FluxCD, Docker containers
 
@@ -29,7 +29,7 @@ A pixel cat gacha platform featuring generators, wheels, and collection tools bu
 
 - [Node.js](https://nodejs.org/) (v24+; required by Portless)
 - [pnpm](https://pnpm.io/) (v10+)
-- [Convex](https://convex.dev) account (for database)
+- Access to the development PostgreSQL configuration in Infisical
 - Python 3.11+ with [uv](https://github.com/astral-sh/uv) (for renderer service)
 - [Infisical CLI](https://infisical.com/docs/cli/overview) with access to the development project
 
@@ -50,14 +50,12 @@ the frontend, renderer, media service, Discord bot, and palette watcher, then
 opens the worktree-specific Portless URL after every service is ready. The exact
 URL is printed in the terminal; it is intentionally not hard-coded.
 
-The frontend uses the Convex development deployment configured through
-Infisical. Run `pnpm dev:convex` separately only when you intend to sync Convex
-functions and already have an interactive Convex CLI login.
-
-The frontend's `prepare` hook runs Convex code generation. Dependency installs
-skip lifecycle scripts so a local setup without `CONVEX_DEPLOYMENT` does not
-silently fail; run `pnpm --dir frontend exec convex codegen` after configuring
-Infisical when generated Convex types need refreshing.
+The frontend uses PostgreSQL through the Drizzle data layer. The production CNPG
+cluster is `beastypage-postgres` in the `webpage` namespace; migrations run in
+the frontend init container before the application starts. Local database and
+runtime values come from Infisical paths
+`/kubernetes/webpage/beastypage-postgres` and
+`/kubernetes/webpage/beastypage-frontend-runtime-config`.
 
 ### Frontend only
 
@@ -81,20 +79,18 @@ uv run uvicorn renderer_service.app.main:app --reload --port 8001
 
 | Variable | Description |
 |----------|-------------|
-| `CONVEX_DEPLOYMENT` | Convex deployment identifier |
-| `NEXT_PUBLIC_CONVEX_URL` | Convex cloud URL |
 | `NEXT_PUBLIC_POSTHOG_KEY` | PostHog analytics key (optional) |
 | `NEXT_PUBLIC_POSTHOG_HOST` | PostHog host URL (optional) |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk browser key |
 
-### Convex deployment
+### Quick Share worker
 
 | Variable | Description |
 |----------|-------------|
-| `QUICK_SHARE_WORKER_URL` | Public base URL Convex uses to dispatch Quick Share jobs (for example, `https://beastyrabbit.com`) |
+| `QUICK_SHARE_WORKER_URL` | Public base URL used to dispatch Quick Share jobs (for example, `https://beastyrabbit.com`) |
 
 Quick Share background processing is event driven. See the
-[Convex cost incident and production runbook](docs/quick-share-convex-cost-incident.md)
+[Quick Share processing rollout and production runbook](docs/quick-share-processing-rollout.md)
 for the architecture, cost model, rollout lessons, and verification procedure.
 
 ### Runtime
@@ -111,8 +107,7 @@ for the architecture, cost model, rollout lessons, and verification procedure.
 ```
 beastypage/
 ├── frontend/               # Next.js application
-│   ├── convex/             # Convex functions and schema
-│   ├── app/                # Next.js app router pages
+│   ├── app/                # Next.js routes and PostgreSQL-backed API
 │   └── Dockerfile          # Multi-stage build (pnpm → Node)
 ├── backend/
 │   ├── discord-bot/        # Discord commands and cat generation
@@ -134,7 +129,7 @@ Additional operational notes:
 
 ## Container Images
 
-GitHub Actions builds GHCR images on `main` and version-tag pushes. The Forgejo workflow and registry path are retained for the migration; repository files alone do not establish whether that runner is active. Both paths gate publication on validation. Convex deploys through version tags or explicit manual deployment on `main`, so merging preparatory code does not change the live backend. A pull request runs validation only.
+GitHub Actions builds GHCR images on `main` and version-tag pushes. The Forgejo workflow and registry path are retained for the migration; repository files alone do not establish whether that runner is active. Both paths gate publication on validation. A pull request runs validation only.
 
 The retained Forgejo image names are:
 
@@ -162,17 +157,17 @@ legacy renderer does not advertise a catalog hash.
 
 ### Running with Your Own Database
 
-The frontend image uses a placeholder for the Convex URL at build time. Provide your own Convex instance at runtime:
+The frontend image connects to the PostgreSQL-backed API configured by its runtime environment:
 
 ```bash
 docker run -p 3000:3000 \
-  -e NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud \
   git.heerlab.com/beasty/beastypage-frontend:latest
 ```
 
 ### Kubernetes Deployment
 
-For Kubernetes/Talos deployments, configure the Convex URL via ConfigMap or Secret:
+For Kubernetes/Talos deployments, configure the PostgreSQL runtime values via the
+frontend runtime Secret and the CNPG cluster Secret:
 
 ```yaml
 apiVersion: apps/v1
@@ -184,11 +179,11 @@ spec:
         - name: frontend
           image: git.heerlab.com/beasty/beastypage-frontend:latest
           env:
-            - name: NEXT_PUBLIC_CONVEX_URL
+            - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: beastypage-secrets
-                  key: convex-url
+                  name: beastypage-frontend-runtime-config
+                  key: DATABASE_URL
 ```
 
 ## Credits

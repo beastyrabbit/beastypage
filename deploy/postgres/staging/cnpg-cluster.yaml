@@ -55,8 +55,8 @@ spec:
     requests: { cpu: 50m, memory: 128Mi }
     limits: { memory: 512Mi }
 ---
-# Staging must not reach production services (Convex, Discord, production
-# S3 bucket, production media/renderer). Allow DNS, the cluster's own
+# Staging must not reach production services (Discord, production S3 bucket,
+# production media/renderer). Allow DNS, the cluster's own
 # database, and in-namespace traffic only; the Cilium policy below adds the
 # Clerk development instance. Add the staging Quick Share bucket's endpoint
 # the same way once it exists.

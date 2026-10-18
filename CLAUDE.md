@@ -60,7 +60,7 @@ The tag is the deployment: `.github/workflows/build-images.yml` publishes all im
 
 > Replacing/overhauling an existing route (e.g., palette-spinner → palette-generator) is minor, not major.
 
-The CI frontend build takes `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` from Infisical `prod` `/ci` and bakes them into the image; change them there, not only in code. `NEXT_PUBLIC_CONVEX_URL` is a placeholder that `frontend/docker-entrypoint.sh` replaces at container start.
+The CI frontend build takes `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` from Infisical `prod` `/ci` and bakes them into the image; change them there, not only in code. PostgreSQL runtime configuration is supplied through the frontend runtime Secret.
 
 ## Icons
 
@@ -109,16 +109,8 @@ Hooks defined in `lefthook.yml`:
 4. **After merging, create a version tag** (check latest with `git tag --sort=-v:refname | head -1`)
 5. Push the tag to trigger a release (e.g., `git tag v1.7.0 && git push origin v1.7.0`)
 
-<!-- convex-ai-start -->
-
-This project uses [Convex](https://convex.dev) as its backend.
-
-When working on Convex code, **always read
-`convex/_generated/ai/guidelines.md` first** for important guidelines on
-how to correctly use Convex APIs and patterns. The file contains rules that
-override what you may have learned about Convex from training data.
-
-Convex agent skills for common tasks can be installed by running
-`npx convex ai-files install`.
-
-<!-- convex-ai-end -->
+The backend uses PostgreSQL through Drizzle. Production runs the
+`beastypage-postgres` CNPG cluster in the `webpage` namespace. Migrations run in
+the frontend init container, with database secrets in Infisical at
+`/kubernetes/webpage/beastypage-postgres` and frontend runtime settings at
+`/kubernetes/webpage/beastypage-frontend-runtime-config`.

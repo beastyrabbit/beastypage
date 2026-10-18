@@ -10,6 +10,14 @@ Status as of 2026-10-17, branch `t3code/convex-postgres-migration`.
 Every area now has a PostgreSQL implementation behind `DATA_BACKEND=postgres`;
 Convex stays the default until the cutover.
 
+## Cutover and decommission
+
+Production switched to PostgreSQL on 2026-10-18 in v7.11.0–v7.11.4, including
+the job worker start fix, orphan-cleanup `pg_catalog` fix, root-layout prerender
+backend fix, and forwarded Clerk template token fix. Convex code is removed in
+v8.0.0. The Convex project is paused pending a CNPG restore drill before
+deletion.
+
 | Phase | Issue | State | Evidence in the repository | Still open |
 | --- | --- | --- | --- | --- |
 | 1. Inventory and architecture | #105 | **Done** | `frontend/scripts/migration/convex-inventory.ts` (`--check` in CI), [`convex-inventory.md`](convex-inventory.md), [ADR 0001](adr-0001-postgresql.md) | Machine-linked blockers between the issues |
