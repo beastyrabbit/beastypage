@@ -497,8 +497,14 @@ describe("moderation previews", () => {
 		ipHash: "hash",
 		ownerTokenIdentifier: null,
 		originalKey: "originals/upload1",
+		retainedUntil: Date.now() + 86_400_000,
 		createdAt: 1,
 	};
+
+	function grantOf(url: string) {
+		const grant = new URL(url, "http://local").searchParams.get("grant");
+		return JSON.parse(Buffer.from(grant ?? "", "base64url").toString("utf8"));
+	}
 
 	async function listPreviews(uploads: unknown[]) {
 		vi.stubGlobal(
@@ -546,6 +552,13 @@ describe("moderation previews", () => {
 				publicMime: "image/webp",
 			},
 			{ ...adminUpload, id: "upload5", publicMime: null },
+			{
+				...adminUpload,
+				id: "upload6",
+				retainedUntil: Date.now() - 1,
+				publicKey: "derivatives/upload6-a.webp",
+				publicMime: "image/webp",
+			},
 		]);
 		expect(previews[0]).toMatch(
 			/^\/i\/api\/admin\/uploads\/upload1\/preview\?/,
@@ -553,7 +566,27 @@ describe("moderation previews", () => {
 		expect(previews[1]).toMatch(
 			/^\/i\/api\/admin\/uploads\/upload2\/preview\?/,
 		);
-		expect(previews.slice(2)).toEqual([null, null, null]);
+		expect(previews.slice(2)).toEqual([null, null, null, null]);
+	});
+
+	it("never signs a preview past the retention boundary", async () => {
+		const retainedUntil = Date.now() + 60_000;
+		const { app, previews } = await listPreviews([
+			{
+				...adminUpload,
+				retainedUntil,
+				publicKey: "derivatives/upload1-a.webp",
+				publicMime: "image/webp",
+			},
+		]);
+		const url = previews[0] as string;
+		expect(grantOf(url).expiresAt).toBe(retainedUntil);
+		vi.useFakeTimers({ now: retainedUntil + 1, toFake: ["Date"] });
+		try {
+			expect((await app.request(url)).status).toBe(403);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("serves a signed preview inline and rejects tampering", async () => {

@@ -167,20 +167,24 @@ function previewable(key: string, mime: string) {
 }
 
 function previewUrl(upload: AdminUpload, hmacKey: string) {
+	const now = Date.now();
 	if (
 		upload.state !== "ready" ||
+		upload.retainedUntil <= now ||
 		!upload.publicKey ||
 		!upload.publicMime ||
 		!previewable(upload.publicKey, upload.publicMime)
 	) {
 		return null;
 	}
+	// A preview never outlives the retention boundary, even if the delete
+	// job has not removed the object yet.
 	const grant = Buffer.from(
 		JSON.stringify({
 			uploadId: upload.id,
 			key: upload.publicKey,
 			mime: upload.publicMime,
-			expiresAt: Date.now() + PREVIEW_GRANT_MS,
+			expiresAt: Math.min(now + PREVIEW_GRANT_MS, upload.retainedUntil),
 		}),
 	).toString("base64url");
 	return `/i/api/admin/uploads/${upload.id}/preview?grant=${encodeURIComponent(
