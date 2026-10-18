@@ -207,8 +207,8 @@ export function HistoryClient() {
   const trees = treesQuery ?? [];
 
   const singleItems: HistoryItem[] = profiles
-    .filter((profile) => !profile.adoptionBatchId)
-    .map((profile) => {
+    .filter((profile: any) => !profile.adoptionBatchId)
+    .map((profile: any) => {
       const catData = profile.cat_data as Record<string, unknown> | null;
       const mode = (catData as { mode?: string } | null)?.mode ?? null;
       let source: unknown = catData?.source;
@@ -242,41 +242,43 @@ export function HistoryClient() {
       };
     });
 
-  const adoptionItems: HistoryItem[] = batches.map((batch) => {
+  const adoptionItems: HistoryItem[] = batches.map((batch: any) => {
     const isEvolution = isEvolutionBatchSettings(batch.settings);
     const baseTitle =
       cleanDisplay(batch.title) ||
       (isEvolution ? "Evolution Batch" : "Adoption Batch");
     const baseCreator = cleanDisplay(batch.creatorName) || null;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const cats: AdoptionHistoryCat[] = (batch.cats ?? []).map((cat, index) => {
-      let encoded = cat.encoded ?? null;
-      if ((!encoded || encoded.length === 0) && cat.catData) {
-        try {
-          const canonical = normalizeCatViewPayload(cat.catData);
-          encoded = encodeCatShare(catViewPayloadToShareSeed(canonical));
-        } catch (error) {
-          console.warn("Failed to encode adoption cat payload", error);
-          encoded = null;
+    const cats: AdoptionHistoryCat[] = (batch.cats ?? []).map(
+      (cat: any, index: number) => {
+        let encoded = cat.encoded ?? null;
+        if ((!encoded || encoded.length === 0) && cat.catData) {
+          try {
+            const canonical = normalizeCatViewPayload(cat.catData);
+            encoded = encodeCatShare(catViewPayloadToShareSeed(canonical));
+          } catch (error) {
+            console.warn("Failed to encode adoption cat payload", error);
+            encoded = null;
+          }
         }
-      }
-      const viewerUrl = buildViewerUrl(origin, cat.shareToken, encoded);
-      const previewUrl = getPreviewUrl(
-        cat.profileId ?? null,
-        encoded,
-        cat.previews ?? undefined,
-      );
-      const fullUrl = previewUrl;
-      return {
-        index,
-        label: cat.label ?? "",
-        catName: cat.catName ?? null,
-        creatorName: cat.creatorName ?? null,
-        previewUrl,
-        fullUrl,
-        viewerUrl,
-      };
-    });
+        const viewerUrl = buildViewerUrl(origin, cat.shareToken, encoded);
+        const previewUrl = getPreviewUrl(
+          cat.profileId ?? null,
+          encoded,
+          cat.previews ?? undefined,
+        );
+        const fullUrl = previewUrl;
+        return {
+          index,
+          label: cat.label ?? "",
+          catName: cat.catName ?? null,
+          creatorName: cat.creatorName ?? null,
+          previewUrl,
+          fullUrl,
+          viewerUrl,
+        };
+      },
+    );
     const firstCat = cats[0] ?? null;
     const previewUrl = firstCat?.previewUrl ?? null;
     const fullUrl = firstCat?.fullUrl ?? previewUrl;
@@ -299,7 +301,7 @@ export function HistoryClient() {
     };
   });
 
-  const treeItems: HistoryItem[] = trees.map((tree) => ({
+  const treeItems: HistoryItem[] = trees.map((tree: any) => ({
     kind: "tree" as const,
     id: tree.id,
     title: cleanDisplay(tree.name) || "Ancestry Tree",

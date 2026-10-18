@@ -1,5 +1,5 @@
-import type { CatParams } from "@/lib/cat-v3/types";
 import type { TraitEditorCatalogSource } from "@/lib/cat-system/catalog";
+import type { CatParams } from "@/lib/cat-v3/types";
 
 export type StreamCatalogSource = TraitEditorCatalogSource & {
   schemaVersion?: number;

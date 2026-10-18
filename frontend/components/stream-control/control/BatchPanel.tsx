@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useCatGenerator } from "@/components/cat-builder/hooks";
 import { PaletteMultiSelect } from "@/components/common/PaletteMultiSelect";
-import { toId } from "@/convex/utils";
 import {
   BATCH_FINAL_COUNT,
   type BatchLayerConfig,
@@ -304,7 +303,7 @@ export function BatchPanel() {
             return {
               label: `Cat ${index + 1}`,
               catData: catDataToLegacyPersistence(cat.catData),
-              profileId: toId("cat_profile", mapperResult.id),
+              profileId: mapperResult.id,
               editToken: mapperResult.editToken ?? undefined,
               encoded: encodeCatShare(
                 cat.catData as unknown as Parameters<typeof encodeCatShare>[0],

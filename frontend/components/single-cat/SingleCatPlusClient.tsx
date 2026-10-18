@@ -54,7 +54,6 @@ import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
-import type { Id } from "@/convex/_generated/dataModel";
 import { track } from "@/lib/analytics";
 import {
   catDataToLegacyPersistence,
@@ -3060,7 +3059,7 @@ export function SingleCatPlusClient({
         return url;
       }
     } catch (err) {
-      console.warn("Failed to persist share payload to Convex", err);
+      console.warn("Failed to persist share payload to PostgreSQL", err);
     }
 
     if (!shareSlug) {
@@ -3145,7 +3144,7 @@ export function SingleCatPlusClient({
     setMetaSaving(true);
     try {
       const result = await updateMapperMeta({
-        id: state.profileId as Id<"cat_profile">,
+        id: state.profileId as string,
         catName: trimmedCat || undefined,
         creatorName: trimmedCreator || undefined,
         editToken: state.editToken ?? undefined,

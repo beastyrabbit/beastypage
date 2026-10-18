@@ -10,7 +10,7 @@ export type ClassicWheelSelection = {
   random?: number;
 };
 
-/** Wire format for wheel spin data sent to/from Convex. */
+/** Wire format for wheel spin data sent to/from PostgreSQL. */
 export type StreamWheelSpin = {
   prizeName: string;
   prizeIndex: number;

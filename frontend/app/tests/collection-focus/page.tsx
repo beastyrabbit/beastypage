@@ -2,13 +2,11 @@
 
 import { useCallback, useMemo, useState } from "react";
 import ProgressiveImage from "@/components/common/ProgressiveImage";
-import type { Id } from "@/convex/_generated/dataModel";
-import type { CollectionEntry } from "@/convex/collection";
-import { CONVEX_HTTP_URL } from "@/lib/convexClient";
 import {
   useCatalogCollectionPage,
   useCatalogSetFocus,
 } from "@/lib/data/catalog";
+import type { CollectionPayload as CollectionEntry } from "@/server/services/catalog";
 
 export default function CollectionFocusTestingPage() {
   const {
@@ -63,7 +61,7 @@ export default function CollectionFocusTestingPage() {
       const draft = override ?? getDraft(entry);
       try {
         await setFocus({
-          id: entry.id as Id<"collection">,
+          id: entry.id as string,
           focusX: draft.focusX,
           focusY: draft.focusY,
         });
@@ -230,7 +228,7 @@ function absoluteUrl(url?: string | null): string | null {
   if (!url) return null;
   if (/^https?:\/\//i.test(url)) return url;
   if (url.startsWith("/api/files/")) return url;
-  const base = CONVEX_HTTP_URL.replace(/\/$/, "");
+  const base = window.location.origin.replace(/\/$/, "");
   return url.startsWith("/") ? `${base}${url}` : `${base}/${url}`;
 }
 

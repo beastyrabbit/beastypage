@@ -7,7 +7,6 @@ import {
   VisualBuilderClient,
   type VisualBuilderInitialPayload,
 } from "@/components/visual-builder/VisualBuilderClient";
-import type { Id } from "@/convex/_generated/dataModel";
 import {
   hydrateBuilderParams,
   synchronizeBuilderParams,
@@ -23,7 +22,7 @@ type TortieLayer = {
 };
 
 type MapperRecord = {
-  id: Id<"cat_profile">;
+  id: string;
   slug?: string | null;
   shareToken?: string | null;
   cat_data?: unknown;

@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestIdentity } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody } from "@/server/request";
@@ -13,12 +12,6 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (dataBackend() !== "postgres") {
-    return NextResponse.json(
-      { error: "Not found", code: "not_found" },
-      { status: 404 },
-    );
-  }
   try {
     const body = await parseJsonBody(
       request,

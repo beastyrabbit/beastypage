@@ -18,12 +18,12 @@ type CreationOrderedTable = {
   id: AnyColumn;
 };
 
-/** The Convex `_creationTime` equivalent for imported and new PostgreSQL rows. */
+/** The PostgreSQL `_creationTime` equivalent for imported and new PostgreSQL rows. */
 export function creationTimestamp(table: CreationOrderedTable) {
   return sql`coalesce(${table.legacyCreatedAt}, ${table.createdAt})`;
 }
 
-/** Descending keyset predicate for Convex creation-order pagination. */
+/** Descending keyset predicate for PostgreSQL creation-order pagination. */
 export function creationOrderBefore(
   table: CreationOrderedTable,
   cursor: PageCursor,

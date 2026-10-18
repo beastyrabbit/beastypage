@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestIdentity } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { ServiceError } from "@/server/errors";
 import { errorResponse } from "@/server/http";
@@ -62,7 +61,6 @@ function unavailable() {
   );
 }
 export async function GET(request: NextRequest) {
-  if (dataBackend() !== "postgres") return unavailable();
   try {
     return NextResponse.json(
       await listStreamParticipants(
@@ -80,7 +78,6 @@ export async function GET(request: NextRequest) {
   }
 }
 export async function POST(request: NextRequest) {
-  if (dataBackend() !== "postgres") return unavailable();
   try {
     const input = await parseJsonBody(request, bodySchema);
     if (input.operation === "create")

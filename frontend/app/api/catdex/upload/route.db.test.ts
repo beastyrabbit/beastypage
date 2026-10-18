@@ -58,7 +58,6 @@ function uploadRequest(
 }
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   uploadUrlRoute = await import("../upload-url/route");
   uploadRoute = await import("./route");

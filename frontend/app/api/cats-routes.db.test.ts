@@ -28,7 +28,6 @@ let discordRandomCatRoute: typeof import("@/app/api/discord/random-cat/route");
 let ancestryPage: typeof import("@/app/projects/warrior-cats/ancestry-tree/[slug]/page");
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   pool = createPool(
     readDatabaseConfig("app", { DATABASE_URL: inject("databaseUrl") }),

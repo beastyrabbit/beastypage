@@ -1,148 +1,19 @@
-# BeastyPage Frontend - Development Context
+# BeastyPage Frontend
 
-This is a Next.js 16 application with React 19, using Convex as the backend database.
+This is a Next.js 16 application with React 19. PostgreSQL is the database, accessed through Drizzle repositories and service modules under \`server/\`.
 
-## Project Overview
+Development commands:
 
-A pixel cat gacha platform featuring:
-- Cat generators with ClanGen sprites
-- Gacha wheels and adoption mechanics
-- Catdex (Pokedex-style cat browser)
-- Stream tools for audience interaction
+\`\`\`bash
+pnpm install
+pnpm run dev
+pnpm run typecheck
+pnpm run lint
+pnpm run test
+pnpm run db:local up
+pnpm run db:migrate
+\`\`\`
 
-## Tech Stack
+The application uses Clerk for authentication, TanStack Query for browser data fetching, and PostHog for optional analytics. API routes under \`app/api\` validate input and call PostgreSQL services. Public links resolve by slug, legacy imported identifier, or UUID through the legacy-link repository.
 
-- **Framework**: Next.js 16 (App Router)
-- **UI**: React 19, TailwindCSS, Radix UI primitives
-- **Database**: Convex (serverless)
-- **Package Manager**: pnpm
-- **Linter/Formatter**: Biome
-- **Analytics**: PostHog (optional)
-
-## Directory Structure
-
-```
-frontend/
-├── app/                    # Next.js App Router pages
-│   ├── projects/           # Category hubs (gacha, games, tools, artist, warrior-cats)
-│   ├── single-cat-plus/    # Cat generator
-│   ├── catdex/             # Cat collection browser
-│   ├── wheel/              # Gacha wheel
-│   ├── adoption-generator/ # Litter adoption flow
-│   ├── visual-builder/     # Trait-by-trait builder
-│   └── stream/             # Stream tools
-├── components/             # React components
-│   ├── common/             # Shared UI components
-│   ├── ui/                 # Radix-based primitives
-│   └── ...                 # Feature-specific components
-├── convex/                 # Convex backend functions
-│   ├── schema.ts           # Database schema
-│   ├── cats.ts             # Cat-related queries/mutations
-│   └── ...
-├── lib/                    # Utilities and helpers
-└── public/                 # Static assets (sprites, images)
-```
-
-## Development Commands
-
-```bash
-pnpm install             # Install dependencies
-pnpm run dev             # Start dev server (port via portless)
-pnpm run build           # Production build
-pnpm run lint            # Lint check
-pnpm run typecheck       # TypeScript check
-
-# Convex
-pnpm exec convex dev     # Start Convex dev server
-pnpm exec convex deploy  # Deploy to production
-```
-
-## Key Conventions
-
-### pnpm
-
-- Use `pnpm install` for dependency management
-- Use `pnpm exec tsx <file>` to run TypeScript scripts
-- Use `pnpm run test` (vitest) for testing
-- If `pnpm add` fails with "Unexpected store location" (store v10 vs v11 mismatch), use `pnpm dlx pnpm@10 add <pkg>`
-
-### Component Patterns
-
-- Page components in `app/*/page.tsx`
-- Shared UI in `components/common/`
-- Use TailwindCSS for styling
-- Radix primitives wrapped in `components/ui/`
-
-### Convex Patterns
-
-- Schema defined in `convex/schema.ts`
-- Queries are read-only, use `query()`
-- Mutations modify data, use `mutation()`
-- Actions for external API calls, use `action()`
-- Use `useQuery()` and `useMutation()` hooks in components
-- Relative imports inside `convex/` need explicit `.js` extensions (node16 module resolution)
-- Temporary `convex/*.ts` test helpers leak into `convex/_generated/api.d.ts` — delete the file and run `pnpm exec convex dev --once` before committing generated files
-- Inspect dev data from the CLI: `pnpm exec convex data <table>`; run internal mutations: `pnpm exec convex run file:fn '{...json args}'`
-
-### Stream Overlay (single-cat-stream)
-
-- `cat_stream_sessions.currentCommand` payloads must be params-only (slug + cat params, never rendered images) — the session document is capped at Convex's 1 MiB limit; the overlay re-renders sprites locally
-- Generation + persistence happen on the control page (authed); the overlay (`?key=<apiKey>`) only renders
-- `attachViewSlug`-style patches that don't bump `seq` are ignored by the overlay's dispatch guard (`components/stream-control/obs/commandPolicy.ts`)
-
-### Sprite Assets
-
-- Cat sprites are under `public/assets/`
-- Sprites from ClanGen (CC BY-NC 4.0 licensed)
-- Do not use sprites for commercial purposes
-
-## Environment Variables
-
-Required for development:
-- `CONVEX_DEPLOYMENT` - Convex deployment ID
-- `NEXT_PUBLIC_CONVEX_URL` - Convex cloud URL
-
-Optional:
-- `NEXT_PUBLIC_POSTHOG_KEY` - Analytics
-- `NEXT_PUBLIC_POSTHOG_HOST` - Analytics host
-- `RENDERER_INTERNAL_URL` - Cat card renderer service
-
-## Testing
-
-```bash
-pnpm run test            # Run tests (vitest)
-pnpm run test -- --watch # Watch mode
-```
-
-### Palette System
-
-- Palette types are centralized in `lib/palettes/types.ts` — `PaletteId`, `PaletteMode`, `PaletteCategory`
-- `PaletteCategory.id` is typed as `PaletteId` (not `string`) for compile-time safety
-- Adding a new palette: create file, add to `pure/index.ts` or `index.ts`, add ID to `PaletteId` union in `types.ts`
-- Never duplicate `PaletteMode` type — always import from `@/lib/palettes`
-
-## Ports
-
-Ports are managed by portless — check dev server output or `/home/beasty/projects/.ports` for registered defaults.
-
-## Important Files
-
-- `app/layout.tsx` - Root layout with providers
-- `convex/schema.ts` - Database schema definition
-- `components/common/PageHero.tsx` - Standard page header
-- `middleware.ts` - Entry point routing for multi-subdomain setup
-
-## Server-Side Patterns
-
-- **Server-side canvas**: Use `@napi-rs/canvas` (already a dependency) for image generation in API routes
-- **SSRF protection**: For user-provided image URLs, use `downloadPublicImage` in `lib/public-image-download.ts`. It validates all resolved addresses with `assertPublicAddresses`, pins the connection, and revalidates redirects.
-- **Convex HTTP client in API routes**: Use `ConvexHttpClient` with `getServerConvexUrl()` — see `app/api/discord/random-cat/route.ts` or `app/api/cat-share/route.ts`
-- **Standalone Docker path resolution**: `process.cwd()` may not point to the Next.js dir in standalone builds — use `NEXT_PUBLIC_DIR` env var as fallback
-
-<!-- convex-ai-start -->
-This project uses [Convex](https://convex.dev) as its backend.
-
-When working on Convex code, **always read `convex/_generated/ai/guidelines.md` first** for important guidelines on how to correctly use Convex APIs and patterns. The file contains rules that override what you may have learned about Convex from training data.
-
-Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
-<!-- convex-ai-end -->
+Cat sprites live under \`public/assets/\`. Keep the existing palette and cat-system type modules as the source of truth for frontend generation.

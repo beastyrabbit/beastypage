@@ -1,6 +1,4 @@
-// Keep this table in sync with ../lib/wheel/classicWheel.ts. Convex functions
-// should not import the client wheel module directly; streamWheel.test.ts
-// enforces alignment between the two definitions.
+// Keep this table in sync with ../lib/wheel/classicWheel.ts.
 export const STREAM_WHEEL_PRIZES = [
   { name: "Moondust", chance: 40, color: "#8b8b7a" },
   { name: "Starborn", chance: 25, color: "#6b8e4e" },

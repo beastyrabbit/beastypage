@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestIdentity } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseSearchParams } from "@/server/request";
@@ -21,7 +20,6 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (dataBackend() !== "postgres") return unavailable();
   try {
     const { id } = await params;
     const identity = await getRequestIdentity();

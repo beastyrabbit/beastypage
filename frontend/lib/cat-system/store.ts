@@ -13,7 +13,7 @@ export interface CatPage<TId extends string = string, TCursor = string> {
 }
 
 /**
- * Persistence boundary for cat documents. Implementations may use Convex,
+ * Persistence boundary for cat documents. Implementations may use PostgreSQL,
  * another database or local storage; cat-system consumers only depend on this
  * interface and never on database-specific trait fields.
  */

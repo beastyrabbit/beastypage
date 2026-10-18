@@ -39,7 +39,7 @@ export type EvolutionStreamCommand = {
 /** Charge used when the command carries none (the generator page default). */
 const DEFAULT_CHARGE_MS = 8400;
 
-/** Hold auto-releases after this; convex/catStream.ts keeps HOLD_MAX_MS = 90000 in sync. */
+/** Hold auto-releases after this; postgresql/catStream.ts keeps HOLD_MAX_MS = 90000 in sync. */
 export const EVOLUTION_HOLD_MAX_MS = 90_000;
 
 /** cat_stream_sessions.evolutionState as the overlay and control page read it. */
@@ -70,7 +70,7 @@ export function toEvolutionStreamCats(
   }));
 }
 
-/** Light runtime guard for command payloads coming out of Convex. */
+/** Light runtime guard for command payloads coming out of PostgreSQL. */
 export function parseEvolutionStreamCommand(
   value: unknown,
 ): EvolutionStreamCommand | null {

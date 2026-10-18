@@ -68,7 +68,7 @@ describe("JSON contracts", () => {
     expect(catData.safeParse({ when: new Date() }).success).toBe(false);
   });
 
-  it("enforces the size caps Convex enforced", () => {
+  it("enforces the size caps PostgreSQL enforced", () => {
     const big = { blob: "x".repeat(901 * 1024) };
     expect(catProfileData.safeParse(big).success).toBe(false);
     expect(

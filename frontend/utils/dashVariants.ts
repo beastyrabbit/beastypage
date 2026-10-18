@@ -12,7 +12,7 @@ export const DEFAULT_DASH_SETTINGS: DashSettings = {
 };
 
 // ---------------------------------------------------------------------------
-// Payload parsing (Convex / import)
+// Payload parsing (PostgreSQL / import)
 // ---------------------------------------------------------------------------
 
 export function parseDashPayload(payload: unknown): DashSettings {

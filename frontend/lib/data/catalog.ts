@@ -1,11 +1,5 @@
 "use client";
 
-import type { FunctionReturnType } from "convex/server";
-import { api } from "@/convex/_generated/api";
-import type { CatdexPayload } from "@/convex/catdex";
-import type { CollectionEntry } from "@/convex/collection";
-import type { RarityPayload } from "@/convex/rarities";
-import type { SeasonPayload } from "@/convex/seasons";
 import { fetchJson } from "@/lib/api";
 import {
   dataQueryKeys,
@@ -13,6 +7,12 @@ import {
   useDataPaginatedQuery,
   useDataQuery,
 } from "@/lib/data";
+import type {
+  CatdexPayload,
+  CollectionPayload,
+  RarityPayload,
+  SeasonPayload,
+} from "@/server/services/catalog";
 
 type CatdexPageArgs = { approved: boolean };
 type CatdexPageResponse = {
@@ -20,13 +20,12 @@ type CatdexPageResponse = {
   nextCursor: string | null;
 };
 type CollectionPageResponse = {
-  results: CollectionEntry[];
+  results: CollectionPayload[];
   nextCursor: string | null;
 };
 
 export function useCatalogSeasons() {
   return useDataQuery(
-    api.seasons.list,
     {},
     {
       queryKey: dataQueryKeys.list("seasons"),
@@ -38,7 +37,6 @@ export function useCatalogSeasons() {
 
 export function useCatalogRarities() {
   return useDataQuery(
-    api.rarities.list,
     {},
     {
       queryKey: dataQueryKeys.list("rarities"),
@@ -49,7 +47,7 @@ export function useCatalogRarities() {
 }
 
 export function useCatalogCatdexPage(args: CatdexPageArgs) {
-  return useDataPaginatedQuery(api.catdex.page, args, {
+  return useDataPaginatedQuery(args, {
     initialNumItems: 48,
     queryKey: dataQueryKeys.list("catdex", args),
     queryFn: async (queryArgs, cursor, signal) => {
@@ -69,7 +67,6 @@ export function useCatalogCatdexPage(args: CatdexPageArgs) {
 
 export function useCatalogHasPending() {
   return useDataQuery(
-    api.catdex.hasPending,
     {},
     {
       queryKey: dataQueryKeys.query("catdex.hasPending"),
@@ -80,7 +77,7 @@ export function useCatalogHasPending() {
 }
 
 export function useCatalogGenerateUploadUrl() {
-  return useDataMutation(api.catdex.generateUploadUrl, {
+  return useDataMutation({
     mutationFn: async ({ clientKey }, signal) => {
       const result = await fetchJson<{ uploadUrl: string }>(
         "/api/catdex/upload-url",
@@ -96,7 +93,7 @@ export function useCatalogGenerateUploadUrl() {
 }
 
 export function useCatalogCreateCatdex() {
-  return useDataMutation(api.catdex.create, {
+  return useDataMutation({
     mutationFn: (args, signal) =>
       fetchJson<CatdexPayload>("/api/catdex", {
         method: "POST",
@@ -109,7 +106,6 @@ export function useCatalogCreateCatdex() {
 
 export function useCatalogCollectionPage() {
   return useDataPaginatedQuery(
-    api.collection.page,
     {},
     {
       initialNumItems: 36,
@@ -128,16 +124,13 @@ export function useCatalogCollectionPage() {
 }
 
 export function useCatalogSetFocus() {
-  return useDataMutation(api.collection.setFocus, {
+  return useDataMutation({
     mutationFn: (args, signal) =>
-      fetchJson<FunctionReturnType<typeof api.collection.setFocus>>(
-        "/api/collection",
-        {
-          method: "PATCH",
-          body: args,
-          signal,
-        },
-      ),
+      fetchJson<any>("/api/collection", {
+        method: "PATCH",
+        body: args,
+        signal,
+      }),
     invalidate: [dataQueryKeys.list("collection")],
   });
 }

@@ -4,7 +4,7 @@ import { auth, verifyToken } from "@clerk/nextjs/server";
 import { ServiceError } from "@/server/errors";
 
 /**
- * Who is calling. `tokenIdentifier` uses Convex's format, `<iss>|<sub>`, so
+ * Who is calling. `tokenIdentifier` uses the historical `<iss>|<sub>` format,
  * owner columns, users.token_identifier and admin allowlists carry over
  * unchanged (ADR §9). Null for anonymous callers.
  */
@@ -29,8 +29,8 @@ export async function getRequestIdentity(): Promise<Identity> {
 /**
  * Identity from a Clerk token another service forwarded, such as the media
  * service relaying a browser's Quick Share request. Browsers mint these from
- * the "convex" JWT template, which Clerk's session middleware rejects as the
- * wrong token type, so verify it directly with the same audience check Convex
+ * the historical JWT template, which Clerk's session middleware rejects as the
+ * wrong token type, so verify it directly with the same audience check used by
  * used. Throws when the token is invalid or expired.
  */
 export async function identityFromForwardedToken(

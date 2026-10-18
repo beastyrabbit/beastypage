@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestIdentity } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseSearchParams } from "@/server/request";
@@ -12,8 +11,6 @@ const querySchema = z.object({
 });
 
 export async function GET(request: Request) {
-  if (dataBackend() !== "postgres")
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
   try {
     const parsed = parseSearchParams(
       new URL(request.url).searchParams,

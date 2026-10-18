@@ -20,7 +20,6 @@ async function insertFile(content: Buffer) {
 }
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   route = await import("@/app/api/files/[id]/route");
   publicId = await insertFile(bytes);

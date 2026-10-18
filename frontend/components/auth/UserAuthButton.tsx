@@ -18,7 +18,7 @@ export function UserAuthButton() {
   const viewer = useUserViewer();
   const hasCreatedRef = useRef(false);
 
-  // Ensure user doc exists in Convex after login
+  // Ensure user doc exists in PostgreSQL after login
   useEffect(() => {
     if (isAuthenticated && !hasCreatedRef.current) {
       hasCreatedRef.current = true;

@@ -30,10 +30,6 @@ vi.mock("@/lib/cat-v3/random-cat-server", () => ({
   parseDiscordTraitOverride: vi.fn(),
 }));
 
-vi.mock("@/lib/convexUrl", () => ({
-  getServerConvexUrl: () => null,
-}));
-
 import { POST } from "./route";
 
 function request(signal?: AbortSignal) {

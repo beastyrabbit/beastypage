@@ -24,7 +24,7 @@ import { deleteFirstByUser } from "../repositories/userVariants";
 const MAX_RESOLVE_IDS = 100;
 const MAX_ID_LENGTH = 128;
 
-/** The profile fields exposed by Clerk's Convex JWT template. */
+/** The profile fields exposed by Clerk's PostgreSQL JWT template. */
 export interface ClerkProfile {
   username?: string | null;
   firstName?: string | null;

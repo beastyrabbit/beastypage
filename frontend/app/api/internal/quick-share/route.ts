@@ -6,7 +6,6 @@ import {
   type Identity,
   identityFromForwardedToken,
 } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { parseJsonBody } from "@/server/request";
 import {
@@ -34,8 +33,6 @@ function json(body: unknown, status = 200) {
 }
 
 export async function POST(request: NextRequest) {
-  if (dataBackend() !== "postgres") return json({ error: "Not found" }, 404);
-
   const expected = process.env.QUICK_SHARE_INTERNAL_TOKEN;
   const receivedHeader = request.headers.get("x-quick-share-internal-token");
   const authorization = request.headers.get("authorization");

@@ -241,10 +241,10 @@ function sanitizeTiming(raw: unknown): SpinTimingConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Payload parsing (Convex / import)
+// Payload parsing (PostgreSQL / import)
 // ---------------------------------------------------------------------------
 
-/** Parses a v2 payload from Convex into a valid SingleCatSettings; anything else yields defaults. */
+/** Parses a v2 payload from PostgreSQL into a valid SingleCatSettings; anything else yields defaults. */
 export function parseSingleCatPayload(payload: unknown): SingleCatSettings {
   if (!payload || typeof payload !== "object") {
     return { ...DEFAULT_SINGLE_CAT_SETTINGS };

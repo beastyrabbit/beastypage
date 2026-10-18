@@ -75,7 +75,7 @@ interface ParentPreview {
   name: CatName;
 }
 
-// Keep the client-side guard aligned with the Convex ancestryTree mutation.
+// Keep the client-side guard aligned with the PostgreSQL ancestryTree mutation.
 const MAX_CATS = 500;
 const LARGE_TREE_THRESHOLD = Math.floor(MAX_CATS * 0.8);
 

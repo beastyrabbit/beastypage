@@ -8,7 +8,6 @@ import type { CatGeneratorApi } from "@/components/cat-builder/types";
 import ArrowBigDownDashIcon from "@/components/ui/arrow-big-down-dash-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SendHorizontalIcon from "@/components/ui/send-horizontal-icon";
-import type { Id } from "@/convex/_generated/dataModel";
 import {
   getCoatChoiceValue,
   getCoatPatternName,
@@ -342,7 +341,7 @@ export function GuidedTimelineViewer({
     setMetaSaving(true);
     try {
       const result = await updateMeta({
-        id: recordId as Id<"cat_profile">,
+        id: recordId as string,
         catName: trimmedCat || undefined,
         creatorName: trimmedCreator || undefined,
         editToken: (slug ? readMapperEditToken(slug) : null) ?? undefined,

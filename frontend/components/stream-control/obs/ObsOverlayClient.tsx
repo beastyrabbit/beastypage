@@ -561,7 +561,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     initialSettings.timing,
   );
 
-  // OBS: no variant management — settings come from Convex session
+  // OBS: no variant management — settings come from PostgreSQL session
   const variants = {
     variants: [] as {
       id: string;
@@ -683,7 +683,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     () => new Set(initialSettings.extendedModes),
   );
 
-  // OBS: Re-sync settings when the Convex session updates (control page changed them)
+  // OBS: Re-sync settings when the PostgreSQL session updates (control page changed them)
   useEffect(() => {
     if (!sessionSettings) return;
     setMode(sessionSettings.mode ?? DEFAULT_SINGLE_CAT_SETTINGS.mode);
@@ -796,7 +796,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     return "text-3xl tracking-[0.32em]";
   }, [rollerActiveValue]);
 
-  // OBS: stub out Convex mutations not needed for overlay
+  // OBS: stub out PostgreSQL mutations not needed for overlay
   const createMapper = useCallback(
     async (
       ..._args: unknown[]
@@ -3111,7 +3111,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
         return url;
       }
     } catch (err) {
-      console.warn("Failed to persist share payload to Convex", err);
+      console.warn("Failed to persist share payload to PostgreSQL", err);
     }
 
     if (!shareSlug) {
@@ -3196,7 +3196,7 @@ export function ObsOverlayClient({ apiKey }: Readonly<{ apiKey: string }>) {
     setMetaSaving(true);
     try {
       const result = await updateMapperMeta({
-        id: state.profileId as Id<"cat_profile">,
+        id: state.profileId as string,
         catName: trimmedCat || undefined,
         creatorName: trimmedCreator || undefined,
         editToken: state.editToken ?? undefined,

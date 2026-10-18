@@ -44,7 +44,6 @@ async function readChunk(
 }
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   db = getDb();
   route = await import("@/app/api/live/[...topic]/route");

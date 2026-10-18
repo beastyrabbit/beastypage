@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { isUuid } from "@/server/repositories/legacyLinks";
 import { findServableFile, readFileBytes } from "@/server/services/files";
@@ -17,7 +16,6 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (dataBackend() !== "postgres") return notFound();
   const { id } = await params;
   if (!isUuid(id)) return notFound();
 

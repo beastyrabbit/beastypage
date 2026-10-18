@@ -1,11 +1,8 @@
 "use client";
 
-import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { useMemo } from "react";
-import { api } from "@/convex/_generated/api";
 import { fetchJson } from "@/lib/api";
 import { useLive } from "@/lib/live";
-import { useDataBackend } from "./backend";
 import { useDataMutation, useDataQuery } from "./hooks";
 import { dataQueryKeys } from "./keys";
 
@@ -36,39 +33,30 @@ function useKeyedEventSource(
 }
 
 export function useCatStreamSession(enabled = true) {
-  const backend = useDataBackend();
   const query = useDataQuery(
-    api.catStream.getSession,
     {},
     {
       queryKey: dataQueryKeys.query("catStream.session"),
       queryFn: (_, signal) =>
-        get<FunctionReturnType<typeof api.catStream.getSession>>(
-          "/api/cat-stream",
-          signal,
-          { nullable: true },
-        ),
+        get<any>("/api/cat-stream", signal, { nullable: true }),
       enabled,
     },
   );
   let sessionId: string | null = null;
   if (query) sessionId = "id" in query ? String(query.id) : String(query._id);
-  const live = useLive<FunctionReturnType<typeof api.catStream.getSession>>(
-    sessionId ? `cat-stream/${sessionId}` : null,
-    { enabled: backend === "postgres" && enabled },
-  );
-  return backend === "postgres" ? (live ?? query) : query;
+  const live = useLive<any>(sessionId ? `cat-stream/${sessionId}` : null, {
+    enabled: enabled,
+  });
+  return live ?? query;
 }
 
 export function useCatStreamSessionByApiKey(apiKey: string, enabled = true) {
-  const backend = useDataBackend();
   const query = useDataQuery(
-    api.catStream.getSessionByApiKey,
     { apiKey },
     {
       queryKey: dataQueryKeys.detail("catStream.overlay", apiKey),
       queryFn: (args, signal) =>
-        get<FunctionReturnType<typeof api.catStream.getSessionByApiKey>>(
+        get<any>(
           `/api/cat-stream?key=${encodeURIComponent(args.apiKey)}`,
           signal,
           { nullable: true },
@@ -83,13 +71,11 @@ export function useCatStreamSessionByApiKey(apiKey: string, enabled = true) {
       new EventSource(`${url}?key=${encodeURIComponent(apiKey)}`),
     [apiKey],
   );
-  const live = useLive<
-    FunctionReturnType<typeof api.catStream.getSessionByApiKey>
-  >(sessionId ? `cat-stream/${sessionId}` : null, {
-    enabled: backend === "postgres" && enabled && Boolean(sessionId),
+  const live = useLive<any>(sessionId ? `cat-stream/${sessionId}` : null, {
+    enabled: enabled && Boolean(sessionId),
     eventSource,
   });
-  return backend === "postgres" ? (live ?? query) : query;
+  return live ?? query;
 }
 
 function catMutation(operation: string) {
@@ -98,176 +84,156 @@ function catMutation(operation: string) {
 }
 
 export const useEnsureCatStreamSession = () =>
-  useDataMutation(api.catStream.ensureSession, {
+  useDataMutation({
     mutationFn: (args) =>
-      catMutation("ensureSession")(args as Record<string, unknown>) as Promise<
-        FunctionReturnType<typeof api.catStream.ensureSession>
-      >,
+      catMutation("ensureSession")(
+        args as Record<string, unknown>,
+      ) as Promise<any>,
     invalidate: [dataQueryKeys.query("catStream.session")],
   });
 export const useUpdateCatStreamSettings = () =>
-  useDataMutation(api.catStream.updateSettings, {
+  useDataMutation({
     mutationFn: (args) =>
-      catMutation("updateSettings")(args as Record<string, unknown>) as Promise<
-        FunctionReturnType<typeof api.catStream.updateSettings>
-      >,
+      catMutation("updateSettings")(
+        args as Record<string, unknown>,
+      ) as Promise<any>,
     invalidate: [dataQueryKeys.query("catStream.session")],
   });
 export const useMergeCatStreamSettings = () =>
-  useDataMutation(api.catStream.mergeSettings, {
+  useDataMutation({
     mutationFn: (args) =>
-      catMutation("mergeSettings")(args as Record<string, unknown>) as Promise<
-        FunctionReturnType<typeof api.catStream.mergeSettings>
-      >,
+      catMutation("mergeSettings")(
+        args as Record<string, unknown>,
+      ) as Promise<any>,
     invalidate: [dataQueryKeys.query("catStream.session")],
   });
 export const useTriggerCatStreamSpin = () =>
-  useDataMutation(api.catStream.triggerSpin, {
+  useDataMutation({
     mutationFn: (args) =>
-      catMutation("triggerSpin")(args as Record<string, unknown>) as Promise<
-        FunctionReturnType<typeof api.catStream.triggerSpin>
-      >,
+      catMutation("triggerSpin")(
+        args as Record<string, unknown>,
+      ) as Promise<any>,
   });
 export const useAttachCatStreamViewSlug = () =>
-  useDataMutation(api.catStream.attachViewSlug, {
+  useDataMutation({
     mutationFn: (args) =>
-      catMutation("attachViewSlug")(args as Record<string, unknown>) as Promise<
-        FunctionReturnType<typeof api.catStream.attachViewSlug>
-      >,
+      catMutation("attachViewSlug")(
+        args as Record<string, unknown>,
+      ) as Promise<any>,
   });
 export const useTriggerCatStreamWheel = () =>
-  useDataMutation(api.catStream.triggerWheel, {
-    mutationFn: () =>
-      catMutation("triggerWheel")({}) as Promise<
-        FunctionReturnType<typeof api.catStream.triggerWheel>
-      >,
+  useDataMutation({
+    mutationFn: () => catMutation("triggerWheel")({}) as Promise<any>,
   });
 export const useShowLobby = () =>
-  useDataMutation(api.catStream.showLobby, {
-    mutationFn: () =>
-      catMutation("showLobby")({}) as Promise<
-        FunctionReturnType<typeof api.catStream.showLobby>
-      >,
+  useDataMutation({
+    mutationFn: () => catMutation("showLobby")({}) as Promise<any>,
   });
 export const useShowBrb = () =>
-  useDataMutation(api.catStream.showBrb, {
-    mutationFn: () =>
-      catMutation("showBrb")({}) as Promise<
-        FunctionReturnType<typeof api.catStream.showBrb>
-      >,
+  useDataMutation({
+    mutationFn: () => catMutation("showBrb")({}) as Promise<any>,
   });
 export const useClearOverlay = () =>
-  useDataMutation(api.catStream.clearOverlay, {
-    mutationFn: () =>
-      catMutation("clearOverlay")({}) as Promise<
-        FunctionReturnType<typeof api.catStream.clearOverlay>
-      >,
+  useDataMutation({
+    mutationFn: () => catMutation("clearOverlay")({}) as Promise<any>,
   });
 export const useToggleTestMode = () =>
-  useDataMutation(api.catStream.toggleTestMode, {
-    mutationFn: () =>
-      catMutation("toggleTestMode")({}) as Promise<
-        FunctionReturnType<typeof api.catStream.toggleTestMode>
-      >,
+  useDataMutation({
+    mutationFn: () => catMutation("toggleTestMode")({}) as Promise<any>,
   });
 export const useTriggerCatStreamEvolution = () =>
-  useDataMutation(api.catStream.triggerEvolution, {
+  useDataMutation({
     mutationFn: (args) =>
       catMutation("triggerEvolution")(
         args as Record<string, unknown>,
-      ) as Promise<FunctionReturnType<typeof api.catStream.triggerEvolution>>,
+      ) as Promise<any>,
   });
 export const useTriggerCatStreamBatch = () =>
-  useDataMutation(api.catStream.triggerBatch, {
+  useDataMutation({
     mutationFn: (args) =>
-      catMutation("triggerBatch")(args as Record<string, unknown>) as Promise<
-        FunctionReturnType<typeof api.catStream.triggerBatch>
-      >,
+      catMutation("triggerBatch")(
+        args as Record<string, unknown>,
+      ) as Promise<any>,
   });
 export const useReportBatchStage = () =>
-  useDataMutation(api.catStream.reportBatchStage, {
+  useDataMutation({
     mutationFn: (args) =>
       catMutation("reportBatchStage")(
         args as Record<string, unknown>,
-      ) as Promise<FunctionReturnType<typeof api.catStream.reportBatchStage>>,
+      ) as Promise<any>,
   });
 export const useMarkBatchCat = () =>
-  useDataMutation(api.catStream.markBatchCat, {
+  useDataMutation({
     mutationFn: (args) =>
-      catMutation("markBatchCat")(args as Record<string, unknown>) as Promise<
-        FunctionReturnType<typeof api.catStream.markBatchCat>
-      >,
+      catMutation("markBatchCat")(
+        args as Record<string, unknown>,
+      ) as Promise<any>,
   });
 export const useSetBatchHighlight = () =>
-  useDataMutation(api.catStream.setBatchHighlight, {
+  useDataMutation({
     mutationFn: (args) =>
       catMutation("setBatchHighlight")(
         args as Record<string, unknown>,
-      ) as Promise<FunctionReturnType<typeof api.catStream.setBatchHighlight>>,
+      ) as Promise<any>,
   });
 export const useCullBatchCat = () =>
-  useDataMutation(api.catStream.cullBatchCat, {
+  useDataMutation({
     mutationFn: (args) =>
-      catMutation("cullBatchCat")(args as Record<string, unknown>) as Promise<
-        FunctionReturnType<typeof api.catStream.cullBatchCat>
-      >,
+      catMutation("cullBatchCat")(
+        args as Record<string, unknown>,
+      ) as Promise<any>,
   });
 export const useCancelBatchCull = () =>
-  useDataMutation(api.catStream.cancelBatchCull, {
+  useDataMutation({
     mutationFn: (args) =>
       catMutation("cancelBatchCull")(
         args as Record<string, unknown>,
-      ) as Promise<FunctionReturnType<typeof api.catStream.cancelBatchCull>>,
+      ) as Promise<any>,
   });
 export const useHoldEvolution = () =>
-  useDataMutation(api.catStream.holdEvolution, {
+  useDataMutation({
     mutationFn: (args) =>
-      catMutation("holdEvolution")(args as Record<string, unknown>) as Promise<
-        FunctionReturnType<typeof api.catStream.holdEvolution>
-      >,
+      catMutation("holdEvolution")(
+        args as Record<string, unknown>,
+      ) as Promise<any>,
   });
 export const useReleaseEvolution = () =>
-  useDataMutation(api.catStream.releaseEvolution, {
+  useDataMutation({
     mutationFn: (args) =>
       catMutation("releaseEvolution")(
         args as Record<string, unknown>,
-      ) as Promise<FunctionReturnType<typeof api.catStream.releaseEvolution>>,
+      ) as Promise<any>,
   });
 export const useRevealEvolutionAt = () =>
-  useDataMutation(api.catStream.revealEvolutionAt, {
+  useDataMutation({
     mutationFn: (args) =>
       catMutation("revealEvolutionAt")(
         args as Record<string, unknown>,
-      ) as Promise<FunctionReturnType<typeof api.catStream.revealEvolutionAt>>,
+      ) as Promise<any>,
   });
 export const useSkipEvolutionToBoard = () =>
-  useDataMutation(api.catStream.skipEvolutionToBoard, {
+  useDataMutation({
     mutationFn: (args) =>
       catMutation("skipEvolutionToBoard")(
         args as Record<string, unknown>,
-      ) as Promise<
-        FunctionReturnType<typeof api.catStream.skipEvolutionToBoard>
-      >,
+      ) as Promise<any>,
   });
 export const useAttachBatchSlug = () =>
-  useDataMutation(api.catStream.attachBatchSlug, {
+  useDataMutation({
     mutationFn: (args) =>
       catMutation("attachBatchSlug")(
         args as Record<string, unknown>,
-      ) as Promise<FunctionReturnType<typeof api.catStream.attachBatchSlug>>,
+      ) as Promise<any>,
   });
 
-export function useStreamSessions(
-  args: FunctionArgs<typeof api.streamSessionsV2.list> | "skip",
-) {
-  const backend = useDataBackend();
-  const query = useDataQuery(api.streamSessionsV2.list, args, {
+export function useStreamSessions(args: any | "skip") {
+  const query = useDataQuery(args, {
     queryKey: dataQueryKeys.list(
       "stream.sessions",
       args === "skip" ? {} : args,
     ),
     queryFn: (input, signal) =>
-      get<FunctionReturnType<typeof api.streamSessionsV2.list>>(
+      get<any>(
         `/api/stream/sessions?${new URLSearchParams(
           Object.entries(input)
             .filter(([, value]) => value !== undefined)
@@ -280,78 +246,69 @@ export function useStreamSessions(
   const viewerKey = args === "skip" ? undefined : args.viewerKey;
   const eventSource = useKeyedEventSource(viewerKey);
   const live = useLive<{
-    session: FunctionReturnType<typeof api.streamSessionsV2.get> | null;
+    session: any | null;
     participants: unknown[];
     votes: unknown[];
   }>(id ? `stream/${id}` : null, {
-    enabled: backend === "postgres" && Boolean(id),
+    enabled: Boolean(id),
     eventSource,
   });
-  return backend === "postgres" && live?.session ? [live.session] : query;
+  return live?.session ? [live.session] : query;
 }
 
 export function useStreamSession(
-  args: FunctionArgs<typeof api.streamSessionsV2.get> | "skip",
+  args: any | "skip",
   viewerKey?: string | null,
 ) {
-  const backend = useDataBackend();
-  const query = useDataQuery(api.streamSessionsV2.get, args, {
+  const query = useDataQuery(args, {
     queryKey: dataQueryKeys.detail(
       "stream.session",
       args === "skip" ? "none" : String(args.id),
     ),
     queryFn: (input, signal) =>
-      get<FunctionReturnType<typeof api.streamSessionsV2.get>>(
-        `/api/stream/sessions/${String(input.id)}`,
-        signal,
-        { nullable: true },
-      ),
+      get<any>(`/api/stream/sessions/${String(input.id)}`, signal, {
+        nullable: true,
+      }),
   });
   const id = args === "skip" ? null : String(args.id);
   const eventSource = useKeyedEventSource(viewerKey);
   const live = useLive<{
-    session: FunctionReturnType<typeof api.streamSessionsV2.get> | null;
+    session: any | null;
     participants: unknown[];
     votes: unknown[];
   }>(id ? `stream/${id}` : null, {
-    enabled: backend === "postgres" && Boolean(id),
+    enabled: Boolean(id),
     eventSource,
   });
-  return backend === "postgres" && live?.session ? live.session : query;
+  return live?.session ? live.session : query;
 }
 
-export function useStreamSessionForHost(
-  args: FunctionArgs<typeof api.streamSessionsV2.getForHost> | "skip",
-) {
-  const backend = useDataBackend();
-  const query = useDataQuery(api.streamSessionsV2.getForHost, args, {
+export function useStreamSessionForHost(args: any | "skip") {
+  const query = useDataQuery(args, {
     queryKey: dataQueryKeys.detail(
       "stream.host-session",
       args === "skip" ? "none" : String(args.id),
     ),
     queryFn: (input, signal) =>
-      get<FunctionReturnType<typeof api.streamSessionsV2.getForHost>>(
-        `/api/stream/sessions/${String(input.id)}?host=1`,
-        signal,
-        { nullable: true },
-      ),
+      get<any>(`/api/stream/sessions/${String(input.id)}?host=1`, signal, {
+        nullable: true,
+      }),
   });
   const id = args === "skip" ? null : String(args.id);
   const live = useLive<{
-    session: FunctionReturnType<typeof api.streamSessionsV2.get> | null;
+    session: any | null;
     participants: unknown[];
     votes: unknown[];
   }>(id ? `stream/${id}` : null, {
-    enabled: backend === "postgres" && Boolean(id),
+    enabled: Boolean(id),
   });
-  return backend === "postgres" && live?.session ? live.session : query;
+  return live?.session ? live.session : query;
 }
 export function useStreamParticipants(
-  args: FunctionArgs<typeof api.streamParticipantsV2.list> | "skip",
+  args: any | "skip",
   viewerKey?: string | null,
 ) {
-  const backend = useDataBackend();
-  const query = useDataQuery(api.streamParticipantsV2.list, args, {
+  const query = useDataQuery(args, {
     queryKey: dataQueryKeys.list(
       "stream.participants",
       args === "skip" ? {} : args,
@@ -360,7 +317,7 @@ export function useStreamParticipants(
       const viewerParam = input.viewerSession
         ? `viewerSession=${encodeURIComponent(input.viewerSession)}&`
         : "";
-      return get<FunctionReturnType<typeof api.streamParticipantsV2.list>>(
+      return get<any>(
         `/api/stream/participants?session=${String(input.session)}&${viewerParam}limit=${input.limit}`,
         signal,
       );
@@ -374,29 +331,23 @@ export function useStreamParticipants(
     viewerSession,
   );
   const live = useLive<{
-    participants: FunctionReturnType<typeof api.streamParticipantsV2.list>;
+    participants: any;
     session: unknown;
     votes: unknown[];
   }>(id ? `stream/${id}` : null, {
-    enabled: backend === "postgres" && Boolean(id),
+    enabled: Boolean(id),
     eventSource,
   });
-  return backend === "postgres" && live?.participants
-    ? live.participants
-    : query;
+  return live?.participants ? live.participants : query;
 }
-export function useStreamVotes(
-  args: FunctionArgs<typeof api.streamVotesV2.list> | "skip",
-  viewerKey?: string | null,
-) {
-  const backend = useDataBackend();
-  const query = useDataQuery(api.streamVotesV2.list, args, {
+export function useStreamVotes(args: any | "skip", viewerKey?: string | null) {
+  const query = useDataQuery(args, {
     queryKey: dataQueryKeys.list("stream.votes", args === "skip" ? {} : args),
     queryFn: (input, signal) => {
       const stepParam = input.stepId
         ? `stepId=${encodeURIComponent(input.stepId)}&`
         : "";
-      return get<FunctionReturnType<typeof api.streamVotesV2.list>>(
+      return get<any>(
         `/api/stream/votes?session=${String(input.session)}&${stepParam}limit=${input.limit}`,
         signal,
       );
@@ -406,53 +357,37 @@ export function useStreamVotes(
   const stepId = args === "skip" ? undefined : args.stepId;
   const eventSource = useKeyedEventSource(viewerKey, "stepId", stepId);
   const live = useLive<{
-    votes: FunctionReturnType<typeof api.streamVotesV2.list>;
+    votes: any;
     session: unknown;
     participants: unknown[];
   }>(id ? `stream/${id}` : null, {
-    enabled: backend === "postgres" && Boolean(id),
+    enabled: Boolean(id),
     eventSource,
   });
-  return backend === "postgres" && live?.votes ? live.votes : query;
+  return live?.votes ? live.votes : query;
 }
 export const useCreateStreamSession = () =>
-  useDataMutation(api.streamSessionsV2.create, {
+  useDataMutation({
     mutationFn: (args) =>
-      post<FunctionReturnType<typeof api.streamSessionsV2.create>>(
-        "/api/stream/sessions",
-        { operation: "create", ...args },
-      ),
+      post<any>("/api/stream/sessions", { operation: "create", ...args }),
     invalidate: [dataQueryKeys.list("stream.sessions", {})],
   });
 export const useUpdateStreamSession = () =>
-  useDataMutation(api.streamSessionsV2.update, {
+  useDataMutation({
     mutationFn: (args) =>
-      post<FunctionReturnType<typeof api.streamSessionsV2.update>>(
-        "/api/stream/sessions",
-        { operation: "update", ...args },
-      ),
+      post<any>("/api/stream/sessions", { operation: "update", ...args }),
   });
 export const useCreateStreamParticipant = () =>
-  useDataMutation(api.streamParticipantsV2.create, {
+  useDataMutation({
     mutationFn: (args) =>
-      post<FunctionReturnType<typeof api.streamParticipantsV2.create>>(
-        "/api/stream/participants",
-        { operation: "create", ...args },
-      ),
+      post<any>("/api/stream/participants", { operation: "create", ...args }),
   });
 export const useUpdateStreamParticipant = () =>
-  useDataMutation(api.streamParticipantsV2.update, {
+  useDataMutation({
     mutationFn: (args) =>
-      post<FunctionReturnType<typeof api.streamParticipantsV2.update>>(
-        "/api/stream/participants",
-        { operation: "update", ...args },
-      ),
+      post<any>("/api/stream/participants", { operation: "update", ...args }),
   });
 export const useCreateStreamVote = () =>
-  useDataMutation(api.streamVotesV2.create, {
-    mutationFn: (args) =>
-      post<FunctionReturnType<typeof api.streamVotesV2.create>>(
-        "/api/stream/votes",
-        args,
-      ),
+  useDataMutation({
+    mutationFn: (args) => post<any>("/api/stream/votes", args),
   });

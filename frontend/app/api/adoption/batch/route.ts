@@ -1,9 +1,5 @@
-import { ConvexHttpClient } from "convex/browser";
 import { type NextRequest, NextResponse } from "next/server";
-import { api } from "@/convex/_generated/api";
-import { getServerConvexUrl } from "@/lib/convexUrl";
 import { ANONYMOUS, getRequestIdentity } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody, parseSearchParams } from "@/server/request";
@@ -32,26 +28,13 @@ export async function GET(request: NextRequest) {
       request.nextUrl.searchParams,
       slugOrIdQuerySchema,
     );
-    if (dataBackend() === "postgres") {
-      const result = await getBatch(getDb(), slugOrId);
-      return result
-        ? NextResponse.json(result)
-        : NextResponse.json(
-            { error: "Not found", code: "not_found" },
-            { status: 404 },
-          );
-    }
-    const url = getServerConvexUrl();
-    if (!url)
-      return NextResponse.json(
-        { error: "Convex URL not configured" },
-        { status: 500 },
-      );
-    return NextResponse.json(
-      await new ConvexHttpClient(url).query(api.adoptionV2.getBySlug, {
-        slugOrId,
-      }),
-    );
+    const result = await getBatch(getDb(), slugOrId);
+    return result
+      ? NextResponse.json(result)
+      : NextResponse.json(
+          { error: "Not found", code: "not_found" },
+          { status: 404 },
+        );
   } catch (error) {
     return errorResponse(
       error,
@@ -64,30 +47,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await parseJsonBody(request, adoptionCreateSchema);
-    if (dataBackend() === "postgres") {
-      return NextResponse.json(
-        await createBatch(
-          getDb(),
-          {
-            cats: body.cats as never,
-            title: body.title,
-            creatorName: body.creatorName,
-            settings: body.settings,
-          },
-          await requestIdentity(),
-        ),
-      );
-    }
-    const url = getServerConvexUrl();
-    if (!url)
-      return NextResponse.json(
-        { error: "Convex URL not configured" },
-        { status: 500 },
-      );
     return NextResponse.json(
-      await new ConvexHttpClient(url).mutation(
-        api.adoptionV2.createBatch,
-        body as never,
+      await createBatch(
+        getDb(),
+        {
+          cats: body.cats as never,
+          title: body.title,
+          creatorName: body.creatorName,
+          settings: body.settings,
+        },
+        await requestIdentity(),
       ),
     );
   } catch (error) {
@@ -102,30 +71,16 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await parseJsonBody(request, adoptionUpdateSchema);
-    if (dataBackend() === "postgres") {
-      return NextResponse.json(
-        await updateBatchMeta(
-          getDb(),
-          {
-            id: body.id,
-            editToken: body.editToken,
-            title: body.title,
-            creatorName: body.creatorName,
-          },
-          await requestIdentity(),
-        ),
-      );
-    }
-    const url = getServerConvexUrl();
-    if (!url)
-      return NextResponse.json(
-        { error: "Convex URL not configured" },
-        { status: 500 },
-      );
     return NextResponse.json(
-      await new ConvexHttpClient(url).mutation(
-        api.adoptionV2.updateBatchMeta,
-        body as never,
+      await updateBatchMeta(
+        getDb(),
+        {
+          id: body.id,
+          editToken: body.editToken,
+          title: body.title,
+          creatorName: body.creatorName,
+        },
+        await requestIdentity(),
       ),
     );
   } catch (error) {

@@ -32,7 +32,7 @@ describe("forwarded identity tokens", () => {
     verifyToken.mockReset();
   });
 
-  it("verifies the Convex template audience and keeps the Convex identifier", async () => {
+  it("verifies the historical template audience and keeps the stable identifier", async () => {
     vi.stubEnv("CLERK_SECRET_KEY", "sk_test_fixture");
     verifyToken.mockResolvedValue({
       iss: "https://clerk.example.com",

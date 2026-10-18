@@ -9,16 +9,18 @@ describe("database health route", () => {
     getPool.mockReset();
   });
 
-  it("does not open a PostgreSQL pool while Convex is selected", async () => {
-    vi.stubEnv("DATA_BACKEND", "convex");
+  it("reports an unreachable PostgreSQL database", async () => {
     vi.stubEnv("DATABASE_URL", "postgresql://app@127.0.0.1/db");
+    getPool.mockReturnValue({
+      query: vi.fn().mockRejectedValue(new Error("connection refused")),
+    });
     const { GET } = await import("./route");
     const response = await GET();
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({
       ok: false,
-      reason: "postgres backend not selected",
+      reason: "database unreachable",
     });
-    expect(getPool).not.toHaveBeenCalled();
+    expect(getPool).toHaveBeenCalledOnce();
   });
 });

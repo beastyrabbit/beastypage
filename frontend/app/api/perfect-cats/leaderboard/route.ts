@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseSearchParams } from "@/server/request";
@@ -9,7 +8,6 @@ export const dynamic = "force-dynamic";
 const notFound = () =>
   NextResponse.json({ error: "Not found", code: "not_found" }, { status: 404 });
 export async function GET(request: Request) {
-  if (dataBackend() !== "postgres") return notFound();
   try {
     const params = parseSearchParams(
       new URL(request.url).searchParams,

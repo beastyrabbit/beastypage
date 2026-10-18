@@ -51,7 +51,6 @@ async function responseJson(response: Response) {
 }
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   process.env.QUICK_SHARE_ADMIN_TOKEN_IDENTIFIERS =
     "https://identity.example|catalog-admin";
@@ -154,16 +153,11 @@ afterAll(async () => {
 });
 
 describe("catalog routes on PostgreSQL", () => {
-  it("serves seasons and rarities and rejects the Convex fallback", async () => {
+  it("serves seasons and rarities from PostgreSQL", async () => {
     expect((await seasonsRoute.GET()).status).toBe(200);
     expect((await raritiesRoute.GET()).status).toBe(200);
     expect((await seasonsRoute.POST()).status).toBe(200);
     expect((await raritiesRoute.POST()).status).toBe(200);
-
-    process.env.DATA_BACKEND = "convex";
-    expect((await seasonsRoute.GET()).status).toBe(404);
-    expect((await raritiesRoute.GET()).status).toBe(404);
-    process.env.DATA_BACKEND = "postgres";
   });
 
   it("covers public, owner, pending, moderation, and item Catdex routes", async () => {
@@ -200,9 +194,6 @@ describe("catalog routes on PostgreSQL", () => {
     expect(ownerInvalid.status).toBe(400);
 
     expect((await catdexPendingRoute.GET()).status).toBe(200);
-    process.env.DATA_BACKEND = "convex";
-    expect((await catdexPendingRoute.GET()).status).toBe(404);
-    process.env.DATA_BACKEND = "postgres";
 
     const moderationDenied = await catdexModerationRoute.GET(
       new NextRequest("http://localhost/api/catdex/moderation?approved=true"),

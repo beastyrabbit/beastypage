@@ -608,7 +608,7 @@ export function catParamsToLegacyPersistence(
 }
 
 /**
- * Converts a known cat-data wrapper for Convex without mutating the local
+ * Converts a known cat-data wrapper for PostgreSQL without mutating the local
  * render/share payload. Only the canonical document and duplicated params
  * envelopes are removed; slots, counts, metadata and flattened future traits
  * remain untouched.

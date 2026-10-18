@@ -46,7 +46,7 @@ export const pixelatorSettings =
 export const dashSettings = slugSettingsTable<DashConfig>("dash_settings");
 
 /**
- * Palette settings carried a Convex storage id inside `config`
+ * Palette settings carried a PostgreSQL storage id inside `config`
  * (`imageStorageId`). It becomes a real column; the importer moves it out of
  * the JSON and rewrites it to a file id.
  */

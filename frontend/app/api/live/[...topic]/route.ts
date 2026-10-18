@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { ANONYMOUS, getRequestIdentity } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { isServiceError, ServiceError } from "@/server/errors";
 import { errorResponse } from "@/server/http";
@@ -36,13 +35,6 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ topic: string[] }> },
 ) {
-  if (dataBackend() !== "postgres") {
-    return NextResponse.json(
-      { error: "Live updates are unavailable", code: "not_found" },
-      { status: 404 },
-    );
-  }
-
   const { topic: topicParts } = await params;
   const topic = topicParts.join("/");
   const definition = findLiveTopic(topic);

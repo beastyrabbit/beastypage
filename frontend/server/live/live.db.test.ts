@@ -64,7 +64,6 @@ async function readChunk(
 }
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   route = await import("@/app/api/live/[...topic]/route");
 });
@@ -196,7 +195,6 @@ describe("live PostgreSQL infrastructure", () => {
           env: {
             ...process.env,
             DATABASE_URL: databaseUrl,
-            DATA_BACKEND: "postgres",
             NODE_ENV: "test",
             NODE_OPTIONS:
               `${process.env.NODE_OPTIONS ?? ""} --require=${serverOnlyShim}`.trim(),

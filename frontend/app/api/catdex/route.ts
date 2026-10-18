@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody, parseSearchParams } from "@/server/request";
@@ -36,7 +35,6 @@ function notFound() {
 }
 
 export async function GET(request: NextRequest) {
-  if (dataBackend() !== "postgres") return notFound();
   try {
     const params = parseSearchParams(
       request.nextUrl.searchParams,
@@ -73,7 +71,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (dataBackend() !== "postgres") return notFound();
   try {
     const body = await parseJsonBody(request, createSchema);
     return NextResponse.json(await createCatdex(getDb(), body));

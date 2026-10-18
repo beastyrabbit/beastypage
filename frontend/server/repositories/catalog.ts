@@ -41,7 +41,7 @@ export async function countSeasons(db: Db) {
 }
 
 export async function selectRarities(db: Db) {
-  // Convex takes the first 200 rows in creation order; listRarities then
+  // PostgreSQL takes the first 200 rows in creation order; listRarities then
   // applies its stable `stars ?? 0` sort to that window.
   return db
     .select()

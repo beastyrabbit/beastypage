@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody } from "@/server/request";
@@ -21,11 +20,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return errorResponse(error, "Invalid request body", "Invalid request body");
   }
-  if (dataBackend() !== "postgres")
-    return NextResponse.json(
-      { error: "Not found", code: "not_found" },
-      { status: 404 },
-    );
   try {
     return NextResponse.json(await upsertMapperPreviews(getDb(), payload));
   } catch (error) {

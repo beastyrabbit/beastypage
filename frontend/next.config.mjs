@@ -1,32 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const remotePatterns = (() => {
-  const patterns = [];
-  const raw = process.env.NEXT_PUBLIC_CONVEX_URL;
-  if (raw) {
-    try {
-      const url = new URL(raw);
-      patterns.push({
-        protocol: url.protocol.replace(":", ""),
-        hostname: url.hostname,
-        port: url.port || undefined,
-        pathname: "/storage/**",
-      });
-    } catch {
-      // ignore invalid URL and fall back to defaults
-    }
-  }
-  if (!patterns.length) {
-    patterns.push({
-      protocol: "http",
-      hostname: "localhost",
-      port: "3210",
-      pathname: "/storage/**",
-    });
-  }
-  return patterns;
-})();
+const remotePatterns = [];
 
 const allowedDevOrigins = (() => {
   const values = new Set(["*.beastypage.localhost"]);

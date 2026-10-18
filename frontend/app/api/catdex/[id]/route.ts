@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestIdentity } from "@/server/auth/identity";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseJsonBody } from "@/server/request";
@@ -28,7 +27,6 @@ export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (dataBackend() !== "postgres") return notFound();
   try {
     const { id } = await context.params;
     const result = await getCatdexByLink(getDb(), id);
@@ -46,7 +44,6 @@ export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  if (dataBackend() !== "postgres") return notFound();
   try {
     const { id } = await context.params;
     const body = await parseJsonBody(request, editSchema);

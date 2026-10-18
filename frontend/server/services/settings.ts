@@ -21,7 +21,7 @@ import { withTransaction } from "../db/transaction";
 import { ServiceError } from "../errors";
 
 /**
- * Shareable settings by slug. Port of convex/settings.ts: same slug rules,
+ * Shareable settings by slug. Port of postgresql/settings.ts: same slug rules,
  * size cap and capability checks (owner token identifier or edit token).
  */
 export type SettingsKind =

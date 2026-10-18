@@ -1,45 +1,31 @@
 import "server-only";
 
-import type { internal } from "@/convex/_generated/api";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { getUserConfig, updateUserConfig } from "@/server/services/discord";
 
-export type DiscordUserConfig =
-  typeof internal.discordUserConfigInternal.get._returnType;
+export type DiscordUserConfig = Awaited<ReturnType<typeof getUserConfig>>;
+
+export function isDiscordServiceRequest(request: Request): boolean {
+  const token = process.env.DISCORD_API_TOKEN;
+  if (!token || token.length < 32) return false;
+  const actual = request.headers.get("authorization") ?? "";
+  const expected = `Bearer ${token}`;
+  let difference = actual.length ^ expected.length;
+  for (let i = 0; i < expected.length; i++) {
+    difference |= (expected.codePointAt(i) ?? 0) ^ (actual.codePointAt(i) ?? 0);
+  }
+  return difference === 0;
+}
 
 export async function discordConfig(
   operation: string,
   args: Record<string, unknown>,
-): Promise<DiscordUserConfig> {
-  if (dataBackend() === "postgres") {
-    if (operation === "get" && typeof args.discordUserId === "string")
-      return getUserConfig(
-        getDb(),
-        args.discordUserId,
-      ) as Promise<DiscordUserConfig>;
-    await updateUserConfig(getDb(), operation, args);
-    return (
-      typeof args.discordUserId === "string"
-        ? getUserConfig(getDb(), args.discordUserId)
-        : null
-    ) as Promise<DiscordUserConfig>;
+): Promise<DiscordUserConfig | null> {
+  if (operation === "get" && typeof args.discordUserId === "string") {
+    return getUserConfig(getDb(), args.discordUserId);
   }
-  const site =
-    process.env.CONVEX_SITE_URL ?? process.env.NEXT_PUBLIC_CONVEX_SITE_URL;
-  const token = process.env.DISCORD_API_TOKEN;
-  if (!site || !token) throw new Error("Discord service is not configured");
-  const response = await fetch(new URL("/discord/user-config", site), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ operation, ...args }),
-    signal: AbortSignal.timeout(10_000),
-    redirect: "error",
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error("Discord config request failed");
-  return response.json();
+  await updateUserConfig(getDb(), operation, args);
+  return typeof args.discordUserId === "string"
+    ? getUserConfig(getDb(), args.discordUserId)
+    : null;
 }

@@ -26,7 +26,6 @@ function json(url: string, body: unknown) {
 }
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   perfectRegister = await import("./perfect-cats/register/route");
   perfectMatchup = await import("./perfect-cats/matchup/route");
@@ -113,15 +112,6 @@ describe("games API routes", () => {
     );
     expect(spin.status).toBe(403);
     expect(await spin.json()).toMatchObject({ code: "forbidden" });
-  });
-
-  it("keeps PostgreSQL route disabled on the Convex backend", async () => {
-    process.env.DATA_BACKEND = "convex";
-    const response = await perfectRegister.POST(
-      json("http://localhost/api/perfect-cats/register", { cats: [] }),
-    );
-    expect(response.status).toBe(404);
-    process.env.DATA_BACKEND = "postgres";
   });
 
   it("returns invalid-input responses for every games route", async () => {

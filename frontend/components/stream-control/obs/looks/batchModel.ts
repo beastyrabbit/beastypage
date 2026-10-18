@@ -2,7 +2,7 @@
  * The batch adoption show as every look sees it: the full pool with each
  * cat's live state (eliminated at which stage, marked, potential, favourite,
  * spotlight) plus stage progress and the finale QR. Pure, so the looks can
- * be unit-tested and previewed without Convex or the renderer.
+ * be unit-tested and previewed without PostgreSQL or the renderer.
  */
 
 import {

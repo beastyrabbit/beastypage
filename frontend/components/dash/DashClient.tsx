@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { TOOL_MAP } from "@/lib/dash/registry.generated";
 import type { DashSettings, ToolWidgetMeta } from "@/lib/dash/types";
-import { APP_VERSION } from "@/lib/dash/version";
 import { useBackendAuth } from "@/lib/data";
 import { useUpsertUserVariant, useUserVariants } from "@/lib/data/users";
 import { DEFAULT_DASH_SETTINGS, parseDashPayload } from "@/utils/dashVariants";
@@ -14,6 +13,7 @@ import { ReleaseNotesModal } from "./ReleaseNotesModal";
 import { WidgetGrid } from "./WidgetGrid";
 
 const DASH_VARIANT_ID = "dash-settings";
+const APP_VERSION = "dev";
 
 type DashClientProps = {
   initialSlug?: string | null;
@@ -28,8 +28,8 @@ export function DashClient({
 }: DashClientProps = {}) {
   const { isAuthenticated } = useBackendAuth();
 
-  // Load settings from Convex
-  const convexVariants = useUserVariants("dash", isAuthenticated);
+  // Load settings from PostgreSQL
+  const postgresqlVariants = useUserVariants("dash", isAuthenticated);
   const upsertVariant = useUpsertUserVariant();
 
   // Local working copy of settings
@@ -43,7 +43,7 @@ export function DashClient({
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
   const [opening, setOpening] = useState(false);
   const initialLoadToastRef = useRef(false);
-  const [loadedFromConvex, setLoadedFromConvex] = useState(false);
+  const [loadedFromPostgreSQL, setLoadedFromPostgreSQL] = useState(false);
 
   useEffect(() => {
     if (initialLoadToastRef.current) return;
@@ -58,20 +58,22 @@ export function DashClient({
     }
   }, [initialLoadError, initialSettings, initialSlug]);
 
-  // Load settings from Convex once available
+  // Load settings from PostgreSQL once available
   const justLoadedRef = useRef(false);
   useEffect(() => {
-    if (loadedFromConvex || initialSlug) return;
-    if (!convexVariants) return;
-    const saved = convexVariants.find((v) => v.variantId === DASH_VARIANT_ID);
+    if (loadedFromPostgreSQL || initialSlug) return;
+    if (!postgresqlVariants) return;
+    const saved = postgresqlVariants.find(
+      (v: any) => v.variantId === DASH_VARIANT_ID,
+    );
     if (saved) {
       justLoadedRef.current = true;
       setSettings(parseDashPayload(saved.settings));
     }
-    setLoadedFromConvex(true);
-  }, [convexVariants, initialSlug, loadedFromConvex]);
+    setLoadedFromPostgreSQL(true);
+  }, [postgresqlVariants, initialSlug, loadedFromPostgreSQL]);
 
-  // Save settings to Convex on change (debounced)
+  // Save settings to PostgreSQL on change (debounced)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFirstRender = useRef(true);
   useEffect(() => {
@@ -83,7 +85,7 @@ export function DashClient({
       justLoadedRef.current = false;
       return;
     }
-    if (!isAuthenticated || !loadedFromConvex) return;
+    if (!isAuthenticated || !loadedFromPostgreSQL) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       void upsertVariant({
@@ -100,15 +102,15 @@ export function DashClient({
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [settings, isAuthenticated, upsertVariant, loadedFromConvex]);
+  }, [settings, isAuthenticated, upsertVariant, loadedFromPostgreSQL]);
 
   // Auto-enter edit mode when there are no widgets and no slug pending
   useEffect(() => {
-    if (!initialSlug && settings.widgets.length === 0 && loadedFromConvex) {
+    if (!initialSlug && settings.widgets.length === 0 && loadedFromPostgreSQL) {
       queueMicrotask(() => setEditing(true));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSlug, loadedFromConvex, settings.widgets.length]);
+  }, [initialSlug, loadedFromPostgreSQL, settings.widgets.length]);
 
   // Resolve widget IDs to tool metadata
   const resolvedWidgets = useMemo(

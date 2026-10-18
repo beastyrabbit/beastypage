@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseSearchParams } from "@/server/request";
 import { coinflipScores } from "@/server/services/games";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
-  if (dataBackend() !== "postgres")
-    return NextResponse.json(
-      { error: "Not found", code: "not_found" },
-      { status: 404 },
-    );
   try {
     const params = parseSearchParams(
       new URL(request.url).searchParams,

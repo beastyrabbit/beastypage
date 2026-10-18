@@ -108,7 +108,7 @@ export interface UseVariantsReturn<T> {
 
 interface UseVariantsOptions<T> {
   storageKey: string;
-  /** Tool identifier for Convex storage (e.g., "singleCatPlus"). When provided, syncs to Convex for authenticated users. */
+  /** Tool identifier for remote service storage (e.g., "singleCatPlus"). When provided, syncs to remote service for authenticated users. */
   toolKey?: string;
   /** One-time migration callback; runs only when no store exists in localStorage. */
   migrate?: () => { name: string; settings: T; cleanup?: () => void } | null;
@@ -120,8 +120,8 @@ export function useVariants<T>(
   const { storageKey, toolKey, migrate } = options;
   const { isAuthenticated } = useBackendAuth();
 
-  // Convex queries/mutations — only active when toolKey is provided and authenticated
-  const convexVariants = useUserVariants(
+  // remote service queries/mutations — only active when toolKey is provided and authenticated
+  const remoteVariants = useUserVariants(
     toolKey,
     Boolean(toolKey && isAuthenticated),
   );
@@ -131,7 +131,7 @@ export function useVariants<T>(
   const setActiveMut = useSetActiveUserVariant();
   const importBatchMut = useImportUserVariants();
 
-  const useConvex = Boolean(toolKey && isAuthenticated);
+  const useRemote = Boolean(toolKey && isAuthenticated);
 
   const [localStore, setLocalStore] = useState<VariantStore<T>>({
     activeId: null,
@@ -173,10 +173,10 @@ export function useVariants<T>(
     }
   }, [storageKey, migrate]);
 
-  // Auto-import localStorage variants to Convex on first authenticated visit
+  // Auto-import localStorage variants to remote service on first authenticated visit
   useEffect(() => {
-    if (!useConvex || !toolKey || importedRef.current) return;
-    if (convexVariants === undefined) return; // still loading
+    if (!useRemote || !toolKey || importedRef.current) return;
+    if (remoteVariants === undefined) return; // still loading
 
     const localData = loadVariantStore<T>(storageKey);
     if (!localData || localData.variants.length === 0) {
@@ -184,9 +184,9 @@ export function useVariants<T>(
       return;
     }
 
-    // Check if any local variants are missing from Convex
-    const convexIds = new Set(convexVariants.map((v) => v.variantId));
-    const toImport = localData.variants.filter((v) => !convexIds.has(v.id));
+    // Check if any local variants are missing from remote service
+    const remoteIds = new Set(remoteVariants.map((v: any) => v.variantId));
+    const toImport = localData.variants.filter((v) => !remoteIds.has(v.id));
 
     if (toImport.length === 0) {
       importedRef.current = true;
@@ -197,7 +197,7 @@ export function useVariants<T>(
     importedRef.current = true;
     void importBatchMut({
       toolKey,
-      variants: toImport.map((v) => ({
+      variants: toImport.map((v: any) => ({
         variantId: v.id,
         name: v.name,
         slug: v.slug,
@@ -214,25 +214,26 @@ export function useVariants<T>(
         console.error("[useVariants] auto-import failed:", err);
         importedRef.current = false; // allow retry on next mount
       });
-  }, [useConvex, toolKey, convexVariants, storageKey, importBatchMut]);
+  }, [useRemote, toolKey, remoteVariants, storageKey, importBatchMut]);
 
   // Persist localStorage changes (anonymous mode only)
   const isFirstRender = useRef(true);
   useEffect(() => {
-    if (useConvex) return; // Convex handles persistence
+    if (useRemote) return; // remote service handles persistence
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
     saveVariantStore(storageKey, localStore);
-  }, [storageKey, localStore, useConvex]);
+  }, [storageKey, localStore, useRemote]);
 
-  // Build the effective store from Convex data when authenticated
+  // Build the effective store from remote service data when authenticated
   const store: VariantStore<T> =
-    useConvex && convexVariants
+    useRemote && remoteVariants
       ? {
-          activeId: convexVariants.find((v) => v.isActive)?.variantId ?? null,
-          variants: convexVariants.map((v) => ({
+          activeId:
+            remoteVariants.find((v: any) => v.isActive)?.variantId ?? null,
+          variants: remoteVariants.map((v: any) => ({
             id: v.variantId,
             name: v.name,
             slug: v.slug,
@@ -257,7 +258,7 @@ export function useVariants<T>(
         updatedAt: now,
       };
 
-      if (useConvex && toolKey) {
+      if (useRemote && toolKey) {
         upsertVariant({
           toolKey,
           variantId: variant.id,
@@ -275,12 +276,12 @@ export function useVariants<T>(
       }));
       return variant;
     },
-    [useConvex, toolKey, upsertVariant],
+    [useRemote, toolKey, upsertVariant],
   );
 
   const saveToActive = useCallback(
     (settings: T) => {
-      if (useConvex && toolKey) {
+      if (useRemote && toolKey) {
         const active = store.variants.find((v) => v.id === store.activeId);
         if (active) {
           upsertVariant({
@@ -306,12 +307,12 @@ export function useVariants<T>(
         };
       });
     },
-    [useConvex, toolKey, upsertVariant, store.variants, store.activeId],
+    [useRemote, toolKey, upsertVariant, store.variants, store.activeId],
   );
 
   const deleteVariant = useCallback(
     (id: string) => {
-      if (useConvex && toolKey) {
+      if (useRemote && toolKey) {
         removeVariant({ toolKey, variantId: id }).catch((err) =>
           console.error("[useVariants] delete sync failed:", err),
         );
@@ -321,12 +322,12 @@ export function useVariants<T>(
         variants: prev.variants.filter((v) => v.id !== id),
       }));
     },
-    [useConvex, toolKey, removeVariant],
+    [useRemote, toolKey, removeVariant],
   );
 
   const renameVariant = useCallback(
     (id: string, name: string) => {
-      if (useConvex && toolKey) {
+      if (useRemote && toolKey) {
         renameVariantMut({ toolKey, variantId: id, name }).catch((err) =>
           console.error("[useVariants] rename sync failed:", err),
         );
@@ -338,24 +339,24 @@ export function useVariants<T>(
         ),
       }));
     },
-    [useConvex, toolKey, renameVariantMut],
+    [useRemote, toolKey, renameVariantMut],
   );
 
   const setActive = useCallback(
     (id: string | null) => {
-      if (useConvex && toolKey) {
+      if (useRemote && toolKey) {
         setActiveMut({ toolKey, variantId: id ?? undefined }).catch((err) =>
           console.error("[useVariants] setActive sync failed:", err),
         );
       }
       setLocalStore((prev) => ({ ...prev, activeId: id }));
     },
-    [useConvex, toolKey, setActiveMut],
+    [useRemote, toolKey, setActiveMut],
   );
 
   const setVariantSlug = useCallback(
     (id: string, slug: string) => {
-      if (useConvex && toolKey) {
+      if (useRemote && toolKey) {
         const variant = store.variants.find((v) => v.id === id);
         if (variant) {
           upsertVariant({
@@ -375,7 +376,7 @@ export function useVariants<T>(
         variants: prev.variants.map((v) => (v.id === id ? { ...v, slug } : v)),
       }));
     },
-    [useConvex, toolKey, upsertVariant, store.variants, store.activeId],
+    [useRemote, toolKey, upsertVariant, store.variants, store.activeId],
   );
 
   return {

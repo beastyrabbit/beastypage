@@ -10,7 +10,7 @@ import {
 import { createdUpdated, legacyColumns, primaryId } from "./columns";
 
 /**
- * `token_identifier` keeps the Convex/Clerk format `<issuer>|<subject>` so
+ * `token_identifier` keeps the PostgreSQL/Clerk format `<issuer>|<subject>` so
  * owner columns and admin allowlists carry over unchanged (ADR §9).
  */
 export const users = pgTable(
@@ -21,7 +21,7 @@ export const users = pgTable(
     tokenIdentifier: text("token_identifier").notNull(),
     username: text("username"),
     // Usernames are ASCII [A-Za-z0-9_-], so lower() matches JS toLowerCase().
-    // Generated, which retires the Convex username-search backfill cron.
+    // Generated, which retires the PostgreSQL username-search backfill cron.
     usernameSearch: text("username_search").generatedAlwaysAs(
       sql`nullif(lower(btrim(username)), '')`,
     ),

@@ -1,7 +1,5 @@
 "use client";
 
-import type { FunctionReturnType } from "convex/server";
-import { api } from "@/convex/_generated/api";
 import { fetchJson } from "@/lib/api";
 import { useDataMutation, useDataQuery } from "./hooks";
 import { dataQueryKeys } from "./keys";
@@ -18,48 +16,33 @@ const patch = <T>(url: string, body?: unknown) =>
 
 export function useUserViewer() {
   return useDataQuery(
-    api.users.viewer,
     {},
     {
       queryKey: dataQueryKeys.query("users.viewer"),
       queryFn: (_, signal) =>
-        get<FunctionReturnType<typeof api.users.viewer>>(
-          "/api/users/viewer",
-          signal,
-          { nullable: true },
-        ),
+        get<any>("/api/users/viewer", signal, { nullable: true }),
     },
   );
 }
 
 export function useEnsureUser() {
-  return useDataMutation(api.users.getOrCreateUser, {
-    mutationFn: () =>
-      post<FunctionReturnType<typeof api.users.getOrCreateUser>>(
-        "/api/users/ensure",
-      ),
+  return useDataMutation({
+    mutationFn: () => post<any>("/api/users/ensure"),
     // The viewer may have cached `null` before the user row existed.
     invalidate: [dataQueryKeys.query("users.viewer")],
   });
 }
 
 export function useUpdateUserProfile() {
-  return useDataMutation(api.users.updateProfile, {
-    mutationFn: (args) =>
-      patch<FunctionReturnType<typeof api.users.updateProfile>>(
-        "/api/users/profile",
-        args,
-      ),
+  return useDataMutation({
+    mutationFn: (args) => patch<any>("/api/users/profile", args),
     invalidate: [dataQueryKeys.query("users.viewer")],
   });
 }
 
 export function useResetSavedVariants() {
-  return useDataMutation(api.users.resetSavedVariants, {
-    mutationFn: () =>
-      post<FunctionReturnType<typeof api.users.resetSavedVariants>>(
-        "/api/users/reset-variants",
-      ),
+  return useDataMutation({
+    mutationFn: () => post<any>("/api/users/reset-variants"),
     invalidate: [
       dataQueryKeys.query("userVariants.listAll"),
       dataQueryKeys.list("userVariants"),
@@ -68,47 +51,32 @@ export function useResetSavedVariants() {
 }
 
 export function useRegenerateUserApiKey() {
-  return useDataMutation(api.users.regenerateApiKey, {
-    mutationFn: () =>
-      post<FunctionReturnType<typeof api.users.regenerateApiKey>>(
-        "/api/users/api-key",
-      ),
+  return useDataMutation({
+    mutationFn: () => post<any>("/api/users/api-key"),
     invalidate: [dataQueryKeys.query("users.viewer")],
   });
 }
 
 export function useUserVariants(toolKey?: string, enabled = true) {
   const args = toolKey ? { toolKey } : {};
-  return useDataQuery(
-    api.userVariants.list,
-    (toolKey ? args : "skip") as never,
-    {
-      queryKey: dataQueryKeys.list("userVariants", args),
-      queryFn: (_, signal) => {
-        const toolParam = toolKey
-          ? `?toolKey=${encodeURIComponent(toolKey)}`
-          : "";
-        return get<FunctionReturnType<typeof api.userVariants.list>>(
-          `/api/user-variants${toolParam}`,
-          signal,
-        );
-      },
-      enabled,
+  return useDataQuery((toolKey ? args : "skip") as never, {
+    queryKey: dataQueryKeys.list("userVariants", args),
+    queryFn: (_, signal) => {
+      const toolParam = toolKey
+        ? `?toolKey=${encodeURIComponent(toolKey)}`
+        : "";
+      return get<any>(`/api/user-variants${toolParam}`, signal);
     },
-  );
+    enabled,
+  });
 }
 
 export function useAllUserVariants(enabled = true) {
   return useDataQuery(
-    api.userVariants.listAll,
     {},
     {
       queryKey: dataQueryKeys.query("userVariants.listAll"),
-      queryFn: (_, signal) =>
-        get<FunctionReturnType<typeof api.userVariants.listAll>>(
-          "/api/user-variants",
-          signal,
-        ),
+      queryFn: (_, signal) => get<any>("/api/user-variants", signal),
       enabled,
     },
   );
@@ -120,74 +88,51 @@ function variantMutation(operation: string) {
 }
 
 export const useUpsertUserVariant = () =>
-  useDataMutation(api.userVariants.upsert, {
-    mutationFn: (args) =>
-      variantMutation("upsert")(args) as Promise<
-        FunctionReturnType<typeof api.userVariants.upsert>
-      >,
+  useDataMutation({
+    mutationFn: (args) => variantMutation("upsert")(args) as Promise<any>,
     invalidate: [
       dataQueryKeys.query("userVariants.listAll"),
       dataQueryKeys.list("userVariants"),
     ],
   });
 export const useRemoveUserVariant = () =>
-  useDataMutation(api.userVariants.remove, {
-    mutationFn: (args) =>
-      variantMutation("remove")(args) as Promise<
-        FunctionReturnType<typeof api.userVariants.remove>
-      >,
+  useDataMutation({
+    mutationFn: (args) => variantMutation("remove")(args) as Promise<any>,
     invalidate: [
       dataQueryKeys.query("userVariants.listAll"),
       dataQueryKeys.list("userVariants"),
     ],
   });
 export const useImportUserVariants = () =>
-  useDataMutation(api.userVariants.importBatch, {
-    mutationFn: (args) =>
-      variantMutation("importBatch")(args) as Promise<
-        FunctionReturnType<typeof api.userVariants.importBatch>
-      >,
+  useDataMutation({
+    mutationFn: (args) => variantMutation("importBatch")(args) as Promise<any>,
     invalidate: [
       dataQueryKeys.query("userVariants.listAll"),
       dataQueryKeys.list("userVariants"),
     ],
   });
 export const useRenameUserVariant = () =>
-  useDataMutation(api.userVariants.rename, {
-    mutationFn: (args) =>
-      variantMutation("rename")(args) as Promise<
-        FunctionReturnType<typeof api.userVariants.rename>
-      >,
+  useDataMutation({
+    mutationFn: (args) => variantMutation("rename")(args) as Promise<any>,
     invalidate: [
       dataQueryKeys.query("userVariants.listAll"),
       dataQueryKeys.list("userVariants"),
     ],
   });
 export const useSetActiveUserVariant = () =>
-  useDataMutation(api.userVariants.setActive, {
-    mutationFn: (args) =>
-      variantMutation("setActive")(args) as Promise<
-        FunctionReturnType<typeof api.userVariants.setActive>
-      >,
+  useDataMutation({
+    mutationFn: (args) => variantMutation("setActive")(args) as Promise<any>,
     invalidate: [dataQueryKeys.query("userVariants.listAll")],
   });
 
 export function useDiscordChallenge() {
-  return useDataMutation(api.discord.issueChallenge, {
-    mutationFn: () =>
-      post<FunctionReturnType<typeof api.discord.issueChallenge>>(
-        "/api/discord/challenge",
-        {},
-      ),
+  return useDataMutation({
+    mutationFn: () => post<any>("/api/discord/challenge", {}),
   });
 }
 
 export function useRedeemDiscordChallenge() {
-  return useDataMutation(api.discord.redeemChallenge, {
-    mutationFn: (args) =>
-      post<FunctionReturnType<typeof api.discord.redeemChallenge>>(
-        "/api/discord/challenge",
-        args,
-      ),
+  return useDataMutation({
+    mutationFn: (args) => post<any>("/api/discord/challenge", args),
   });
 }

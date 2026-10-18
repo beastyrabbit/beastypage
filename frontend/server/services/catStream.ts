@@ -1,10 +1,6 @@
 import "server-only";
 
 import { timingSafeEqual } from "node:crypto";
-import {
-  buildStreamWheelUpdate,
-  pickStreamWheelSpin,
-} from "../../convex/streamWheel";
 import type { Identity } from "../auth/identity";
 import { catStreamCommand, catStreamSettings } from "../db/contracts";
 import type { Database } from "../db/pool";
@@ -28,6 +24,7 @@ import {
   getUserByApiKey,
   getUserByTokenIdentifier,
 } from "../repositories/users";
+import { buildStreamWheelUpdate, pickStreamWheelSpin } from "./streamWheel";
 import { findUserByApiKey } from "./users";
 
 export const VERDICT_MS = 3_000;

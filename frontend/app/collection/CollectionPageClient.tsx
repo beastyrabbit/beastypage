@@ -7,9 +7,8 @@ import ExternalLinkIcon from "@/components/ui/external-link-icon";
 import MagnifierIcon from "@/components/ui/magnifier-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import XIcon from "@/components/ui/x-icon";
-import type { CollectionEntry } from "@/convex/collection";
-import { CONVEX_HTTP_URL } from "@/lib/convexClient";
 import { useCatalogCollectionPage } from "@/lib/data/catalog";
+import type { CollectionPayload as CollectionEntry } from "@/server/services/catalog";
 
 export default function CollectionPage() {
   const {
@@ -220,7 +219,7 @@ export default function CollectionPage() {
 
       <footer className="rounded-2xl border border-white/5 bg-white/5 p-6 text-xs text-muted-foreground text-center">
         Committing the export archive keeps deployments deterministic: bring up
-        a fresh Convex instance, run the seed mutation, and these assets are
+        a fresh PostgreSQL instance, run the seed mutation, and these assets are
         instantly ready for LAN or production environments.
       </footer>
 
@@ -363,7 +362,7 @@ function absoluteUrl(url?: string | null): string | null {
   if (/^https?:\/\//i.test(url)) {
     try {
       const parsed = new URL(url);
-      const preferred = new URL(CONVEX_HTTP_URL);
+      const preferred = new URL(window.location.origin);
       if (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") {
         parsed.protocol = preferred.protocol;
         parsed.host = preferred.host;
@@ -374,7 +373,7 @@ function absoluteUrl(url?: string | null): string | null {
     }
   }
   if (url.startsWith("/api/files/")) return url;
-  const base = CONVEX_HTTP_URL.replace(/\/$/, "");
+  const base = window.location.origin.replace(/\/$/, "");
   if (url.startsWith("/")) return `${base}${url}`;
   return `${base}/${url}`;
 }

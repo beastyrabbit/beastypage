@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { parseSearchParams } from "@/server/request";
@@ -9,12 +8,6 @@ import { listCatdexForOwner } from "@/server/services/catalog";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  if (dataBackend() !== "postgres") {
-    return NextResponse.json(
-      { error: "Not found", code: "not_found" },
-      { status: 404 },
-    );
-  }
   try {
     const params = parseSearchParams(
       request.nextUrl.searchParams,

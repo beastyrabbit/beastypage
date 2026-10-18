@@ -27,8 +27,6 @@ import FilledCheckedIcon from "@/components/ui/filled-checked-icon";
 import RefreshIcon from "@/components/ui/refresh-icon";
 import SparklesIcon from "@/components/ui/sparkles-icon";
 import UsersIcon from "@/components/ui/users-icon";
-import type { api } from "@/convex/_generated/api";
-import { toId } from "@/convex/utils";
 import { track } from "@/lib/analytics";
 import { catDataToLegacyPersistence } from "@/lib/cat-system";
 import { useBackendAuth } from "@/lib/data";
@@ -53,9 +51,8 @@ import {
 } from "@/lib/streamer/steps";
 import { cn } from "@/lib/utils";
 
-type SessionListItem = (typeof api.streamSessionsV2.list._returnType)[number];
-type ParticipantRecord =
-  (typeof api.streamParticipantsV2.list._returnType)[number];
+type SessionListItem = any;
+type ParticipantRecord = any;
 
 type LockedEntry = {
   step_id?: string;
@@ -350,7 +347,7 @@ function AuthenticatedHostClient() {
 
   const sessionArgs = useMemo(() => {
     if (!activeSessionId) return "skip" as const;
-    return { id: toId("stream_sessions", activeSessionId) } as const;
+    return { id: activeSessionId } as const;
   }, [activeSessionId]);
 
   const session = useStreamSessionForHost(sessionArgs);
@@ -383,7 +380,7 @@ function AuthenticatedHostClient() {
   const votesArgs = useMemo(() => {
     if (!activeSessionId || !session) return "skip" as const;
     return {
-      session: toId("stream_sessions", activeSessionId),
+      session: activeSessionId,
       stepId: currentStepId ?? undefined,
       limit: 500,
     } as const;
@@ -395,7 +392,7 @@ function AuthenticatedHostClient() {
   const participantsArgs = useMemo(() => {
     if (!activeSessionId || !session) return "skip" as const;
     return {
-      session: toId("stream_sessions", activeSessionId),
+      session: activeSessionId,
       limit: 200,
     } as const;
   }, [activeSessionId, session]);
@@ -606,7 +603,7 @@ function AuthenticatedHostClient() {
     [voteRows],
   );
   const activeParticipantCount = participants.filter(
-    (p) => (p.status ?? "active").toLowerCase() === "active",
+    (p: any) => (p.status ?? "active").toLowerCase() === "active",
   ).length;
 
   const leaderOption = useMemo(() => {
@@ -723,7 +720,7 @@ function AuthenticatedHostClient() {
       }));
       try {
         await updateSession({
-          id: toId("stream_sessions", activeSessionId),
+          id: activeSessionId,
           params,
           allowedOptions:
             createStreamSteps({ params })
@@ -784,7 +781,7 @@ function AuthenticatedHostClient() {
 
     try {
       await updateSession({
-        id: toId("stream_sessions", activeSessionId),
+        id: activeSessionId,
         allowRepeatIps: nextValue,
         params: paramsForUpdate,
       });
@@ -806,7 +803,7 @@ function AuthenticatedHostClient() {
       if (!session || !activeSessionId || !currentStep) return;
       try {
         await createVote({
-          sessionId: toId("stream_sessions", activeSessionId),
+          sessionId: activeSessionId,
           stepId: currentStep.id,
           optionKey: option.key,
           voteRound: session.vote_round,
@@ -887,7 +884,7 @@ function AuthenticatedHostClient() {
         setPending(true);
         setLocalState({ params: draftParams, history: updatedHistory });
         await updateSession({
-          id: toId("stream_sessions", activeSessionId),
+          id: activeSessionId,
           params: draftParams,
           stepHistory: updatedHistory,
           stepIndex: Math.max(nextStepIndex, 0),
@@ -996,7 +993,7 @@ function AuthenticatedHostClient() {
     if (!voteSent && currentStep && activeSessionId) {
       try {
         await createVote({
-          sessionId: toId("stream_sessions", activeSessionId),
+          sessionId: activeSessionId,
           stepId: currentStep.id,
           optionKey: winnerRow.option.key,
           voteRound: session?.vote_round,
@@ -1108,7 +1105,7 @@ function AuthenticatedHostClient() {
     try {
       setPending(true);
       await completeSession({
-        id: toId("stream_sessions", activeSessionId),
+        id: activeSessionId,
         status: "completed",
         params: session.params ?? {},
       });
@@ -1174,7 +1171,7 @@ function AuthenticatedHostClient() {
         } as StreamParams & Record<string, unknown>;
 
         await updateSession({
-          id: toId("stream_sessions", activeSessionId),
+          id: activeSessionId,
           status: "completed",
           params: updatedParams,
           stepHistory: historyCopy,
@@ -1225,7 +1222,7 @@ function AuthenticatedHostClient() {
     async (participant: ParticipantRecord, status: "active" | "kicked") => {
       try {
         await updateParticipant({
-          id: toId("stream_participants", participant.id),
+          id: participant.id,
           status,
         });
       } catch (error) {
@@ -1757,7 +1754,7 @@ function AuthenticatedHostClient() {
               </p>
             ) : (
               <ul className="divide-y divide-border/40 text-sm">
-                {participants.map((participant) => {
+                {participants.map((participant: any) => {
                   const status = (participant.status ?? "active").toLowerCase();
                   return (
                     <li
@@ -1814,7 +1811,7 @@ function AuthenticatedHostClient() {
               </p>
             ) : (
               <ul className="divide-y divide-border/40 text-sm">
-                {sessionListResolved.map((item) => (
+                {sessionListResolved.map((item: any) => (
                   <li
                     key={item.id}
                     className="flex items-center justify-between gap-3 px-4 py-3"

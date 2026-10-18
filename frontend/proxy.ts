@@ -4,7 +4,6 @@ import {
   type NextRequest,
   NextResponse,
 } from "next/server";
-import { dataBackend } from "./server/backend";
 
 const DEFAULT_REDIRECT = normalizeRoute(process.env.NEXT_ENTRY_REDIRECT);
 const HOST_ROUTE_MAP = parseHostMap(process.env.NEXT_ENTRY_HOST_MAP);
@@ -84,14 +83,11 @@ export function routeRequest(request: NextRequest) {
 }
 
 // Route handlers read the Clerk session with auth(), which needs Clerk's
-// middleware (ADR §9). Convex validates Clerk tokens itself, so the Convex
-// backend keeps the proxy exactly as it was.
+// middleware (ADR §9).
 const withClerk = clerkMiddleware((_auth, request) => routeRequest(request));
 
 export function proxy(request: NextRequest, event: NextFetchEvent) {
-  return dataBackend() === "postgres"
-    ? withClerk(request, event)
-    : routeRequest(request);
+  return withClerk(request, event);
 }
 
 export const config = {

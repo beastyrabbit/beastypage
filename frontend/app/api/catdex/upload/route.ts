@@ -3,7 +3,6 @@ import {
   RequestBodyTooLargeError,
   readRequestBytes,
 } from "@/app/api/_lib/request-body";
-import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { errorResponse } from "@/server/http";
 import { storeAndAttachCatdexUpload } from "@/server/services/catalog";
@@ -88,7 +87,6 @@ function knownUploadError(error: unknown): NextResponse | null {
 }
 
 export async function POST(request: NextRequest) {
-  if (dataBackend() !== "postgres") return json({ error: "NOT_FOUND" }, 404);
   const validated = validateUploadRequest(request);
   if (validated instanceof NextResponse) return validated;
   try {

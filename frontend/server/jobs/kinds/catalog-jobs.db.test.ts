@@ -171,7 +171,7 @@ describe("catalog jobs against PostgreSQL", () => {
     ).rejects.toBe(rollback);
   });
 
-  it("generates JPEG thumbnails once per cat and keeps the Convex 256px bound", async () => {
+  it("generates JPEG thumbnails once per cat and keeps the PostgreSQL 256px bound", async () => {
     const bytes = await sharp({
       create: {
         width: 512,

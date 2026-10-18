@@ -18,7 +18,6 @@ const anonymous = { tokenIdentifier: null };
 let route: typeof import("./route");
 
 beforeAll(async () => {
-  process.env.DATA_BACKEND = "postgres";
   process.env.DATABASE_URL = inject("databaseUrl");
   getRequestIdentity.mockResolvedValue(owner);
   route = await import("./route");
