@@ -12,6 +12,10 @@ function shouldStartJobs(
 }
 
 export async function register() {
+  // Next replaces this literal at build time, which drops the worker from the
+  // Edge instrumentation bundle. Do not move it into shouldStartJobs: the
+  // running server has no NEXT_RUNTIME environment variable.
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (!shouldStartJobs()) return;
   const globals = globalThis as typeof globalThis & {
     __beastypageJobWorker?: Promise<{ stop(): Promise<void> }>;
