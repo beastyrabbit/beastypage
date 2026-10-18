@@ -34,7 +34,7 @@ type ModerationUpload = {
   failureMessage: string | null;
 };
 
-function Preview({ upload }: { upload: ModerationUpload }) {
+function Preview({ upload }: Readonly<{ upload: ModerationUpload }>) {
   const box =
     "flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-black/40";
   if (!upload.previewUrl) {
