@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import {
   Ban,
   Download,
+  ImageOff,
   LoaderCircle,
   RefreshCw,
   Search,
@@ -20,6 +21,7 @@ type ModerationUpload = {
   originalName: string;
   originalSize: number;
   state: string;
+  publicMime: string | null;
   rawIp: string;
   ipHash: string;
   publicExpiresAt: number;
@@ -27,9 +29,50 @@ type ModerationUpload = {
   createdAt: number;
   url: string;
   originalDownloadUrl: string;
+  previewUrl?: string | null;
   ownerTokenIdentifier: string | null;
   failureMessage: string | null;
 };
+
+function Preview({ upload }: Readonly<{ upload: ModerationUpload }>) {
+  const box =
+    "flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-black/40";
+  if (!upload.previewUrl) {
+    return (
+      <div className={box} title="No preview available">
+        <ImageOff className="size-4 text-muted-foreground" />
+      </div>
+    );
+  }
+  return (
+    <a
+      href={upload.previewUrl}
+      target="_blank"
+      rel="noreferrer"
+      className={box}
+      aria-label={`Open preview of ${upload.slug}`}
+    >
+      {upload.publicMime?.startsWith("video/") ? (
+        <video
+          src={upload.previewUrl}
+          muted
+          playsInline
+          preload="metadata"
+          className="size-full object-cover"
+        />
+      ) : (
+        // biome-ignore lint/performance/noImgElement: signed media-service URL
+        <img
+          src={upload.previewUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="size-full object-cover"
+        />
+      )}
+    </a>
+  );
+}
 
 function formatBytes(bytes: number) {
   const mib = bytes / (1024 * 1024);
@@ -217,17 +260,23 @@ export function QuickShareModerationClient() {
               {uploads.map((upload) => (
                 <tr key={upload.id} className="align-top">
                   <td className="max-w-xs px-4 py-4">
-                    <a
-                      href={upload.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium hover:underline"
-                    >
-                      {upload.slug}
-                    </a>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">
-                      {upload.originalName} · {formatBytes(upload.originalSize)}
-                    </p>
+                    <div className="flex items-start gap-3">
+                      <Preview upload={upload} />
+                      <div className="min-w-0">
+                        <a
+                          href={upload.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-medium hover:underline"
+                        >
+                          {upload.slug}
+                        </a>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {upload.originalName} ·{" "}
+                          {formatBytes(upload.originalSize)}
+                        </p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-4 font-mono text-xs">
                     {upload.rawIp}

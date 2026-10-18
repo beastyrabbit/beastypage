@@ -144,6 +144,50 @@ function grantSignature(value: string, key: string) {
 	return hmac(`grant:${value}`, key);
 }
 
+const PREVIEW_GRANT_MS = 15 * 60_000;
+
+const previewGrantSchema = z.object({
+	uploadId: z.string().min(1),
+	key: z.string().min(1),
+	mime: z.string().min(1).max(150),
+	expiresAt: z.number().int().positive(),
+});
+
+function previewSignature(value: string, key: string) {
+	return hmac(`preview:${value}`, key);
+}
+
+// Only the same media the public link would serve: sanitized image
+// derivatives and validated videos, never a raw image original.
+function previewable(key: string, mime: string) {
+	return (
+		mime.startsWith("video/") ||
+		(mime.startsWith("image/") && key.startsWith("derivatives/"))
+	);
+}
+
+function previewUrl(upload: AdminUpload, hmacKey: string) {
+	if (
+		upload.state !== "ready" ||
+		!upload.publicKey ||
+		!upload.publicMime ||
+		!previewable(upload.publicKey, upload.publicMime)
+	) {
+		return null;
+	}
+	const grant = Buffer.from(
+		JSON.stringify({
+			uploadId: upload.id,
+			key: upload.publicKey,
+			mime: upload.publicMime,
+			expiresAt: Date.now() + PREVIEW_GRANT_MS,
+		}),
+	).toString("base64url");
+	return `/i/api/admin/uploads/${upload.id}/preview?grant=${encodeURIComponent(
+		grant,
+	)}&signature=${encodeURIComponent(previewSignature(grant, hmacKey))}`;
+}
+
 function safeName(value: string) {
 	return (
 		Array.from(value)
@@ -655,6 +699,7 @@ export function createApp(
 			uploads.map((upload) => ({
 				...withLink(upload, config),
 				originalDownloadUrl: `/i/api/admin/uploads/${upload.id}/original-link`,
+				previewUrl: previewUrl(upload, config.hmacKey),
 			})),
 		);
 	});
@@ -719,6 +764,50 @@ export function createApp(
 					downloadGrant.name,
 				)}`,
 				"cache-control": "private, no-store",
+				"x-content-type-options": "nosniff",
+				"x-robots-tag": "noindex, noarchive, nosnippet",
+			},
+		});
+	});
+
+	app.get("/i/api/admin/uploads/:id/preview", async (c) => {
+		const grant = c.req.query("grant");
+		const signature = c.req.query("signature");
+		if (
+			!grant ||
+			!signature ||
+			!safeEqual(previewSignature(grant, config.hmacKey), signature)
+		) {
+			return c.json({ error: "Preview link is invalid or expired" }, 403);
+		}
+		let previewGrant: z.infer<typeof previewGrantSchema>;
+		try {
+			previewGrant = previewGrantSchema.parse(
+				JSON.parse(Buffer.from(grant, "base64url").toString("utf8")),
+			);
+		} catch {
+			return c.json({ error: "Preview link is invalid or expired" }, 403);
+		}
+		const now = Date.now();
+		if (
+			previewGrant.uploadId !== c.req.param("id") ||
+			previewGrant.expiresAt < now ||
+			previewGrant.expiresAt > now + PREVIEW_GRANT_MS + 30_000 ||
+			!previewable(previewGrant.key, previewGrant.mime)
+		) {
+			return c.json({ error: "Preview link is invalid or expired" }, 403);
+		}
+		const object = await store.get(previewGrant.key, c.req.header("range"));
+		return new Response(object.body, {
+			status: object.contentRange ? 206 : 200,
+			headers: {
+				"content-type": previewGrant.mime,
+				"content-length": String(object.contentLength),
+				...(object.contentRange
+					? { "content-range": object.contentRange }
+					: {}),
+				"accept-ranges": "bytes",
+				"cache-control": "private, max-age=600",
 				"x-content-type-options": "nosniff",
 				"x-robots-tag": "noindex, noarchive, nosnippet",
 			},

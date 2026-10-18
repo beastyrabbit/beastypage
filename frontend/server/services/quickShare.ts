@@ -160,6 +160,7 @@ function adminUpload(
     ipHash: upload.ipHash,
     ownerTokenIdentifier: upload.ownerTokenIdentifier,
     originalKey: upload.originalKey,
+    publicKey: upload.publicKey,
   };
 }
 
