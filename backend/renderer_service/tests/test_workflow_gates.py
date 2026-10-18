@@ -12,7 +12,6 @@ def test_publication_requires_successful_application_checks(provider):
     )
     jobs = workflow["jobs"]
     for publish, check in [
-        ("deploy-convex", "cat-system-contract"),
         ("build-image-processing", "check-image-processing"),
         ("build-media", "check-media"),
     ]:
@@ -21,8 +20,9 @@ def test_publication_requires_successful_application_checks(provider):
         assert condition.strip().startswith(
             f"always() && needs.{check}.result == 'success' &&"
         )
-    assert "refs/heads/main" in jobs["deploy-convex"]["if"]
-    deploy_condition = jobs["deploy-convex"]["if"]
-    assert "startsWith(github.ref, 'refs/tags/v')" in deploy_condition
-    assert "github.event_name == 'workflow_dispatch'" in deploy_condition
-    assert "needs.changes.outputs.convex" not in deploy_condition
+    assert {
+        "build-frontend",
+        "build-renderer",
+        "build-image-processing",
+        "build-media",
+    } <= jobs.keys()

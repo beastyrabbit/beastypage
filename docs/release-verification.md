@@ -12,4 +12,4 @@ For a release `X.Y.Z`:
 
 When a release changes the generated cat-system hash, build frontend, renderer, and Discord from the same tag and verify their reported hashes before switching traffic. Keep the previous stack available until external smoke checks pass. Never suppress a catalog mismatch.
 
-Production delivery remains an explicit, approved release action. Merging a pull request does not deploy the Convex backend or push a version tag.
+Production delivery remains an explicit, approved release action. Merging a pull request does not deploy production PostgreSQL workloads or push a version tag.

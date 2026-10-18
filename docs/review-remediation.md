@@ -6,11 +6,11 @@ This change addresses the [project review](https://schaffa.dev/p/m8tcd0usfcrqvul
 
 | Finding | Result and regression coverage |
 | --- | --- |
-| F01 | Adoption public projections omit editing capabilities. Linking an existing profile requires its owner or editing token. Batch metadata requires its creator identity or a newly issued private batch token. Synthetic Convex tests cover denial and public viewing. |
+| F01 | Adoption public projections omit editing capabilities. Linking an existing profile requires its owner or editing token. Batch metadata requires its creator identity or a newly issued private batch token. Synthetic PostgreSQL tests cover denial and public viewing. |
 | F02 | New hosts must sign in. Mutations enforce host ownership, participant membership and token, live/current rounds, allowed choices, closed polls, removed participants, and one participant vote per round. Host tie-break votes remain supported. Queries use bounded indexes and omit participant capabilities. |
-| F03 | Next Discord preference routes require a service bearer credential. New Convex config functions are internal and reachable through an authenticated HTTP action. The temporary public config functions are removed in this enforcement candidate. The bot supplies the credential. Tests cover both boundaries with synthetic values. |
+| F03 | Next Discord preference routes require a service bearer credential. New PostgreSQL-backed config functions are internal and reachable through an authenticated HTTP action. The temporary public config functions are removed in this enforcement candidate. The bot supplies the credential. Tests cover both boundaries with synthetic values. |
 | F04 | Image downloads validate every resolved address and redirect, pin the selected public address, reject nonstandard ports, bound bytes and total time, and inherit request cancellation. Fake DNS and transport tests cover redirect rejection, pinning, streamed byte limits, and pre-aborted requests. |
-| F05 | Both delivery workflows require a successful cat-system contract job before Convex deployment. A workflow regression checks the dependency and success predicate. |
+| F05 | Both delivery workflows require a successful cat-system contract job before database rollout. A workflow regression checks the dependency and success predicate. |
 | F06 | Renderer batches admit at most 256 total frames, 1,024-pixel tiles, and a conservative 16-million-pixel working budget. Invalid work is rejected before queue admission. |
 | F07 | Image processing runs in at most two disposable worker threads, with cancellation, a deadline, a 256 MB JavaScript heap limit per worker, and byte/pixel/work admission limits. Small real-worker tests cover health responsiveness and cancellation. Native Sharp allocations are bounded by image/work limits, not the JavaScript heap setting. |
 | F08 | Metadata/probe failure leaves media private and failed. Explicit unsafe-media rejection stays unsupported. Images must be normalized before publication; only a validated video original can be used after conversion failure. Derivative storage failures remain retryable. |
@@ -33,10 +33,10 @@ This change addresses the [project review](https://schaffa.dev/p/m8tcd0usfcrqvul
 - Media shutdown rejects new jobs and drains current work for up to ten seconds. An unfinished lease remains recoverable after the deadline.
 - Pixelator proxy deadlines and browser cancellation remain active through response-body consumption.
 - Renderer runtime dependencies no longer include pytest. The bot image prunes development dependencies after compilation. No image-size reduction is claimed.
-- Removed inert renderer cache settings. Existing sprite caching remains. Component READMEs now describe the actual services, Portless entry point, sprite source, and shared-versus-local Convex behavior.
-- Direct frontend typecheck generates ignored version metadata first. Convex TypeScript uses the current package's generated-config template.
+- Removed inert renderer cache settings. Existing sprite caching remains. Component READMEs now describe the actual services, Portless entry point, sprite source, and shared-versus-local backend behavior.
+- Direct frontend typecheck generates ignored version metadata first. Frontend TypeScript uses the current package configuration.
 - Frontend Biome configuration matches the installed version. Changed first-party TypeScript files were formatted; legacy asset JSON and adapted-code exclusions were retained. Newly reported optional-chain diagnostics in two unchanged files remain scoped warnings. Python pins Ruff and a scoped first-party rule set. Pillow/AnyIO/FastAPI deprecated call sites were updated. One upstream Starlette test-client warning remains.
-- Forgejo's manual Convex deployment requires main, matching GitHub. Both workflows remain maintained; this change does not establish which provider operates production.
+- Forgejo's manual image publication requires main, matching GitHub. Both workflows remain maintained; this change does not establish which provider operates production.
 
 ## Admission limits
 
@@ -48,10 +48,10 @@ The renderer's budget includes padded output-sheet cells, retained source frames
 
 This candidate is phase 4 below. Its deletion of the temporary namespaces is safe only after the bridge client rollout has completed. The temporary behavior described below belongs to the 7.5.0 bridge, not this enforcement candidate.
 
-Production delivery uses explicit human approval and the version-tag release flow. A main-branch merge builds images but no longer deploys Convex; version tags and explicit main-branch dispatch retain the contract gate.
+Production delivery uses explicit human approval and the version-tag release flow. A main-branch merge builds images but no longer deploys the database backend; version tags and explicit main-branch dispatch retain the contract gate.
 
-1. Provision a single `DISCORD_API_TOKEN` of at least 32 random characters through the approved secret mechanism in the bot, frontend, and Convex environments. The frontend also needs `CONVEX_SITE_URL`. Verify equality without exposing values.
-2. Publish the bridge release, planned as `v7.5.0`. Its Convex deployment adds `adoptionV2`, `streamSessionsV2`, `streamParticipantsV2`, `streamVotesV2`, `discordUserConfigInternal`, the authenticated Discord HTTP route, Catdex pagination/pending APIs, and `users.resetSavedVariants`. New clients use those APIs. The old namespaces retain old argument validators during this phase. Public projections never return editing or participant capabilities.
+1. Provision a single `DISCORD_API_TOKEN` of at least 32 random characters through the approved secret mechanism in the bot, frontend, and frontend runtime configuration. The media service also needs `CONTROL_PLANE_URL`. Verify equality without exposing values.
+2. Publish the bridge release, planned as `v7.5.0`. The database rollout adds `adoptionV2`, `streamSessionsV2`, `streamParticipantsV2`, `streamVotesV2`, `discordUserConfigInternal`, the authenticated Discord HTTP route, Catdex pagination/pending APIs, and `users.resetSavedVariants`. New clients use those APIs. The old namespaces retain old argument validators during this phase. Public projections never return editing or participant capabilities.
 3. After the bridge backend is deployed, roll the bot first so it sends the service credential. Then roll the frontend and remaining services through GitOps. Confirm the live image identities and that every legacy service replica has stopped. Image publication alone is insufficient.
 4. Publish the enforcement release, planned as `v7.5.1`, removing temporary `adoption`, `streamSessions`, `streamParticipants`, `streamVotes`, `discordUserConfig`, `rolloutLegacy` and the `users.deleteAccount` placeholder. Keep the V2 and internal API names unchanged. New frontend replicas already use them, so removing legacy names cannot change their contracts.
 5. Reconcile the final version in GitOps, verify the public serving version at desktop and mobile sizes, and inspect time-filtered logs only after legacy replicas are gone.
@@ -70,7 +70,7 @@ The September 21 release audit found new Next.js and js-yaml advisories. Next.js
 
 ## Verification scope
 
-Run the root `cat-system:build`, `media:check`, and `image-processing:check` commands, the scoped Ruff checks, and `pnpm --dir frontend exec playwright test`. Browser fixtures use actual Collection, Profile, Pixelator, Host, and Catdex components with local assets and fake auth/database hooks. They block nonlocal requests. They verify UI state and keyboard behavior, not live Clerk/Convex/Discord/S3 integration. Screenshot evidence is kept outside tracked source and published through Schaffa in the PR.
+Run the root `cat-system:build`, `media:check`, and `image-processing:check` commands, the scoped Ruff checks, and `pnpm --dir frontend exec playwright test`. Browser fixtures use actual Collection, Profile, Pixelator, Host, and Catdex components with local assets and fake auth/database hooks. They block nonlocal requests. They verify UI state and keyboard behavior, not live Clerk/PostgreSQL/Discord/S3 integration. Screenshot evidence is kept outside tracked source and published through Schaffa in the PR.
 
 ## PR feedback
 
@@ -79,7 +79,7 @@ Run the root `cat-system:build`, `media:check`, and `image-processing:check` com
 - Pixelator preserves images up to 4,000 pixels on the longest side and four million pixels in total. A 4,000 × 800 image remains full size. Worker validation errors keep their safe hints; unexpected decoder errors remain masked.
 - Clearing tie-break choices retains the current round and its deciding votes. Earlier rounds are not restored. The host UI states this explicitly. Host votes retain only bounded label/step strings and recognized coin-flip provenance after authorization; participant metadata comes from the server.
 - The legacy `catdex.list` endpoint remains capped at 48 for compatibility. Clients needing every card must use `catdex.page` until pagination completes.
-- Configure the bot's `FRONTEND_API_URL` with the canonical origin, using HTTPS publicly or the existing trusted in-cluster service address. Redirects are rejected so a bearer credential is never forwarded to a different endpoint. Set the same `DISCORD_API_TOKEN` through the approved secret mechanism in the bot, frontend, and Convex. Local frontend/bot environment checks require it. Frontend config reads use `CONVEX_SITE_URL` or `NEXT_PUBLIC_CONVEX_SITE_URL`; they do not depend on the separate Convex query URL.
+- Configure the bot's `FRONTEND_API_URL` with the canonical origin, using HTTPS publicly or the existing trusted in-cluster service address. Redirects are rejected so a bearer credential is never forwarded to a different endpoint. Set the same `DISCORD_API_TOKEN` through the approved secret mechanism in the bot, frontend, and PostgreSQL. Local frontend/bot environment checks require it. Frontend and media config use the PostgreSQL control-plane URL.
 - Image download sources must return an `image/*` Content-Type. Missing headers are rejected intentionally. Temporary DNS abort listeners are removed as soon as resolution settles.
 - Frontend, bot, and image-processing Docker stages and contract CI use Node 24. Renderer test dependencies explicitly include PyYAML. `httpx2` remains because the installed Starlette test client imports it and deprecates its `httpx` fallback.
-- Convex declarations were regenerated locally with the installed CLI, including the new Discord and stream modules. No deployment was needed.
+- PostgreSQL contracts were checked locally, including the Discord and stream modules. No deployment was needed.

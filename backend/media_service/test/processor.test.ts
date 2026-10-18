@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Config } from "../src/config.ts";
-import type { ConvexControlPlane } from "../src/convex.ts";
+import type { ControlPlane } from "../src/control-plane.ts";
 import type { ObjectStore } from "../src/objectStore.ts";
 import { MediaWorker, processOriginal } from "../src/processor.ts";
 import type { ClaimedJob } from "../src/types.ts";
@@ -126,7 +126,7 @@ it("drains an in-flight claim before shutdown and refuses new jobs", async () =>
 	const claim = new Promise<null>((resolve) => {
 		finishClaim = resolve;
 	});
-	const control = { call: vi.fn(() => claim) } as unknown as ConvexControlPlane;
+	const control = { call: vi.fn(() => claim) } as unknown as ControlPlane;
 	const worker = new MediaWorker(config, control, store);
 	const dispatch = worker.dispatch("fixture");
 	let drained = false;
