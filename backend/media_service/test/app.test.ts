@@ -581,7 +581,7 @@ describe("moderation previews", () => {
 		]);
 		const url = previews[0] as string;
 		expect(grantOf(url).expiresAt).toBe(retainedUntil);
-		vi.useFakeTimers({ now: retainedUntil + 1, toFake: ["Date"] });
+		vi.useFakeTimers({ now: retainedUntil, toFake: ["Date"] });
 		try {
 			expect((await app.request(url)).status).toBe(403);
 		} finally {

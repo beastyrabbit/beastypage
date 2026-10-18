@@ -795,7 +795,7 @@ export function createApp(
 		const now = Date.now();
 		if (
 			previewGrant.uploadId !== c.req.param("id") ||
-			previewGrant.expiresAt < now ||
+			previewGrant.expiresAt <= now ||
 			previewGrant.expiresAt > now + PREVIEW_GRANT_MS + 30_000 ||
 			!previewable(previewGrant.key, previewGrant.mime)
 		) {
