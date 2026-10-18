@@ -34,17 +34,18 @@ const filesOrphanCleanup: JobKindDefinition<z.infer<typeof payloadSchema>> = {
       table_name: string;
       column_name: string;
     }>(sql`
-      select tc.table_name, kcu.column_name
-      from information_schema.table_constraints tc
-      join information_schema.key_column_usage kcu
-        on kcu.constraint_name = tc.constraint_name
-       and kcu.table_schema = tc.table_schema
-      join information_schema.constraint_column_usage ccu
-        on ccu.constraint_name = tc.constraint_name
-       and ccu.table_schema = tc.table_schema
-      where tc.constraint_type = 'FOREIGN KEY'
-        and ccu.table_name = 'files'
-        and tc.table_schema = 'public'
+      -- pg_catalog, not information_schema: the latter only lists constraints
+      -- on tables the current role owns, and the app role owns none.
+      select rel.relname as table_name, att.attname as column_name
+      from pg_constraint con
+      join pg_class rel on rel.oid = con.conrelid
+      join pg_namespace ns on ns.oid = rel.relnamespace
+      join pg_attribute att
+        on att.attrelid = con.conrelid
+       and att.attnum = any (con.conkey)
+      where con.contype = 'f'
+        and con.confrelid = 'public.files'::regclass
+        and ns.nspname = 'public'
     `);
     const actual = new Set(
       fkRows.rows.map((row) => `${row.table_name}.${row.column_name}`),
