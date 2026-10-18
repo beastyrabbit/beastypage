@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const getRequestIdentity = vi.fn();
+const identityFromForwardedToken = vi.fn();
 const handleQuickShareOperation = vi.fn();
 vi.mock("@/server/auth/identity", () => ({
-  getRequestIdentity,
+  ANONYMOUS: { tokenIdentifier: null },
+  identityFromForwardedToken,
 }));
 vi.mock("@/server/db/client", () => ({
   getDb: () => ({}),
@@ -17,7 +18,7 @@ vi.mock("@/server/services/quickShare", () => ({
 describe("POST /api/internal/quick-share", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
-    getRequestIdentity.mockReset();
+    identityFromForwardedToken.mockReset();
     handleQuickShareOperation.mockReset();
   });
 
@@ -55,7 +56,6 @@ describe("POST /api/internal/quick-share", () => {
   it("returns the policy through the PostgreSQL route", async () => {
     vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
-    getRequestIdentity.mockResolvedValue({ tokenIdentifier: null });
     handleQuickShareOperation.mockResolvedValue({
       status: 200,
       body: { tier: "anonymous", chunkBytes: 16 * 1024 * 1024 },
@@ -81,7 +81,6 @@ describe("POST /api/internal/quick-share", () => {
   it("accepts the internal token as a bearer credential", async () => {
     vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
-    getRequestIdentity.mockResolvedValue({ tokenIdentifier: null });
     handleQuickShareOperation.mockResolvedValue({
       status: 200,
       body: { tier: "anonymous" },
@@ -99,6 +98,50 @@ describe("POST /api/internal/quick-share", () => {
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ tier: "anonymous" });
+  });
+
+  it("never treats the internal bearer credential as a user token", async () => {
+    vi.stubEnv("DATA_BACKEND", "postgres");
+    vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
+    handleQuickShareOperation.mockResolvedValue({ status: 200, body: {} });
+    const { POST } = await import("./route");
+    await POST(
+      new NextRequest("http://localhost/api/internal/quick-share", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer internal-token",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ op: "policy" }),
+      }),
+    );
+    expect(identityFromForwardedToken).not.toHaveBeenCalled();
+    expect(handleQuickShareOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      "policy",
+      expect.anything(),
+      { tokenIdentifier: null },
+    );
+  });
+
+  it("rejects an invalid forwarded user token", async () => {
+    vi.stubEnv("DATA_BACKEND", "postgres");
+    vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
+    identityFromForwardedToken.mockRejectedValue(new Error("expired"));
+    const { POST } = await import("./route");
+    const response = await POST(
+      new NextRequest("http://localhost/api/internal/quick-share", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer stale-user-token",
+          "content-type": "application/json",
+          "x-quick-share-internal-token": "internal-token",
+        },
+        body: JSON.stringify({ op: "adminList" }),
+      }),
+    );
+    expect(response.status).toBe(401);
+    expect(handleQuickShareOperation).not.toHaveBeenCalled();
   });
 
   const operations = [
@@ -128,7 +171,9 @@ describe("POST /api/internal/quick-share", () => {
     async (op) => {
       vi.stubEnv("DATA_BACKEND", "postgres");
       vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
-      getRequestIdentity.mockResolvedValue({ tokenIdentifier: "iss|owner" });
+      identityFromForwardedToken.mockResolvedValue({
+        tokenIdentifier: "iss|owner",
+      });
       handleQuickShareOperation.mockResolvedValue({
         status: 200,
         body: { op },
@@ -138,6 +183,7 @@ describe("POST /api/internal/quick-share", () => {
         new NextRequest("http://localhost/api/internal/quick-share", {
           method: "POST",
           headers: {
+            authorization: "Bearer user-token",
             "content-type": "application/json",
             "x-quick-share-internal-token": "internal-token",
           },
@@ -146,6 +192,7 @@ describe("POST /api/internal/quick-share", () => {
       );
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ op });
+      expect(identityFromForwardedToken).toHaveBeenCalledWith("user-token");
       expect(handleQuickShareOperation).toHaveBeenCalledWith(
         expect.anything(),
         op,
@@ -158,7 +205,6 @@ describe("POST /api/internal/quick-share", () => {
   it.each(operations)("preserves a denial from %s", async (op) => {
     vi.stubEnv("DATA_BACKEND", "postgres");
     vi.stubEnv("QUICK_SHARE_INTERNAL_TOKEN", "internal-token");
-    getRequestIdentity.mockResolvedValue({ tokenIdentifier: null });
     handleQuickShareOperation.mockResolvedValue({
       status: 403,
       body: { error: "Forbidden" },

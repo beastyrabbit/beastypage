@@ -1,7 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getRequestIdentity } from "@/server/auth/identity";
+import {
+  ANONYMOUS,
+  type Identity,
+  identityFromForwardedToken,
+} from "@/server/auth/identity";
 import { dataBackend } from "@/server/backend";
 import { getDb } from "@/server/db/client";
 import { parseJsonBody } from "@/server/request";
@@ -54,13 +58,23 @@ export async function POST(request: NextRequest) {
   if (typeof op !== "string" || op.length === 0)
     return json({ error: "Missing operation" }, 400);
 
+  // With the internal-token header present, Authorization carries the end
+  // user's Clerk token, forwarded by the media service.
+  let identity: Identity = ANONYMOUS;
+  const userToken =
+    receivedHeader && authorization?.startsWith("Bearer ")
+      ? authorization.slice(7).trim()
+      : "";
+  if (userToken) {
+    try {
+      identity = await identityFromForwardedToken(userToken);
+    } catch {
+      return json({ error: "Unauthorized" }, 401);
+    }
+  }
+
   try {
-    const result = await handleQuickShareOperation(
-      getDb(),
-      op,
-      body,
-      await getRequestIdentity(),
-    );
+    const result = await handleQuickShareOperation(getDb(), op, body, identity);
     return json(result.body, result.status);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal error";
